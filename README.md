@@ -22,6 +22,7 @@ apps/
     src/app/           Login, dashboard, courses, course detail/edit
     src/components/    Auth provider, app shell, forms
     src/lib/api.ts     Browser API client
+    public/brand/      Web-ready brand assets used by the UI
 packages/
   activity-sdk/        Activity definition and registry
   config/              Environment validation
@@ -200,6 +201,10 @@ API: http://localhost:3001
 
 - Login, dashboard, courses, course detail, and edit flows are translated in English, French, and Chinese.
 - Locale selection is client-side and persisted in `localStorage`.
+- The header and login page use the Cognara logo from the repo's brand assets, with a cropped web-ready PNG under `apps/web/public/brand/`.
+- The favicon/app icon uses the square Cognara icon asset and is served from `apps/web/src/app/icon.png`.
+- The top navigation separates primary app routes from the account dropdown, which contains language selection and logout.
+- The web theme is aligned to the Cognara brand palette, using teal/blue/violet accents, navy headings, light surfaces, and restrained branded emphasis.
 - Course materials support:
   - GitHub repository links
   - file uploads

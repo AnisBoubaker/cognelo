@@ -36,7 +36,9 @@ const messages: Record<Locale, MessageTree> = {
     nav: {
       dashboard: "Dashboard",
       courses: "Courses",
-      newCourse: "New course"
+      newCourse: "New course",
+      account: "Account",
+      accountMenu: "Open account menu"
     },
     status: {
       draft: "Draft",
@@ -196,7 +198,9 @@ const messages: Record<Locale, MessageTree> = {
     nav: {
       dashboard: "Tableau de bord",
       courses: "Cours",
-      newCourse: "Nouveau cours"
+      newCourse: "Nouveau cours",
+      account: "Compte",
+      accountMenu: "Ouvrir le menu du compte"
     },
     status: {
       draft: "Brouillon",
@@ -356,7 +360,9 @@ const messages: Record<Locale, MessageTree> = {
     nav: {
       dashboard: "仪表盘",
       courses: "课程",
-      newCourse: "新建课程"
+      newCourse: "新建课程",
+      account: "账户",
+      accountMenu: "打开账户菜单"
     },
     status: {
       draft: "草稿",

@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BrandLogo } from "@/components/brand-logo";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { useAuth } from "@/components/auth-provider";
 import { useI18n } from "@/lib/i18n";
@@ -37,8 +38,8 @@ export default function LoginPage() {
             <div style={{ flex: 1 }} />
             <LocaleSwitcher />
           </div>
-          <div>
-            <p className="eyebrow">Cognara</p>
+          <div className="login-brand-block">
+            <BrandLogo priority size="hero" />
             <h1>{t("login.title")}</h1>
             <p className="muted">{t("login.subtitle")}</p>
           </div>
