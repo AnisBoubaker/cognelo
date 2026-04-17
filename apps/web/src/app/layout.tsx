@@ -6,7 +6,12 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Cognara",
-  description: "A modular intelligent tutoring system for programming education."
+  description: "A modular intelligent tutoring system for programming education.",
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png"
+  }
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

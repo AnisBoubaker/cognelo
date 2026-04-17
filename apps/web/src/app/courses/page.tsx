@@ -21,15 +21,15 @@ export default function CoursesPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <div className="row">
-          <div>
+        <section className="hero-panel row hero-actions">
+          <div className="hero-meta">
             <p className="eyebrow">{t("courses.eyebrow")}</p>
             <h1>{t("courses.title")}</h1>
           </div>
           <Link className="button" href="/courses/new">
             {t("courses.create")}
           </Link>
-        </div>
+        </section>
         {error ? <p className="error">{error}</p> : null}
         <section className="grid">
           {courses.map((course) => (

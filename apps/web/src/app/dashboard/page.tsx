@@ -13,10 +13,12 @@ export default function DashboardPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section>
-          <p className="eyebrow">{t("dashboard.eyebrow")}</p>
-          <h1>{t("dashboard.welcome")}{user?.name ? `, ${user.name}` : ""}</h1>
-          <p className="muted">{t("dashboard.roles", { roles })}</p>
+        <section className="hero-panel stack">
+          <div className="hero-meta">
+            <p className="eyebrow">{t("dashboard.eyebrow")}</p>
+            <h1>{t("dashboard.welcome")}{user?.name ? `, ${user.name}` : ""}</h1>
+            <p className="muted">{t("dashboard.roles", { roles })}</p>
+          </div>
         </section>
         <section className="grid">
           <Link className="card" href="/courses">

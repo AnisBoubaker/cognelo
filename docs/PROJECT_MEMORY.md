@@ -11,6 +11,7 @@ Important long-term decisions:
 - Use Prisma/PostgreSQL with normalized tables and JSON fields only for extensible metadata/config.
 - Keep the first version as a modular monorepo, not a microservice split.
 - Favor shared contracts and service-layer logic over duplicating validation in each app.
+- Treat `docs/PROJECT_MEMORY.md` and `README.md` as living project artifacts that must be updated whenever architecture, setup, product behavior, or major implementation capabilities change.
 
 Implemented platform foundations:
 
@@ -40,6 +41,12 @@ Frontend UX decisions currently in place:
   - a floating drag preview
   - valid drop target highlighting
   - a top-level drop zone for moving items back to root
+- Branding uses the project logo from `docs/brand`, with a cropped web-ready asset copied to `apps/web/public/brand/cognara-logo-tight.png`.
+- The web app uses the real Cognara logo in the main header and login screen rather than plain text branding.
+- The app favicon uses `docs/brand/cognara_icon.png`, resized and copied to `apps/web/src/app/icon.png` for Next.js metadata/app-icon handling.
+- The top header separates primary app navigation from personal controls: dashboard/courses/new course stay in primary nav, while language and logout live in an account dropdown anchored by the user identity.
+- The visual theme should reflect the logo palette: bright teal, blue, and violet accents over light neutral surfaces, with the darker navy from the wordmark used for headings and key text.
+- Keep the branding influence subtle and product-like: use restrained gradients, tinted hero panels, and soft shadows rather than loud decorative backgrounds.
 
 Internationalization decisions:
 
