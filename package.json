@@ -1,0 +1,27 @@
+{
+  "name": "cognara",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Modular intelligent tutoring system foundation for programming education.",
+  "packageManager": "npm@10.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "set -a && . ./.env && set +a && npm run dev --workspace @cognara/api & npm run dev:web",
+    "dev:api": "set -a && . ./.env && set +a && npm run dev --workspace @cognara/api",
+    "dev:web": "set -a && . ./.env && set +a && npm run dev --workspace @cognara/web",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run db:generate --workspace @cognara/db",
+    "db:migrate": "npm run db:migrate --workspace @cognara/db",
+    "db:seed": "npm run db:seed --workspace @cognara/db",
+    "db:studio": "npm run db:studio --workspace @cognara/db"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "typescript": "^5.4.5"
+  }
+}

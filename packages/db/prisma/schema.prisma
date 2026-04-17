@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CourseStatus {
+  draft
+  published
+  archived
+}
+
+enum CourseMembershipRole {
+  owner
+  teacher
+  ta
+  student
+}
+
+enum MaterialKind {
+  text
+  markdown
+  pdf
+  link
+  github_repo
+  code_example
+  dataset
+  file
+  module
+}
+
+enum ActivityLifecycle {
+  draft
+  published
+  paused
+  archived
+}
+
+model User {
+  id              String             @id @default(cuid())
+  email           String             @unique
+  name            String?
+  passwordHash    String
+  isActive        Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  roles           UserRole[]
+  courses         CourseMembership[]
+  createdCourses  Course[]           @relation("CourseCreator")
+  materials       CourseMaterial[]   @relation("MaterialCreator")
+  activities      Activity[]         @relation("ActivityCreator")
+
+  @@index([email])
+}
+
+model Role {
+  id          String     @id @default(cuid())
+  key         String     @unique
+  name        String
+  description String?
+  createdAt   DateTime   @default(now())
+  users       UserRole[]
+}
+
+model UserRole {
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model Course {
+  id          String             @id @default(cuid())
+  title       String
+  description String             @default("")
+  status      CourseStatus       @default(draft)
+  createdById String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  createdBy   User               @relation("CourseCreator", fields: [createdById], references: [id])
+  memberships CourseMembership[]
+  materials   CourseMaterial[]
+  activities  Activity[]
+
+  @@index([status])
+  @@index([createdById])
+}
+
+model CourseMembership {
+  id        String               @id @default(cuid())
+  courseId  String
+  userId    String
+  role      CourseMembershipRole
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  course    Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, userId, role])
+  @@index([courseId])
+  @@index([userId])
+}
+
+model CourseMaterial {
+  id          String       @id @default(cuid())
+  courseId    String
+  title       String
+  kind        MaterialKind
+  body        String?
+  url         String?
+  metadata    Json         @default("{}")
+  position    Int          @default(0)
+  createdById String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdBy   User         @relation("MaterialCreator", fields: [createdById], references: [id])
+
+  @@index([courseId, position])
+  @@index([kind])
+}
+
+model ActivityType {
+  id          String     @id @default(cuid())
+  key         String     @unique
+  name        String
+  description String
+  version     String     @default("0.1.0")
+  metadata    Json       @default("{}")
+  isEnabled   Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  activities  Activity[]
+}
+
+model Activity {
+  id             String            @id @default(cuid())
+  courseId       String
+  activityTypeId String
+  title          String
+  description    String            @default("")
+  lifecycle      ActivityLifecycle @default(draft)
+  config         Json              @default("{}")
+  metadata       Json              @default("{}")
+  position       Int               @default(0)
+  createdById    String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  course         Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  activityType   ActivityType      @relation(fields: [activityTypeId], references: [id])
+  createdBy      User              @relation("ActivityCreator", fields: [createdById], references: [id])
+
+  @@index([courseId, position])
+  @@index([activityTypeId])
+  @@index([lifecycle])
+}

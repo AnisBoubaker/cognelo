@@ -1,0 +1,51 @@
+import { prisma } from "@cognara/db";
+import type { CurrentUser } from "@cognara/contracts";
+import { forbidden } from "./errors";
+
+export function isAdmin(user: CurrentUser) {
+  return user.roles.includes("admin");
+}
+
+export function isTeacher(user: CurrentUser) {
+  return user.roles.includes("teacher") || isAdmin(user);
+}
+
+export async function getCourseMembership(userId: string, courseId: string) {
+  return prisma.courseMembership.findMany({
+    where: { userId, courseId }
+  });
+}
+
+export async function assertCanCreateCourse(user: CurrentUser) {
+  if (!isTeacher(user)) {
+    throw forbidden();
+  }
+}
+
+export async function assertCanManageCourse(user: CurrentUser, courseId: string) {
+  if (isAdmin(user)) {
+    return;
+  }
+  const memberships = await getCourseMembership(user.id, courseId);
+  if (memberships.some((membership) => ["owner", "teacher", "ta"].includes(membership.role))) {
+    return;
+  }
+  throw forbidden();
+}
+
+export async function assertCanViewCourse(user: CurrentUser, courseId: string) {
+  if (isAdmin(user)) {
+    return;
+  }
+  if (isTeacher(user)) {
+    const memberships = await getCourseMembership(user.id, courseId);
+    if (memberships.length > 0) {
+      return;
+    }
+  }
+  const memberships = await getCourseMembership(user.id, courseId);
+  if (memberships.length > 0) {
+    return;
+  }
+  throw forbidden();
+}

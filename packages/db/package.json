@@ -1,0 +1,28 @@
+{
+  "name": "@cognara/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "prisma": {
+    "schema": "prisma/schema.prisma",
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.14.0",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "prisma": "^5.14.0",
+    "tsx": "^4.10.5",
+    "typescript": "^5.4.5"
+  },
+  "scripts": {
+    "db:generate": "set -a && . ../../.env && set +a && prisma generate",
+    "db:migrate": "set -a && . ../../.env && set +a && prisma migrate dev",
+    "db:seed": "set -a && . ../../.env && set +a && prisma db seed",
+    "db:studio": "set -a && . ../../.env && set +a && prisma studio",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

@@ -1,0 +1,90 @@
+import { CourseInputSchema, CourseUpdateSchema, EnrollmentInputSchema } from "@cognara/contracts";
+import { prisma } from "@cognara/db";
+import type { CurrentUser } from "@cognara/contracts";
+import { assertCanCreateCourse, assertCanManageCourse, assertCanViewCourse, isAdmin, isTeacher } from "./authorization";
+import { notFound } from "./errors";
+
+const courseInclude = {
+  memberships: { include: { user: { select: { id: true, email: true, name: true } } } },
+  materials: { orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }] },
+  activities: {
+    include: { activityType: true },
+    orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }]
+  }
+};
+
+export async function listCourses(user: CurrentUser) {
+  if (isAdmin(user)) {
+    return prisma.course.findMany({ include: courseInclude, orderBy: { updatedAt: "desc" } });
+  }
+
+  if (isTeacher(user)) {
+    return prisma.course.findMany({
+      where: {
+        OR: [{ createdById: user.id }, { memberships: { some: { userId: user.id } } }]
+      },
+      include: courseInclude,
+      orderBy: { updatedAt: "desc" }
+    });
+  }
+
+  return prisma.course.findMany({
+    where: { memberships: { some: { userId: user.id } } },
+    include: courseInclude,
+    orderBy: { updatedAt: "desc" }
+  });
+}
+
+export async function getCourse(user: CurrentUser, courseId: string) {
+  await assertCanViewCourse(user, courseId);
+  const course = await prisma.course.findUnique({ where: { id: courseId }, include: courseInclude });
+  if (!course) {
+    throw notFound("Course");
+  }
+  return course;
+}
+
+export async function createCourse(user: CurrentUser, input: unknown) {
+  await assertCanCreateCourse(user);
+  const data = CourseInputSchema.parse(input);
+  return prisma.course.create({
+    data: {
+      ...data,
+      createdById: user.id,
+      memberships: {
+        create: {
+          userId: user.id,
+          role: "owner"
+        }
+      }
+    },
+    include: courseInclude
+  });
+}
+
+export async function updateCourse(user: CurrentUser, courseId: string, input: unknown) {
+  await assertCanManageCourse(user, courseId);
+  const data = CourseUpdateSchema.parse(input);
+  return prisma.course.update({
+    where: { id: courseId },
+    data,
+    include: courseInclude
+  });
+}
+
+export async function archiveCourse(user: CurrentUser, courseId: string) {
+  return updateCourse(user, courseId, { status: "archived" });
+}
+
+export async function addCourseMembership(user: CurrentUser, courseId: string, input: unknown) {
+  await assertCanManageCourse(user, courseId);
+  const data = EnrollmentInputSchema.parse(input);
+  return prisma.courseMembership.create({
+    data: {
+      courseId,
+      userId: data.userId,
+      role: data.role
+    },
+    include: { user: { select: { id: true, email: true, name: true } } }
+  });
+}
