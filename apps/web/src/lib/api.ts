@@ -36,6 +36,22 @@ export type ActivityType = {
   description: string;
 };
 
+export type ActivityDefinition = {
+  key: string;
+  name: string;
+  description: string;
+  i18n?: Partial<
+    Record<
+      "en" | "fr" | "zh",
+      {
+        name: string;
+        description: string;
+        defaultTitle?: string;
+      }
+    >
+  >;
+};
+
 export type Activity = {
   id: string;
   title: string;
@@ -85,7 +101,7 @@ export const api = {
       body: JSON.stringify(input)
     }),
   archiveCourse: (courseId: string) => request<{ course: Course }>(`/courses/${courseId}`, { method: "DELETE" }),
-  activityTypes: () => request<{ activityTypes: ActivityType[] }>("/activity-types"),
+  activityTypes: () => request<{ activityTypes: ActivityType[]; registeredDefinitions: ActivityDefinition[] }>("/activity-types"),
   createActivity: (courseId: string, input: ActivityInput) =>
     request<{ activity: Activity }>(`/courses/${courseId}/activities`, {
       method: "POST",
