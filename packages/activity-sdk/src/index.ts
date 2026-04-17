@@ -1,9 +1,18 @@
 import { z } from "zod";
 
+export type PluginLocale = "en" | "fr" | "zh";
+
+export type ActivityMessages = {
+  name: string;
+  description: string;
+  defaultTitle?: string;
+};
+
 export type ActivityDefinition = {
   key: string;
   name: string;
   description: string;
+  i18n?: Partial<Record<PluginLocale, ActivityMessages>>;
   defaultConfig?: Record<string, unknown>;
   configSchema?: z.ZodTypeAny;
   metadataSchema?: z.ZodTypeAny;
@@ -26,10 +35,40 @@ export function listActivityDefinitions() {
   return Array.from(definitions.values());
 }
 
+export function getActivityMessages(definition: ActivityDefinition | undefined, locale: PluginLocale): ActivityMessages | undefined {
+  if (!definition) {
+    return undefined;
+  }
+
+  const localized = definition.i18n?.[locale];
+  return {
+    name: localized?.name ?? definition.name,
+    description: localized?.description ?? definition.description,
+    defaultTitle: localized?.defaultTitle ?? definition.name
+  };
+}
+
 registerActivity({
   key: "placeholder",
   name: "Placeholder activity",
   description: "A generic shell used while a pedagogical activity is being designed.",
+  i18n: {
+    en: {
+      name: "Placeholder activity",
+      description: "A generic shell used while a pedagogical activity is being designed.",
+      defaultTitle: "Placeholder activity"
+    },
+    fr: {
+      name: "Activité provisoire",
+      description: "Une structure générique utilisée pendant la conception d'une activité pédagogique.",
+      defaultTitle: "Activité provisoire"
+    },
+    zh: {
+      name: "占位活动",
+      description: "用于设计教学活动时的通用占位结构。",
+      defaultTitle: "占位活动"
+    }
+  },
   defaultConfig: {}
 });
 
@@ -37,6 +76,23 @@ registerActivity({
   key: "homework-grader",
   name: "Homework grader",
   description: "Future programming assignment submission and grading workflow.",
+  i18n: {
+    en: {
+      name: "Homework grader",
+      description: "Future programming assignment submission and grading workflow.",
+      defaultTitle: "Homework grader"
+    },
+    fr: {
+      name: "Correcteur de devoirs",
+      description: "Flux futur pour la remise et l'évaluation des devoirs de programmation.",
+      defaultTitle: "Correcteur de devoirs"
+    },
+    zh: {
+      name: "作业评分器",
+      description: "未来用于编程作业提交与评分的流程。",
+      defaultTitle: "作业评分器"
+    }
+  },
   defaultConfig: {
     gradingMode: "manual",
     maxAttempts: 3

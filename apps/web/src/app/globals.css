@@ -200,6 +200,24 @@ a:focus-visible {
   gap: 10px;
 }
 
+.locale-switcher {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.locale-switcher span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.locale-switcher select {
+  min-height: 36px;
+  padding: 6px 30px 6px 10px;
+  width: auto;
+}
+
 .section-heading {
   align-items: center;
   display: flex;
