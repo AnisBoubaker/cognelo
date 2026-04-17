@@ -1,4 +1,12 @@
-import type { ActivityInput, CourseInput, CourseMaterialInput, CourseUpdate, CurrentUser } from "@cognara/contracts";
+import type {
+  ActivityInput,
+  CourseInput,
+  CourseMaterialInput,
+  CourseMaterialUpdate,
+  CourseUpdate,
+  CurrentUser,
+  MaterialKind
+} from "@cognara/contracts";
 
 export type Course = {
   id: string;
@@ -13,9 +21,11 @@ export type Course = {
 export type CourseMaterial = {
   id: string;
   title: string;
-  kind: string;
+  kind: MaterialKind;
+  parentId?: string | null;
   body?: string | null;
   url?: string | null;
+  metadata?: Record<string, unknown>;
   position: number;
 };
 
@@ -85,5 +95,38 @@ export const api = {
     request<{ material: CourseMaterial }>(`/courses/${courseId}/materials`, {
       method: "POST",
       body: JSON.stringify(input)
-    })
+    }),
+  updateMaterial: (courseId: string, materialId: string, input: CourseMaterialUpdate) =>
+    request<{ material: CourseMaterial }>(`/courses/${courseId}/materials/${materialId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  deleteMaterial: (courseId: string, materialId: string) =>
+    request<{ ok: true }>(`/courses/${courseId}/materials/${materialId}`, {
+      method: "DELETE"
+    }),
+  uploadMaterial: async (courseId: string, input: { title: string; file: File; parentId?: string | null; position?: number }) => {
+    const formData = new FormData();
+    formData.append("title", input.title);
+    formData.append("file", input.file);
+    if (input.parentId) {
+      formData.append("parentId", input.parentId);
+    }
+    if (input.position !== undefined) {
+      formData.append("position", String(input.position));
+    }
+
+    const response = await fetch(`${API_URL}/api/courses/${courseId}/materials/upload`, {
+      method: "POST",
+      credentials: "include",
+      body: formData
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(body?.error?.message ?? "Upload failed.");
+    }
+    return body as { material: CourseMaterial };
+  },
+  materialDownloadUrl: (courseId: string, materialId: string) =>
+    `${API_URL}/api/courses/${courseId}/materials/${materialId}/download`
 };
