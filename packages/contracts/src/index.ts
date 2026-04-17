@@ -10,6 +10,7 @@ export const CourseMembershipRoleSchema = z.enum(["owner", "teacher", "ta", "stu
 export type CourseMembershipRole = z.infer<typeof CourseMembershipRoleSchema>;
 
 export const MaterialKindSchema = z.enum([
+  "folder",
   "text",
   "markdown",
   "pdf",
@@ -41,17 +42,45 @@ export type CourseInput = z.infer<typeof CourseInputSchema>;
 export const CourseUpdateSchema = CourseInputSchema.partial();
 export type CourseUpdate = z.infer<typeof CourseUpdateSchema>;
 
-export const CourseMaterialInputSchema = z.object({
+const CourseMaterialBaseSchema = z.object({
   title: z.string().min(2).max(180),
   kind: MaterialKindSchema,
+  parentId: z.string().cuid().nullable().optional(),
   body: z.string().max(20000).optional(),
   url: z.string().url().optional(),
   metadata: z.record(z.unknown()).optional().default({}),
   position: z.number().int().min(0).optional().default(0)
 });
+
+function validateCourseMaterialUrl(value: { kind?: MaterialKind; url?: string }, context: z.RefinementCtx) {
+  if (value.kind === "github_repo" && value.url) {
+    const host = new URL(value.url).host.toLowerCase();
+    if (host !== "github.com" && !host.endsWith(".github.com")) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["url"],
+        message: "GitHub repository material must use a github.com URL."
+      });
+    }
+  }
+}
+
+function validateCourseMaterialCreate(value: { kind?: MaterialKind; url?: string }, context: z.RefinementCtx) {
+  if (value.kind && ["link", "github_repo", "pdf"].includes(value.kind) && !value.url) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["url"],
+      message: "A URL is required for this material type."
+    });
+  }
+
+  validateCourseMaterialUrl(value, context);
+}
+
+export const CourseMaterialInputSchema = CourseMaterialBaseSchema.superRefine(validateCourseMaterialCreate);
 export type CourseMaterialInput = z.infer<typeof CourseMaterialInputSchema>;
 
-export const CourseMaterialUpdateSchema = CourseMaterialInputSchema.partial();
+export const CourseMaterialUpdateSchema = CourseMaterialBaseSchema.partial().superRefine(validateCourseMaterialUrl);
 export type CourseMaterialUpdate = z.infer<typeof CourseMaterialUpdateSchema>;
 
 export const ActivityInputSchema = z.object({

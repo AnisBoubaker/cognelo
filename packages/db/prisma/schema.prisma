@@ -21,6 +21,7 @@ enum CourseMembershipRole {
 }
 
 enum MaterialKind {
+  folder
   text
   markdown
   pdf
@@ -111,6 +112,7 @@ model CourseMembership {
 model CourseMaterial {
   id          String       @id @default(cuid())
   courseId    String
+  parentId    String?
   title       String
   kind        MaterialKind
   body        String?
@@ -122,8 +124,11 @@ model CourseMaterial {
   updatedAt   DateTime     @updatedAt
   course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
   createdBy   User         @relation("MaterialCreator", fields: [createdById], references: [id])
+  parent      CourseMaterial?  @relation("MaterialTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    CourseMaterial[] @relation("MaterialTree")
 
   @@index([courseId, position])
+  @@index([courseId, parentId, position])
   @@index([kind])
 }
 
