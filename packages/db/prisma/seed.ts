@@ -70,6 +70,22 @@ async function main() {
     }
   });
 
+  const parsonsType = await prisma.activityType.upsert({
+    where: { key: "parsons-problem" },
+    update: {
+      name: "Parsons problem",
+      description: "Reorder scrambled code blocks and optionally restore indentation to rebuild a working program.",
+      metadata: { researchReady: true, pedagogy: "parsons" },
+      isEnabled: true
+    },
+    create: {
+      key: "parsons-problem",
+      name: "Parsons problem",
+      description: "Reorder scrambled code blocks and optionally restore indentation to rebuild a working program.",
+      metadata: { researchReady: true, pedagogy: "parsons" }
+    }
+  });
+
   const course = await prisma.course.upsert({
     where: { id: "seed-course-programming-101" },
     update: {
@@ -143,6 +159,48 @@ async function main() {
       lifecycle: "published",
       config: {},
       metadata: { researchTags: ["onboarding"], instrumented: false },
+      createdById: teacher.id
+    }
+  });
+
+  await prisma.activity.upsert({
+    where: { id: "seed-activity-parsons" },
+    update: {
+      title: "Loop over a list",
+      description: "Put the code in order so it prints each name on its own line.",
+      lifecycle: "published",
+      config: {
+        prompt: "Rebuild the Python program so it loops over the list and prints each name.",
+        solution: [
+          "names = ['Ada', 'Linus', 'Grace']",
+          "",
+          "for name in names:",
+          "    print(name)"
+        ].join("\n"),
+        language: "python",
+        stripIndentation: true
+      },
+      metadata: { researchTags: ["parsons", "loops"], instrumented: false }
+    },
+    create: {
+      id: "seed-activity-parsons",
+      courseId: course.id,
+      activityTypeId: parsonsType.id,
+      title: "Loop over a list",
+      description: "Put the code in order so it prints each name on its own line.",
+      lifecycle: "published",
+      config: {
+        prompt: "Rebuild the Python program so it loops over the list and prints each name.",
+        solution: [
+          "names = ['Ada', 'Linus', 'Grace']",
+          "",
+          "for name in names:",
+          "    print(name)"
+        ].join("\n"),
+        language: "python",
+        stripIndentation: true
+      },
+      metadata: { researchTags: ["parsons", "loops"], instrumented: false },
       createdById: teacher.id
     }
   });

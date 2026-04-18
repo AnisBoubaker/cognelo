@@ -67,6 +67,7 @@ GET    /api/courses/:courseId/materials/:materialId/download
 GET    /api/activity-types
 GET    /api/courses/:courseId/activities
 POST   /api/courses/:courseId/activities
+GET    /api/courses/:courseId/activities/:activityId
 PATCH  /api/courses/:courseId/activities/:activityId
 DELETE /api/courses/:courseId/activities/:activityId
 ```
@@ -110,7 +111,7 @@ teacher@cognara.local
 student@cognara.local
 ```
 
-The seed also creates a sample Programming 101 course, starter material, a placeholder activity, and a future homework-grader activity type.
+The seed also creates a sample Programming 101 course, starter material, a placeholder activity, and a sample Parsons problem activity.
 
 ## Example API Usage
 
@@ -212,6 +213,12 @@ API: http://localhost:3001
   - inline edit/remove
   - expand/collapse
   - pointer-based drag and drop with destination highlighting
+- Activities now include a first real plugin implementation:
+  - `parsons-problem`
+  - teacher authoring for prompt, reference solution, language, and indentation mode
+  - student workspace for reordering code blocks and, optionally, restoring indentation
+  - compact editor-style line rendering with syntax coloring and line numbers
+- activities can also be removed from the course detail page by course managers
 
 ## Plugin i18n
 
@@ -234,3 +241,24 @@ For a new `homework-grader` implementation, add a package such as `packages/acti
 The core course model does not change. The frontend can add an editor/renderer keyed by `activity.activityType.key`, while backend services can delegate grading/submission behavior to the registered activity module.
 
 When the plugin needs localized copy, define `i18n` on the activity definition so the core UI can render translated names, descriptions, and default titles without special-case code.
+
+## Parsons Problem
+
+The first real pedagogical activity is `parsons-problem`.
+
+Its current implementation includes:
+
+- teacher setup fields for title, description, prompt, language, and reference solution
+- automatic generation of scrambled code blocks from the reference solution
+- an option to strip indentation from the student version so learners must restore both order and indentation
+- a student-facing workspace for reordering blocks and adjusting indentation
+
+Current MVP limitation:
+
+- student attempts are not yet persisted to the database; the activity currently focuses on authoring and interactive solving in the browser
+
+Shared frontend note:
+
+- syntax-colored code display is now implemented as a shared web component so future programming activities can reuse the same renderer instead of rolling their own
+- supported code-display languages are exposed through a shared dropdown/list so authoring UIs can stay aligned with what the renderer can actually highlight
+- a lightweight shared code editor is available for authoring code with syntax coloring and line numbers

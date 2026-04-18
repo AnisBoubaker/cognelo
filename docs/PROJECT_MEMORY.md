@@ -19,6 +19,8 @@ Implemented platform foundations:
 - Global authorization supports many-to-many user roles (`admin`, `teacher`, `student`) and is designed for more roles later.
 - Courses support create, edit, archive, and draft/published/archived status.
 - Activities are attachable to courses through a plugin-style registry and are not hardcoded into the course model.
+- The first real pedagogical plugin is `parsons-problem`.
+- Course managers can remove activities directly from the course detail page.
 
 Course material decisions:
 
@@ -47,6 +49,9 @@ Frontend UX decisions currently in place:
 - The top header separates primary app navigation from personal controls: dashboard/courses/new course stay in primary nav, while language and logout live in an account dropdown anchored by the user identity.
 - The visual theme should reflect the logo palette: bright teal, blue, and violet accents over light neutral surfaces, with the darker navy from the wordmark used for headings and key text.
 - Keep the branding influence subtle and product-like: use restrained gradients, tinted hero panels, and soft shadows rather than loud decorative backgrounds.
+- Syntax-colored code rendering should be shared across activities. The web app now has a reusable code renderer component for line-numbered, syntax-highlighted code displays.
+- When an activity lets teachers choose a programming language for display/highlighting, prefer a shared dropdown backed by the renderer's supported-language list instead of free-text language entry.
+- The web app also has a lightweight shared code editor component for authoring code with syntax coloring and line numbers; Parsons reference solutions should use it instead of a plain textarea.
 
 Internationalization decisions:
 
@@ -55,6 +60,21 @@ Internationalization decisions:
 - Visible UI copy is translated across login, navigation, dashboard, course flows, materials UI, and activity management UI.
 - Plugin/activity definitions can provide localized `name`, `description`, and `defaultTitle` through the activity registry.
 - The course detail page resolves plugin-localized activity labels from registry definitions instead of relying only on database display names.
+
+Activity/plugin notes:
+
+- `parsons-problem` is configured through activity `config`, not special database columns.
+- Current Parsons config includes:
+  - `prompt`
+  - `solution`
+  - `language`
+  - `stripIndentation`
+- The student workspace currently supports block reordering plus indentation adjustment when `stripIndentation` is enabled.
+- Parsons student rendering uses a compact editor-like row layout with shared syntax highlighting and line numbers.
+- Parsons lines can be activated by click/toggle and then manipulated with keyboard arrow keys: up/down reorder, left/right adjust indentation when indentation mode is enabled.
+- Scrambled Parsons blocks are generated from the teacher-authored solution rather than stored separately.
+- Parsons scrambling should be random on each fresh try/reset rather than fixed per activity.
+- Current Parsons attempts are interactive in the browser only and are not yet persisted as submissions/attempt records.
 
 Known MVP constraints to remember:
 
@@ -67,6 +87,7 @@ Verification habits that have been used successfully:
 - Use `npm run typecheck --workspace @cognara/web` for frontend changes.
 - Use `npm run build --workspace @cognara/web` to confirm the Next.js app still produces a valid production build.
 - Use `npm run db:generate` after Prisma schema changes.
+- Use root `npm run typecheck` and `npm run build` when activity changes touch shared packages plus both apps.
 
 - Seed users:
   - `admin@cognara.local` / `Password123!`

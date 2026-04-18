@@ -103,3 +103,40 @@ registerActivity({
     repositoryTemplateUrl: z.string().url().optional()
   })
 });
+
+const parsonsConfigSchema = z.object({
+  prompt: z.string().min(10).max(6000),
+  solution: z.string().min(2).max(20000),
+  language: z.string().min(1).max(40).default("python"),
+  stripIndentation: z.boolean().default(false)
+});
+
+registerActivity({
+  key: "parsons-problem",
+  name: "Parsons problem",
+  description: "Reorder scrambled code blocks and optionally restore indentation to rebuild a working program.",
+  i18n: {
+    en: {
+      name: "Parsons problem",
+      description: "Reorder scrambled code blocks and optionally restore indentation to rebuild a working program.",
+      defaultTitle: "Parsons problem"
+    },
+    fr: {
+      name: "Problème de Parsons",
+      description: "Réorganisez des blocs de code mélangés et, si nécessaire, restaurez l'indentation pour reconstruire un programme correct.",
+      defaultTitle: "Problème de Parsons"
+    },
+    zh: {
+      name: "Parsons 题",
+      description: "重新排列被打乱的代码块，并在需要时恢复缩进，以重建正确程序。",
+      defaultTitle: "Parsons 题"
+    }
+  },
+  defaultConfig: {
+    prompt: "Rebuild the program in the correct order.",
+    solution: "print('Hello, Parsons!')",
+    language: "python",
+    stripIndentation: false
+  },
+  configSchema: parsonsConfigSchema
+});
