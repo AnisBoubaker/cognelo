@@ -216,6 +216,8 @@ API: http://localhost:3001
 - Activities now include a first real plugin implementation:
   - `parsons-problem`
   - teacher authoring for prompt, reference solution, language, and indentation mode
+  - teacher-defined grouping directly from the reference editor gutter, with visible group boxes beside the code
+  - precedence rules between groups for “A must come before B” constraints
   - student workspace for reordering code blocks and, optionally, restoring indentation
   - compact editor-style line rendering with syntax coloring and line numbers
 - activities can also be removed from the course detail page by course managers
@@ -249,9 +251,15 @@ The first real pedagogical activity is `parsons-problem`.
 Its current implementation includes:
 
 - teacher setup fields for title, description, prompt, language, and reference solution
+- teacher-defined groups created by selecting lines in the reference editor gutter
+- visible group boxes aligned beside the editor so teachers can click a group and mark it as fixed-order or flexible
+- precedence rules between groups, expressed as arrows from one group to another
+- group ranges rebased when the teacher edits the solution, so inserted lines inside a group stay with that group
 - automatic generation of scrambled code blocks from the reference solution
 - an option to strip indentation from the student version so learners must restore both order and indentation
 - a student-facing workspace for reordering blocks and adjusting indentation
+- evaluation that accepts any permutation inside flexible groups while still enforcing the configured structure
+- order feedback that counts minimally misplaced units, so a small mistake does not look like the whole board is wrong
 
 Current MVP limitation:
 
@@ -262,3 +270,4 @@ Shared frontend note:
 - syntax-colored code display is now implemented as a shared web component so future programming activities can reuse the same renderer instead of rolling their own
 - supported code-display languages are exposed through a shared dropdown/list so authoring UIs can stay aligned with what the renderer can actually highlight
 - a lightweight shared code editor is available for authoring code with syntax coloring and line numbers
+- the shared code editor grows vertically with its content so longer authoring tasks stay visible without manual resizing
