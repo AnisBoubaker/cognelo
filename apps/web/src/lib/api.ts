@@ -1,5 +1,6 @@
 import type {
   ActivityInput,
+  ActivityUpdate,
   CourseInput,
   CourseMaterialInput,
   CourseMaterialUpdate,
@@ -57,6 +58,8 @@ export type Activity = {
   title: string;
   description: string;
   lifecycle: string;
+  config?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   activityType: ActivityType;
   position: number;
 };
@@ -65,6 +68,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}/api${path}`, {
+    cache: "no-store",
     ...init,
     credentials: "include",
     headers: {
@@ -102,10 +106,21 @@ export const api = {
     }),
   archiveCourse: (courseId: string) => request<{ course: Course }>(`/courses/${courseId}`, { method: "DELETE" }),
   activityTypes: () => request<{ activityTypes: ActivityType[]; registeredDefinitions: ActivityDefinition[] }>("/activity-types"),
+  activity: (courseId: string, activityId: string) =>
+    request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}`),
   createActivity: (courseId: string, input: ActivityInput) =>
     request<{ activity: Activity }>(`/courses/${courseId}/activities`, {
       method: "POST",
       body: JSON.stringify(input)
+    }),
+  updateActivity: (courseId: string, activityId: string, input: ActivityUpdate) =>
+    request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  deleteActivity: (courseId: string, activityId: string) =>
+    request<{ ok: true }>(`/courses/${courseId}/activities/${activityId}`, {
+      method: "DELETE"
     }),
   createMaterial: (courseId: string, input: CourseMaterialInput) =>
     request<{ material: CourseMaterial }>(`/courses/${courseId}/materials`, {
@@ -133,6 +148,7 @@ export const api = {
     }
 
     const response = await fetch(`${API_URL}/api/courses/${courseId}/materials/upload`, {
+      cache: "no-store",
       method: "POST",
       credentials: "include",
       body: formData

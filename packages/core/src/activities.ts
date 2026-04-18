@@ -13,6 +13,18 @@ export function listRegisteredActivityDefinitions() {
   return listActivityDefinitions();
 }
 
+export async function getActivity(user: CurrentUser, courseId: string, activityId: string) {
+  await assertCanViewCourse(user, courseId);
+  const activity = await prisma.activity.findFirst({
+    where: { id: activityId, courseId },
+    include: { activityType: true }
+  });
+  if (!activity) {
+    throw notFound("Activity");
+  }
+  return activity;
+}
+
 export async function listActivities(user: CurrentUser, courseId: string) {
   await assertCanViewCourse(user, courseId);
   return prisma.activity.findMany({
@@ -33,8 +45,9 @@ export async function createActivity(user: CurrentUser, courseId: string, input:
   }
 
   const definition = getActivityDefinition(data.activityTypeKey);
+  const mergedConfig = { ...(definition?.defaultConfig ?? {}), ...data.config };
   if (definition?.configSchema) {
-    definition.configSchema.parse(data.config);
+    definition.configSchema.parse(mergedConfig);
   }
   if (definition?.metadataSchema) {
     definition.metadataSchema.parse(data.metadata);
@@ -47,7 +60,7 @@ export async function createActivity(user: CurrentUser, courseId: string, input:
       title: data.title,
       description: data.description,
       lifecycle: data.lifecycle,
-      config: { ...(definition?.defaultConfig ?? {}), ...data.config } as Prisma.InputJsonValue,
+      config: mergedConfig as Prisma.InputJsonValue,
       metadata: data.metadata as Prisma.InputJsonValue,
       position: data.position,
       createdById: user.id
@@ -68,8 +81,15 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
   }
 
   const definition = getActivityDefinition(data.activityTypeKey ?? activity.activityType.key);
-  if (definition?.configSchema && data.config) {
-    definition.configSchema.parse(data.config);
+  const mergedConfig =
+    data.config !== undefined
+      ? ({
+          ...((activity.config as Record<string, unknown> | null) ?? {}),
+          ...data.config
+        } as Record<string, unknown>)
+      : undefined;
+  if (definition?.configSchema && mergedConfig) {
+    definition.configSchema.parse(mergedConfig);
   }
 
   const activityTypeId = data.activityTypeKey
@@ -83,7 +103,7 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
       title: data.title,
       description: data.description,
       lifecycle: data.lifecycle,
-      config: data.config as Prisma.InputJsonValue | undefined,
+      config: mergedConfig as Prisma.InputJsonValue | undefined,
       metadata: data.metadata as Prisma.InputJsonValue | undefined,
       position: data.position
     },

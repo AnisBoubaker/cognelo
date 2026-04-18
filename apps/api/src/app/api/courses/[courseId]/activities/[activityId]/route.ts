@@ -1,11 +1,21 @@
 import { NextRequest } from "next/server";
-import { deleteActivity, updateActivity } from "@cognara/core";
+import { deleteActivity, getActivity, updateActivity } from "@cognara/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; activityId: string }> };
 
+export const dynamic = "force-dynamic";
+
 export function OPTIONS() {
   return options();
+}
+
+export async function GET(_request: NextRequest, { params }: Params) {
+  return handleRoute(async () => {
+    const user = await requireUser();
+    const { courseId, activityId } = await params;
+    return json({ activity: await getActivity(user, courseId, activityId) });
+  });
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {

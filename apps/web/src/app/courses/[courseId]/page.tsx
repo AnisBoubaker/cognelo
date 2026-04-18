@@ -65,6 +65,21 @@ export default function CourseDetailPage() {
     }
   }
 
+  async function removeActivity(activity: NonNullable<Course["activities"]>[number]) {
+    const confirmed = window.confirm(t("courseDetail.removeActivityConfirm", { title: activity.title }));
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+    try {
+      await api.deleteActivity(courseId, activity.id);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.removeActivityError"));
+    }
+  }
+
   async function createCourseMaterial(event: FormEvent) {
     event.preventDefault();
     setMaterialError("");
@@ -364,11 +379,21 @@ export default function CourseDetailPage() {
                   course.activities.map((activity) => (
                     <article className="card" key={activity.id}>
                       <span className="eyebrow">{activityCopy(activity.activityType.key).name}</span>
-                      <h3>{activity.title}</h3>
+                      <h3>
+                        <Link href={`/courses/${course.id}/activities/${activity.id}`}>{activity.title}</Link>
+                      </h3>
                       <p className="muted">
                         {activityCopy(activity.activityType.key).description || t(`activityLifecycle.${activity.lifecycle}`)}
                       </p>
                       <p className="muted">{t(`activityLifecycle.${activity.lifecycle}`)}</p>
+                      <div className="row">
+                        <Link className="button secondary" href={`/courses/${course.id}/activities/${activity.id}`}>
+                          {t("courseDetail.openActivity")}
+                        </Link>
+                        <button className="danger" type="button" onClick={() => removeActivity(activity)}>
+                          {t("courseDetail.removeActivity")}
+                        </button>
+                      </div>
                     </article>
                   ))
                 ) : (
