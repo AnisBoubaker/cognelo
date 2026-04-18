@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyboardEvent, useEffect, useRef } from "react";
+import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
 import { CodeRenderer } from "@/components/code-renderer";
 
 type CodeEditorProps = {
@@ -9,11 +9,26 @@ type CodeEditorProps = {
   language?: string;
   id?: string;
   minHeight?: number;
+  leftRail?: ReactNode;
+  rightRail?: ReactNode;
+  leftRailWidth?: number;
+  rightRailWidth?: number;
 };
 
-export function CodeEditor({ value, onChange, language = "text", id, minHeight = 220 }: CodeEditorProps) {
+export function CodeEditor({
+  value,
+  onChange,
+  language = "text",
+  id,
+  minHeight = 220,
+  leftRail,
+  rightRail,
+  leftRailWidth = 0,
+  rightRailWidth = 0
+}: CodeEditorProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -31,6 +46,21 @@ export function CodeEditor({ value, onChange, language = "text", id, minHeight =
     textarea.addEventListener("scroll", syncScroll, { passive: true });
     return () => textarea.removeEventListener("scroll", syncScroll);
   }, []);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    const overlay = overlayRef.current;
+    const container = containerRef.current;
+    if (!container || !textarea || !overlay) {
+      return;
+    }
+
+    textarea.style.height = "0px";
+    const nextHeight = `${Math.max(minHeight, textarea.scrollHeight)}px`;
+    textarea.style.height = nextHeight;
+    overlay.style.height = nextHeight;
+    container.style.height = nextHeight;
+  }, [minHeight, value]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== "Tab") {
@@ -116,9 +146,21 @@ export function CodeEditor({ value, onChange, language = "text", id, minHeight =
   }
 
   return (
-    <div className="code-editor" style={{ minHeight: `${minHeight}px` }}>
+    <div
+      ref={containerRef}
+      className="code-editor"
+      style={
+        {
+          minHeight: `${minHeight}px`,
+          "--code-editor-left-rail": `${leftRailWidth}px`,
+          "--code-editor-right-rail": `${rightRailWidth}px`
+        } as CSSProperties
+      }
+    >
       <div aria-hidden="true" className="code-editor-overlay" ref={overlayRef}>
+        {leftRail ? <div className="code-editor-rail code-editor-rail-left">{leftRail}</div> : null}
         <CodeRenderer code={value || " "} language={language} showLineNumbers />
+        {rightRail ? <div className="code-editor-rail code-editor-rail-right">{rightRail}</div> : null}
       </div>
       <textarea
         id={id}

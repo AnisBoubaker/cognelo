@@ -10,10 +10,18 @@ import { CodeRenderer, codeLanguageOptions, normalizeCodeLanguage } from "@/comp
 import { api, Activity, Course } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import {
+  createParsonsGroup,
+  createParsonsPrecedenceRule,
   evaluateParsonsSolution,
+  getSolutionLines,
   parseParsonsConfig,
+  rebaseParsonsGroupsOnSolutionChange,
+  removeParsonsGroup,
+  removeParsonsGroupDependencies,
   resetParsonsBlocks,
-  type ParsonsBlock
+  type ParsonsBlock,
+  type ParsonsGroup,
+  type ParsonsPrecedenceRule
 } from "@/lib/parsons";
 
 export default function ActivityPage() {
@@ -29,6 +37,11 @@ export default function ActivityPage() {
   const [solution, setSolution] = useState("");
   const [language, setLanguage] = useState("python");
   const [stripIndentation, setStripIndentation] = useState(false);
+  const [groups, setGroups] = useState<ParsonsGroup[]>([]);
+  const [precedenceRules, setPrecedenceRules] = useState<ParsonsPrecedenceRule[]>([]);
+  const [selectedLines, setSelectedLines] = useState<number[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [precedenceDraft, setPrecedenceDraft] = useState<{ beforeGroupId: string; afterGroupId: string } | null>(null);
   const [blocks, setBlocks] = useState<ParsonsBlock[]>([]);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState("");
@@ -38,6 +51,7 @@ export default function ActivityPage() {
 
   const canManage = user?.roles.includes("admin") || user?.roles.includes("teacher");
   const isParsonsProblem = activity?.activityType.key === "parsons-problem";
+  const solutionLines = getSolutionLines(solution);
 
   async function refresh() {
     const [courseResult, activityResult] = await Promise.all([api.course(courseId), api.activity(courseId, activityId)]);
@@ -52,6 +66,11 @@ export default function ActivityPage() {
     setSolution(nextConfig.solution);
     setLanguage(normalizeCodeLanguage(nextConfig.language));
     setStripIndentation(nextConfig.stripIndentation);
+    setGroups(nextConfig.groups);
+    setPrecedenceRules(nextConfig.precedenceRules);
+    setSelectedLines([]);
+    setSelectedGroupId(null);
+    setPrecedenceDraft(null);
     setBlocks(resetParsonsBlocks(nextConfig));
     setSelectedBlockId(null);
   }
@@ -59,6 +78,12 @@ export default function ActivityPage() {
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("activityPage.loadError")));
   }, [activityId, courseId, t]);
+
+  useEffect(() => {
+    if (selectedGroupId && !groups.some((group) => group.id === selectedGroupId)) {
+      setSelectedGroupId(null);
+    }
+  }, [groups, selectedGroupId]);
 
   async function saveParsonsProblem(event: FormEvent) {
     event.preventDefault();
@@ -77,11 +102,16 @@ export default function ActivityPage() {
           prompt,
           solution,
           language,
-          stripIndentation
+          stripIndentation,
+          groups,
+          precedenceRules
         }
       });
+      const savedConfig = parseParsonsConfig(result.activity.config);
       setActivity(result.activity);
-      setBlocks(resetParsonsBlocks(parseParsonsConfig(result.activity.config)));
+      setGroups(savedConfig.groups);
+      setPrecedenceRules(savedConfig.precedenceRules);
+      setBlocks(resetParsonsBlocks(savedConfig));
       setSelectedBlockId(null);
       setSaveMessage(t("parsons.saved"));
     } catch (err) {
@@ -146,7 +176,7 @@ export default function ActivityPage() {
   }
 
   function checkSolution() {
-    const result = evaluateParsonsSolution(blocks);
+    const result = evaluateParsonsSolution(blocks, parseParsonsConfig(activity?.config));
     if (result.isCorrect) {
       setFeedback(t("parsons.correct"));
       return;
@@ -160,6 +190,84 @@ export default function ActivityPage() {
       parts.push(t("parsons.indentFeedback", { count: result.incorrectIndents }));
     }
     setFeedback(parts.join(" "));
+  }
+
+  function toggleSelectedLine(lineIndex: number) {
+    setSelectedLines((current) =>
+      current.includes(lineIndex) ? current.filter((value) => value !== lineIndex) : [...current, lineIndex].sort((left, right) => left - right)
+    );
+  }
+
+  function handleSolutionChange(nextSolution: string) {
+    setGroups((current) => rebaseParsonsGroupsOnSolutionChange(solution, nextSolution, current));
+    setSolution(nextSolution);
+  }
+
+  function createGroupFromSelection() {
+    const nextGroup = createParsonsGroup(selectedLines, solutionLines.length);
+    if (!nextGroup) {
+      setError(t("parsons.groupSelectionError"));
+      return;
+    }
+    if (groups.some((group) => !(nextGroup.endLine < group.startLine || nextGroup.startLine > group.endLine))) {
+      setError(t("parsons.groupOverlapError"));
+      return;
+    }
+
+    setGroups((current) => [...current, { ...nextGroup, label: t("parsons.newGroupLabel", { count: current.length + 1 }) }]);
+    setSelectedGroupId(nextGroup.id);
+    setSelectedLines([]);
+    setError("");
+  }
+
+  function updateGroup(groupId: string, patch: Partial<ParsonsGroup>) {
+    setGroups((current) => current.map((group) => (group.id === groupId ? { ...group, ...patch } : group)));
+  }
+
+  function deleteGroup(groupId: string) {
+    setGroups((current) => removeParsonsGroup(current, groupId));
+    setPrecedenceRules((current) => removeParsonsGroupDependencies(current, groupId));
+    setSelectedGroupId((current) => (current === groupId ? null : current));
+    setPrecedenceDraft((current) =>
+      current && (current.beforeGroupId === groupId || current.afterGroupId === groupId) ? null : current
+    );
+  }
+
+  function startPrecedenceRule() {
+    if (groups.length < 2) {
+      return;
+    }
+    setPrecedenceDraft({
+      beforeGroupId: groups[0]?.id ?? "",
+      afterGroupId: groups[1]?.id ?? groups[0]?.id ?? ""
+    });
+  }
+
+  function savePrecedenceRule() {
+    if (!precedenceDraft || !precedenceDraft.beforeGroupId || !precedenceDraft.afterGroupId) {
+      return;
+    }
+    if (precedenceDraft.beforeGroupId === precedenceDraft.afterGroupId) {
+      setError(t("parsons.precedenceSelectionError"));
+      return;
+    }
+
+    setPrecedenceRules((current) => [
+      ...current.filter(
+        (rule) =>
+          !(
+            rule.beforeGroupId === precedenceDraft.beforeGroupId &&
+            rule.afterGroupId === precedenceDraft.afterGroupId
+          )
+      ),
+      createParsonsPrecedenceRule(precedenceDraft.beforeGroupId, precedenceDraft.afterGroupId)
+    ]);
+    setPrecedenceDraft(null);
+    setError("");
+  }
+
+  function deletePrecedenceRule(ruleId: string) {
+    setPrecedenceRules((current) => current.filter((rule) => rule.id !== ruleId));
   }
 
   useEffect(() => {
@@ -246,9 +354,13 @@ export default function ActivityPage() {
                     <CodeEditor
                       id="parsons-solution"
                       language={language}
+                      leftRail={renderSelectionRail(solutionLines, groups, selectedLines, toggleSelectedLine, t)}
+                      leftRailWidth={26}
                       minHeight={260}
+                      onChange={handleSolutionChange}
+                      rightRail={renderGroupRail(solutionLines, groups, selectedGroupId, setSelectedGroupId)}
+                      rightRailWidth={180}
                       value={solution}
-                      onChange={setSolution}
                     />
                   </div>
                   <div className="split parsons-authoring-grid">
@@ -271,6 +383,142 @@ export default function ActivityPage() {
                       <span>{t("parsons.stripIndentation")}</span>
                     </label>
                   </div>
+                  <section className="inline-panel stack">
+                    <div className="row wrap parsons-group-toolbar">
+                      <div className="stack stack-tight">
+                        <p className="eyebrow">{t("parsons.groupsEyebrow")}</p>
+                        <h3>{t("parsons.groupsTitle")}</h3>
+                        <p className="muted">{t("parsons.groupsText")}</p>
+                      </div>
+                      <div className="row wrap">
+                        <button className="secondary" type="button" onClick={createGroupFromSelection}>
+                          {t("parsons.createGroup")}
+                        </button>
+                        <button className="secondary" disabled={groups.length < 2} type="button" onClick={startPrecedenceRule}>
+                          {t("parsons.addPrecedence")}
+                        </button>
+                      </div>
+                    </div>
+
+                    {selectedGroupId ? (
+                      <div className="parsons-group-card">
+                        {groups
+                          .filter((group) => group.id === selectedGroupId)
+                          .map((group) => (
+                            <div className="stack" key={group.id}>
+                              <div className="field">
+                                <label htmlFor={`parsons-group-${group.id}`}>{t("parsons.groupLabel")}</label>
+                                <input
+                                  id={`parsons-group-${group.id}`}
+                                  required
+                                  value={group.label}
+                                  onChange={(event) => updateGroup(group.id, { label: event.target.value })}
+                                />
+                              </div>
+                              <label className="checkbox-row">
+                                <input
+                                  checked={!group.orderSensitive}
+                                  type="checkbox"
+                                  onChange={(event) => updateGroup(group.id, { orderSensitive: !event.target.checked })}
+                                />
+                                <span>{t("parsons.groupFlexible")}</span>
+                              </label>
+                              <div className="row wrap">
+                                <button className="secondary" type="button" onClick={() => deleteGroup(group.id)}>
+                                  {t("parsons.deleteGroup")}
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <p className="muted">{t("parsons.groupSelectionHint")}</p>
+                    )}
+
+                    <div className="stack">
+                      <h3>{t("parsons.precedenceTitle")}</h3>
+                      <p className="muted">{t("parsons.precedenceText")}</p>
+                      {precedenceDraft ? (
+                        <div className="parsons-precedence-editor">
+                          <div className="field">
+                            <label htmlFor="parsons-precedence-before">{t("parsons.precedenceBefore")}</label>
+                            <select
+                              id="parsons-precedence-before"
+                              value={precedenceDraft.beforeGroupId}
+                              onChange={(event) =>
+                                setPrecedenceDraft((current) =>
+                                  current ? { ...current, beforeGroupId: event.target.value } : current
+                                )
+                              }
+                            >
+                              {groups.map((group) => (
+                                <option key={group.id} value={group.id}>
+                                  {group.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <span className="parsons-precedence-arrow" aria-hidden="true">
+                            →
+                          </span>
+                          <div className="field">
+                            <label htmlFor="parsons-precedence-after">{t("parsons.precedenceAfter")}</label>
+                            <select
+                              id="parsons-precedence-after"
+                              value={precedenceDraft.afterGroupId}
+                              onChange={(event) =>
+                                setPrecedenceDraft((current) =>
+                                  current ? { ...current, afterGroupId: event.target.value } : current
+                                )
+                              }
+                            >
+                              {groups.map((group) => (
+                                <option key={group.id} value={group.id}>
+                                  {group.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="row wrap">
+                            <button type="button" onClick={savePrecedenceRule}>
+                              {t("common.save")}
+                            </button>
+                            <button className="secondary" type="button" onClick={() => setPrecedenceDraft(null)}>
+                              {t("common.cancel")}
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {precedenceRules.length > 0 ? (
+                        <div className="parsons-precedence-list">
+                          {precedenceRules.map((rule) => {
+                            const beforeLabel = groups.find((group) => group.id === rule.beforeGroupId)?.label ?? rule.beforeGroupId;
+                            const afterLabel = groups.find((group) => group.id === rule.afterGroupId)?.label ?? rule.afterGroupId;
+                            return (
+                              <div className="parsons-precedence-item" key={rule.id}>
+                                <span>{beforeLabel}</span>
+                                <span className="parsons-precedence-arrow" aria-hidden="true">
+                                  →
+                                </span>
+                                <span>{afterLabel}</span>
+                                <button
+                                  className="secondary icon-button"
+                                  title={t("parsons.deletePrecedence")}
+                                  type="button"
+                                  onClick={() => deletePrecedenceRule(rule.id)}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="muted">{t("parsons.noPrecedenceRules")}</p>
+                      )}
+                    </div>
+                  </section>
                   <div className="row">
                     <button disabled={saving} type="submit">
                       {saving ? t("common.saving") : t("common.save")}
@@ -416,5 +664,62 @@ function ParsonsControlIcon({ direction }: { direction: "up" | "down" | "left" |
         strokeWidth="1.8"
       />
     </svg>
+  );
+}
+
+function renderSelectionRail(
+  solutionLines: string[],
+  groups: ParsonsGroup[],
+  selectedLines: number[],
+  toggleSelectedLine: (lineIndex: number) => void,
+  t: (key: string, vars?: Record<string, string | number>) => string
+) {
+  return (
+    <div className="parsons-editor-rail parsons-editor-selection-rail">
+      {solutionLines.map((line, lineIndex) => {
+        const inGroup = groups.some((group) => lineIndex >= group.startLine && lineIndex <= group.endLine);
+        const selected = selectedLines.includes(lineIndex);
+        return (
+          <button
+            aria-label={t("parsons.selectLine", { line: lineIndex + 1 })}
+            className={`parsons-line-marker ${selected ? "is-selected" : ""} ${inGroup ? "is-grouped" : ""}`}
+            key={`marker-${lineIndex}`}
+            type="button"
+            onClick={() => toggleSelectedLine(lineIndex)}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function renderGroupRail(
+  solutionLines: string[],
+  groups: ParsonsGroup[],
+  selectedGroupId: string | null,
+  setSelectedGroupId: (groupId: string | null) => void
+) {
+  return (
+    <div className="parsons-editor-rail parsons-editor-group-rail">
+      <div className="parsons-editor-group-rail-inner" style={{ height: `${solutionLines.length * 21}px` }}>
+        {groups.map((group) => (
+          <button
+            className={`parsons-group-box ${selectedGroupId === group.id ? "is-selected" : ""} ${
+              group.orderSensitive ? "" : "is-flex"
+            }`}
+            key={group.id}
+            style={{
+              top: `${group.startLine * 21}px`,
+              height: `${Math.max(21, (group.endLine - group.startLine + 1) * 21)}px`
+            }}
+            type="button"
+            onClick={() => setSelectedGroupId(selectedGroupId === group.id ? null : group.id)}
+          >
+            <span className="parsons-group-box-line" />
+            <span className="parsons-group-box-label">{group.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

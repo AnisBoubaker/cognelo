@@ -104,12 +104,61 @@ registerActivity({
   })
 });
 
-const parsonsConfigSchema = z.object({
-  prompt: z.string().min(10).max(6000),
-  solution: z.string().min(2).max(20000),
-  language: z.string().min(1).max(40).default("python"),
-  stripIndentation: z.boolean().default(false)
+const parsonsGroupSchema = z.object({
+  id: z.string().min(1).max(80),
+  label: z.string().min(1).max(120),
+  orderSensitive: z.boolean().default(true),
+  startLine: z.number().int().min(0),
+  endLine: z.number().int().min(0)
 });
+
+const parsonsPrecedenceRuleSchema = z.object({
+  id: z.string().min(1).max(80),
+  beforeGroupId: z.string().min(1).max(80),
+  afterGroupId: z.string().min(1).max(80)
+});
+
+const parsonsConfigSchema = z
+  .object({
+    prompt: z.string().min(10).max(6000),
+    solution: z.string().min(2).max(20000),
+    language: z.string().min(1).max(40).default("python"),
+    stripIndentation: z.boolean().default(false),
+    groups: z.array(parsonsGroupSchema).default([]),
+    precedenceRules: z.array(parsonsPrecedenceRuleSchema).default([])
+  })
+  .superRefine((value, context) => {
+    const groupIds = new Set<string>();
+    for (const group of value.groups) {
+      if (groupIds.has(group.id)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["groups"],
+          message: "Parsons group ids must be unique."
+        });
+        return;
+      }
+      groupIds.add(group.id);
+      if (group.endLine < group.startLine) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["groups"],
+          message: "Parsons groups must end on or after their start line."
+        });
+        return;
+      }
+    }
+
+    for (const [index, rule] of value.precedenceRules.entries()) {
+      if (!groupIds.has(rule.beforeGroupId) || !groupIds.has(rule.afterGroupId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["precedenceRules", index],
+          message: "Each Parsons precedence rule must reference existing groups."
+        });
+      }
+    }
+  });
 
 registerActivity({
   key: "parsons-problem",
@@ -136,7 +185,9 @@ registerActivity({
     prompt: "Rebuild the program in the correct order.",
     solution: "print('Hello, Parsons!')",
     language: "python",
-    stripIndentation: false
+    stripIndentation: false,
+    groups: [],
+    precedenceRules: []
   },
   configSchema: parsonsConfigSchema
 });

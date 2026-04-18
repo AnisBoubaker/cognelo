@@ -52,6 +52,7 @@ Frontend UX decisions currently in place:
 - Syntax-colored code rendering should be shared across activities. The web app now has a reusable code renderer component for line-numbered, syntax-highlighted code displays.
 - When an activity lets teachers choose a programming language for display/highlighting, prefer a shared dropdown backed by the renderer's supported-language list instead of free-text language entry.
 - The web app also has a lightweight shared code editor component for authoring code with syntax coloring and line numbers; Parsons reference solutions should use it instead of a plain textarea.
+- The shared code editor should grow vertically with its content so longer authoring tasks are comfortable without relying on manual resize gestures.
 
 Internationalization decisions:
 
@@ -69,11 +70,17 @@ Activity/plugin notes:
   - `solution`
   - `language`
   - `stripIndentation`
+  - `groups`
+  - `precedenceRules`
 - The student workspace currently supports block reordering plus indentation adjustment when `stripIndentation` is enabled.
 - Parsons student rendering uses a compact editor-like row layout with shared syntax highlighting and line numbers.
 - Parsons lines can be activated by click/toggle and then manipulated with keyboard arrow keys: up/down reorder, left/right adjust indentation when indentation mode is enabled.
 - Scrambled Parsons blocks are generated from the teacher-authored solution rather than stored separately.
 - Parsons scrambling should be random on each fresh try/reset rather than fixed per activity.
+- Parsons authoring now uses editor-adjacent line selection and visible group boxes instead of a separate line-to-group assignment form.
+- Parsons groups are stored as line ranges, not per-line selects, so inserting lines inside a group should keep those new lines inside the group after rebasing.
+- Parsons supports group-based partial ordering: teachers can define groups, mark them strict or flexible internally, and add explicit precedence rules between groups.
+- Parsons order feedback should count minimally misplaced units rather than every downstream displaced line, so small mistakes produce believable feedback.
 - Current Parsons attempts are interactive in the browser only and are not yet persisted as submissions/attempt records.
 
 Known MVP constraints to remember:
