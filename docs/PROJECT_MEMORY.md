@@ -12,6 +12,8 @@ Important long-term decisions:
 - Keep the first version as a modular monorepo, not a microservice split.
 - Favor shared contracts and service-layer logic over duplicating validation in each app.
 - Treat `docs/PROJECT_MEMORY.md` and `README.md` as living project artifacts that must be updated whenever architecture, setup, product behavior, or major implementation capabilities change.
+- Activity plugins should be clearly packaged in their own folders/packages. Plugin-owned code should not be scattered through core modules or the main web app when it can live inside the plugin package.
+- Plugin-specific persistence should be modeled as plugin-owned tables/modules rather than by stretching core tables with plugin-specific columns. Core tables remain generic and plugins declare their own database manifests.
 
 Implemented platform foundations:
 
@@ -50,6 +52,7 @@ Frontend UX decisions currently in place:
 - The visual theme should reflect the logo palette: bright teal, blue, and violet accents over light neutral surfaces, with the darker navy from the wordmark used for headings and key text.
 - Keep the branding influence subtle and product-like: use restrained gradients, tinted hero panels, and soft shadows rather than loud decorative backgrounds.
 - Syntax-colored code rendering should be shared across activities. The web app now has a reusable code renderer component for line-numbered, syntax-highlighted code displays.
+- Shared plugin-facing UI now belongs in `packages/activity-ui`, not inside `apps/web`, so plugins can reuse those components without importing application-local files.
 - When an activity lets teachers choose a programming language for display/highlighting, prefer a shared dropdown backed by the renderer's supported-language list instead of free-text language entry.
 - The web app also has a lightweight shared code editor component for authoring code with syntax coloring and line numbers; Parsons reference solutions should use it instead of a plain textarea.
 - The shared code editor should grow vertically with its content so longer authoring tasks are comfortable without relying on manual resize gestures.
@@ -64,6 +67,10 @@ Internationalization decisions:
 
 Activity/plugin notes:
 
+- Activity plugins are now packaged under `packages/plugin-*`.
+- The registry package `packages/activity-sdk` aggregates plugins; it no longer hardcodes all plugin definitions inline.
+- `packages/plugin-parsons` owns Parsons-specific definition/schema/UI/messages/runtime logic and now also owns dedicated plugin tables for attempt persistence under the plugin namespace.
+- `packages/plugin-placeholder` and `packages/plugin-homework-grader` provide the same package boundary for simpler/future plugins.
 - `parsons-problem` is configured through activity `config`, not special database columns.
 - Current Parsons config includes:
   - `prompt`
@@ -81,7 +88,12 @@ Activity/plugin notes:
 - Parsons groups are stored as line ranges, not per-line selects, so inserting lines inside a group should keep those new lines inside the group after rebasing.
 - Parsons supports group-based partial ordering: teachers can define groups, mark them strict or flexible internally, and add explicit precedence rules between groups.
 - Parsons order feedback should count minimally misplaced units rather than every downstream displaced line, so small mistakes produce believable feedback.
-- Current Parsons attempts are interactive in the browser only and are not yet persisted as submissions/attempt records.
+- Parsons attempts are now persisted in plugin-owned tables:
+  - `PluginParsonsAttempt`
+  - `PluginParsonsAttemptEvent`
+- Parsons attempt state stores the latest block order, indentation, selected block, and last evaluation snapshot so students can resume an in-progress attempt after reload.
+- Parsons attempt events currently record moves, indent/outdent actions, resets, and checks, which provides a foundation for teacher-facing flags and research analytics.
+- Teacher/admin previews of Parsons remain ephemeral on purpose so instructor exploration does not pollute student-behavior data.
 
 Known MVP constraints to remember:
 

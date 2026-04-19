@@ -40,6 +40,12 @@ enum ActivityLifecycle {
   archived
 }
 
+enum PluginParsonsAttemptStatus {
+  in_progress
+  completed
+  abandoned
+}
+
 model User {
   id              String             @id @default(cuid())
   email           String             @unique
@@ -53,6 +59,7 @@ model User {
   createdCourses  Course[]           @relation("CourseCreator")
   materials       CourseMaterial[]   @relation("MaterialCreator")
   activities      Activity[]         @relation("ActivityCreator")
+  parsonsAttempts PluginParsonsAttempt[]
 
   @@index([email])
 }
@@ -161,8 +168,46 @@ model Activity {
   course         Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
   activityType   ActivityType      @relation(fields: [activityTypeId], references: [id])
   createdBy      User              @relation("ActivityCreator", fields: [createdById], references: [id])
+  parsonsAttempts PluginParsonsAttempt[]
 
   @@index([courseId, position])
   @@index([activityTypeId])
   @@index([lifecycle])
+}
+
+model PluginParsonsAttempt {
+  id                String                     @id @default(cuid())
+  activityId        String
+  userId            String
+  status            PluginParsonsAttemptStatus @default(in_progress)
+  latestState       Json                       @default("{}")
+  resultSummary     Json                       @default("{}")
+  checkCount        Int                        @default(0)
+  resetCount        Int                        @default(0)
+  moveCount         Int                        @default(0)
+  indentCount       Int                        @default(0)
+  startedAt         DateTime                   @default(now())
+  lastInteractionAt DateTime                   @default(now())
+  completedAt       DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  activity          Activity                   @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events            PluginParsonsAttemptEvent[]
+
+  @@index([activityId, userId, status])
+  @@index([userId, status])
+  @@index([activityId, lastInteractionAt])
+}
+
+model PluginParsonsAttemptEvent {
+  id        String               @id @default(cuid())
+  attemptId String
+  type      String
+  payload   Json                 @default("{}")
+  createdAt DateTime             @default(now())
+  attempt   PluginParsonsAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId, createdAt])
+  @@index([type])
 }

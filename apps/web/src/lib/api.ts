@@ -64,6 +64,47 @@ export type Activity = {
   position: number;
 };
 
+export type ParsonsAttemptEvaluation = {
+  isCorrect: boolean;
+  orderCorrect: boolean;
+  indentationCorrect: boolean;
+  misplacedBlocks: number;
+  incorrectIndents: number;
+};
+
+export type ParsonsAttemptState = {
+  configFingerprint: string;
+  blocks: Array<{
+    id: string;
+    displayText: string;
+    originalText: string;
+    sourceIndex: number;
+    physicalLineIndex: number;
+    unitId: string;
+    groupId: string | null;
+    expectedIndent: number;
+    currentIndent: number;
+  }>;
+  selectedBlockId?: string | null;
+  lastEvaluation?: ParsonsAttemptEvaluation | null;
+};
+
+export type ParsonsAttempt = {
+  id: string;
+  activityId: string;
+  userId: string;
+  status: "in_progress" | "completed" | "abandoned";
+  startedAt: string;
+  lastInteractionAt: string;
+  completedAt: string | null;
+  checkCount: number;
+  resetCount: number;
+  moveCount: number;
+  indentCount: number;
+  latestState: ParsonsAttemptState;
+  resultSummary: Record<string, unknown>;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -108,6 +149,27 @@ export const api = {
   activityTypes: () => request<{ activityTypes: ActivityType[]; registeredDefinitions: ActivityDefinition[] }>("/activity-types"),
   activity: (courseId: string, activityId: string) =>
     request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}`),
+  ensureParsonsAttempt: (courseId: string, activityId: string, input?: { forceNew?: boolean }) =>
+    request<{ attempt: ParsonsAttempt }>(`/courses/${courseId}/activities/${activityId}/parsons/attempt`, {
+      method: "POST",
+      body: JSON.stringify(input ?? {})
+    }),
+  updateParsonsAttempt: (
+    courseId: string,
+    activityId: string,
+    input: {
+      attemptId: string;
+      state?: ParsonsAttemptState;
+      event?: { type: "move" | "indent" | "reset" | "check"; payload?: Record<string, unknown> };
+      result?: ParsonsAttemptEvaluation;
+      complete?: boolean;
+      abandon?: boolean;
+    }
+  ) =>
+    request<{ attempt: ParsonsAttempt }>(`/courses/${courseId}/activities/${activityId}/parsons/attempt`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
   createActivity: (courseId: string, input: ActivityInput) =>
     request<{ activity: Activity }>(`/courses/${courseId}/activities`, {
       method: "POST",

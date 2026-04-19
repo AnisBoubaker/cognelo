@@ -19,7 +19,12 @@
       "@cognara/core": ["packages/core/src/index.ts"],
       "@cognara/db": ["packages/db/src/index.ts"],
       "@cognara/activity-sdk": ["packages/activity-sdk/src/index.ts"],
-      "@cognara/config": ["packages/config/src/index.ts"]
+      "@cognara/activity-ui": ["packages/activity-ui/src/index.ts"],
+      "@cognara/config": ["packages/config/src/index.ts"],
+      "@cognara/plugin-homework-grader": ["packages/plugin-homework-grader/src/index.ts"],
+      "@cognara/plugin-parsons": ["packages/plugin-parsons/src/index.ts"],
+      "@cognara/plugin-parsons/server": ["packages/plugin-parsons/src/server.ts"],
+      "@cognara/plugin-placeholder": ["packages/plugin-placeholder/src/index.ts"]
     }
   }
 }
