@@ -66,6 +66,8 @@ Plugin packages can export:
 - web components
 - plugin-local `README.md` and `PROJECT_MEMORY.md`
 
+For the beginner-friendly plugin authoring handbook, including step-by-step setup, shared services, persistence patterns, and research/grading guidance, see [docs/plugin-authoring/README.md](docs/plugin-authoring/README.md).
+
 ## API Surface
 
 Core endpoints:
@@ -204,6 +206,8 @@ If you are working on a single plugin, start inside that plugin package:
 
 - `packages/plugins/plugin-your-plugin/README.md`
 - `packages/plugins/plugin-your-plugin/PROJECT_MEMORY.md`
+
+For the beginner-friendly plugin authoring handbook, including step-by-step setup, core services, API/web integration, research data patterns, and grading-oriented design guidance, use [docs/plugin-authoring/README.md](docs/plugin-authoring/README.md).
 
 The convention is:
 
