@@ -6,7 +6,8 @@
   "packageManager": "npm@10.0.0",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "packages/plugins/*"
   ],
   "scripts": {
     "dev": "set -a && . ./.env && set +a && npm run dev --workspace @cognara/api & npm run dev:web",
