@@ -1,15 +1,16 @@
 # Cognara
 
-Cognara is a modular ITS foundation for programming education. This first iteration focuses on the core platform: authentication, role-aware course management, generic materials, plugin-ready activities, and a multilingual frontend foundation.
+Cognara is a modular ITS foundation for programming education. This root README covers the platform itself: core architecture, shared services, setup, and conventions for adding plugins.
+
+Plugin-specific behavior, routes, persistence, and UX notes belong in each plugin package under `packages/plugins/*`.
 
 ## Architecture Rationale
 
 - **Next.js + TypeScript** powers both the backend API and frontend app, keeping the MVP cohesive while preserving a clean app boundary.
 - **PostgreSQL + Prisma** gives the system relational integrity, migrations, and a schema that can grow into enrollment, sections, TAs, invitations, and research analytics.
 - **Shared contracts with Zod** keep API validation close to TypeScript types.
-- **Activity registry package** keeps activity logic out of the course model. Courses attach activity instances by type, while each plugin owns its own definition, web UI, and database manifest in its own package.
-- **Plugin-owned persistence** keeps research-grade attempt data inside the plugin namespace instead of stretching the core activity tables.
-- **Generic plugin route dispatch** lets the API app host one reusable activity subroute dispatcher while each plugin owns its own server handlers inside the plugin package.
+- **Activity registry packages** keep plugin logic out of the course model.
+- **Plugin-owned persistence and routes** keep plugin-specific concerns out of core tables and out of hardcoded API files.
 - **HttpOnly JWT cookie auth** gives a secure browser default for the MVP.
 - **Built-in i18n** gives the web app English, French, and Chinese UI copy, while plugins can provide their own localized labels.
 
@@ -18,61 +19,56 @@ Cognara is a modular ITS foundation for programming education. This first iterat
 ```text
 apps/
   api/                 Next.js backend API
-    src/app/api/       Route handlers
-    src/lib/http.ts    CORS, auth cookie, errors, current-user guard
   web/                 Next.js frontend
-    src/app/           Login, dashboard, courses, course detail/edit
-    src/components/    Auth provider, app shell, forms
-    src/lib/api.ts     Browser API client
-    public/brand/      Web-ready brand assets used by the UI
 packages/
-  activity-sdk/        Plugin registry plus activity-definition contracts
+  activity-sdk/        Plugin registries and shared plugin contracts
   activity-ui/         Shared plugin-facing UI such as code editor/renderer
   config/              Environment validation
   contracts/           Shared DTO schemas and types
   core/                Services and authorization
   db/                  Prisma schema, migration, seed, client
   plugins/
-    plugin-placeholder/      Placeholder plugin package
-    plugin-homework-grader/  Homework grader plugin package
-    plugin-parsons/          Parsons plugin package (definition, UI, attempts, DB manifest)
+    plugin-*/          Plugin packages, each with its own README and PROJECT_MEMORY
 docs/
   ARCHITECTURE.md      Durable architecture notes
-  PROJECT_MEMORY.md    Future-session memory
+  PROJECT_MEMORY.md    Platform-level memory for future sessions
 ```
 
-## Implemented Backend Modules
+## Core Modules
 
 - Auth: login, logout, current-user token verification
 - Users: `/users/me`
-- Authorization: admin/teacher/student global roles plus course memberships
+- Authorization: global roles plus course memberships
 - Courses: create, list, read, update, archive
 - Memberships: basic course membership creation
 - Materials: generic typed course material records
-- Material hierarchy: folders, ordering, upload metadata, and tree-safe move operations
 - Activities: typed activity instances with JSON config and research metadata
-- Activity types: enabled type listing plus SDK definitions and plugin-localized metadata
+- Activity types: enabled type listing plus SDK definitions
 
-## Plugin Packaging
+## Plugin Boundary
 
-Each activity plugin now lives in its own package under `packages/plugins/plugin-*`.
+Each activity plugin lives in its own package under `packages/plugins/plugin-*`.
 
 The intended boundary is:
 
 - **Core tables stay generic**: `Activity`, `ActivityType`, `Course`, and related auth/course tables remain shared.
-- **Plugin tables belong to the plugin**: plugin-specific persistence should be declared in the plugin package's database module rather than modifying core tables for plugin-specific concerns.
-- **Shared services stay shared**: for example, the syntax-colored code editor and code renderer now live in `@cognara/activity-ui` so multiple plugins can reuse them without reaching into the web app internals.
+- **Plugin tables belong to the plugin**: plugin-specific persistence is declared in the plugin package's database module rather than by modifying core tables for plugin-specific concerns.
+- **Plugin HTTP handlers belong to the plugin**: the API app provides a generic dispatcher route, while plugin-specific subroutes are declared in plugin packages.
+- **Shared services stay shared**: reusable pieces such as the syntax-colored code editor and code renderer live in `@cognara/activity-ui`.
 
-Current plugin packages export:
+Plugin packages can export:
 
 - activity definitions
-- plugin-localized metadata and UI strings
-- plugin database manifests
-- plugin-owned persistence/services when the activity needs dedicated storage
-- plugin-owned server route definitions for activity-specific APIs
-- plugin-owned web components when the activity has a dedicated interface
+- localized metadata and UI strings
+- database manifests
+- persistence/services
+- server route definitions
+- web components
+- plugin-local `README.md` and `PROJECT_MEMORY.md`
 
-## API Endpoints
+## API Surface
+
+Core endpoints:
 
 ```text
 POST   /api/auth/login
@@ -96,11 +92,15 @@ POST   /api/courses/:courseId/activities
 GET    /api/courses/:courseId/activities/:activityId
 PATCH  /api/courses/:courseId/activities/:activityId
 DELETE /api/courses/:courseId/activities/:activityId
-POST   /api/courses/:courseId/activities/:activityId/parsons/attempt
-PATCH  /api/courses/:courseId/activities/:activityId/parsons/attempt
 ```
 
-The API app now mounts a generic activity-plugin dispatcher under `apps/api/src/app/api/courses/[courseId]/activities/[activityId]/[...pluginPath]/route.ts`; concrete routes such as `parsons/attempt` are declared in the plugin package instead of as plugin-specific files inside `apps/api`.
+Plugin-specific subroutes are dispatched through:
+
+```text
+/api/courses/:courseId/activities/:activityId/[...pluginPath]
+```
+
+Concrete plugin routes are documented in the owning plugin package.
 
 ## Authorization Model
 
@@ -111,7 +111,7 @@ The API app now mounts a generic activity-plugin dispatcher under `apps/api/src/
 
 ## Database Design
 
-The initial Prisma schema includes:
+Core Prisma entities include:
 
 - `User`
 - `Role`
@@ -121,24 +121,10 @@ The initial Prisma schema includes:
 - `CourseMaterial`
 - `ActivityType`
 - `Activity`
-- `PluginParsonsAttempt`
-- `PluginParsonsAttemptEvent`
 
 Enums cover course status, course membership role, material kind, and activity lifecycle.
 
-Notable plugin-persistence choices:
-
-- Parsons authoring data still lives in the core `Activity.config`.
-- Parsons student attempts live in plugin-owned tables, not in `Activity.config` and not in ad hoc core columns.
-- `PluginParsonsAttempt.latestState` stores the student's current block order, indentation, and last evaluation snapshot so an in-progress attempt can resume after reload.
-- `PluginParsonsAttemptEvent` records interaction events such as moves, indentation changes, resets, and checks for analytics/research use.
-
-Notable material-model choices:
-
-- `CourseMaterial.parentId` enables folder hierarchy.
-- `CourseMaterial.position` controls explicit ordering within a folder/root level.
-- `MaterialKind` already includes `folder`, `github_repo`, and `file` in active use, with room for future content types.
-- Uploaded files are represented as course materials with structured metadata.
+Plugin-owned tables are documented in the owning plugin package rather than in the platform README.
 
 ## Seed Accounts
 
@@ -150,57 +136,7 @@ teacher@cognara.local
 student@cognara.local
 ```
 
-The seed also creates a sample Programming 101 course, starter material, a placeholder activity, and a sample Parsons problem activity.
-
-## Parsons Attempt Persistence
-
-Parsons is the first plugin with dedicated plugin-owned persistence.
-
-- Students now get a persisted in-progress attempt per Parsons activity.
-- Reloading the activity restores the latest saved block order and indentation state.
-- Correct completion closes the current attempt; the next fresh try starts a new one.
-- Teacher/admin previews remain ephemeral so instructor clicks do not pollute student analytics.
-
-This gives the platform a clean base for:
-
-- stuck-student flags
-- repeated reset/check patterns
-- time-on-task signals
-- research exports built from plugin-owned attempt events
-
-## Example API Usage
-
-```bash
-curl -i -c cookies.txt \
-  -H "Content-Type: application/json" \
-  -d '{"email":"teacher@cognara.local","password":"Password123!"}' \
-  http://localhost:3001/api/auth/login
-```
-
-```bash
-curl -b cookies.txt http://localhost:3001/api/users/me
-```
-
-```bash
-curl -b cookies.txt \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Data Structures","description":"Lists, trees, and graphs","status":"draft"}' \
-  http://localhost:3001/api/courses
-```
-
-```bash
-curl -b cookies.txt \
-  -H "Content-Type: application/json" \
-  -d '{"activityTypeKey":"placeholder","title":"Warm-up reflection","lifecycle":"draft","config":{},"metadata":{"researchTags":["warmup"]}}' \
-  http://localhost:3001/api/courses/COURSE_ID/activities
-```
-
-```bash
-curl -b cookies.txt \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Examples de code","kind":"github_repo","url":"https://github.com/org/repo","metadata":{"source":"github"}}' \
-  http://localhost:3001/api/courses/COURSE_ID/materials
-```
+The seed also creates a sample course, starter material, and sample activities for development.
 
 ## Run Locally
 
@@ -253,77 +189,25 @@ Web: http://localhost:3000
 API: http://localhost:3001
 ```
 
-## Frontend UX Notes
+## Frontend Notes
 
 - Login, dashboard, courses, course detail, and edit flows are translated in English, French, and Chinese.
 - Locale selection is client-side and persisted in `localStorage`.
-- The header and login page use the Cognara logo from the repo's brand assets, with a cropped web-ready PNG under `apps/web/public/brand/`.
-- The favicon/app icon uses the square Cognara icon asset and is served from `apps/web/src/app/icon.png`.
-- The top navigation separates primary app routes from the account dropdown, which contains language selection and logout.
-- The web theme is aligned to the Cognara brand palette, using teal/blue/violet accents, navy headings, light surfaces, and restrained branded emphasis.
-- Course materials support:
-  - GitHub repository links
-  - file uploads
-  - folders
-  - inline edit/remove
-  - expand/collapse
-  - pointer-based drag and drop with destination highlighting
-- Activities now include a first real plugin implementation:
-  - `parsons-problem`
-  - the activity definition, config schema, UI strings, runtime logic, and web renderer now live under `packages/plugins/plugin-parsons`
-  - teacher authoring for prompt, reference solution, language, and indentation mode
-  - teacher-defined grouping directly from the reference editor gutter, with visible group boxes beside the code
-  - precedence rules between groups for “A must come before B” constraints
-  - student workspace for reordering code blocks and, optionally, restoring indentation
-  - compact editor-style line rendering with syntax coloring and line numbers
-- activities can also be removed from the course detail page by course managers
+- The header and login page use the Cognara logo from the repo's brand assets.
+- The favicon/app icon uses the square Cognara icon asset served from `apps/web/src/app/icon.png`.
+- The top navigation separates primary app routes from the account dropdown.
+- Course materials support links, uploads, folders, edit/remove, expand/collapse, and drag/drop ordering.
 
-## Plugin i18n
+## Plugin Contributor Workflow
 
-Activity definitions in `packages/activity-sdk` can include:
+If you are working on a single plugin, start inside that plugin package:
 
-```ts
-i18n: {
-  en: { name, description, defaultTitle },
-  fr: { name, description, defaultTitle },
-  zh: { name, description, defaultTitle }
-}
-```
+- `packages/plugins/plugin-your-plugin/README.md`
+- `packages/plugins/plugin-your-plugin/PROJECT_MEMORY.md`
 
-The web app uses that localized plugin metadata in the activity picker and on attached activity cards. This lets each plugin carry its own user-facing copy without hardcoding labels into the core UI.
+The convention is:
 
-## Adding a New Activity Type
+- platform-wide decisions live in the root `README.md` and `docs/PROJECT_MEMORY.md`
+- plugin-specific decisions live in the plugin's own `README.md` and `PROJECT_MEMORY.md`
 
-For a new `homework-grader` implementation, add a package such as `packages/activity-homework-grader`, export an `ActivityDefinition`, and register it through the activity SDK. Store common instance data in `Activity`, type metadata in `ActivityType`, and type-specific configuration in `Activity.config`.
-
-The core course model does not change. The frontend can add an editor/renderer keyed by `activity.activityType.key`, while backend services can delegate grading/submission behavior to the registered activity module.
-
-When the plugin needs localized copy, define `i18n` on the activity definition so the core UI can render translated names, descriptions, and default titles without special-case code.
-
-## Parsons Problem
-
-The first real pedagogical activity is `parsons-problem`.
-
-Its current implementation includes:
-
-- teacher setup fields for title, description, prompt, language, and reference solution
-- teacher-defined groups created by selecting lines in the reference editor gutter
-- visible group boxes aligned beside the editor so teachers can click a group and mark it as fixed-order or flexible
-- precedence rules between groups, expressed as arrows from one group to another
-- group ranges rebased when the teacher edits the solution, so inserted lines inside a group stay with that group
-- automatic generation of scrambled code blocks from the reference solution
-- an option to strip indentation from the student version so learners must restore both order and indentation
-- a student-facing workspace for reordering blocks and adjusting indentation
-- evaluation that accepts any permutation inside flexible groups while still enforcing the configured structure
-- order feedback that counts minimally misplaced units, so a small mistake does not look like the whole board is wrong
-
-Current MVP limitation:
-
-- student attempts are not yet persisted to the database; the activity currently focuses on authoring and interactive solving in the browser
-
-Shared frontend note:
-
-- syntax-colored code display is now implemented as a shared web component so future programming activities can reuse the same renderer instead of rolling their own
-- supported code-display languages are exposed through a shared dropdown/list so authoring UIs can stay aligned with what the renderer can actually highlight
-- a lightweight shared code editor is available for authoring code with syntax coloring and line numbers
-- the shared code editor grows vertically with its content so longer authoring tasks stay visible without manual resizing
+That way someone can clone the project and work almost entirely inside a plugin directory, including in a Codex session focused on that plugin.
