@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { homeworkGraderPlugin } from "@cognara/plugin-homework-grader";
-import { parsonsPlugin } from "@cognara/plugin-parsons";
-import { placeholderPlugin } from "@cognara/plugin-placeholder";
+import { homeworkGraderPlugin } from "@cognelo/plugin-homework-grader";
+import { parsonsPlugin } from "@cognelo/plugin-parsons";
+import { placeholderPlugin } from "@cognelo/plugin-placeholder";
 
 export type PluginLocale = "en" | "fr" | "zh";
 

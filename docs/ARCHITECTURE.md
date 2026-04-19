@@ -1,6 +1,6 @@
-# Cognara Architecture
+# Cognelo Architecture
 
-Cognara is a modular intelligent tutoring system for programming education.
+Cognelo is a modular intelligent tutoring system for programming education.
 
 ## Stack Rationale
 

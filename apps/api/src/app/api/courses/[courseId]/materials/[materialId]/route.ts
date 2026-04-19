@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { deleteMaterial, updateMaterial } from "@cognara/core";
+import { deleteMaterial, updateMaterial } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; materialId: string }> };

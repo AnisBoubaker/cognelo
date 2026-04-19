@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextRequest } from "next/server";
-import { createMaterial } from "@cognara/core";
+import { createMaterial } from "@cognelo/core";
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string }> };

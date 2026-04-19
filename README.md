@@ -1,6 +1,6 @@
-# Cognara
+# Cognelo
 
-Cognara is a modular ITS foundation for programming education. This root README covers the platform itself: core architecture, shared services, setup, and conventions for adding plugins.
+Cognelo is a modular ITS foundation for programming education. This root README covers the platform itself: core architecture, shared services, setup, and conventions for adding plugins.
 
 Plugin-specific behavior, routes, persistence, and UX notes belong in each plugin package under `packages/plugins/*`.
 
@@ -54,7 +54,7 @@ The intended boundary is:
 - **Core tables stay generic**: `Activity`, `ActivityType`, `Course`, and related auth/course tables remain shared.
 - **Plugin tables belong to the plugin**: plugin-specific persistence is declared in the plugin package's database module rather than by modifying core tables for plugin-specific concerns.
 - **Plugin HTTP handlers belong to the plugin**: the API app provides a generic dispatcher route, while plugin-specific subroutes are declared in plugin packages.
-- **Shared services stay shared**: reusable pieces such as the syntax-colored code editor and code renderer live in `@cognara/activity-ui`.
+- **Shared services stay shared**: reusable pieces such as the syntax-colored code editor and code renderer live in `@cognelo/activity-ui`.
 
 Plugin packages can export:
 
@@ -131,9 +131,9 @@ Plugin-owned tables are documented in the owning plugin package rather than in t
 All seeded accounts use `Password123!`.
 
 ```text
-admin@cognara.local
-teacher@cognara.local
-student@cognara.local
+admin@cognelo.local
+teacher@cognelo.local
+student@cognelo.local
 ```
 
 The seed also creates a sample course, starter material, and sample activities for development.
@@ -193,8 +193,8 @@ API: http://localhost:3001
 
 - Login, dashboard, courses, course detail, and edit flows are translated in English, French, and Chinese.
 - Locale selection is client-side and persisted in `localStorage`.
-- The header and login page use the Cognara logo from the repo's brand assets.
-- The favicon/app icon uses the square Cognara icon asset served from `apps/web/src/app/icon.png`.
+- The header and login page use the Cognelo logo from the repo's brand assets.
+- The favicon/app icon uses the square Cognelo icon asset served from `apps/web/src/app/icon.png`.
 - The top navigation separates primary app routes from the account dropdown.
 - Course materials support links, uploads, folders, edit/remove, expand/collapse, and drag/drop ordering.
 

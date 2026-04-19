@@ -1,5 +1,5 @@
 const nextConfig = {
-  transpilePackages: ["@cognara/contracts", "@cognara/activity-ui", "@cognara/plugin-parsons"]
+  transpilePackages: ["@cognelo/contracts", "@cognelo/activity-ui", "@cognelo/plugin-parsons"]
 };
 
 export default nextConfig;

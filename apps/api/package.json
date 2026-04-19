@@ -1,5 +1,5 @@
 {
-  "name": "@cognara/api",
+  "name": "@cognelo/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,10 +11,10 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@cognara/config": "0.1.0",
-    "@cognara/contracts": "0.1.0",
-    "@cognara/core": "0.1.0",
-    "@cognara/db": "0.1.0",
+    "@cognelo/config": "0.1.0",
+    "@cognelo/contracts": "0.1.0",
+    "@cognelo/core": "0.1.0",
+    "@cognelo/db": "0.1.0",
     "next": "^16.2.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",

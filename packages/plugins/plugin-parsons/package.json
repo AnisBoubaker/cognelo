@@ -1,14 +1,14 @@
 {
-  "name": "@cognara/plugin-parsons",
+  "name": "@cognelo/plugin-parsons",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "src/index.ts",
   "dependencies": {
-    "@cognara/activity-ui": "0.1.0",
-    "@cognara/activity-sdk": "0.1.0",
-    "@cognara/core": "0.1.0",
-    "@cognara/db": "0.1.0",
+    "@cognelo/activity-ui": "0.1.0",
+    "@cognelo/activity-sdk": "0.1.0",
+    "@cognelo/core": "0.1.0",
+    "@cognelo/db": "0.1.0",
     "react": "^19.2.5",
     "zod": "^3.23.8"
   },

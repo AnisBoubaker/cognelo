@@ -1,7 +1,7 @@
-import { getActivityDefinition, listActivityDefinitions } from "@cognara/activity-sdk";
-import { ActivityInputSchema, ActivityUpdateSchema } from "@cognara/contracts";
-import { Prisma, prisma } from "@cognara/db";
-import type { CurrentUser } from "@cognara/contracts";
+import { getActivityDefinition, listActivityDefinitions } from "@cognelo/activity-sdk";
+import { ActivityInputSchema, ActivityUpdateSchema } from "@cognelo/contracts";
+import { Prisma, prisma } from "@cognelo/db";
+import type { CurrentUser } from "@cognelo/contracts";
 import { assertCanManageCourse, assertCanViewCourse } from "./authorization";
 import { AppError, notFound } from "./errors";
 

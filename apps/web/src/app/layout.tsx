@@ -5,7 +5,7 @@ import { I18nProvider } from "@/lib/i18n";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Cognara",
+  title: "Cognelo",
   description: "A modular intelligent tutoring system for programming education.",
   icons: {
     icon: "/icon.png",

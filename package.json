@@ -1,5 +1,5 @@
 {
-  "name": "cognara",
+  "name": "cognelo",
   "private": true,
   "version": "0.1.0",
   "description": "Modular intelligent tutoring system foundation for programming education.",
@@ -10,16 +10,16 @@
     "packages/plugins/*"
   ],
   "scripts": {
-    "dev": "set -a && . ./.env && set +a && npm run dev --workspace @cognara/api & npm run dev:web",
-    "dev:api": "set -a && . ./.env && set +a && npm run dev --workspace @cognara/api",
-    "dev:web": "set -a && . ./.env && set +a && npm run dev --workspace @cognara/web",
+    "dev": "set -a && . ./.env && set +a && npm run dev --workspace @cognelo/api & npm run dev:web",
+    "dev:api": "set -a && . ./.env && set +a && npm run dev --workspace @cognelo/api",
+    "dev:web": "set -a && . ./.env && set +a && npm run dev --workspace @cognelo/web",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "db:generate": "npm run db:generate --workspace @cognara/db",
-    "db:migrate": "npm run db:migrate --workspace @cognara/db",
-    "db:seed": "npm run db:seed --workspace @cognara/db",
-    "db:studio": "npm run db:studio --workspace @cognara/db"
+    "db:generate": "npm run db:generate --workspace @cognelo/db",
+    "db:migrate": "npm run db:migrate --workspace @cognelo/db",
+    "db:seed": "npm run db:seed --workspace @cognelo/db",
+    "db:studio": "npm run db:studio --workspace @cognelo/db"
   },
   "devDependencies": {
     "@types/node": "^20.12.12",

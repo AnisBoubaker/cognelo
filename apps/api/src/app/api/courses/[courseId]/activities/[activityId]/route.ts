@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { deleteActivity, getActivity, updateActivity } from "@cognara/core";
+import { deleteActivity, getActivity, updateActivity } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; activityId: string }> };

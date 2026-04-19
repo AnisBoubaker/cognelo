@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import type { CourseInput } from "@cognara/contracts";
+import type { CourseInput } from "@cognelo/contracts";
 import type { Course } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 

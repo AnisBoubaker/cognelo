@@ -6,7 +6,7 @@ The package currently defines the activity shell, localized metadata, and config
 
 ## Purpose
 
-`@cognara/plugin-homework-grader` is the planned home for programming-assignment submission and grading behavior.
+`@cognelo/plugin-homework-grader` is the planned home for programming-assignment submission and grading behavior.
 
 Current scope:
 

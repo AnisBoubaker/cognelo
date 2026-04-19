@@ -1,4 +1,4 @@
-import { listActivityTypes, listRegisteredActivityDefinitions } from "@cognara/core";
+import { listActivityTypes, listRegisteredActivityDefinitions } from "@cognelo/core";
 import { handleRoute, json, options } from "@/lib/http";
 
 export function OPTIONS() {

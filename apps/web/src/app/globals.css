@@ -203,13 +203,18 @@ select:focus {
 }
 
 .brand-logo-header {
-  max-width: 160px;
-  width: min(160px, 32vw);
+  width: fit-content;
 }
 
 .brand-logo-hero {
-  max-width: 240px;
-  width: min(240px, 100%);
+  width: fit-content;
+}
+
+.brand-logo-header .brand-logo-image,
+.brand-logo-hero .brand-logo-image {
+  height: 90px;
+  width: auto;
+  max-width: min(100%, 100vw - 48px);
 }
 
 .nav {

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { LoginInputSchema } from "@cognara/contracts";
-import { getServerEnv } from "@cognara/config";
-import { loginWithPassword } from "@cognara/core";
+import { LoginInputSchema } from "@cognelo/contracts";
+import { getServerEnv } from "@cognelo/config";
+import { loginWithPassword } from "@cognelo/core";
 import { authCookie, handleRoute, json, options, readJson } from "@/lib/http";
 
 export function OPTIONS() {

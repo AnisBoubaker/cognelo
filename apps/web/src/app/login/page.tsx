@@ -11,7 +11,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
   const { t } = useI18n();
-  const [email, setEmail] = useState("teacher@cognara.local");
+  const [email, setEmail] = useState("teacher@cognelo.local");
   const [password, setPassword] = useState("Password123!");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);

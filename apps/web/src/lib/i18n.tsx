@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
-import { parsonsMessages } from "@cognara/plugin-parsons";
+import { parsonsMessages } from "@cognelo/plugin-parsons";
 
 export const locales = ["en", "fr", "zh"] as const;
 export type Locale = (typeof locales)[number];
@@ -544,7 +544,7 @@ function detectInitialLocale() {
     return "en" as Locale;
   }
 
-  const saved = window.localStorage.getItem("cognara-locale");
+  const saved = window.localStorage.getItem("cognelo-locale");
   if (saved && locales.includes(saved as Locale)) {
     return saved as Locale;
   }
@@ -568,7 +568,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = locale;
-    window.localStorage.setItem("cognara-locale", locale);
+    window.localStorage.setItem("cognelo-locale", locale);
   }, [locale]);
 
   const value = useMemo<I18nContextValue>(

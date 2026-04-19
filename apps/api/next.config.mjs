@@ -1,13 +1,13 @@
 const nextConfig = {
   transpilePackages: [
-    "@cognara/config",
-    "@cognara/contracts",
-    "@cognara/core",
-    "@cognara/db",
-    "@cognara/activity-sdk",
-    "@cognara/plugin-homework-grader",
-    "@cognara/plugin-parsons",
-    "@cognara/plugin-placeholder"
+    "@cognelo/config",
+    "@cognelo/contracts",
+    "@cognelo/core",
+    "@cognelo/db",
+    "@cognelo/activity-sdk",
+    "@cognelo/plugin-homework-grader",
+    "@cognelo/plugin-parsons",
+    "@cognelo/plugin-placeholder"
   ]
 };
 

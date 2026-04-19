@@ -1,6 +1,6 @@
-import { CourseInputSchema, CourseUpdateSchema, EnrollmentInputSchema } from "@cognara/contracts";
-import { prisma } from "@cognara/db";
-import type { CurrentUser } from "@cognara/contracts";
+import { CourseInputSchema, CourseUpdateSchema, EnrollmentInputSchema } from "@cognelo/contracts";
+import { prisma } from "@cognelo/db";
+import type { CurrentUser } from "@cognelo/contracts";
 import { assertCanCreateCourse, assertCanManageCourse, assertCanViewCourse, isAdmin, isTeacher } from "./authorization";
 import { notFound } from "./errors";
 

@@ -1,1 +1,1 @@
-export * from "@cognara/plugin-parsons";
+export * from "@cognelo/plugin-parsons";

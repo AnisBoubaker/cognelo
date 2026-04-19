@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createCourse, listCourses } from "@cognara/core";
+import { createCourse, listCourses } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
 export function OPTIONS() {

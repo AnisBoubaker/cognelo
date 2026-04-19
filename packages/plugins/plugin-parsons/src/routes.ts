@@ -1,5 +1,5 @@
-import type { PluginRouteDefinition } from "@cognara/activity-sdk/server";
-import { AppError } from "@cognara/core";
+import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
+import { AppError } from "@cognelo/core";
 import { ensureParsonsAttempt, updateParsonsAttempt } from "./attempts";
 import { parsonsAttemptEnsureInputSchema, parsonsAttemptUpdateInputSchema } from "./attempt-types";
 import { parseParsonsConfig } from "./parsons";

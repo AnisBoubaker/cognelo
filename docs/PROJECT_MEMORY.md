@@ -54,9 +54,9 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Folders support expand/collapse.
 - Material moving uses pointer-based drag and drop with a drag handle, floating preview, target highlighting, and a top-level drop zone.
 - Branding uses the project logo from `docs/brand`.
-- The app favicon uses the square Cognara icon asset.
+- The app favicon uses the square Cognelo icon asset.
 - The top header separates primary app navigation from personal controls.
-- The visual theme should reflect the Cognara logo palette in a restrained, product-like way.
+- The visual theme should reflect the Cognelo logo palette in a restrained, product-like way.
 - Syntax-colored code rendering should be shared across activities through `packages/activity-ui`.
 - The shared code editor should grow vertically with its content.
 
@@ -77,13 +77,13 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 
 ## Verification Habits
 
-- Use `npm run typecheck --workspace @cognara/web` for frontend-only changes.
-- Use `npm run build --workspace @cognara/web` to confirm the Next.js web app still produces a valid production build.
+- Use `npm run typecheck --workspace @cognelo/web` for frontend-only changes.
+- Use `npm run build --workspace @cognelo/web` to confirm the Next.js web app still produces a valid production build.
 - Use `npm run db:generate` after Prisma schema changes.
 - Use root `npm run typecheck` and `npm run build` when shared packages or both apps are touched.
 
 ## Seed Users
 
-- `admin@cognara.local` / `Password123!`
-- `teacher@cognara.local` / `Password123!`
-- `student@cognara.local` / `Password123!`
+- `admin@cognelo.local` / `Password123!`
+- `teacher@cognelo.local` / `Password123!`
+- `student@cognelo.local` / `Password123!`

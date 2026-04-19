@@ -1,5 +1,5 @@
 {
-  "name": "@cognara/web",
+  "name": "@cognelo/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,9 +11,9 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@cognara/activity-ui": "0.1.0",
-    "@cognara/contracts": "0.1.0",
-    "@cognara/plugin-parsons": "0.1.0",
+    "@cognelo/activity-ui": "0.1.0",
+    "@cognelo/contracts": "0.1.0",
+    "@cognelo/plugin-parsons": "0.1.0",
     "next": "^16.2.4",
     "prism-react-renderer": "^2.4.1",
     "prismjs": "^1.30.0",

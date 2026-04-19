@@ -12,19 +12,28 @@
       "@/*": [
         "./src/*"
       ],
-      "@cognara/contracts": [
+      "@cognelo/contracts": [
         "../../packages/contracts/src/index.ts"
       ],
-      "@cognara/activity-ui": [
+      "@cognelo/core": [
+        "../../packages/core/src/index.ts"
+      ],
+      "@cognelo/db": [
+        "../../packages/db/src/index.ts"
+      ],
+      "@cognelo/activity-sdk": [
+        "../../packages/activity-sdk/src/index.ts"
+      ],
+      "@cognelo/activity-ui": [
         "../../packages/activity-ui/src/index.ts"
       ],
-      "@cognara/plugin-homework-grader": [
+      "@cognelo/plugin-homework-grader": [
         "../../packages/plugins/plugin-homework-grader/src/index.ts"
       ],
-      "@cognara/plugin-parsons": [
+      "@cognelo/plugin-parsons": [
         "../../packages/plugins/plugin-parsons/src/index.ts"
       ],
-      "@cognara/plugin-placeholder": [
+      "@cognelo/plugin-placeholder": [
         "../../packages/plugins/plugin-placeholder/src/index.ts"
       ]
     }
