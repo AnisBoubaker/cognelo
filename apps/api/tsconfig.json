@@ -27,17 +27,26 @@
       "@cognara/activity-sdk": [
         "../../packages/activity-sdk/src/index.ts"
       ],
+      "@cognara/activity-sdk/server": [
+        "../../packages/activity-sdk/src/server.ts"
+      ],
       "@cognara/plugin-homework-grader": [
-        "../../packages/plugin-homework-grader/src/index.ts"
+        "../../packages/plugins/plugin-homework-grader/src/index.ts"
+      ],
+      "@cognara/plugin-homework-grader/server": [
+        "../../packages/plugins/plugin-homework-grader/src/server.ts"
       ],
       "@cognara/plugin-parsons": [
-        "../../packages/plugin-parsons/src/index.ts"
+        "../../packages/plugins/plugin-parsons/src/index.ts"
       ],
       "@cognara/plugin-parsons/server": [
-        "../../packages/plugin-parsons/src/server.ts"
+        "../../packages/plugins/plugin-parsons/src/server.ts"
       ],
       "@cognara/plugin-placeholder": [
-        "../../packages/plugin-placeholder/src/index.ts"
+        "../../packages/plugins/plugin-placeholder/src/index.ts"
+      ],
+      "@cognara/plugin-placeholder/server": [
+        "../../packages/plugins/plugin-placeholder/src/server.ts"
       ],
       "@cognara/config": [
         "../../packages/config/src/index.ts"

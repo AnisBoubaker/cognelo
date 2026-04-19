@@ -9,6 +9,7 @@ Cognara is a modular ITS foundation for programming education. This first iterat
 - **Shared contracts with Zod** keep API validation close to TypeScript types.
 - **Activity registry package** keeps activity logic out of the course model. Courses attach activity instances by type, while each plugin owns its own definition, web UI, and database manifest in its own package.
 - **Plugin-owned persistence** keeps research-grade attempt data inside the plugin namespace instead of stretching the core activity tables.
+- **Generic plugin route dispatch** lets the API app host one reusable activity subroute dispatcher while each plugin owns its own server handlers inside the plugin package.
 - **HttpOnly JWT cookie auth** gives a secure browser default for the MVP.
 - **Built-in i18n** gives the web app English, French, and Chinese UI copy, while plugins can provide their own localized labels.
 
@@ -31,10 +32,10 @@ packages/
   contracts/           Shared DTO schemas and types
   core/                Services and authorization
   db/                  Prisma schema, migration, seed, client
-  plugin-placeholder/  Placeholder plugin package
-  plugin-homework-grader/
-                       Homework grader plugin package
-  plugin-parsons/      Parsons plugin package (definition, UI, attempts, DB manifest)
+  plugins/
+    plugin-placeholder/      Placeholder plugin package
+    plugin-homework-grader/  Homework grader plugin package
+    plugin-parsons/          Parsons plugin package (definition, UI, attempts, DB manifest)
 docs/
   ARCHITECTURE.md      Durable architecture notes
   PROJECT_MEMORY.md    Future-session memory
@@ -54,7 +55,7 @@ docs/
 
 ## Plugin Packaging
 
-Each activity plugin now lives in its own package under `packages/plugin-*`.
+Each activity plugin now lives in its own package under `packages/plugins/plugin-*`.
 
 The intended boundary is:
 
@@ -68,6 +69,7 @@ Current plugin packages export:
 - plugin-localized metadata and UI strings
 - plugin database manifests
 - plugin-owned persistence/services when the activity needs dedicated storage
+- plugin-owned server route definitions for activity-specific APIs
 - plugin-owned web components when the activity has a dedicated interface
 
 ## API Endpoints
@@ -97,6 +99,8 @@ DELETE /api/courses/:courseId/activities/:activityId
 POST   /api/courses/:courseId/activities/:activityId/parsons/attempt
 PATCH  /api/courses/:courseId/activities/:activityId/parsons/attempt
 ```
+
+The API app now mounts a generic activity-plugin dispatcher under `apps/api/src/app/api/courses/[courseId]/activities/[activityId]/[...pluginPath]/route.ts`; concrete routes such as `parsons/attempt` are declared in the plugin package instead of as plugin-specific files inside `apps/api`.
 
 ## Authorization Model
 
@@ -266,7 +270,7 @@ API: http://localhost:3001
   - pointer-based drag and drop with destination highlighting
 - Activities now include a first real plugin implementation:
   - `parsons-problem`
-  - the activity definition, config schema, UI strings, runtime logic, and web renderer now live under `packages/plugin-parsons`
+  - the activity definition, config schema, UI strings, runtime logic, and web renderer now live under `packages/plugins/plugin-parsons`
   - teacher authoring for prompt, reference solution, language, and indentation mode
   - teacher-defined grouping directly from the reference editor gutter, with visible group boxes beside the code
   - precedence rules between groups for “A must come before B” constraints

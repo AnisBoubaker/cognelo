@@ -14,6 +14,7 @@ Important long-term decisions:
 - Treat `docs/PROJECT_MEMORY.md` and `README.md` as living project artifacts that must be updated whenever architecture, setup, product behavior, or major implementation capabilities change.
 - Activity plugins should be clearly packaged in their own folders/packages. Plugin-owned code should not be scattered through core modules or the main web app when it can live inside the plugin package.
 - Plugin-specific persistence should be modeled as plugin-owned tables/modules rather than by stretching core tables with plugin-specific columns. Core tables remain generic and plugins declare their own database manifests.
+- Plugin-specific HTTP handlers should also live in plugin packages. The API app should expose generic dispatcher routes, not one hardcoded Next route file per plugin capability.
 
 Implemented platform foundations:
 
@@ -67,10 +68,11 @@ Internationalization decisions:
 
 Activity/plugin notes:
 
-- Activity plugins are now packaged under `packages/plugin-*`.
+- Activity plugins are now packaged under `packages/plugins/plugin-*`.
 - The registry package `packages/activity-sdk` aggregates plugins; it no longer hardcodes all plugin definitions inline.
-- `packages/plugin-parsons` owns Parsons-specific definition/schema/UI/messages/runtime logic and now also owns dedicated plugin tables for attempt persistence under the plugin namespace.
-- `packages/plugin-placeholder` and `packages/plugin-homework-grader` provide the same package boundary for simpler/future plugins.
+- Server-side plugin routes are resolved through `packages/activity-sdk/src/server.ts`, while `apps/api` provides a single catch-all activity plugin dispatcher route.
+- `packages/plugins/plugin-parsons` owns Parsons-specific definition/schema/UI/messages/runtime logic and now also owns dedicated plugin tables for attempt persistence under the plugin namespace.
+- `packages/plugins/plugin-placeholder` and `packages/plugins/plugin-homework-grader` provide the same package boundary for simpler/future plugins.
 - `parsons-problem` is configured through activity `config`, not special database columns.
 - Current Parsons config includes:
   - `prompt`
