@@ -7,7 +7,8 @@ Cognara is a modular ITS foundation for programming education. This first iterat
 - **Next.js + TypeScript** powers both the backend API and frontend app, keeping the MVP cohesive while preserving a clean app boundary.
 - **PostgreSQL + Prisma** gives the system relational integrity, migrations, and a schema that can grow into enrollment, sections, TAs, invitations, and research analytics.
 - **Shared contracts with Zod** keep API validation close to TypeScript types.
-- **Activity registry package** keeps activity logic out of the course model. Courses attach activity instances by type, while type-specific behavior can live in later packages.
+- **Activity registry package** keeps activity logic out of the course model. Courses attach activity instances by type, while each plugin owns its own definition, web UI, and database manifest in its own package.
+- **Plugin-owned persistence** keeps research-grade attempt data inside the plugin namespace instead of stretching the core activity tables.
 - **HttpOnly JWT cookie auth** gives a secure browser default for the MVP.
 - **Built-in i18n** gives the web app English, French, and Chinese UI copy, while plugins can provide their own localized labels.
 
@@ -24,11 +25,16 @@ apps/
     src/lib/api.ts     Browser API client
     public/brand/      Web-ready brand assets used by the UI
 packages/
-  activity-sdk/        Activity definition and registry
+  activity-sdk/        Plugin registry plus activity-definition contracts
+  activity-ui/         Shared plugin-facing UI such as code editor/renderer
   config/              Environment validation
   contracts/           Shared DTO schemas and types
   core/                Services and authorization
   db/                  Prisma schema, migration, seed, client
+  plugin-placeholder/  Placeholder plugin package
+  plugin-homework-grader/
+                       Homework grader plugin package
+  plugin-parsons/      Parsons plugin package (definition, UI, attempts, DB manifest)
 docs/
   ARCHITECTURE.md      Durable architecture notes
   PROJECT_MEMORY.md    Future-session memory
@@ -45,6 +51,24 @@ docs/
 - Material hierarchy: folders, ordering, upload metadata, and tree-safe move operations
 - Activities: typed activity instances with JSON config and research metadata
 - Activity types: enabled type listing plus SDK definitions and plugin-localized metadata
+
+## Plugin Packaging
+
+Each activity plugin now lives in its own package under `packages/plugin-*`.
+
+The intended boundary is:
+
+- **Core tables stay generic**: `Activity`, `ActivityType`, `Course`, and related auth/course tables remain shared.
+- **Plugin tables belong to the plugin**: plugin-specific persistence should be declared in the plugin package's database module rather than modifying core tables for plugin-specific concerns.
+- **Shared services stay shared**: for example, the syntax-colored code editor and code renderer now live in `@cognara/activity-ui` so multiple plugins can reuse them without reaching into the web app internals.
+
+Current plugin packages export:
+
+- activity definitions
+- plugin-localized metadata and UI strings
+- plugin database manifests
+- plugin-owned persistence/services when the activity needs dedicated storage
+- plugin-owned web components when the activity has a dedicated interface
 
 ## API Endpoints
 
@@ -70,6 +94,8 @@ POST   /api/courses/:courseId/activities
 GET    /api/courses/:courseId/activities/:activityId
 PATCH  /api/courses/:courseId/activities/:activityId
 DELETE /api/courses/:courseId/activities/:activityId
+POST   /api/courses/:courseId/activities/:activityId/parsons/attempt
+PATCH  /api/courses/:courseId/activities/:activityId/parsons/attempt
 ```
 
 ## Authorization Model
@@ -91,8 +117,17 @@ The initial Prisma schema includes:
 - `CourseMaterial`
 - `ActivityType`
 - `Activity`
+- `PluginParsonsAttempt`
+- `PluginParsonsAttemptEvent`
 
 Enums cover course status, course membership role, material kind, and activity lifecycle.
+
+Notable plugin-persistence choices:
+
+- Parsons authoring data still lives in the core `Activity.config`.
+- Parsons student attempts live in plugin-owned tables, not in `Activity.config` and not in ad hoc core columns.
+- `PluginParsonsAttempt.latestState` stores the student's current block order, indentation, and last evaluation snapshot so an in-progress attempt can resume after reload.
+- `PluginParsonsAttemptEvent` records interaction events such as moves, indentation changes, resets, and checks for analytics/research use.
 
 Notable material-model choices:
 
@@ -112,6 +147,22 @@ student@cognara.local
 ```
 
 The seed also creates a sample Programming 101 course, starter material, a placeholder activity, and a sample Parsons problem activity.
+
+## Parsons Attempt Persistence
+
+Parsons is the first plugin with dedicated plugin-owned persistence.
+
+- Students now get a persisted in-progress attempt per Parsons activity.
+- Reloading the activity restores the latest saved block order and indentation state.
+- Correct completion closes the current attempt; the next fresh try starts a new one.
+- Teacher/admin previews remain ephemeral so instructor clicks do not pollute student analytics.
+
+This gives the platform a clean base for:
+
+- stuck-student flags
+- repeated reset/check patterns
+- time-on-task signals
+- research exports built from plugin-owned attempt events
 
 ## Example API Usage
 
@@ -215,6 +266,7 @@ API: http://localhost:3001
   - pointer-based drag and drop with destination highlighting
 - Activities now include a first real plugin implementation:
   - `parsons-problem`
+  - the activity definition, config schema, UI strings, runtime logic, and web renderer now live under `packages/plugin-parsons`
   - teacher authoring for prompt, reference solution, language, and indentation mode
   - teacher-defined grouping directly from the reference editor gutter, with visible group boxes beside the code
   - precedence rules between groups for “A must come before B” constraints

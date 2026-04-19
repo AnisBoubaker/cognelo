@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
+import { listActivityDefinitions, listActivityPlugins } from "@cognara/activity-sdk";
 
 const prisma = new PrismaClient();
 
@@ -40,51 +41,35 @@ async function main() {
   const teacher = await upsertUser("teacher@cognara.local", "Terry Teacher", ["teacher"]);
   const student = await upsertUser("student@cognara.local", "Sam Student", ["student"]);
 
-  const placeholderType = await prisma.activityType.upsert({
-    where: { key: "placeholder" },
-    update: {
-      name: "Placeholder activity",
-      description: "A generic activity shell for course planning.",
-      isEnabled: true
-    },
-    create: {
-      key: "placeholder",
-      name: "Placeholder activity",
-      description: "A generic activity shell for course planning."
+  const activityTypesByKey = new Map<string, Awaited<ReturnType<typeof prisma.activityType.upsert>>>();
+  const pluginKeyByActivityKey = new Map<string, string>();
+  for (const plugin of listActivityPlugins()) {
+    for (const definition of plugin.activities) {
+      pluginKeyByActivityKey.set(definition.key, plugin.key);
+      const activityType = await prisma.activityType.upsert({
+        where: { key: definition.key },
+        update: {
+          name: definition.name,
+          description: definition.description,
+          metadata: { researchReady: true, plugin: plugin.key },
+          isEnabled: true
+        },
+        create: {
+          key: definition.key,
+          name: definition.name,
+          description: definition.description,
+          metadata: { researchReady: true, plugin: plugin.key }
+        }
+      });
+      activityTypesByKey.set(definition.key, activityType);
     }
-  });
+  }
 
-  await prisma.activityType.upsert({
-    where: { key: "homework-grader" },
-    update: {
-      name: "Homework grader",
-      description: "Future programming assignment submission and grading workflow.",
-      metadata: { researchReady: true },
-      isEnabled: true
-    },
-    create: {
-      key: "homework-grader",
-      name: "Homework grader",
-      description: "Future programming assignment submission and grading workflow.",
-      metadata: { researchReady: true }
-    }
-  });
-
-  const parsonsType = await prisma.activityType.upsert({
-    where: { key: "parsons-problem" },
-    update: {
-      name: "Parsons problem",
-      description: "Reorder scrambled code blocks and optionally restore indentation to rebuild a working program.",
-      metadata: { researchReady: true, pedagogy: "parsons" },
-      isEnabled: true
-    },
-    create: {
-      key: "parsons-problem",
-      name: "Parsons problem",
-      description: "Reorder scrambled code blocks and optionally restore indentation to rebuild a working program.",
-      metadata: { researchReady: true, pedagogy: "parsons" }
-    }
-  });
+  const placeholderType = activityTypesByKey.get("placeholder");
+  const parsonsType = activityTypesByKey.get("parsons-problem");
+  if (!placeholderType || !parsonsType) {
+    throw new Error(`Missing seeded activity types from plugin registry: ${listActivityDefinitions().map((definition) => definition.key).join(", ")}`);
+  }
 
   const course = await prisma.course.upsert({
     where: { id: "seed-course-programming-101" },
@@ -158,7 +143,7 @@ async function main() {
       description: "A placeholder activity attached to the sample course.",
       lifecycle: "published",
       config: {},
-      metadata: { researchTags: ["onboarding"], instrumented: false },
+      metadata: { researchTags: ["onboarding"], instrumented: false, plugin: pluginKeyByActivityKey.get("placeholder") },
       createdById: teacher.id
     }
   });
@@ -178,9 +163,11 @@ async function main() {
           "    print(name)"
         ].join("\n"),
         language: "python",
-        stripIndentation: true
+        stripIndentation: true,
+        groups: [],
+        precedenceRules: []
       },
-      metadata: { researchTags: ["parsons", "loops"], instrumented: false }
+      metadata: { researchTags: ["parsons", "loops"], instrumented: false, plugin: pluginKeyByActivityKey.get("parsons-problem") }
     },
     create: {
       id: "seed-activity-parsons",
@@ -198,9 +185,11 @@ async function main() {
           "    print(name)"
         ].join("\n"),
         language: "python",
-        stripIndentation: true
+        stripIndentation: true,
+        groups: [],
+        precedenceRules: []
       },
-      metadata: { researchTags: ["parsons", "loops"], instrumented: false },
+      metadata: { researchTags: ["parsons", "loops"], instrumented: false, plugin: pluginKeyByActivityKey.get("parsons-problem") },
       createdById: teacher.id
     }
   });

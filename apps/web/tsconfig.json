@@ -14,6 +14,18 @@
       ],
       "@cognara/contracts": [
         "../../packages/contracts/src/index.ts"
+      ],
+      "@cognara/activity-ui": [
+        "../../packages/activity-ui/src/index.ts"
+      ],
+      "@cognara/plugin-homework-grader": [
+        "../../packages/plugin-homework-grader/src/index.ts"
+      ],
+      "@cognara/plugin-parsons": [
+        "../../packages/plugin-parsons/src/index.ts"
+      ],
+      "@cognara/plugin-placeholder": [
+        "../../packages/plugin-placeholder/src/index.ts"
       ]
     }
   },
