@@ -2,7 +2,7 @@
 
 This README is for the Parsons plugin only.
 
-It documents plugin-specific behavior, persistence, routes, and contributor workflow. Platform-wide architecture belongs in the root [README.md](/Users/anis/Sync/01_ETS/Dev/cognelo/README.md).
+It documents plugin-specific behavior, persistence, routes, and contributor workflow. Platform-wide architecture belongs in the root [README.md](../../../README.md).
 
 ## Purpose
 
