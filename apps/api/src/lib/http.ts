@@ -1,10 +1,10 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
-import { getServerEnv } from "@cognara/config";
-import { AppError, verifyAuthToken } from "@cognara/core";
+import { getServerEnv } from "@cognelo/config";
+import { AppError, verifyAuthToken } from "@cognelo/core";
 
-export const AUTH_COOKIE = "cognara_session";
+export const AUTH_COOKIE = "cognelo_session";
 
 export async function requireUser() {
   const env = getServerEnv();

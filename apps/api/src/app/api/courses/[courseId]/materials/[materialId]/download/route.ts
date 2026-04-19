@@ -3,7 +3,7 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { NextRequest, NextResponse } from "next/server";
-import { getMaterialForDownload } from "@cognara/core";
+import { getMaterialForDownload } from "@cognelo/core";
 import { handleRoute, options, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; materialId: string }> };

@@ -7,7 +7,7 @@ This file is for Parsons-specific memory only.
 - Parsons-specific logic stays inside `packages/plugins/plugin-parsons`.
 - Parsons-specific persistence lives in plugin-owned tables, not in core activity tables.
 - Parsons-specific server handlers live in plugin-owned route definitions, not in `apps/api`.
-- Shared code editor and syntax renderer come from `@cognara/activity-ui`.
+- Shared code editor and syntax renderer come from `@cognelo/activity-ui`.
 
 ## Current Feature Decisions
 

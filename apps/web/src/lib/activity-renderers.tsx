@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { ParsonsActivityView } from "@cognara/plugin-parsons";
+import { ParsonsActivityView } from "@cognelo/plugin-parsons";
 import { api, type ParsonsAttempt, type ParsonsAttemptEvaluation, type ParsonsAttemptState } from "@/lib/api";
 
 function ParsonsActivityRenderer(props: ComponentProps<typeof ParsonsActivityView>) {

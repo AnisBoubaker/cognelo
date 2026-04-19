@@ -1,5 +1,5 @@
 {
-  "name": "@cognara/plugin-homework-grader",
+  "name": "@cognelo/plugin-homework-grader",
   "version": "0.1.0",
   "private": true,
   "type": "module",

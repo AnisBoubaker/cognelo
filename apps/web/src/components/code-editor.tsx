@@ -1,1 +1,1 @@
-export { CodeEditor } from "@cognara/activity-ui";
+export { CodeEditor } from "@cognelo/activity-ui";

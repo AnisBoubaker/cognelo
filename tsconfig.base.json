@@ -15,19 +15,19 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@cognara/contracts": ["packages/contracts/src/index.ts"],
-      "@cognara/core": ["packages/core/src/index.ts"],
-      "@cognara/db": ["packages/db/src/index.ts"],
-      "@cognara/activity-sdk": ["packages/activity-sdk/src/index.ts"],
-      "@cognara/activity-sdk/server": ["packages/activity-sdk/src/server.ts"],
-      "@cognara/activity-ui": ["packages/activity-ui/src/index.ts"],
-      "@cognara/config": ["packages/config/src/index.ts"],
-      "@cognara/plugin-homework-grader": ["packages/plugins/plugin-homework-grader/src/index.ts"],
-      "@cognara/plugin-homework-grader/server": ["packages/plugins/plugin-homework-grader/src/server.ts"],
-      "@cognara/plugin-parsons": ["packages/plugins/plugin-parsons/src/index.ts"],
-      "@cognara/plugin-parsons/server": ["packages/plugins/plugin-parsons/src/server.ts"],
-      "@cognara/plugin-placeholder": ["packages/plugins/plugin-placeholder/src/index.ts"],
-      "@cognara/plugin-placeholder/server": ["packages/plugins/plugin-placeholder/src/server.ts"]
+      "@cognelo/contracts": ["packages/contracts/src/index.ts"],
+      "@cognelo/core": ["packages/core/src/index.ts"],
+      "@cognelo/db": ["packages/db/src/index.ts"],
+      "@cognelo/activity-sdk": ["packages/activity-sdk/src/index.ts"],
+      "@cognelo/activity-sdk/server": ["packages/activity-sdk/src/server.ts"],
+      "@cognelo/activity-ui": ["packages/activity-ui/src/index.ts"],
+      "@cognelo/config": ["packages/config/src/index.ts"],
+      "@cognelo/plugin-homework-grader": ["packages/plugins/plugin-homework-grader/src/index.ts"],
+      "@cognelo/plugin-homework-grader/server": ["packages/plugins/plugin-homework-grader/src/server.ts"],
+      "@cognelo/plugin-parsons": ["packages/plugins/plugin-parsons/src/index.ts"],
+      "@cognelo/plugin-parsons/server": ["packages/plugins/plugin-parsons/src/server.ts"],
+      "@cognelo/plugin-placeholder": ["packages/plugins/plugin-placeholder/src/index.ts"],
+      "@cognelo/plugin-placeholder/server": ["packages/plugins/plugin-placeholder/src/server.ts"]
     }
   }
 }

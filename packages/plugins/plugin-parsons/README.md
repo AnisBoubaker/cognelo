@@ -2,11 +2,11 @@
 
 This README is for the Parsons plugin only.
 
-It documents plugin-specific behavior, persistence, routes, and contributor workflow. Platform-wide architecture belongs in the root [README.md](/Users/anis/Sync/01_ETS/Dev/cognara/README.md).
+It documents plugin-specific behavior, persistence, routes, and contributor workflow. Platform-wide architecture belongs in the root [README.md](/Users/anis/Sync/01_ETS/Dev/cognelo/README.md).
 
 ## Purpose
 
-`@cognara/plugin-parsons` provides the `parsons-problem` activity type for programming education.
+`@cognelo/plugin-parsons` provides the `parsons-problem` activity type for programming education.
 
 Teachers can:
 
@@ -89,7 +89,7 @@ These are mounted through the platform’s generic plugin dispatcher, not throug
 ## UX Notes
 
 - student rows render in a compact editor-like style
-- syntax highlighting and line numbers come from shared `@cognara/activity-ui`
+- syntax highlighting and line numbers come from shared `@cognelo/activity-ui`
 - scrambling is random on each fresh try/reset
 - order feedback counts minimally misplaced units instead of cascading false counts
 - groups are stored as line ranges so edits inside a group keep the group coherent

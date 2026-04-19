@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
-import { listActivityDefinitions, listActivityPlugins } from "@cognara/activity-sdk";
+import { listActivityDefinitions, listActivityPlugins } from "@cognelo/activity-sdk";
 
 const prisma = new PrismaClient();
 
@@ -37,9 +37,9 @@ async function main() {
   await upsertRole("teacher", "Teacher", "Can create and manage courses and activities.");
   await upsertRole("student", "Student", "Can participate in enrolled courses.");
 
-  const admin = await upsertUser("admin@cognara.local", "Ada Admin", ["admin"]);
-  const teacher = await upsertUser("teacher@cognara.local", "Terry Teacher", ["teacher"]);
-  const student = await upsertUser("student@cognara.local", "Sam Student", ["student"]);
+  const admin = await upsertUser("admin@cognelo.local", "Ada Admin", ["admin"]);
+  const teacher = await upsertUser("teacher@cognelo.local", "Terry Teacher", ["teacher"]);
+  const student = await upsertUser("student@cognelo.local", "Sam Student", ["student"]);
 
   const activityTypesByKey = new Map<string, Awaited<ReturnType<typeof prisma.activityType.upsert>>>();
   const pluginKeyByActivityKey = new Map<string, string>();
@@ -75,13 +75,13 @@ async function main() {
     where: { id: "seed-course-programming-101" },
     update: {
       title: "Programming 101",
-      description: "A sample course for the Cognara ITS foundation.",
+      description: "A sample course for the Cognelo ITS foundation.",
       status: "published"
     },
     create: {
       id: "seed-course-programming-101",
       title: "Programming 101",
-      description: "A sample course for the Cognara ITS foundation.",
+      description: "A sample course for the Cognelo ITS foundation.",
       status: "published",
       createdById: teacher.id
     }

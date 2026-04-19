@@ -1,1 +1,1 @@
-export { CodeRenderer, codeLanguageOptions, normalizeCodeLanguage } from "@cognara/activity-ui";
+export { CodeRenderer, codeLanguageOptions, normalizeCodeLanguage } from "@cognelo/activity-ui";

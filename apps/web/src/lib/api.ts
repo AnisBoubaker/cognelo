@@ -7,7 +7,7 @@ import type {
   CourseUpdate,
   CurrentUser,
   MaterialKind
-} from "@cognara/contracts";
+} from "@cognelo/contracts";
 
 export type Course = {
   id: string;

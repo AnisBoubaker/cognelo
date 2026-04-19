@@ -1,7 +1,7 @@
-import type { CurrentUser } from "@cognara/contracts";
-import { homeworkGraderServerPlugin } from "@cognara/plugin-homework-grader/server";
-import { parsonsServerPlugin } from "@cognara/plugin-parsons/server";
-import { placeholderServerPlugin } from "@cognara/plugin-placeholder/server";
+import type { CurrentUser } from "@cognelo/contracts";
+import { homeworkGraderServerPlugin } from "@cognelo/plugin-homework-grader/server";
+import { parsonsServerPlugin } from "@cognelo/plugin-parsons/server";
+import { placeholderServerPlugin } from "@cognelo/plugin-placeholder/server";
 
 export type ServerActivityRecord = {
   id: string;

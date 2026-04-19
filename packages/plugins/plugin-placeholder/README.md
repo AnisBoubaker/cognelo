@@ -6,7 +6,7 @@ The placeholder plugin exists as a minimal activity shell while a real pedagogic
 
 ## Purpose
 
-`@cognara/plugin-placeholder` provides:
+`@cognelo/plugin-placeholder` provides:
 
 - a lightweight registered activity type
 - localized labels

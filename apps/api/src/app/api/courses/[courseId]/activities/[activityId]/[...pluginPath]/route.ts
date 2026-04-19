@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { resolvePluginRoute } from "@cognara/activity-sdk/server";
-import { AppError, getActivity } from "@cognara/core";
+import { resolvePluginRoute } from "@cognelo/activity-sdk/server";
+import { AppError, getActivity } from "@cognelo/core";
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; activityId: string; pluginPath: string[] }> };

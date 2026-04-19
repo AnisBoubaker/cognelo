@@ -1,4 +1,4 @@
-import type { ActivityPlugin } from "@cognara/activity-sdk";
+import type { ActivityPlugin } from "@cognelo/activity-sdk";
 
 export const placeholderPlugin: ActivityPlugin = {
   key: "placeholder",

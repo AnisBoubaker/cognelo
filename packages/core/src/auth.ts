@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
-import type { CurrentUser } from "@cognara/contracts";
-import { prisma } from "@cognara/db";
+import type { CurrentUser } from "@cognelo/contracts";
+import { prisma } from "@cognelo/db";
 import { unauthorized } from "./errors";
 
 const encoder = new TextEncoder();

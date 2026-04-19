@@ -27,12 +27,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("pointerdown", handlePointerDown);
   }, []);
 
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+    }
+  }, [loading, router, user]);
+
   if (loading) {
     return <main className="page">{t("common.loading")}</main>;
   }
 
   if (!user) {
-    router.replace("/login");
     return <main className="page">{t("common.redirecting")}</main>;
   }
 

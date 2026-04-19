@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { addCourseMembership } from "@cognara/core";
+import { addCourseMembership } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string }> };

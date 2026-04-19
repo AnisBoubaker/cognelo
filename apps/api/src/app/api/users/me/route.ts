@@ -1,4 +1,4 @@
-import { getMe } from "@cognara/core";
+import { getMe } from "@cognelo/core";
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 
 export function OPTIONS() {

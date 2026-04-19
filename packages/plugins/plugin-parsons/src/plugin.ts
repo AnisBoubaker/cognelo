@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ActivityPlugin } from "@cognara/activity-sdk";
+import type { ActivityPlugin } from "@cognelo/activity-sdk";
 import { parsonsDatabaseModule } from "./db";
 
 const parsonsGroupSchema = z.object({

@@ -1,13 +1,13 @@
 {
-  "name": "@cognara/activity-sdk",
+  "name": "@cognelo/activity-sdk",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "src/index.ts",
   "dependencies": {
-    "@cognara/plugin-homework-grader": "0.1.0",
-    "@cognara/plugin-parsons": "0.1.0",
-    "@cognara/plugin-placeholder": "0.1.0",
+    "@cognelo/plugin-homework-grader": "0.1.0",
+    "@cognelo/plugin-parsons": "0.1.0",
+    "@cognelo/plugin-placeholder": "0.1.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { CodeEditor, CodeRenderer, codeLanguageOptions, normalizeCodeLanguage } from "@cognara/activity-ui";
+import { CodeEditor, CodeRenderer, codeLanguageOptions, normalizeCodeLanguage } from "@cognelo/activity-ui";
 import {
   createParsonsGroup,
   createParsonsPrecedenceRule,

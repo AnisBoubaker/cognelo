@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ActivityPlugin } from "@cognara/activity-sdk";
+import type { ActivityPlugin } from "@cognelo/activity-sdk";
 
 export const homeworkGraderPlugin: ActivityPlugin = {
   key: "homework-grader",

@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: cognara
+      POSTGRES_DB: cognelo
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
@@ -10,7 +10,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d cognara"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cognelo"]
       interval: 5s
       timeout: 5s
       retries: 10

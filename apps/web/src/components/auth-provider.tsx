@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import type { CurrentUser } from "@cognara/contracts";
+import type { CurrentUser } from "@cognelo/contracts";
 import { api } from "@/lib/api";
 
 type AuthState = {
