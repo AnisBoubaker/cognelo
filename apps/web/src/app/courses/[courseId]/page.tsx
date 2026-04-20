@@ -17,6 +17,7 @@ export default function CourseDetailPage() {
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [activityTitle, setActivityTitle] = useState("");
   const [activityTypeKey, setActivityTypeKey] = useState("placeholder");
+  const [isAddingActivity, setIsAddingActivity] = useState(false);
   const [groupTitle, setGroupTitle] = useState("");
   const [materialMode, setMaterialMode] = useState<"folder" | "github_repo" | "file">("github_repo");
   const [materialTitle, setMaterialTitle] = useState("");
@@ -62,6 +63,7 @@ export default function CourseDetailPage() {
       });
       await refresh();
       setActivityTitle("");
+      setIsAddingActivity(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("courseDetail.createActivityError"));
     }
@@ -625,72 +627,105 @@ export default function CourseDetailPage() {
                   id: "activities",
                   label: t("courseDetail.activitiesTab"),
                   render: () => (
-                    <div className="split">
-                      <section className="section stack">
-                    <div>
-                      <p className="eyebrow">{t("courseDetail.activitiesEyebrow")}</p>
-                      <h2>{t("courseDetail.activitiesTitle")}</h2>
-                    </div>
-                    {course.activities?.length ? (
-                      course.activities.map((activity) => (
-                        <article className="card card-compact" key={activity.id}>
-                          <span className="eyebrow">{activityCopy(activity.activityType.key).name}</span>
-                          <h3>
-                            <Link href={`/courses/${course.id}/activities/${activity.id}`}>{activity.title}</Link>
-                          </h3>
-                          <p className="muted">
-                            {activityCopy(activity.activityType.key).description || t(`activityLifecycle.${activity.lifecycle}`)}
-                          </p>
-                          <p className="muted">{t(`activityLifecycle.${activity.lifecycle}`)}</p>
+                    <section className="section stack">
+                      <div className="section-heading">
+                        <div>
+                          <p className="eyebrow">{t("courseDetail.activitiesEyebrow")}</p>
+                          <h2>{t("courseDetail.activitiesTitle")}</h2>
+                        </div>
+                        <button className="secondary" type="button" onClick={() => setIsAddingActivity((current) => !current)}>
+                          {isAddingActivity ? t("common.cancel") : t("courseDetail.activityShellTitle")}
+                        </button>
+                      </div>
+
+                      {isAddingActivity ? (
+                        <form className="form inline-panel" onSubmit={createActivity}>
+                          <div>
+                            <p className="eyebrow">{t("courseDetail.activityShellEyebrow")}</p>
+                            <h2>{t("courseDetail.activityShellTitle")}</h2>
+                          </div>
+                          <div className="grid compact-form-grid">
+                            <div className="field">
+                              <label htmlFor="activityTitle">{t("courseDetail.activityTitle")}</label>
+                              <input
+                                id="activityTitle"
+                                value={activityTitle}
+                                onChange={(event) => setActivityTitle(event.target.value)}
+                                placeholder={t("courseDetail.defaultActivityTitle")}
+                                required
+                                minLength={2}
+                              />
+                            </div>
+                            <div className="field">
+                              <label htmlFor="activityType">{t("courseDetail.activityType")}</label>
+                              <select
+                                id="activityType"
+                                value={activityTypeKey}
+                                onChange={(event) => setActivityTypeKey(event.target.value)}
+                              >
+                                {activityTypes.map((type) => (
+                                  <option key={type.id} value={type.key}>
+                                    {activityCopy(type.key).name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
                           <div className="row">
-                            <Link className="button secondary" href={`/courses/${course.id}/activities/${activity.id}`}>
-                              {t("courseDetail.openActivity")}
-                            </Link>
-                            <button className="danger" type="button" onClick={() => removeActivity(activity)}>
-                              {t("courseDetail.removeActivity")}
+                            <button type="submit">{t("courseDetail.attachActivity")}</button>
+                            <button className="secondary" type="button" onClick={() => setIsAddingActivity(false)}>
+                              {t("common.close")}
                             </button>
                           </div>
-                        </article>
-                      ))
-                    ) : (
-                      <p className="muted">{t("courseDetail.noActivities")}</p>
-                    )}
-                      </section>
-                      <section className="section">
-                        <form className="form" onSubmit={createActivity}>
-                      <div>
-                        <p className="eyebrow">{t("courseDetail.activityShellEyebrow")}</p>
-                        <h2>{t("courseDetail.activityShellTitle")}</h2>
-                      </div>
-                      <div className="field">
-                        <label htmlFor="activityTitle">{t("courseDetail.activityTitle")}</label>
-                        <input
-                          id="activityTitle"
-                          value={activityTitle}
-                          onChange={(event) => setActivityTitle(event.target.value)}
-                          placeholder={t("courseDetail.defaultActivityTitle")}
-                          required
-                          minLength={2}
-                        />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="activityType">{t("courseDetail.activityType")}</label>
-                        <select
-                          id="activityType"
-                          value={activityTypeKey}
-                          onChange={(event) => setActivityTypeKey(event.target.value)}
-                        >
-                          {activityTypes.map((type) => (
-                            <option key={type.id} value={type.key}>
-                              {activityCopy(type.key).name}
-                            </option>
-                        ))}
-                      </select>
-                          </div>
-                          <button type="submit">{t("courseDetail.attachActivity")}</button>
                         </form>
-                      </section>
-                    </div>
+                      ) : null}
+
+                      {course.activities?.length ? (
+                        <div className="table-list">
+                          <div className="table-row table-head" aria-hidden="true">
+                            <span>{t("courseDetail.titleHeader")}</span>
+                            <span>{t("courseDetail.activityType")}</span>
+                            <span>{t("courseDetail.statusHeader")}</span>
+                            <span>{t("courseDetail.actionsHeader")}</span>
+                          </div>
+                          {course.activities.map((activity) => (
+                            <div className="table-row" key={activity.id}>
+                              <div className="table-main table-main-stack">
+                                <strong>
+                                  <Link href={`/courses/${course.id}/activities/${activity.id}`}>{activity.title}</Link>
+                                </strong>
+                                <span className="table-meta-note muted">
+                                  {activityCopy(activity.activityType.key).description || t(`activityLifecycle.${activity.lifecycle}`)}
+                                </span>
+                              </div>
+                              <span className="eyebrow">{activityCopy(activity.activityType.key).name}</span>
+                              <span className="table-meta muted">{t(`activityLifecycle.${activity.lifecycle}`)}</span>
+                              <div className="table-actions">
+                                <Link
+                                  aria-label={t("courseDetail.openActivity")}
+                                  className="button secondary icon-button"
+                                  href={`/courses/${course.id}/activities/${activity.id}`}
+                                  title={t("courseDetail.openActivity")}
+                                >
+                                  <MaterialActionIcon name="open" />
+                                </Link>
+                                <button
+                                  aria-label={t("courseDetail.removeActivity")}
+                                  className="danger icon-button"
+                                  title={t("courseDetail.removeActivity")}
+                                  type="button"
+                                  onClick={() => removeActivity(activity)}
+                                >
+                                  <MaterialActionIcon name="remove" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="muted">{t("courseDetail.noActivities")}</p>
+                      )}
+                    </section>
                   )
                 },
                 {
