@@ -581,6 +581,10 @@ a.card:hover,
   padding: 10px 12px;
 }
 
+.table-row-groups {
+  grid-template-columns: minmax(240px, 1.6fr) minmax(190px, 0.95fr) 110px max-content;
+}
+
 .table-row:first-child {
   border-top: 0;
 }
