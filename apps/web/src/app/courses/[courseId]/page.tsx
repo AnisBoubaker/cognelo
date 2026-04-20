@@ -781,13 +781,10 @@ export default function CourseDetailPage() {
                           </div>
                           {course.groups.map((group) => (
                             <div className="table-row table-row-groups" key={group.id}>
-                              <div className="table-main table-main-stack">
+                              <div className="table-main">
                                 <strong>
                                   <Link href={`/courses/${course.id}/groups/${group.id}`}>{group.title}</Link>
                                 </strong>
-                                <span className="table-meta-note muted">
-                                  {formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}
-                                </span>
                               </div>
                               <span className="table-meta muted">{formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</span>
                               <span className="table-meta muted">{group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}</span>
@@ -847,16 +844,43 @@ function formatAvailabilityWindow(
 
   if (availableFrom && availableUntil) {
     return t("groupPage.availableWindow", {
-      from: new Date(availableFrom).toLocaleString(),
-      until: new Date(availableUntil).toLocaleString()
+      from: formatAvailabilityValue(availableFrom),
+      until: formatAvailabilityValue(availableUntil)
     });
   }
 
   if (availableFrom) {
-    return t("groupPage.availableAfter", { from: new Date(availableFrom).toLocaleString() });
+    return t("groupPage.availableAfter", { from: formatAvailabilityValue(availableFrom) });
   }
 
-  return t("groupPage.availableBefore", { until: new Date(availableUntil as string).toLocaleString() });
+  return t("groupPage.availableBefore", { until: formatAvailabilityValue(availableUntil as string) });
+}
+
+function formatAvailabilityValue(value: string) {
+  const date = new Date(value);
+  const isMidnight =
+    date.getHours() === 0 &&
+    date.getMinutes() === 0 &&
+    date.getSeconds() === 0 &&
+    date.getMilliseconds() === 0;
+
+  if (isMidnight) {
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric"
+    }).format(date);
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: false,
+    hourCycle: "h23"
+  }).format(date);
 }
 
 function compareMaterials(left: CourseMaterial, right: CourseMaterial) {

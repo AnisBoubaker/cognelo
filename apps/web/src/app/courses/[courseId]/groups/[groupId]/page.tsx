@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { ChangeEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
+import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import { api, ActivityDefinition, ActivityType, Course, CourseGroup, CourseGroupMaterial, CourseMaterial } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -575,21 +576,19 @@ export default function CourseGroupPage() {
                       </div>
                       <div className="field">
                         <label htmlFor="assignAvailableFrom">{t("groupPage.availableFrom")}</label>
-                        <input
+                        <DateTimeMinuteInput
                           id="assignAvailableFrom"
-                          type="datetime-local"
                           value={assignAvailableFrom}
-                          onChange={(event) => setAssignAvailableFrom(event.target.value)}
+                          onChange={setAssignAvailableFrom}
                           disabled={!canManage}
                         />
                       </div>
                       <div className="field">
                         <label htmlFor="assignAvailableUntil">{t("groupPage.availableUntil")}</label>
-                        <input
+                        <DateTimeMinuteInput
                           id="assignAvailableUntil"
-                          type="datetime-local"
                           value={assignAvailableUntil}
-                          onChange={(event) => setAssignAvailableUntil(event.target.value)}
+                          onChange={setAssignAvailableUntil}
                           disabled={!canManage}
                         />
                       </div>
@@ -1010,20 +1009,18 @@ export default function CourseGroupPage() {
                       <div className="split">
                         <div className="field">
                           <label htmlFor="group-available-from">{t("groupPage.availableFrom")}</label>
-                          <input
+                          <DateTimeMinuteInput
                             id="group-available-from"
-                            type="datetime-local"
                             value={groupAvailableFrom}
-                            onChange={(event) => setGroupAvailableFrom(event.target.value)}
+                            onChange={setGroupAvailableFrom}
                           />
                         </div>
                         <div className="field">
                           <label htmlFor="group-available-until">{t("groupPage.availableUntil")}</label>
-                          <input
+                          <DateTimeMinuteInput
                             id="group-available-until"
-                            type="datetime-local"
                             value={groupAvailableUntil}
-                            onChange={(event) => setGroupAvailableUntil(event.target.value)}
+                            onChange={setGroupAvailableUntil}
                           />
                         </div>
                       </div>
@@ -1096,21 +1093,19 @@ function GroupActivityCard({
       <div className="split">
         <div className="field">
           <label htmlFor={`available-from-${assignment.id}`}>{t("groupPage.availableFrom")}</label>
-          <input
+          <DateTimeMinuteInput
             id={`available-from-${assignment.id}`}
-            type="datetime-local"
             value={availableFrom}
-            onChange={(event) => setAvailableFrom(event.target.value)}
+            onChange={setAvailableFrom}
             disabled={saving || !canManage}
           />
         </div>
         <div className="field">
           <label htmlFor={`available-until-${assignment.id}`}>{t("groupPage.availableUntil")}</label>
-          <input
+          <DateTimeMinuteInput
             id={`available-until-${assignment.id}`}
-            type="datetime-local"
             value={availableUntil}
-            onChange={(event) => setAvailableUntil(event.target.value)}
+            onChange={setAvailableUntil}
             disabled={saving || !canManage}
           />
         </div>
@@ -1162,16 +1157,43 @@ function formatAvailabilityWindow(
 
   if (availableFrom && availableUntil) {
     return t("groupPage.availableWindow", {
-      from: new Date(availableFrom).toLocaleString(),
-      until: new Date(availableUntil).toLocaleString()
+      from: formatAvailabilityValue(availableFrom),
+      until: formatAvailabilityValue(availableUntil)
     });
   }
 
   if (availableFrom) {
-    return t("groupPage.availableAfter", { from: new Date(availableFrom).toLocaleString() });
+    return t("groupPage.availableAfter", { from: formatAvailabilityValue(availableFrom) });
   }
 
-  return t("groupPage.availableBefore", { until: new Date(availableUntil as string).toLocaleString() });
+  return t("groupPage.availableBefore", { until: formatAvailabilityValue(availableUntil as string) });
+}
+
+function formatAvailabilityValue(value: string) {
+  const date = new Date(value);
+  const isMidnight =
+    date.getHours() === 0 &&
+    date.getMinutes() === 0 &&
+    date.getSeconds() === 0 &&
+    date.getMilliseconds() === 0;
+
+  if (isMidnight) {
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric"
+    }).format(date);
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: false,
+    hourCycle: "h23"
+  }).format(date);
 }
 
 type MaterialTreeNode = {
