@@ -67,7 +67,8 @@ async function main() {
 
   const placeholderType = activityTypesByKey.get("placeholder");
   const parsonsType = activityTypesByKey.get("parsons-problem");
-  if (!placeholderType || !parsonsType) {
+  const mcqType = activityTypesByKey.get("mcq");
+  if (!placeholderType || !parsonsType || !mcqType) {
     throw new Error(`Missing seeded activity types from plugin registry: ${listActivityDefinitions().map((definition) => definition.key).join(", ")}`);
   }
 
@@ -190,6 +191,76 @@ async function main() {
         precedenceRules: []
       },
       metadata: { researchTags: ["parsons", "loops"], instrumented: false, plugin: pluginKeyByActivityKey.get("parsons-problem") },
+      createdById: teacher.id
+    }
+  });
+
+  await prisma.activity.upsert({
+    where: { id: "seed-activity-mcq" },
+    update: {
+      title: "Basic Python output MCQ",
+      description: "Answer the questions by choosing the correct output or concept.",
+      lifecycle: "published",
+      config: {
+        defaultCodeLanguage: "python",
+        source: [
+          "This short MCQ checks Python basics.",
+          "",
+          "## Output prediction",
+          "What does this program print?",
+          "",
+          "```python",
+          "value = 2 * 3",
+          "print(value)",
+          "```",
+          "",
+          "- [ ] 5",
+          "- [x] 6",
+          "- [ ] 23",
+          "",
+          "## Choose the collection types",
+          "Which of these are Python collection types?",
+          "",
+          "- [x] `list`",
+          "- [x] `dict`",
+          "- [ ] `switch`"
+        ].join("\n")
+      },
+      metadata: { researchTags: ["mcq", "python-basics"], instrumented: false, plugin: pluginKeyByActivityKey.get("mcq") }
+    },
+    create: {
+      id: "seed-activity-mcq",
+      courseId: course.id,
+      activityTypeId: mcqType.id,
+      title: "Basic Python output MCQ",
+      description: "Answer the questions by choosing the correct output or concept.",
+      lifecycle: "published",
+      config: {
+        defaultCodeLanguage: "python",
+        source: [
+          "This short MCQ checks Python basics.",
+          "",
+          "## Output prediction",
+          "What does this program print?",
+          "",
+          "```python",
+          "value = 2 * 3",
+          "print(value)",
+          "```",
+          "",
+          "- [ ] 5",
+          "- [x] 6",
+          "- [ ] 23",
+          "",
+          "## Choose the collection types",
+          "Which of these are Python collection types?",
+          "",
+          "- [x] `list`",
+          "- [x] `dict`",
+          "- [ ] `switch`"
+        ].join("\n")
+      },
+      metadata: { researchTags: ["mcq", "python-basics"], instrumented: false, plugin: pluginKeyByActivityKey.get("mcq") },
       createdById: teacher.id
     }
   });

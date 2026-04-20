@@ -27,7 +27,9 @@
       "@cognelo/plugin-parsons": ["packages/plugins/plugin-parsons/src/index.ts"],
       "@cognelo/plugin-parsons/server": ["packages/plugins/plugin-parsons/src/server.ts"],
       "@cognelo/plugin-placeholder": ["packages/plugins/plugin-placeholder/src/index.ts"],
-      "@cognelo/plugin-placeholder/server": ["packages/plugins/plugin-placeholder/src/server.ts"]
+      "@cognelo/plugin-placeholder/server": ["packages/plugins/plugin-placeholder/src/server.ts"],
+      "@cognelo/plugin-mcq": ["packages/plugins/plugin-mcq/src/index.ts"],
+      "@cognelo/plugin-mcq/server": ["packages/plugins/plugin-mcq/src/server.ts"]
     }
   }
 }

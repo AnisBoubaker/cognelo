@@ -1,17 +1,17 @@
 {
-  "name": "@cognelo/activity-sdk",
+  "name": "@cognelo/plugin-mcq",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "src/index.ts",
   "dependencies": {
-    "@cognelo/plugin-homework-grader": "0.1.0",
-    "@cognelo/plugin-parsons": "0.1.0",
-    "@cognelo/plugin-placeholder": "0.1.0",
-    "@cognelo/plugin-mcq": "0.1.0",
+    "@cognelo/activity-ui": "0.1.0",
+    "katex": "^0.16.45",
+    "react": "^19.2.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/react": "^19.2.7",
     "typescript": "^5.4.5"
   },
   "scripts": {

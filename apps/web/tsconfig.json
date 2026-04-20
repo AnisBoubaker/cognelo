@@ -35,6 +35,9 @@
       ],
       "@cognelo/plugin-placeholder": [
         "../../packages/plugins/plugin-placeholder/src/index.ts"
+      ],
+      "@cognelo/plugin-mcq": [
+        "../../packages/plugins/plugin-mcq/src/index.ts"
       ]
     }
   },
