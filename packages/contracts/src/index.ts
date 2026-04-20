@@ -26,6 +26,9 @@ export type MaterialKind = z.infer<typeof MaterialKindSchema>;
 export const ActivityLifecycleSchema = z.enum(["draft", "published", "paused", "archived"]);
 export type ActivityLifecycle = z.infer<typeof ActivityLifecycleSchema>;
 
+export const CourseGroupStatusSchema = z.enum(["draft", "published"]);
+export type CourseGroupStatus = z.infer<typeof CourseGroupStatusSchema>;
+
 export const LoginInputSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8)
@@ -41,6 +44,29 @@ export type CourseInput = z.infer<typeof CourseInputSchema>;
 
 export const CourseUpdateSchema = CourseInputSchema.partial();
 export type CourseUpdate = z.infer<typeof CourseUpdateSchema>;
+
+export const CourseGroupInputSchema = z.object({
+  title: z.string().min(2).max(160)
+});
+export type CourseGroupInput = z.infer<typeof CourseGroupInputSchema>;
+
+export const CourseGroupUpdateSchema = z
+  .object({
+    title: z.string().min(2).max(160).optional(),
+    status: CourseGroupStatusSchema.optional(),
+    availableFrom: z.string().datetime().nullable().optional(),
+    availableUntil: z.string().datetime().nullable().optional()
+  })
+  .superRefine((value, context) => {
+    if (value.availableFrom && value.availableUntil && new Date(value.availableUntil) < new Date(value.availableFrom)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["availableUntil"],
+        message: "The availability end must be after the start."
+      });
+    }
+  });
+export type CourseGroupUpdate = z.infer<typeof CourseGroupUpdateSchema>;
 
 const CourseMaterialBaseSchema = z.object({
   title: z.string().min(2).max(180),
@@ -83,6 +109,12 @@ export type CourseMaterialInput = z.infer<typeof CourseMaterialInputSchema>;
 export const CourseMaterialUpdateSchema = CourseMaterialBaseSchema.partial().superRefine(validateCourseMaterialUrl);
 export type CourseMaterialUpdate = z.infer<typeof CourseMaterialUpdateSchema>;
 
+export const CourseGroupMaterialInputSchema = CourseMaterialBaseSchema.superRefine(validateCourseMaterialCreate);
+export type CourseGroupMaterialInput = z.infer<typeof CourseGroupMaterialInputSchema>;
+
+export const CourseGroupMaterialUpdateSchema = CourseMaterialBaseSchema.partial().superRefine(validateCourseMaterialUrl);
+export type CourseGroupMaterialUpdate = z.infer<typeof CourseGroupMaterialUpdateSchema>;
+
 export const ActivityInputSchema = z.object({
   activityTypeKey: z.string().min(2).max(80),
   title: z.string().min(2).max(180),
@@ -96,6 +128,25 @@ export type ActivityInput = z.infer<typeof ActivityInputSchema>;
 
 export const ActivityUpdateSchema = ActivityInputSchema.partial();
 export type ActivityUpdate = z.infer<typeof ActivityUpdateSchema>;
+
+export const CourseGroupActivityInputSchema = z.object({
+  activityId: z.string().cuid(),
+  availableFrom: z.string().datetime().nullable().optional(),
+  availableUntil: z.string().datetime().nullable().optional(),
+  config: z.record(z.unknown()).optional().default({}),
+  metadata: z.record(z.unknown()).optional().default({}),
+  position: z.number().int().min(0).optional().default(0)
+});
+export type CourseGroupActivityInput = z.infer<typeof CourseGroupActivityInputSchema>;
+
+export const CourseGroupActivityUpdateSchema = z.object({
+  availableFrom: z.string().datetime().nullable().optional(),
+  availableUntil: z.string().datetime().nullable().optional(),
+  config: z.record(z.unknown()).optional(),
+  metadata: z.record(z.unknown()).optional(),
+  position: z.number().int().min(0).optional()
+});
+export type CourseGroupActivityUpdate = z.infer<typeof CourseGroupActivityUpdateSchema>;
 
 export const EnrollmentInputSchema = z.object({
   userId: z.string().cuid(),

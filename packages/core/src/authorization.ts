@@ -23,14 +23,21 @@ export async function assertCanCreateCourse(user: CurrentUser) {
 }
 
 export async function assertCanManageCourse(user: CurrentUser, courseId: string) {
-  if (isAdmin(user)) {
-    return;
-  }
-  const memberships = await getCourseMembership(user.id, courseId);
-  if (memberships.some((membership) => ["owner", "teacher", "ta"].includes(membership.role))) {
+  if (await canManageCourse(user, courseId)) {
     return;
   }
   throw forbidden();
+}
+
+export async function canManageCourse(user: CurrentUser, courseId: string) {
+  if (isAdmin(user)) {
+    return true;
+  }
+  const memberships = await getCourseMembership(user.id, courseId);
+  if (memberships.some((membership) => ["owner", "teacher", "ta"].includes(membership.role))) {
+    return true;
+  }
+  return false;
 }
 
 export async function assertCanViewCourse(user: CurrentUser, courseId: string) {

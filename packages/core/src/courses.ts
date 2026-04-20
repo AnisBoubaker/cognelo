@@ -10,6 +10,9 @@ const courseInclude = {
   activities: {
     include: { activityType: true },
     orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }]
+  },
+  groups: {
+    orderBy: [{ updatedAt: "desc" as const }, { createdAt: "desc" as const }]
   }
 };
 
