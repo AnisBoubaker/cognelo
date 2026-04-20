@@ -198,13 +198,13 @@ async function main() {
   await prisma.activity.upsert({
     where: { id: "seed-activity-mcq" },
     update: {
-      title: "Basic Python output MCQ",
+      title: "Basic Python multiple choice questions",
       description: "Answer the questions by choosing the correct output or concept.",
       lifecycle: "published",
       config: {
         defaultCodeLanguage: "python",
         source: [
-          "This short MCQ checks Python basics.",
+          "This short multiple choice questions activity checks Python basics.",
           "",
           "## Output prediction",
           "What does this program print?",
@@ -232,13 +232,13 @@ async function main() {
       id: "seed-activity-mcq",
       courseId: course.id,
       activityTypeId: mcqType.id,
-      title: "Basic Python output MCQ",
+      title: "Basic Python multiple choice questions",
       description: "Answer the questions by choosing the correct output or concept.",
       lifecycle: "published",
       config: {
         defaultCodeLanguage: "python",
         source: [
-          "This short MCQ checks Python basics.",
+          "This short multiple choice questions activity checks Python basics.",
           "",
           "## Output prediction",
           "What does this program print?",

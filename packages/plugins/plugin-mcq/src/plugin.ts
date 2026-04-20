@@ -85,7 +85,7 @@ const defaultMcqSource = [
 
 export const mcqPlugin: ActivityPlugin = {
   key: "mcq",
-  name: "MCQ",
+  name: "Multpiple choice questions",
   db: {
     namespace: "plugin_mcq",
     tables: [],
@@ -94,23 +94,23 @@ export const mcqPlugin: ActivityPlugin = {
   activities: [
     {
       key: "mcq",
-      name: "MCQ",
-      description: "Single-choice and multiple-choice questions authored in a text-first Markdown-like format.",
+      name: "Multpiple choice questions",
+      description: "Single-choice and multiple-choice activities authored in a text-first Markdown-like format.",
       i18n: {
         en: {
-          name: "MCQ",
-          description: "Single-choice and multiple-choice questions authored in a text-first Markdown-like format.",
-          defaultTitle: "MCQ"
+          name: "Multpiple choice questions",
+          description: "Single-choice and multiple-choice activities authored in a text-first Markdown-like format.",
+          defaultTitle: "Multpiple choice questions"
         },
         fr: {
-          name: "MCQ",
-          description: "Questions à choix simple ou multiple rédigées dans un format textuel inspiré de Markdown.",
-          defaultTitle: "MCQ"
+          name: "Questions à choix multiples",
+          description: "Activités à choix simple ou multiple rédigées dans un format textuel inspiré de Markdown.",
+          defaultTitle: "Questions à choix multiples"
         },
         zh: {
-          name: "测验",
-          description: "使用文本优先、类 Markdown 格式编写的单选题和多选题。",
-          defaultTitle: "测验"
+          name: "选择题",
+          description: "使用文本优先、类 Markdown 格式编写的单选题和多选题活动。",
+          defaultTitle: "选择题"
         }
       },
       defaultConfig: {

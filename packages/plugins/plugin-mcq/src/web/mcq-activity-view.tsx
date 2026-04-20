@@ -16,6 +16,7 @@ type McqActivityViewProps = {
   activity: ActivityLike;
   canManage: boolean;
   onSave: (input: { title: string; description: string; config: Record<string, unknown> }) => Promise<ActivityLike>;
+  locale?: "en" | "fr" | "zh";
 };
 
 type StudentAnswerState = Record<string, string[]>;
@@ -25,7 +26,59 @@ const fallbackConfig = {
   defaultCodeLanguage: "python"
 };
 
-export function McqActivityView({ activity, canManage, onSave }: McqActivityViewProps) {
+const copyByLocale = {
+  en: {
+    authoringTitle: "Multiple choice questions authoring",
+    authoringHelp: "Write the activity as text. Use ## headings for questions and task-list syntax like - [x] and - [ ] for the choices.",
+    title: "Title",
+    description: "Description",
+    defaultCodeLanguage: "Default code language",
+    source: "Multiple choice questions source",
+    parsingIssues: "Parsing issues",
+    line: "Line",
+    saving: "Saving...",
+    save: "Save multiple choice questions",
+    saved: "Multiple choice questions activity saved.",
+    saveError: "Unable to save the multiple choice questions activity right now.",
+    studentPreview: "Student preview",
+    question: "Question"
+  },
+  fr: {
+    authoringTitle: "Edition des questions a choix multiples",
+    authoringHelp: "Redigez l'activite sous forme de texte. Utilisez des titres ## pour les questions et la syntaxe de liste de taches comme - [x] et - [ ] pour les choix.",
+    title: "Titre",
+    description: "Description",
+    defaultCodeLanguage: "Langage de code par defaut",
+    source: "Source des questions a choix multiples",
+    parsingIssues: "Problemes d'analyse",
+    line: "Ligne",
+    saving: "Enregistrement...",
+    save: "Enregistrer les questions a choix multiples",
+    saved: "L'activite de questions a choix multiples a ete enregistree.",
+    saveError: "Impossible d'enregistrer l'activite de questions a choix multiples pour le moment.",
+    studentPreview: "Apercu etudiant",
+    question: "Question"
+  },
+  zh: {
+    authoringTitle: "选择题编辑",
+    authoringHelp: "使用文本来编写活动。用 ## 标题表示题目，用 - [x] 和 - [ ] 这样的任务列表语法表示选项。",
+    title: "标题",
+    description: "说明",
+    defaultCodeLanguage: "默认代码语言",
+    source: "选择题源码",
+    parsingIssues: "解析问题",
+    line: "第",
+    saving: "保存中...",
+    save: "保存选择题",
+    saved: "选择题活动已保存。",
+    saveError: "暂时无法保存选择题活动。",
+    studentPreview: "学生预览",
+    question: "问题"
+  }
+} as const;
+
+export function McqActivityView({ activity, canManage, onSave, locale = "en" }: McqActivityViewProps) {
+  const copy = copyByLocale[locale] ?? copyByLocale.en;
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);
   const [source, setSource] = useState(String(activity.config?.source ?? fallbackConfig.source));
@@ -83,9 +136,9 @@ export function McqActivityView({ activity, canManage, onSave }: McqActivityView
           defaultCodeLanguage
         }
       });
-      setSaveMessage("MCQ saved.");
+      setSaveMessage(copy.saved);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save the MCQ right now.");
+      setError(err instanceof Error ? err.message : copy.saveError);
     } finally {
       setSaving(false);
     }
@@ -117,25 +170,22 @@ export function McqActivityView({ activity, canManage, onSave }: McqActivityView
     return (
       <form className="section stack" onSubmit={saveMcq}>
         <div className="stack">
-          <h2>MCQ authoring</h2>
-          <p className="muted">
-            Write the activity as text. Use <code>##</code> headings for questions and task-list syntax like <code>- [x]</code> and{" "}
-            <code>- [ ]</code> for the choices.
-          </p>
+          <h2>{copy.authoringTitle}</h2>
+          <p className="muted">{copy.authoringHelp}</p>
         </div>
 
         <div className="field">
-          <label htmlFor="mcq-title">Title</label>
+          <label htmlFor="mcq-title">{copy.title}</label>
           <input id="mcq-title" value={title} onChange={(event) => setTitle(event.target.value)} />
         </div>
 
         <div className="field">
-          <label htmlFor="mcq-description">Description</label>
+          <label htmlFor="mcq-description">{copy.description}</label>
           <textarea id="mcq-description" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />
         </div>
 
         <div className="field">
-          <label htmlFor="mcq-default-language">Default code language</label>
+          <label htmlFor="mcq-default-language">{copy.defaultCodeLanguage}</label>
           <select id="mcq-default-language" value={defaultCodeLanguage} onChange={(event) => setDefaultCodeLanguage(event.target.value)}>
             {codeLanguageOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -146,16 +196,16 @@ export function McqActivityView({ activity, canManage, onSave }: McqActivityView
         </div>
 
         <div className="stack">
-          <span>MCQ source</span>
+          <span>{copy.source}</span>
           <CodeEditor id="mcq-source" value={source} onChange={setSource} language="markdown" minHeight={420} />
         </div>
 
         {parsedMcq.errors.length ? (
           <section className="stack" style={{ border: "1px solid rgba(210, 61, 71, 0.25)", borderRadius: 10, padding: 16 }}>
-            <h3>Parsing issues</h3>
+            <h3>{copy.parsingIssues}</h3>
             <ul className="stack" style={{ gap: 8, margin: 0, paddingLeft: 20 }}>
               {parsedMcq.errors.map((issue, index) => (
-                <li key={`${issue.line}-${index}`}>Line {issue.line}: {issue.message}</li>
+                <li key={`${issue.line}-${index}`}>{copy.line} {issue.line}: {issue.message}</li>
               ))}
             </ul>
           </section>
@@ -166,12 +216,12 @@ export function McqActivityView({ activity, canManage, onSave }: McqActivityView
 
         <div className="row">
           <button type="submit" disabled={saving || parsedMcq.errors.length > 0 || parsedMcq.questions.length === 0}>
-            {saving ? "Saving..." : "Save MCQ"}
+            {saving ? copy.saving : copy.save}
           </button>
         </div>
 
         <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
-          <h3>Student preview</h3>
+          <h3>{copy.studentPreview}</h3>
           <McqStudentView
             parsedMcq={parsedMcq}
             studentAnswers={studentAnswers}
@@ -184,6 +234,7 @@ export function McqActivityView({ activity, canManage, onSave }: McqActivityView
             }}
             onSingleChoice={updateSingleChoice}
             onMultipleChoice={updateMultipleChoice}
+            questionLabel={copy.question}
           />
         </section>
       </form>
@@ -204,6 +255,7 @@ export function McqActivityView({ activity, canManage, onSave }: McqActivityView
         }}
         onSingleChoice={updateSingleChoice}
         onMultipleChoice={updateMultipleChoice}
+        questionLabel={copy.question}
       />
     </section>
   );
@@ -217,7 +269,8 @@ function McqStudentView({
   onSubmit,
   onReset,
   onSingleChoice,
-  onMultipleChoice
+  onMultipleChoice,
+  questionLabel
 }: {
   parsedMcq: ParsedMcq;
   studentAnswers: StudentAnswerState;
@@ -227,6 +280,7 @@ function McqStudentView({
   onReset: () => void;
   onSingleChoice: (question: McqQuestion, choiceId: string) => void;
   onMultipleChoice: (question: McqQuestion, choiceId: string, checked: boolean) => void;
+  questionLabel: string;
 }) {
   return (
     <div className="stack">
@@ -241,7 +295,7 @@ function McqStudentView({
         return (
           <article key={question.id} className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 18 }}>
             <div className="stack" style={{ gap: 6 }}>
-              <p className="eyebrow">Question {index + 1}</p>
+              <p className="eyebrow">{questionLabel} {index + 1}</p>
               <h3 style={{ margin: 0 }}>{question.title}</h3>
             </div>
 
