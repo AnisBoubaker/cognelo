@@ -264,6 +264,88 @@ async function main() {
       createdById: teacher.id
     }
   });
+
+  const group = await prisma.courseGroup.upsert({
+    where: { id: "seed-group-programming-101-section-a" },
+    update: {
+      title: "Section A",
+      description: "Monday lab group with its own launch notes and activity schedule.",
+      status: "published",
+      availableFrom: new Date("2026-04-20T13:00:00.000Z"),
+      availableUntil: new Date("2026-05-30T03:59:00.000Z")
+    },
+    create: {
+      id: "seed-group-programming-101-section-a",
+      courseId: course.id,
+      title: "Section A",
+      description: "Monday lab group with its own launch notes and activity schedule.",
+      status: "published",
+      availableFrom: new Date("2026-04-20T13:00:00.000Z"),
+      availableUntil: new Date("2026-05-30T03:59:00.000Z"),
+      createdById: teacher.id
+    }
+  });
+
+  await prisma.courseGroupMaterial.upsert({
+    where: { id: "seed-group-material-checklist" },
+    update: {
+      title: "Section A checklist",
+      kind: "markdown",
+      body: "## Section A checklist\n\n- Bring your laptop\n- Open the starter repository\n- Start with the assigned activities below",
+      metadata: { audience: "section-a" }
+    },
+    create: {
+      id: "seed-group-material-checklist",
+      groupId: group.id,
+      title: "Section A checklist",
+      kind: "markdown",
+      body: "## Section A checklist\n\n- Bring your laptop\n- Open the starter repository\n- Start with the assigned activities below",
+      metadata: { audience: "section-a" },
+      createdById: teacher.id
+    }
+  });
+
+  await prisma.courseGroupActivity.upsert({
+    where: {
+      groupId_activityId: {
+        groupId: group.id,
+        activityId: "seed-activity-parsons"
+      }
+    },
+    update: {
+      availableFrom: new Date("2026-04-20T13:00:00.000Z"),
+      availableUntil: new Date("2026-05-01T03:59:00.000Z"),
+      position: 0
+    },
+    create: {
+      groupId: group.id,
+      activityId: "seed-activity-parsons",
+      availableFrom: new Date("2026-04-20T13:00:00.000Z"),
+      availableUntil: new Date("2026-05-01T03:59:00.000Z"),
+      position: 0
+    }
+  });
+
+  await prisma.courseGroupActivity.upsert({
+    where: {
+      groupId_activityId: {
+        groupId: group.id,
+        activityId: "seed-activity-mcq"
+      }
+    },
+    update: {
+      availableFrom: new Date("2026-04-22T13:00:00.000Z"),
+      availableUntil: new Date("2026-05-08T03:59:00.000Z"),
+      position: 1
+    },
+    create: {
+      groupId: group.id,
+      activityId: "seed-activity-mcq",
+      availableFrom: new Date("2026-04-22T13:00:00.000Z"),
+      availableUntil: new Date("2026-05-08T03:59:00.000Z"),
+      position: 1
+    }
+  });
 }
 
 main()

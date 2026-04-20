@@ -16,6 +16,7 @@ export default function CourseDetailPage() {
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [activityTitle, setActivityTitle] = useState("");
   const [activityTypeKey, setActivityTypeKey] = useState("placeholder");
+  const [groupTitle, setGroupTitle] = useState("");
   const [materialMode, setMaterialMode] = useState<"folder" | "github_repo" | "file">("github_repo");
   const [materialTitle, setMaterialTitle] = useState("");
   const [githubUrl, setGithubUrl] = useState("");
@@ -62,6 +63,20 @@ export default function CourseDetailPage() {
       setActivityTitle("");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("courseDetail.createActivityError"));
+    }
+  }
+
+  async function createGroup(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    try {
+      await api.createGroup(courseId, {
+        title: groupTitle
+      });
+      await refresh();
+      setGroupTitle("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.createGroupError"));
     }
   }
 
@@ -435,6 +450,54 @@ export default function CourseDetailPage() {
                 </form>
               </section>
             </div>
+            <div className="split">
+              <section className="section stack">
+                <div>
+                  <p className="eyebrow">{t("courseDetail.groupsEyebrow")}</p>
+                  <h2>{t("courseDetail.groupsTitle")}</h2>
+                </div>
+                {course.groups?.length ? (
+                  course.groups.map((group) => (
+                    <article className="card" key={group.id}>
+                      <span className="eyebrow">
+                        {t("courseDetail.groupCardEyebrow")} · {group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}
+                      </span>
+                      <h3>
+                        <Link href={`/courses/${course.id}/groups/${group.id}`}>{group.title}</Link>
+                      </h3>
+                      <p className="muted">{formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</p>
+                      <div className="row">
+                        <Link className="button secondary" href={`/courses/${course.id}/groups/${group.id}`}>
+                          {t("courseDetail.openGroup")}
+                        </Link>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p className="muted">{t("courseDetail.noGroups")}</p>
+                )}
+              </section>
+              <section className="section">
+                <form className="form" onSubmit={createGroup}>
+                  <div>
+                    <p className="eyebrow">{t("courseDetail.groupShellEyebrow")}</p>
+                    <h2>{t("courseDetail.groupShellTitle")}</h2>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="groupTitle">{t("courseDetail.groupTitle")}</label>
+                    <input
+                      id="groupTitle"
+                      value={groupTitle}
+                      onChange={(event) => setGroupTitle(event.target.value)}
+                      placeholder={t("courseDetail.groupTitlePlaceholder")}
+                      required
+                      minLength={2}
+                    />
+                  </div>
+                  <button type="submit">{t("courseDetail.createGroup")}</button>
+                </form>
+              </section>
+            </div>
             <section className="section stack">
               <div className="section-heading">
                 <div>
@@ -681,6 +744,29 @@ function formatBytes(bytes: number) {
     return `${(bytes / 1024).toFixed(1)} KB`;
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatAvailabilityWindow(
+  availableFrom: string | null | undefined,
+  availableUntil: string | null | undefined,
+  t: (key: string, vars?: Record<string, string | number>) => string
+) {
+  if (!availableFrom && !availableUntil) {
+    return t("groupPage.availableAlways");
+  }
+
+  if (availableFrom && availableUntil) {
+    return t("groupPage.availableWindow", {
+      from: new Date(availableFrom).toLocaleString(),
+      until: new Date(availableUntil).toLocaleString()
+    });
+  }
+
+  if (availableFrom) {
+    return t("groupPage.availableAfter", { from: new Date(availableFrom).toLocaleString() });
+  }
+
+  return t("groupPage.availableBefore", { until: new Date(availableUntil as string).toLocaleString() });
 }
 
 function compareMaterials(left: CourseMaterial, right: CourseMaterial) {

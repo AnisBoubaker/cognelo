@@ -1,6 +1,13 @@
 import type {
   ActivityInput,
   ActivityUpdate,
+  CourseGroupActivityInput,
+  CourseGroupActivityUpdate,
+  CourseGroupInput,
+  CourseGroupStatus,
+  CourseGroupMaterialInput,
+  CourseGroupMaterialUpdate,
+  CourseGroupUpdate,
   CourseInput,
   CourseMaterialInput,
   CourseMaterialUpdate,
@@ -17,9 +24,32 @@ export type Course = {
   memberships?: unknown[];
   materials?: CourseMaterial[];
   activities?: Activity[];
+  groups?: CourseGroup[];
 };
 
 export type CourseMaterial = {
+  id: string;
+  title: string;
+  kind: MaterialKind;
+  parentId?: string | null;
+  body?: string | null;
+  url?: string | null;
+  metadata?: Record<string, unknown>;
+  position: number;
+};
+
+export type CourseGroup = {
+  id: string;
+  title: string;
+  description: string;
+  status: CourseGroupStatus;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
+  materials?: CourseGroupMaterial[];
+  activities?: CourseGroupActivityAssignment[];
+};
+
+export type CourseGroupMaterial = {
   id: string;
   title: string;
   kind: MaterialKind;
@@ -62,6 +92,17 @@ export type Activity = {
   metadata?: Record<string, unknown>;
   activityType: ActivityType;
   position: number;
+};
+
+export type CourseGroupActivityAssignment = {
+  id: string;
+  activityId: string;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
+  config?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  position: number;
+  activity: Activity;
 };
 
 export type ParsonsAttemptEvaluation = {
@@ -146,6 +187,22 @@ export const api = {
       body: JSON.stringify(input)
     }),
   archiveCourse: (courseId: string) => request<{ course: Course }>(`/courses/${courseId}`, { method: "DELETE" }),
+  groups: (courseId: string) => request<{ groups: CourseGroup[] }>(`/courses/${courseId}/groups`),
+  group: (courseId: string, groupId: string) => request<{ group: CourseGroup }>(`/courses/${courseId}/groups/${groupId}`),
+  createGroup: (courseId: string, input: CourseGroupInput) =>
+    request<{ group: CourseGroup }>(`/courses/${courseId}/groups`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  updateGroup: (courseId: string, groupId: string, input: CourseGroupUpdate) =>
+    request<{ group: CourseGroup }>(`/courses/${courseId}/groups/${groupId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  deleteGroup: (courseId: string, groupId: string) =>
+    request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}`, {
+      method: "DELETE"
+    }),
   activityTypes: () => request<{ activityTypes: ActivityType[]; registeredDefinitions: ActivityDefinition[] }>("/activity-types"),
   activity: (courseId: string, activityId: string) =>
     request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}`),
@@ -222,5 +279,71 @@ export const api = {
     return body as { material: CourseMaterial };
   },
   materialDownloadUrl: (courseId: string, materialId: string) =>
-    `${API_URL}/api/courses/${courseId}/materials/${materialId}/download`
+    `${API_URL}/api/courses/${courseId}/materials/${materialId}/download`,
+  groupMaterials: (courseId: string, groupId: string) =>
+    request<{ materials: CourseGroupMaterial[] }>(`/courses/${courseId}/groups/${groupId}/materials`),
+  createGroupMaterial: (courseId: string, groupId: string, input: CourseGroupMaterialInput) =>
+    request<{ material: CourseGroupMaterial }>(`/courses/${courseId}/groups/${groupId}/materials`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  updateGroupMaterial: (courseId: string, groupId: string, materialId: string, input: CourseGroupMaterialUpdate) =>
+    request<{ material: CourseGroupMaterial }>(`/courses/${courseId}/groups/${groupId}/materials/${materialId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  deleteGroupMaterial: (courseId: string, groupId: string, materialId: string) =>
+    request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}/materials/${materialId}`, {
+      method: "DELETE"
+    }),
+  uploadGroupMaterial: async (
+    courseId: string,
+    groupId: string,
+    input: { title: string; file: File; parentId?: string | null; position?: number }
+  ) => {
+    const formData = new FormData();
+    formData.append("title", input.title);
+    formData.append("file", input.file);
+    if (input.parentId) {
+      formData.append("parentId", input.parentId);
+    }
+    if (input.position !== undefined) {
+      formData.append("position", String(input.position));
+    }
+
+    const response = await fetch(`${API_URL}/api/courses/${courseId}/groups/${groupId}/materials/upload`, {
+      cache: "no-store",
+      method: "POST",
+      credentials: "include",
+      body: formData
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(body?.error?.message ?? "Upload failed.");
+    }
+    return body as { material: CourseGroupMaterial };
+  },
+  groupMaterialDownloadUrl: (courseId: string, groupId: string, materialId: string) =>
+    `${API_URL}/api/courses/${courseId}/groups/${groupId}/materials/${materialId}/download`,
+  groupActivityAssignments: (courseId: string, groupId: string) =>
+    request<{ assignments: CourseGroupActivityAssignment[] }>(`/courses/${courseId}/groups/${groupId}/activities`),
+  assignGroupActivity: (courseId: string, groupId: string, input: CourseGroupActivityInput) =>
+    request<{ assignment: CourseGroupActivityAssignment }>(`/courses/${courseId}/groups/${groupId}/activities`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  updateGroupActivityAssignment: (
+    courseId: string,
+    groupId: string,
+    assignmentId: string,
+    input: CourseGroupActivityUpdate
+  ) =>
+    request<{ assignment: CourseGroupActivityAssignment }>(`/courses/${courseId}/groups/${groupId}/activities/${assignmentId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  deleteGroupActivityAssignment: (courseId: string, groupId: string, assignmentId: string) =>
+    request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}/activities/${assignmentId}`, {
+      method: "DELETE"
+    })
 };

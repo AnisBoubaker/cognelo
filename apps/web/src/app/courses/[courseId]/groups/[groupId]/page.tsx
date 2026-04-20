@@ -1,0 +1,1039 @@
+"use client";
+
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { ChangeEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
+import { AppShell } from "@/components/app-shell";
+import { useAuth } from "@/components/auth-provider";
+import { api, ActivityDefinition, ActivityType, Course, CourseGroup, CourseGroupMaterial } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
+
+export default function CourseGroupPage() {
+  const params = useParams<{ courseId: string; groupId: string }>();
+  const { courseId, groupId } = params;
+  const { user } = useAuth();
+  const { locale, t } = useI18n();
+  const [course, setCourse] = useState<Course | null>(null);
+  const [group, setGroup] = useState<CourseGroup | null>(null);
+  const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
+  const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
+  const [groupTitle, setGroupTitle] = useState("");
+  const [groupStatus, setGroupStatus] = useState<"draft" | "published">("draft");
+  const [groupAvailableFrom, setGroupAvailableFrom] = useState("");
+  const [groupAvailableUntil, setGroupAvailableUntil] = useState("");
+  const [savingGroup, setSavingGroup] = useState(false);
+  const [groupMaterialMode, setGroupMaterialMode] = useState<"folder" | "github_repo" | "file">("github_repo");
+  const [groupMaterialTitle, setGroupMaterialTitle] = useState("");
+  const [groupMaterialParentId, setGroupMaterialParentId] = useState("");
+  const [groupGithubUrl, setGroupGithubUrl] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
+  const [editMaterialTitle, setEditMaterialTitle] = useState("");
+  const [editMaterialUrl, setEditMaterialUrl] = useState("");
+  const [draggingMaterialId, setDraggingMaterialId] = useState<string | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ title: string; x: number; y: number } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; type: "material" | "root" } | null>(null);
+  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(new Set());
+  const [assignActivityId, setAssignActivityId] = useState("");
+  const [assignAvailableFrom, setAssignAvailableFrom] = useState("");
+  const [assignAvailableUntil, setAssignAvailableUntil] = useState("");
+  const [savingAssignmentId, setSavingAssignmentId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [materialError, setMaterialError] = useState("");
+  const [materialActionError, setMaterialActionError] = useState("");
+  const [assignmentError, setAssignmentError] = useState("");
+
+  const canManage = user?.roles.includes("admin") || user?.roles.includes("teacher");
+
+  async function refresh() {
+    const [courseResult, groupResult, typeResult] = await Promise.all([
+      api.course(courseId),
+      api.group(courseId, groupId),
+      api.activityTypes()
+    ]);
+    setCourse(courseResult.course);
+    setGroup(groupResult.group);
+    setGroupTitle(groupResult.group.title);
+    setGroupStatus(groupResult.group.status);
+    setGroupAvailableFrom(toDateTimeLocalValue(groupResult.group.availableFrom));
+    setGroupAvailableUntil(toDateTimeLocalValue(groupResult.group.availableUntil));
+    setActivityTypes(typeResult.activityTypes);
+    setActivityDefinitions(typeResult.registeredDefinitions);
+  }
+
+  useEffect(() => {
+    refresh().catch((err) => setError(err instanceof Error ? err.message : t("groupPage.loadError")));
+  }, [courseId, groupId, t]);
+
+  const materials = group?.materials ?? [];
+  const folders = materials.filter((material) => material.kind === "folder").sort(compareMaterials);
+  const visibleMaterials = flattenMaterials(materials, collapsedFolderIds);
+  const assignedActivities = group?.activities ?? [];
+  const assignableActivities = (course?.activities ?? []).filter(
+    (activity) => !assignedActivities.some((assignment) => assignment.activityId === activity.id)
+  );
+
+  useEffect(() => {
+    if (!assignActivityId && assignableActivities[0]?.id) {
+      setAssignActivityId(assignableActivities[0].id);
+    }
+  }, [assignActivityId, assignableActivities]);
+
+  function activityCopy(activityTypeKey: string) {
+    const definition = activityDefinitions.find((candidate) => candidate.key === activityTypeKey);
+    const localized = definition?.i18n?.[locale];
+
+    return {
+      name: localized?.name ?? definition?.name ?? activityTypes.find((type) => type.key === activityTypeKey)?.name ?? activityTypeKey,
+      description:
+        localized?.description ??
+        definition?.description ??
+        activityTypes.find((type) => type.key === activityTypeKey)?.description ??
+        ""
+    };
+  }
+
+  function nextMaterialPosition(parentId: string | null) {
+    return materials.filter((material) => (material.parentId ?? null) === parentId).length;
+  }
+
+  function groupMaterialHref(material: CourseGroupMaterial) {
+    if (material.kind === "file") {
+      return api.groupMaterialDownloadUrl(courseId, groupId, material.id);
+    }
+    return material.url ?? undefined;
+  }
+
+  function materialDetail(material: CourseGroupMaterial) {
+    const originalName = typeof material.metadata?.originalName === "string" ? material.metadata.originalName : undefined;
+    const size = typeof material.metadata?.size === "number" ? formatBytes(material.metadata.size) : undefined;
+    if (originalName && size) {
+      return `${originalName} · ${size}`;
+    }
+    return originalName || material.url || material.body || t("courseDetail.metadataOnly");
+  }
+
+  async function createGroupMaterial(event: FormEvent) {
+    event.preventDefault();
+    setMaterialError("");
+
+    try {
+      const parentId = groupMaterialParentId || null;
+      const position = nextMaterialPosition(parentId);
+
+      if (groupMaterialMode === "folder") {
+        await api.createGroupMaterial(courseId, groupId, {
+          title: groupMaterialTitle || t("courseDetail.defaultFolderTitle"),
+          kind: "folder",
+          parentId,
+          metadata: {},
+          position
+        });
+      } else if (groupMaterialMode === "github_repo") {
+        await api.createGroupMaterial(courseId, groupId, {
+          title: groupMaterialTitle || t("courseDetail.defaultRepoTitle"),
+          kind: "github_repo",
+          parentId,
+          url: groupGithubUrl,
+          metadata: { source: "github" },
+          position
+        });
+      } else {
+        if (!selectedFile) {
+          setMaterialError(t("courseDetail.chooseFile"));
+          return;
+        }
+        await api.uploadGroupMaterial(courseId, groupId, {
+          title: groupMaterialTitle || selectedFile.name,
+          file: selectedFile,
+          parentId,
+          position
+        });
+      }
+
+      await refresh();
+      setGroupMaterialTitle("");
+      setGroupMaterialParentId("");
+      setGroupGithubUrl("");
+      setSelectedFile(null);
+    } catch (err) {
+      setMaterialError(err instanceof Error ? err.message : t("groupPage.materialCreateError"));
+    }
+  }
+
+  async function saveGroupSettings(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    setSavingGroup(true);
+    try {
+      await api.updateGroup(courseId, groupId, {
+        title: groupTitle,
+        status: groupStatus,
+        availableFrom: toIsoOrNull(groupAvailableFrom),
+        availableUntil: toIsoOrNull(groupAvailableUntil)
+      });
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("groupPage.groupSaveError"));
+    } finally {
+      setSavingGroup(false);
+    }
+  }
+
+  function chooseFile(event: ChangeEvent<HTMLInputElement>) {
+    setSelectedFile(event.target.files?.[0] ?? null);
+  }
+
+  function startEditingMaterial(material: CourseGroupMaterial) {
+    setMaterialActionError("");
+    setEditingMaterialId(material.id);
+    setEditMaterialTitle(material.title);
+    setEditMaterialUrl(material.url ?? "");
+  }
+
+  async function saveMaterialEdit(material: CourseGroupMaterial) {
+    setMaterialActionError("");
+    try {
+      await api.updateGroupMaterial(courseId, groupId, material.id, {
+        kind: material.kind,
+        title: editMaterialTitle,
+        url: material.kind === "github_repo" ? editMaterialUrl : undefined
+      });
+      setEditingMaterialId(null);
+      await refresh();
+    } catch (err) {
+      setMaterialActionError(err instanceof Error ? err.message : t("groupPage.materialUpdateError"));
+    }
+  }
+
+  async function removeMaterial(material: CourseGroupMaterial) {
+    const confirmed = window.confirm(t("groupPage.removeMaterialConfirm", { title: material.title }));
+    if (!confirmed) {
+      return;
+    }
+
+    setMaterialActionError("");
+    try {
+      await api.deleteGroupMaterial(courseId, groupId, material.id);
+      if (editingMaterialId === material.id) {
+        setEditingMaterialId(null);
+      }
+      await refresh();
+    } catch (err) {
+      setMaterialActionError(err instanceof Error ? err.message : t("groupPage.materialDeleteError"));
+    }
+  }
+
+  async function moveMaterialAfterTarget(dragged: CourseGroupMaterial, target: CourseGroupMaterial) {
+    const nextParentId = target.parentId ?? null;
+    const siblings = materials
+      .filter((material) => material.id !== dragged.id && (material.parentId ?? null) === nextParentId)
+      .sort(compareMaterials);
+    const targetIndex = siblings.findIndex((material) => material.id === target.id);
+    siblings.splice(targetIndex + 1, 0, { ...dragged, parentId: nextParentId });
+
+    await Promise.all(
+      siblings.map((material, index) =>
+        api.updateGroupMaterial(courseId, groupId, material.id, {
+          parentId: nextParentId,
+          position: index
+        })
+      )
+    );
+  }
+
+  async function moveMaterialIntoFolder(dragged: CourseGroupMaterial, folder: CourseGroupMaterial) {
+    await api.updateGroupMaterial(courseId, groupId, dragged.id, {
+      parentId: folder.id,
+      position: nextMaterialPosition(folder.id)
+    });
+  }
+
+  async function moveMaterialToRoot(dragged: CourseGroupMaterial) {
+    await api.updateGroupMaterial(courseId, groupId, dragged.id, {
+      parentId: null,
+      position: nextMaterialPosition(null)
+    });
+  }
+
+  async function moveMaterialSafely(action: () => Promise<void>) {
+    try {
+      await action();
+      await refresh();
+    } catch (err) {
+      setMaterialActionError(err instanceof Error ? err.message : t("courseDetail.moveError"));
+    }
+  }
+
+  function handleMaterialPointerDown(material: CourseGroupMaterial, event: PointerEvent) {
+    if (event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    setDraggingMaterialId(material.id);
+    setDragPreview({ title: material.title, x: event.clientX, y: event.clientY });
+
+    const movePreview = (moveEvent: globalThis.PointerEvent) => {
+      setDragPreview((current) => (current ? { ...current, x: moveEvent.clientX, y: moveEvent.clientY } : current));
+      setDropTarget(findDropTarget(moveEvent.clientX, moveEvent.clientY, material.id));
+    };
+
+    const finishDrag = async (upEvent: globalThis.PointerEvent) => {
+      window.removeEventListener("pointercancel", cancelDrag);
+      window.removeEventListener("pointermove", movePreview);
+      const dropElement = document.elementFromPoint(upEvent.clientX, upEvent.clientY);
+      setDraggingMaterialId(null);
+      setDragPreview(null);
+      setDropTarget(null);
+
+      if (dropElement?.closest("[data-root-drop='true']")) {
+        if (!material.parentId) {
+          return;
+        }
+        await moveMaterialSafely(() => moveMaterialToRoot(material));
+        return;
+      }
+
+      const targetElement = dropElement?.closest("[data-material-id]");
+      if (!(targetElement instanceof HTMLElement)) {
+        return;
+      }
+
+      const target = materials.find((candidate) => candidate.id === targetElement.dataset.materialId);
+      if (!target || target.id === material.id) {
+        return;
+      }
+
+      await moveMaterialSafely(async () => {
+        if (target.kind === "folder") {
+          if (isMaterialDescendant(materials, target.id, material.id)) {
+            setMaterialActionError(t("courseDetail.invalidFolderMove"));
+            return;
+          }
+          await moveMaterialIntoFolder(material, target);
+        } else {
+          await moveMaterialAfterTarget(material, target);
+        }
+      });
+    };
+
+    const cancelDrag = () => {
+      setDraggingMaterialId(null);
+      setDragPreview(null);
+      setDropTarget(null);
+      window.removeEventListener("pointerup", finishDrag);
+      window.removeEventListener("pointermove", movePreview);
+    };
+
+    window.addEventListener("pointermove", movePreview);
+    window.addEventListener("pointerup", finishDrag, { once: true });
+    window.addEventListener("pointercancel", cancelDrag, { once: true });
+  }
+
+  function findDropTarget(x: number, y: number, draggedId: string) {
+    const element = document.elementFromPoint(x, y);
+    if (element?.closest("[data-root-drop='true']")) {
+      return { id: "root", type: "root" as const };
+    }
+
+    const materialElement = element?.closest("[data-material-id]");
+    if (!(materialElement instanceof HTMLElement)) {
+      return null;
+    }
+
+    const targetId = materialElement.dataset.materialId;
+    if (!targetId || targetId === draggedId) {
+      return null;
+    }
+
+    return { id: targetId, type: "material" as const };
+  }
+
+  function toggleFolder(folderId: string) {
+    setCollapsedFolderIds((current) => {
+      const next = new Set(current);
+      if (next.has(folderId)) {
+        next.delete(folderId);
+      } else {
+        next.add(folderId);
+      }
+      return next;
+    });
+  }
+
+  async function assignActivity(event: FormEvent) {
+    event.preventDefault();
+    setAssignmentError("");
+
+    try {
+      await api.assignGroupActivity(courseId, groupId, {
+        activityId: assignActivityId,
+        availableFrom: toIsoOrNull(assignAvailableFrom),
+        availableUntil: toIsoOrNull(assignAvailableUntil),
+        config: {},
+        metadata: {},
+        position: assignedActivities.length
+      });
+      await refresh();
+      setAssignAvailableFrom("");
+      setAssignAvailableUntil("");
+      const remaining = assignableActivities.filter((activity) => activity.id !== assignActivityId);
+      setAssignActivityId(remaining[0]?.id ?? "");
+    } catch (err) {
+      setAssignmentError(err instanceof Error ? err.message : t("groupPage.assignmentCreateError"));
+    }
+  }
+
+  async function saveAssignmentAvailability(assignmentId: string, availableFrom: string, availableUntil: string) {
+    setSavingAssignmentId(assignmentId);
+    setAssignmentError("");
+    try {
+      await api.updateGroupActivityAssignment(courseId, groupId, assignmentId, {
+        availableFrom: toIsoOrNull(availableFrom),
+        availableUntil: toIsoOrNull(availableUntil)
+      });
+      await refresh();
+    } catch (err) {
+      setAssignmentError(err instanceof Error ? err.message : t("groupPage.assignmentUpdateError"));
+    } finally {
+      setSavingAssignmentId(null);
+    }
+  }
+
+  async function removeAssignment(assignmentId: string, title: string) {
+    const confirmed = window.confirm(t("groupPage.removeAssignmentConfirm", { title }));
+    if (!confirmed) {
+      return;
+    }
+
+    setAssignmentError("");
+    try {
+      await api.deleteGroupActivityAssignment(courseId, groupId, assignmentId);
+      await refresh();
+    } catch (err) {
+      setAssignmentError(err instanceof Error ? err.message : t("groupPage.assignmentDeleteError"));
+    }
+  }
+
+  return (
+    <AppShell>
+      <main className="page stack">
+        {group && course ? (
+          <>
+            <section className="hero-panel stack">
+              <div className="hero-meta">
+                <p className="eyebrow">{t("groupPage.eyebrow")} · {group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}</p>
+                <h1>{group.title}</h1>
+                <p className="muted">{t("groupPage.inCourse", { title: course.title })}</p>
+                <p className="muted">{formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</p>
+              </div>
+              <div className="row">
+                <Link className="button secondary" href={`/courses/${courseId}`}>
+                  {t("groupPage.backToCourse")}
+                </Link>
+              </div>
+            </section>
+
+            {error ? <p className="error">{error}</p> : null}
+
+            {canManage ? (
+              <section className="section">
+                <form className="form" onSubmit={saveGroupSettings}>
+                  <div>
+                    <p className="eyebrow">{t("groupPage.settingsEyebrow")}</p>
+                    <h2>{t("groupPage.settingsTitle")}</h2>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="group-title">{t("courseDetail.groupTitle")}</label>
+                    <input
+                      id="group-title"
+                      value={groupTitle}
+                      onChange={(event) => setGroupTitle(event.target.value)}
+                      required
+                      minLength={2}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="group-status">{t("groupPage.statusLabel")}</label>
+                    <select id="group-status" value={groupStatus} onChange={(event) => setGroupStatus(event.target.value as "draft" | "published")}>
+                      <option value="draft">{t("groupPage.statusDraft")}</option>
+                      <option value="published">{t("groupPage.statusPublished")}</option>
+                    </select>
+                  </div>
+                  <div className="split">
+                    <div className="field">
+                      <label htmlFor="group-available-from">{t("groupPage.availableFrom")}</label>
+                      <input
+                        id="group-available-from"
+                        type="datetime-local"
+                        value={groupAvailableFrom}
+                        onChange={(event) => setGroupAvailableFrom(event.target.value)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="group-available-until">{t("groupPage.availableUntil")}</label>
+                      <input
+                        id="group-available-until"
+                        type="datetime-local"
+                        value={groupAvailableUntil}
+                        onChange={(event) => setGroupAvailableUntil(event.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="row">
+                    <button type="submit" disabled={savingGroup}>
+                      {savingGroup ? t("common.saving") : t("groupPage.saveSettings")}
+                    </button>
+                  </div>
+                </form>
+              </section>
+            ) : null}
+
+            <div className="split">
+              <section className="section stack">
+                <div>
+                  <p className="eyebrow">{t("groupPage.assignedActivitiesEyebrow")}</p>
+                  <h2>{t("groupPage.assignedActivitiesTitle")}</h2>
+                  <p className="muted">{t("groupPage.assignedActivitiesText")}</p>
+                </div>
+
+                {assignedActivities.length ? (
+                  assignedActivities.map((assignment) => (
+                    <GroupActivityCard
+                      key={assignment.id}
+                      courseId={courseId}
+                      assignment={assignment}
+                      activityLabel={activityCopy(assignment.activity.activityType.key).name}
+                      canManage={Boolean(canManage)}
+                      saving={savingAssignmentId === assignment.id}
+                      t={t}
+                      onSave={saveAssignmentAvailability}
+                      onRemove={removeAssignment}
+                    />
+                  ))
+                ) : (
+                  <p className="muted">{t("groupPage.noAssignedActivities")}</p>
+                )}
+              </section>
+
+              <section className="section">
+                <form className="form" onSubmit={assignActivity}>
+                  <div>
+                    <p className="eyebrow">{t("groupPage.assignActivityEyebrow")}</p>
+                    <h2>{t("groupPage.assignActivityTitle")}</h2>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="assignActivity">{t("groupPage.availableActivities")}</label>
+                    <select
+                      id="assignActivity"
+                      value={assignActivityId}
+                      onChange={(event) => setAssignActivityId(event.target.value)}
+                      disabled={!assignableActivities.length || !canManage}
+                    >
+                      {assignableActivities.length ? (
+                        assignableActivities.map((activity) => (
+                          <option key={activity.id} value={activity.id}>
+                            {activity.title}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="">{t("groupPage.noAssignableActivities")}</option>
+                      )}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="assignAvailableFrom">{t("groupPage.availableFrom")}</label>
+                    <input
+                      id="assignAvailableFrom"
+                      type="datetime-local"
+                      value={assignAvailableFrom}
+                      onChange={(event) => setAssignAvailableFrom(event.target.value)}
+                      disabled={!canManage}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="assignAvailableUntil">{t("groupPage.availableUntil")}</label>
+                    <input
+                      id="assignAvailableUntil"
+                      type="datetime-local"
+                      value={assignAvailableUntil}
+                      onChange={(event) => setAssignAvailableUntil(event.target.value)}
+                      disabled={!canManage}
+                    />
+                  </div>
+                  {assignmentError ? <p className="error">{assignmentError}</p> : null}
+                  <button type="submit" disabled={!assignActivityId || !assignableActivities.length || !canManage}>
+                    {t("groupPage.assignActivity")}
+                  </button>
+                </form>
+              </section>
+            </div>
+
+            <section className="section stack">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">{t("groupPage.materialsEyebrow")}</p>
+                  <h2>{t("groupPage.materialsTitle")}</h2>
+                  <p className="muted">{t("groupPage.materialsText")}</p>
+                </div>
+              </div>
+
+              {canManage ? (
+                <form className="form inline-panel" onSubmit={createGroupMaterial}>
+                  <div className="field">
+                    <label htmlFor="groupMaterialMode">{t("courseDetail.source")}</label>
+                    <select
+                      id="groupMaterialMode"
+                      value={groupMaterialMode}
+                      onChange={(event) => setGroupMaterialMode(event.target.value as typeof groupMaterialMode)}
+                    >
+                      <option value="folder">{t("materialKinds.folder")}</option>
+                      <option value="github_repo">{t("materialKinds.github_repo")}</option>
+                      <option value="file">{t("materialKinds.file")}</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="groupMaterialParent">{t("courseDetail.location")}</label>
+                    <select
+                      id="groupMaterialParent"
+                      value={groupMaterialParentId}
+                      onChange={(event) => setGroupMaterialParentId(event.target.value)}
+                    >
+                      <option value="">{t("courseDetail.topLevel")}</option>
+                      {folders.map((folder) => (
+                        <option key={folder.id} value={folder.id}>
+                          {folder.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="groupMaterialTitle">{t("courseDetail.activityTitle")}</label>
+                    <input
+                      id="groupMaterialTitle"
+                      value={groupMaterialTitle}
+                      onChange={(event) => setGroupMaterialTitle(event.target.value)}
+                      placeholder={
+                        groupMaterialMode === "file"
+                          ? t("courseDetail.fileTitlePlaceholder")
+                          : groupMaterialMode === "folder"
+                            ? t("courseDetail.folderTitlePlaceholder")
+                            : t("courseDetail.repoTitlePlaceholder")
+                      }
+                    />
+                  </div>
+                  {groupMaterialMode === "folder" ? null : groupMaterialMode === "github_repo" ? (
+                    <div className="field">
+                      <label htmlFor="groupGithubUrl">{t("courseDetail.githubUrl")}</label>
+                      <input
+                        id="groupGithubUrl"
+                        type="url"
+                        value={groupGithubUrl}
+                        onChange={(event) => setGroupGithubUrl(event.target.value)}
+                        placeholder="https://github.com/org/repo"
+                        required
+                      />
+                    </div>
+                  ) : (
+                    <div className="field">
+                      <label htmlFor="groupMaterialFile">{t("courseDetail.file")}</label>
+                      <input id="groupMaterialFile" type="file" onChange={chooseFile} required />
+                      <p className="muted">{t("courseDetail.maxFileSize")}</p>
+                    </div>
+                  )}
+                  {materialError ? <p className="error">{materialError}</p> : null}
+                  <div className="row">
+                    <button type="submit">{t("groupPage.addMaterial")}</button>
+                  </div>
+                </form>
+              ) : null}
+
+              {visibleMaterials.length ? (
+                <div className="table-list">
+                  <div className="table-row table-head" aria-hidden="true">
+                    <span>{t("courseDetail.titleHeader")}</span>
+                    <span>{t("courseDetail.typeHeader")}</span>
+                    <span>{t("courseDetail.sourceHeader")}</span>
+                    <span>{t("courseDetail.actionsHeader")}</span>
+                  </div>
+                  <div
+                    className={`root-drop-zone ${draggingMaterialId ? "is-active" : ""} ${
+                      dropTarget?.type === "root" ? "is-drop-target" : ""
+                    }`}
+                    data-root-drop="true"
+                  >
+                    {t("courseDetail.moveToTopLevel")}
+                  </div>
+                  {visibleMaterials.map(({ material, depth }) => {
+                    const href = groupMaterialHref(material);
+                    const isEditing = editingMaterialId === material.id;
+                    const isCollapsed = collapsedFolderIds.has(material.id);
+                    return (
+                      <div key={material.id}>
+                        <div
+                          className={`table-row ${draggingMaterialId === material.id ? "is-dragging" : ""} ${
+                            dropTarget?.type === "material" && dropTarget.id === material.id ? "is-drop-target" : ""
+                          }`}
+                          data-material-id={material.id}
+                        >
+                          <div className="table-main material-title" style={{ paddingLeft: `${depth * 22}px` }}>
+                            {canManage ? (
+                              <span
+                                aria-label={t("courseDetail.dragMaterial", { title: material.title })}
+                                className="drag-handle"
+                                role="button"
+                                tabIndex={0}
+                                title={t("courseDetail.dragToMove")}
+                                onPointerDown={(event) => handleMaterialPointerDown(material, event)}
+                              >
+                                <MaterialActionIcon name="drag" />
+                              </span>
+                            ) : null}
+                            {material.kind === "folder" ? (
+                              <button
+                                aria-expanded={!isCollapsed}
+                                aria-label={t(isCollapsed ? "courseDetail.expandFolder" : "courseDetail.collapseFolder", {
+                                  title: material.title
+                                })}
+                                className="material-glyph"
+                                title={t(isCollapsed ? "courseDetail.expandFolderTitle" : "courseDetail.collapseFolderTitle")}
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleFolder(material.id);
+                                }}
+                              >
+                                {isCollapsed ? "[+]" : "[-]"}
+                              </button>
+                            ) : (
+                              <span className="material-glyph material-glyph-static">-</span>
+                            )}
+                            <strong>{material.title}</strong>
+                          </div>
+                          <span className="eyebrow">{t(`materialKinds.${material.kind}`)}</span>
+                          <span className="table-meta muted">{materialDetail(material)}</span>
+                          <div className="table-actions">
+                            {href ? (
+                              <a
+                                aria-label={t(
+                                  material.kind === "file" ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial",
+                                  { title: material.title }
+                                )}
+                                className="button secondary icon-button"
+                                href={href}
+                                rel={material.kind === "file" ? undefined : "noreferrer"}
+                                target={material.kind === "file" ? undefined : "_blank"}
+                                title={t(material.kind === "file" ? "common.download" : "common.open")}
+                              >
+                                <MaterialActionIcon name={material.kind === "file" ? "download" : "open"} />
+                              </a>
+                            ) : null}
+                            {canManage ? (
+                              <>
+                                <button
+                                  aria-label={t("courseDetail.editMaterial", { title: material.title })}
+                                  className="secondary icon-button"
+                                  title={t("common.edit")}
+                                  type="button"
+                                  onClick={() => startEditingMaterial(material)}
+                                >
+                                  <MaterialActionIcon name="edit" />
+                                </button>
+                                <button
+                                  aria-label={t("courseDetail.removeMaterial", { title: material.title })}
+                                  className="danger icon-button"
+                                  title={t("common.remove")}
+                                  type="button"
+                                  onClick={() => removeMaterial(material)}
+                                >
+                                  <MaterialActionIcon name="remove" />
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+                        {isEditing ? (
+                          <form
+                            className="inline-edit"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              void saveMaterialEdit(material);
+                            }}
+                          >
+                            <div className="field">
+                              <label htmlFor={`group-edit-title-${material.id}`}>{t("courseDetail.activityTitle")}</label>
+                              <input
+                                id={`group-edit-title-${material.id}`}
+                                value={editMaterialTitle}
+                                onChange={(event) => setEditMaterialTitle(event.target.value)}
+                                required
+                                minLength={2}
+                              />
+                            </div>
+                            {material.kind === "github_repo" ? (
+                              <div className="field">
+                                <label htmlFor={`group-edit-url-${material.id}`}>{t("courseDetail.githubEditLabel")}</label>
+                                <input
+                                  id={`group-edit-url-${material.id}`}
+                                  type="url"
+                                  value={editMaterialUrl}
+                                  onChange={(event) => setEditMaterialUrl(event.target.value)}
+                                  required
+                                />
+                              </div>
+                            ) : null}
+                            <div className="row">
+                              <button type="submit">{t("courseDetail.saveMaterial")}</button>
+                              <button className="secondary" type="button" onClick={() => setEditingMaterialId(null)}>
+                                {t("common.cancel")}
+                              </button>
+                            </div>
+                          </form>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="muted">{t("groupPage.noMaterials")}</p>
+              )}
+              {materialActionError ? <p className="error">{materialActionError}</p> : null}
+            </section>
+            {dragPreview ? (
+              <div className="drag-preview" style={{ left: dragPreview.x + 14, top: dragPreview.y + 14 }}>
+                {dragPreview.title}
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <p>{t("common.loading")}</p>
+        )}
+      </main>
+    </AppShell>
+  );
+}
+
+function GroupActivityCard({
+  courseId,
+  assignment,
+  activityLabel,
+  canManage,
+  saving,
+  t,
+  onSave,
+  onRemove
+}: {
+  courseId: string;
+  assignment: NonNullable<CourseGroup["activities"]>[number];
+  activityLabel: string;
+  canManage: boolean;
+  saving: boolean;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  onSave: (assignmentId: string, availableFrom: string, availableUntil: string) => Promise<void>;
+  onRemove: (assignmentId: string, title: string) => Promise<void>;
+}) {
+  const [availableFrom, setAvailableFrom] = useState(toDateTimeLocalValue(assignment.availableFrom));
+  const [availableUntil, setAvailableUntil] = useState(toDateTimeLocalValue(assignment.availableUntil));
+
+  useEffect(() => {
+    setAvailableFrom(toDateTimeLocalValue(assignment.availableFrom));
+    setAvailableUntil(toDateTimeLocalValue(assignment.availableUntil));
+  }, [assignment.availableFrom, assignment.availableUntil]);
+
+  return (
+    <article className="card stack">
+      <span className="eyebrow">{activityLabel}</span>
+      <h3 style={{ margin: 0 }}>{assignment.activity.title}</h3>
+      <p className="muted">{assignment.activity.description || t("common.noDescription")}</p>
+      <div className="row">
+        <Link className="button secondary" href={`/courses/${courseId}/activities/${assignment.activity.id}`}>
+          {t("courseDetail.openActivity")}
+        </Link>
+      </div>
+      <div className="split">
+        <div className="field">
+          <label htmlFor={`available-from-${assignment.id}`}>{t("groupPage.availableFrom")}</label>
+          <input
+            id={`available-from-${assignment.id}`}
+            type="datetime-local"
+            value={availableFrom}
+            onChange={(event) => setAvailableFrom(event.target.value)}
+            disabled={saving || !canManage}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor={`available-until-${assignment.id}`}>{t("groupPage.availableUntil")}</label>
+          <input
+            id={`available-until-${assignment.id}`}
+            type="datetime-local"
+            value={availableUntil}
+            onChange={(event) => setAvailableUntil(event.target.value)}
+            disabled={saving || !canManage}
+          />
+        </div>
+      </div>
+      <div className="row">
+        <button type="button" disabled={saving || !canManage} onClick={() => void onSave(assignment.id, availableFrom, availableUntil)}>
+          {saving ? t("common.saving") : t("common.save")}
+        </button>
+        <button className="danger" type="button" disabled={saving || !canManage} onClick={() => void onRemove(assignment.id, assignment.activity.title)}>
+          {t("groupPage.removeAssignment")}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function toIsoOrNull(value: string) {
+  return value ? new Date(value).toISOString() : null;
+}
+
+function toDateTimeLocalValue(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatAvailabilityWindow(
+  availableFrom: string | null | undefined,
+  availableUntil: string | null | undefined,
+  t: (key: string, vars?: Record<string, string | number>) => string
+) {
+  if (!availableFrom && !availableUntil) {
+    return t("groupPage.availableAlways");
+  }
+
+  if (availableFrom && availableUntil) {
+    return t("groupPage.availableWindow", {
+      from: new Date(availableFrom).toLocaleString(),
+      until: new Date(availableUntil).toLocaleString()
+    });
+  }
+
+  if (availableFrom) {
+    return t("groupPage.availableAfter", { from: new Date(availableFrom).toLocaleString() });
+  }
+
+  return t("groupPage.availableBefore", { until: new Date(availableUntil as string).toLocaleString() });
+}
+
+function compareMaterials(left: CourseGroupMaterial, right: CourseGroupMaterial) {
+  return left.position - right.position || left.title.localeCompare(right.title);
+}
+
+function flattenMaterials(materials: CourseGroupMaterial[], collapsedFolderIds: Set<string>) {
+  const materialIds = new Set(materials.map((material) => material.id));
+  const byParent = new Map<string, CourseGroupMaterial[]>();
+  for (const material of materials) {
+    const parentId = material.parentId ?? "root";
+    byParent.set(parentId, [...(byParent.get(parentId) ?? []), material]);
+  }
+
+  for (const [parentId, children] of byParent) {
+    byParent.set(parentId, children.sort(compareMaterials));
+  }
+
+  const rows: { material: CourseGroupMaterial; depth: number }[] = [];
+  const visited = new Set<string>();
+
+  function walk(parentId: string, depth: number) {
+    for (const material of byParent.get(parentId) ?? []) {
+      if (visited.has(material.id)) {
+        continue;
+      }
+      visited.add(material.id);
+      rows.push({ material, depth });
+      if (material.kind === "folder" && !collapsedFolderIds.has(material.id)) {
+        walk(material.id, depth + 1);
+      }
+    }
+  }
+
+  walk("root", 0);
+
+  for (const material of materials.sort(compareMaterials)) {
+    const parentIsMissing = material.parentId && !materialIds.has(material.parentId);
+    if (!visited.has(material.id) && parentIsMissing) {
+      rows.push({ material, depth: 0 });
+    }
+  }
+
+  return rows;
+}
+
+function isMaterialDescendant(materials: CourseGroupMaterial[], possibleChildId: string, possibleAncestorId: string) {
+  const byId = new Map(materials.map((material) => [material.id, material]));
+  let current = byId.get(possibleChildId);
+
+  while (current?.parentId) {
+    if (current.parentId === possibleAncestorId) {
+      return true;
+    }
+    current = byId.get(current.parentId);
+  }
+
+  return false;
+}
+
+function MaterialActionIcon({ name }: { name: "download" | "drag" | "edit" | "open" | "remove" }) {
+  const paths = {
+    download: (
+      <>
+        <path d="M12 3v10" />
+        <path d="m8 9 4 4 4-4" />
+        <path d="M5 19h14" />
+      </>
+    ),
+    drag: (
+      <>
+        <path d="M9 5h.01" />
+        <path d="M15 5h.01" />
+        <path d="M9 12h.01" />
+        <path d="M15 12h.01" />
+        <path d="M9 19h.01" />
+        <path d="M15 19h.01" />
+      </>
+    ),
+    edit: (
+      <>
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+      </>
+    ),
+    open: (
+      <>
+        <path d="M7 17 17 7" />
+        <path d="M7 7h10v10" />
+      </>
+    ),
+    remove: (
+      <>
+        <path d="M3 6h18" />
+        <path d="M8 6V4h8v2" />
+        <path d="M19 6l-1 14H6L5 6" />
+        <path d="M10 11v6" />
+        <path d="M14 11v6" />
+      </>
+    )
+  } as const;
+
+  return (
+    <svg aria-hidden="true" fill="none" height="18" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24" width="18">
+      {paths[name]}
+    </svg>
+  );
+}
