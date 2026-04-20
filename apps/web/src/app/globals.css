@@ -359,13 +359,13 @@ select:focus {
 
 .page {
   margin: 0 auto;
-  max-width: 1120px;
-  padding: 36px 20px 64px;
+  max-width: 1280px;
+  padding: 28px 20px 52px;
 }
 
 .stack {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
 .split {
@@ -384,7 +384,7 @@ select:focus {
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow-soft);
-  padding: 20px;
+  padding: 18px;
 }
 
 .grid {
@@ -400,12 +400,26 @@ select:focus {
   box-shadow: var(--shadow-card);
   display: grid;
   gap: 10px;
-  min-height: 150px;
-  padding: 18px;
+  min-height: 132px;
+  padding: 16px;
   transition:
     transform 140ms ease,
     box-shadow 140ms ease,
     border-color 140ms ease;
+}
+
+.card-compact {
+  gap: 8px;
+  min-height: 0;
+  padding: 14px;
+}
+
+.card-compact h3 {
+  margin: 0;
+}
+
+.card-compact p {
+  margin: 0;
 }
 
 a.card:hover,
@@ -465,7 +479,7 @@ a.card:hover,
   border: 1px solid color-mix(in srgb, var(--brand-blue), white 78%);
   border-radius: 8px;
   box-shadow: 0 22px 40px rgba(13, 27, 71, 0.08);
-  padding: 24px;
+  padding: 18px 20px;
 }
 
 .hero-panel h1 {
@@ -483,7 +497,33 @@ a.card:hover,
 .hero-meta {
   align-items: flex-start;
   display: grid;
-  gap: 8px;
+  gap: 6px;
+}
+
+.hero-panel-compact {
+  align-items: start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.hero-panel-compact h1 {
+  font-size: clamp(2rem, 3.8vw, 3.4rem);
+  line-height: 0.98;
+  max-width: none;
+}
+
+.hero-panel-compact .hero-actions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.hero-panel-compact .button {
+  white-space: nowrap;
+}
+
+.hero-panel-compact .muted {
+  max-width: 78ch;
 }
 
 .form {
@@ -554,6 +594,20 @@ a.card:hover,
   box-shadow: inset 4px 0 0 var(--accent);
 }
 
+.table-row.is-hidden-material {
+  background: color-mix(in srgb, var(--surface-2), white 22%);
+  color: color-mix(in srgb, var(--ink), white 26%);
+}
+
+.table-row.is-hidden-material strong,
+.table-row.is-hidden-material .eyebrow,
+.table-row.is-hidden-material .table-meta,
+.table-row.is-hidden-material .material-glyph,
+.table-row.is-hidden-material .icon-button,
+.table-row.is-hidden-material .drag-handle {
+  opacity: 0.72;
+}
+
 .table-row .table-main,
 .table-row .table-meta,
 .table-row .eyebrow {
@@ -615,6 +669,13 @@ a.card:hover,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.table-meta-note {
+  display: block;
+  font-size: 12px;
+  margin-top: 2px;
+  white-space: normal;
 }
 
 .material-glyph {

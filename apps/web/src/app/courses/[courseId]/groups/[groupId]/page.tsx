@@ -5,7 +5,8 @@ import { useParams } from "next/navigation";
 import { ChangeEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
-import { api, ActivityDefinition, ActivityType, Course, CourseGroup, CourseGroupMaterial } from "@/lib/api";
+import { WorkspaceTabs } from "@/components/workspace-tabs";
+import { api, ActivityDefinition, ActivityType, Course, CourseGroup, CourseGroupMaterial, CourseMaterial } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 export default function CourseGroupPage() {
@@ -22,6 +23,7 @@ export default function CourseGroupPage() {
   const [groupAvailableFrom, setGroupAvailableFrom] = useState("");
   const [groupAvailableUntil, setGroupAvailableUntil] = useState("");
   const [savingGroup, setSavingGroup] = useState(false);
+  const [isAddingGroupMaterial, setIsAddingGroupMaterial] = useState(false);
   const [groupMaterialMode, setGroupMaterialMode] = useState<"folder" | "github_repo" | "file">("github_repo");
   const [groupMaterialTitle, setGroupMaterialTitle] = useState("");
   const [groupMaterialParentId, setGroupMaterialParentId] = useState("");
@@ -34,13 +36,16 @@ export default function CourseGroupPage() {
   const [dragPreview, setDragPreview] = useState<{ title: string; x: number; y: number } | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; type: "material" | "root" } | null>(null);
   const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(new Set());
+  const [collapsedCourseFolderIds, setCollapsedCourseFolderIds] = useState<Set<string>>(new Set());
   const [assignActivityId, setAssignActivityId] = useState("");
   const [assignAvailableFrom, setAssignAvailableFrom] = useState("");
   const [assignAvailableUntil, setAssignAvailableUntil] = useState("");
   const [savingAssignmentId, setSavingAssignmentId] = useState<string | null>(null);
+  const [savingCourseMaterialVisibilityId, setSavingCourseMaterialVisibilityId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [materialError, setMaterialError] = useState("");
   const [materialActionError, setMaterialActionError] = useState("");
+  const [courseMaterialVisibilityError, setCourseMaterialVisibilityError] = useState("");
   const [assignmentError, setAssignmentError] = useState("");
 
   const canManage = user?.roles.includes("admin") || user?.roles.includes("teacher");
@@ -68,6 +73,12 @@ export default function CourseGroupPage() {
   const materials = group?.materials ?? [];
   const folders = materials.filter((material) => material.kind === "folder").sort(compareMaterials);
   const visibleMaterials = flattenMaterials(materials, collapsedFolderIds);
+  const courseMaterials = course?.materials ?? [];
+  const hiddenCourseMaterialIds = new Set(group?.hiddenCourseMaterialIds ?? []);
+  const visibleCourseMaterials = flattenMaterials(courseMaterials, collapsedCourseFolderIds);
+  const displayedCourseMaterials = canManage
+    ? visibleCourseMaterials
+    : visibleCourseMaterials.filter(({ material }) => !getHiddenMaterialState(courseMaterials, hiddenCourseMaterialIds, material.id).effectivelyHidden);
   const assignedActivities = group?.activities ?? [];
   const assignableActivities = (course?.activities ?? []).filter(
     (activity) => !assignedActivities.some((assignment) => assignment.activityId === activity.id)
@@ -113,6 +124,36 @@ export default function CourseGroupPage() {
     return originalName || material.url || material.body || t("courseDetail.metadataOnly");
   }
 
+  function courseMaterialHref(material: CourseMaterial) {
+    if (material.kind === "file") {
+      return api.materialDownloadUrl(courseId, material.id);
+    }
+    return material.url ?? undefined;
+  }
+
+  function courseMaterialDetail(material: CourseMaterial) {
+    const originalName = typeof material.metadata?.originalName === "string" ? material.metadata.originalName : undefined;
+    const size = typeof material.metadata?.size === "number" ? formatBytes(material.metadata.size) : undefined;
+    if (originalName && size) {
+      return `${originalName} · ${size}`;
+    }
+    return originalName || material.url || material.body || t("courseDetail.metadataOnly");
+  }
+
+  function resetGroupMaterialForm() {
+    setGroupMaterialMode("github_repo");
+    setGroupMaterialTitle("");
+    setGroupMaterialParentId("");
+    setGroupGithubUrl("");
+    setSelectedFile(null);
+    setMaterialError("");
+  }
+
+  function closeGroupMaterialForm() {
+    resetGroupMaterialForm();
+    setIsAddingGroupMaterial(false);
+  }
+
   async function createGroupMaterial(event: FormEvent) {
     event.preventDefault();
     setMaterialError("");
@@ -152,10 +193,7 @@ export default function CourseGroupPage() {
       }
 
       await refresh();
-      setGroupMaterialTitle("");
-      setGroupMaterialParentId("");
-      setGroupGithubUrl("");
-      setSelectedFile(null);
+      closeGroupMaterialForm();
     } catch (err) {
       setMaterialError(err instanceof Error ? err.message : t("groupPage.materialCreateError"));
     }
@@ -361,6 +399,44 @@ export default function CourseGroupPage() {
     });
   }
 
+  function toggleCourseFolder(folderId: string) {
+    setCollapsedCourseFolderIds((current) => {
+      const next = new Set(current);
+      if (next.has(folderId)) {
+        next.delete(folderId);
+      } else {
+        next.add(folderId);
+      }
+      return next;
+    });
+  }
+
+  async function toggleCourseMaterialVisibility(material: CourseMaterial) {
+    if (!canManage) {
+      return;
+    }
+
+    const hiddenState = getHiddenMaterialState(courseMaterials, hiddenCourseMaterialIds, material.id);
+    if (hiddenState.hiddenByAncestor && !hiddenState.directlyHidden) {
+      return;
+    }
+
+    setCourseMaterialVisibilityError("");
+    setSavingCourseMaterialVisibilityId(material.id);
+    try {
+      if (hiddenState.directlyHidden) {
+        await api.unhideCourseMaterialInGroup(courseId, groupId, material.id);
+      } else {
+        await api.hideCourseMaterialInGroup(courseId, groupId, material.id);
+      }
+      await refresh();
+    } catch (err) {
+      setCourseMaterialVisibilityError(err instanceof Error ? err.message : t("groupPage.courseMaterialVisibilityError"));
+    } finally {
+      setSavingCourseMaterialVisibilityId(null);
+    }
+  }
+
   async function assignActivity(event: FormEvent) {
     event.preventDefault();
     setAssignmentError("");
@@ -420,14 +496,15 @@ export default function CourseGroupPage() {
       <main className="page stack">
         {group && course ? (
           <>
-            <section className="hero-panel stack">
+            <section className="hero-panel hero-panel-compact">
               <div className="hero-meta">
                 <p className="eyebrow">{t("groupPage.eyebrow")} · {group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}</p>
-                <h1>{group.title}</h1>
-                <p className="muted">{t("groupPage.inCourse", { title: course.title })}</p>
-                <p className="muted">{formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</p>
+                <h1>{course.title}: {group.title}</h1>
+                {group.availableFrom || group.availableUntil ? (
+                  <p className="muted">{formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</p>
+                ) : null}
               </div>
-              <div className="row">
+              <div className="hero-actions">
                 <Link className="button secondary" href={`/courses/${courseId}`}>
                   {t("groupPage.backToCourse")}
                 </Link>
@@ -436,369 +513,535 @@ export default function CourseGroupPage() {
 
             {error ? <p className="error">{error}</p> : null}
 
-            {canManage ? (
-              <section className="section">
-                <form className="form" onSubmit={saveGroupSettings}>
-                  <div>
-                    <p className="eyebrow">{t("groupPage.settingsEyebrow")}</p>
-                    <h2>{t("groupPage.settingsTitle")}</h2>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="group-title">{t("courseDetail.groupTitle")}</label>
-                    <input
-                      id="group-title"
-                      value={groupTitle}
-                      onChange={(event) => setGroupTitle(event.target.value)}
-                      required
-                      minLength={2}
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="group-status">{t("groupPage.statusLabel")}</label>
-                    <select id="group-status" value={groupStatus} onChange={(event) => setGroupStatus(event.target.value as "draft" | "published")}>
-                      <option value="draft">{t("groupPage.statusDraft")}</option>
-                      <option value="published">{t("groupPage.statusPublished")}</option>
-                    </select>
-                  </div>
-                  <div className="split">
-                    <div className="field">
-                      <label htmlFor="group-available-from">{t("groupPage.availableFrom")}</label>
-                      <input
-                        id="group-available-from"
-                        type="datetime-local"
-                        value={groupAvailableFrom}
-                        onChange={(event) => setGroupAvailableFrom(event.target.value)}
-                      />
+            <WorkspaceTabs
+              ariaLabel={t("groupPage.workspaceTabs")}
+              initialTab="activities"
+              tabs={[
+                {
+                  id: "activities",
+                  label: t("groupPage.activitiesTab"),
+                  render: () => (
+                    <div className="split">
+                      <section className="section stack">
+                    <div>
+                      <p className="eyebrow">{t("groupPage.assignedActivitiesEyebrow")}</p>
+                      <h2>{t("groupPage.assignedActivitiesTitle")}</h2>
+                      <p className="muted">{t("groupPage.assignedActivitiesText")}</p>
                     </div>
-                    <div className="field">
-                      <label htmlFor="group-available-until">{t("groupPage.availableUntil")}</label>
-                      <input
-                        id="group-available-until"
-                        type="datetime-local"
-                        value={groupAvailableUntil}
-                        onChange={(event) => setGroupAvailableUntil(event.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="row">
-                    <button type="submit" disabled={savingGroup}>
-                      {savingGroup ? t("common.saving") : t("groupPage.saveSettings")}
-                    </button>
-                  </div>
-                </form>
-              </section>
-            ) : null}
 
-            <div className="split">
-              <section className="section stack">
-                <div>
-                  <p className="eyebrow">{t("groupPage.assignedActivitiesEyebrow")}</p>
-                  <h2>{t("groupPage.assignedActivitiesTitle")}</h2>
-                  <p className="muted">{t("groupPage.assignedActivitiesText")}</p>
-                </div>
+                    {assignedActivities.length ? (
+                      assignedActivities.map((assignment) => (
+                        <GroupActivityCard
+                          key={assignment.id}
+                          courseId={courseId}
+                          assignment={assignment}
+                          activityLabel={activityCopy(assignment.activity.activityType.key).name}
+                          canManage={Boolean(canManage)}
+                          saving={savingAssignmentId === assignment.id}
+                          t={t}
+                          onSave={saveAssignmentAvailability}
+                          onRemove={removeAssignment}
+                        />
+                      ))
+                    ) : (
+                      <p className="muted">{t("groupPage.noAssignedActivities")}</p>
+                    )}
+                      </section>
 
-                {assignedActivities.length ? (
-                  assignedActivities.map((assignment) => (
-                    <GroupActivityCard
-                      key={assignment.id}
-                      courseId={courseId}
-                      assignment={assignment}
-                      activityLabel={activityCopy(assignment.activity.activityType.key).name}
-                      canManage={Boolean(canManage)}
-                      saving={savingAssignmentId === assignment.id}
-                      t={t}
-                      onSave={saveAssignmentAvailability}
-                      onRemove={removeAssignment}
-                    />
-                  ))
-                ) : (
-                  <p className="muted">{t("groupPage.noAssignedActivities")}</p>
-                )}
-              </section>
-
-              <section className="section">
-                <form className="form" onSubmit={assignActivity}>
-                  <div>
-                    <p className="eyebrow">{t("groupPage.assignActivityEyebrow")}</p>
-                    <h2>{t("groupPage.assignActivityTitle")}</h2>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="assignActivity">{t("groupPage.availableActivities")}</label>
-                    <select
-                      id="assignActivity"
-                      value={assignActivityId}
-                      onChange={(event) => setAssignActivityId(event.target.value)}
-                      disabled={!assignableActivities.length || !canManage}
-                    >
-                      {assignableActivities.length ? (
-                        assignableActivities.map((activity) => (
-                          <option key={activity.id} value={activity.id}>
-                            {activity.title}
-                          </option>
-                        ))
-                      ) : (
-                        <option value="">{t("groupPage.noAssignableActivities")}</option>
-                      )}
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="assignAvailableFrom">{t("groupPage.availableFrom")}</label>
-                    <input
-                      id="assignAvailableFrom"
-                      type="datetime-local"
-                      value={assignAvailableFrom}
-                      onChange={(event) => setAssignAvailableFrom(event.target.value)}
-                      disabled={!canManage}
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="assignAvailableUntil">{t("groupPage.availableUntil")}</label>
-                    <input
-                      id="assignAvailableUntil"
-                      type="datetime-local"
-                      value={assignAvailableUntil}
-                      onChange={(event) => setAssignAvailableUntil(event.target.value)}
-                      disabled={!canManage}
-                    />
-                  </div>
-                  {assignmentError ? <p className="error">{assignmentError}</p> : null}
-                  <button type="submit" disabled={!assignActivityId || !assignableActivities.length || !canManage}>
-                    {t("groupPage.assignActivity")}
-                  </button>
-                </form>
-              </section>
-            </div>
-
-            <section className="section stack">
-              <div className="section-heading">
-                <div>
-                  <p className="eyebrow">{t("groupPage.materialsEyebrow")}</p>
-                  <h2>{t("groupPage.materialsTitle")}</h2>
-                  <p className="muted">{t("groupPage.materialsText")}</p>
-                </div>
-              </div>
-
-              {canManage ? (
-                <form className="form inline-panel" onSubmit={createGroupMaterial}>
-                  <div className="field">
-                    <label htmlFor="groupMaterialMode">{t("courseDetail.source")}</label>
-                    <select
-                      id="groupMaterialMode"
-                      value={groupMaterialMode}
-                      onChange={(event) => setGroupMaterialMode(event.target.value as typeof groupMaterialMode)}
-                    >
-                      <option value="folder">{t("materialKinds.folder")}</option>
-                      <option value="github_repo">{t("materialKinds.github_repo")}</option>
-                      <option value="file">{t("materialKinds.file")}</option>
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="groupMaterialParent">{t("courseDetail.location")}</label>
-                    <select
-                      id="groupMaterialParent"
-                      value={groupMaterialParentId}
-                      onChange={(event) => setGroupMaterialParentId(event.target.value)}
-                    >
-                      <option value="">{t("courseDetail.topLevel")}</option>
-                      {folders.map((folder) => (
-                        <option key={folder.id} value={folder.id}>
-                          {folder.title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="groupMaterialTitle">{t("courseDetail.activityTitle")}</label>
-                    <input
-                      id="groupMaterialTitle"
-                      value={groupMaterialTitle}
-                      onChange={(event) => setGroupMaterialTitle(event.target.value)}
-                      placeholder={
-                        groupMaterialMode === "file"
-                          ? t("courseDetail.fileTitlePlaceholder")
-                          : groupMaterialMode === "folder"
-                            ? t("courseDetail.folderTitlePlaceholder")
-                            : t("courseDetail.repoTitlePlaceholder")
-                      }
-                    />
-                  </div>
-                  {groupMaterialMode === "folder" ? null : groupMaterialMode === "github_repo" ? (
-                    <div className="field">
-                      <label htmlFor="groupGithubUrl">{t("courseDetail.githubUrl")}</label>
-                      <input
-                        id="groupGithubUrl"
-                        type="url"
-                        value={groupGithubUrl}
-                        onChange={(event) => setGroupGithubUrl(event.target.value)}
-                        placeholder="https://github.com/org/repo"
-                        required
-                      />
-                    </div>
-                  ) : (
-                    <div className="field">
-                      <label htmlFor="groupMaterialFile">{t("courseDetail.file")}</label>
-                      <input id="groupMaterialFile" type="file" onChange={chooseFile} required />
-                      <p className="muted">{t("courseDetail.maxFileSize")}</p>
-                    </div>
-                  )}
-                  {materialError ? <p className="error">{materialError}</p> : null}
-                  <div className="row">
-                    <button type="submit">{t("groupPage.addMaterial")}</button>
-                  </div>
-                </form>
-              ) : null}
-
-              {visibleMaterials.length ? (
-                <div className="table-list">
-                  <div className="table-row table-head" aria-hidden="true">
-                    <span>{t("courseDetail.titleHeader")}</span>
-                    <span>{t("courseDetail.typeHeader")}</span>
-                    <span>{t("courseDetail.sourceHeader")}</span>
-                    <span>{t("courseDetail.actionsHeader")}</span>
-                  </div>
-                  <div
-                    className={`root-drop-zone ${draggingMaterialId ? "is-active" : ""} ${
-                      dropTarget?.type === "root" ? "is-drop-target" : ""
-                    }`}
-                    data-root-drop="true"
-                  >
-                    {t("courseDetail.moveToTopLevel")}
-                  </div>
-                  {visibleMaterials.map(({ material, depth }) => {
-                    const href = groupMaterialHref(material);
-                    const isEditing = editingMaterialId === material.id;
-                    const isCollapsed = collapsedFolderIds.has(material.id);
-                    return (
-                      <div key={material.id}>
-                        <div
-                          className={`table-row ${draggingMaterialId === material.id ? "is-dragging" : ""} ${
-                            dropTarget?.type === "material" && dropTarget.id === material.id ? "is-drop-target" : ""
-                          }`}
-                          data-material-id={material.id}
+                      <section className="section">
+                        <form className="form" onSubmit={assignActivity}>
+                      <div>
+                        <p className="eyebrow">{t("groupPage.assignActivityEyebrow")}</p>
+                        <h2>{t("groupPage.assignActivityTitle")}</h2>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="assignActivity">{t("groupPage.availableActivities")}</label>
+                        <select
+                          id="assignActivity"
+                          value={assignActivityId}
+                          onChange={(event) => setAssignActivityId(event.target.value)}
+                          disabled={!assignableActivities.length || !canManage}
                         >
-                          <div className="table-main material-title" style={{ paddingLeft: `${depth * 22}px` }}>
-                            {canManage ? (
-                              <span
-                                aria-label={t("courseDetail.dragMaterial", { title: material.title })}
-                                className="drag-handle"
-                                role="button"
-                                tabIndex={0}
-                                title={t("courseDetail.dragToMove")}
-                                onPointerDown={(event) => handleMaterialPointerDown(material, event)}
-                              >
-                                <MaterialActionIcon name="drag" />
-                              </span>
-                            ) : null}
-                            {material.kind === "folder" ? (
-                              <button
-                                aria-expanded={!isCollapsed}
-                                aria-label={t(isCollapsed ? "courseDetail.expandFolder" : "courseDetail.collapseFolder", {
-                                  title: material.title
-                                })}
-                                className="material-glyph"
-                                title={t(isCollapsed ? "courseDetail.expandFolderTitle" : "courseDetail.collapseFolderTitle")}
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  toggleFolder(material.id);
+                          {assignableActivities.length ? (
+                            assignableActivities.map((activity) => (
+                              <option key={activity.id} value={activity.id}>
+                                {activity.title}
+                              </option>
+                            ))
+                          ) : (
+                            <option value="">{t("groupPage.noAssignableActivities")}</option>
+                          )}
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="assignAvailableFrom">{t("groupPage.availableFrom")}</label>
+                        <input
+                          id="assignAvailableFrom"
+                          type="datetime-local"
+                          value={assignAvailableFrom}
+                          onChange={(event) => setAssignAvailableFrom(event.target.value)}
+                          disabled={!canManage}
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="assignAvailableUntil">{t("groupPage.availableUntil")}</label>
+                        <input
+                          id="assignAvailableUntil"
+                          type="datetime-local"
+                          value={assignAvailableUntil}
+                          onChange={(event) => setAssignAvailableUntil(event.target.value)}
+                          disabled={!canManage}
+                        />
+                      </div>
+                      {assignmentError ? <p className="error">{assignmentError}</p> : null}
+                      <button type="submit" disabled={!assignActivityId || !assignableActivities.length || !canManage}>
+                        {t("groupPage.assignActivity")}
+                      </button>
+                        </form>
+                      </section>
+                    </div>
+                  )
+                },
+                {
+                  id: "materials",
+                  label: t("groupPage.materialsTab"),
+                  render: () => (
+                    <div className="stack">
+                  <div className="section-heading">
+                    <div>
+                      <p className="eyebrow">{t("groupPage.materialsEyebrow")}</p>
+                      <h2>{t("groupPage.materialsTitle")}</h2>
+                      <p className="muted">{t("groupPage.materialsText")}</p>
+                    </div>
+                    {canManage ? (
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => {
+                          if (isAddingGroupMaterial) {
+                            closeGroupMaterialForm();
+                            return;
+                          }
+                          setMaterialError("");
+                          setIsAddingGroupMaterial(true);
+                        }}
+                      >
+                        {isAddingGroupMaterial ? t("common.cancel") : t("courseDetail.addMaterial")}
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {canManage && isAddingGroupMaterial ? (
+                    <form className="form inline-panel" onSubmit={createGroupMaterial}>
+                      <div className="field">
+                        <label htmlFor="groupMaterialMode">{t("courseDetail.source")}</label>
+                        <select
+                          id="groupMaterialMode"
+                          value={groupMaterialMode}
+                          onChange={(event) => setGroupMaterialMode(event.target.value as typeof groupMaterialMode)}
+                        >
+                          <option value="folder">{t("materialKinds.folder")}</option>
+                          <option value="github_repo">{t("materialKinds.github_repo")}</option>
+                          <option value="file">{t("materialKinds.file")}</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="groupMaterialParent">{t("courseDetail.location")}</label>
+                        <select
+                          id="groupMaterialParent"
+                          value={groupMaterialParentId}
+                          onChange={(event) => setGroupMaterialParentId(event.target.value)}
+                        >
+                          <option value="">{t("courseDetail.topLevel")}</option>
+                          {folders.map((folder) => (
+                            <option key={folder.id} value={folder.id}>
+                              {folder.title}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="groupMaterialTitle">{t("courseDetail.activityTitle")}</label>
+                        <input
+                          id="groupMaterialTitle"
+                          value={groupMaterialTitle}
+                          onChange={(event) => setGroupMaterialTitle(event.target.value)}
+                          placeholder={
+                            groupMaterialMode === "file"
+                              ? t("courseDetail.fileTitlePlaceholder")
+                              : groupMaterialMode === "folder"
+                                ? t("courseDetail.folderTitlePlaceholder")
+                                : t("courseDetail.repoTitlePlaceholder")
+                          }
+                        />
+                      </div>
+                      {groupMaterialMode === "folder" ? null : groupMaterialMode === "github_repo" ? (
+                        <div className="field" key="group-github-repo-material">
+                          <label htmlFor="groupGithubUrl">{t("courseDetail.githubUrl")}</label>
+                          <input
+                            key="groupGithubUrl"
+                            id="groupGithubUrl"
+                            type="url"
+                            value={groupGithubUrl}
+                            onChange={(event) => setGroupGithubUrl(event.target.value)}
+                            placeholder="https://github.com/org/repo"
+                            required
+                          />
+                        </div>
+                      ) : (
+                        <div className="field" key="group-file-material">
+                          <label htmlFor="groupMaterialFile">{t("courseDetail.file")}</label>
+                          <input key="groupMaterialFile" id="groupMaterialFile" type="file" onChange={chooseFile} required />
+                          <p className="muted">{t("courseDetail.maxFileSize")}</p>
+                        </div>
+                      )}
+                      {materialError ? <p className="error">{materialError}</p> : null}
+                      <div className="row">
+                        <button type="submit">{t("groupPage.addMaterial")}</button>
+                        <button type="button" className="button secondary" onClick={closeGroupMaterialForm}>
+                          {t("common.cancel")}
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
+
+                  {visibleMaterials.length ? (
+                    <div className="table-list">
+                      <div className="table-row table-head" aria-hidden="true">
+                        <span>{t("courseDetail.titleHeader")}</span>
+                        <span>{t("courseDetail.typeHeader")}</span>
+                        <span>{t("courseDetail.sourceHeader")}</span>
+                        <span>{t("courseDetail.actionsHeader")}</span>
+                      </div>
+                      <div
+                        className={`root-drop-zone ${draggingMaterialId ? "is-active" : ""} ${
+                          dropTarget?.type === "root" ? "is-drop-target" : ""
+                        }`}
+                        data-root-drop="true"
+                      >
+                        {t("courseDetail.moveToTopLevel")}
+                      </div>
+                      {visibleMaterials.map(({ material, depth }) => {
+                        const href = groupMaterialHref(material);
+                        const isEditing = editingMaterialId === material.id;
+                        const isCollapsed = collapsedFolderIds.has(material.id);
+                        return (
+                          <div key={material.id}>
+                            <div
+                              className={`table-row ${draggingMaterialId === material.id ? "is-dragging" : ""} ${
+                                dropTarget?.type === "material" && dropTarget.id === material.id ? "is-drop-target" : ""
+                              }`}
+                              data-material-id={material.id}
+                            >
+                              <div className="table-main material-title" style={{ paddingLeft: `${depth * 22}px` }}>
+                                {canManage ? (
+                                  <span
+                                    aria-label={t("courseDetail.dragMaterial", { title: material.title })}
+                                    className="drag-handle"
+                                    role="button"
+                                    tabIndex={0}
+                                    title={t("courseDetail.dragToMove")}
+                                    onPointerDown={(event) => handleMaterialPointerDown(material, event)}
+                                  >
+                                    <MaterialActionIcon name="drag" />
+                                  </span>
+                                ) : null}
+                                {material.kind === "folder" ? (
+                                  <button
+                                    aria-expanded={!isCollapsed}
+                                    aria-label={t(isCollapsed ? "courseDetail.expandFolder" : "courseDetail.collapseFolder", {
+                                      title: material.title
+                                    })}
+                                    className="material-glyph"
+                                    title={t(isCollapsed ? "courseDetail.expandFolderTitle" : "courseDetail.collapseFolderTitle")}
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      toggleFolder(material.id);
+                                    }}
+                                  >
+                                    {isCollapsed ? "[+]" : "[-]"}
+                                  </button>
+                                ) : (
+                                  <span className="material-glyph material-glyph-static">-</span>
+                                )}
+                                <strong>{material.title}</strong>
+                              </div>
+                              <span className="eyebrow">{t(`materialKinds.${material.kind}`)}</span>
+                              <span className="table-meta muted">{materialDetail(material)}</span>
+                              <div className="table-actions">
+                                {href ? (
+                                  <a
+                                    aria-label={t(
+                                      material.kind === "file" ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial",
+                                      { title: material.title }
+                                    )}
+                                    className="button secondary icon-button"
+                                    href={href}
+                                    rel={material.kind === "file" ? undefined : "noreferrer"}
+                                    target={material.kind === "file" ? undefined : "_blank"}
+                                    title={t(material.kind === "file" ? "common.download" : "common.open")}
+                                  >
+                                    <MaterialActionIcon name={material.kind === "file" ? "download" : "open"} />
+                                  </a>
+                                ) : null}
+                                {canManage ? (
+                                  <>
+                                    <button
+                                      aria-label={t("courseDetail.editMaterial", { title: material.title })}
+                                      className="secondary icon-button"
+                                      title={t("common.edit")}
+                                      type="button"
+                                      onClick={() => startEditingMaterial(material)}
+                                    >
+                                      <MaterialActionIcon name="edit" />
+                                    </button>
+                                    <button
+                                      aria-label={t("courseDetail.removeMaterial", { title: material.title })}
+                                      className="danger icon-button"
+                                      title={t("common.remove")}
+                                      type="button"
+                                      onClick={() => removeMaterial(material)}
+                                    >
+                                      <MaterialActionIcon name="remove" />
+                                    </button>
+                                  </>
+                                ) : null}
+                              </div>
+                            </div>
+                            {isEditing ? (
+                              <form
+                                className="inline-edit"
+                                onSubmit={(event) => {
+                                  event.preventDefault();
+                                  void saveMaterialEdit(material);
                                 }}
                               >
-                                {isCollapsed ? "[+]" : "[-]"}
-                              </button>
-                            ) : (
-                              <span className="material-glyph material-glyph-static">-</span>
-                            )}
-                            <strong>{material.title}</strong>
-                          </div>
-                          <span className="eyebrow">{t(`materialKinds.${material.kind}`)}</span>
-                          <span className="table-meta muted">{materialDetail(material)}</span>
-                          <div className="table-actions">
-                            {href ? (
-                              <a
-                                aria-label={t(
-                                  material.kind === "file" ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial",
-                                  { title: material.title }
-                                )}
-                                className="button secondary icon-button"
-                                href={href}
-                                rel={material.kind === "file" ? undefined : "noreferrer"}
-                                target={material.kind === "file" ? undefined : "_blank"}
-                                title={t(material.kind === "file" ? "common.download" : "common.open")}
-                              >
-                                <MaterialActionIcon name={material.kind === "file" ? "download" : "open"} />
-                              </a>
-                            ) : null}
-                            {canManage ? (
-                              <>
-                                <button
-                                  aria-label={t("courseDetail.editMaterial", { title: material.title })}
-                                  className="secondary icon-button"
-                                  title={t("common.edit")}
-                                  type="button"
-                                  onClick={() => startEditingMaterial(material)}
-                                >
-                                  <MaterialActionIcon name="edit" />
-                                </button>
-                                <button
-                                  aria-label={t("courseDetail.removeMaterial", { title: material.title })}
-                                  className="danger icon-button"
-                                  title={t("common.remove")}
-                                  type="button"
-                                  onClick={() => removeMaterial(material)}
-                                >
-                                  <MaterialActionIcon name="remove" />
-                                </button>
-                              </>
+                                <div className="field">
+                                  <label htmlFor={`group-edit-title-${material.id}`}>{t("courseDetail.activityTitle")}</label>
+                                  <input
+                                    id={`group-edit-title-${material.id}`}
+                                    value={editMaterialTitle}
+                                    onChange={(event) => setEditMaterialTitle(event.target.value)}
+                                    required
+                                    minLength={2}
+                                  />
+                                </div>
+                                {material.kind === "github_repo" ? (
+                                  <div className="field">
+                                    <label htmlFor={`group-edit-url-${material.id}`}>{t("courseDetail.githubEditLabel")}</label>
+                                    <input
+                                      id={`group-edit-url-${material.id}`}
+                                      type="url"
+                                      value={editMaterialUrl}
+                                      onChange={(event) => setEditMaterialUrl(event.target.value)}
+                                      required
+                                    />
+                                  </div>
+                                ) : null}
+                                <div className="row">
+                                  <button type="submit">{t("courseDetail.saveMaterial")}</button>
+                                  <button className="secondary" type="button" onClick={() => setEditingMaterialId(null)}>
+                                    {t("common.cancel")}
+                                  </button>
+                                </div>
+                              </form>
                             ) : null}
                           </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="muted">{t("groupPage.noMaterials")}</p>
+                  )}
+                  {materialActionError ? <p className="error">{materialActionError}</p> : null}
+
+                  <section className="section stack">
+                    <div>
+                      <p className="eyebrow">{t("groupPage.inheritedMaterialsEyebrow")}</p>
+                      <h2>{t("groupPage.inheritedMaterialsTitle")}</h2>
+                      <p className="muted">{t("groupPage.inheritedMaterialsText")}</p>
+                    </div>
+
+                    {displayedCourseMaterials.length ? (
+                      <div className="table-list">
+                        <div className="table-row table-head" aria-hidden="true">
+                          <span>{t("courseDetail.titleHeader")}</span>
+                          <span>{t("courseDetail.typeHeader")}</span>
+                          <span>{t("courseDetail.sourceHeader")}</span>
+                          <span>{t("courseDetail.actionsHeader")}</span>
                         </div>
-                        {isEditing ? (
-                          <form
-                            className="inline-edit"
-                            onSubmit={(event) => {
-                              event.preventDefault();
-                              void saveMaterialEdit(material);
-                            }}
-                          >
-                            <div className="field">
-                              <label htmlFor={`group-edit-title-${material.id}`}>{t("courseDetail.activityTitle")}</label>
-                              <input
-                                id={`group-edit-title-${material.id}`}
-                                value={editMaterialTitle}
-                                onChange={(event) => setEditMaterialTitle(event.target.value)}
-                                required
-                                minLength={2}
-                              />
-                            </div>
-                            {material.kind === "github_repo" ? (
-                              <div className="field">
-                                <label htmlFor={`group-edit-url-${material.id}`}>{t("courseDetail.githubEditLabel")}</label>
-                                <input
-                                  id={`group-edit-url-${material.id}`}
-                                  type="url"
-                                  value={editMaterialUrl}
-                                  onChange={(event) => setEditMaterialUrl(event.target.value)}
-                                  required
-                                />
+                        {displayedCourseMaterials.map(({ material, depth }) => {
+                          const href = courseMaterialHref(material);
+                          const hiddenState = getHiddenMaterialState(courseMaterials, hiddenCourseMaterialIds, material.id);
+                          const isCollapsed = collapsedCourseFolderIds.has(material.id);
+
+                          return (
+                            <div
+                              key={material.id}
+                              className={`table-row ${hiddenState.effectivelyHidden ? "is-hidden-material" : ""}`}
+                            >
+                              <div className="table-main material-title" style={{ paddingLeft: `${depth * 22}px` }}>
+                                {material.kind === "folder" ? (
+                                  <button
+                                    aria-expanded={!isCollapsed}
+                                    aria-label={t(isCollapsed ? "courseDetail.expandFolder" : "courseDetail.collapseFolder", {
+                                      title: material.title
+                                    })}
+                                    className="material-glyph"
+                                    title={t(isCollapsed ? "courseDetail.expandFolderTitle" : "courseDetail.collapseFolderTitle")}
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      toggleCourseFolder(material.id);
+                                    }}
+                                  >
+                                    {isCollapsed ? "[+]" : "[-]"}
+                                  </button>
+                                ) : (
+                                  <span className="material-glyph material-glyph-static">-</span>
+                                )}
+                                <strong>{material.title}</strong>
                               </div>
-                            ) : null}
-                            <div className="row">
-                              <button type="submit">{t("courseDetail.saveMaterial")}</button>
-                              <button className="secondary" type="button" onClick={() => setEditingMaterialId(null)}>
-                                {t("common.cancel")}
-                              </button>
+                              <span className="eyebrow">{t(`materialKinds.${material.kind}`)}</span>
+                              <span className="table-meta muted">
+                                {courseMaterialDetail(material)}
+                                {hiddenState.effectivelyHidden ? (
+                                  <span className="table-meta-note">
+                                    {hiddenState.hiddenByAncestor && !hiddenState.directlyHidden
+                                      ? t("groupPage.hiddenByFolder")
+                                      : t("groupPage.hiddenInGroup")}
+                                  </span>
+                                ) : null}
+                              </span>
+                              <div className="table-actions">
+                                {href ? (
+                                  <a
+                                    aria-label={t(
+                                      material.kind === "file" ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial",
+                                      { title: material.title }
+                                    )}
+                                    className="button secondary icon-button"
+                                    href={href}
+                                    rel={material.kind === "file" ? undefined : "noreferrer"}
+                                    target={material.kind === "file" ? undefined : "_blank"}
+                                    title={t(material.kind === "file" ? "common.download" : "common.open")}
+                                  >
+                                    <MaterialActionIcon name={material.kind === "file" ? "download" : "open"} />
+                                  </a>
+                                ) : null}
+                                {canManage ? (
+                                  <button
+                                    aria-label={t(
+                                      hiddenState.directlyHidden ? "groupPage.unhideCourseMaterial" : "groupPage.hideCourseMaterial",
+                                      { title: material.title }
+                                    )}
+                                    className="secondary icon-button"
+                                    disabled={
+                                      savingCourseMaterialVisibilityId === material.id ||
+                                      (hiddenState.hiddenByAncestor && !hiddenState.directlyHidden)
+                                    }
+                                    title={
+                                      hiddenState.hiddenByAncestor && !hiddenState.directlyHidden
+                                        ? t("groupPage.hiddenByFolder")
+                                        : t(hiddenState.directlyHidden ? "groupPage.unhideAction" : "groupPage.hideAction")
+                                    }
+                                    type="button"
+                                    onClick={() => void toggleCourseMaterialVisibility(material)}
+                                  >
+                                    <MaterialActionIcon name={hiddenState.effectivelyHidden ? "hidden" : "visible"} />
+                                  </button>
+                                ) : null}
+                              </div>
                             </div>
-                          </form>
-                        ) : null}
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="muted">{t("groupPage.noMaterials")}</p>
-              )}
-              {materialActionError ? <p className="error">{materialActionError}</p> : null}
-            </section>
+                    ) : (
+                      <p className="muted">{t("groupPage.noCourseMaterials")}</p>
+                    )}
+                    {courseMaterialVisibilityError ? <p className="error">{courseMaterialVisibilityError}</p> : null}
+                  </section>
+                    </div>
+                  )
+                },
+                {
+                  id: "participants",
+                  label: t("groupPage.participantsTab"),
+                  render: () => (
+                    <section className="section stack">
+                      <div>
+                        <p className="eyebrow">{t("groupPage.participantsEyebrow")}</p>
+                        <h2>{t("groupPage.participantsTitle")}</h2>
+                        <p className="muted">{t("groupPage.participantsText")}</p>
+                      </div>
+                      <p className="muted">{t("groupPage.participantsPlaceholder")}</p>
+                    </section>
+                  )
+                },
+                {
+                  id: "settings",
+                  label: t("groupPage.settingsTab"),
+                  render: () =>
+                    canManage ? (
+                      <section className="section">
+                        <form className="form" onSubmit={saveGroupSettings}>
+                      <div>
+                        <p className="eyebrow">{t("groupPage.settingsEyebrow")}</p>
+                        <h2>{t("groupPage.settingsTitle")}</h2>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="group-title">{t("courseDetail.groupTitle")}</label>
+                        <input
+                          id="group-title"
+                          value={groupTitle}
+                          onChange={(event) => setGroupTitle(event.target.value)}
+                          required
+                          minLength={2}
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="group-status">{t("groupPage.statusLabel")}</label>
+                        <select id="group-status" value={groupStatus} onChange={(event) => setGroupStatus(event.target.value as "draft" | "published")}>
+                          <option value="draft">{t("groupPage.statusDraft")}</option>
+                          <option value="published">{t("groupPage.statusPublished")}</option>
+                        </select>
+                      </div>
+                      <div className="split">
+                        <div className="field">
+                          <label htmlFor="group-available-from">{t("groupPage.availableFrom")}</label>
+                          <input
+                            id="group-available-from"
+                            type="datetime-local"
+                            value={groupAvailableFrom}
+                            onChange={(event) => setGroupAvailableFrom(event.target.value)}
+                          />
+                        </div>
+                        <div className="field">
+                          <label htmlFor="group-available-until">{t("groupPage.availableUntil")}</label>
+                          <input
+                            id="group-available-until"
+                            type="datetime-local"
+                            value={groupAvailableUntil}
+                            onChange={(event) => setGroupAvailableUntil(event.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="row">
+                        <button type="submit" disabled={savingGroup}>
+                          {savingGroup ? t("common.saving") : t("groupPage.saveSettings")}
+                        </button>
+                      </div>
+                        </form>
+                      </section>
+                    ) : (
+                      <section className="section stack">
+                        <p className="muted">{t("groupPage.settingsReadOnly")}</p>
+                      </section>
+                    )
+                }
+              ]}
+            />
             {dragPreview ? (
               <div className="drag-preview" style={{ left: dragPreview.x + 14, top: dragPreview.y + 14 }}>
                 {dragPreview.title}
@@ -931,13 +1174,21 @@ function formatAvailabilityWindow(
   return t("groupPage.availableBefore", { until: new Date(availableUntil as string).toLocaleString() });
 }
 
-function compareMaterials(left: CourseGroupMaterial, right: CourseGroupMaterial) {
+type MaterialTreeNode = {
+  id: string;
+  title: string;
+  kind: string;
+  parentId?: string | null;
+  position: number;
+};
+
+function compareMaterials<T extends MaterialTreeNode>(left: T, right: T) {
   return left.position - right.position || left.title.localeCompare(right.title);
 }
 
-function flattenMaterials(materials: CourseGroupMaterial[], collapsedFolderIds: Set<string>) {
+function flattenMaterials<T extends MaterialTreeNode>(materials: T[], collapsedFolderIds: Set<string>) {
   const materialIds = new Set(materials.map((material) => material.id));
-  const byParent = new Map<string, CourseGroupMaterial[]>();
+  const byParent = new Map<string, T[]>();
   for (const material of materials) {
     const parentId = material.parentId ?? "root";
     byParent.set(parentId, [...(byParent.get(parentId) ?? []), material]);
@@ -947,7 +1198,7 @@ function flattenMaterials(materials: CourseGroupMaterial[], collapsedFolderIds: 
     byParent.set(parentId, children.sort(compareMaterials));
   }
 
-  const rows: { material: CourseGroupMaterial; depth: number }[] = [];
+  const rows: { material: T; depth: number }[] = [];
   const visited = new Set<string>();
 
   function walk(parentId: string, depth: number) {
@@ -975,7 +1226,7 @@ function flattenMaterials(materials: CourseGroupMaterial[], collapsedFolderIds: 
   return rows;
 }
 
-function isMaterialDescendant(materials: CourseGroupMaterial[], possibleChildId: string, possibleAncestorId: string) {
+function isMaterialDescendant<T extends MaterialTreeNode>(materials: T[], possibleChildId: string, possibleAncestorId: string) {
   const byId = new Map(materials.map((material) => [material.id, material]));
   let current = byId.get(possibleChildId);
 
@@ -989,7 +1240,32 @@ function isMaterialDescendant(materials: CourseGroupMaterial[], possibleChildId:
   return false;
 }
 
-function MaterialActionIcon({ name }: { name: "download" | "drag" | "edit" | "open" | "remove" }) {
+function getHiddenMaterialState<T extends MaterialTreeNode>(materials: T[], hiddenMaterialIds: Set<string>, materialId: string) {
+  const byId = new Map(materials.map((material) => [material.id, material]));
+  let current = byId.get(materialId);
+  let directlyHidden = false;
+  let hiddenByAncestor = false;
+
+  while (current) {
+    if (hiddenMaterialIds.has(current.id)) {
+      if (current.id === materialId) {
+        directlyHidden = true;
+      } else {
+        hiddenByAncestor = true;
+      }
+      break;
+    }
+    current = current.parentId ? byId.get(current.parentId) : undefined;
+  }
+
+  return {
+    directlyHidden,
+    hiddenByAncestor,
+    effectivelyHidden: directlyHidden || hiddenByAncestor
+  };
+}
+
+function MaterialActionIcon({ name }: { name: "download" | "drag" | "edit" | "hidden" | "open" | "remove" | "visible" }) {
   const paths = {
     download: (
       <>
@@ -1014,6 +1290,14 @@ function MaterialActionIcon({ name }: { name: "download" | "drag" | "edit" | "op
         <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
       </>
     ),
+    hidden: (
+      <>
+        <path d="m3 3 18 18" />
+        <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" />
+        <path d="M9.9 5.2A10.4 10.4 0 0 1 12 5c5 0 9.3 3 10 7-.3 1.5-1.2 2.8-2.4 3.9" />
+        <path d="M6.6 6.7C4.5 8 3.2 9.8 2 12c.8 1.6 1.9 3 3.3 4.1" />
+      </>
+    ),
     open: (
       <>
         <path d="M7 17 17 7" />
@@ -1027,6 +1311,12 @@ function MaterialActionIcon({ name }: { name: "download" | "drag" | "edit" | "op
         <path d="M19 6l-1 14H6L5 6" />
         <path d="M10 11v6" />
         <path d="M14 11v6" />
+      </>
+    ),
+    visible: (
+      <>
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+        <circle cx="12" cy="12" r="3" />
       </>
     )
   } as const;

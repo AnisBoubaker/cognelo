@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ChangeEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { WorkspaceTabs } from "@/components/workspace-tabs";
 import { api, ActivityDefinition, ActivityType, Course, CourseMaterial } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
@@ -14,7 +15,6 @@ export default function CourseDetailPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
-  const [activeTab, setActiveTab] = useState<"materials" | "activities" | "groups">("materials");
   const [activityTitle, setActivityTitle] = useState("");
   const [activityTypeKey, setActivityTypeKey] = useState("placeholder");
   const [groupTitle, setGroupTitle] = useState("");
@@ -374,56 +374,28 @@ export default function CourseDetailPage() {
       <main className="page stack">
         {course ? (
           <>
-            <section className="row">
-              <div>
+            <section className="hero-panel hero-panel-compact">
+              <div className="hero-meta">
                 <p className="eyebrow">{t(`status.${course.status}`)}</p>
                 <h1>{course.title}</h1>
                 <p className="muted">{course.description || t("common.noDescription")}</p>
               </div>
-              <Link className="button secondary" href={`/courses/${course.id}/edit`}>
-                {t("courseDetail.edit")}
-              </Link>
+              <div className="hero-actions">
+                <Link className="button secondary" href={`/courses/${course.id}/edit`}>
+                  {t("courseDetail.edit")}
+                </Link>
+              </div>
             </section>
             {error ? <p className="error">{error}</p> : null}
-            <section className="section stack">
-              <div className="tab-strip" role="tablist" aria-label={t("courseDetail.workspaceTabs")}>
-                <button
-                  aria-controls="course-materials-panel"
-                  aria-selected={activeTab === "materials"}
-                  className={`tab-button ${activeTab === "materials" ? "is-active" : ""}`}
-                  id="course-materials-tab"
-                  role="tab"
-                  type="button"
-                  onClick={() => setActiveTab("materials")}
-                >
-                  {t("courseDetail.materialsTab")}
-                </button>
-                <button
-                  aria-controls="course-activities-panel"
-                  aria-selected={activeTab === "activities"}
-                  className={`tab-button ${activeTab === "activities" ? "is-active" : ""}`}
-                  id="course-activities-tab"
-                  role="tab"
-                  type="button"
-                  onClick={() => setActiveTab("activities")}
-                >
-                  {t("courseDetail.activitiesTab")}
-                </button>
-                <button
-                  aria-controls="course-groups-panel"
-                  aria-selected={activeTab === "groups"}
-                  className={`tab-button ${activeTab === "groups" ? "is-active" : ""}`}
-                  id="course-groups-tab"
-                  role="tab"
-                  type="button"
-                  onClick={() => setActiveTab("groups")}
-                >
-                  {t("courseDetail.groupsTab")}
-                </button>
-              </div>
-
-              {activeTab === "materials" ? (
-                <div className="stack" id="course-materials-panel" role="tabpanel" aria-labelledby="course-materials-tab">
+            <WorkspaceTabs
+              ariaLabel={t("courseDetail.workspaceTabs")}
+              initialTab="materials"
+              tabs={[
+                {
+                  id: "materials",
+                  label: t("courseDetail.materialsTab"),
+                  render: () => (
+                    <div className="stack">
                   <div className="section-heading">
                     <div>
                       <p className="eyebrow">{t("courseDetail.materialsEyebrow")}</p>
@@ -646,19 +618,22 @@ export default function CourseDetailPage() {
                     <p className="muted">{t("courseDetail.noMaterials")}</p>
                   )}
                   {materialActionError ? <p className="error">{materialActionError}</p> : null}
-                </div>
-              ) : null}
-
-              {activeTab === "activities" ? (
-                <div className="split" id="course-activities-panel" role="tabpanel" aria-labelledby="course-activities-tab">
-                  <section className="section stack">
+                    </div>
+                  )
+                },
+                {
+                  id: "activities",
+                  label: t("courseDetail.activitiesTab"),
+                  render: () => (
+                    <div className="split">
+                      <section className="section stack">
                     <div>
                       <p className="eyebrow">{t("courseDetail.activitiesEyebrow")}</p>
                       <h2>{t("courseDetail.activitiesTitle")}</h2>
                     </div>
                     {course.activities?.length ? (
                       course.activities.map((activity) => (
-                        <article className="card" key={activity.id}>
+                        <article className="card card-compact" key={activity.id}>
                           <span className="eyebrow">{activityCopy(activity.activityType.key).name}</span>
                           <h3>
                             <Link href={`/courses/${course.id}/activities/${activity.id}`}>{activity.title}</Link>
@@ -680,9 +655,9 @@ export default function CourseDetailPage() {
                     ) : (
                       <p className="muted">{t("courseDetail.noActivities")}</p>
                     )}
-                  </section>
-                  <section className="section">
-                    <form className="form" onSubmit={createActivity}>
+                      </section>
+                      <section className="section">
+                        <form className="form" onSubmit={createActivity}>
                       <div>
                         <p className="eyebrow">{t("courseDetail.activityShellEyebrow")}</p>
                         <h2>{t("courseDetail.activityShellTitle")}</h2>
@@ -709,25 +684,28 @@ export default function CourseDetailPage() {
                             <option key={type.id} value={type.key}>
                               {activityCopy(type.key).name}
                             </option>
-                          ))}
-                        </select>
-                      </div>
-                      <button type="submit">{t("courseDetail.attachActivity")}</button>
-                    </form>
-                  </section>
-                </div>
-              ) : null}
-
-              {activeTab === "groups" ? (
-                <div className="split" id="course-groups-panel" role="tabpanel" aria-labelledby="course-groups-tab">
-                  <section className="section stack">
+                        ))}
+                      </select>
+                          </div>
+                          <button type="submit">{t("courseDetail.attachActivity")}</button>
+                        </form>
+                      </section>
+                    </div>
+                  )
+                },
+                {
+                  id: "groups",
+                  label: t("courseDetail.groupsTab"),
+                  render: () => (
+                    <div className="split">
+                      <section className="section stack">
                     <div>
                       <p className="eyebrow">{t("courseDetail.groupsEyebrow")}</p>
                       <h2>{t("courseDetail.groupsTitle")}</h2>
                     </div>
                     {course.groups?.length ? (
                       course.groups.map((group) => (
-                        <article className="card" key={group.id}>
+                        <article className="card card-compact" key={group.id}>
                           <span className="eyebrow">
                             {t("courseDetail.groupCardEyebrow")} · {group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}
                           </span>
@@ -745,9 +723,9 @@ export default function CourseDetailPage() {
                     ) : (
                       <p className="muted">{t("courseDetail.noGroups")}</p>
                     )}
-                  </section>
-                  <section className="section">
-                    <form className="form" onSubmit={createGroup}>
+                      </section>
+                      <section className="section">
+                        <form className="form" onSubmit={createGroup}>
                       <div>
                         <p className="eyebrow">{t("courseDetail.groupShellEyebrow")}</p>
                         <h2>{t("courseDetail.groupShellTitle")}</h2>
@@ -762,13 +740,15 @@ export default function CourseDetailPage() {
                           required
                           minLength={2}
                         />
-                      </div>
-                      <button type="submit">{t("courseDetail.createGroup")}</button>
-                    </form>
-                  </section>
-                </div>
-              ) : null}
-            </section>
+                          </div>
+                          <button type="submit">{t("courseDetail.createGroup")}</button>
+                        </form>
+                      </section>
+                    </div>
+                  )
+                }
+              ]}
+            />
             {dragPreview ? (
               <div className="drag-preview" style={{ left: dragPreview.x + 14, top: dragPreview.y + 14 }}>
                 {dragPreview.title}
