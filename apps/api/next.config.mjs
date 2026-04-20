@@ -7,7 +7,8 @@ const nextConfig = {
     "@cognelo/activity-sdk",
     "@cognelo/plugin-homework-grader",
     "@cognelo/plugin-parsons",
-    "@cognelo/plugin-placeholder"
+    "@cognelo/plugin-placeholder",
+    "@cognelo/plugin-mcq"
   ]
 };
 

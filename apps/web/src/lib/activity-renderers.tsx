@@ -1,5 +1,6 @@
 import type { ComponentProps } from "react";
 import { ParsonsActivityView } from "@cognelo/plugin-parsons";
+import { McqActivityView } from "@cognelo/plugin-mcq";
 import { api, type ParsonsAttempt, type ParsonsAttemptEvaluation, type ParsonsAttemptState } from "@/lib/api";
 
 function ParsonsActivityRenderer(props: ComponentProps<typeof ParsonsActivityView>) {
@@ -42,5 +43,6 @@ export type ParsonsAttemptsClient = {
 };
 
 export const activityRenderers = {
-  "parsons-problem": ParsonsActivityRenderer
+  "parsons-problem": ParsonsActivityRenderer,
+  mcq: McqActivityView
 } as const;
