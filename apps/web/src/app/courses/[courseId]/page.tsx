@@ -19,6 +19,7 @@ export default function CourseDetailPage() {
   const [activityTypeKey, setActivityTypeKey] = useState("placeholder");
   const [isAddingActivity, setIsAddingActivity] = useState(false);
   const [groupTitle, setGroupTitle] = useState("");
+  const [isAddingGroup, setIsAddingGroup] = useState(false);
   const [materialMode, setMaterialMode] = useState<"folder" | "github_repo" | "file">("github_repo");
   const [materialTitle, setMaterialTitle] = useState("");
   const [githubUrl, setGithubUrl] = useState("");
@@ -78,6 +79,7 @@ export default function CourseDetailPage() {
       });
       await refresh();
       setGroupTitle("");
+      setIsAddingGroup(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("courseDetail.createGroupError"));
     }
@@ -682,7 +684,7 @@ export default function CourseDetailPage() {
 
                       {course.activities?.length ? (
                         <div className="table-list">
-                          <div className="table-row table-head" aria-hidden="true">
+                          <div className="table-row table-row-groups table-head" aria-hidden="true">
                             <span>{t("courseDetail.titleHeader")}</span>
                             <span>{t("courseDetail.activityType")}</span>
                             <span>{t("courseDetail.statusHeader")}</span>
@@ -732,54 +734,80 @@ export default function CourseDetailPage() {
                   id: "groups",
                   label: t("courseDetail.groupsTab"),
                   render: () => (
-                    <div className="split">
-                      <section className="section stack">
-                    <div>
-                      <p className="eyebrow">{t("courseDetail.groupsEyebrow")}</p>
-                      <h2>{t("courseDetail.groupsTitle")}</h2>
-                    </div>
-                    {course.groups?.length ? (
-                      course.groups.map((group) => (
-                        <article className="card card-compact" key={group.id}>
-                          <span className="eyebrow">
-                            {t("courseDetail.groupCardEyebrow")} · {group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}
-                          </span>
-                          <h3>
-                            <Link href={`/courses/${course.id}/groups/${group.id}`}>{group.title}</Link>
-                          </h3>
-                          <p className="muted">{formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</p>
-                          <div className="row">
-                            <Link className="button secondary" href={`/courses/${course.id}/groups/${group.id}`}>
-                              {t("courseDetail.openGroup")}
-                            </Link>
-                          </div>
-                        </article>
-                      ))
-                    ) : (
-                      <p className="muted">{t("courseDetail.noGroups")}</p>
-                    )}
-                      </section>
-                      <section className="section">
-                        <form className="form" onSubmit={createGroup}>
-                      <div>
-                        <p className="eyebrow">{t("courseDetail.groupShellEyebrow")}</p>
-                        <h2>{t("courseDetail.groupShellTitle")}</h2>
+                    <section className="section stack">
+                      <div className="section-heading">
+                        <div>
+                          <p className="eyebrow">{t("courseDetail.groupsEyebrow")}</p>
+                          <h2>{t("courseDetail.groupsTitle")}</h2>
+                        </div>
+                        <button className="secondary" type="button" onClick={() => setIsAddingGroup((current) => !current)}>
+                          {isAddingGroup ? t("common.cancel") : t("courseDetail.groupShellTitle")}
+                        </button>
                       </div>
-                      <div className="field">
-                        <label htmlFor="groupTitle">{t("courseDetail.groupTitle")}</label>
-                        <input
-                          id="groupTitle"
-                          value={groupTitle}
-                          onChange={(event) => setGroupTitle(event.target.value)}
-                          placeholder={t("courseDetail.groupTitlePlaceholder")}
-                          required
-                          minLength={2}
-                        />
+
+                      {isAddingGroup ? (
+                        <form className="form inline-panel" onSubmit={createGroup}>
+                          <div>
+                            <p className="eyebrow">{t("courseDetail.groupShellEyebrow")}</p>
+                            <h2>{t("courseDetail.groupShellTitle")}</h2>
                           </div>
-                          <button type="submit">{t("courseDetail.createGroup")}</button>
+                          <div className="field">
+                            <label htmlFor="groupTitle">{t("courseDetail.groupTitle")}</label>
+                            <input
+                              id="groupTitle"
+                              value={groupTitle}
+                              onChange={(event) => setGroupTitle(event.target.value)}
+                              placeholder={t("courseDetail.groupTitlePlaceholder")}
+                              required
+                              minLength={2}
+                            />
+                          </div>
+                          <div className="row">
+                            <button type="submit">{t("courseDetail.createGroup")}</button>
+                            <button className="secondary" type="button" onClick={() => setIsAddingGroup(false)}>
+                              {t("common.close")}
+                            </button>
+                          </div>
                         </form>
-                      </section>
-                    </div>
+                      ) : null}
+
+                      {course.groups?.length ? (
+                        <div className="table-list">
+                          <div className="table-row table-row-groups table-head" aria-hidden="true">
+                            <span>{t("courseDetail.titleHeader")}</span>
+                            <span>{t("courseDetail.availabilityHeader")}</span>
+                            <span>{t("courseDetail.statusHeader")}</span>
+                            <span>{t("courseDetail.actionsHeader")}</span>
+                          </div>
+                          {course.groups.map((group) => (
+                            <div className="table-row table-row-groups" key={group.id}>
+                              <div className="table-main table-main-stack">
+                                <strong>
+                                  <Link href={`/courses/${course.id}/groups/${group.id}`}>{group.title}</Link>
+                                </strong>
+                                <span className="table-meta-note muted">
+                                  {formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}
+                                </span>
+                              </div>
+                              <span className="table-meta muted">{formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</span>
+                              <span className="table-meta muted">{group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}</span>
+                              <div className="table-actions">
+                                <Link
+                                  aria-label={t("courseDetail.openGroup")}
+                                  className="button secondary icon-button"
+                                  href={`/courses/${course.id}/groups/${group.id}`}
+                                  title={t("courseDetail.openGroup")}
+                                >
+                                  <MaterialActionIcon name="open" />
+                                </Link>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="muted">{t("courseDetail.noGroups")}</p>
+                      )}
+                    </section>
                   )
                 }
               ]}
