@@ -45,6 +45,7 @@ export type CourseGroup = {
   status: CourseGroupStatus;
   availableFrom?: string | null;
   availableUntil?: string | null;
+  hiddenCourseMaterialIds?: string[];
   materials?: CourseGroupMaterial[];
   activities?: CourseGroupActivityAssignment[];
 };
@@ -325,6 +326,14 @@ export const api = {
   },
   groupMaterialDownloadUrl: (courseId: string, groupId: string, materialId: string) =>
     `${API_URL}/api/courses/${courseId}/groups/${groupId}/materials/${materialId}/download`,
+  hideCourseMaterialInGroup: (courseId: string, groupId: string, materialId: string) =>
+    request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}/course-materials/${materialId}/visibility`, {
+      method: "PUT"
+    }),
+  unhideCourseMaterialInGroup: (courseId: string, groupId: string, materialId: string) =>
+    request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}/course-materials/${materialId}/visibility`, {
+      method: "DELETE"
+    }),
   groupActivityAssignments: (courseId: string, groupId: string) =>
     request<{ assignments: CourseGroupActivityAssignment[] }>(`/courses/${courseId}/groups/${groupId}/activities`),
   assignGroupActivity: (courseId: string, groupId: string, input: CourseGroupActivityInput) =>

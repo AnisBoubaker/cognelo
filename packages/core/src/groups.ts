@@ -14,6 +14,11 @@ import { AppError, notFound } from "./errors";
 
 const groupInclude = {
   materials: { orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }] },
+  hiddenCourseMaterials: {
+    select: {
+      courseMaterialId: true
+    }
+  },
   activities: {
     include: {
       activity: {
@@ -50,7 +55,10 @@ export async function getCourseGroup(user: CurrentUser, courseId: string, groupI
   if (!group) {
     throw notFound("Course group");
   }
-  return group;
+  return {
+    ...group,
+    hiddenCourseMaterialIds: group.hiddenCourseMaterials.map((entry) => entry.courseMaterialId)
+  };
 }
 
 export async function createCourseGroup(user: CurrentUser, courseId: string, input: unknown) {
@@ -153,6 +161,43 @@ export async function deleteGroupMaterial(user: CurrentUser, courseId: string, g
     throw notFound("Group material");
   }
   await prisma.courseGroupMaterial.delete({ where: { id: materialId } });
+  return { ok: true };
+}
+
+export async function hideCourseMaterialForGroup(user: CurrentUser, courseId: string, groupId: string, materialId: string) {
+  await assertCanManageCourse(user, courseId);
+  await assertGroupBelongsToCourse(courseId, groupId);
+  await assertCourseMaterialBelongsToCourse(courseId, materialId);
+
+  await prisma.courseGroupHiddenCourseMaterial.upsert({
+    where: {
+      groupId_courseMaterialId: {
+        groupId,
+        courseMaterialId: materialId
+      }
+    },
+    update: {},
+    create: {
+      groupId,
+      courseMaterialId: materialId
+    }
+  });
+
+  return { ok: true };
+}
+
+export async function unhideCourseMaterialForGroup(user: CurrentUser, courseId: string, groupId: string, materialId: string) {
+  await assertCanManageCourse(user, courseId);
+  await assertGroupBelongsToCourse(courseId, groupId);
+  await assertCourseMaterialBelongsToCourse(courseId, materialId);
+
+  await prisma.courseGroupHiddenCourseMaterial.deleteMany({
+    where: {
+      groupId,
+      courseMaterialId: materialId
+    }
+  });
+
   return { ok: true };
 }
 
@@ -270,6 +315,14 @@ async function assertActivityBelongsToCourse(courseId: string, activityId: strin
     throw notFound("Course activity");
   }
   return activity;
+}
+
+async function assertCourseMaterialBelongsToCourse(courseId: string, materialId: string) {
+  const material = await prisma.courseMaterial.findFirst({ where: { id: materialId, courseId } });
+  if (!material) {
+    throw notFound("Course material");
+  }
+  return material;
 }
 
 async function assertValidGroupMaterialParent(groupId: string, parentId: string | null | undefined) {
