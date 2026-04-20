@@ -536,6 +536,21 @@ a.card:hover,
   gap: 7px;
 }
 
+.date-time-minute-input {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1.25fr) 110px;
+}
+
+.date-time-minute-input input[type="date"],
+.date-time-minute-input input[type="text"] {
+  width: 100%;
+}
+
+.date-time-minute-input input[type="text"] {
+  font-variant-numeric: tabular-nums;
+}
+
 .field label {
   font-weight: 700;
 }
@@ -1026,9 +1041,11 @@ a.card:hover,
 }
 
 .parsons-editor-selection-rail {
+  align-content: start;
   align-items: stretch;
   display: grid;
   gap: 0;
+  grid-auto-rows: 21px;
   padding-left: 6px;
   padding-right: 6px;
 }
