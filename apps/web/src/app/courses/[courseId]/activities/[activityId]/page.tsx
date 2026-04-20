@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
-import { api, Activity, Course } from "@/lib/api";
+import { api, Activity, ActivityDefinition, Course } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { activityRenderers } from "@/lib/activity-renderers";
 
@@ -13,9 +13,10 @@ export default function ActivityPage() {
   const params = useParams<{ courseId: string; activityId: string }>();
   const { courseId, activityId } = params;
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [course, setCourse] = useState<Course | null>(null);
   const [activity, setActivity] = useState<Activity | null>(null);
+  const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [error, setError] = useState("");
 
   const canManage = user?.roles.includes("admin") || user?.roles.includes("teacher");
@@ -23,9 +24,14 @@ export default function ActivityPage() {
 
   useEffect(() => {
     async function refresh() {
-      const [courseResult, activityResult] = await Promise.all([api.course(courseId), api.activity(courseId, activityId)]);
+      const [courseResult, activityResult, typeResult] = await Promise.all([
+        api.course(courseId),
+        api.activity(courseId, activityId),
+        api.activityTypes()
+      ]);
       setCourse(courseResult.course);
       setActivity(activityResult.activity);
+      setActivityDefinitions(typeResult.registeredDefinitions);
     }
 
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("activityPage.loadError")));
@@ -37,12 +43,22 @@ export default function ActivityPage() {
     return result.activity;
   }
 
+  function localizedActivityName() {
+    if (!activity) {
+      return t("common.loading");
+    }
+
+    const definition = activityDefinitions.find((candidate) => candidate.key === activity.activityType.key);
+    const localized = definition?.i18n?.[locale];
+    return localized?.name ?? definition?.name ?? activity.activityType.name;
+  }
+
   return (
     <AppShell>
       <main className="page stack">
         <section className="hero-panel stack">
           <div className="hero-meta">
-            <p className="eyebrow">{activity?.activityType.name ?? t("common.loading")}</p>
+            <p className="eyebrow">{localizedActivityName()}</p>
             <h1>{activity?.title ?? t("common.loading")}</h1>
             <p className="muted">{course ? `${t("parsons.inCourse", { title: course.title })}` : t("common.loading")}</p>
           </div>
@@ -56,7 +72,7 @@ export default function ActivityPage() {
         {error ? <p className="error">{error}</p> : null}
 
         {activity && ActivityRenderer ? (
-          <ActivityRenderer activity={activity} canManage={Boolean(canManage)} course={course} onSave={saveActivity} t={t} />
+          <ActivityRenderer activity={activity} canManage={Boolean(canManage)} course={course} onSave={saveActivity} t={t} locale={locale} />
         ) : activity ? (
           <section className="section stack">
             <h2>{t("parsons.unsupportedTitle")}</h2>
