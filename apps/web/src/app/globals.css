@@ -658,6 +658,12 @@ a.card:hover,
   min-width: 0;
 }
 
+.table-main-stack {
+  align-items: flex-start;
+  display: grid;
+  gap: 2px;
+}
+
 .table-main strong {
   overflow: hidden;
   text-overflow: ellipsis;
