@@ -249,6 +249,32 @@ select:focus {
   color: var(--brand-ink);
 }
 
+.tab-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tab-button {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: none;
+  color: var(--muted);
+  min-height: 40px;
+  padding: 0 18px;
+}
+
+.tab-button:hover {
+  box-shadow: none;
+}
+
+.tab-button.is-active {
+  background: linear-gradient(135deg, rgba(41, 213, 207, 0.16), rgba(46, 131, 216, 0.16));
+  border-color: color-mix(in srgb, var(--brand-blue), white 50%);
+  color: var(--brand-ink);
+}
+
 .account-menu {
   position: relative;
 }
