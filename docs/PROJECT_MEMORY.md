@@ -32,9 +32,22 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 
 - Authentication uses JWT stored in HttpOnly cookies.
 - Global authorization supports many-to-many user roles (`admin`, `teacher`, `student`) and is designed for more roles later.
+- Accounts can be activated on first login when a person was pre-added to a group participant list by email and no user record existed yet.
 - Courses support create, edit, archive, and draft/published/archived status.
 - Activities are attachable to courses through a plugin-style registry and are not hardcoded into the course model.
 - Course managers can remove activities directly from the course detail page.
+
+## Group Participant Decisions
+
+- Course groups have explicit participant records separate from platform users.
+- Group participants support roles `student`, `ta`, and `teacher`.
+- Adding a participant by email links immediately to an existing user when the email already exists.
+- When the participant email matches an existing user, first name, last name, and external ID are treated as locked/read-only in the add-participant UI.
+- When the participant email does not match an existing user, the group participant record is created without a linked user account, and the actual user account is created only at first activation/login.
+- Group creators are automatically added as `teacher` participants when a group is created.
+- A manager cannot remove themselves from the participant list of a group.
+- Existing-user lookup for participant enrollment is manager-only and happens before submit in the group participant UI.
+- Non-manager access to a group is tied to being added as a participant in that group, not only to broad course visibility.
 
 ## Course Material Decisions
 
@@ -59,6 +72,8 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - The visual theme should reflect the Cognelo logo palette in a restrained, product-like way.
 - Syntax-colored code rendering should be shared across activities through `packages/activity-ui`.
 - The shared code editor should grow vertically with its content.
+- Group participant management uses an inline panel form in the group workspace with an email-first flow.
+- Read-only inherited fields in forms should have a visible locked treatment rather than appearing identical to editable fields.
 
 ## Internationalization Decisions
 
