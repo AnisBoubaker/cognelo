@@ -555,6 +555,19 @@ a.card:hover,
   font-weight: 700;
 }
 
+.field-readonly input[readonly] {
+  background: linear-gradient(180deg, rgba(238, 244, 251, 0.96), rgba(245, 248, 252, 0.96));
+  border-color: color-mix(in srgb, var(--brand-blue), white 72%);
+  color: var(--muted);
+  cursor: default;
+}
+
+.field-readonly label::after {
+  color: var(--muted);
+  content: " (Locked)";
+  font-weight: 600;
+}
+
 .error {
   color: var(--danger);
   font-weight: 700;

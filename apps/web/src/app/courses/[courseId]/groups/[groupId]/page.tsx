@@ -1152,7 +1152,7 @@ export default function CourseGroupPage() {
                                 <option value="teacher">{t("groupPage.participantRoleTeacher")}</option>
                               </select>
                             </div>
-                            <div className="field">
+                            <div className={`field ${participantCandidate ? "field-readonly" : ""}`}>
                               <label htmlFor="participant-first-name">{t("groupPage.participantFirstName")}</label>
                               <input
                                 id="participant-first-name"
@@ -1162,7 +1162,7 @@ export default function CourseGroupPage() {
                                 required={!participantCandidate}
                               />
                             </div>
-                            <div className="field">
+                            <div className={`field ${participantCandidate ? "field-readonly" : ""}`}>
                               <label htmlFor="participant-last-name">{t("groupPage.participantLastName")}</label>
                               <input
                                 id="participant-last-name"
@@ -1172,13 +1172,14 @@ export default function CourseGroupPage() {
                                 required={!participantCandidate}
                               />
                             </div>
-                            <div className="field">
+                            <div className={`field ${participantCandidate ? "field-readonly" : ""}`}>
                               <label htmlFor="participant-external-id">{t("groupPage.participantExternalId")}</label>
                               <input
                                 id="participant-external-id"
                                 value={participantExternalId}
                                 onChange={(event) => setParticipantExternalId(event.target.value)}
                                 placeholder={t("groupPage.participantExternalIdPlaceholder")}
+                                readOnly={Boolean(participantCandidate)}
                               />
                             </div>
                           </div>
