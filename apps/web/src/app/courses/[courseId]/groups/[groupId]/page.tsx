@@ -41,6 +41,7 @@ export default function CourseGroupPage() {
   const [assignActivityId, setAssignActivityId] = useState("");
   const [assignAvailableFrom, setAssignAvailableFrom] = useState("");
   const [assignAvailableUntil, setAssignAvailableUntil] = useState("");
+  const [isAssigningActivity, setIsAssigningActivity] = useState(false);
   const [savingAssignmentId, setSavingAssignmentId] = useState<string | null>(null);
   const [savingCourseMaterialVisibilityId, setSavingCourseMaterialVisibilityId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -456,6 +457,7 @@ export default function CourseGroupPage() {
       setAssignAvailableUntil("");
       const remaining = assignableActivities.filter((activity) => activity.id !== assignActivityId);
       setAssignActivityId(remaining[0]?.id ?? "");
+      setIsAssigningActivity(false);
     } catch (err) {
       setAssignmentError(err instanceof Error ? err.message : t("groupPage.assignmentCreateError"));
     }
@@ -522,83 +524,104 @@ export default function CourseGroupPage() {
                   id: "activities",
                   label: t("groupPage.activitiesTab"),
                   render: () => (
-                    <div className="split">
-                      <section className="section stack">
-                    <div>
-                      <p className="eyebrow">{t("groupPage.assignedActivitiesEyebrow")}</p>
-                      <h2>{t("groupPage.assignedActivitiesTitle")}</h2>
-                      <p className="muted">{t("groupPage.assignedActivitiesText")}</p>
-                    </div>
+                    <section className="section stack">
+                      <div className="section-heading">
+                        <div>
+                          <p className="eyebrow">{t("groupPage.assignedActivitiesEyebrow")}</p>
+                          <h2>{t("groupPage.assignedActivitiesTitle")}</h2>
+                          <p className="muted">{t("groupPage.assignedActivitiesText")}</p>
+                        </div>
+                        {canManage ? (
+                          <button className="secondary" type="button" onClick={() => setIsAssigningActivity((current) => !current)}>
+                            {isAssigningActivity ? t("common.cancel") : t("groupPage.assignActivityTitle")}
+                          </button>
+                        ) : null}
+                      </div>
 
-                    {assignedActivities.length ? (
-                      assignedActivities.map((assignment) => (
-                        <GroupActivityCard
-                          key={assignment.id}
-                          courseId={courseId}
-                          assignment={assignment}
-                          activityLabel={activityCopy(assignment.activity.activityType.key).name}
-                          canManage={Boolean(canManage)}
-                          saving={savingAssignmentId === assignment.id}
-                          t={t}
-                          onSave={saveAssignmentAvailability}
-                          onRemove={removeAssignment}
-                        />
-                      ))
-                    ) : (
-                      <p className="muted">{t("groupPage.noAssignedActivities")}</p>
-                    )}
-                      </section>
-
-                      <section className="section">
-                        <form className="form" onSubmit={assignActivity}>
-                      <div>
-                        <p className="eyebrow">{t("groupPage.assignActivityEyebrow")}</p>
-                        <h2>{t("groupPage.assignActivityTitle")}</h2>
-                      </div>
-                      <div className="field">
-                        <label htmlFor="assignActivity">{t("groupPage.availableActivities")}</label>
-                        <select
-                          id="assignActivity"
-                          value={assignActivityId}
-                          onChange={(event) => setAssignActivityId(event.target.value)}
-                          disabled={!assignableActivities.length || !canManage}
-                        >
-                          {assignableActivities.length ? (
-                            assignableActivities.map((activity) => (
-                              <option key={activity.id} value={activity.id}>
-                                {activity.title}
-                              </option>
-                            ))
-                          ) : (
-                            <option value="">{t("groupPage.noAssignableActivities")}</option>
-                          )}
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label htmlFor="assignAvailableFrom">{t("groupPage.availableFrom")}</label>
-                        <DateTimeMinuteInput
-                          id="assignAvailableFrom"
-                          value={assignAvailableFrom}
-                          onChange={setAssignAvailableFrom}
-                          disabled={!canManage}
-                        />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="assignAvailableUntil">{t("groupPage.availableUntil")}</label>
-                        <DateTimeMinuteInput
-                          id="assignAvailableUntil"
-                          value={assignAvailableUntil}
-                          onChange={setAssignAvailableUntil}
-                          disabled={!canManage}
-                        />
-                      </div>
-                      {assignmentError ? <p className="error">{assignmentError}</p> : null}
-                      <button type="submit" disabled={!assignActivityId || !assignableActivities.length || !canManage}>
-                        {t("groupPage.assignActivity")}
-                      </button>
+                      {canManage && isAssigningActivity ? (
+                        <form className="form inline-panel" onSubmit={assignActivity}>
+                          <div>
+                            <p className="eyebrow">{t("groupPage.assignActivityEyebrow")}</p>
+                            <h2>{t("groupPage.assignActivityTitle")}</h2>
+                          </div>
+                          <div className="grid compact-form-grid">
+                            <div className="field">
+                              <label htmlFor="assignActivity">{t("groupPage.availableActivities")}</label>
+                              <select
+                                id="assignActivity"
+                                value={assignActivityId}
+                                onChange={(event) => setAssignActivityId(event.target.value)}
+                                disabled={!assignableActivities.length || !canManage}
+                              >
+                                {assignableActivities.length ? (
+                                  assignableActivities.map((activity) => (
+                                    <option key={activity.id} value={activity.id}>
+                                      {activity.title}
+                                    </option>
+                                  ))
+                                ) : (
+                                  <option value="">{t("groupPage.noAssignableActivities")}</option>
+                                )}
+                              </select>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="assignAvailableFrom">{t("groupPage.availableFrom")}</label>
+                              <DateTimeMinuteInput
+                                id="assignAvailableFrom"
+                                value={assignAvailableFrom}
+                                onChange={setAssignAvailableFrom}
+                                disabled={!canManage}
+                              />
+                            </div>
+                            <div className="field">
+                              <label htmlFor="assignAvailableUntil">{t("groupPage.availableUntil")}</label>
+                              <DateTimeMinuteInput
+                                id="assignAvailableUntil"
+                                value={assignAvailableUntil}
+                                onChange={setAssignAvailableUntil}
+                                disabled={!canManage}
+                              />
+                            </div>
+                          </div>
+                          {assignmentError ? <p className="error">{assignmentError}</p> : null}
+                          <div className="row">
+                            <button type="submit" disabled={!assignActivityId || !assignableActivities.length || !canManage}>
+                              {t("groupPage.assignActivity")}
+                            </button>
+                            <button className="secondary" type="button" onClick={() => setIsAssigningActivity(false)}>
+                              {t("common.close")}
+                            </button>
+                          </div>
                         </form>
-                      </section>
-                    </div>
+                      ) : null}
+
+                      {assignedActivities.length ? (
+                        <div className="table-list">
+                          <div className="table-row table-row-assignments table-head" aria-hidden="true">
+                            <span>{t("courseDetail.titleHeader")}</span>
+                            <span>{t("groupPage.availableFrom")}</span>
+                            <span>{t("groupPage.availableUntil")}</span>
+                            <span>{t("courseDetail.actionsHeader")}</span>
+                          </div>
+                          {assignedActivities.map((assignment) => (
+                            <GroupActivityCard
+                              key={assignment.id}
+                              courseId={courseId}
+                              assignment={assignment}
+                              activityLabel={activityCopy(assignment.activity.activityType.key).name}
+                              canManage={Boolean(canManage)}
+                              saving={savingAssignmentId === assignment.id}
+                              t={t}
+                              onSave={saveAssignmentAvailability}
+                              onRemove={removeAssignment}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="muted">{t("groupPage.noAssignedActivities")}</p>
+                      )}
+                      {assignmentError ? <p className="error">{assignmentError}</p> : null}
+                    </section>
                   )
                 },
                 {
@@ -1081,44 +1104,63 @@ function GroupActivityCard({
   }, [assignment.availableFrom, assignment.availableUntil]);
 
   return (
-    <article className="card stack">
-      <span className="eyebrow">{activityLabel}</span>
-      <h3 style={{ margin: 0 }}>{assignment.activity.title}</h3>
-      <p className="muted">{assignment.activity.description || t("common.noDescription")}</p>
-      <div className="row">
-        <Link className="button secondary" href={`/courses/${courseId}/activities/${assignment.activity.id}`}>
-          {t("courseDetail.openActivity")}
+    <div className="table-row table-row-assignments">
+      <div className="table-main table-main-stack">
+        <span className="eyebrow">{activityLabel}</span>
+        <strong>
+          <Link href={`/courses/${courseId}/activities/${assignment.activity.id}`}>{assignment.activity.title}</Link>
+        </strong>
+        <span className="table-meta-note muted">{assignment.activity.description || t("common.noDescription")}</span>
+      </div>
+      <div className="field assignment-date-field">
+        <label className="sr-only" htmlFor={`available-from-${assignment.id}`}>{t("groupPage.availableFrom")}</label>
+        <DateTimeMinuteInput
+          id={`available-from-${assignment.id}`}
+          value={availableFrom}
+          onChange={setAvailableFrom}
+          disabled={saving || !canManage}
+        />
+      </div>
+      <div className="field assignment-date-field">
+        <label className="sr-only" htmlFor={`available-until-${assignment.id}`}>{t("groupPage.availableUntil")}</label>
+        <DateTimeMinuteInput
+          id={`available-until-${assignment.id}`}
+          value={availableUntil}
+          onChange={setAvailableUntil}
+          disabled={saving || !canManage}
+        />
+      </div>
+      <div className="table-actions">
+        <Link
+          aria-label={t("courseDetail.openActivity")}
+          className="button secondary icon-button"
+          href={`/courses/${courseId}/activities/${assignment.activity.id}`}
+          title={t("courseDetail.openActivity")}
+        >
+          <MaterialActionIcon name="open" />
         </Link>
-      </div>
-      <div className="split">
-        <div className="field">
-          <label htmlFor={`available-from-${assignment.id}`}>{t("groupPage.availableFrom")}</label>
-          <DateTimeMinuteInput
-            id={`available-from-${assignment.id}`}
-            value={availableFrom}
-            onChange={setAvailableFrom}
-            disabled={saving || !canManage}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor={`available-until-${assignment.id}`}>{t("groupPage.availableUntil")}</label>
-          <DateTimeMinuteInput
-            id={`available-until-${assignment.id}`}
-            value={availableUntil}
-            onChange={setAvailableUntil}
-            disabled={saving || !canManage}
-          />
-        </div>
-      </div>
-      <div className="row">
-        <button type="button" disabled={saving || !canManage} onClick={() => void onSave(assignment.id, availableFrom, availableUntil)}>
-          {saving ? t("common.saving") : t("common.save")}
+        <button
+          aria-label={t("common.save")}
+          className="icon-button"
+          type="button"
+          disabled={saving || !canManage}
+          title={saving ? t("common.saving") : t("common.save")}
+          onClick={() => void onSave(assignment.id, availableFrom, availableUntil)}
+        >
+          <MaterialActionIcon name="save" />
         </button>
-        <button className="danger" type="button" disabled={saving || !canManage} onClick={() => void onRemove(assignment.id, assignment.activity.title)}>
-          {t("groupPage.removeAssignment")}
+        <button
+          aria-label={t("groupPage.removeAssignment")}
+          className="danger icon-button"
+          type="button"
+          disabled={saving || !canManage}
+          title={t("groupPage.removeAssignment")}
+          onClick={() => void onRemove(assignment.id, assignment.activity.title)}
+        >
+          <MaterialActionIcon name="remove" />
         </button>
       </div>
-    </article>
+    </div>
   );
 }
 
@@ -1287,7 +1329,7 @@ function getHiddenMaterialState<T extends MaterialTreeNode>(materials: T[], hidd
   };
 }
 
-function MaterialActionIcon({ name }: { name: "download" | "drag" | "edit" | "hidden" | "open" | "remove" | "visible" }) {
+function MaterialActionIcon({ name }: { name: "download" | "drag" | "edit" | "hidden" | "open" | "remove" | "save" | "visible" }) {
   const paths = {
     download: (
       <>
@@ -1333,6 +1375,13 @@ function MaterialActionIcon({ name }: { name: "download" | "drag" | "edit" | "hi
         <path d="M19 6l-1 14H6L5 6" />
         <path d="M10 11v6" />
         <path d="M14 11v6" />
+      </>
+    ),
+    save: (
+      <>
+        <path d="M5 3h11l3 3v15H5z" />
+        <path d="M8 3v6h8" />
+        <path d="M9 21v-7h6v7" />
       </>
     ),
     visible: (

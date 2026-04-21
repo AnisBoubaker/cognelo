@@ -600,6 +600,10 @@ a.card:hover,
   grid-template-columns: minmax(240px, 1.6fr) minmax(190px, 0.95fr) 110px max-content;
 }
 
+.table-row-assignments {
+  grid-template-columns: minmax(220px, 1.2fr) minmax(210px, 0.9fr) minmax(210px, 0.9fr) max-content;
+}
+
 .table-row:first-child {
   border-top: 0;
 }
@@ -681,6 +685,16 @@ a.card:hover,
   align-items: flex-start;
   display: grid;
   gap: 2px;
+}
+
+.assignment-date-field {
+  gap: 4px;
+  min-width: 0;
+}
+
+.assignment-date-field .date-time-minute-input {
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 78px;
 }
 
 .table-main strong {
