@@ -52,6 +52,8 @@ export default function CourseGroupPage() {
   const [assignAvailableFrom, setAssignAvailableFrom] = useState("");
   const [assignAvailableUntil, setAssignAvailableUntil] = useState("");
   const [isAssigningActivity, setIsAssigningActivity] = useState(false);
+  const [draggingAssignmentId, setDraggingAssignmentId] = useState<string | null>(null);
+  const [assignmentDropTargetId, setAssignmentDropTargetId] = useState<string | null>(null);
   const [isAddingParticipant, setIsAddingParticipant] = useState(false);
   const [participantFirstName, setParticipantFirstName] = useState("");
   const [participantLastName, setParticipantLastName] = useState("");
@@ -533,6 +535,101 @@ export default function CourseGroupPage() {
     }
   }
 
+  async function moveAssignmentRelativeToTarget(
+    dragged: NonNullable<CourseGroup["activities"]>[number],
+    target: NonNullable<CourseGroup["activities"]>[number]
+  ) {
+    const draggedIndex = assignedActivities.findIndex((assignment) => assignment.id === dragged.id);
+    const targetIndexInOriginal = assignedActivities.findIndex((assignment) => assignment.id === target.id);
+    const reordered = assignedActivities.filter((assignment) => assignment.id !== dragged.id);
+    const targetIndex = reordered.findIndex((assignment) => assignment.id === target.id);
+    const insertIndex = draggedIndex < targetIndexInOriginal ? targetIndex + 1 : targetIndex;
+    reordered.splice(insertIndex, 0, dragged);
+
+    await Promise.all(
+      reordered.map((assignment, index) =>
+        api.updateGroupActivityAssignment(courseId, groupId, assignment.id, {
+          position: index
+        })
+      )
+    );
+  }
+
+  async function moveAssignmentSafely(action: () => Promise<void>) {
+    setAssignmentError("");
+    try {
+      await action();
+      await refresh();
+    } catch (err) {
+      setAssignmentError(err instanceof Error ? err.message : t("groupPage.assignmentReorderError"));
+    }
+  }
+
+  function handleAssignmentPointerDown(
+    assignment: NonNullable<CourseGroup["activities"]>[number],
+    event: PointerEvent
+  ) {
+    if (event.button !== 0 || !canManage) {
+      return;
+    }
+    event.preventDefault();
+    setDraggingAssignmentId(assignment.id);
+    setDragPreview({ title: assignment.activity.title, x: event.clientX, y: event.clientY });
+
+    const movePreview = (moveEvent: globalThis.PointerEvent) => {
+      setDragPreview((current) => (current ? { ...current, x: moveEvent.clientX, y: moveEvent.clientY } : current));
+      setAssignmentDropTargetId(findAssignmentDropTarget(moveEvent.clientX, moveEvent.clientY, assignment.id));
+    };
+
+    const finishDrag = async (upEvent: globalThis.PointerEvent) => {
+      window.removeEventListener("pointercancel", cancelDrag);
+      window.removeEventListener("pointermove", movePreview);
+      const dropElement = document.elementFromPoint(upEvent.clientX, upEvent.clientY);
+      setDraggingAssignmentId(null);
+      setDragPreview(null);
+      setAssignmentDropTargetId(null);
+
+      const targetElement = dropElement?.closest("[data-assignment-id]");
+      if (!(targetElement instanceof HTMLElement)) {
+        return;
+      }
+
+      const target = assignedActivities.find((candidate) => candidate.id === targetElement.dataset.assignmentId);
+      if (!target || target.id === assignment.id) {
+        return;
+      }
+
+      await moveAssignmentSafely(() => moveAssignmentRelativeToTarget(assignment, target));
+    };
+
+    const cancelDrag = () => {
+      setDraggingAssignmentId(null);
+      setDragPreview(null);
+      setAssignmentDropTargetId(null);
+      window.removeEventListener("pointerup", finishDrag);
+      window.removeEventListener("pointermove", movePreview);
+    };
+
+    window.addEventListener("pointermove", movePreview);
+    window.addEventListener("pointerup", finishDrag, { once: true });
+    window.addEventListener("pointercancel", cancelDrag, { once: true });
+  }
+
+  function findAssignmentDropTarget(x: number, y: number, draggedId: string) {
+    const element = document.elementFromPoint(x, y);
+    const assignmentElement = element?.closest("[data-assignment-id]");
+    if (!(assignmentElement instanceof HTMLElement)) {
+      return null;
+    }
+
+    const targetId = assignmentElement.dataset.assignmentId;
+    if (!targetId || targetId === draggedId) {
+      return null;
+    }
+
+    return targetId;
+  }
+
   async function addParticipant(event: FormEvent) {
     event.preventDefault();
     setParticipantError("");
@@ -720,8 +817,11 @@ export default function CourseGroupPage() {
                               assignment={assignment}
                               activityLabel={activityCopy(assignment.activity.activityType.key).name}
                               canManage={Boolean(canManage)}
+                              dragging={draggingAssignmentId === assignment.id}
+                              dropTarget={assignmentDropTargetId === assignment.id}
                               saving={savingAssignmentId === assignment.id}
                               t={t}
+                              onDragStart={handleAssignmentPointerDown}
                               onSave={saveAssignmentAvailability}
                               onRemove={removeAssignment}
                             />
@@ -1334,8 +1434,11 @@ function GroupActivityCard({
   assignment,
   activityLabel,
   canManage,
+  dragging,
+  dropTarget,
   saving,
   t,
+  onDragStart,
   onSave,
   onRemove
 }: {
@@ -1343,8 +1446,11 @@ function GroupActivityCard({
   assignment: NonNullable<CourseGroup["activities"]>[number];
   activityLabel: string;
   canManage: boolean;
+  dragging: boolean;
+  dropTarget: boolean;
   saving: boolean;
   t: (key: string, vars?: Record<string, string | number>) => string;
+  onDragStart: (assignment: NonNullable<CourseGroup["activities"]>[number], event: PointerEvent) => void;
   onSave: (assignmentId: string, availableFrom: string, availableUntil: string) => Promise<void>;
   onRemove: (assignmentId: string, title: string) => Promise<void>;
 }) {
@@ -1357,8 +1463,23 @@ function GroupActivityCard({
   }, [assignment.availableFrom, assignment.availableUntil]);
 
   return (
-    <div className="table-row table-row-assignments">
-      <div className="table-main table-main-stack">
+    <div
+      className={`table-row table-row-assignments ${dragging ? "is-dragging" : ""} ${dropTarget ? "is-drop-target" : ""}`}
+      data-assignment-id={assignment.id}
+    >
+      {canManage ? (
+        <span
+          aria-label={t("groupPage.dragAssignment", { title: assignment.activity.title })}
+          className="drag-handle"
+          role="button"
+          tabIndex={0}
+          title={t("groupPage.dragAssignmentTitle")}
+          onPointerDown={(event) => onDragStart(assignment, event)}
+        >
+          <MaterialActionIcon name="drag" />
+        </span>
+      ) : null}
+      <div className="table-main table-main-stack assignment-main">
         <span className="eyebrow">{activityLabel}</span>
         <strong>
           <Link href={`/courses/${courseId}/activities/${assignment.activity.id}`}>{assignment.activity.title}</Link>
