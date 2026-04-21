@@ -614,7 +614,7 @@ a.card:hover,
 }
 
 .table-row-assignments {
-  grid-template-columns: minmax(220px, 1.2fr) minmax(210px, 0.9fr) minmax(210px, 0.9fr) max-content;
+  grid-template-columns: 28px minmax(220px, 1.2fr) minmax(210px, 0.9fr) minmax(210px, 0.9fr) max-content;
 }
 
 .table-row-participants {
@@ -707,6 +707,10 @@ a.card:hover,
 .assignment-date-field {
   gap: 4px;
   min-width: 0;
+}
+
+.assignment-main {
+  gap: 0;
 }
 
 .assignment-date-field .date-time-minute-input {
