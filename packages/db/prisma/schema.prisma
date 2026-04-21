@@ -45,6 +45,12 @@ enum CourseGroupStatus {
   published
 }
 
+enum CourseGroupParticipantRole {
+  teacher
+  ta
+  student
+}
+
 enum PluginParsonsAttemptStatus {
   in_progress
   completed
@@ -65,6 +71,7 @@ model User {
   materials       CourseMaterial[]   @relation("MaterialCreator")
   activities      Activity[]         @relation("ActivityCreator")
   createdGroups   CourseGroup[]      @relation("CourseGroupCreator")
+  groupParticipants CourseGroupParticipant[]
   groupMaterials  CourseGroupMaterial[] @relation("GroupMaterialCreator")
   parsonsAttempts PluginParsonsAttempt[]
 
@@ -163,11 +170,32 @@ model CourseGroup {
   createdBy   User                  @relation("CourseGroupCreator", fields: [createdById], references: [id])
   materials   CourseGroupMaterial[]
   activities  CourseGroupActivity[]
+  participants CourseGroupParticipant[]
   hiddenCourseMaterials CourseGroupHiddenCourseMaterial[]
 
   @@index([courseId, updatedAt])
   @@index([status, availableFrom, availableUntil])
   @@index([createdById])
+}
+
+model CourseGroupParticipant {
+  id          String      @id @default(cuid())
+  groupId      String
+  userId       String?
+  role         CourseGroupParticipantRole @default(student)
+  firstName    String
+  lastName     String
+  email        String
+  externalId   String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  group        CourseGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([groupId, email])
+  @@index([groupId, createdAt])
+  @@index([email])
+  @@index([userId])
 }
 
 model CourseGroupMaterial {

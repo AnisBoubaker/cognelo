@@ -1,9 +1,12 @@
 import type {
+  ActivateAccountInput,
   ActivityInput,
   ActivityUpdate,
   CourseGroupActivityInput,
   CourseGroupActivityUpdate,
   CourseGroupInput,
+  CourseGroupParticipantInput,
+  CourseGroupParticipantRole,
   CourseGroupStatus,
   CourseGroupMaterialInput,
   CourseGroupMaterialUpdate,
@@ -21,10 +24,16 @@ export type Course = {
   title: string;
   description: string;
   status: "draft" | "published" | "archived";
-  memberships?: unknown[];
+  memberships?: CourseMembership[];
   materials?: CourseMaterial[];
   activities?: Activity[];
   groups?: CourseGroup[];
+};
+
+export type CourseMembership = {
+  id: string;
+  role: "owner" | "teacher" | "ta" | "student";
+  userId: string;
 };
 
 export type CourseMaterial = {
@@ -48,6 +57,33 @@ export type CourseGroup = {
   hiddenCourseMaterialIds?: string[];
   materials?: CourseGroupMaterial[];
   activities?: CourseGroupActivityAssignment[];
+  participants?: GroupParticipant[];
+};
+
+export type GroupParticipant = {
+  id: string;
+  groupId: string;
+  userId?: string | null;
+  role: CourseGroupParticipantRole;
+  firstName: string;
+  lastName: string;
+  email: string;
+  externalId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user?: {
+    id: string;
+    email: string;
+    name: string | null;
+  } | null;
+};
+
+export type GroupParticipantCandidate = {
+  id: string;
+  email: string;
+  name: string | null;
+  firstName: string;
+  lastName: string;
 };
 
 export type CourseGroupMaterial = {
@@ -149,6 +185,18 @@ export type ParsonsAttempt = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
+export class ApiError extends Error {
+  code?: string;
+  details?: unknown;
+
+  constructor(message: string, options?: { code?: string; details?: unknown }) {
+    super(message);
+    this.name = "ApiError";
+    this.code = options?.code;
+    this.details = options?.details;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}/api${path}`, {
     cache: "no-store",
@@ -162,7 +210,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(body?.error?.message ?? "Request failed.");
+    throw new ApiError(body?.error?.message ?? "Request failed.", {
+      code: body?.error?.code,
+      details: body?.error?.details
+    });
   }
   return body as T;
 }
@@ -172,6 +223,11 @@ export const api = {
     request<{ user: CurrentUser }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password })
+    }),
+  activateAccount: (input: ActivateAccountInput) =>
+    request<{ user: CurrentUser }>("/auth/activate", {
+      method: "POST",
+      body: JSON.stringify(input)
     }),
   logout: () => request<{ ok: true }>("/auth/logout", { method: "POST" }),
   me: () => request<{ user: CurrentUser }>("/users/me"),
@@ -202,6 +258,19 @@ export const api = {
     }),
   deleteGroup: (courseId: string, groupId: string) =>
     request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}`, {
+      method: "DELETE"
+    }),
+  addGroupParticipant: (courseId: string, groupId: string, input: CourseGroupParticipantInput) =>
+    request<{ participant: GroupParticipant }>(`/courses/${courseId}/groups/${groupId}/participants`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  groupParticipantCandidate: (courseId: string, email: string) =>
+    request<{ candidate: GroupParticipantCandidate | null }>(
+      `/courses/${courseId}/groups/participant-candidates?email=${encodeURIComponent(email)}`
+    ),
+  removeGroupParticipant: (courseId: string, groupId: string, participantId: string) =>
+    request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}/participants/${participantId}`, {
       method: "DELETE"
     }),
   activityTypes: () => request<{ activityTypes: ActivityType[]; registeredDefinitions: ActivityDefinition[] }>("/activity-types"),

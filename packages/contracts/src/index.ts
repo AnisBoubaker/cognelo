@@ -29,11 +29,31 @@ export type ActivityLifecycle = z.infer<typeof ActivityLifecycleSchema>;
 export const CourseGroupStatusSchema = z.enum(["draft", "published"]);
 export type CourseGroupStatus = z.infer<typeof CourseGroupStatusSchema>;
 
+export const CourseGroupParticipantRoleSchema = z.enum(["teacher", "ta", "student"]);
+export type CourseGroupParticipantRole = z.infer<typeof CourseGroupParticipantRoleSchema>;
+
 export const LoginInputSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8)
 });
 export type LoginInput = z.infer<typeof LoginInputSchema>;
+
+export const ActivateAccountInputSchema = z
+  .object({
+    email: z.string().email(),
+    password: z.string().min(8),
+    confirmPassword: z.string().min(8)
+  })
+  .superRefine((value, context) => {
+    if (value.password !== value.confirmPassword) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "Passwords must match."
+      });
+    }
+  });
+export type ActivateAccountInput = z.infer<typeof ActivateAccountInputSchema>;
 
 export const CourseInputSchema = z.object({
   title: z.string().min(2).max(160),
@@ -147,6 +167,15 @@ export const CourseGroupActivityUpdateSchema = z.object({
   position: z.number().int().min(0).optional()
 });
 export type CourseGroupActivityUpdate = z.infer<typeof CourseGroupActivityUpdateSchema>;
+
+export const CourseGroupParticipantInputSchema = z.object({
+  role: CourseGroupParticipantRoleSchema.optional().default("student"),
+  firstName: z.string().trim().min(1).max(120).optional(),
+  lastName: z.string().trim().min(1).max(120).optional(),
+  email: z.string().email(),
+  externalId: z.string().trim().max(120).optional().nullable()
+});
+export type CourseGroupParticipantInput = z.infer<typeof CourseGroupParticipantInputSchema>;
 
 export const EnrollmentInputSchema = z.object({
   userId: z.string().cuid(),

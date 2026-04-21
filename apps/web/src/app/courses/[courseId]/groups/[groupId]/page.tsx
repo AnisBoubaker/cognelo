@@ -2,12 +2,22 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ChangeEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
+import { ChangeEvent, FocusEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
-import { api, ActivityDefinition, ActivityType, Course, CourseGroup, CourseGroupMaterial, CourseMaterial } from "@/lib/api";
+import {
+  api,
+  ActivityDefinition,
+  ActivityType,
+  Course,
+  CourseGroup,
+  CourseGroupMaterial,
+  CourseMaterial,
+  GroupParticipant,
+  GroupParticipantCandidate
+} from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 export default function CourseGroupPage() {
@@ -42,6 +52,17 @@ export default function CourseGroupPage() {
   const [assignAvailableFrom, setAssignAvailableFrom] = useState("");
   const [assignAvailableUntil, setAssignAvailableUntil] = useState("");
   const [isAssigningActivity, setIsAssigningActivity] = useState(false);
+  const [isAddingParticipant, setIsAddingParticipant] = useState(false);
+  const [participantFirstName, setParticipantFirstName] = useState("");
+  const [participantLastName, setParticipantLastName] = useState("");
+  const [participantEmail, setParticipantEmail] = useState("");
+  const [participantExternalId, setParticipantExternalId] = useState("");
+  const [participantRole, setParticipantRole] = useState<"teacher" | "ta" | "student">("student");
+  const [participantCandidate, setParticipantCandidate] = useState<GroupParticipantCandidate | null>(null);
+  const [checkingParticipantEmail, setCheckingParticipantEmail] = useState(false);
+  const [participantError, setParticipantError] = useState("");
+  const [savingParticipant, setSavingParticipant] = useState(false);
+  const [removingParticipantId, setRemovingParticipantId] = useState<string | null>(null);
   const [savingAssignmentId, setSavingAssignmentId] = useState<string | null>(null);
   const [savingCourseMaterialVisibilityId, setSavingCourseMaterialVisibilityId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -50,7 +71,8 @@ export default function CourseGroupPage() {
   const [courseMaterialVisibilityError, setCourseMaterialVisibilityError] = useState("");
   const [assignmentError, setAssignmentError] = useState("");
 
-  const canManage = user?.roles.includes("admin") || user?.roles.includes("teacher");
+  const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
+  const canManage = user?.roles.includes("admin") || membershipRole === "owner" || membershipRole === "teacher";
 
   async function refresh() {
     const [courseResult, groupResult, typeResult] = await Promise.all([
@@ -82,6 +104,7 @@ export default function CourseGroupPage() {
     ? visibleCourseMaterials
     : visibleCourseMaterials.filter(({ material }) => !getHiddenMaterialState(courseMaterials, hiddenCourseMaterialIds, material.id).effectivelyHidden);
   const assignedActivities = group?.activities ?? [];
+  const participants = group?.participants ?? [];
   const assignableActivities = (course?.activities ?? []).filter(
     (activity) => !assignedActivities.some((assignment) => assignment.activityId === activity.id)
   );
@@ -154,6 +177,22 @@ export default function CourseGroupPage() {
   function closeGroupMaterialForm() {
     resetGroupMaterialForm();
     setIsAddingGroupMaterial(false);
+  }
+
+  function resetParticipantForm() {
+    setParticipantRole("student");
+    setParticipantCandidate(null);
+    setCheckingParticipantEmail(false);
+    setParticipantFirstName("");
+    setParticipantLastName("");
+    setParticipantEmail("");
+    setParticipantExternalId("");
+    setParticipantError("");
+  }
+
+  function closeParticipantForm() {
+    resetParticipantForm();
+    setIsAddingParticipant(false);
   }
 
   async function createGroupMaterial(event: FormEvent) {
@@ -491,6 +530,77 @@ export default function CourseGroupPage() {
       await refresh();
     } catch (err) {
       setAssignmentError(err instanceof Error ? err.message : t("groupPage.assignmentDeleteError"));
+    }
+  }
+
+  async function addParticipant(event: FormEvent) {
+    event.preventDefault();
+    setParticipantError("");
+    setSavingParticipant(true);
+
+    try {
+      await api.addGroupParticipant(courseId, groupId, {
+        role: participantRole,
+        firstName: participantCandidate ? undefined : participantFirstName,
+        lastName: participantCandidate ? undefined : participantLastName,
+        email: participantEmail,
+        externalId: participantExternalId || null
+      });
+      await refresh();
+      closeParticipantForm();
+    } catch (err) {
+      setParticipantError(err instanceof Error ? err.message : t("groupPage.participantCreateError"));
+    } finally {
+      setSavingParticipant(false);
+    }
+  }
+
+  async function resolveParticipantEmail(event?: FocusEvent<HTMLInputElement>) {
+    const nextEmail = (event?.target.value ?? participantEmail).trim().toLowerCase();
+    if (!nextEmail) {
+      setParticipantCandidate(null);
+      setParticipantFirstName("");
+      setParticipantLastName("");
+      return;
+    }
+
+    setParticipantError("");
+    setCheckingParticipantEmail(true);
+    try {
+      const result = await api.groupParticipantCandidate(courseId, nextEmail);
+      setParticipantCandidate(result.candidate);
+      if (result.candidate) {
+        setParticipantFirstName(result.candidate.firstName);
+        setParticipantLastName(result.candidate.lastName);
+      } else {
+        setParticipantFirstName("");
+        setParticipantLastName("");
+      }
+    } catch (err) {
+      setParticipantCandidate(null);
+      setParticipantError(err instanceof Error ? err.message : t("groupPage.participantLookupError"));
+    } finally {
+      setCheckingParticipantEmail(false);
+    }
+  }
+
+  async function removeParticipant(participant: GroupParticipant) {
+    const confirmed = window.confirm(
+      t("groupPage.removeParticipantConfirm", { name: `${participant.firstName} ${participant.lastName}`.trim() })
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setParticipantError("");
+    setRemovingParticipantId(participant.id);
+    try {
+      await api.removeGroupParticipant(courseId, groupId, participant.id);
+      await refresh();
+    } catch (err) {
+      setParticipantError(err instanceof Error ? err.message : t("groupPage.participantDeleteError"));
+    } finally {
+      setRemovingParticipantId(null);
     }
   }
 
@@ -992,12 +1102,154 @@ export default function CourseGroupPage() {
                   label: t("groupPage.participantsTab"),
                   render: () => (
                     <section className="section stack">
-                      <div>
-                        <p className="eyebrow">{t("groupPage.participantsEyebrow")}</p>
-                        <h2>{t("groupPage.participantsTitle")}</h2>
-                        <p className="muted">{t("groupPage.participantsText")}</p>
+                      <div className="section-heading">
+                        <div>
+                          <p className="eyebrow">{t("groupPage.participantsEyebrow")}</p>
+                          <h2>{t("groupPage.participantsTitle")}</h2>
+                          <p className="muted">{t("groupPage.participantsText")}</p>
+                        </div>
+                        {canManage ? (
+                          <button className="secondary" type="button" onClick={() => setIsAddingParticipant((current) => !current)}>
+                            {isAddingParticipant ? t("common.cancel") : t("groupPage.addParticipant")}
+                          </button>
+                        ) : null}
                       </div>
-                      <p className="muted">{t("groupPage.participantsPlaceholder")}</p>
+
+                      {canManage && isAddingParticipant ? (
+                        <form className="form inline-panel" onSubmit={addParticipant}>
+                          <div>
+                            <p className="eyebrow">{t("groupPage.addParticipantEyebrow")}</p>
+                            <h2>{t("groupPage.addParticipantTitle")}</h2>
+                            <p className="muted">{t("groupPage.addParticipantText")}</p>
+                          </div>
+                          <div className="grid compact-form-grid">
+                            <div className="field">
+                              <label htmlFor="participant-email">{t("groupPage.participantEmail")}</label>
+                              <input
+                                id="participant-email"
+                                type="email"
+                                value={participantEmail}
+                                onBlur={(event) => void resolveParticipantEmail(event)}
+                                onChange={(event) => {
+                                  setParticipantEmail(event.target.value);
+                                  setParticipantCandidate(null);
+                                  setParticipantFirstName("");
+                                  setParticipantLastName("");
+                                  setParticipantError("");
+                                }}
+                                required
+                              />
+                            </div>
+                            <div className="field">
+                              <label htmlFor="participant-role">{t("groupPage.participantRole")}</label>
+                              <select
+                                id="participant-role"
+                                value={participantRole}
+                                onChange={(event) => setParticipantRole(event.target.value as typeof participantRole)}
+                              >
+                                <option value="student">{t("groupPage.participantRoleStudent")}</option>
+                                <option value="ta">{t("groupPage.participantRoleTa")}</option>
+                                <option value="teacher">{t("groupPage.participantRoleTeacher")}</option>
+                              </select>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="participant-first-name">{t("groupPage.participantFirstName")}</label>
+                              <input
+                                id="participant-first-name"
+                                value={participantFirstName}
+                                onChange={(event) => setParticipantFirstName(event.target.value)}
+                                readOnly={Boolean(participantCandidate)}
+                                required={!participantCandidate}
+                              />
+                            </div>
+                            <div className="field">
+                              <label htmlFor="participant-last-name">{t("groupPage.participantLastName")}</label>
+                              <input
+                                id="participant-last-name"
+                                value={participantLastName}
+                                onChange={(event) => setParticipantLastName(event.target.value)}
+                                readOnly={Boolean(participantCandidate)}
+                                required={!participantCandidate}
+                              />
+                            </div>
+                            <div className="field">
+                              <label htmlFor="participant-external-id">{t("groupPage.participantExternalId")}</label>
+                              <input
+                                id="participant-external-id"
+                                value={participantExternalId}
+                                onChange={(event) => setParticipantExternalId(event.target.value)}
+                                placeholder={t("groupPage.participantExternalIdPlaceholder")}
+                              />
+                            </div>
+                          </div>
+                          <p className="muted">
+                            {checkingParticipantEmail
+                              ? t("groupPage.participantLookupChecking")
+                              : participantCandidate
+                                ? t("groupPage.participantLookupFound", { name: participantCandidate.name || participantCandidate.email })
+                                : t("groupPage.participantLookupNew")}
+                          </p>
+                          <p className="muted">{t("groupPage.pendingAccountHelp")}</p>
+                          {participantError ? <p className="error">{participantError}</p> : null}
+                          <div className="row">
+                            <button type="submit" disabled={savingParticipant}>
+                              {savingParticipant ? t("common.saving") : t("groupPage.addParticipant")}
+                            </button>
+                            <button className="secondary" type="button" onClick={closeParticipantForm}>
+                              {t("common.close")}
+                            </button>
+                          </div>
+                        </form>
+                      ) : null}
+
+                      {participants.length ? (
+                        <div className="table-list">
+                          <div className="table-row table-row-participants table-head" aria-hidden="true">
+                            <span>{t("groupPage.participantNameHeader")}</span>
+                            <span>{t("groupPage.participantRoleHeader")}</span>
+                            <span>{t("groupPage.participantEmailHeader")}</span>
+                            <span>{t("groupPage.participantExternalIdHeader")}</span>
+                            <span>{t("groupPage.participantStatusHeader")}</span>
+                            <span>{t("courseDetail.actionsHeader")}</span>
+                          </div>
+                          {participants.map((participant) => (
+                            <div className="table-row table-row-participants" key={participant.id}>
+                              <div className="table-main table-main-stack">
+                                <strong>{participant.firstName} {participant.lastName}</strong>
+                              </div>
+                              <span className={`participant-role participant-role-${participant.role}`}>
+                                {participant.role === "teacher"
+                                  ? t("groupPage.participantRoleTeacher")
+                                  : participant.role === "ta"
+                                    ? t("groupPage.participantRoleTa")
+                                    : t("groupPage.participantRoleStudent")}
+                              </span>
+                              <span className="table-meta">{participant.email}</span>
+                              <span className="table-meta">{participant.externalId || t("groupPage.noExternalId")}</span>
+                              <span className={`participant-status ${participant.userId ? "is-linked" : "is-pending"}`}>
+                                {participant.userId ? t("groupPage.participantStatusLinked") : t("groupPage.participantStatusPending")}
+                              </span>
+                              <div className="table-actions">
+                                {canManage ? (
+                                  <button
+                                    aria-label={t("groupPage.removeParticipant")}
+                                    className="danger icon-button"
+                                    disabled={removingParticipantId === participant.id || participant.userId === user?.id}
+                                    title={participant.userId === user?.id ? t("groupPage.removeSelfBlocked") : t("groupPage.removeParticipant")}
+                                    type="button"
+                                    onClick={() => void removeParticipant(participant)}
+                                  >
+                                    <MaterialActionIcon name="remove" />
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="muted">{t("groupPage.noParticipants")}</p>
+                      )}
+                      {participantError ? <p className="error">{participantError}</p> : null}
                     </section>
                   )
                 },
