@@ -604,6 +604,10 @@ a.card:hover,
   grid-template-columns: minmax(220px, 1.2fr) minmax(210px, 0.9fr) minmax(210px, 0.9fr) max-content;
 }
 
+.table-row-participants {
+  grid-template-columns: minmax(180px, 1fr) 110px minmax(220px, 1.1fr) minmax(140px, 0.8fr) 140px max-content;
+}
+
 .table-row:first-child {
   border-top: 0;
 }
@@ -816,6 +820,51 @@ a.card:hover,
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 16px;
+}
+
+.participant-status {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  justify-self: start;
+  padding: 6px 10px;
+  text-transform: uppercase;
+}
+
+.participant-status.is-linked {
+  background: color-mix(in srgb, var(--brand-teal), white 84%);
+  color: var(--accent-strong);
+}
+
+.participant-status.is-pending {
+  background: color-mix(in srgb, var(--brand-gold), white 82%);
+  color: color-mix(in srgb, var(--brand-ink), black 10%);
+}
+
+.participant-role {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  justify-self: start;
+  padding: 6px 10px;
+  text-transform: uppercase;
+}
+
+.participant-role-teacher {
+  background: color-mix(in srgb, var(--brand-blue), white 85%);
+  color: var(--brand-ink);
+}
+
+.participant-role-ta {
+  background: color-mix(in srgb, var(--brand-violet), white 86%);
+  color: var(--brand-ink);
+}
+
+.participant-role-student {
+  background: color-mix(in srgb, var(--surface-2), white 18%);
+  color: var(--muted);
 }
 
 .parsons-authoring-grid {
@@ -1247,6 +1296,30 @@ a.card:hover,
   margin-top: 6px;
 }
 
+.login-mode-toggle {
+  background: rgba(238, 244, 251, 0.9);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 6px;
+}
+
+.login-mode-toggle button {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  font-weight: 800;
+  min-height: 40px;
+}
+
+.login-mode-toggle button.is-active {
+  background: linear-gradient(135deg, var(--brand-blue), var(--brand-violet));
+  color: #fff;
+}
+
 @media (max-width: 780px) {
   .topbar {
     align-items: flex-start;
@@ -1299,6 +1372,10 @@ a.card:hover,
 
   .table-row {
     align-items: start;
+    grid-template-columns: 1fr;
+  }
+
+  .table-row-participants {
     grid-template-columns: 1fr;
   }
 

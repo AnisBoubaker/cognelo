@@ -8,6 +8,7 @@ type AuthState = {
   user: CurrentUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  activateAccount: (input: { email: string; password: string; confirmPassword: string }) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -40,6 +41,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refresh,
       login: async (email, password) => {
         const result = await api.login(email, password);
+        setUser(result.user);
+      },
+      activateAccount: async (input) => {
+        const result = await api.activateAccount(input);
         setUser(result.user);
       },
       logout: async () => {
