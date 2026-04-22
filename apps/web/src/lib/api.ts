@@ -320,6 +320,8 @@ export const api = {
   activityTypes: () => request<{ activityTypes: ActivityType[]; registeredDefinitions: ActivityDefinition[] }>("/activity-types"),
   activity: (courseId: string, activityId: string) =>
     request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}`),
+  groupActivity: (courseId: string, groupId: string, activityId: string) =>
+    request<{ activity: Activity }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}`),
   ensureParsonsAttempt: (courseId: string, activityId: string, input?: { forceNew?: boolean }) =>
     request<{ attempt: ParsonsAttempt }>(`/courses/${courseId}/activities/${activityId}/parsons/attempt`, {
       method: "POST",
@@ -432,6 +434,8 @@ export const api = {
   },
   materialDownloadUrl: (courseId: string, materialId: string) =>
     `${API_URL}/api/courses/${courseId}/materials/${materialId}/download`,
+  groupCourseMaterialDownloadUrl: (courseId: string, groupId: string, materialId: string) =>
+    `${API_URL}/api/courses/${courseId}/groups/${groupId}/course-materials/${materialId}/download`,
   groupMaterials: (courseId: string, groupId: string) =>
     request<{ materials: CourseGroupMaterial[] }>(`/courses/${courseId}/groups/${groupId}/materials`),
   createGroupMaterial: (courseId: string, groupId: string, input: CourseGroupMaterialInput) =>
@@ -505,5 +509,77 @@ export const api = {
   deleteGroupActivityAssignment: (courseId: string, groupId: string, assignmentId: string) =>
     request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}/activities/${assignmentId}`, {
       method: "DELETE"
-    })
+    }),
+  ensureGroupParsonsAttempt: (courseId: string, groupId: string, activityId: string, input?: { forceNew?: boolean }) =>
+    request<{ attempt: ParsonsAttempt }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/parsons/attempt`, {
+      method: "POST",
+      body: JSON.stringify(input ?? {})
+    }),
+  updateGroupParsonsAttempt: (
+    courseId: string,
+    groupId: string,
+    activityId: string,
+    input: {
+      attemptId: string;
+      state?: ParsonsAttemptState;
+      event?: { type: "move" | "indent" | "reset" | "check"; payload?: Record<string, unknown> };
+      result?: ParsonsAttemptEvaluation;
+      complete?: boolean;
+      abandon?: boolean;
+    }
+  ) =>
+    request<{ attempt: ParsonsAttempt }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/parsons/attempt`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  groupCodingExerciseHiddenTests: (courseId: string, groupId: string, activityId: string) =>
+    request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/hidden-tests`
+    ),
+  saveGroupCodingExerciseHiddenTests: (
+    courseId: string,
+    groupId: string,
+    activityId: string,
+    input: {
+      tests: Array<Omit<CodingExerciseHiddenTest, "orderIndex" | "metadata" | "createdAt" | "updatedAt"> & { orderIndex?: number }>;
+      sampleTests: Array<{ id: string; input: string; output: string; explanation: string }>;
+      referenceSolution: string;
+    }
+  ) =>
+    request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/hidden-tests`,
+      {
+        method: "PUT",
+        body: JSON.stringify(input)
+      }
+    ),
+  runGroupCodingExercise: (
+    courseId: string,
+    groupId: string,
+    activityId: string,
+    input: { sourceCode: string; stdin?: string; expectedOutput?: string }
+  ) =>
+    request<{ execution: CodingExerciseExecution }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/run`,
+      {
+        method: "POST",
+        body: JSON.stringify(input)
+      }
+    ),
+  groupCodingExerciseRuns: (courseId: string, groupId: string, activityId: string) =>
+    request<{ executions: CodingExerciseExecution[] }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/run`
+    ),
+  submitGroupCodingExercise: (courseId: string, groupId: string, activityId: string, input: { sourceCode: string }) =>
+    request<{ execution: CodingExerciseExecution }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/submit`,
+      {
+        method: "POST",
+        body: JSON.stringify(input)
+      }
+    ),
+  groupCodingExerciseSubmissions: (courseId: string, groupId: string, activityId: string) =>
+    request<{ executions: CodingExerciseExecution[] }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/submit`
+    )
 };

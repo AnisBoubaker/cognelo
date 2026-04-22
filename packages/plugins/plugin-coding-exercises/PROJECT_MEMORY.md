@@ -16,3 +16,7 @@ This file is for coding-exercises-specific memory only.
 - Hidden tests are managed through the teacher-only `coding-exercises/hidden-tests` route.
 - Enabled hidden tests must validate against the private reference solution before they are saved.
 - Graded submissions are handled separately from sample runs through `coding-exercises/submit`.
+- Teacher authoring separates student-facing starter code from a private reference solution; the reference solution must never be stored in public activity config.
+- Teacher test authoring uses collapsible sample-test and hidden-test cards with saved validation status and per-test failure details.
+- The same coding-exercise activity UI should work in both course-scoped teacher pages and group-scoped student assigned-activity pages by swapping the API client boundary rather than forking the plugin UI.
+- Group-scoped student coding-exercise access uses assigned-activity routes under `groups/:groupId/activities/assigned/:activityId/...` to avoid route conflicts with teacher assignment-management endpoints.
