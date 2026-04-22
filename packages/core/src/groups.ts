@@ -179,6 +179,45 @@ export async function getGroupMaterialForDownload(user: CurrentUser, courseId: s
   return material;
 }
 
+export async function getCourseMaterialForGroupDownload(user: CurrentUser, courseId: string, groupId: string, materialId: string) {
+  await assertCanViewGroup(user, courseId, groupId);
+  await assertCourseMaterialBelongsToCourse(courseId, materialId);
+
+  const hiddenEntries = await prisma.courseGroupHiddenCourseMaterial.findMany({
+    where: { groupId },
+    select: { courseMaterialId: true }
+  });
+  const hiddenCourseMaterialIds = new Set(hiddenEntries.map((entry) => entry.courseMaterialId));
+
+  const material = await prisma.courseMaterial.findFirst({
+    where: { id: materialId, courseId, kind: "file" }
+  });
+  if (!material) {
+    throw notFound("Course material");
+  }
+
+  if (hiddenCourseMaterialIds.has(materialId)) {
+    throw new AppError(403, "FORBIDDEN", "You do not have access to this course material in the group workspace.");
+  }
+
+  if (material.parentId) {
+    const courseMaterials = await prisma.courseMaterial.findMany({
+      where: { courseId },
+      select: { id: true, parentId: true }
+    });
+    const parentById = new Map<string, string | null>(courseMaterials.map((entry) => [entry.id, entry.parentId]));
+    let parentId: string | null = material.parentId;
+    while (parentId) {
+      if (hiddenCourseMaterialIds.has(parentId)) {
+        throw new AppError(403, "FORBIDDEN", "You do not have access to this course material in the group workspace.");
+      }
+      parentId = parentById.get(parentId) ?? null;
+    }
+  }
+
+  return material;
+}
+
 export async function deleteGroupMaterial(user: CurrentUser, courseId: string, groupId: string, materialId: string) {
   await assertCanManageCourse(user, courseId);
   await assertGroupBelongsToCourse(courseId, groupId);
@@ -238,6 +277,35 @@ export async function listGroupActivityAssignments(user: CurrentUser, courseId: 
     },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }]
   });
+}
+
+export async function getGroupAssignedActivity(user: CurrentUser, courseId: string, groupId: string, activityId: string) {
+  const group = await assertCanViewGroup(user, courseId, groupId);
+  const assignment = await prisma.courseGroupActivity.findFirst({
+    where: { groupId, activityId },
+    include: {
+      activity: {
+        include: { activityType: true }
+      }
+    }
+  });
+
+  if (!assignment) {
+    throw notFound("Group activity assignment");
+  }
+
+  if (!(isAdmin(user) || (await canManageCourse(user, courseId)))) {
+    const now = new Date();
+    if (
+      group.status !== "published" ||
+      (assignment.availableFrom && assignment.availableFrom > now) ||
+      (assignment.availableUntil && assignment.availableUntil < now)
+    ) {
+      throw new AppError(403, "GROUP_ACTIVITY_NOT_AVAILABLE", "This activity is not currently available in the group.");
+    }
+  }
+
+  return assignment.activity;
 }
 
 export async function addGroupParticipant(user: CurrentUser, courseId: string, groupId: string, input: unknown) {

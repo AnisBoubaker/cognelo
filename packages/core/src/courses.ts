@@ -16,6 +16,34 @@ const courseInclude = {
   }
 };
 
+function buildVisibleStudentGroupWhere(userId: string) {
+  const now = new Date();
+  return {
+    participants: {
+      some: { userId }
+    },
+    status: "published" as const,
+    AND: [
+      {
+        OR: [{ availableFrom: null }, { availableFrom: { lte: now } }]
+      },
+      {
+        OR: [{ availableUntil: null }, { availableUntil: { gte: now } }]
+      }
+    ]
+  };
+}
+
+function buildCourseIncludeForStudent(userId: string) {
+  return {
+    ...courseInclude,
+    groups: {
+      where: buildVisibleStudentGroupWhere(userId),
+      orderBy: [{ updatedAt: "desc" as const }, { createdAt: "desc" as const }]
+    }
+  };
+}
+
 export async function listCourses(user: CurrentUser) {
   if (isAdmin(user)) {
     return prisma.course.findMany({ include: courseInclude, orderBy: { updatedAt: "desc" } });
@@ -33,14 +61,17 @@ export async function listCourses(user: CurrentUser) {
 
   return prisma.course.findMany({
     where: { memberships: { some: { userId: user.id } } },
-    include: courseInclude,
+    include: buildCourseIncludeForStudent(user.id),
     orderBy: { updatedAt: "desc" }
   });
 }
 
 export async function getCourse(user: CurrentUser, courseId: string) {
   await assertCanViewCourse(user, courseId);
-  const course = await prisma.course.findUnique({ where: { id: courseId }, include: courseInclude });
+  const course = await prisma.course.findUnique({
+    where: { id: courseId },
+    include: isAdmin(user) || isTeacher(user) ? courseInclude : buildCourseIncludeForStudent(user.id)
+  });
   if (!course) {
     throw notFound("Course");
   }

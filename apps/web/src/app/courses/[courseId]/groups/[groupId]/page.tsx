@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { ChangeEvent, FocusEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
@@ -23,6 +23,7 @@ import { useI18n } from "@/lib/i18n";
 export default function CourseGroupPage() {
   const params = useParams<{ courseId: string; groupId: string }>();
   const { courseId, groupId } = params;
+  const router = useRouter();
   const { user } = useAuth();
   const { locale, t } = useI18n();
   const [course, setCourse] = useState<Course | null>(null);
@@ -117,6 +118,151 @@ export default function CourseGroupPage() {
     }
   }, [assignActivityId, assignableActivities]);
 
+  if (group && course && !canManage) {
+    return (
+      <AppShell>
+        <main className="page stack">
+          <section className="hero-panel hero-panel-compact">
+            <div className="hero-meta">
+              <p className="eyebrow">
+                {t("groupPage.eyebrow")} · {group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}
+              </p>
+              <h1>
+                {course.title}: {group.title}
+              </h1>
+              {group.availableFrom || group.availableUntil ? (
+                <p className="muted">{formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</p>
+              ) : null}
+            </div>
+          </section>
+
+          {error ? <p className="error">{error}</p> : null}
+
+          <WorkspaceTabs
+            ariaLabel={t("groupPage.workspaceTabs")}
+            initialTab="activities"
+            tabs={[
+              {
+                id: "activities",
+                label: t("groupPage.activitiesTab"),
+                render: () => (
+                  <section className="section stack">
+                    <div>
+                      <p className="eyebrow">{t("groupPage.assignedActivitiesEyebrow")}</p>
+                      <h2>{t("groupPage.assignedActivitiesTitle")}</h2>
+                      <p className="muted">{t("groupPage.assignedActivitiesText")}</p>
+                    </div>
+
+                    {assignedActivities.length ? (
+                      <div className="stack" style={{ gap: 10 }}>
+                        {assignedActivities.map((assignment) => (
+                          <button
+                            key={assignment.id}
+                            type="button"
+                            style={{
+                              background: "rgba(255, 255, 255, 0.92)",
+                              border: "1px solid rgba(13, 27, 71, 0.08)",
+                              borderRadius: 12,
+                              color: "inherit",
+                              cursor: "pointer",
+                              display: "block",
+                              padding: "10px 12px",
+                              textAlign: "left",
+                              width: "100%"
+                            }}
+                            onClick={() => router.push(`/courses/${courseId}/groups/${groupId}/activities/assigned/${assignment.activity.id}`)}
+                          >
+                            <div style={{ textAlign: "left", width: "100%" }}>
+                              <strong style={{ display: "block" }}>{assignment.activity.title}</strong>
+                              <span className="table-meta-note muted">
+                                {formatAvailabilityWindow(assignment.availableFrom, assignment.availableUntil, t)}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="muted">{t("groupPage.noAssignedActivities")}</p>
+                    )}
+                  </section>
+                )
+              },
+              {
+                id: "materials",
+                label: t("groupPage.materialsTab"),
+                render: () => (
+                  <section className="section stack">
+                    <div>
+                      <p className="eyebrow">{t("groupPage.inheritedMaterialsEyebrow")}</p>
+                      <h2>{t("groupPage.inheritedMaterialsTitle")}</h2>
+                      <p className="muted">{t("groupPage.inheritedMaterialsText")}</p>
+                    </div>
+
+                    {displayedCourseMaterials.length ? (
+                      <div className="table-list">
+                        {displayedCourseMaterials.map(({ material, depth }) => {
+                          const href = courseMaterialHref(material);
+                          const isCollapsed = collapsedCourseFolderIds.has(material.id);
+
+                          return (
+                            <div key={material.id} className="table-row">
+                              <div className="table-main material-title" style={{ paddingLeft: `${depth * 22}px` }}>
+                                {material.kind === "folder" ? (
+                                  <button
+                                    aria-expanded={!isCollapsed}
+                                    aria-label={t(isCollapsed ? "courseDetail.expandFolder" : "courseDetail.collapseFolder", {
+                                      title: material.title
+                                    })}
+                                    className="material-glyph"
+                                    title={t(isCollapsed ? "courseDetail.expandFolderTitle" : "courseDetail.collapseFolderTitle")}
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      toggleCourseFolder(material.id);
+                                    }}
+                                  >
+                                    {isCollapsed ? "[+]" : "[-]"}
+                                  </button>
+                                ) : (
+                                  <span className="material-glyph material-glyph-static">-</span>
+                                )}
+                                <strong>{material.title}</strong>
+                              </div>
+                              <span className="table-meta muted">{courseMaterialDetail(material)}</span>
+                              <div className="table-actions">
+                                {href ? (
+                                  <a
+                                    aria-label={t(
+                                      material.kind === "file" ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial",
+                                      { title: material.title }
+                                    )}
+                                    className="button secondary icon-button"
+                                    href={href}
+                                    rel={material.kind === "file" ? undefined : "noreferrer"}
+                                    target={material.kind === "file" ? undefined : "_blank"}
+                                    title={t(material.kind === "file" ? "common.download" : "common.open")}
+                                  >
+                                    <MaterialActionIcon name={material.kind === "file" ? "download" : "open"} />
+                                  </a>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="muted">{t("groupPage.noCourseMaterials")}</p>
+                    )}
+                  </section>
+                )
+              }
+            ]}
+          />
+        </main>
+      </AppShell>
+    );
+  }
+
   function activityCopy(activityTypeKey: string) {
     const definition = activityDefinitions.find((candidate) => candidate.key === activityTypeKey);
     const localized = definition?.i18n?.[locale];
@@ -153,7 +299,7 @@ export default function CourseGroupPage() {
 
   function courseMaterialHref(material: CourseMaterial) {
     if (material.kind === "file") {
-      return api.materialDownloadUrl(courseId, material.id);
+      return api.groupCourseMaterialDownloadUrl(courseId, groupId, material.id);
     }
     return material.url ?? undefined;
   }
@@ -714,11 +860,13 @@ export default function CourseGroupPage() {
                   <p className="muted">{formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</p>
                 ) : null}
               </div>
-              <div className="hero-actions">
-                <Link className="button secondary" href={`/courses/${courseId}`}>
-                  {t("groupPage.backToCourse")}
-                </Link>
-              </div>
+              {canManage ? (
+                <div className="hero-actions">
+                  <Link className="button secondary" href={`/courses/${courseId}`}>
+                    {t("groupPage.backToCourse")}
+                  </Link>
+                </div>
+              ) : null}
             </section>
 
             {error ? <p className="error">{error}</p> : null}
@@ -814,6 +962,7 @@ export default function CourseGroupPage() {
                             <GroupActivityCard
                               key={assignment.id}
                               courseId={courseId}
+                              groupId={groupId}
                               assignment={assignment}
                               activityLabel={activityCopy(assignment.activity.activityType.key).name}
                               canManage={Boolean(canManage)}
@@ -1431,6 +1580,7 @@ export default function CourseGroupPage() {
 
 function GroupActivityCard({
   courseId,
+  groupId,
   assignment,
   activityLabel,
   canManage,
@@ -1443,6 +1593,7 @@ function GroupActivityCard({
   onRemove
 }: {
   courseId: string;
+  groupId: string;
   assignment: NonNullable<CourseGroup["activities"]>[number];
   activityLabel: string;
   canManage: boolean;
@@ -1482,7 +1633,7 @@ function GroupActivityCard({
       <div className="table-main table-main-stack assignment-main">
         <span className="eyebrow">{activityLabel}</span>
         <strong>
-          <Link href={`/courses/${courseId}/activities/${assignment.activity.id}`}>{assignment.activity.title}</Link>
+          <Link href={`/courses/${courseId}/groups/${groupId}/activities/assigned/${assignment.activity.id}`}>{assignment.activity.title}</Link>
         </strong>
         <span className="table-meta-note muted">{assignment.activity.description || t("common.noDescription")}</span>
       </div>
@@ -1508,7 +1659,7 @@ function GroupActivityCard({
         <Link
           aria-label={t("courseDetail.openActivity")}
           className="button secondary icon-button"
-          href={`/courses/${courseId}/activities/${assignment.activity.id}`}
+          href={`/courses/${courseId}/groups/${groupId}/activities/assigned/${assignment.activity.id}`}
           title={t("courseDetail.openActivity")}
         >
           <MaterialActionIcon name="open" />

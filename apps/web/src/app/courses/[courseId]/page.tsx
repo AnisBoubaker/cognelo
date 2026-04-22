@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { useAuth } from "@/components/auth-provider";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import { api, ActivityDefinition, ActivityType, Course, CourseMaterial } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -11,6 +12,8 @@ import { useI18n } from "@/lib/i18n";
 export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();
   const courseId = params.courseId;
+  const router = useRouter();
+  const { user } = useAuth();
   const { locale, t } = useI18n();
   const [course, setCourse] = useState<Course | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
@@ -47,6 +50,15 @@ export default function CourseDetailPage() {
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("courseDetail.loadError")));
   }, [courseId, t]);
+
+  const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
+  const canManage = user?.roles.includes("admin") || membershipRole === "owner" || membershipRole === "teacher";
+
+  useEffect(() => {
+    if (course && !canManage && course.groups?.[0]?.id) {
+      router.replace(`/courses/${courseId}/groups/${course.groups[0].id}`);
+    }
+  }, [canManage, course, courseId, router]);
 
   async function createActivity(event: FormEvent) {
     event.preventDefault();
@@ -190,6 +202,16 @@ export default function CourseDetailPage() {
         "",
       defaultTitle: localized?.defaultTitle ?? definition?.name ?? activityTypeKey
     };
+  }
+
+  if (course && !canManage) {
+    return (
+      <AppShell>
+        <main className="page stack">
+          <p>{t("common.loading")}</p>
+        </main>
+      </AppShell>
+    );
   }
 
   function startEditingMaterial(material: CourseMaterial) {

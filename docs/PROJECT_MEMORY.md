@@ -49,6 +49,10 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - A manager cannot remove themselves from the participant list of a group.
 - Existing-user lookup for participant enrollment is manager-only and happens before submit in the group participant UI.
 - Non-manager access to a group is tied to being added as a participant in that group, not only to broad course visibility.
+- Student-facing navigation should be group-first: students work from the group workspace, not the broad course workspace.
+- Student course access should resolve to visible published groups, and the course detail page should not act as the primary student workspace.
+- Student access to assigned activities should be group-scoped and assignment-aware rather than relying on course-level activity routes.
+- Student access to inherited course file materials from a group should respect group visibility rules and use group-scoped download routes.
 
 ## Course Material Decisions
 
@@ -75,6 +79,8 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - The shared code editor should grow vertically with its content.
 - Group participant management uses an inline panel form in the group workspace with an email-first flow.
 - Read-only inherited fields in forms should have a visible locked treatment rather than appearing identical to editable fields.
+- The student group workspace should stay intentionally minimal: assigned activities and visible course materials only, with no management forms, settings, or participant management.
+- Student assigned-activity lists should optimize for compactness and neutral presentation rather than dense manager-style tables or visually ranked cards.
 
 ## Internationalization Decisions
 
@@ -91,6 +97,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Locale-prefixed routes are not implemented; localization is currently app-state driven on the frontend.
 - Plugin registration is explicit, not autodiscovered.
 - Judge0 dev infrastructure is local-Docker only; production still requires a separately managed Judge0 host with its own hardening, monitoring, and secrets management.
+- Some management-oriented course and group pages still exist for teachers/admins in the same route tree, so student simplicity relies on explicit student-first redirects and rendering branches rather than totally separate apps.
 
 ## Verification Habits
 

@@ -22,6 +22,7 @@ export type ServerActivityRecord = {
 export type PluginRouteContext = {
   user: CurrentUser;
   courseId: string;
+  groupId?: string;
   activityId: string;
   path: string[];
   activity: ServerActivityRecord;
