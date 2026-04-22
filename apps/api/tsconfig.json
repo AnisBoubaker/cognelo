@@ -36,6 +36,12 @@
       "@cognelo/plugin-homework-grader/server": [
         "../../packages/plugins/plugin-homework-grader/src/server.ts"
       ],
+      "@cognelo/plugin-coding-exercises": [
+        "../../packages/plugins/plugin-coding-exercises/src/index.ts"
+      ],
+      "@cognelo/plugin-coding-exercises/server": [
+        "../../packages/plugins/plugin-coding-exercises/src/server.ts"
+      ],
       "@cognelo/plugin-parsons": [
         "../../packages/plugins/plugin-parsons/src/index.ts"
       ],

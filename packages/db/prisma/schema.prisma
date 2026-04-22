@@ -57,6 +57,17 @@ enum PluginParsonsAttemptStatus {
   abandoned
 }
 
+enum PluginCodingExerciseExecutionKind {
+  run
+  submit
+}
+
+enum PluginCodingExerciseExecutionStatus {
+  pending
+  completed
+  failed
+}
+
 model User {
   id              String             @id @default(cuid())
   email           String             @unique
@@ -74,6 +85,7 @@ model User {
   groupParticipants CourseGroupParticipant[]
   groupMaterials  CourseGroupMaterial[] @relation("GroupMaterialCreator")
   parsonsAttempts PluginParsonsAttempt[]
+  codingExerciseExecutions PluginCodingExerciseExecution[]
 
   @@index([email])
 }
@@ -282,6 +294,9 @@ model Activity {
   createdBy      User              @relation("ActivityCreator", fields: [createdById], references: [id])
   groupAssignments CourseGroupActivity[]
   parsonsAttempts PluginParsonsAttempt[]
+  codingExerciseHiddenTests PluginCodingExerciseHiddenTest[]
+  codingExerciseExecutions PluginCodingExerciseExecution[]
+  codingExerciseReferenceSolution PluginCodingExerciseReferenceSolution?
 
   @@index([courseId, position])
   @@index([activityTypeId])
@@ -323,4 +338,64 @@ model PluginParsonsAttemptEvent {
 
   @@index([attemptId, createdAt])
   @@index([type])
+}
+
+model PluginCodingExerciseHiddenTest {
+  id             String   @id @default(cuid())
+  activityId     String
+  name           String
+  stdin          String   @default("")
+  expectedOutput String   @default("")
+  orderIndex     Int      @default(0)
+  isEnabled      Boolean  @default(true)
+  weight         Int      @default(1)
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  activity       Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([activityId, orderIndex])
+  @@index([activityId, isEnabled])
+}
+
+model PluginCodingExerciseReferenceSolution {
+  id                String   @id @default(cuid())
+  activityId        String   @unique
+  sourceCode        String
+  validationSummary Json     @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  activity          Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+}
+
+model PluginCodingExerciseExecution {
+  id                    String                             @id @default(cuid())
+  activityId            String
+  userId                String
+  kind                  PluginCodingExerciseExecutionKind  @default(run)
+  status                PluginCodingExerciseExecutionStatus @default(pending)
+  languageKey           String
+  judge0LanguageId      Int
+  sourceCode            String
+  stdin                 String?   @default("")
+  expectedOutput        String?   @default("")
+  judge0Token           String?
+  stdout                String?
+  stderr                String?
+  compileOutput         String?
+  message               String?
+  timeSeconds           String?
+  memoryKb              Int?
+  judge0StatusId        Int?
+  judge0StatusLabel     String?
+  resultSummary         Json      @default("{}")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  activity              Activity  @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([activityId, userId, createdAt])
+  @@index([userId, createdAt])
+  @@index([activityId, kind, createdAt])
+  @@index([judge0Token])
 }

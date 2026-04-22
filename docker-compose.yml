@@ -15,5 +15,44 @@ services:
       timeout: 5s
       retries: 10
 
+  judge0-server:
+    image: judge0/judge0:latest
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    volumes:
+      - ./infra/judge0/judge0.conf:/judge0.conf:ro
+    ports:
+      - "2358:2358"
+    privileged: true
+    restart: unless-stopped
+
+  judge0-worker:
+    image: judge0/judge0:latest
+    command: ["./scripts/workers"]
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    volumes:
+      - ./infra/judge0/judge0.conf:/judge0.conf:ro
+    privileged: true
+    restart: unless-stopped
+
+  judge0-db:
+    image: postgres:16.2
+    env_file:
+      - ./infra/judge0/judge0.conf
+    volumes:
+      - judge0-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  judge0-redis:
+    image: redis:7.2.4
+    command: ["bash", "-c", "docker-entrypoint.sh --appendonly no --requirepass \"$${REDIS_PASSWORD}\""]
+    env_file:
+      - ./infra/judge0/judge0.conf
+    restart: unless-stopped
+
 volumes:
   postgres-data:
+  judge0-postgres-data:

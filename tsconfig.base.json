@@ -24,6 +24,8 @@
       "@cognelo/config": ["packages/config/src/index.ts"],
       "@cognelo/plugin-homework-grader": ["packages/plugins/plugin-homework-grader/src/index.ts"],
       "@cognelo/plugin-homework-grader/server": ["packages/plugins/plugin-homework-grader/src/server.ts"],
+      "@cognelo/plugin-coding-exercises": ["packages/plugins/plugin-coding-exercises/src/index.ts"],
+      "@cognelo/plugin-coding-exercises/server": ["packages/plugins/plugin-coding-exercises/src/server.ts"],
       "@cognelo/plugin-parsons": ["packages/plugins/plugin-parsons/src/index.ts"],
       "@cognelo/plugin-parsons/server": ["packages/plugins/plugin-parsons/src/server.ts"],
       "@cognelo/plugin-placeholder": ["packages/plugins/plugin-placeholder/src/index.ts"],
