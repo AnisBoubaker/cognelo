@@ -29,6 +29,7 @@ export const codingExerciseHiddenTestSchema = z.object({
 
 export const codingExerciseHiddenTestsInputSchema = z.object({
   tests: z.array(codingExerciseHiddenTestSchema).max(50),
+  sampleTests: z.array(sampleTestSchema).max(10).default([]),
   referenceSolution: z.string().max(60000).default("")
 });
 

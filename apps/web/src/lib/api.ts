@@ -350,6 +350,7 @@ export const api = {
     activityId: string,
     input: {
       tests: Array<Omit<CodingExerciseHiddenTest, "orderIndex" | "metadata" | "createdAt" | "updatedAt"> & { orderIndex?: number }>;
+      sampleTests: Array<{ id: string; input: string; output: string; explanation: string }>;
       referenceSolution: string;
     }
   ) =>

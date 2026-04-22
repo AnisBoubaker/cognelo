@@ -2,7 +2,7 @@ import { Prisma, prisma } from "@cognelo/db";
 import { getServerEnv } from "@cognelo/config";
 import { AppError } from "@cognelo/core";
 import { z } from "zod";
-import { parseCodingExerciseConfig } from "./coding-exercises";
+import { parseCodingExerciseConfig, type CodingExerciseSampleTest } from "./coding-exercises";
 import { resolveJudge0Language, runJudge0Submission } from "./judge0";
 
 type CodingExerciseExecutionRow = {
@@ -67,6 +67,14 @@ type HiddenTestCase = {
   isEnabled: boolean;
   weight: number;
   orderIndex: number;
+};
+
+type ReferenceValidationTestCase = {
+  id: string;
+  name: string;
+  stdin: string;
+  expectedOutput: string;
+  weight: number;
 };
 
 type ReferenceSolutionValidationRecord = {
@@ -335,16 +343,92 @@ export async function getCodingExerciseReferenceSolution(params: { activityId: s
 export async function validateReferenceSolutionAgainstHiddenTests(params: {
   activityConfig: unknown;
   sourceCode: string;
+  sampleTests: CodingExerciseSampleTest[];
   hiddenTests: HiddenTestCase[];
 }) {
   const config = parseCodingExerciseConfig(params.activityConfig);
-  const enabledTests = params.hiddenTests.filter((test) => test.isEnabled);
+  const sampleTests = params.sampleTests.map((test) => ({
+    id: test.id,
+    name: test.explanation.trim() || test.id,
+    stdin: test.input,
+    expectedOutput: test.output,
+    weight: 1
+  }));
+  const enabledHiddenTests = params.hiddenTests
+    .filter((test) => test.isEnabled)
+    .map((test) => ({
+      id: test.id,
+      name: test.name,
+      stdin: test.stdin,
+      expectedOutput: test.expectedOutput,
+      weight: test.weight
+    }));
+  const allTestsCount = sampleTests.length + enabledHiddenTests.length;
 
-  if (!enabledTests.length) {
+  if (!allTestsCount) {
     return {
       accepted: true,
       judge0LanguageName: null,
       validatedAt: new Date().toISOString(),
+      sampleTests: {
+        testCount: 0,
+        passedCount: 0,
+        tests: []
+      },
+      hiddenTests: {
+        testCount: 0,
+        passedCount: 0,
+        earnedWeight: 0,
+        totalWeight: 0,
+        tests: []
+      }
+    };
+  }
+
+  if (!params.sourceCode.trim()) {
+    throw new AppError(
+      400,
+      "REFERENCE_SOLUTION_REQUIRED",
+      "Add a reference solution before saving tests so the test suite can be validated."
+    );
+  }
+
+  const env = getServerEnv();
+  const runtime = await resolveJudge0Language(config.language);
+  const sampleValidation = await validateReferenceSolutionTestGroup({
+    tests: sampleTests,
+    languageId: runtime.languageId,
+    sourceCode: params.sourceCode,
+    cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
+    env
+  });
+  const hiddenValidation = await validateReferenceSolutionTestGroup({
+    tests: enabledHiddenTests,
+    languageId: runtime.languageId,
+    sourceCode: params.sourceCode,
+    cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
+    env
+  });
+
+  return {
+    accepted: sampleValidation.accepted && hiddenValidation.accepted,
+    judge0LanguageName: runtime.languageName,
+    validatedAt: new Date().toISOString(),
+    sampleTests: sampleValidation,
+    hiddenTests: hiddenValidation
+  };
+}
+
+async function validateReferenceSolutionTestGroup(params: {
+  tests: ReferenceValidationTestCase[];
+  languageId: number;
+  sourceCode: string;
+  cpuTimeLimit: number;
+  env: ReturnType<typeof getServerEnv>;
+}) {
+  if (!params.tests.length) {
+    return {
+      accepted: true,
       testCount: 0,
       passedCount: 0,
       earnedWeight: 0,
@@ -353,44 +437,34 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
     };
   }
 
-  if (!params.sourceCode.trim()) {
-    throw new AppError(
-      400,
-      "REFERENCE_SOLUTION_REQUIRED",
-      "Add a reference solution before enabling hidden tests so the test suite can be validated."
-    );
-  }
-
-  const env = getServerEnv();
-  const runtime = await resolveJudge0Language(config.language);
   const testResults = [];
   let totalWeight = 0;
   let earnedWeight = 0;
 
-  for (const hiddenTest of enabledTests) {
-    totalWeight += hiddenTest.weight;
+  for (const testCase of params.tests) {
+    totalWeight += testCase.weight;
     const result = await runJudge0Submission({
-      languageId: runtime.languageId,
+      languageId: params.languageId,
       sourceCode: params.sourceCode,
-      stdin: hiddenTest.stdin,
-      expectedOutput: hiddenTest.expectedOutput,
-      cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
+      stdin: testCase.stdin,
+      expectedOutput: testCase.expectedOutput,
+      cpuTimeLimit: params.cpuTimeLimit,
       wallTimeLimit: 10,
       memoryLimitKb: 128000,
-      enablePerProcessAndThreadTimeLimit: env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS,
-      enablePerProcessAndThreadMemoryLimit: env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS
+      enablePerProcessAndThreadTimeLimit: params.env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS,
+      enablePerProcessAndThreadMemoryLimit: params.env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS
     });
 
     const passed = result.status?.id === 3;
     if (passed) {
-      earnedWeight += hiddenTest.weight;
+      earnedWeight += testCase.weight;
     }
 
     testResults.push({
-      id: hiddenTest.id,
-      name: hiddenTest.name,
+      id: testCase.id,
+      name: testCase.name,
       passed,
-      weight: hiddenTest.weight,
+      weight: testCase.weight,
       statusId: result.status?.id ?? null,
       statusLabel: result.status?.description ?? null,
       stdout: result.stdout ?? null,
@@ -404,9 +478,7 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
 
   return {
     accepted: earnedWeight === totalWeight,
-    judge0LanguageName: runtime.languageName,
-    validatedAt: new Date().toISOString(),
-    testCount: enabledTests.length,
+    testCount: params.tests.length,
     passedCount: testResults.filter((test) => test.passed).length,
     earnedWeight,
     totalWeight,
