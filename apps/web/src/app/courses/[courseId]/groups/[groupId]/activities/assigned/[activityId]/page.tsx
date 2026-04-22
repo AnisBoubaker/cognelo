@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
@@ -59,7 +60,7 @@ export default function GroupActivityPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel stack">
+        <section className="hero-panel hero-panel-compact">
           <div className="hero-meta">
             <p className="eyebrow">{localizedActivityName()}</p>
             <h1>{activity?.title ?? t("common.loading")}</h1>
@@ -68,13 +69,11 @@ export default function GroupActivityPage() {
               {course ? ` · ${course.title}` : ""}
             </p>
           </div>
-          {canManage ? (
-            <div className="row">
-              <a className="button secondary" href={`/courses/${courseId}/groups/${groupId}`}>
-                {t("parsons.backToCourse")}
-              </a>
-            </div>
-          ) : null}
+          <div className="hero-actions">
+            <Link className="button secondary" href={`/courses/${courseId}/groups/${groupId}`}>
+              {t("groupPage.backToCourse")}
+            </Link>
+          </div>
         </section>
 
         {error ? <p className="error">{error}</p> : null}
