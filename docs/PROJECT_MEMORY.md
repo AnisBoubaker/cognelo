@@ -27,6 +27,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Plugin-specific HTTP handlers should live in plugin packages. The API app should expose generic dispatcher routes, not one hardcoded Next route file per plugin capability.
 - Shared plugin-facing UI belongs in `packages/activity-ui`.
 - Shared plugin registries belong in `packages/activity-sdk`.
+- Untrusted learner code must run in an external sandbox service, not inside the Cognelo API process.
 
 ## Implemented Platform Foundations
 
@@ -89,6 +90,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Backend/server validation and error messages are not yet fully internationalized.
 - Locale-prefixed routes are not implemented; localization is currently app-state driven on the frontend.
 - Plugin registration is explicit, not autodiscovered.
+- Judge0 dev infrastructure is local-Docker only; production still requires a separately managed Judge0 host with its own hardening, monitoring, and secrets management.
 
 ## Verification Habits
 

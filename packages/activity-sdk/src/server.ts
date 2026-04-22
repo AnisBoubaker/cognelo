@@ -1,4 +1,5 @@
 import type { CurrentUser } from "@cognelo/contracts";
+import { codingExercisesServerPlugin } from "@cognelo/plugin-coding-exercises/server";
 import { homeworkGraderServerPlugin } from "@cognelo/plugin-homework-grader/server";
 import { parsonsServerPlugin } from "@cognelo/plugin-parsons/server";
 import { placeholderServerPlugin } from "@cognelo/plugin-placeholder/server";
@@ -43,7 +44,13 @@ export type ServerActivityPlugin = {
   routes?: readonly PluginRouteDefinition[];
 };
 
-const serverPlugins: readonly ServerActivityPlugin[] = [placeholderServerPlugin, homeworkGraderServerPlugin, parsonsServerPlugin, mcqServerPlugin];
+const serverPlugins: readonly ServerActivityPlugin[] = [
+  placeholderServerPlugin,
+  homeworkGraderServerPlugin,
+  parsonsServerPlugin,
+  mcqServerPlugin,
+  codingExercisesServerPlugin
+];
 
 function normalizePath(path: string | readonly string[]) {
   const segments: readonly string[] = typeof path === "string" ? path.split("/") : path;

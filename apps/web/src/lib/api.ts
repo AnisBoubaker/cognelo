@@ -183,6 +183,50 @@ export type ParsonsAttempt = {
   resultSummary: Record<string, unknown>;
 };
 
+export type CodingExerciseHiddenTest = {
+  id: string;
+  name: string;
+  stdin: string;
+  expectedOutput: string;
+  isEnabled: boolean;
+  weight: number;
+  orderIndex: number;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CodingExerciseReferenceSolution = {
+  sourceCode: string;
+  validationSummary: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CodingExerciseExecution = {
+  id: string;
+  activityId: string;
+  userId: string;
+  kind: "run" | "submit";
+  status: "pending" | "completed" | "failed";
+  languageKey: string;
+  judge0LanguageId: number;
+  judge0Token?: string | null;
+  stdin: string;
+  expectedOutput: string;
+  stdout?: string | null;
+  stderr?: string | null;
+  compileOutput?: string | null;
+  message?: string | null;
+  timeSeconds?: string | null;
+  memoryKb?: number | null;
+  judge0StatusId?: number | null;
+  judge0StatusLabel?: string | null;
+  resultSummary: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 export class ApiError extends Error {
@@ -297,6 +341,43 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(input)
     }),
+  codingExerciseHiddenTests: (courseId: string, activityId: string) =>
+    request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
+      `/courses/${courseId}/activities/${activityId}/coding-exercises/hidden-tests`
+    ),
+  saveCodingExerciseHiddenTests: (
+    courseId: string,
+    activityId: string,
+    input: {
+      tests: Array<Omit<CodingExerciseHiddenTest, "orderIndex" | "metadata" | "createdAt" | "updatedAt"> & { orderIndex?: number }>;
+      referenceSolution: string;
+    }
+  ) =>
+    request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
+      `/courses/${courseId}/activities/${activityId}/coding-exercises/hidden-tests`,
+      {
+        method: "PUT",
+        body: JSON.stringify(input)
+      }
+    ),
+  runCodingExercise: (
+    courseId: string,
+    activityId: string,
+    input: { sourceCode: string; stdin?: string; expectedOutput?: string }
+  ) =>
+    request<{ execution: CodingExerciseExecution }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/run`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  codingExerciseRuns: (courseId: string, activityId: string) =>
+    request<{ executions: CodingExerciseExecution[] }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/run`),
+  submitCodingExercise: (courseId: string, activityId: string, input: { sourceCode: string }) =>
+    request<{ execution: CodingExerciseExecution }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/submit`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  codingExerciseSubmissions: (courseId: string, activityId: string) =>
+    request<{ executions: CodingExerciseExecution[] }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/submit`),
   createActivity: (courseId: string, input: ActivityInput) =>
     request<{ activity: Activity }>(`/courses/${courseId}/activities`, {
       method: "POST",

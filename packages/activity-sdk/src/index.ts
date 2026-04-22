@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { codingExercisesPlugin } from "@cognelo/plugin-coding-exercises";
 import { homeworkGraderPlugin } from "@cognelo/plugin-homework-grader";
 import { parsonsPlugin } from "@cognelo/plugin-parsons";
 import { placeholderPlugin } from "@cognelo/plugin-placeholder";
@@ -35,7 +36,7 @@ export type ActivityPlugin = {
   activities: ActivityDefinition[];
 };
 
-const plugins: ActivityPlugin[] = [placeholderPlugin, homeworkGraderPlugin, parsonsPlugin, mcqPlugin];
+const plugins: ActivityPlugin[] = [placeholderPlugin, homeworkGraderPlugin, parsonsPlugin, mcqPlugin, codingExercisesPlugin];
 
 const definitions = new Map<string, ActivityDefinition>();
 for (const plugin of plugins) {

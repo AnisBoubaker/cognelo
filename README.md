@@ -20,10 +20,10 @@ Plugin-specific behavior, routes, persistence, and UX notes belong in each plugi
 apps/
   api/                 Next.js backend API
   web/                 Next.js frontend
-packages/
-  activity-sdk/        Plugin registries and shared plugin contracts
-  activity-ui/         Shared plugin-facing UI such as code editor/renderer
-  config/              Environment validation
+  packages/
+    activity-sdk/        Plugin registries and shared plugin contracts
+    activity-ui/         Shared plugin-facing UI such as code editor/renderer
+    config/              Environment validation
   contracts/           Shared DTO schemas and types
   core/                Services and authorization
   db/                  Prisma schema, migration, seed, client
@@ -55,6 +55,7 @@ The intended boundary is:
 - **Plugin tables belong to the plugin**: plugin-specific persistence is declared in the plugin package's database module rather than by modifying core tables for plugin-specific concerns.
 - **Plugin HTTP handlers belong to the plugin**: the API app provides a generic dispatcher route, while plugin-specific subroutes are declared in plugin packages.
 - **Shared services stay shared**: reusable pieces such as the syntax-colored code editor and code renderer live in `@cognelo/activity-ui`.
+- **Remote execution stays outside the API app**: activities that run learner code should call an external sandbox service such as Judge0 from server-side plugin routes.
 
 Plugin packages can export:
 
@@ -154,6 +155,12 @@ cp .env.example .env
 docker compose up -d db
 ```
 
+If you are developing the coding-exercises plugin, also start Judge0 locally:
+
+```bash
+docker compose up -d judge0-db judge0-redis judge0-server judge0-worker
+```
+
 3. Install dependencies:
 
 ```bash
@@ -189,6 +196,16 @@ Open:
 ```text
 Web: http://localhost:3000
 API: http://localhost:3001
+Judge0 (dev): http://localhost:2358
+```
+
+Judge0-related environment variables:
+
+```text
+JUDGE0_BASE_URL=http://localhost:2358
+JUDGE0_AUTH_HEADER=X-Auth-Token
+JUDGE0_AUTH_TOKEN=dev-local-token
+JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS=true
 ```
 
 ## Frontend Notes

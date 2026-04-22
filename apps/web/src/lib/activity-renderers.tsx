@@ -1,7 +1,15 @@
 import type { ComponentProps } from "react";
+import { CodingExerciseActivityView } from "@cognelo/plugin-coding-exercises";
 import { ParsonsActivityView } from "@cognelo/plugin-parsons";
 import { McqActivityView } from "@cognelo/plugin-mcq";
-import { api, type ParsonsAttempt, type ParsonsAttemptEvaluation, type ParsonsAttemptState } from "@/lib/api";
+import {
+  api,
+  type CodingExerciseExecution,
+  type CodingExerciseHiddenTest,
+  type ParsonsAttempt,
+  type ParsonsAttemptEvaluation,
+  type ParsonsAttemptState
+} from "@/lib/api";
 
 function ParsonsActivityRenderer(props: ComponentProps<typeof ParsonsActivityView>) {
   return (
@@ -15,6 +23,46 @@ function ParsonsActivityRenderer(props: ComponentProps<typeof ParsonsActivityVie
         updateAttempt: async (activityId, courseId, input) => {
           const result = await api.updateParsonsAttempt(courseId, activityId, input);
           return { attempt: result.attempt as ParsonsAttemptClientShape };
+        }
+      }}
+    />
+  );
+}
+
+function CodingExerciseActivityRenderer(props: ComponentProps<typeof CodingExerciseActivityView>) {
+  return (
+    <CodingExerciseActivityView
+      {...props}
+      codingClient={{
+        listHiddenTests: async (courseId, activityId) => {
+          const result = await api.codingExerciseHiddenTests(courseId, activityId);
+          return {
+            tests: result.tests as CodingExerciseHiddenTest[],
+            referenceSolution: result.referenceSolution
+          };
+        },
+        saveHiddenTests: async (courseId, activityId, input) => {
+          const result = await api.saveCodingExerciseHiddenTests(courseId, activityId, input);
+          return {
+            tests: result.tests as CodingExerciseHiddenTest[],
+            referenceSolution: result.referenceSolution
+          };
+        },
+        runCode: async (courseId, activityId, input) => {
+          const result = await api.runCodingExercise(courseId, activityId, input);
+          return { execution: result.execution as CodingExerciseExecution };
+        },
+        listRuns: async (courseId, activityId) => {
+          const result = await api.codingExerciseRuns(courseId, activityId);
+          return { executions: result.executions as CodingExerciseExecution[] };
+        },
+        submitCode: async (courseId, activityId, input) => {
+          const result = await api.submitCodingExercise(courseId, activityId, input);
+          return { execution: result.execution as CodingExerciseExecution };
+        },
+        listSubmissions: async (courseId, activityId) => {
+          const result = await api.codingExerciseSubmissions(courseId, activityId);
+          return { executions: result.executions as CodingExerciseExecution[] };
         }
       }}
     />
@@ -43,6 +91,7 @@ export type ParsonsAttemptsClient = {
 };
 
 export const activityRenderers = {
+  "coding-exercise": CodingExerciseActivityRenderer,
   "parsons-problem": ParsonsActivityRenderer,
   mcq: McqActivityView
 } as const;

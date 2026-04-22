@@ -30,6 +30,9 @@
       "@cognelo/plugin-homework-grader": [
         "../../packages/plugins/plugin-homework-grader/src/index.ts"
       ],
+      "@cognelo/plugin-coding-exercises": [
+        "../../packages/plugins/plugin-coding-exercises/src/index.ts"
+      ],
       "@cognelo/plugin-parsons": [
         "../../packages/plugins/plugin-parsons/src/index.ts"
       ],
