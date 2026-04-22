@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type CSSProperties, type FormEvent, useEffect, useRef, useState } from "react";
 import { CodeEditor, codeLanguageOptions } from "@cognelo/activity-ui";
 import { normalizeCodingExerciseSampleTests, parseCodingExerciseConfig, type CodingExerciseConfig } from "../coding-exercises";
 
@@ -21,6 +21,8 @@ type HiddenTest = {
   orderIndex?: number;
 };
 
+type SampleTest = CodingExerciseConfig["sampleTests"][number];
+
 type CodingExecution = {
   id: string;
   kind: "run" | "submit";
@@ -36,6 +38,27 @@ type CodingExecution = {
   createdAt: string;
 };
 
+type ReferenceValidationTestResult = {
+  id: string;
+  name: string;
+  passed: boolean;
+  weight: number;
+  statusId?: number | null;
+  statusLabel?: string | null;
+  stdout?: string | null;
+  stderr?: string | null;
+  compileOutput?: string | null;
+  message?: string | null;
+  timeSeconds?: string | null;
+  memoryKb?: number | null;
+};
+
+type ReferenceValidationGroup = {
+  testCount?: number;
+  passedCount?: number;
+  tests?: ReferenceValidationTestResult[];
+};
+
 type CodingExerciseClient = {
   listHiddenTests: (
     courseId: string,
@@ -44,7 +67,7 @@ type CodingExerciseClient = {
   saveHiddenTests: (
     courseId: string,
     activityId: string,
-    input: { tests: HiddenTest[]; referenceSolution: string }
+    input: { tests: HiddenTest[]; sampleTests: SampleTest[]; referenceSolution: string }
   ) => Promise<{ tests: HiddenTest[]; referenceSolution: { sourceCode: string; validationSummary: Record<string, unknown> } | null }>;
   runCode: (
     courseId: string,
@@ -79,12 +102,15 @@ export function CodingExerciseActivityView({
   onSave,
   codingClient
 }: CodingExerciseActivityViewProps) {
+  const previousActivityIdRef = useRef(activity.id);
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);
   const [config, setConfig] = useState<CodingExerciseConfig>(() => parseCodingExerciseConfig(activity.config ?? fallbackConfig));
   const [hiddenTests, setHiddenTests] = useState<HiddenTest[]>([]);
   const [referenceSolution, setReferenceSolution] = useState("");
   const [referenceValidationSummary, setReferenceValidationSummary] = useState<Record<string, unknown> | null>(null);
+  const [expandedSampleTestIds, setExpandedSampleTestIds] = useState<string[]>([]);
+  const [expandedHiddenTestIds, setExpandedHiddenTestIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [error, setError] = useState("");
@@ -96,8 +122,11 @@ export function CodingExerciseActivityView({
   const [recentRuns, setRecentRuns] = useState<CodingExecution[]>([]);
   const [recentSubmissions, setRecentSubmissions] = useState<CodingExecution[]>([]);
   const [workingAction, setWorkingAction] = useState<"run" | "submit" | null>(null);
+  const sampleValidationTests = getReferenceValidationTests(referenceValidationSummary, "sampleTests");
+  const hiddenValidationTests = getReferenceValidationTests(referenceValidationSummary, "hiddenTests");
 
   useEffect(() => {
+    const isNewActivity = previousActivityIdRef.current !== activity.id;
     const nextConfig = parseCodingExerciseConfig(activity.config ?? fallbackConfig);
     const sampleTests = normalizeCodingExerciseSampleTests(nextConfig.sampleTests);
     setTitle(activity.title);
@@ -108,10 +137,16 @@ export function CodingExerciseActivityView({
     setSampleExpectedOutput(sampleTests[0]?.output ?? "");
     setRunExecution(null);
     setSubmitExecution(null);
-    setReferenceSolution("");
-    setReferenceValidationSummary(null);
+    if (isNewActivity) {
+      setHiddenTests([]);
+      setReferenceSolution("");
+      setReferenceValidationSummary(null);
+      setExpandedSampleTestIds([]);
+      setExpandedHiddenTestIds([]);
+    }
     setSaveMessage("");
     setError("");
+    previousActivityIdRef.current = activity.id;
   }, [activity]);
 
   useEffect(() => {
@@ -127,7 +162,7 @@ export function CodingExerciseActivityView({
         setReferenceValidationSummary(result.referenceSolution?.validationSummary ?? null);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load hidden tests."));
-  }, [activity.id, canManage, codingClient, course?.id]);
+  }, [activity.id, canManage, course?.id]);
 
   useEffect(() => {
     if (!course?.id || !codingClient) {
@@ -140,7 +175,7 @@ export function CodingExerciseActivityView({
         setRecentSubmissions(submissions.executions);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load coding exercise history."));
-  }, [activity.id, codingClient, course?.id]);
+  }, [activity.id, course?.id]);
 
   function updateSampleTest(index: number, field: keyof CodingExerciseConfig["sampleTests"][number], value: string) {
     setConfig((current) => {
@@ -155,18 +190,20 @@ export function CodingExerciseActivityView({
   }
 
   function addSampleTest() {
+    const nextId = `sample-${normalizeCodingExerciseSampleTests(config.sampleTests).length + 1}`;
     setConfig((current) => ({
       ...current,
       sampleTests: [
         ...normalizeCodingExerciseSampleTests(current.sampleTests),
         {
-          id: `sample-${normalizeCodingExerciseSampleTests(current.sampleTests).length + 1}`,
+          id: nextId,
           input: "",
           output: "",
           explanation: ""
         }
       ]
     }));
+    setExpandedSampleTestIds((current) => [...current, nextId]);
   }
 
   function removeSampleTest(index: number) {
@@ -183,10 +220,11 @@ export function CodingExerciseActivityView({
   }
 
   function addHiddenTest() {
+    const nextId = `hidden-test-${hiddenTests.length + 1}`;
     setHiddenTests((current) => [
       ...current,
       {
-        id: `hidden-test-${current.length + 1}`,
+        id: nextId,
         name: `Hidden test ${current.length + 1}`,
         stdin: "",
         expectedOutput: "",
@@ -195,10 +233,23 @@ export function CodingExerciseActivityView({
         orderIndex: current.length
       }
     ]);
+    setExpandedHiddenTestIds((current) => [...current, nextId]);
   }
 
   function removeHiddenTest(index: number) {
     setHiddenTests((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  }
+
+  function toggleSampleTest(testId: string) {
+    setExpandedSampleTestIds((current) =>
+      current.includes(testId) ? current.filter((value) => value !== testId) : [...current, testId]
+    );
+  }
+
+  function toggleHiddenTest(testId: string) {
+    setExpandedHiddenTestIds((current) =>
+      current.includes(testId) ? current.filter((value) => value !== testId) : [...current, testId]
+    );
   }
 
   async function saveActivityAndHiddenTests(event: FormEvent) {
@@ -226,6 +277,7 @@ export function CodingExerciseActivityView({
             ...test,
             orderIndex: index
           })),
+          sampleTests: normalizeCodingExerciseSampleTests(config.sampleTests),
           referenceSolution
         });
         setHiddenTests(result.tests);
@@ -235,6 +287,13 @@ export function CodingExerciseActivityView({
 
       setSaveMessage("Coding exercise saved.");
     } catch (err) {
+      if (isApiErrorLike(err) && err.code === "REFERENCE_SOLUTION_VALIDATION_FAILED") {
+        const details = normalizeObject(err.details);
+        const validationSummary = normalizeObject(details?.validationSummary);
+        if (validationSummary) {
+          setReferenceValidationSummary(validationSummary);
+        }
+      }
       setError(err instanceof Error ? err.message : "Unable to save the coding exercise right now.");
     } finally {
       setSaving(false);
@@ -373,28 +432,45 @@ export function CodingExerciseActivityView({
             </div>
             {normalizeCodingExerciseSampleTests(config.sampleTests).map((test, index) => (
               <section key={test.id} className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 16 }}>
-                <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                  <strong>{test.id}</strong>
-                  <button type="button" className="button secondary" onClick={() => removeSampleTest(index)}>
-                    Remove
-                  </button>
-                </div>
-                <div className="field">
-                  <label>Input</label>
-                  <textarea rows={3} value={test.input} onChange={(event) => updateSampleTest(index, "input", event.target.value)} />
-                </div>
-                <div className="field">
-                  <label>Expected output</label>
-                  <textarea rows={3} value={test.output} onChange={(event) => updateSampleTest(index, "output", event.target.value)} />
-                </div>
-                <div className="field">
-                  <label>Explanation</label>
-                  <textarea
-                    rows={2}
-                    value={test.explanation}
-                    onChange={(event) => updateSampleTest(index, "explanation", event.target.value)}
-                  />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleSampleTest(test.id)}
+                  style={collapsibleHeaderStyle}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span>{expandedSampleTestIds.includes(test.id) ? "▾" : "▸"}</span>
+                    <span>{getSampleTestSummary(test)}</span>
+                  </span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <ValidationBadge result={sampleValidationTests.get(test.id)} />
+                  </span>
+                </button>
+                {expandedSampleTestIds.includes(test.id) ? (
+                  <>
+                    <div className="row" style={{ justifyContent: "flex-end" }}>
+                      <button type="button" className="button secondary" onClick={() => removeSampleTest(index)}>
+                        Remove
+                      </button>
+                    </div>
+                    <div className="field">
+                      <label>Input</label>
+                      <textarea rows={3} value={test.input} onChange={(event) => updateSampleTest(index, "input", event.target.value)} />
+                    </div>
+                    <div className="field">
+                      <label>Expected output</label>
+                      <textarea rows={3} value={test.output} onChange={(event) => updateSampleTest(index, "output", event.target.value)} />
+                    </div>
+                    <div className="field">
+                      <label>Explanation</label>
+                      <textarea
+                        rows={2}
+                        value={test.explanation}
+                        onChange={(event) => updateSampleTest(index, "explanation", event.target.value)}
+                      />
+                    </div>
+                    {renderHiddenTestValidation(test.id, sampleValidationTests.get(test.id))}
+                  </>
+                ) : null}
               </section>
             ))}
           </section>
@@ -409,70 +485,87 @@ export function CodingExerciseActivityView({
             <p className="muted">Hidden tests are stored in plugin-owned tables and are not exposed to students.</p>
             {hiddenTests.map((test, index) => (
               <section key={test.id} className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 16 }}>
-                <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                  <strong>{test.name}</strong>
-                  <button type="button" className="button secondary" onClick={() => removeHiddenTest(index)}>
-                    Remove
-                  </button>
-                </div>
-                <div className="field">
-                  <label>Name</label>
-                  <input value={test.name} onChange={(event) => updateHiddenTest(index, "name", event.target.value)} />
-                </div>
-                <div className="field">
-                  <label>Stable id</label>
-                  <input value={test.id} onChange={(event) => updateHiddenTest(index, "id", event.target.value)} />
-                </div>
-                <div className="field">
-                  <label>Input</label>
-                  <textarea rows={3} value={test.stdin} onChange={(event) => updateHiddenTest(index, "stdin", event.target.value)} />
-                </div>
-                <div className="field">
-                  <label>Expected output</label>
-                  <textarea
-                    rows={3}
-                    value={test.expectedOutput}
-                    onChange={(event) => updateHiddenTest(index, "expectedOutput", event.target.value)}
-                  />
-                </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gap: 12,
-                    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-                    alignItems: "start"
-                  }}
+                <button
+                  type="button"
+                  onClick={() => toggleHiddenTest(test.id)}
+                  style={collapsibleHeaderStyle}
                 >
-                  <div className="field">
-                    <label htmlFor={`hidden-test-enabled-${index}`}>Enabled</label>
-                    <div
-                      style={{
-                        alignItems: "center",
-                        display: "flex",
-                        minHeight: 42
-                      }}
-                    >
-                      <input
-                        id={`hidden-test-enabled-${index}`}
-                        type="checkbox"
-                        checked={test.isEnabled}
-                        onChange={(event) => updateHiddenTest(index, "isEnabled", event.target.checked)}
+                  <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span>{expandedHiddenTestIds.includes(test.id) ? "▾" : "▸"}</span>
+                    <span>{test.name}</span>
+                  </span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <ValidationBadge result={test.isEnabled ? hiddenValidationTests.get(test.id) : undefined} />
+                  </span>
+                </button>
+                {expandedHiddenTestIds.includes(test.id) ? (
+                  <>
+                    <div className="row" style={{ justifyContent: "flex-end" }}>
+                      <button type="button" className="button secondary" onClick={() => removeHiddenTest(index)}>
+                        Remove
+                      </button>
+                    </div>
+                    <div className="field">
+                      <label>Name</label>
+                      <input value={test.name} onChange={(event) => updateHiddenTest(index, "name", event.target.value)} />
+                    </div>
+                    <div className="field">
+                      <label>Stable id</label>
+                      <input value={test.id} onChange={(event) => updateHiddenTest(index, "id", event.target.value)} />
+                    </div>
+                    <div className="field">
+                      <label>Input</label>
+                      <textarea rows={3} value={test.stdin} onChange={(event) => updateHiddenTest(index, "stdin", event.target.value)} />
+                    </div>
+                    <div className="field">
+                      <label>Expected output</label>
+                      <textarea
+                        rows={3}
+                        value={test.expectedOutput}
+                        onChange={(event) => updateHiddenTest(index, "expectedOutput", event.target.value)}
                       />
                     </div>
-                  </div>
-                  <div className="field">
-                    <label htmlFor={`hidden-test-weight-${index}`}>Weight</label>
-                    <input
-                      id={`hidden-test-weight-${index}`}
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={test.weight}
-                      onChange={(event) => updateHiddenTest(index, "weight", Number(event.target.value || "1"))}
-                      style={{ maxWidth: 120 }}
-                    />
-                  </div>
-                </div>
+                    <div
+                      style={{
+                        display: "grid",
+                        gap: 12,
+                        gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                        alignItems: "start"
+                      }}
+                    >
+                      <div className="field">
+                        <label htmlFor={`hidden-test-enabled-${index}`}>Enabled</label>
+                        <div
+                          style={{
+                            alignItems: "center",
+                            display: "flex",
+                            minHeight: 42
+                          }}
+                        >
+                          <input
+                            id={`hidden-test-enabled-${index}`}
+                            type="checkbox"
+                            checked={test.isEnabled}
+                            onChange={(event) => updateHiddenTest(index, "isEnabled", event.target.checked)}
+                          />
+                        </div>
+                      </div>
+                      <div className="field">
+                        <label htmlFor={`hidden-test-weight-${index}`}>Weight</label>
+                        <input
+                          id={`hidden-test-weight-${index}`}
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={test.weight}
+                          onChange={(event) => updateHiddenTest(index, "weight", Number(event.target.value || "1"))}
+                          style={{ maxWidth: 120 }}
+                        />
+                      </div>
+                    </div>
+                    {renderHiddenTestValidation(test.id, hiddenValidationTests.get(test.id))}
+                  </>
+                ) : null}
               </section>
             ))}
           </section>
@@ -536,6 +629,123 @@ export function CodingExerciseActivityView({
             </section>
           ) : null}
         </div>
+      )}
+    </section>
+  );
+}
+
+function normalizeObject(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function isApiErrorLike(value: unknown): value is { code?: string; details?: unknown } {
+  return value instanceof Error && "code" in value;
+}
+
+function getReferenceValidationTests(summary: Record<string, unknown> | null, groupKey: "sampleTests" | "hiddenTests") {
+  const group = normalizeObject(summary?.[groupKey]) as ReferenceValidationGroup | null;
+  const tests = Array.isArray(group?.tests) ? group.tests : [];
+  const testMap = new Map<string, ReferenceValidationTestResult>();
+
+  for (const test of tests) {
+    if (!test || typeof test !== "object" || Array.isArray(test)) {
+      continue;
+    }
+    const id = "id" in test && typeof test.id === "string" ? test.id : null;
+    if (!id) {
+      continue;
+    }
+    testMap.set(id, test as ReferenceValidationTestResult);
+  }
+
+  return testMap;
+}
+
+function getSampleTestSummary(test: SampleTest) {
+  return test.explanation.trim() || test.id;
+}
+
+function ValidationBadge({ result }: { result?: ReferenceValidationTestResult }) {
+  if (!result) {
+    return null;
+  }
+
+  return (
+    <span
+      aria-label={result.passed ? "Passed" : "Failed"}
+      style={{
+        color: result.passed ? "#157347" : "#b42318",
+        fontSize: 18,
+        fontWeight: 700,
+        lineHeight: 1
+      }}
+    >
+      {result.passed ? "✓" : "✕"}
+    </span>
+  );
+}
+
+const collapsibleHeaderStyle: CSSProperties = {
+  alignItems: "center",
+  background: "transparent",
+  border: "none",
+  color: "inherit",
+  cursor: "pointer",
+  display: "flex",
+  justifyContent: "space-between",
+  padding: 0,
+  textAlign: "left",
+  width: "100%"
+};
+
+function renderHiddenTestValidation(testId: string, testResult?: ReferenceValidationTestResult) {
+  if (!testResult || testResult.passed) {
+    return null;
+  }
+
+  const detailBlocks = [
+    { label: "Compiler output", value: testResult.compileOutput },
+    { label: "Runtime error", value: testResult.stderr },
+    { label: "Judge0 message", value: testResult.message },
+    { label: "Program output", value: testResult.stdout }
+  ].filter((item) => item.value && item.value.trim().length > 0);
+
+  return (
+    <section
+      key={`${testId}-validation`}
+      className="stack"
+      style={{
+        background: "rgba(186, 26, 26, 0.05)",
+        border: "1px solid rgba(186, 26, 26, 0.18)",
+        borderRadius: 10,
+        padding: 12
+      }}
+    >
+      <strong style={{ color: "#8f1d1d" }}>
+        Validation failed{testResult.statusLabel ? `: ${testResult.statusLabel}` : ""}
+      </strong>
+      {detailBlocks.length ? (
+        detailBlocks.map((item) => (
+          <div key={item.label} className="stack" style={{ gap: 6 }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>{item.label}</span>
+            <pre
+              style={{
+                background: "rgba(13, 27, 71, 0.04)",
+                borderRadius: 8,
+                margin: 0,
+                overflowX: "auto",
+                padding: 10,
+                whiteSpace: "pre-wrap"
+              }}
+            >
+              {item.value}
+            </pre>
+          </div>
+        ))
+      ) : (
+        <p className="muted" style={{ margin: 0 }}>
+          The reference solution did not pass this hidden test.
+        </p>
       )}
     </section>
   );

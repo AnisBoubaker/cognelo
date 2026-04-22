@@ -61,6 +61,7 @@ export async function replaceCodingExerciseHiddenTests(params: {
   const validationSummary = await validateReferenceSolutionAgainstHiddenTests({
     activityConfig: params.activityConfig,
     sourceCode: input.referenceSolution,
+    sampleTests: input.sampleTests,
     hiddenTests: input.tests.map((test, index) => ({
       ...test,
       orderIndex: index
@@ -68,7 +69,7 @@ export async function replaceCodingExerciseHiddenTests(params: {
   });
 
   if (!validationSummary.accepted) {
-    const firstFailedTest = validationSummary.tests.find((test) => !test.passed);
+    const firstFailedTest = [...validationSummary.sampleTests.tests, ...validationSummary.hiddenTests.tests].find((test) => !test.passed);
     const failureReason =
       (firstFailedTest &&
         typeof firstFailedTest === "object" &&
@@ -90,7 +91,7 @@ export async function replaceCodingExerciseHiddenTests(params: {
         "statusLabel" in firstFailedTest &&
         typeof firstFailedTest.statusLabel === "string" &&
         firstFailedTest.statusLabel) ||
-      "The reference solution did not pass the hidden tests.";
+      "The reference solution did not pass one of the saved tests.";
     const failedTestName =
       firstFailedTest &&
       typeof firstFailedTest === "object" &&
@@ -102,7 +103,17 @@ export async function replaceCodingExerciseHiddenTests(params: {
     throw new AppError(
       400,
       "REFERENCE_SOLUTION_VALIDATION_FAILED",
-      `The reference solution failed hidden test "${failedTestName}": ${failureReason}`
+      `The reference solution failed test "${failedTestName}": ${failureReason}`,
+      {
+        failedTestId:
+          firstFailedTest &&
+          typeof firstFailedTest === "object" &&
+          "id" in firstFailedTest &&
+          typeof firstFailedTest.id === "string"
+            ? firstFailedTest.id
+            : null,
+        validationSummary
+      }
     );
   }
 
@@ -111,23 +122,21 @@ export async function replaceCodingExerciseHiddenTests(params: {
       where: { activityId: params.activityId }
     });
 
-    if (!input.tests.length) {
-      return;
+    if (input.tests.length) {
+      await transaction.pluginCodingExerciseHiddenTest.createMany({
+        data: input.tests.map((test, index) => ({
+          activityId: params.activityId,
+          id: test.id,
+          name: test.name,
+          stdin: test.stdin,
+          expectedOutput: test.expectedOutput,
+          orderIndex: index,
+          isEnabled: test.isEnabled,
+          weight: test.weight,
+          metadata: {} as Prisma.InputJsonValue
+        }))
+      });
     }
-
-    await transaction.pluginCodingExerciseHiddenTest.createMany({
-      data: input.tests.map((test, index) => ({
-        activityId: params.activityId,
-        id: test.id,
-        name: test.name,
-        stdin: test.stdin,
-        expectedOutput: test.expectedOutput,
-        orderIndex: index,
-        isEnabled: test.isEnabled,
-        weight: test.weight,
-        metadata: {} as Prisma.InputJsonValue
-      }))
-    });
 
     await (transaction as typeof codingExerciseHiddenTestsClient).pluginCodingExerciseReferenceSolution.upsert({
       where: { activityId: params.activityId },
