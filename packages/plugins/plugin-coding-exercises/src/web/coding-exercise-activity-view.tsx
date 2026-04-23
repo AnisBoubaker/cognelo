@@ -3,6 +3,7 @@
 import { type CSSProperties, type FormEvent, useEffect, useRef, useState } from "react";
 import { CodeEditor, codeLanguageOptions } from "@cognelo/activity-ui";
 import { normalizeCodingExerciseSampleTests, parseCodingExerciseConfig, type CodingExerciseConfig } from "../coding-exercises";
+import { formatCodingExercisesMessage, normalizeCodingExercisesLocale, type CodingExercisesLocale } from "./messages";
 
 type ActivityLike = {
   id: string;
@@ -85,6 +86,7 @@ type CodingExerciseActivityViewProps = {
   course?: { id?: string; title: string } | null;
   onSave: (input: { title: string; description: string; config: Record<string, unknown> }) => Promise<ActivityLike>;
   codingClient?: CodingExerciseClient;
+  locale?: string;
 };
 
 const fallbackConfig: CodingExerciseConfig = {
@@ -100,8 +102,12 @@ export function CodingExerciseActivityView({
   canManage,
   course,
   onSave,
-  codingClient
+  codingClient,
+  locale
 }: CodingExerciseActivityViewProps) {
+  const pluginLocale = normalizeCodingExercisesLocale(locale);
+  const t = (key: Parameters<typeof formatCodingExercisesMessage>[1], values?: Record<string, string | number>) =>
+    formatCodingExercisesMessage(pluginLocale, key, values);
   const previousActivityIdRef = useRef(activity.id);
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);
@@ -161,7 +167,7 @@ export function CodingExerciseActivityView({
         setReferenceSolution(result.referenceSolution?.sourceCode ?? "");
         setReferenceValidationSummary(result.referenceSolution?.validationSummary ?? null);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load hidden tests."));
+      .catch((err) => setError(err instanceof Error ? err.message : t("loadHiddenTestsError")));
   }, [activity.id, canManage, course?.id]);
 
   useEffect(() => {
@@ -174,7 +180,7 @@ export function CodingExerciseActivityView({
         setRecentRuns(runs.executions);
         setRecentSubmissions(submissions.executions);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load coding exercise history."));
+      .catch((err) => setError(err instanceof Error ? err.message : t("loadHistoryError")));
   }, [activity.id, course?.id]);
 
   function updateSampleTest(index: number, field: keyof CodingExerciseConfig["sampleTests"][number], value: string) {
@@ -285,7 +291,7 @@ export function CodingExerciseActivityView({
         setReferenceValidationSummary(result.referenceSolution?.validationSummary ?? null);
       }
 
-      setSaveMessage("Coding exercise saved.");
+      setSaveMessage(t("saved"));
     } catch (err) {
       if (isApiErrorLike(err) && err.code === "REFERENCE_SOLUTION_VALIDATION_FAILED") {
         const details = normalizeObject(err.details);
@@ -294,7 +300,7 @@ export function CodingExerciseActivityView({
           setReferenceValidationSummary(validationSummary);
         }
       }
-      setError(err instanceof Error ? err.message : "Unable to save the coding exercise right now.");
+      setError(err instanceof Error ? err.message : t("saveError"));
     } finally {
       setSaving(false);
     }
@@ -316,7 +322,7 @@ export function CodingExerciseActivityView({
       const runs = await codingClient.listRuns(course.id, activity.id);
       setRecentRuns(runs.executions);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to run code right now.");
+      setError(err instanceof Error ? err.message : t("runError"));
     } finally {
       setWorkingAction(null);
     }
@@ -336,7 +342,7 @@ export function CodingExerciseActivityView({
       const submissions = await codingClient.listSubmissions(course.id, activity.id);
       setRecentSubmissions(submissions.executions);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to submit code right now.");
+      setError(err instanceof Error ? err.message : t("submitError"));
     } finally {
       setWorkingAction(null);
     }
@@ -346,20 +352,20 @@ export function CodingExerciseActivityView({
     <section className="section stack">
       {canManage ? (
         <form className="stack" onSubmit={saveActivityAndHiddenTests}>
-          <h2>Coding exercise authoring</h2>
+          <h2>{t("authoringTitle")}</h2>
 
           <div className="field">
-            <label htmlFor="coding-title">Title</label>
+            <label htmlFor="coding-title">{t("title")}</label>
             <input id="coding-title" value={title} onChange={(event) => setTitle(event.target.value)} />
           </div>
 
           <div className="field">
-            <label htmlFor="coding-description">Description</label>
+            <label htmlFor="coding-description">{t("description")}</label>
             <textarea id="coding-description" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />
           </div>
 
           <div className="field">
-            <label htmlFor="coding-language">Language</label>
+            <label htmlFor="coding-language">{t("language")}</label>
             <select
               id="coding-language"
               value={config.language}
@@ -374,7 +380,7 @@ export function CodingExerciseActivityView({
           </div>
 
           <div className="field">
-            <label htmlFor="coding-prompt">Prompt</label>
+            <label htmlFor="coding-prompt">{t("prompt")}</label>
             <textarea
               id="coding-prompt"
               rows={5}
@@ -384,7 +390,7 @@ export function CodingExerciseActivityView({
           </div>
 
           <div className="stack">
-            <span>Starter code</span>
+            <span>{t("starterCode")}</span>
             <CodeEditor
               value={config.starterCode}
               onChange={(value) => setConfig((current) => ({ ...current, starterCode: value }))}
@@ -394,20 +400,23 @@ export function CodingExerciseActivityView({
           </div>
 
           <div className="stack">
-            <span>Reference solution</span>
+            <span>{t("referenceSolution")}</span>
             <p className="muted" style={{ margin: 0 }}>
-              Teacher-only answer key. Hidden tests are validated against this code before they are saved.
+              {t("referenceSolutionHelp")}
             </p>
             <CodeEditor value={referenceSolution} onChange={setReferenceSolution} language={config.language} minHeight={220} />
             {referenceValidationSummary ? (
               <p className="muted" style={{ margin: 0 }}>
-                Last validation: {String(referenceValidationSummary.passedCount ?? 0)}/{String(referenceValidationSummary.testCount ?? 0)} hidden tests passed.
+                {t("lastValidationSummary", {
+                  passedCount: String(referenceValidationSummary.passedCount ?? 0),
+                  testCount: String(referenceValidationSummary.testCount ?? 0)
+                })}
               </p>
             ) : null}
           </div>
 
           <div className="field">
-            <label htmlFor="coding-max-editor-seconds">Editor time limit (seconds)</label>
+            <label htmlFor="coding-max-editor-seconds">{t("editorTimeLimit")}</label>
             <input
               id="coding-max-editor-seconds"
               type="number"
@@ -425,9 +434,9 @@ export function CodingExerciseActivityView({
 
           <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
             <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-              <h3>Visible sample tests</h3>
+              <h3>{t("visibleSampleTests")}</h3>
               <button type="button" className="button secondary" onClick={addSampleTest}>
-                Add sample test
+                {t("addSampleTest")}
               </button>
             </div>
             {normalizeCodingExerciseSampleTests(config.sampleTests).map((test, index) => (
@@ -442,33 +451,33 @@ export function CodingExerciseActivityView({
                     <span>{getSampleTestSummary(test)}</span>
                   </span>
                   <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <ValidationBadge result={sampleValidationTests.get(test.id)} />
+                    <ValidationBadge result={sampleValidationTests.get(test.id)} locale={pluginLocale} />
                   </span>
                 </button>
                 {expandedSampleTestIds.includes(test.id) ? (
                   <>
                     <div className="row" style={{ justifyContent: "flex-end" }}>
                       <button type="button" className="button secondary" onClick={() => removeSampleTest(index)}>
-                        Remove
+                        {t("remove")}
                       </button>
                     </div>
                     <div className="field">
-                      <label>Input</label>
+                      <label>{t("input")}</label>
                       <textarea rows={3} value={test.input} onChange={(event) => updateSampleTest(index, "input", event.target.value)} />
                     </div>
                     <div className="field">
-                      <label>Expected output</label>
+                      <label>{t("expectedOutput")}</label>
                       <textarea rows={3} value={test.output} onChange={(event) => updateSampleTest(index, "output", event.target.value)} />
                     </div>
                     <div className="field">
-                      <label>Explanation</label>
+                      <label>{t("explanation")}</label>
                       <textarea
                         rows={2}
                         value={test.explanation}
                         onChange={(event) => updateSampleTest(index, "explanation", event.target.value)}
                       />
                     </div>
-                    {renderHiddenTestValidation(test.id, sampleValidationTests.get(test.id))}
+                    {renderHiddenTestValidation(test.id, sampleValidationTests.get(test.id), pluginLocale)}
                   </>
                 ) : null}
               </section>
@@ -477,12 +486,12 @@ export function CodingExerciseActivityView({
 
           <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
             <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-              <h3>Hidden tests</h3>
+              <h3>{t("hiddenTests")}</h3>
               <button type="button" className="button secondary" onClick={addHiddenTest}>
-                Add hidden test
+                {t("addHiddenTest")}
               </button>
             </div>
-            <p className="muted">Hidden tests are stored in plugin-owned tables and are not exposed to students.</p>
+            <p className="muted">{t("hiddenTestsHelp")}</p>
             {hiddenTests.map((test, index) => (
               <section key={test.id} className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 16 }}>
                 <button
@@ -495,30 +504,30 @@ export function CodingExerciseActivityView({
                     <span>{test.name}</span>
                   </span>
                   <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <ValidationBadge result={test.isEnabled ? hiddenValidationTests.get(test.id) : undefined} />
+                    <ValidationBadge result={test.isEnabled ? hiddenValidationTests.get(test.id) : undefined} locale={pluginLocale} />
                   </span>
                 </button>
                 {expandedHiddenTestIds.includes(test.id) ? (
                   <>
                     <div className="row" style={{ justifyContent: "flex-end" }}>
                       <button type="button" className="button secondary" onClick={() => removeHiddenTest(index)}>
-                        Remove
+                        {t("remove")}
                       </button>
                     </div>
                     <div className="field">
-                      <label>Name</label>
+                      <label>{t("name")}</label>
                       <input value={test.name} onChange={(event) => updateHiddenTest(index, "name", event.target.value)} />
                     </div>
                     <div className="field">
-                      <label>Stable id</label>
+                      <label>{t("stableId")}</label>
                       <input value={test.id} onChange={(event) => updateHiddenTest(index, "id", event.target.value)} />
                     </div>
                     <div className="field">
-                      <label>Input</label>
+                      <label>{t("input")}</label>
                       <textarea rows={3} value={test.stdin} onChange={(event) => updateHiddenTest(index, "stdin", event.target.value)} />
                     </div>
                     <div className="field">
-                      <label>Expected output</label>
+                      <label>{t("expectedOutput")}</label>
                       <textarea
                         rows={3}
                         value={test.expectedOutput}
@@ -534,7 +543,7 @@ export function CodingExerciseActivityView({
                       }}
                     >
                       <div className="field">
-                        <label htmlFor={`hidden-test-enabled-${index}`}>Enabled</label>
+                        <label htmlFor={`hidden-test-enabled-${index}`}>{t("enabled")}</label>
                         <div
                           style={{
                             alignItems: "center",
@@ -551,7 +560,7 @@ export function CodingExerciseActivityView({
                         </div>
                       </div>
                       <div className="field">
-                        <label htmlFor={`hidden-test-weight-${index}`}>Weight</label>
+                        <label htmlFor={`hidden-test-weight-${index}`}>{t("weight")}</label>
                         <input
                           id={`hidden-test-weight-${index}`}
                           type="number"
@@ -563,7 +572,7 @@ export function CodingExerciseActivityView({
                         />
                       </div>
                     </div>
-                    {renderHiddenTestValidation(test.id, hiddenValidationTests.get(test.id))}
+                    {renderHiddenTestValidation(test.id, hiddenValidationTests.get(test.id), pluginLocale)}
                   </>
                 ) : null}
               </section>
@@ -575,7 +584,7 @@ export function CodingExerciseActivityView({
 
           <div className="row">
             <button type="submit" disabled={saving}>
-              {saving ? "Saving..." : "Save coding exercise"}
+              {saving ? t("saving") : t("saveCodingExercise")}
             </button>
           </div>
         </form>
@@ -587,44 +596,56 @@ export function CodingExerciseActivityView({
           <CodeEditor value={editorCode} onChange={setEditorCode} language={config.language} minHeight={260} />
 
           <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
-            <h3>Sample run</h3>
+            <h3>{t("sampleRun")}</h3>
             <div className="field">
-              <label>Sample input</label>
+              <label>{t("sampleInput")}</label>
               <textarea rows={4} value={sampleInput} onChange={(event) => setSampleInput(event.target.value)} />
             </div>
             <div className="field">
-              <label>Expected output</label>
+              <label>{t("expectedOutput")}</label>
               <textarea rows={4} value={sampleExpectedOutput} onChange={(event) => setSampleExpectedOutput(event.target.value)} />
             </div>
             <div className="row">
               <button type="button" onClick={runCode} disabled={workingAction === "run"}>
-                {workingAction === "run" ? "Running..." : "Run sample test"}
+                {workingAction === "run" ? t("running") : t("runSampleTest")}
               </button>
               <button type="button" onClick={submitCode} disabled={workingAction === "submit"}>
-                {workingAction === "submit" ? "Submitting..." : "Submit for grading"}
+                {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
               </button>
             </div>
           </section>
 
           {error ? <p className="error">{error}</p> : null}
 
-          {runExecution ? <ExecutionCard execution={runExecution} title="Latest sample run" /> : null}
-          {submitExecution ? <ExecutionCard execution={submitExecution} title="Latest submission" /> : null}
+          {runExecution ? <ExecutionCard execution={runExecution} title={t("latestSampleRun")} locale={pluginLocale} /> : null}
+          {submitExecution ? <ExecutionCard execution={submitExecution} title={t("latestSubmission")} locale={pluginLocale} /> : null}
 
           {recentRuns.length ? (
             <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
-              <h3>Recent runs</h3>
+              <h3>{t("recentRuns")}</h3>
               {recentRuns.map((execution) => (
-                <ExecutionCard key={execution.id} execution={execution} title={new Date(execution.createdAt).toLocaleString()} compact />
+                <ExecutionCard
+                  key={execution.id}
+                  execution={execution}
+                  title={new Date(execution.createdAt).toLocaleString(pluginLocale)}
+                  compact
+                  locale={pluginLocale}
+                />
               ))}
             </section>
           ) : null}
 
           {recentSubmissions.length ? (
             <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
-              <h3>Recent submissions</h3>
+              <h3>{t("recentSubmissions")}</h3>
               {recentSubmissions.map((execution) => (
-                <ExecutionCard key={execution.id} execution={execution} title={new Date(execution.createdAt).toLocaleString()} compact />
+                <ExecutionCard
+                  key={execution.id}
+                  execution={execution}
+                  title={new Date(execution.createdAt).toLocaleString(pluginLocale)}
+                  compact
+                  locale={pluginLocale}
+                />
               ))}
             </section>
           ) : null}
@@ -665,14 +686,14 @@ function getSampleTestSummary(test: SampleTest) {
   return test.explanation.trim() || test.id;
 }
 
-function ValidationBadge({ result }: { result?: ReferenceValidationTestResult }) {
+function ValidationBadge({ result, locale }: { result?: ReferenceValidationTestResult; locale: CodingExercisesLocale }) {
   if (!result) {
     return null;
   }
 
   return (
     <span
-      aria-label={result.passed ? "Passed" : "Failed"}
+      aria-label={result.passed ? formatCodingExercisesMessage(locale, "passed") : formatCodingExercisesMessage(locale, "failed")}
       style={{
         color: result.passed ? "#157347" : "#b42318",
         fontSize: 18,
@@ -698,16 +719,16 @@ const collapsibleHeaderStyle: CSSProperties = {
   width: "100%"
 };
 
-function renderHiddenTestValidation(testId: string, testResult?: ReferenceValidationTestResult) {
+function renderHiddenTestValidation(testId: string, testResult: ReferenceValidationTestResult | undefined, locale: CodingExercisesLocale) {
   if (!testResult || testResult.passed) {
     return null;
   }
 
   const detailBlocks = [
-    { label: "Compiler output", value: testResult.compileOutput },
-    { label: "Runtime error", value: testResult.stderr },
-    { label: "Judge0 message", value: testResult.message },
-    { label: "Program output", value: testResult.stdout }
+    { label: formatCodingExercisesMessage(locale, "compilerOutput"), value: testResult.compileOutput },
+    { label: formatCodingExercisesMessage(locale, "runtimeError"), value: testResult.stderr },
+    { label: formatCodingExercisesMessage(locale, "judgeMessage"), value: testResult.message },
+    { label: formatCodingExercisesMessage(locale, "programOutput"), value: testResult.stdout }
   ].filter((item) => item.value && item.value.trim().length > 0);
 
   return (
@@ -722,7 +743,8 @@ function renderHiddenTestValidation(testId: string, testResult?: ReferenceValida
       }}
     >
       <strong style={{ color: "#8f1d1d" }}>
-        Validation failed{testResult.statusLabel ? `: ${testResult.statusLabel}` : ""}
+        {formatCodingExercisesMessage(locale, "validationFailed")}
+        {testResult.statusLabel ? `: ${testResult.statusLabel}` : ""}
       </strong>
       {detailBlocks.length ? (
         detailBlocks.map((item) => (
@@ -744,14 +766,24 @@ function renderHiddenTestValidation(testId: string, testResult?: ReferenceValida
         ))
       ) : (
         <p className="muted" style={{ margin: 0 }}>
-          The reference solution did not pass this hidden test.
+          {formatCodingExercisesMessage(locale, "referenceSolutionFailedHiddenTest")}
         </p>
       )}
     </section>
   );
 }
 
-function ExecutionCard({ execution, title, compact = false }: { execution: CodingExecution; title: string; compact?: boolean }) {
+function ExecutionCard({
+  execution,
+  title,
+  compact = false,
+  locale
+}: {
+  execution: CodingExecution;
+  title: string;
+  compact?: boolean;
+  locale: CodingExercisesLocale;
+}) {
   const testSummary = execution.resultSummary?.tests;
   const tests = Array.isArray(testSummary) ? testSummary : [];
   return (
@@ -759,38 +791,41 @@ function ExecutionCard({ execution, title, compact = false }: { execution: Codin
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
         <strong>{title}</strong>
         <span className="muted">
-          {execution.status} {execution.judge0StatusLabel ? `· ${execution.judge0StatusLabel}` : ""}
+          {formatExecutionStatus(locale, execution.status)} {execution.judge0StatusLabel ? `· ${execution.judge0StatusLabel}` : ""}
         </span>
       </div>
       {execution.stdout ? (
         <div className="field">
-          <label>Stdout</label>
+          <label>{formatCodingExercisesMessage(locale, "stdout")}</label>
           <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{execution.stdout}</pre>
         </div>
       ) : null}
       {execution.stderr ? (
         <div className="field">
-          <label>Stderr</label>
+          <label>{formatCodingExercisesMessage(locale, "stderr")}</label>
           <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{execution.stderr}</pre>
         </div>
       ) : null}
       {execution.compileOutput ? (
         <div className="field">
-          <label>Compile output</label>
+          <label>{formatCodingExercisesMessage(locale, "compileOutput")}</label>
           <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{execution.compileOutput}</pre>
         </div>
       ) : null}
       {execution.message ? <p className="muted">{execution.message}</p> : null}
       {tests.length && !compact ? (
         <div className="stack">
-          <strong>Hidden test results</strong>
+          <strong>{formatCodingExercisesMessage(locale, "hiddenTestResults")}</strong>
           {tests.map((test) => {
             const item = test as Record<string, unknown>;
             return (
               <div key={String(item.id ?? item.name)} className="row" style={{ justifyContent: "space-between", gap: 12 }}>
-                <span>{String(item.name ?? item.id ?? "Test")}</span>
+                <span>{String(item.name ?? item.id ?? formatCodingExercisesMessage(locale, "test"))}</span>
                 <span className="muted">
-                  {item.passed ? "passed" : "failed"} {item.statusLabel ? `· ${String(item.statusLabel)}` : ""}
+                  {item.passed
+                    ? formatCodingExercisesMessage(locale, "passed").toLowerCase()
+                    : formatCodingExercisesMessage(locale, "failed").toLowerCase()}{" "}
+                  {item.statusLabel ? `· ${String(item.statusLabel)}` : ""}
                 </span>
               </div>
             );
@@ -799,4 +834,14 @@ function ExecutionCard({ execution, title, compact = false }: { execution: Codin
       ) : null}
     </section>
   );
+}
+
+function formatExecutionStatus(locale: CodingExercisesLocale, status: CodingExecution["status"]) {
+  if (status === "completed") {
+    return formatCodingExercisesMessage(locale, "statusCompleted");
+  }
+  if (status === "failed") {
+    return formatCodingExercisesMessage(locale, "statusFailed");
+  }
+  return formatCodingExercisesMessage(locale, "statusPending");
 }
