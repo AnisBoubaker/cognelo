@@ -106,9 +106,7 @@ export function buildCodingExerciseSource(params: {
 }) {
   const sections: string[] = [];
   const hiddenSupportCode = params.privateConfig.hiddenSupportCode.trim();
-  const templateParts = splitCodingExerciseTemplateSource(params.privateConfig.templateSource);
-  const templatePrefix = templateParts.prefix.trim() || params.privateConfig.templatePrefix.trim();
-  const templateSuffix = templateParts.suffix.trim() || params.privateConfig.templateSuffix.trim();
+  const templateSource = params.privateConfig.templateSource || buildCodingExerciseTemplateSource(params.privateConfig.templatePrefix, params.privateConfig.templateSuffix);
   const testCode = (params.testCode ?? "").trim();
 
   if (hiddenSupportCode) {
@@ -116,12 +114,13 @@ export function buildCodingExerciseSource(params: {
   }
 
   if (params.config.executionMode === "template") {
-    if (templatePrefix) {
-      sections.push(templateParts.prefix);
-    }
-    sections.push(params.studentSourceCode);
-    if (templateSuffix) {
-      sections.push(templateParts.suffix);
+    if (templateSource.includes(codingExerciseTemplateInsertionToken)) {
+      sections.push(templateSource.replace(codingExerciseTemplateInsertionToken, params.studentSourceCode));
+    } else if (templateSource.trim().length > 0) {
+      sections.push(templateSource);
+      sections.push(params.studentSourceCode);
+    } else {
+      sections.push(params.studentSourceCode);
     }
   } else {
     sections.push(params.studentSourceCode);
@@ -153,8 +152,8 @@ export function splitCodingExerciseTemplateSource(templateSource: string) {
   }
 
   return {
-    prefix: templateSource.slice(0, markerIndex).trimEnd(),
-    suffix: templateSource.slice(markerIndex + codingExerciseTemplateInsertionToken.length).trimStart()
+    prefix: templateSource.slice(0, markerIndex),
+    suffix: templateSource.slice(markerIndex + codingExerciseTemplateInsertionToken.length)
   };
 }
 
@@ -188,15 +187,29 @@ export function buildCodingExerciseStudentTemplateSource(
     visibleLineNumberSet,
     language
   );
+  const markerIndentation = getLeadingWhitespace(lines[markerLineIndex] ?? "");
 
-  return [...projectedPrefix, codingExerciseTemplateInsertionToken, ...projectedSuffix].join("\n");
+  return [...projectedPrefix, `${markerIndentation}${codingExerciseTemplateInsertionToken}`, ...projectedSuffix].join("\n");
+}
+
+export function alignCodingExerciseStarterCodeToTemplate(starterCode: string, templateSource: string) {
+  if (!starterCode.trim()) {
+    return starterCode;
+  }
+
+  const insertionIndentation = getCodingExerciseTemplateInsertionIndentation(templateSource);
+  const normalizedStarterLines = dedentCodingExerciseLines(starterCode.split("\n"));
+
+  return normalizedStarterLines
+    .map((line) => (line.trim().length ? `${insertionIndentation}${line}` : ""))
+    .join("\n");
 }
 
 export function buildCodingExerciseStudentTemplateProjectionFromSource(templateSource: string) {
   const templateParts = splitCodingExerciseTemplateSource(templateSource);
   return {
-    readOnlyPrefix: templateParts.prefix ? `${templateParts.prefix}\n` : "",
-    readOnlySuffix: templateParts.suffix ? `\n${templateParts.suffix}` : ""
+    readOnlyPrefix: templateParts.prefix,
+    readOnlySuffix: templateParts.suffix
   };
 }
 
@@ -207,39 +220,39 @@ function projectCodingExerciseTemplateSection(
   language: string
 ) {
   const projectedLines: string[] = [];
-  let hasHiddenBlock = false;
+  let hiddenLines: string[] = [];
 
   for (const [index, line] of lines.entries()) {
     const lineNumber = lineOffset + index;
     const isVisible = visibleLineNumbers.has(lineNumber);
 
     if (isVisible) {
-      if (hasHiddenBlock) {
-        projectedLines.push(getCodingExerciseHiddenCodePlaceholder(language));
-        hasHiddenBlock = false;
+      if (hiddenLines.length) {
+        projectedLines.push(...projectCodingExerciseHiddenLines(hiddenLines, projectedLines, language));
+        hiddenLines = [];
       }
       projectedLines.push(line);
       continue;
     }
 
-    hasHiddenBlock = true;
+    hiddenLines.push(line);
   }
 
-  if (hasHiddenBlock) {
-    projectedLines.push(getCodingExerciseHiddenCodePlaceholder(language));
+  if (hiddenLines.length) {
+    projectedLines.push(...projectCodingExerciseHiddenLines(hiddenLines, projectedLines, language));
   }
 
   return projectedLines;
 }
 
-export function getCodingExerciseHiddenCodePlaceholder(language: string) {
+export function getCodingExerciseHiddenCodePlaceholder(language: string, indentation = "") {
   const normalizedLanguage = language.trim().toLowerCase();
 
   if (normalizedLanguage === "python") {
-    return "# Hidden code";
+    return `${indentation}# Hidden code`;
   }
 
-  return "// Hidden code";
+  return `${indentation}// Hidden code`;
 }
 
 function getCodingExerciseRuntimeEpilogue(language: string) {
@@ -262,4 +275,70 @@ export function getJudge0LanguageCandidates(languageKey: string) {
   }
 
   return { languageKey: normalizedKey, candidates };
+}
+
+function projectCodingExerciseHiddenLines(hiddenLines: string[], projectedLines: string[], language: string) {
+  const hasSubstantiveLine = hiddenLines.some((line) => line.trim().length > 0);
+  if (!hasSubstantiveLine) {
+    return hiddenLines.map(() => "");
+  }
+
+  return [getCodingExerciseHiddenCodePlaceholder(language, getCodingExerciseHiddenPlaceholderIndentation(hiddenLines, projectedLines))];
+}
+
+function getCodingExerciseHiddenPlaceholderIndentation(hiddenLines: string[], projectedLines: string[]) {
+  const firstSubstantiveHiddenLine = hiddenLines.find((line) => line.trim().length > 0);
+  if (firstSubstantiveHiddenLine) {
+    return getLeadingWhitespace(firstSubstantiveHiddenLine);
+  }
+
+  for (let index = projectedLines.length - 1; index >= 0; index -= 1) {
+    const previousLine = projectedLines[index];
+    if (previousLine.trim().length > 0) {
+      return getLeadingWhitespace(previousLine);
+    }
+  }
+
+  return "";
+}
+
+function getCodingExerciseTemplateInsertionIndentation(templateSource: string) {
+  const lines = templateSource.split("\n");
+  const markerLineIndex = lines.findIndex((line) => line.includes(codingExerciseTemplateInsertionToken));
+  if (markerLineIndex === -1) {
+    return "";
+  }
+
+  const markerIndentation = getLeadingWhitespace(lines[markerLineIndex] ?? "");
+  if (markerIndentation.length > 0) {
+    return markerIndentation;
+  }
+
+  for (let index = markerLineIndex + 1; index < lines.length; index += 1) {
+    const nextLine = lines[index] ?? "";
+    if (nextLine.trim().length > 0) {
+      return getLeadingWhitespace(nextLine);
+    }
+  }
+
+  return "";
+}
+
+function dedentCodingExerciseLines(lines: string[]) {
+  const indentedLines = lines.filter((line) => line.trim().length > 0);
+  if (!indentedLines.length) {
+    return lines;
+  }
+
+  const sharedIndentation = Math.min(...indentedLines.map((line) => getLeadingWhitespace(line).length));
+  if (!sharedIndentation) {
+    return lines;
+  }
+
+  return lines.map((line) => (line.trim().length ? line.slice(sharedIndentation) : ""));
+}
+
+function getLeadingWhitespace(line: string) {
+  const match = line.match(/^\s*/);
+  return match?.[0] ?? "";
 }
