@@ -2,20 +2,20 @@ import { z } from "zod";
 
 export const codingExerciseTemplateInsertionToken = "{{ STUDENT_CODE }}";
 
-export const codingExerciseExecutionModeSchema = z.enum(["program", "function", "template"]);
+export const codingExerciseExecutionModeSchema = z.literal("template");
 
 export const sampleTestSchema = z.object({
   id: z.string().min(1).max(80),
   input: z.string().max(8000).default(""),
   output: z.string().max(8000).default(""),
   testCode: z.string().max(40000).default(""),
-  explanation: z.string().max(1000).default("")
+  title: z.string().max(200).default("")
 });
 
 export const codingExerciseConfigSchema = z.object({
   prompt: z.string().min(10).max(12000),
   language: z.string().min(1).max(40).default("python"),
-  executionMode: codingExerciseExecutionModeSchema.default("program"),
+  executionMode: codingExerciseExecutionModeSchema.default("template"),
   starterCode: z.string().max(40000).default(""),
   studentTemplateSource: z.string().max(120000).default(""),
   sampleTests: z.array(sampleTestSchema).max(10).default([]),
@@ -73,11 +73,55 @@ const judge0LanguageNameCandidates: Record<string, readonly string[]> = {
 };
 
 export function parseCodingExerciseConfig(value: unknown): CodingExerciseConfig {
-  return codingExerciseConfigSchema.parse(value ?? {});
+  const raw =
+    value && typeof value === "object" && !Array.isArray(value) ? { ...(value as Record<string, unknown>) } : {};
+  const normalizedSampleTests = Array.isArray(raw.sampleTests)
+    ? raw.sampleTests.map((test) => {
+        if (!test || typeof test !== "object" || Array.isArray(test)) {
+          return test;
+        }
+        const record = { ...(test as Record<string, unknown>) };
+        if (typeof record.title !== "string" && typeof record.explanation === "string") {
+          record.title = record.explanation;
+        }
+        return record;
+      })
+    : raw.sampleTests;
+
+  if (raw.executionMode === "function" || raw.executionMode === "program") {
+    raw.executionMode = "template";
+  }
+
+  if (typeof raw.executionMode !== "string") {
+    raw.executionMode = "template";
+  }
+
+  raw.sampleTests = normalizedSampleTests;
+  return codingExerciseConfigSchema.parse(raw);
 }
 
 export function normalizeCodingExerciseSampleTests(value: unknown) {
-  return z.array(sampleTestSchema).max(10).parse(value ?? []);
+  const raw = Array.isArray(value) ? value : [];
+  return z
+    .array(
+      sampleTestSchema.or(
+        z.object({
+          id: z.string().min(1).max(80),
+          input: z.string().max(8000).default(""),
+          output: z.string().max(8000).default(""),
+          testCode: z.string().max(40000).default(""),
+          explanation: z.string().max(1000).default("")
+        }).transform((test) => ({
+          id: test.id,
+          input: test.input,
+          output: test.output,
+          testCode: test.testCode,
+          title: test.explanation
+        }))
+      )
+    )
+    .max(10)
+    .parse(raw);
 }
 
 export function parseCodingExercisePrivateConfig(value: unknown) {
@@ -113,15 +157,11 @@ export function buildCodingExerciseSource(params: {
     sections.push(params.privateConfig.hiddenSupportCode);
   }
 
-  if (params.config.executionMode === "template") {
-    if (templateSource.includes(codingExerciseTemplateInsertionToken)) {
-      sections.push(templateSource.replace(codingExerciseTemplateInsertionToken, params.studentSourceCode));
-    } else if (templateSource.trim().length > 0) {
-      sections.push(templateSource);
-      sections.push(params.studentSourceCode);
-    } else {
-      sections.push(params.studentSourceCode);
-    }
+  if (templateSource.includes(codingExerciseTemplateInsertionToken)) {
+    sections.push(templateSource.replace(codingExerciseTemplateInsertionToken, params.studentSourceCode));
+  } else if (templateSource.trim().length > 0) {
+    sections.push(templateSource);
+    sections.push(params.studentSourceCode);
   } else {
     sections.push(params.studentSourceCode);
   }

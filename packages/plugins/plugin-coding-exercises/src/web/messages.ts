@@ -5,11 +5,6 @@ type MessageKey =
   | "title"
   | "description"
   | "language"
-  | "executionMode"
-  | "executionModeHelp"
-  | "executionModeProgram"
-  | "executionModeFunction"
-  | "executionModeTemplate"
   | "prompt"
   | "starterCode"
   | "referenceSolution"
@@ -31,7 +26,7 @@ type MessageKey =
   | "testHarnessCode"
   | "testHarnessCodeHelp"
   | "visibleTestHarnessHelp"
-  | "explanation"
+  | "testTitle"
   | "hiddenTests"
   | "addHiddenTest"
   | "hiddenTestsHelp"
@@ -82,11 +77,6 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
     title: "Title",
     description: "Description",
     language: "Language",
-    executionMode: "Execution mode",
-    executionModeHelp: "Choose whether students write a full program, a full function definition, or a code snippet inserted into a hidden template.",
-    executionModeProgram: "Full program",
-    executionModeFunction: "Full function definition",
-    executionModeTemplate: "Template snippet",
     prompt: "Prompt",
     starterCode: "Starter code",
     referenceSolution: "Reference solution",
@@ -108,7 +98,7 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
     testHarnessCode: "Test harness code",
     testHarnessCodeHelp: "Optional code appended after the student submission for this test. Use it to call a function, wire hidden helpers, or provide a custom main/harness in any language.",
     visibleTestHarnessHelp: "Visible sample harness code. Students can inspect or adjust it for public sample runs.",
-    explanation: "Explanation",
+    testTitle: "Title",
     hiddenTests: "Hidden tests",
     addHiddenTest: "Add hidden test",
     hiddenTestsHelp: "Hidden tests are stored in plugin-owned tables and are not exposed to students.",
@@ -156,11 +146,6 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
     title: "Titre",
     description: "Description",
     language: "Langage",
-    executionMode: "Mode d'exécution",
-    executionModeHelp: "Choisissez si les étudiants écrivent un programme complet, une définition complète de fonction ou un extrait inséré dans un modèle caché.",
-    executionModeProgram: "Programme complet",
-    executionModeFunction: "Définition complète de fonction",
-    executionModeTemplate: "Extrait de modèle",
     prompt: "Consigne",
     starterCode: "Code de départ",
     referenceSolution: "Solution de référence",
@@ -182,7 +167,7 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
     testHarnessCode: "Code du harnais de test",
     testHarnessCodeHelp: "Code optionnel ajouté après la soumission étudiante pour ce test. Utilisez-le pour appeler une fonction, brancher des helpers cachés ou fournir un `main`/harnais personnalisé dans n'importe quel langage.",
     visibleTestHarnessHelp: "Code de harnais visible pour l'exemple. Les étudiants peuvent l'inspecter ou l'ajuster pour les exécutions publiques.",
-    explanation: "Explication",
+    testTitle: "Titre",
     hiddenTests: "Tests cachés",
     addHiddenTest: "Ajouter un test caché",
     hiddenTestsHelp: "Les tests cachés sont stockés dans des tables propres au plugin et ne sont pas exposés aux étudiants.",
@@ -230,11 +215,6 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
     title: "标题",
     description: "说明",
     language: "语言",
-    executionMode: "执行模式",
-    executionModeHelp: "选择学生是编写完整程序、完整函数定义，还是写入隐藏模板中的代码片段。",
-    executionModeProgram: "完整程序",
-    executionModeFunction: "完整函数定义",
-    executionModeTemplate: "模板片段",
     prompt: "题目",
     starterCode: "起始代码",
     referenceSolution: "参考答案",
@@ -256,7 +236,7 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
     testHarnessCode: "测试脚手架代码",
     testHarnessCodeHelp: "此测试中会追加在学生提交代码之后的可选代码。可用于调用函数、连接隐藏辅助函数，或在任意语言中提供自定义 main/测试脚手架。",
     visibleTestHarnessHelp: "公开示例运行用的可见脚手架代码。学生可以查看或调整它。",
-    explanation: "说明",
+    testTitle: "标题",
     hiddenTests: "隐藏测试",
     addHiddenTest: "添加隐藏测试",
     hiddenTestsHelp: "隐藏测试保存在插件自有数据表中，不会暴露给学生。",

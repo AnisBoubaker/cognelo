@@ -360,7 +360,7 @@ export const api = {
     activityId: string,
     input: {
       tests: Array<Omit<CodingExerciseHiddenTest, "orderIndex" | "metadata" | "createdAt" | "updatedAt"> & { orderIndex?: number }>;
-      sampleTests: Array<{ id: string; input: string; output: string; explanation: string }>;
+      sampleTests: Array<{ id: string; input: string; output: string; title: string }>;
       referenceSolution: string;
     }
   ) =>
@@ -550,7 +550,7 @@ export const api = {
     activityId: string,
     input: {
       tests: Array<Omit<CodingExerciseHiddenTest, "orderIndex" | "metadata" | "createdAt" | "updatedAt"> & { orderIndex?: number }>;
-      sampleTests: Array<{ id: string; input: string; output: string; explanation: string }>;
+      sampleTests: Array<{ id: string; input: string; output: string; title: string }>;
       referenceSolution: string;
     }
   ) =>

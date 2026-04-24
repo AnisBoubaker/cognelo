@@ -417,7 +417,7 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
   const config = parseCodingExerciseConfig(params.activityConfig);
   const sampleTests = params.sampleTests.map((test) => ({
     id: test.id,
-    name: test.explanation.trim() || test.id,
+    name: test.title.trim() || test.id,
     stdin: test.input,
     expectedOutput: test.output,
     testCode: test.testCode,

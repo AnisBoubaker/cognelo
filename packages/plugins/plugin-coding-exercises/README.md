@@ -12,10 +12,9 @@ Teachers will be able to:
 
 - write a programming prompt
 - choose the learner language/runtime
-- choose whether students write a full program, a full function definition, or a code snippet inserted into a hidden template
 - provide starter code and visible sample tests
 - add optional per-test harness code for visible and hidden tests
-- provide hidden support code and a hidden template scaffold with a `{{ STUDENT_CODE }}` insertion marker when the exercise needs private helpers or scaffolding
+- provide hidden support code and a hidden template scaffold with a `{{ STUDENT_CODE }}` insertion marker, including for exercises that would otherwise be plain full-program prompts
 - choose which scaffold lines remain visible to students while hidden blocks collapse to a language-appropriate `Hidden code` placeholder
 - define hidden tests and grading rules
 - run submissions against a remote Judge0 service
@@ -57,7 +56,6 @@ The first implementation pass keeps only student-visible fields in `Activity.con
 
 - `prompt`
 - `language`
-- `executionMode`
 - `starterCode`
 - `studentTemplateSource`
 - `sampleTests`
