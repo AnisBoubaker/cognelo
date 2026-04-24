@@ -20,4 +20,5 @@ This file is for coding-exercises-specific memory only.
 - Teacher test authoring uses collapsible sample-test and hidden-test cards with saved validation status and per-test failure details.
 - The same coding-exercise activity UI should work in both course-scoped teacher pages and group-scoped student assigned-activity pages by swapping the API client boundary rather than forking the plugin UI.
 - Group-scoped student coding-exercise access uses assigned-activity routes under `groups/:groupId/activities/assigned/:activityId/...` to avoid route conflicts with teacher assignment-management endpoints.
+- Student coding uses the shared Monaco editor from `@cognelo/activity-ui`, while teacher authoring still uses the in-house editor for the lighter authoring workflow.
 - Plugin-owned user-facing translations should live inside the plugin package rather than in the host app's global i18n file.

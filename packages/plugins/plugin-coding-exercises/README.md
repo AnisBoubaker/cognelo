@@ -18,7 +18,7 @@ Teachers will be able to:
 
 Students will be able to:
 
-- read the prompt and write code in the shared editor
+- read the prompt and write code in the shared Monaco editor
 - run code against visible examples
 - submit code for evaluation against hidden tests
 - resume their work and review prior results
