@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import Editor, { type Monaco } from "@monaco-editor/react";
+import { useMemo, useRef } from "react";
+import Editor, { type Monaco, type OnMount } from "@monaco-editor/react";
 import { normalizeMonacoLanguage } from "./code-language";
 
 let hasRegisteredCogneloTheme = false;
@@ -14,6 +14,8 @@ type MonacoCodeEditorProps = {
   id?: string;
   ariaLabel?: string;
   readOnly?: boolean;
+  readOnlyPrefix?: string;
+  readOnlySuffix?: string;
 };
 
 export function MonacoCodeEditor({
@@ -23,9 +25,14 @@ export function MonacoCodeEditor({
   minHeight = 260,
   id,
   ariaLabel,
-  readOnly = false
+  readOnly = false,
+  readOnlyPrefix = "",
+  readOnlySuffix = ""
 }: MonacoCodeEditorProps) {
   const editorLanguage = useMemo(() => normalizeMonacoLanguage(language), [language]);
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const monacoRef = useRef<Monaco | null>(null);
+  const displayedValue = `${readOnlyPrefix}${value}${readOnlySuffix}`;
 
   return (
     <div
@@ -40,10 +47,33 @@ export function MonacoCodeEditor({
     >
       <Editor
         beforeMount={configureMonaco}
+        onMount={handleEditorMount}
         defaultLanguage={editorLanguage}
         height={minHeight}
         language={editorLanguage}
-        onChange={(nextValue) => onChange(nextValue ?? "")}
+        onChange={(nextValue) => {
+          const nextText = nextValue ?? "";
+
+          if (readOnly || (!readOnlyPrefix && !readOnlySuffix)) {
+            onChange(nextText);
+            return;
+          }
+
+          if (!nextText.startsWith(readOnlyPrefix) || !nextText.endsWith(readOnlySuffix)) {
+            const editor = editorRef.current;
+            const model = editor?.getModel();
+            if (editor && model && model.getValue() !== displayedValue) {
+              model.setValue(displayedValue);
+              const editableRange = getEditableMonacoRange(monacoRef.current, displayedValue, readOnlyPrefix, value);
+              if (editableRange) {
+                editor.setSelection(editableRange);
+              }
+            }
+            return;
+          }
+
+          onChange(nextText.slice(readOnlyPrefix.length, nextText.length - readOnlySuffix.length));
+        }}
         options={{
           ariaLabel,
           automaticLayout: true,
@@ -74,10 +104,15 @@ export function MonacoCodeEditor({
         }}
         path={id}
         theme="cognelo-light"
-        value={value}
+        value={displayedValue}
       />
     </div>
   );
+
+  function handleEditorMount(editor: Parameters<OnMount>[0], monaco: Monaco) {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+  }
 }
 
 function configureMonaco(monaco: Monaco) {
@@ -97,6 +132,27 @@ function configureMonaco(monaco: Monaco) {
     });
     hasRegisteredCogneloTheme = true;
   }
-
   monaco.editor.setTheme("cognelo-light");
+}
+
+function getEditableMonacoRange(monaco: Monaco | null, displayedValue: string, readOnlyPrefix: string, studentValue: string) {
+  if (!monaco) {
+    return null;
+  }
+
+  const startOffset = readOnlyPrefix.length;
+  const endOffset = readOnlyPrefix.length + studentValue.length;
+  const startPosition = getPositionFromOffset(displayedValue, startOffset);
+  const endPosition = getPositionFromOffset(displayedValue, endOffset);
+
+  return new monaco.Range(startPosition.lineNumber, startPosition.column, endPosition.lineNumber, endPosition.column);
+}
+
+function getPositionFromOffset(value: string, offset: number) {
+  const beforeOffset = value.slice(0, offset);
+  const lines = beforeOffset.split("\n");
+  return {
+    lineNumber: lines.length,
+    column: (lines.at(-1)?.length ?? 0) + 1
+  };
 }

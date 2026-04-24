@@ -31,12 +31,15 @@ export const codingExercisesPlugin: ActivityPlugin = {
       defaultConfig: {
         prompt: "Write a program that reads a name and prints `Hello, <name>!`.",
         language: "python",
+        executionMode: "program",
         starterCode: "name = input().strip()\n# Write your solution below\n",
+        studentTemplateSource: "",
         sampleTests: [
           {
             id: "sample-1",
             input: "Ada",
             output: "Hello, Ada!",
+            testCode: "",
             explanation: "The program should greet the provided name."
           }
         ],

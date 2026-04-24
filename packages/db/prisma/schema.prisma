@@ -362,6 +362,7 @@ model PluginCodingExerciseReferenceSolution {
   id                String   @id @default(cuid())
   activityId        String   @unique
   sourceCode        String
+  privateConfig     Json     @default("{}")
   validationSummary Json     @default("{}")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

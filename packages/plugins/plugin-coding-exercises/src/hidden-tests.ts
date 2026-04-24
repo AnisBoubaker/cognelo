@@ -14,6 +14,7 @@ type HiddenTestRecord = {
   name: string;
   stdin: string;
   expectedOutput: string;
+  testCode: string;
   isEnabled: boolean;
   weight: number;
   orderIndex: number;
@@ -64,8 +65,10 @@ export async function replaceCodingExerciseHiddenTests(params: {
     sampleTests: input.sampleTests,
     hiddenTests: input.tests.map((test, index) => ({
       ...test,
+      testCode: test.testCode,
       orderIndex: index
-    }))
+    })),
+    privateConfig: input.privateConfig
   });
 
   if (!validationSummary.accepted) {
@@ -133,7 +136,9 @@ export async function replaceCodingExerciseHiddenTests(params: {
           orderIndex: index,
           isEnabled: test.isEnabled,
           weight: test.weight,
-          metadata: {} as Prisma.InputJsonValue
+          metadata: {
+            testCode: test.testCode
+          } as Prisma.InputJsonValue
         }))
       });
     }
@@ -143,10 +148,12 @@ export async function replaceCodingExerciseHiddenTests(params: {
       create: {
         activityId: params.activityId,
         sourceCode: input.referenceSolution,
+        privateConfig: input.privateConfig as Prisma.InputJsonValue,
         validationSummary: validationSummary as Prisma.InputJsonValue
       },
       update: {
         sourceCode: input.referenceSolution,
+        privateConfig: input.privateConfig as Prisma.InputJsonValue,
         validationSummary: validationSummary as Prisma.InputJsonValue
       }
     });
@@ -172,6 +179,7 @@ function toHiddenTestRecord(test: {
     name: test.name,
     stdin: test.stdin,
     expectedOutput: test.expectedOutput,
+    testCode: getHiddenTestCode(test.metadata),
     isEnabled: test.isEnabled,
     weight: test.weight,
     orderIndex: test.orderIndex,
@@ -179,4 +187,9 @@ function toHiddenTestRecord(test: {
     createdAt: test.createdAt.toISOString(),
     updatedAt: test.updatedAt.toISOString()
   };
+}
+
+function getHiddenTestCode(value: unknown) {
+  const metadata = normalizeMetadata(value);
+  return typeof metadata.testCode === "string" ? metadata.testCode : "";
 }

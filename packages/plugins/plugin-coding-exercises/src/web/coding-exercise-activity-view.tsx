@@ -2,7 +2,19 @@
 
 import { type CSSProperties, type FormEvent, useEffect, useRef, useState } from "react";
 import { CodeEditor, MonacoCodeEditor, codeLanguageOptions } from "@cognelo/activity-ui";
-import { normalizeCodingExerciseSampleTests, parseCodingExerciseConfig, type CodingExerciseConfig } from "../coding-exercises";
+import {
+  buildCodingExerciseStudentTemplateProjectionFromSource,
+  buildCodingExerciseStudentTemplateSource,
+  buildCodingExerciseTemplateSource,
+  codingExerciseTemplateInsertionToken,
+  normalizeCodingExerciseSampleTests,
+  parseCodingExerciseConfig,
+  parseCodingExercisePrivateConfig,
+  splitCodingExerciseTemplateSource,
+  type CodingExerciseConfig,
+  type CodingExerciseExecutionMode,
+  type CodingExercisePrivateConfig
+} from "../coding-exercises";
 import { formatCodingExercisesMessage, normalizeCodingExercisesLocale, type CodingExercisesLocale } from "./messages";
 
 type ActivityLike = {
@@ -17,6 +29,7 @@ type HiddenTest = {
   name: string;
   stdin: string;
   expectedOutput: string;
+  testCode: string;
   isEnabled: boolean;
   weight: number;
   orderIndex?: number;
@@ -64,16 +77,22 @@ type CodingExerciseClient = {
   listHiddenTests: (
     courseId: string,
     activityId: string
-  ) => Promise<{ tests: HiddenTest[]; referenceSolution: { sourceCode: string; validationSummary: Record<string, unknown> } | null }>;
+  ) => Promise<{
+    tests: HiddenTest[];
+    referenceSolution: { sourceCode: string; privateConfig: CodingExercisePrivateConfig; validationSummary: Record<string, unknown> } | null;
+  }>;
   saveHiddenTests: (
     courseId: string,
     activityId: string,
-    input: { tests: HiddenTest[]; sampleTests: SampleTest[]; referenceSolution: string }
-  ) => Promise<{ tests: HiddenTest[]; referenceSolution: { sourceCode: string; validationSummary: Record<string, unknown> } | null }>;
+    input: { tests: HiddenTest[]; sampleTests: SampleTest[]; referenceSolution: string; privateConfig: CodingExercisePrivateConfig }
+  ) => Promise<{
+    tests: HiddenTest[];
+    referenceSolution: { sourceCode: string; privateConfig: CodingExercisePrivateConfig; validationSummary: Record<string, unknown> } | null;
+  }>;
   runCode: (
     courseId: string,
     activityId: string,
-    input: { sourceCode: string; stdin?: string; expectedOutput?: string }
+    input: { sourceCode: string; stdin?: string; expectedOutput?: string; testCode?: string }
   ) => Promise<{ execution: CodingExecution }>;
   listRuns: (courseId: string, activityId: string) => Promise<{ executions: CodingExecution[] }>;
   submitCode: (courseId: string, activityId: string, input: { sourceCode: string }) => Promise<{ execution: CodingExecution }>;
@@ -92,10 +111,14 @@ type CodingExerciseActivityViewProps = {
 const fallbackConfig: CodingExerciseConfig = {
   prompt: "",
   language: "python",
+  executionMode: "program",
   starterCode: "",
+  studentTemplateSource: "",
   sampleTests: [],
   maxEditorSeconds: 1800
 };
+
+const disabledCodingExerciseLanguages = new Set(["javascript"]);
 
 export function CodingExerciseActivityView({
   activity,
@@ -108,12 +131,16 @@ export function CodingExerciseActivityView({
   const pluginLocale = normalizeCodingExercisesLocale(locale);
   const t = (key: Parameters<typeof formatCodingExercisesMessage>[1], values?: Record<string, string | number>) =>
     formatCodingExercisesMessage(pluginLocale, key, values);
+  const codingExerciseLanguageOptions = codeLanguageOptions.map((option) => ({
+    ...option,
+    disabled: disabledCodingExerciseLanguages.has(option.value)
+  }));
   const previousActivityIdRef = useRef(activity.id);
   const [title, setTitle] = useState(activity.title);
-  const [description, setDescription] = useState(activity.description);
   const [config, setConfig] = useState<CodingExerciseConfig>(() => parseCodingExerciseConfig(activity.config ?? fallbackConfig));
   const [hiddenTests, setHiddenTests] = useState<HiddenTest[]>([]);
   const [referenceSolution, setReferenceSolution] = useState("");
+  const [privateConfig, setPrivateConfig] = useState<CodingExercisePrivateConfig>(() => parseCodingExercisePrivateConfig({}));
   const [referenceValidationSummary, setReferenceValidationSummary] = useState<Record<string, unknown> | null>(null);
   const [expandedSampleTestIds, setExpandedSampleTestIds] = useState<string[]>([]);
   const [expandedHiddenTestIds, setExpandedHiddenTestIds] = useState<string[]>([]);
@@ -123,6 +150,8 @@ export function CodingExerciseActivityView({
   const [editorCode, setEditorCode] = useState("");
   const [sampleInput, setSampleInput] = useState("");
   const [sampleExpectedOutput, setSampleExpectedOutput] = useState("");
+  const [sampleTestCode, setSampleTestCode] = useState("");
+  const [selectedSampleTestId, setSelectedSampleTestId] = useState("");
   const [runExecution, setRunExecution] = useState<CodingExecution | null>(null);
   const [submitExecution, setSubmitExecution] = useState<CodingExecution | null>(null);
   const [recentRuns, setRecentRuns] = useState<CodingExecution[]>([]);
@@ -130,22 +159,43 @@ export function CodingExerciseActivityView({
   const [workingAction, setWorkingAction] = useState<"run" | "submit" | null>(null);
   const sampleValidationTests = getReferenceValidationTests(referenceValidationSummary, "sampleTests");
   const hiddenValidationTests = getReferenceValidationTests(referenceValidationSummary, "hiddenTests");
+  const templateProjection =
+    config.executionMode === "template"
+      ? buildCodingExerciseStudentTemplateProjectionFromSource(config.studentTemplateSource)
+      : null;
+
+  useEffect(() => {
+    if (typeof document === "undefined" || document.getElementById("coding-exercise-spinner-style")) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = "coding-exercise-spinner-style";
+    style.textContent = "@keyframes coding-exercise-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }";
+    document.head.appendChild(style);
+
+    return () => {
+      style.remove();
+    };
+  }, []);
 
   useEffect(() => {
     const isNewActivity = previousActivityIdRef.current !== activity.id;
     const nextConfig = parseCodingExerciseConfig(activity.config ?? fallbackConfig);
     const sampleTests = normalizeCodingExerciseSampleTests(nextConfig.sampleTests);
     setTitle(activity.title);
-    setDescription(activity.description);
     setConfig(nextConfig);
     setEditorCode(nextConfig.starterCode);
+    setSelectedSampleTestId(sampleTests[0]?.id ?? "");
     setSampleInput(sampleTests[0]?.input ?? "");
     setSampleExpectedOutput(sampleTests[0]?.output ?? "");
+    setSampleTestCode(sampleTests[0]?.testCode ?? "");
     setRunExecution(null);
     setSubmitExecution(null);
     if (isNewActivity) {
       setHiddenTests([]);
       setReferenceSolution("");
+      setPrivateConfig(parseCodingExercisePrivateConfig({}));
       setReferenceValidationSummary(null);
       setExpandedSampleTestIds([]);
       setExpandedHiddenTestIds([]);
@@ -165,6 +215,7 @@ export function CodingExerciseActivityView({
       .then((result) => {
         setHiddenTests(result.tests);
         setReferenceSolution(result.referenceSolution?.sourceCode ?? "");
+        setPrivateConfig(parseCodingExercisePrivateConfig(result.referenceSolution?.privateConfig ?? {}));
         setReferenceValidationSummary(result.referenceSolution?.validationSummary ?? null);
       })
       .catch((err) => setError(err instanceof Error ? err.message : t("loadHiddenTestsError")));
@@ -205,6 +256,7 @@ export function CodingExerciseActivityView({
           id: nextId,
           input: "",
           output: "",
+          testCode: "",
           explanation: ""
         }
       ]
@@ -234,6 +286,7 @@ export function CodingExerciseActivityView({
         name: `Hidden test ${current.length + 1}`,
         stdin: "",
         expectedOutput: "",
+        testCode: "",
         isEnabled: true,
         weight: 1,
         orderIndex: current.length
@@ -242,8 +295,29 @@ export function CodingExerciseActivityView({
     setExpandedHiddenTestIds((current) => [...current, nextId]);
   }
 
+  function applySampleTest(testId: string) {
+    const selectedTest = normalizeCodingExerciseSampleTests(config.sampleTests).find((test) => test.id === testId);
+    setSelectedSampleTestId(testId);
+    setSampleInput(selectedTest?.input ?? "");
+    setSampleExpectedOutput(selectedTest?.output ?? "");
+    setSampleTestCode(selectedTest?.testCode ?? "");
+  }
+
   function removeHiddenTest(index: number) {
     setHiddenTests((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  }
+
+  function toggleTemplateVisibleLine(lineIndex: number) {
+    setPrivateConfig((current) => {
+      const visibleLineNumbers = current.templateVisibleLineNumbers.includes(lineIndex)
+        ? current.templateVisibleLineNumbers.filter((value) => value !== lineIndex)
+        : [...current.templateVisibleLineNumbers, lineIndex].sort((left, right) => left - right);
+
+      return {
+        ...current,
+        templateVisibleLineNumbers: visibleLineNumbers
+      };
+    });
   }
 
   function toggleSampleTest(testId: string) {
@@ -265,13 +339,31 @@ export function CodingExerciseActivityView({
     setSaveMessage("");
 
     try {
+      const normalizedPrivateConfig = getPersistedPrivateConfig(privateConfig);
+
+      if (
+        config.executionMode === "template" &&
+        !normalizedPrivateConfig.templateSource.includes(codingExerciseTemplateInsertionToken)
+      ) {
+        throw new Error(t("templateSourceMissingMarker"));
+      }
+
       await onSave({
         title,
-        description,
+        description: config.prompt,
         config: {
           prompt: config.prompt,
           language: config.language,
+          executionMode: config.executionMode,
           starterCode: config.starterCode,
+          studentTemplateSource:
+            config.executionMode === "template"
+              ? buildCodingExerciseStudentTemplateSource(
+                  normalizedPrivateConfig.templateSource,
+                  normalizedPrivateConfig.templateVisibleLineNumbers,
+                  config.language
+                )
+              : "",
           sampleTests: normalizeCodingExerciseSampleTests(config.sampleTests),
           maxEditorSeconds: config.maxEditorSeconds
         }
@@ -284,10 +376,12 @@ export function CodingExerciseActivityView({
             orderIndex: index
           })),
           sampleTests: normalizeCodingExerciseSampleTests(config.sampleTests),
-          referenceSolution
+          referenceSolution,
+          privateConfig: normalizedPrivateConfig
         });
         setHiddenTests(result.tests);
         setReferenceSolution(result.referenceSolution?.sourceCode ?? "");
+        setPrivateConfig(parseCodingExercisePrivateConfig(result.referenceSolution?.privateConfig ?? {}));
         setReferenceValidationSummary(result.referenceSolution?.validationSummary ?? null);
       }
 
@@ -316,7 +410,8 @@ export function CodingExerciseActivityView({
       const result = await codingClient.runCode(course.id, activity.id, {
         sourceCode: editorCode,
         stdin: sampleInput,
-        expectedOutput: sampleExpectedOutput
+        expectedOutput: sampleExpectedOutput,
+        testCode: sampleTestCode
       });
       setRunExecution(result.execution);
       const runs = await codingClient.listRuns(course.id, activity.id);
@@ -360,23 +455,45 @@ export function CodingExerciseActivityView({
           </div>
 
           <div className="field">
-            <label htmlFor="coding-description">{t("description")}</label>
-            <textarea id="coding-description" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />
-          </div>
-
-          <div className="field">
             <label htmlFor="coding-language">{t("language")}</label>
             <select
               id="coding-language"
               value={config.language}
-              onChange={(event) => setConfig((current) => ({ ...current, language: event.target.value }))}
+              onChange={(event) => {
+                const nextLanguage = event.target.value;
+                if (disabledCodingExerciseLanguages.has(nextLanguage)) {
+                  return;
+                }
+                setConfig((current) => ({ ...current, language: nextLanguage }));
+              }}
             >
-              {codeLanguageOptions.map((option) => (
-                <option key={option.value} value={option.value}>
+              {codingExerciseLanguageOptions.map((option) => (
+                <option key={option.value} value={option.value} disabled={option.disabled}>
                   {option.label}
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="field">
+            <label htmlFor="coding-execution-mode">{t("executionMode")}</label>
+            <select
+              id="coding-execution-mode"
+              value={config.executionMode}
+              onChange={(event) =>
+                setConfig((current) => ({
+                  ...current,
+                  executionMode: event.target.value as CodingExerciseExecutionMode
+                }))
+              }
+            >
+              <option value="program">{t("executionModeProgram")}</option>
+              <option value="function">{t("executionModeFunction")}</option>
+              <option value="template">{t("executionModeTemplate")}</option>
+            </select>
+            <p className="muted" style={{ margin: 0 }}>
+              {t("executionModeHelp")}
+            </p>
           </div>
 
           <div className="field">
@@ -415,6 +532,63 @@ export function CodingExerciseActivityView({
             ) : null}
           </div>
 
+          <div className="stack">
+            <span>{t("hiddenSupportCode")}</span>
+            <p className="muted" style={{ margin: 0 }}>
+              {t("hiddenSupportCodeHelp")}
+            </p>
+            <CodeEditor
+              value={privateConfig.hiddenSupportCode}
+              onChange={(value) => setPrivateConfig((current) => ({ ...current, hiddenSupportCode: value }))}
+              language={config.language}
+              minHeight={180}
+            />
+          </div>
+
+          {config.executionMode === "template" ? (
+            <div className="stack">
+              <span>{t("templateSource")}</span>
+              <p className="muted" style={{ margin: 0 }}>
+                {t("templateSourceHelp")}
+              </p>
+              <p className="muted" style={{ margin: 0 }}>
+                {t("templateVisibleLinesHelp")}
+              </p>
+              <CodeEditor
+                value={privateConfig.templateSource || buildCodingExerciseTemplateSource("", "")}
+                onChange={(value) =>
+                  setPrivateConfig((current) => {
+                    const nextTemplate = value || buildCodingExerciseTemplateSource("", "");
+                    const templateParts = splitCodingExerciseTemplateSource(nextTemplate);
+                    return {
+                      ...current,
+                      templateSource: nextTemplate,
+                      templateVisibleLineNumbers: current.templateVisibleLineNumbers.filter(
+                        (lineNumber) => lineNumber < nextTemplate.split("\n").length
+                      ),
+                      templatePrefix: templateParts.prefix,
+                      templateSuffix: templateParts.suffix
+                    };
+                  })
+                }
+                language={config.language}
+                getLineClassName={(lineIndex) =>
+                  privateConfig.templateVisibleLineNumbers.includes(lineIndex)
+                    ? "coding-exercise-template-line is-visible"
+                    : "coding-exercise-template-line"
+                }
+                leftRail={renderTemplateVisibilityRail(
+                  (privateConfig.templateSource || buildCodingExerciseTemplateSource("", "")).split("\n"),
+                  privateConfig.templateVisibleLineNumbers,
+                  toggleTemplateVisibleLine,
+                  t
+                )}
+                leftRailWidth={20}
+                minHeight={260}
+              />
+            </div>
+          ) : null}
+
           <div className="field">
             <label htmlFor="coding-max-editor-seconds">{t("editorTimeLimit")}</label>
             <input
@@ -451,7 +625,7 @@ export function CodingExerciseActivityView({
                     <span>{getSampleTestSummary(test)}</span>
                   </span>
                   <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <ValidationBadge result={sampleValidationTests.get(test.id)} locale={pluginLocale} />
+                    <ValidationBadge result={sampleValidationTests.get(test.id)} locale={pluginLocale} loading={saving} />
                   </span>
                 </button>
                 {expandedSampleTestIds.includes(test.id) ? (
@@ -468,6 +642,18 @@ export function CodingExerciseActivityView({
                     <div className="field">
                       <label>{t("expectedOutput")}</label>
                       <textarea rows={3} value={test.output} onChange={(event) => updateSampleTest(index, "output", event.target.value)} />
+                    </div>
+                    <div className="stack">
+                      <span>{t("testHarnessCode")}</span>
+                      <p className="muted" style={{ margin: 0 }}>
+                        {t("testHarnessCodeHelp")}
+                      </p>
+                      <CodeEditor
+                        value={test.testCode}
+                        onChange={(value) => updateSampleTest(index, "testCode", value)}
+                        language={config.language}
+                        minHeight={160}
+                      />
                     </div>
                     <div className="field">
                       <label>{t("explanation")}</label>
@@ -504,7 +690,11 @@ export function CodingExerciseActivityView({
                     <span>{test.name}</span>
                   </span>
                   <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <ValidationBadge result={test.isEnabled ? hiddenValidationTests.get(test.id) : undefined} locale={pluginLocale} />
+                    <ValidationBadge
+                      result={test.isEnabled ? hiddenValidationTests.get(test.id) : undefined}
+                      locale={pluginLocale}
+                      loading={saving && test.isEnabled}
+                    />
                   </span>
                 </button>
                 {expandedHiddenTestIds.includes(test.id) ? (
@@ -532,6 +722,18 @@ export function CodingExerciseActivityView({
                         rows={3}
                         value={test.expectedOutput}
                         onChange={(event) => updateHiddenTest(index, "expectedOutput", event.target.value)}
+                      />
+                    </div>
+                    <div className="stack">
+                      <span>{t("testHarnessCode")}</span>
+                      <p className="muted" style={{ margin: 0 }}>
+                        {t("testHarnessCodeHelp")}
+                      </p>
+                      <CodeEditor
+                        value={test.testCode}
+                        onChange={(value) => updateHiddenTest(index, "testCode", value)}
+                        language={config.language}
+                        minHeight={160}
                       />
                     </div>
                     <div
@@ -591,8 +793,19 @@ export function CodingExerciseActivityView({
       ) : (
         <div className="stack">
           <h2>{activity.title}</h2>
-          {activity.description ? <p className="muted">{activity.description}</p> : null}
           <p>{config.prompt}</p>
+          {config.executionMode === "template" ? (
+            <MonacoCodeEditor
+              id={`coding-exercise-student-${activity.id}`}
+              ariaLabel={activity.title || t("starterCode")}
+              value={editorCode}
+              onChange={setEditorCode}
+              language={config.language}
+              minHeight={360}
+              readOnlyPrefix={templateProjection?.readOnlyPrefix}
+              readOnlySuffix={templateProjection?.readOnlySuffix}
+            />
+          ) : (
           <MonacoCodeEditor
             id={`coding-exercise-student-${activity.id}`}
             ariaLabel={activity.title || t("starterCode")}
@@ -601,9 +814,26 @@ export function CodingExerciseActivityView({
             language={config.language}
             minHeight={360}
           />
+          )}
 
           <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
             <h3>{t("sampleRun")}</h3>
+            {normalizeCodingExerciseSampleTests(config.sampleTests).length ? (
+              <div className="field">
+                <label htmlFor="coding-visible-sample">{t("visibleSampleTests")}</label>
+                <select
+                  id="coding-visible-sample"
+                  value={selectedSampleTestId}
+                  onChange={(event) => applySampleTest(event.target.value)}
+                >
+                  {normalizeCodingExerciseSampleTests(config.sampleTests).map((test) => (
+                    <option key={test.id} value={test.id}>
+                      {getSampleTestSummary(test)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             <div className="field">
               <label>{t("sampleInput")}</label>
               <textarea rows={4} value={sampleInput} onChange={(event) => setSampleInput(event.target.value)} />
@@ -611,6 +841,13 @@ export function CodingExerciseActivityView({
             <div className="field">
               <label>{t("expectedOutput")}</label>
               <textarea rows={4} value={sampleExpectedOutput} onChange={(event) => setSampleExpectedOutput(event.target.value)} />
+            </div>
+            <div className="stack">
+              <span>{t("testHarnessCode")}</span>
+              <p className="muted" style={{ margin: 0 }}>
+                {t("visibleTestHarnessHelp")}
+              </p>
+              <CodeEditor value={sampleTestCode} onChange={setSampleTestCode} language={config.language} minHeight={160} />
             </div>
             <div className="row">
               <button type="button" onClick={runCode} disabled={workingAction === "run"}>
@@ -666,6 +903,26 @@ function normalizeObject(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
+function getPersistedPrivateConfig(privateConfig: CodingExercisePrivateConfig): CodingExercisePrivateConfig {
+  const templateSource =
+    typeof privateConfig.templateSource === "string" && privateConfig.templateSource.length > 0
+      ? privateConfig.templateSource
+      : buildCodingExerciseTemplateSource(privateConfig.templatePrefix ?? "", privateConfig.templateSuffix ?? "");
+  const templateParts = splitCodingExerciseTemplateSource(templateSource);
+  const lineCount = templateSource.split("\n").length;
+  const templateVisibleLineNumbers = privateConfig.templateVisibleLineNumbers
+    .filter((lineNumber) => Number.isInteger(lineNumber) && lineNumber >= 0 && lineNumber < lineCount)
+    .sort((left, right) => left - right);
+
+  return {
+    ...privateConfig,
+    templateSource,
+    templateVisibleLineNumbers,
+    templatePrefix: templateParts.prefix,
+    templateSuffix: templateParts.suffix
+  };
+}
+
 function isApiErrorLike(value: unknown): value is { code?: string; details?: unknown } {
   return value instanceof Error && "code" in value;
 }
@@ -693,7 +950,62 @@ function getSampleTestSummary(test: SampleTest) {
   return test.explanation.trim() || test.id;
 }
 
-function ValidationBadge({ result, locale }: { result?: ReferenceValidationTestResult; locale: CodingExercisesLocale }) {
+function renderTemplateVisibilityRail(
+  templateLines: string[],
+  visibleLineNumbers: number[],
+  toggleTemplateVisibleLine: (lineIndex: number) => void,
+  t: (key: Parameters<typeof formatCodingExercisesMessage>[1], values?: Record<string, string | number>) => string
+) {
+  const visibleLines = new Set(visibleLineNumbers);
+
+  return (
+    <div className="parsons-editor-rail parsons-editor-selection-rail">
+      {templateLines.map((_, lineIndex) => {
+        const selected = visibleLines.has(lineIndex);
+        const isStudentInsertionLine = templateLines[lineIndex]?.includes(codingExerciseTemplateInsertionToken);
+        return (
+          <button
+            key={`template-visible-line-${lineIndex}`}
+            type="button"
+            aria-label={t("templateVisibleLine", { line: lineIndex + 1 })}
+            title={t("templateVisibleLine", { line: lineIndex + 1 })}
+            disabled={isStudentInsertionLine}
+            onClick={() => toggleTemplateVisibleLine(lineIndex)}
+            className={`parsons-line-marker ${selected ? "is-selected" : ""} ${isStudentInsertionLine ? "is-disabled" : ""}`}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function ValidationBadge({
+  result,
+  locale,
+  loading = false
+}: {
+  result?: ReferenceValidationTestResult;
+  locale: CodingExercisesLocale;
+  loading?: boolean;
+}) {
+  if (loading) {
+    return (
+      <span
+        aria-label={formatCodingExercisesMessage(locale, "saving")}
+        style={{
+          animation: "coding-exercise-spin 0.8s linear infinite",
+          border: "2px solid rgba(13, 27, 71, 0.15)",
+          borderRadius: "50%",
+          borderTopColor: "#0d1b47",
+          boxSizing: "border-box",
+          display: "inline-block",
+          height: 16,
+          width: 16
+        }}
+      />
+    );
+  }
+
   if (!result) {
     return null;
   }

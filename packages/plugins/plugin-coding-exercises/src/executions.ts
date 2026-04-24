@@ -2,7 +2,13 @@ import { Prisma, prisma } from "@cognelo/db";
 import { getServerEnv } from "@cognelo/config";
 import { AppError } from "@cognelo/core";
 import { z } from "zod";
-import { parseCodingExerciseConfig, type CodingExerciseSampleTest } from "./coding-exercises";
+import {
+  buildCodingExerciseSource,
+  parseCodingExerciseConfig,
+  parseCodingExercisePrivateConfig,
+  type CodingExercisePrivateConfig,
+  type CodingExerciseSampleTest
+} from "./coding-exercises";
 import { resolveJudge0Language, runJudge0Submission } from "./judge0";
 
 type CodingExerciseExecutionRow = {
@@ -40,6 +46,7 @@ const codingExerciseExecutionClient = prisma as typeof prisma & {
       args: Prisma.PluginCodingExerciseReferenceSolutionFindUniqueArgs
     ): Promise<{
       sourceCode: string;
+      privateConfig: unknown;
       validationSummary: unknown;
       createdAt: Date;
       updatedAt: Date;
@@ -50,7 +57,8 @@ const codingExerciseExecutionClient = prisma as typeof prisma & {
 export const codingExerciseRunInputSchema = z.object({
   sourceCode: z.string().min(1).max(60000),
   stdin: z.string().max(12000).optional().default(""),
-  expectedOutput: z.string().max(12000).optional().default("")
+  expectedOutput: z.string().max(12000).optional().default(""),
+  testCode: z.string().max(40000).optional().default("")
 });
 
 export type CodingExerciseRunInput = z.infer<typeof codingExerciseRunInputSchema>;
@@ -64,6 +72,7 @@ type HiddenTestCase = {
   name: string;
   stdin: string;
   expectedOutput: string;
+  testCode: string;
   isEnabled: boolean;
   weight: number;
   orderIndex: number;
@@ -74,15 +83,45 @@ type ReferenceValidationTestCase = {
   name: string;
   stdin: string;
   expectedOutput: string;
+  testCode: string;
   weight: number;
 };
 
 type ReferenceSolutionValidationRecord = {
   sourceCode: string;
+  privateConfig: CodingExercisePrivateConfig;
   validationSummary: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 };
+
+function getHiddenTestCode(value: unknown) {
+  const metadata =
+    value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  return typeof metadata?.testCode === "string" ? metadata.testCode : "";
+}
+
+function toHiddenTestCase(test: {
+  id: string;
+  name: string;
+  stdin: string;
+  expectedOutput: string;
+  isEnabled: boolean;
+  weight: number;
+  orderIndex: number;
+  metadata: unknown;
+}): HiddenTestCase {
+  return {
+    id: test.id,
+    name: test.name,
+    stdin: test.stdin,
+    expectedOutput: test.expectedOutput,
+    testCode: getHiddenTestCode(test.metadata),
+    isEnabled: test.isEnabled,
+    weight: test.weight,
+    orderIndex: test.orderIndex
+  };
+}
 
 export async function runCodingExercise(params: {
   activityId: string;
@@ -93,7 +132,14 @@ export async function runCodingExercise(params: {
   const env = getServerEnv();
   const config = parseCodingExerciseConfig(params.activityConfig);
   const input = codingExerciseRunInputSchema.parse(params.input);
+  const privateConfig = await getCodingExercisePrivateConfig({ activityId: params.activityId });
   const runtime = await resolveJudge0Language(config.language);
+  const sourceCode = buildCodingExerciseSource({
+    config,
+    privateConfig,
+    studentSourceCode: input.sourceCode,
+    testCode: input.testCode
+  });
 
   const pendingExecution = await codingExerciseExecutionClient.pluginCodingExerciseExecution.create({
     data: {
@@ -108,6 +154,7 @@ export async function runCodingExercise(params: {
       expectedOutput: input.expectedOutput,
       resultSummary: {
         judge0LanguageName: runtime.languageName,
+        executionMode: config.executionMode,
         phase: "pending"
       } as Prisma.InputJsonValue
     }
@@ -116,7 +163,7 @@ export async function runCodingExercise(params: {
   try {
     const result = await runJudge0Submission({
       languageId: runtime.languageId,
-      sourceCode: input.sourceCode,
+      sourceCode,
       stdin: input.stdin,
       expectedOutput: input.expectedOutput,
       cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
@@ -142,6 +189,7 @@ export async function runCodingExercise(params: {
         resultSummary: {
           judge0LanguageName: runtime.languageName,
           accepted: result.status?.id === 3,
+          executionMode: config.executionMode,
           phase: "finished"
         } as Prisma.InputJsonValue
       }
@@ -194,13 +242,15 @@ export async function submitCodingExercise(params: {
   const env = getServerEnv();
   const config = parseCodingExerciseConfig(params.activityConfig);
   const input = codingExerciseSubmitInputSchema.parse(params.input);
+  const privateConfig = await getCodingExercisePrivateConfig({ activityId: params.activityId });
   const runtime = await resolveJudge0Language(config.language);
   const hiddenTests = await prisma.pluginCodingExerciseHiddenTest.findMany({
     where: { activityId: params.activityId, isEnabled: true },
     orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }]
   });
+  const normalizedHiddenTests = hiddenTests.map((hiddenTest) => toHiddenTestCase(hiddenTest));
 
-  if (!hiddenTests.length) {
+  if (!normalizedHiddenTests.length) {
     throw new AppError(400, "HIDDEN_TESTS_REQUIRED", "This coding exercise does not have any enabled hidden tests yet.");
   }
 
@@ -217,8 +267,9 @@ export async function submitCodingExercise(params: {
       expectedOutput: "",
       resultSummary: {
         judge0LanguageName: runtime.languageName,
+        executionMode: config.executionMode,
         phase: "pending",
-        testCount: hiddenTests.length
+        testCount: normalizedHiddenTests.length
       } as Prisma.InputJsonValue
     }
   });
@@ -237,11 +288,17 @@ export async function submitCodingExercise(params: {
     let latestTime: string | null = null;
     let latestMemory: number | null = null;
 
-    for (const hiddenTest of hiddenTests as HiddenTestCase[]) {
+    for (const hiddenTest of normalizedHiddenTests) {
       totalWeight += hiddenTest.weight;
+      const sourceCode = buildCodingExerciseSource({
+        config,
+        privateConfig,
+        studentSourceCode: input.sourceCode,
+        testCode: hiddenTest.testCode
+      });
       const result = await runJudge0Submission({
         languageId: runtime.languageId,
-        sourceCode: input.sourceCode,
+        sourceCode,
         stdin: hiddenTest.stdin,
         expectedOutput: hiddenTest.expectedOutput,
         cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
@@ -296,9 +353,10 @@ export async function submitCodingExercise(params: {
         judge0StatusLabel: latestStatusLabel ?? undefined,
         resultSummary: {
           judge0LanguageName: runtime.languageName,
+          executionMode: config.executionMode,
           phase: "finished",
           accepted,
-          testCount: hiddenTests.length,
+          testCount: normalizedHiddenTests.length,
           passedCount: testResults.filter((test) => test.passed).length,
           earnedWeight,
           totalWeight,
@@ -340,11 +398,21 @@ export async function getCodingExerciseReferenceSolution(params: { activityId: s
   return toReferenceSolutionRecord(referenceSolution);
 }
 
+export async function getCodingExercisePrivateConfig(params: { activityId: string }) {
+  const referenceSolution = await prisma.pluginCodingExerciseReferenceSolution.findUnique({
+    where: { activityId: params.activityId },
+    select: { privateConfig: true }
+  });
+
+  return parseCodingExercisePrivateConfig(referenceSolution?.privateConfig ?? {});
+}
+
 export async function validateReferenceSolutionAgainstHiddenTests(params: {
   activityConfig: unknown;
   sourceCode: string;
   sampleTests: CodingExerciseSampleTest[];
   hiddenTests: HiddenTestCase[];
+  privateConfig: CodingExercisePrivateConfig;
 }) {
   const config = parseCodingExerciseConfig(params.activityConfig);
   const sampleTests = params.sampleTests.map((test) => ({
@@ -352,6 +420,7 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
     name: test.explanation.trim() || test.id,
     stdin: test.input,
     expectedOutput: test.output,
+    testCode: test.testCode,
     weight: 1
   }));
   const enabledHiddenTests = params.hiddenTests
@@ -361,6 +430,7 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
       name: test.name,
       stdin: test.stdin,
       expectedOutput: test.expectedOutput,
+      testCode: test.testCode,
       weight: test.weight
     }));
   const allTestsCount = sampleTests.length + enabledHiddenTests.length;
@@ -397,6 +467,8 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
   const runtime = await resolveJudge0Language(config.language);
   const sampleValidation = await validateReferenceSolutionTestGroup({
     tests: sampleTests,
+    config,
+    privateConfig: params.privateConfig,
     languageId: runtime.languageId,
     sourceCode: params.sourceCode,
     cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
@@ -404,6 +476,8 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
   });
   const hiddenValidation = await validateReferenceSolutionTestGroup({
     tests: enabledHiddenTests,
+    config,
+    privateConfig: params.privateConfig,
     languageId: runtime.languageId,
     sourceCode: params.sourceCode,
     cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
@@ -421,6 +495,8 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
 
 async function validateReferenceSolutionTestGroup(params: {
   tests: ReferenceValidationTestCase[];
+  config: ReturnType<typeof parseCodingExerciseConfig>;
+  privateConfig: CodingExercisePrivateConfig;
   languageId: number;
   sourceCode: string;
   cpuTimeLimit: number;
@@ -443,9 +519,15 @@ async function validateReferenceSolutionTestGroup(params: {
 
   for (const testCase of params.tests) {
     totalWeight += testCase.weight;
+    const composedSourceCode = buildCodingExerciseSource({
+      config: params.config,
+      privateConfig: params.privateConfig,
+      studentSourceCode: params.sourceCode,
+      testCode: testCase.testCode
+    });
     const result = await runJudge0Submission({
       languageId: params.languageId,
-      sourceCode: params.sourceCode,
+      sourceCode: composedSourceCode,
       stdin: testCase.stdin,
       expectedOutput: testCase.expectedOutput,
       cpuTimeLimit: params.cpuTimeLimit,
@@ -518,12 +600,14 @@ function toCodingExerciseExecutionRecord(execution: CodingExerciseExecutionRow) 
 
 function toReferenceSolutionRecord(referenceSolution: {
   sourceCode: string;
+  privateConfig: unknown;
   validationSummary: unknown;
   createdAt: Date;
   updatedAt: Date;
 }): ReferenceSolutionValidationRecord {
   return {
     sourceCode: referenceSolution.sourceCode,
+    privateConfig: parseCodingExercisePrivateConfig(referenceSolution.privateConfig),
     validationSummary: normalizeResultSummary(referenceSolution.validationSummary),
     createdAt: referenceSolution.createdAt.toISOString(),
     updatedAt: referenceSolution.updatedAt.toISOString()

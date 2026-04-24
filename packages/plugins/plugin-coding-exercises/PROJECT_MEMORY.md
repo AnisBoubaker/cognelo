@@ -17,6 +17,12 @@ This file is for coding-exercises-specific memory only.
 - Enabled hidden tests must validate against the private reference solution before they are saved.
 - Graded submissions are handled separately from sample runs through `coding-exercises/submit`.
 - Teacher authoring separates student-facing starter code from a private reference solution; the reference solution must never be stored in public activity config.
+- Coding exercises support three authoring modes: full program, full function definition, and template snippet insertion.
+- Non-student-visible composition pieces such as hidden support code and the hidden template scaffold are stored in plugin-owned private data and assembled server-side before Judge0 execution.
+- Template-mode authoring uses a single hidden scaffold editor with a `{{ STUDENT_CODE }}` insertion marker; older prefix/suffix data should remain readable for backward compatibility.
+- Template-mode teachers mark student-visible scaffold lines directly in the editor gutter; non-visible blocks collapse into a single language-appropriate hidden-code placeholder in the student-safe scaffold.
+- The browser-facing `Activity.config` carries only the student-safe projected template scaffold, never the full hidden template source.
+- Both visible sample tests and hidden tests can append language-specific harness code after the student submission so function-style and scaffolded exercises work across Python, C, C++, JavaScript, and similar runtimes.
 - Teacher test authoring uses collapsible sample-test and hidden-test cards with saved validation status and per-test failure details.
 - The same coding-exercise activity UI should work in both course-scoped teacher pages and group-scoped student assigned-activity pages by swapping the API client boundary rather than forking the plugin UI.
 - Group-scoped student coding-exercise access uses assigned-activity routes under `groups/:groupId/activities/assigned/:activityId/...` to avoid route conflicts with teacher assignment-management endpoints.
