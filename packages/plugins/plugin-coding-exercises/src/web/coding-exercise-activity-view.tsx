@@ -3,6 +3,7 @@
 import { type CSSProperties, type FormEvent, useEffect, useRef, useState } from "react";
 import { CodeEditor, MonacoCodeEditor, codeLanguageOptions } from "@cognelo/activity-ui";
 import {
+  alignCodingExerciseStarterCodeToTemplate,
   buildCodingExerciseStudentTemplateProjectionFromSource,
   buildCodingExerciseStudentTemplateSource,
   buildCodingExerciseTemplateSource,
@@ -181,11 +182,15 @@ export function CodingExerciseActivityView({
 
   useEffect(() => {
     const isNewActivity = previousActivityIdRef.current !== activity.id;
-    const nextConfig = parseCodingExerciseConfig(activity.config ?? fallbackConfig);
+    const nextConfig = normalizeCodingExerciseConfigForDisplay(parseCodingExerciseConfig(activity.config ?? fallbackConfig));
     const sampleTests = normalizeCodingExerciseSampleTests(nextConfig.sampleTests);
     setTitle(activity.title);
     setConfig(nextConfig);
-    setEditorCode(nextConfig.starterCode);
+    setEditorCode(
+      nextConfig.executionMode === "template"
+        ? alignCodingExerciseStarterCodeToTemplate(nextConfig.starterCode, nextConfig.studentTemplateSource)
+        : nextConfig.starterCode
+    );
     setSelectedSampleTestId(sampleTests[0]?.id ?? "");
     setSampleInput(sampleTests[0]?.input ?? "");
     setSampleExpectedOutput(sampleTests[0]?.output ?? "");
@@ -921,6 +926,22 @@ function getPersistedPrivateConfig(privateConfig: CodingExercisePrivateConfig): 
     templatePrefix: templateParts.prefix,
     templateSuffix: templateParts.suffix
   };
+}
+
+function normalizeCodingExerciseConfigForDisplay(config: CodingExerciseConfig): CodingExerciseConfig {
+  if (
+    config.executionMode === "template" &&
+    !config.studentTemplateSource.trim() &&
+    config.starterCode.includes(codingExerciseTemplateInsertionToken)
+  ) {
+    return {
+      ...config,
+      studentTemplateSource: config.starterCode,
+      starterCode: ""
+    };
+  }
+
+  return config;
 }
 
 function isApiErrorLike(value: unknown): value is { code?: string; details?: unknown } {

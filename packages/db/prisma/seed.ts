@@ -89,6 +89,19 @@ async function main() {
     }
   });
 
+  const seededCodingActivityIds = [
+    "seed-activity-coding-function",
+    "seed-activity-coding-function-js",
+    "seed-activity-coding-template"
+  ] as const;
+
+  await prisma.activity.deleteMany({
+    where: {
+      courseId: course.id,
+      id: { in: [...seededCodingActivityIds] }
+    }
+  });
+
   for (const membership of [
     { userId: teacher.id, role: "owner" as const },
     { userId: student.id, role: "student" as const },
@@ -608,7 +621,7 @@ async function main() {
         ].join("\n\n"),
         language: "c",
         executionMode: "template",
-        starterCode: ['print_boxed("Ready");', 'print_boxed("Go!");'].join("\n"),
+        starterCode: ['print_boxed("...");', 'print_boxed("...");'].join("\n"),
         studentTemplateSource: [
           "#include <stdio.h>",
           "",
@@ -647,7 +660,7 @@ async function main() {
         ].join("\n\n"),
         language: "c",
         executionMode: "template",
-        starterCode: ['print_boxed("Ready");', 'print_boxed("Go!");'].join("\n"),
+        starterCode: ['print_boxed("...");', 'print_boxed("...");'].join("\n"),
         studentTemplateSource: [
           "#include <stdio.h>",
           "",
