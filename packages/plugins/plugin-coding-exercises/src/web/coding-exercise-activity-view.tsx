@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, type FormEvent, useEffect, useRef, useState } from "react";
-import { CodeEditor, codeLanguageOptions } from "@cognelo/activity-ui";
+import { CodeEditor, MonacoCodeEditor, codeLanguageOptions } from "@cognelo/activity-ui";
 import { normalizeCodingExerciseSampleTests, parseCodingExerciseConfig, type CodingExerciseConfig } from "../coding-exercises";
 import { formatCodingExercisesMessage, normalizeCodingExercisesLocale, type CodingExercisesLocale } from "./messages";
 
@@ -593,7 +593,14 @@ export function CodingExerciseActivityView({
           <h2>{activity.title}</h2>
           {activity.description ? <p className="muted">{activity.description}</p> : null}
           <p>{config.prompt}</p>
-          <CodeEditor value={editorCode} onChange={setEditorCode} language={config.language} minHeight={260} />
+          <MonacoCodeEditor
+            id={`coding-exercise-student-${activity.id}`}
+            ariaLabel={activity.title || t("starterCode")}
+            value={editorCode}
+            onChange={setEditorCode}
+            language={config.language}
+            minHeight={360}
+          />
 
           <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
             <h3>{t("sampleRun")}</h3>
