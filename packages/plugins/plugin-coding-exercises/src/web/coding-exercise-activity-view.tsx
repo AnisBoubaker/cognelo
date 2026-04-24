@@ -13,7 +13,6 @@ import {
   parseCodingExercisePrivateConfig,
   splitCodingExerciseTemplateSource,
   type CodingExerciseConfig,
-  type CodingExerciseExecutionMode,
   type CodingExercisePrivateConfig
 } from "../coding-exercises";
 import { formatCodingExercisesMessage, normalizeCodingExercisesLocale, type CodingExercisesLocale } from "./messages";
@@ -112,9 +111,9 @@ type CodingExerciseActivityViewProps = {
 const fallbackConfig: CodingExerciseConfig = {
   prompt: "",
   language: "python",
-  executionMode: "program",
+  executionMode: "template",
   starterCode: "",
-  studentTemplateSource: "",
+  studentTemplateSource: "{{ STUDENT_CODE }}",
   sampleTests: [],
   maxEditorSeconds: 1800
 };
@@ -160,10 +159,9 @@ export function CodingExerciseActivityView({
   const [workingAction, setWorkingAction] = useState<"run" | "submit" | null>(null);
   const sampleValidationTests = getReferenceValidationTests(referenceValidationSummary, "sampleTests");
   const hiddenValidationTests = getReferenceValidationTests(referenceValidationSummary, "hiddenTests");
-  const templateProjection =
-    config.executionMode === "template"
-      ? buildCodingExerciseStudentTemplateProjectionFromSource(config.studentTemplateSource)
-      : null;
+  const templateProjection = buildCodingExerciseStudentTemplateProjectionFromSource(
+    config.studentTemplateSource || buildCodingExerciseTemplateSource("", "")
+  );
 
   useEffect(() => {
     if (typeof document === "undefined" || document.getElementById("coding-exercise-spinner-style")) {
@@ -186,11 +184,7 @@ export function CodingExerciseActivityView({
     const sampleTests = normalizeCodingExerciseSampleTests(nextConfig.sampleTests);
     setTitle(activity.title);
     setConfig(nextConfig);
-    setEditorCode(
-      nextConfig.executionMode === "template"
-        ? alignCodingExerciseStarterCodeToTemplate(nextConfig.starterCode, nextConfig.studentTemplateSource)
-        : nextConfig.starterCode
-    );
+    setEditorCode(alignCodingExerciseStarterCodeToTemplate(nextConfig.starterCode, nextConfig.studentTemplateSource));
     setSelectedSampleTestId(sampleTests[0]?.id ?? "");
     setSampleInput(sampleTests[0]?.input ?? "");
     setSampleExpectedOutput(sampleTests[0]?.output ?? "");
@@ -262,7 +256,7 @@ export function CodingExerciseActivityView({
           input: "",
           output: "",
           testCode: "",
-          explanation: ""
+          title: ""
         }
       ]
     }));
@@ -346,10 +340,7 @@ export function CodingExerciseActivityView({
     try {
       const normalizedPrivateConfig = getPersistedPrivateConfig(privateConfig);
 
-      if (
-        config.executionMode === "template" &&
-        !normalizedPrivateConfig.templateSource.includes(codingExerciseTemplateInsertionToken)
-      ) {
+      if (!normalizedPrivateConfig.templateSource.includes(codingExerciseTemplateInsertionToken)) {
         throw new Error(t("templateSourceMissingMarker"));
       }
 
@@ -359,16 +350,13 @@ export function CodingExerciseActivityView({
         config: {
           prompt: config.prompt,
           language: config.language,
-          executionMode: config.executionMode,
+          executionMode: "template",
           starterCode: config.starterCode,
-          studentTemplateSource:
-            config.executionMode === "template"
-              ? buildCodingExerciseStudentTemplateSource(
-                  normalizedPrivateConfig.templateSource,
-                  normalizedPrivateConfig.templateVisibleLineNumbers,
-                  config.language
-                )
-              : "",
+          studentTemplateSource: buildCodingExerciseStudentTemplateSource(
+            normalizedPrivateConfig.templateSource,
+            normalizedPrivateConfig.templateVisibleLineNumbers,
+            config.language
+          ),
           sampleTests: normalizeCodingExerciseSampleTests(config.sampleTests),
           maxEditorSeconds: config.maxEditorSeconds
         }
@@ -481,27 +469,6 @@ export function CodingExerciseActivityView({
           </div>
 
           <div className="field">
-            <label htmlFor="coding-execution-mode">{t("executionMode")}</label>
-            <select
-              id="coding-execution-mode"
-              value={config.executionMode}
-              onChange={(event) =>
-                setConfig((current) => ({
-                  ...current,
-                  executionMode: event.target.value as CodingExerciseExecutionMode
-                }))
-              }
-            >
-              <option value="program">{t("executionModeProgram")}</option>
-              <option value="function">{t("executionModeFunction")}</option>
-              <option value="template">{t("executionModeTemplate")}</option>
-            </select>
-            <p className="muted" style={{ margin: 0 }}>
-              {t("executionModeHelp")}
-            </p>
-          </div>
-
-          <div className="field">
             <label htmlFor="coding-prompt">{t("prompt")}</label>
             <textarea
               id="coding-prompt"
@@ -550,49 +517,47 @@ export function CodingExerciseActivityView({
             />
           </div>
 
-          {config.executionMode === "template" ? (
-            <div className="stack">
-              <span>{t("templateSource")}</span>
-              <p className="muted" style={{ margin: 0 }}>
-                {t("templateSourceHelp")}
-              </p>
-              <p className="muted" style={{ margin: 0 }}>
-                {t("templateVisibleLinesHelp")}
-              </p>
-              <CodeEditor
-                value={privateConfig.templateSource || buildCodingExerciseTemplateSource("", "")}
-                onChange={(value) =>
-                  setPrivateConfig((current) => {
-                    const nextTemplate = value || buildCodingExerciseTemplateSource("", "");
-                    const templateParts = splitCodingExerciseTemplateSource(nextTemplate);
-                    return {
-                      ...current,
-                      templateSource: nextTemplate,
-                      templateVisibleLineNumbers: current.templateVisibleLineNumbers.filter(
-                        (lineNumber) => lineNumber < nextTemplate.split("\n").length
-                      ),
-                      templatePrefix: templateParts.prefix,
-                      templateSuffix: templateParts.suffix
-                    };
-                  })
-                }
-                language={config.language}
-                getLineClassName={(lineIndex) =>
-                  privateConfig.templateVisibleLineNumbers.includes(lineIndex)
-                    ? "coding-exercise-template-line is-visible"
-                    : "coding-exercise-template-line"
-                }
-                leftRail={renderTemplateVisibilityRail(
-                  (privateConfig.templateSource || buildCodingExerciseTemplateSource("", "")).split("\n"),
-                  privateConfig.templateVisibleLineNumbers,
-                  toggleTemplateVisibleLine,
-                  t
-                )}
-                leftRailWidth={20}
-                minHeight={260}
-              />
-            </div>
-          ) : null}
+          <div className="stack">
+            <span>{t("templateSource")}</span>
+            <p className="muted" style={{ margin: 0 }}>
+              {t("templateSourceHelp")}
+            </p>
+            <p className="muted" style={{ margin: 0 }}>
+              {t("templateVisibleLinesHelp")}
+            </p>
+            <CodeEditor
+              value={privateConfig.templateSource || buildCodingExerciseTemplateSource("", "")}
+              onChange={(value) =>
+                setPrivateConfig((current) => {
+                  const nextTemplate = value || buildCodingExerciseTemplateSource("", "");
+                  const templateParts = splitCodingExerciseTemplateSource(nextTemplate);
+                  return {
+                    ...current,
+                    templateSource: nextTemplate,
+                    templateVisibleLineNumbers: current.templateVisibleLineNumbers.filter(
+                      (lineNumber) => lineNumber < nextTemplate.split("\n").length
+                    ),
+                    templatePrefix: templateParts.prefix,
+                    templateSuffix: templateParts.suffix
+                  };
+                })
+              }
+              language={config.language}
+              getLineClassName={(lineIndex) =>
+                privateConfig.templateVisibleLineNumbers.includes(lineIndex)
+                  ? "coding-exercise-template-line is-visible"
+                  : "coding-exercise-template-line"
+              }
+              leftRail={renderTemplateVisibilityRail(
+                (privateConfig.templateSource || buildCodingExerciseTemplateSource("", "")).split("\n"),
+                privateConfig.templateVisibleLineNumbers,
+                toggleTemplateVisibleLine,
+                t
+              )}
+              leftRailWidth={20}
+              minHeight={260}
+            />
+          </div>
 
           <div className="field">
             <label htmlFor="coding-max-editor-seconds">{t("editorTimeLimit")}</label>
@@ -641,6 +606,10 @@ export function CodingExerciseActivityView({
                       </button>
                     </div>
                     <div className="field">
+                      <label>{t("testTitle")}</label>
+                      <input value={test.title} onChange={(event) => updateSampleTest(index, "title", event.target.value)} />
+                    </div>
+                    <div className="field">
                       <label>{t("input")}</label>
                       <textarea rows={3} value={test.input} onChange={(event) => updateSampleTest(index, "input", event.target.value)} />
                     </div>
@@ -658,14 +627,6 @@ export function CodingExerciseActivityView({
                         onChange={(value) => updateSampleTest(index, "testCode", value)}
                         language={config.language}
                         minHeight={160}
-                      />
-                    </div>
-                    <div className="field">
-                      <label>{t("explanation")}</label>
-                      <textarea
-                        rows={2}
-                        value={test.explanation}
-                        onChange={(event) => updateSampleTest(index, "explanation", event.target.value)}
                       />
                     </div>
                     {renderHiddenTestValidation(test.id, sampleValidationTests.get(test.id), pluginLocale)}
@@ -799,18 +760,6 @@ export function CodingExerciseActivityView({
         <div className="stack">
           <h2>{activity.title}</h2>
           <p>{config.prompt}</p>
-          {config.executionMode === "template" ? (
-            <MonacoCodeEditor
-              id={`coding-exercise-student-${activity.id}`}
-              ariaLabel={activity.title || t("starterCode")}
-              value={editorCode}
-              onChange={setEditorCode}
-              language={config.language}
-              minHeight={360}
-              readOnlyPrefix={templateProjection?.readOnlyPrefix}
-              readOnlySuffix={templateProjection?.readOnlySuffix}
-            />
-          ) : (
           <MonacoCodeEditor
             id={`coding-exercise-student-${activity.id}`}
             ariaLabel={activity.title || t("starterCode")}
@@ -818,8 +767,9 @@ export function CodingExerciseActivityView({
             onChange={setEditorCode}
             language={config.language}
             minHeight={360}
+            readOnlyPrefix={templateProjection.readOnlyPrefix}
+            readOnlySuffix={templateProjection.readOnlySuffix}
           />
-          )}
 
           <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
             <h3>{t("sampleRun")}</h3>
@@ -929,19 +879,27 @@ function getPersistedPrivateConfig(privateConfig: CodingExercisePrivateConfig): 
 }
 
 function normalizeCodingExerciseConfigForDisplay(config: CodingExerciseConfig): CodingExerciseConfig {
-  if (
-    config.executionMode === "template" &&
-    !config.studentTemplateSource.trim() &&
-    config.starterCode.includes(codingExerciseTemplateInsertionToken)
-  ) {
+  if (!config.studentTemplateSource.trim() && config.starterCode.includes(codingExerciseTemplateInsertionToken)) {
     return {
       ...config,
+      executionMode: "template",
       studentTemplateSource: config.starterCode,
       starterCode: ""
     };
   }
 
-  return config;
+  if (!config.studentTemplateSource.trim()) {
+    return {
+      ...config,
+      executionMode: "template",
+      studentTemplateSource: buildCodingExerciseTemplateSource("", "")
+    };
+  }
+
+  return {
+    ...config,
+    executionMode: "template"
+  };
 }
 
 function isApiErrorLike(value: unknown): value is { code?: string; details?: unknown } {
@@ -968,7 +926,7 @@ function getReferenceValidationTests(summary: Record<string, unknown> | null, gr
 }
 
 function getSampleTestSummary(test: SampleTest) {
-  return test.explanation.trim() || test.id;
+  return test.title.trim() || test.id;
 }
 
 function renderTemplateVisibilityRail(
