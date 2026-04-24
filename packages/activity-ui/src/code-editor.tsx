@@ -13,6 +13,7 @@ type CodeEditorProps = {
   rightRail?: ReactNode;
   leftRailWidth?: number;
   rightRailWidth?: number;
+  getLineClassName?: (lineIndex: number) => string | undefined;
 };
 
 export function CodeEditor({
@@ -24,7 +25,8 @@ export function CodeEditor({
   leftRail,
   rightRail,
   leftRailWidth = 0,
-  rightRailWidth = 0
+  rightRailWidth = 0,
+  getLineClassName
 }: CodeEditorProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -158,7 +160,7 @@ export function CodeEditor({
     >
       <div aria-hidden="true" className="code-editor-overlay" ref={overlayRef}>
         {leftRail ? <div className="code-editor-rail code-editor-rail-left">{leftRail}</div> : null}
-        <CodeRenderer code={value || " "} language={language} showLineNumbers />
+        <CodeRenderer code={value || " "} language={language} showLineNumbers getLineClassName={getLineClassName} />
         {rightRail ? <div className="code-editor-rail code-editor-rail-right">{rightRail}</div> : null}
       </div>
       <textarea

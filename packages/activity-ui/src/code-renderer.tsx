@@ -10,6 +10,7 @@ type CodeRendererProps = {
   startingLineNumber?: number;
   className?: string;
   contentOffset?: number;
+  getLineClassName?: (lineIndex: number) => string | undefined;
 };
 
 export function CodeRenderer({
@@ -18,7 +19,8 @@ export function CodeRenderer({
   showLineNumbers = false,
   startingLineNumber = 1,
   className,
-  contentOffset = 0
+  contentOffset = 0,
+  getLineClassName
 }: CodeRendererProps) {
   const normalizedLanguage = normalizeCodeLanguage(language);
 
@@ -30,8 +32,13 @@ export function CodeRenderer({
             {tokens.map((line, index) => {
               const lineProps = getLineProps({ line });
               const lineNumber = startingLineNumber + index;
+              const customLineClassName = getLineClassName?.(index) ?? "";
               return (
-                <div key={lineNumber} {...lineProps} className={`${lineProps.className} code-renderer-line`.trim()}>
+                <div
+                  key={lineNumber}
+                  {...lineProps}
+                  className={`${lineProps.className} code-renderer-line ${customLineClassName}`.trim()}
+                >
                   {showLineNumbers ? <span className="code-renderer-line-number">{lineNumber}</span> : null}
                   <span className="code-renderer-line-content" style={contentOffset ? { paddingLeft: `${contentOffset}px` } : undefined}>
                     {line.map((token, tokenIndex) => {

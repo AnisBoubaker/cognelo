@@ -68,7 +68,8 @@ async function main() {
   const placeholderType = activityTypesByKey.get("placeholder");
   const parsonsType = activityTypesByKey.get("parsons-problem");
   const mcqType = activityTypesByKey.get("mcq");
-  if (!placeholderType || !parsonsType || !mcqType) {
+  const codingExerciseType = activityTypesByKey.get("coding-exercise");
+  if (!placeholderType || !parsonsType || !mcqType || !codingExerciseType) {
     throw new Error(`Missing seeded activity types from plugin registry: ${listActivityDefinitions().map((definition) => definition.key).join(", ")}`);
   }
 
@@ -265,6 +266,509 @@ async function main() {
     }
   });
 
+  await prisma.activity.upsert({
+    where: { id: "seed-activity-coding-function" },
+    update: {
+      title: "Title-case a name with a hidden helper",
+      description: "Write the full Python function definition. The grader provides a hidden helper called `collapse_whitespace(value)`.",
+      lifecycle: "published",
+      config: {
+        prompt: [
+          "Write the full Python function definition `def normalize_title_case(name):`.",
+          "Your function should return the input converted to title case.",
+          "A hidden helper named `collapse_whitespace(value)` is available during execution and grading.",
+          "It trims the string and collapses repeated whitespace to a single space."
+        ].join("\n\n"),
+        language: "python",
+        executionMode: "function",
+        starterCode: [
+          "def normalize_title_case(name):",
+          "    normalized = collapse_whitespace(name)",
+          "    # Return the normalized name in title case."
+        ].join("\n"),
+        sampleTests: [
+          {
+            id: "sample-1",
+            input: "",
+            output: "Ada Lovelace",
+            testCode: 'print(normalize_title_case("   aDa    lOVelace   "))',
+            explanation: "The function should normalize spacing and capitalize each word."
+          }
+        ],
+        maxEditorSeconds: 1800
+      },
+      metadata: { researchTags: ["coding-exercise", "functions", "python"], instrumented: false, plugin: pluginKeyByActivityKey.get("coding-exercise") }
+    },
+    create: {
+      id: "seed-activity-coding-function",
+      courseId: course.id,
+      activityTypeId: codingExerciseType.id,
+      title: "Title-case a name with a hidden helper",
+      description: "Write the full Python function definition. The grader provides a hidden helper called `collapse_whitespace(value)`.",
+      lifecycle: "published",
+      config: {
+        prompt: [
+          "Write the full Python function definition `def normalize_title_case(name):`.",
+          "Your function should return the input converted to title case.",
+          "A hidden helper named `collapse_whitespace(value)` is available during execution and grading.",
+          "It trims the string and collapses repeated whitespace to a single space."
+        ].join("\n\n"),
+        language: "python",
+        executionMode: "function",
+        starterCode: [
+          "def normalize_title_case(name):",
+          "    normalized = collapse_whitespace(name)",
+          "    # Return the normalized name in title case."
+        ].join("\n"),
+        sampleTests: [
+          {
+            id: "sample-1",
+            input: "",
+            output: "Ada Lovelace",
+            testCode: 'print(normalize_title_case("   aDa    lOVelace   "))',
+            explanation: "The function should normalize spacing and capitalize each word."
+          }
+        ],
+        maxEditorSeconds: 1800
+      },
+      metadata: { researchTags: ["coding-exercise", "functions", "python"], instrumented: false, plugin: pluginKeyByActivityKey.get("coding-exercise") },
+      createdById: teacher.id
+    }
+  });
+
+  await prisma.pluginCodingExerciseReferenceSolution.upsert({
+    where: { activityId: "seed-activity-coding-function" },
+    update: {
+      sourceCode: [
+        "def normalize_title_case(name):",
+        "    normalized = collapse_whitespace(name)",
+        "    if not normalized:",
+        '        return ""',
+        "    return \" \".join(part.capitalize() for part in normalized.split(\" \"))"
+      ].join("\n"),
+      privateConfig: {
+        hiddenSupportCode: [
+          "def collapse_whitespace(value):",
+          "    return \" \".join(str(value).split())"
+        ].join("\n"),
+        templatePrefix: "",
+        templateSuffix: ""
+      },
+      validationSummary: {}
+    },
+    create: {
+      activityId: "seed-activity-coding-function",
+      sourceCode: [
+        "def normalize_title_case(name):",
+        "    normalized = collapse_whitespace(name)",
+        "    if not normalized:",
+        '        return ""',
+        "    return \" \".join(part.capitalize() for part in normalized.split(\" \"))"
+      ].join("\n"),
+      privateConfig: {
+        hiddenSupportCode: [
+          "def collapse_whitespace(value):",
+          "    return \" \".join(str(value).split())"
+        ].join("\n"),
+        templatePrefix: "",
+        templateSuffix: ""
+      },
+      validationSummary: {}
+    }
+  });
+
+  for (const hiddenTest of [
+    {
+      id: "seed-hidden-function-1",
+      activityId: "seed-activity-coding-function",
+      name: "Mixed casing and extra spaces",
+      expectedOutput: "Grace Hopper",
+      metadata: {
+        testCode: 'print(normalize_title_case("   gRACE   hOPPER   "))'
+      }
+    },
+    {
+      id: "seed-hidden-function-2",
+      activityId: "seed-activity-coding-function",
+      name: "Single word stays capitalized",
+      expectedOutput: "Alan",
+      metadata: {
+        testCode: 'print(normalize_title_case("aLAN"))'
+      }
+    }
+  ]) {
+    await prisma.pluginCodingExerciseHiddenTest.upsert({
+      where: { id: hiddenTest.id },
+      update: {
+        activityId: hiddenTest.activityId,
+        name: hiddenTest.name,
+        stdin: "",
+        expectedOutput: hiddenTest.expectedOutput,
+        orderIndex: hiddenTest.id.endsWith("-1") ? 0 : 1,
+        isEnabled: true,
+        weight: 1,
+        metadata: hiddenTest.metadata
+      },
+      create: {
+        id: hiddenTest.id,
+        activityId: hiddenTest.activityId,
+        name: hiddenTest.name,
+        stdin: "",
+        expectedOutput: hiddenTest.expectedOutput,
+        orderIndex: hiddenTest.id.endsWith("-1") ? 0 : 1,
+        isEnabled: true,
+        weight: 1,
+        metadata: hiddenTest.metadata
+      }
+    });
+  }
+
+  await prisma.activity.upsert({
+    where: { id: "seed-activity-coding-function-js" },
+    update: {
+      title: "JavaScript title case with a hidden helper",
+      description: "Write the full JavaScript function definition. The grader provides a hidden helper called `collapseWhitespace(value)`.",
+      lifecycle: "published",
+      config: {
+        prompt: [
+          "Write the full JavaScript function definition `function normalizeTitleCase(name) { ... }`.",
+          "Your function should return the input converted to title case.",
+          "A hidden helper named `collapseWhitespace(value)` is available during execution and grading.",
+          "It trims the string and collapses repeated whitespace to a single space."
+        ].join("\n\n"),
+        language: "javascript",
+        executionMode: "function",
+        starterCode: [
+          "function normalizeTitleCase(name) {",
+          "  const normalized = collapseWhitespace(name);",
+          "  // Return the normalized name in title case.",
+          "}"
+        ].join("\n"),
+        sampleTests: [
+          {
+            id: "sample-1",
+            input: "",
+            output: "Ada Lovelace",
+            testCode: 'console.log(normalizeTitleCase("   aDa    lOVelace   "));',
+            explanation: "The function should normalize spacing and capitalize each word."
+          }
+        ],
+        maxEditorSeconds: 1800
+      },
+      metadata: { researchTags: ["coding-exercise", "functions", "javascript"], instrumented: false, plugin: pluginKeyByActivityKey.get("coding-exercise") }
+    },
+    create: {
+      id: "seed-activity-coding-function-js",
+      courseId: course.id,
+      activityTypeId: codingExerciseType.id,
+      title: "JavaScript title case with a hidden helper",
+      description: "Write the full JavaScript function definition. The grader provides a hidden helper called `collapseWhitespace(value)`.",
+      lifecycle: "published",
+      config: {
+        prompt: [
+          "Write the full JavaScript function definition `function normalizeTitleCase(name) { ... }`.",
+          "Your function should return the input converted to title case.",
+          "A hidden helper named `collapseWhitespace(value)` is available during execution and grading.",
+          "It trims the string and collapses repeated whitespace to a single space."
+        ].join("\n\n"),
+        language: "javascript",
+        executionMode: "function",
+        starterCode: [
+          "function normalizeTitleCase(name) {",
+          "  const normalized = collapseWhitespace(name);",
+          "  // Return the normalized name in title case.",
+          "}"
+        ].join("\n"),
+        sampleTests: [
+          {
+            id: "sample-1",
+            input: "",
+            output: "Ada Lovelace",
+            testCode: 'console.log(normalizeTitleCase("   aDa    lOVelace   "));',
+            explanation: "The function should normalize spacing and capitalize each word."
+          }
+        ],
+        maxEditorSeconds: 1800
+      },
+      metadata: { researchTags: ["coding-exercise", "functions", "javascript"], instrumented: false, plugin: pluginKeyByActivityKey.get("coding-exercise") },
+      createdById: teacher.id
+    }
+  });
+
+  await prisma.pluginCodingExerciseReferenceSolution.upsert({
+    where: { activityId: "seed-activity-coding-function-js" },
+    update: {
+      sourceCode: [
+        "function normalizeTitleCase(name) {",
+        "  const normalized = collapseWhitespace(name);",
+        "  if (!normalized) {",
+        '    return "";',
+        "  }",
+        "  return normalized",
+        '    .split(" ")',
+        "    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())",
+        '    .join(" ");',
+        "}"
+      ].join("\n"),
+      privateConfig: {
+        hiddenSupportCode: [
+          "function collapseWhitespace(value) {",
+          '  return String(value).trim().replace(/\\s+/g, " ");',
+          "}"
+        ].join("\n"),
+        templatePrefix: "",
+        templateSuffix: ""
+      },
+      validationSummary: {}
+    },
+    create: {
+      activityId: "seed-activity-coding-function-js",
+      sourceCode: [
+        "function normalizeTitleCase(name) {",
+        "  const normalized = collapseWhitespace(name);",
+        "  if (!normalized) {",
+        '    return "";',
+        "  }",
+        "  return normalized",
+        '    .split(" ")',
+        "    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())",
+        '    .join(" ");',
+        "}"
+      ].join("\n"),
+      privateConfig: {
+        hiddenSupportCode: [
+          "function collapseWhitespace(value) {",
+          '  return String(value).trim().replace(/\\s+/g, " ");',
+          "}"
+        ].join("\n"),
+        templatePrefix: "",
+        templateSuffix: ""
+      },
+      validationSummary: {}
+    }
+  });
+
+  for (const hiddenTest of [
+    {
+      id: "seed-hidden-function-js-1",
+      activityId: "seed-activity-coding-function-js",
+      name: "Mixed casing and extra spaces",
+      expectedOutput: "Grace Hopper",
+      metadata: {
+        testCode: 'console.log(normalizeTitleCase("   gRACE   hOPPER   "));'
+      }
+    },
+    {
+      id: "seed-hidden-function-js-2",
+      activityId: "seed-activity-coding-function-js",
+      name: "Single word stays capitalized",
+      expectedOutput: "Alan",
+      metadata: {
+        testCode: 'console.log(normalizeTitleCase("aLAN"));'
+      }
+    }
+  ]) {
+    await prisma.pluginCodingExerciseHiddenTest.upsert({
+      where: { id: hiddenTest.id },
+      update: {
+        activityId: hiddenTest.activityId,
+        name: hiddenTest.name,
+        stdin: "",
+        expectedOutput: hiddenTest.expectedOutput,
+        orderIndex: hiddenTest.id.endsWith("-1") ? 0 : 1,
+        isEnabled: true,
+        weight: 1,
+        metadata: hiddenTest.metadata
+      },
+      create: {
+        id: hiddenTest.id,
+        activityId: hiddenTest.activityId,
+        name: hiddenTest.name,
+        stdin: "",
+        expectedOutput: hiddenTest.expectedOutput,
+        orderIndex: hiddenTest.id.endsWith("-1") ? 0 : 1,
+        isEnabled: true,
+        weight: 1,
+        metadata: hiddenTest.metadata
+      }
+    });
+  }
+
+  await prisma.activity.upsert({
+    where: { id: "seed-activity-coding-template" },
+    update: {
+      title: "Write the body of main with a hidden C helper",
+      description: "Write only the statements that belong inside `main`. A hidden helper `print_boxed(const char* text)` is available.",
+      lifecycle: "published",
+      config: {
+        prompt: [
+          "Write the statements that belong inside `main`.",
+          "A hidden C helper named `print_boxed(const char* text)` is available.",
+          'Call it twice so the program prints boxed lines for `Ready` and `Go!` in that order.'
+        ].join("\n\n"),
+        language: "c",
+        executionMode: "template",
+        starterCode: ['print_boxed("Ready");', 'print_boxed("Go!");'].join("\n"),
+        studentTemplateSource: [
+          "#include <stdio.h>",
+          "",
+          "void print_boxed(const char *text);",
+          "// Hidden code",
+          "int main(void) {",
+          "{{ STUDENT_CODE }}",
+          "  return 0;",
+          "}"
+        ].join("\n"),
+        sampleTests: [
+          {
+            id: "sample-1",
+            input: "",
+            output: "[[ Ready ]]\n[[ Go! ]]",
+            testCode: "",
+            explanation: "The completed hidden template should print the two boxed lines."
+          }
+        ],
+        maxEditorSeconds: 1800
+      },
+      metadata: { researchTags: ["coding-exercise", "template", "c"], instrumented: false, plugin: pluginKeyByActivityKey.get("coding-exercise") }
+    },
+    create: {
+      id: "seed-activity-coding-template",
+      courseId: course.id,
+      activityTypeId: codingExerciseType.id,
+      title: "Write the body of main with a hidden C helper",
+      description: "Write only the statements that belong inside `main`. A hidden helper `print_boxed(const char* text)` is available.",
+      lifecycle: "published",
+      config: {
+        prompt: [
+          "Write the statements that belong inside `main`.",
+          "A hidden C helper named `print_boxed(const char* text)` is available.",
+          'Call it twice so the program prints boxed lines for `Ready` and `Go!` in that order.'
+        ].join("\n\n"),
+        language: "c",
+        executionMode: "template",
+        starterCode: ['print_boxed("Ready");', 'print_boxed("Go!");'].join("\n"),
+        studentTemplateSource: [
+          "#include <stdio.h>",
+          "",
+          "void print_boxed(const char *text);",
+          "// Hidden code",
+          "int main(void) {",
+          "{{ STUDENT_CODE }}",
+          "  return 0;",
+          "}"
+        ].join("\n"),
+        sampleTests: [
+          {
+            id: "sample-1",
+            input: "",
+            output: "[[ Ready ]]\n[[ Go! ]]",
+            testCode: "",
+            explanation: "The completed hidden template should print the two boxed lines."
+          }
+        ],
+        maxEditorSeconds: 1800
+      },
+      metadata: { researchTags: ["coding-exercise", "template", "c"], instrumented: false, plugin: pluginKeyByActivityKey.get("coding-exercise") },
+      createdById: teacher.id
+    }
+  });
+
+  await prisma.pluginCodingExerciseReferenceSolution.upsert({
+    where: { activityId: "seed-activity-coding-template" },
+    update: {
+      sourceCode: ['  print_boxed("Ready");', '  print_boxed("Go!");'].join("\n"),
+      privateConfig: {
+        hiddenSupportCode: "",
+        templateSource: [
+          "#include <stdio.h>",
+          "",
+          "void print_boxed(const char *text);",
+          "",
+          "void print_boxed(const char *text) {",
+          '  printf("[[ %s ]]\\n", text);',
+          "}",
+          "",
+          "int main(void) {",
+          "  {{ STUDENT_CODE }}",
+          "  return 0;",
+          "}"
+        ].join("\n"),
+        templateVisibleLineNumbers: [0, 1, 2, 6, 8, 9],
+        templatePrefix: ["#include <stdio.h>", "", "void print_boxed(const char *text);", "", "void print_boxed(const char *text) {", '  printf("[[ %s ]]\\n", text);', "}", "", "int main(void) {"].join("\n"),
+        templateSuffix: ["  return 0;", "}"].join("\n")
+      },
+      validationSummary: {}
+    },
+    create: {
+      activityId: "seed-activity-coding-template",
+      sourceCode: ['  print_boxed("Ready");', '  print_boxed("Go!");'].join("\n"),
+      privateConfig: {
+        hiddenSupportCode: "",
+        templateSource: [
+          "#include <stdio.h>",
+          "",
+          "void print_boxed(const char *text);",
+          "",
+          "void print_boxed(const char *text) {",
+          '  printf("[[ %s ]]\\n", text);',
+          "}",
+          "",
+          "int main(void) {",
+          "  {{ STUDENT_CODE }}",
+          "  return 0;",
+          "}"
+        ].join("\n"),
+        templateVisibleLineNumbers: [0, 1, 2, 6, 8, 9],
+        templatePrefix: ["#include <stdio.h>", "", "void print_boxed(const char *text);", "", "void print_boxed(const char *text) {", '  printf("[[ %s ]]\\n", text);', "}", "", "int main(void) {"].join("\n"),
+        templateSuffix: ["  return 0;", "}"].join("\n")
+      },
+      validationSummary: {}
+    }
+  });
+
+  for (const hiddenTest of [
+    {
+      id: "seed-hidden-template-1",
+      activityId: "seed-activity-coding-template",
+      name: "Prints the required boxed lines",
+      expectedOutput: "[[ Ready ]]\n[[ Go! ]]",
+      orderIndex: 0
+    },
+    {
+      id: "seed-hidden-template-2",
+      activityId: "seed-activity-coding-template",
+      name: "No extra output",
+      expectedOutput: "[[ Ready ]]\n[[ Go! ]]",
+      orderIndex: 1
+    }
+  ]) {
+    await prisma.pluginCodingExerciseHiddenTest.upsert({
+      where: { id: hiddenTest.id },
+      update: {
+        activityId: hiddenTest.activityId,
+        name: hiddenTest.name,
+        stdin: "",
+        expectedOutput: hiddenTest.expectedOutput,
+        orderIndex: hiddenTest.orderIndex,
+        isEnabled: true,
+        weight: 1,
+        metadata: { testCode: "" }
+      },
+      create: {
+        id: hiddenTest.id,
+        activityId: hiddenTest.activityId,
+        name: hiddenTest.name,
+        stdin: "",
+        expectedOutput: hiddenTest.expectedOutput,
+        orderIndex: hiddenTest.orderIndex,
+        isEnabled: true,
+        weight: 1,
+        metadata: { testCode: "" }
+      }
+    });
+  }
+
   const group = await prisma.courseGroup.upsert({
     where: { id: "seed-group-programming-101-section-a" },
     update: {
@@ -344,6 +848,69 @@ async function main() {
       availableFrom: new Date("2026-04-22T13:00:00.000Z"),
       availableUntil: new Date("2026-05-08T03:59:00.000Z"),
       position: 1
+    }
+  });
+
+  await prisma.courseGroupActivity.upsert({
+    where: {
+      groupId_activityId: {
+        groupId: group.id,
+        activityId: "seed-activity-coding-function"
+      }
+    },
+    update: {
+      availableFrom: new Date("2026-04-24T13:00:00.000Z"),
+      availableUntil: new Date("2026-05-15T03:59:00.000Z"),
+      position: 2
+    },
+    create: {
+      groupId: group.id,
+      activityId: "seed-activity-coding-function",
+      availableFrom: new Date("2026-04-24T13:00:00.000Z"),
+      availableUntil: new Date("2026-05-15T03:59:00.000Z"),
+      position: 2
+    }
+  });
+
+  await prisma.courseGroupActivity.upsert({
+    where: {
+      groupId_activityId: {
+        groupId: group.id,
+        activityId: "seed-activity-coding-template"
+      }
+    },
+    update: {
+      availableFrom: new Date("2026-04-24T13:00:00.000Z"),
+      availableUntil: new Date("2026-05-22T03:59:00.000Z"),
+      position: 3
+    },
+    create: {
+      groupId: group.id,
+      activityId: "seed-activity-coding-template",
+      availableFrom: new Date("2026-04-24T13:00:00.000Z"),
+      availableUntil: new Date("2026-05-22T03:59:00.000Z"),
+      position: 3
+    }
+  });
+
+  await prisma.courseGroupActivity.upsert({
+    where: {
+      groupId_activityId: {
+        groupId: group.id,
+        activityId: "seed-activity-coding-function-js"
+      }
+    },
+    update: {
+      availableFrom: new Date("2026-04-24T13:00:00.000Z"),
+      availableUntil: new Date("2026-05-22T03:59:00.000Z"),
+      position: 4
+    },
+    create: {
+      groupId: group.id,
+      activityId: "seed-activity-coding-function-js",
+      availableFrom: new Date("2026-04-24T13:00:00.000Z"),
+      availableUntil: new Date("2026-05-22T03:59:00.000Z"),
+      position: 4
     }
   });
 }

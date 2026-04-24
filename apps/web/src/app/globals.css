@@ -1164,9 +1164,23 @@ a.card:hover,
   border-color: rgba(41, 213, 207, 0.45);
 }
 
+.parsons-line-marker.is-disabled {
+  cursor: default;
+  opacity: 0.32;
+}
+
 .parsons-editor-group-rail {
   padding-left: 12px;
   padding-right: 8px;
+}
+
+.coding-exercise-template-line {
+  transition: background-color 120ms ease;
+}
+
+.coding-exercise-template-line.is-visible {
+  background: rgba(41, 213, 207, 0.08);
+  box-shadow: inset 3px 0 0 rgba(41, 213, 207, 0.55);
 }
 
 .parsons-editor-group-rail-inner {

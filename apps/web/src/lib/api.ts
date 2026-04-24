@@ -188,6 +188,7 @@ export type CodingExerciseHiddenTest = {
   name: string;
   stdin: string;
   expectedOutput: string;
+  testCode: string;
   isEnabled: boolean;
   weight: number;
   orderIndex: number;
@@ -198,6 +199,13 @@ export type CodingExerciseHiddenTest = {
 
 export type CodingExerciseReferenceSolution = {
   sourceCode: string;
+  privateConfig: {
+    hiddenSupportCode: string;
+    templateSource: string;
+    templateVisibleLineNumbers: number[];
+    templatePrefix: string;
+    templateSuffix: string;
+  };
   validationSummary: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
