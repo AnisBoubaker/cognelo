@@ -4,9 +4,6 @@ This file is for Parsons-specific memory only.
 
 ## Long-Term Decisions
 
-- Parsons-specific logic stays inside `packages/plugins/plugin-parsons`.
-- Parsons-specific persistence lives in plugin-owned tables, not in core activity tables.
-- Parsons-specific server handlers live in plugin-owned route definitions, not in `apps/api`.
 - Shared code editor and syntax renderer come from `@cognelo/activity-ui`.
 
 ## Current Feature Decisions
@@ -50,7 +47,3 @@ The plugin is being built to support:
 - `npm run typecheck`
 - `npm run build`
 - `npm run db:generate` after schema changes touching Parsons persistence
-
-## Documentation Rule
-
-If a change affects only Parsons, update this file and the local plugin README instead of pushing those details into the root project docs.
