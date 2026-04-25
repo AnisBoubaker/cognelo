@@ -158,14 +158,8 @@ function buildPreviewScriptRunner(scripts: Array<{ path: string; source: string 
       var url = URL.createObjectURL(blob);
       window.__cogneloPreviewScriptUrls[url] = script.path;
       scriptElement.src = url;
-      scriptElement.addEventListener("load", function () {
-        URL.revokeObjectURL(url);
-        delete window.__cogneloPreviewScriptUrls[url];
-      });
       scriptElement.addEventListener("error", function () {
         console.error(script.path + ": Unable to load script.");
-        URL.revokeObjectURL(url);
-        delete window.__cogneloPreviewScriptUrls[url];
       });
       document.body.appendChild(scriptElement);
     } catch (error) {
@@ -221,13 +215,42 @@ function buildPreviewConsoleBridge() {
     }
     return sourcePath;
   }
+  function getStackLocation(stack) {
+    var lines = String(stack || "").split("\\n");
+    for (var index = 0; index < lines.length; index += 1) {
+      var blobMatch = lines[index].match(/(blob:[^\\s)]+):(\\d+):(\\d+)/);
+      if (blobMatch) {
+        return {
+          source: getFriendlySource(blobMatch[1]),
+          line: blobMatch[2],
+          column: blobMatch[3]
+        };
+      }
+
+      var sourceMatch = lines[index].match(/cognelo-preview\\/([^\\s)]+):(\\d+):(\\d+)/);
+      if (sourceMatch) {
+        return {
+          source: sourceMatch[1],
+          line: sourceMatch[2],
+          column: sourceMatch[3]
+        };
+      }
+    }
+    return null;
+  }
   window.__cogneloFormatPreviewError = function (sourcePath, error, lineNumber, columnNumber) {
+    var stack = error && error.stack ? String(error.stack) : "";
+    var stackLocation = getStackLocation(stack);
     var friendlySource = getFriendlySource(sourcePath);
+    if ((!sourcePath || sourcePath === "preview" || sourcePath === "event handler" || sourcePath === "promise") && stackLocation) {
+      friendlySource = stackLocation.source;
+    }
     var name = error && error.name ? error.name : "Error";
     var message = error && error.message ? error.message : String(error);
-    var location = lineNumber ? ":" + lineNumber + (columnNumber ? ":" + columnNumber : "") : "";
+    var displayLine = lineNumber || stackLocation && stackLocation.line;
+    var displayColumn = columnNumber || stackLocation && stackLocation.column;
+    var location = displayLine ? ":" + displayLine + (displayColumn ? ":" + displayColumn : "") : "";
     var headline = friendlySource + location + ": " + name + ": " + message;
-    var stack = error && error.stack ? String(error.stack) : "";
     var stackLines = stack
       .split("\\n")
       .map(function (line) { return line.trim(); })
@@ -249,6 +272,39 @@ function buildPreviewConsoleBridge() {
 
     return stackLines.length ? headline + "\\n" + stackLines.join("\\n") : headline;
   };
+  (function wrapEventListeners() {
+    var originalAddEventListener = EventTarget.prototype.addEventListener;
+    var originalRemoveEventListener = EventTarget.prototype.removeEventListener;
+    var listenerMap = new WeakMap();
+
+    function getWrappedListener(listener) {
+      if (typeof listener !== "function") {
+        return listener;
+      }
+
+      var wrapped = listenerMap.get(listener);
+      if (wrapped) {
+        return wrapped;
+      }
+
+      wrapped = function () {
+        try {
+          return listener.apply(this, arguments);
+        } catch (error) {
+          console.error(window.__cogneloFormatPreviewError("event handler", error));
+        }
+      };
+      listenerMap.set(listener, wrapped);
+      return wrapped;
+    }
+
+    EventTarget.prototype.addEventListener = function (type, listener, options) {
+      return originalAddEventListener.call(this, type, getWrappedListener(listener), options);
+    };
+    EventTarget.prototype.removeEventListener = function (type, listener, options) {
+      return originalRemoveEventListener.call(this, type, getWrappedListener(listener), options);
+    };
+  })();
   ["debug", "error", "info", "log", "warn"].forEach(function (level) {
     var original = console[level] ? console[level].bind(console) : console.log.bind(console);
     console[level] = function () {
