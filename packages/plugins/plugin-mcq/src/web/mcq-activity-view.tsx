@@ -2,7 +2,7 @@
 
 import katex from "katex";
 import { type FormEvent, Fragment, useEffect, useMemo, useState } from "react";
-import { CodeEditor, CodeRenderer, codeLanguageOptions } from "@cognelo/activity-ui";
+import { CodeEditor, CodeRenderer, codeLanguageOptions, useNotifications } from "@cognelo/activity-ui";
 import { parseMcqSource, renderInlineMarkdown, renderInlineTokens, type InlineToken, type ParsedMcq, type McqBlock, type McqQuestion } from "../mcq";
 
 type ActivityLike = {
@@ -79,12 +79,12 @@ const copyByLocale = {
 
 export function McqActivityView({ activity, canManage, onSave, locale = "en" }: McqActivityViewProps) {
   const copy = copyByLocale[locale] ?? copyByLocale.en;
+  const notifications = useNotifications();
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);
   const [source, setSource] = useState(String(activity.config?.source ?? fallbackConfig.source));
   const [defaultCodeLanguage, setDefaultCodeLanguage] = useState(String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage));
   const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState("");
   const [error, setError] = useState("");
   const [studentAnswers, setStudentAnswers] = useState<StudentAnswerState>({});
   const [submitted, setSubmitted] = useState(false);
@@ -96,7 +96,6 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en" }: 
     setDefaultCodeLanguage(String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage));
     setStudentAnswers({});
     setSubmitted(false);
-    setSaveMessage("");
     setError("");
   }, [activity]);
 
@@ -124,7 +123,6 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en" }: 
   async function saveMcq(event: FormEvent) {
     event.preventDefault();
     setSaving(true);
-    setSaveMessage("");
     setError("");
 
     try {
@@ -136,9 +134,10 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en" }: 
           defaultCodeLanguage
         }
       });
-      setSaveMessage(copy.saved);
+      notifications.success(copy.saved);
     } catch (err) {
-      setError(err instanceof Error ? err.message : copy.saveError);
+      notifications.error(err instanceof Error ? err.message : copy.saveError);
+      setError("");
     } finally {
       setSaving(false);
     }
@@ -212,8 +211,6 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en" }: 
         ) : null}
 
         {error ? <p className="error">{error}</p> : null}
-        {saveMessage ? <p className="muted">{saveMessage}</p> : null}
-
         <div className="row">
           <button type="submit" disabled={saving || parsedMcq.errors.length > 0 || parsedMcq.questions.length === 0}>
             {saving ? copy.saving : copy.save}

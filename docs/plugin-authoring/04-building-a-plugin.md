@@ -72,11 +72,12 @@ Example:
 
 ```tsx
 import { useState } from "react";
-import { CodeEditor } from "@cognelo/activity-ui";
+import { CodeEditor, useNotifications } from "@cognelo/activity-ui";
 
 export function TracingQuizView({ activity, canManage, onSave }: any) {
   const config = activity.config ?? {};
   const [starterCode, setStarterCode] = useState(String(config.starterCode ?? ""));
+  const notifications = useNotifications();
 
   if (!canManage) {
     return (
@@ -93,16 +94,17 @@ export function TracingQuizView({ activity, canManage, onSave }: any) {
       <CodeEditor value={starterCode} onChange={setStarterCode} language="python" minHeight={240} />
       <button
         type="button"
-        onClick={() =>
-          onSave({
+        onClick={async () => {
+          await onSave({
             title: activity.title,
             description: activity.description,
             config: {
               ...config,
               starterCode
             }
-          })
-        }
+          });
+          notifications.success("Tracing quiz saved.");
+        }}
       >
         Save
       </button>
@@ -114,6 +116,8 @@ export function TracingQuizView({ activity, canManage, onSave }: any) {
 Then register the renderer in:
 
 - [apps/web/src/lib/activity-renderers.tsx](../../apps/web/src/lib/activity-renderers.tsx)
+
+When you need transient confirmation or error feedback in plugin UI, prefer `useNotifications()` over a plugin-specific inline save banner.
 
 ## Step 4: Add Plugin Routes If Needed
 

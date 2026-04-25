@@ -79,12 +79,13 @@ That context includes:
 
 For beginners, this is much easier than designing a totally separate API architecture.
 
-## Shared UI: Code Editor And Code Renderer
+## Shared UI: Code Editor, Code Renderer, And Notifications
 
 Shared UI primitives live in:
 
 - [packages/activity-ui/src/code-editor.tsx](../../packages/activity-ui/src/code-editor.tsx)
 - [packages/activity-ui/src/code-renderer.tsx](../../packages/activity-ui/src/code-renderer.tsx)
+- [packages/activity-ui/src/notifications.tsx](../../packages/activity-ui/src/notifications.tsx)
 
 These are especially useful for programming-learning activities.
 
@@ -102,18 +103,32 @@ These are especially useful for programming-learning activities.
 - line numbers
 - normalized language handling
 
+### What `useNotifications()` Gives You
+
+- shared bottom-right snackbar-style notifications
+- a single pattern for success, error, and informational messages
+- reuse across core forms and plugin UIs without each plugin inventing its own save banner
+
+Use this for transient confirmations and non-field-specific errors.
+
+Prefer it over inline “saved” messages when the feedback does not need to stay attached to a specific form field.
+
 ### Example
 
 ```tsx
-import { CodeEditor, CodeRenderer } from "@cognelo/activity-ui";
+import { CodeEditor, CodeRenderer, useNotifications } from "@cognelo/activity-ui";
 
 export function Demo() {
   const [value, setValue] = useState("print('hello')");
+  const notifications = useNotifications();
 
   return (
     <section className="stack">
       <CodeEditor value={value} onChange={setValue} language="python" />
       <CodeRenderer code={value} language="python" showLineNumbers />
+      <button type="button" onClick={() => notifications.success("Saved.")}>
+        Save
+      </button>
     </section>
   );
 }
