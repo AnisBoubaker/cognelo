@@ -121,9 +121,11 @@ export function buildWebDesignPreviewDocument(files: readonly Pick<WebDesignExer
   const jsFiles = sortedFiles.filter((file) => file.language === "javascript");
   const html = htmlFile?.starterCode.trim() || "<main></main>";
   const styles = cssFiles.map((file) => `/* ${file.path} */\n${file.starterCode}`).join("\n\n");
-  const scripts = jsFiles.map((file) => `// ${file.path}\n${file.starterCode}`).join("\n\n");
   const safeStyles = styles.replace(/<\/style/gi, "<\\/style");
-  const safeScripts = scripts.replace(/<\/script/gi, "<\\/script");
+  const scriptPayload = jsFiles.map((file) => ({
+    path: file.path,
+    source: `${file.starterCode}\n//# sourceURL=cognelo-preview/${file.path}`
+  }));
 
   return `<!doctype html>
 <html lang="en">
@@ -140,15 +142,43 @@ ${safeStyles}
 <body>
 ${html}
   <script>
-${safeScripts}
+${buildPreviewScriptRunner(scriptPayload)}
   </script>
 </body>
 </html>`;
 }
 
+function buildPreviewScriptRunner(scripts: Array<{ path: string; source: string }>) {
+  return `(function () {
+  var scripts = ${JSON.stringify(scripts).replace(/<\/script/gi, "<\\/script")};
+  scripts.forEach(function (script) {
+    try {
+      var scriptElement = document.createElement("script");
+      var blob = new Blob([script.source], { type: "text/javascript" });
+      var url = URL.createObjectURL(blob);
+      window.__cogneloPreviewScriptUrls[url] = script.path;
+      scriptElement.src = url;
+      scriptElement.addEventListener("load", function () {
+        URL.revokeObjectURL(url);
+        delete window.__cogneloPreviewScriptUrls[url];
+      });
+      scriptElement.addEventListener("error", function () {
+        console.error(script.path + ": Unable to load script.");
+        URL.revokeObjectURL(url);
+        delete window.__cogneloPreviewScriptUrls[url];
+      });
+      document.body.appendChild(scriptElement);
+    } catch (error) {
+      console.error(window.__cogneloFormatPreviewError(script.path, error));
+    }
+  });
+})();`;
+}
+
 function buildPreviewConsoleBridge() {
   return `(function () {
   var messageType = "cognelo:web-design-console";
+  window.__cogneloPreviewScriptUrls = {};
   function serialize(value) {
     try {
       if (value instanceof Error) {
@@ -166,12 +196,59 @@ function buildPreviewConsoleBridge() {
     }
   }
   function emit(level, values) {
+    if (values.length === 1 && values[0] === "Script error.") {
+      values = ["Script error. The browser hid the original error; check syntax and code running from external resources."];
+    }
     window.parent.postMessage({
       type: messageType,
       level: level,
       values: Array.prototype.map.call(values, serialize)
     }, "*");
   }
+  function getFriendlySource(sourcePath) {
+    if (!sourcePath) {
+      return "preview";
+    }
+    if (window.__cogneloPreviewScriptUrls[sourcePath]) {
+      return window.__cogneloPreviewScriptUrls[sourcePath];
+    }
+    var sourceMatch = sourcePath.match(/cognelo-preview\\/([^\\s)]+)$/);
+    if (sourceMatch) {
+      return sourceMatch[1];
+    }
+    if (sourcePath.indexOf("blob:") === 0) {
+      return "script.js";
+    }
+    return sourcePath;
+  }
+  window.__cogneloFormatPreviewError = function (sourcePath, error, lineNumber, columnNumber) {
+    var friendlySource = getFriendlySource(sourcePath);
+    var name = error && error.name ? error.name : "Error";
+    var message = error && error.message ? error.message : String(error);
+    var location = lineNumber ? ":" + lineNumber + (columnNumber ? ":" + columnNumber : "") : "";
+    var headline = friendlySource + location + ": " + name + ": " + message;
+    var stack = error && error.stack ? String(error.stack) : "";
+    var stackLines = stack
+      .split("\\n")
+      .map(function (line) { return line.trim(); })
+      .filter(Boolean)
+      .filter(function (line) {
+        return (
+          line !== message &&
+          line !== name + ": " + message &&
+          line.indexOf("eval@[native code]") === -1 &&
+          line.indexOf("forEach@[native code]") === -1 &&
+          line.indexOf("global code@about:srcdoc") === -1 &&
+          line.indexOf("@about:srcdoc") === -1 &&
+          line.indexOf("blob:") === -1
+        );
+      })
+      .map(function (line) {
+        return line.replace(/^eval code@/, friendlySource + "@");
+      });
+
+    return stackLines.length ? headline + "\\n" + stackLines.join("\\n") : headline;
+  };
   ["debug", "error", "info", "log", "warn"].forEach(function (level) {
     var original = console[level] ? console[level].bind(console) : console.log.bind(console);
     console[level] = function () {
@@ -180,10 +257,14 @@ function buildPreviewConsoleBridge() {
     };
   });
   window.addEventListener("error", function (event) {
-    emit("error", [event.message + (event.lineno ? " (" + event.lineno + ":" + event.colno + ")" : "")]);
+    if (event.error) {
+      emit("error", [window.__cogneloFormatPreviewError(event.filename, event.error, event.lineno, event.colno)]);
+      return;
+    }
+    emit("error", [getFriendlySource(event.filename) + (event.lineno ? ":" + event.lineno + ":" + event.colno : "") + ": " + event.message]);
   });
   window.addEventListener("unhandledrejection", function (event) {
-    emit("error", ["Unhandled promise rejection: " + serialize(event.reason)]);
+    emit("error", [window.__cogneloFormatPreviewError("promise", event.reason)]);
   });
 })();`;
 }
