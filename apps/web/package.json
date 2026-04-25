@@ -15,6 +15,7 @@
     "@cognelo/contracts": "0.1.0",
     "@cognelo/plugin-mcq": "0.1.0",
     "@cognelo/plugin-parsons": "0.1.0",
+    "@cognelo/plugin-web-design-coding-exercises": "0.1.0",
     "katex": "^0.16.45",
     "next": "^16.2.4",
     "prism-react-renderer": "^2.4.1",

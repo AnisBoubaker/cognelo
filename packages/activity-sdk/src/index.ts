@@ -4,6 +4,7 @@ import { homeworkGraderPlugin } from "@cognelo/plugin-homework-grader";
 import { parsonsPlugin } from "@cognelo/plugin-parsons";
 import { placeholderPlugin } from "@cognelo/plugin-placeholder";
 import { mcqPlugin } from "@cognelo/plugin-mcq";
+import { webDesignCodingExercisesPlugin } from "@cognelo/plugin-web-design-coding-exercises";
 
 export type PluginLocale = "en" | "fr" | "zh";
 
@@ -36,7 +37,14 @@ export type ActivityPlugin = {
   activities: ActivityDefinition[];
 };
 
-const plugins: ActivityPlugin[] = [placeholderPlugin, homeworkGraderPlugin, parsonsPlugin, mcqPlugin, codingExercisesPlugin];
+const plugins: ActivityPlugin[] = [
+  placeholderPlugin,
+  homeworkGraderPlugin,
+  parsonsPlugin,
+  mcqPlugin,
+  codingExercisesPlugin,
+  webDesignCodingExercisesPlugin
+];
 
 const definitions = new Map<string, ActivityDefinition>();
 for (const plugin of plugins) {

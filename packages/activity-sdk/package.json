@@ -9,6 +9,7 @@
     "@cognelo/plugin-parsons": "0.1.0",
     "@cognelo/plugin-placeholder": "0.1.0",
     "@cognelo/plugin-mcq": "0.1.0",
+    "@cognelo/plugin-web-design-coding-exercises": "0.1.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
