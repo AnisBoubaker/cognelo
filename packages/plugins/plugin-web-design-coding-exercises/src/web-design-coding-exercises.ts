@@ -24,6 +24,28 @@ export const webDesignExerciseConfigSchema = z.object({
 
 export type WebDesignExerciseConfig = z.infer<typeof webDesignExerciseConfigSchema>;
 
+export const webDesignExerciseTestKindSchema = z.enum(["sample", "hidden"]);
+
+export type WebDesignExerciseTestKind = z.infer<typeof webDesignExerciseTestKindSchema>;
+
+export const webDesignExerciseTestInputSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(180),
+  kind: webDesignExerciseTestKindSchema.default("hidden"),
+  testCode: z.string().min(1).max(80000),
+  isEnabled: z.boolean().default(true),
+  weight: z.number().int().min(0).max(1000).default(1),
+  metadata: z.record(z.unknown()).default({})
+});
+
+export const webDesignExerciseTestsInputSchema = z.object({
+  referenceFiles: z.array(webDesignExerciseFileSchema).min(1).max(12),
+  tests: z.array(webDesignExerciseTestInputSchema).max(80)
+});
+
+export type WebDesignExerciseTestInput = z.infer<typeof webDesignExerciseTestInputSchema>;
+export type WebDesignExerciseTestsInput = z.infer<typeof webDesignExerciseTestsInputSchema>;
+
 export const defaultWebDesignExerciseFiles: WebDesignExerciseFile[] = [
   {
     id: "index-html",

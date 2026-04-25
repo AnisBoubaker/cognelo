@@ -15,4 +15,11 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export { Prisma, PrismaClient } from "@prisma/client";
-export type { PluginParsonsAttempt, PluginParsonsAttemptEvent } from "@prisma/client";
+export type {
+  PluginParsonsAttempt,
+  PluginParsonsAttemptEvent,
+  PluginWebDesignExerciseReferenceBundle,
+  PluginWebDesignExerciseSubmission,
+  PluginWebDesignExerciseTest,
+  PluginWebDesignExerciseTestResult
+} from "@prisma/client";

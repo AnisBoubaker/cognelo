@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "set -a && . ./.env && set +a && node ./scripts/dev.mjs",
     "dev:api": "set -a && . ./.env && set +a && npm run dev --workspace @cognelo/api",
+    "dev:runner": "docker compose up -d web-design-runner",
     "dev:web": "set -a && . ./.env && set +a && npm run dev --workspace @cognelo/web",
     "dev:stop": "node ./scripts/stop-dev.mjs",
     "build": "npm run build --workspaces --if-present",

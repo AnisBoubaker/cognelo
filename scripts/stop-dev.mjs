@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 
-const ports = [3000, 3001];
+const ports = [3000, 3001, 3456];
 const pids = new Set();
 
 for (const port of ports) {
@@ -17,7 +17,7 @@ for (const port of ports) {
 }
 
 if (pids.size === 0) {
-  console.log("No dev servers are listening on ports 3000 or 3001.");
+  console.log("No dev servers are listening on ports 3000, 3001, or 3456.");
   process.exit(0);
 }
 

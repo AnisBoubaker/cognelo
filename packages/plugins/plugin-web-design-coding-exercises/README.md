@@ -17,7 +17,11 @@ src/
   db.ts                         Plugin DB manifest
   index.ts                      Public plugin exports
   plugin.ts                     Activity plugin definition
+  routes.ts                     Plugin-owned test management and execution subroutes
   server.ts                     Server plugin registration
+  tests.ts                      Reference bundle and Playwright test persistence
+  runner.ts                     HTTP client for the external Playwright runner
+  executions.ts                 Student run/submit persistence and result normalization
   web-design-coding-exercises.ts
                                 Shared config parsing and preview helpers
   web/
@@ -41,15 +45,29 @@ The initial implementation keeps only student-visible fields in `Activity.config
 - `previewEntry`
 - `maxEditorSeconds`
 
-Planned plugin-owned persistence:
+Plugin-owned persistence:
 
-- teacher reference file bundle
-- hidden Playwright tests
-- submission history and normalized test results
+- `PluginWebDesignExerciseReferenceBundle`: teacher reference file bundle and validation summary
+- `PluginWebDesignExerciseTest`: sample and hidden Playwright tests
+- `PluginWebDesignExerciseSubmission`: student run/submit file bundle and overall result summary
+- `PluginWebDesignExerciseTestResult`: normalized per-test result records
 
-## Planned Playwright Grading
+## Playwright Grading
 
-The intended submit flow is:
+Implemented plugin subroutes:
+
+```text
+GET    /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/tests
+PUT    /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/tests
+GET    /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/run
+POST   /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/run
+GET    /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/submit
+POST   /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/submit
+```
+
+The same routes are available through group-scoped assigned activity dispatch. The test-management route is teacher/admin-only and persists the reference bundle plus sample/hidden Playwright tests. Student run uses enabled sample tests; student submit uses enabled hidden tests.
+
+The submit flow is:
 
 1. web UI calls a Cognelo plugin route
 2. plugin route authenticates the user and loads the activity
@@ -60,6 +78,16 @@ The intended submit flow is:
 7. Cognelo stores filtered results and returns them to the browser
 
 The browser should never receive hidden tests or private reference files.
+
+## Docker Runner
+
+The Playwright runner lives in `packages/web-design-runner` and is intended to run in Docker with the official Playwright image, so Chromium and system dependencies are container-managed rather than installed on each developer machine.
+
+```text
+npm run dev:runner
+```
+
+The runner listens on port `3456`. The API reads `WEB_DESIGN_RUNNER_URL`, which defaults to `http://localhost:3456` for local development. Running `docker compose up -d web-design-runner` is equivalent to `npm run dev:runner`.
 
 ## Contributor Workflow
 

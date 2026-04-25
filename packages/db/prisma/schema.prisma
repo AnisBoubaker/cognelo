@@ -68,6 +68,22 @@ enum PluginCodingExerciseExecutionStatus {
   failed
 }
 
+enum PluginWebDesignExerciseTestKind {
+  sample
+  hidden
+}
+
+enum PluginWebDesignExerciseSubmissionKind {
+  run
+  submit
+}
+
+enum PluginWebDesignExerciseSubmissionStatus {
+  pending
+  completed
+  failed
+}
+
 model User {
   id              String             @id @default(cuid())
   email           String             @unique
@@ -86,6 +102,7 @@ model User {
   groupMaterials  CourseGroupMaterial[] @relation("GroupMaterialCreator")
   parsonsAttempts PluginParsonsAttempt[]
   codingExerciseExecutions PluginCodingExerciseExecution[]
+  webDesignExerciseSubmissions PluginWebDesignExerciseSubmission[]
 
   @@index([email])
 }
@@ -297,6 +314,9 @@ model Activity {
   codingExerciseHiddenTests PluginCodingExerciseHiddenTest[]
   codingExerciseExecutions PluginCodingExerciseExecution[]
   codingExerciseReferenceSolution PluginCodingExerciseReferenceSolution?
+  webDesignExerciseReferenceBundle PluginWebDesignExerciseReferenceBundle?
+  webDesignExerciseTests PluginWebDesignExerciseTest[]
+  webDesignExerciseSubmissions PluginWebDesignExerciseSubmission[]
 
   @@index([courseId, position])
   @@index([activityTypeId])
@@ -399,4 +419,77 @@ model PluginCodingExerciseExecution {
   @@index([userId, createdAt])
   @@index([activityId, kind, createdAt])
   @@index([judge0Token])
+}
+
+model PluginWebDesignExerciseReferenceBundle {
+  id                String   @id @default(cuid())
+  activityId        String   @unique
+  files             Json     @default("[]")
+  validationSummary Json     @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  activity          Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+}
+
+model PluginWebDesignExerciseTest {
+  id                String                          @id @default(cuid())
+  activityId        String
+  name              String
+  kind              PluginWebDesignExerciseTestKind @default(hidden)
+  testCode          String
+  orderIndex        Int                             @default(0)
+  isEnabled         Boolean                         @default(true)
+  weight            Int                             @default(1)
+  metadata          Json                            @default("{}")
+  validationSummary Json                            @default("{}")
+  createdAt         DateTime                        @default(now())
+  updatedAt         DateTime                        @updatedAt
+  activity          Activity                        @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  results           PluginWebDesignExerciseTestResult[]
+
+  @@index([activityId, kind, orderIndex])
+  @@index([activityId, isEnabled])
+}
+
+model PluginWebDesignExerciseSubmission {
+  id            String                                  @id @default(cuid())
+  activityId    String
+  userId        String
+  kind          PluginWebDesignExerciseSubmissionKind   @default(run)
+  status        PluginWebDesignExerciseSubmissionStatus @default(pending)
+  files         Json                                    @default("[]")
+  resultSummary Json                                    @default("{}")
+  score         Float?
+  maxScore      Float?
+  message       String?
+  createdAt     DateTime                                @default(now())
+  updatedAt     DateTime                                @updatedAt
+  activity      Activity                                @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user          User                                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  testResults   PluginWebDesignExerciseTestResult[]
+
+  @@index([activityId, userId, createdAt])
+  @@index([userId, createdAt])
+  @@index([activityId, kind, createdAt])
+  @@index([activityId, status, createdAt])
+}
+
+model PluginWebDesignExerciseTestResult {
+  id           String                            @id @default(cuid())
+  submissionId String
+  testId       String?
+  name         String
+  status       PluginWebDesignExerciseSubmissionStatus
+  weight       Int                               @default(1)
+  score        Float?
+  message      String?
+  durationMs   Int?
+  details      Json                              @default("{}")
+  createdAt    DateTime                          @default(now())
+  submission   PluginWebDesignExerciseSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  test         PluginWebDesignExerciseTest?      @relation(fields: [testId], references: [id], onDelete: SetNull)
+
+  @@index([submissionId])
+  @@index([testId])
+  @@index([status])
 }

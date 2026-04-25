@@ -11,6 +11,7 @@ import {
   parseWebDesignExerciseConfig,
   type WebDesignExerciseConfig,
   type WebDesignExerciseFile,
+  type WebDesignExerciseTestKind,
   type WebDesignFileLanguage
 } from "../web-design-coding-exercises";
 
@@ -21,11 +22,88 @@ type ActivityLike = {
   config?: Record<string, unknown>;
 };
 
+type CourseLike = {
+  id: string;
+};
+
+type WebDesignExerciseTestRecord = {
+  id: string;
+  name: string;
+  kind: WebDesignExerciseTestKind;
+  testCode: string;
+  isEnabled: boolean;
+  weight: number;
+  orderIndex: number;
+  metadata: Record<string, unknown>;
+  validationSummary: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type WebDesignExerciseReferenceBundleRecord = {
+  files: WebDesignExerciseFile[];
+  validationSummary: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type WebDesignExerciseSubmissionRecord = {
+  id: string;
+  activityId: string;
+  userId: string;
+  kind: "run" | "submit";
+  status: "pending" | "completed" | "failed";
+  files: WebDesignExerciseFile[];
+  resultSummary: Record<string, unknown>;
+  score: number | null;
+  maxScore: number | null;
+  message: string | null;
+  createdAt: string;
+  updatedAt: string;
+  testResults: Array<{
+    id: string;
+    testId: string | null;
+    name: string;
+    status: "pending" | "completed" | "failed";
+    weight: number;
+    score: number | null;
+    message: string | null;
+    durationMs: number | null;
+    details: Record<string, unknown>;
+    createdAt: string;
+  }>;
+};
+
+type WebDesignExerciseClient = {
+  listTests: (
+    courseId: string,
+    activityId: string
+  ) => Promise<{ tests: WebDesignExerciseTestRecord[]; referenceBundle: WebDesignExerciseReferenceBundleRecord | null }>;
+  saveTests: (
+    courseId: string,
+    activityId: string,
+    input: {
+      referenceFiles: WebDesignExerciseFile[];
+      tests: Array<Omit<WebDesignExerciseTestRecord, "orderIndex" | "createdAt" | "updatedAt" | "validationSummary">>;
+    }
+  ) => Promise<{ tests: WebDesignExerciseTestRecord[]; referenceBundle: WebDesignExerciseReferenceBundleRecord | null }>;
+  runCode: (courseId: string, activityId: string, input: { files: WebDesignExerciseFile[] }) => Promise<{ submission: WebDesignExerciseSubmissionRecord }>;
+  listRuns: (courseId: string, activityId: string) => Promise<{ submissions: WebDesignExerciseSubmissionRecord[] }>;
+  submitCode: (
+    courseId: string,
+    activityId: string,
+    input: { files: WebDesignExerciseFile[] }
+  ) => Promise<{ submission: WebDesignExerciseSubmissionRecord }>;
+  listSubmissions: (courseId: string, activityId: string) => Promise<{ submissions: WebDesignExerciseSubmissionRecord[] }>;
+};
+
 type WebDesignCodingExerciseActivityViewProps = {
   activity: ActivityLike;
   canManage: boolean;
+  course?: CourseLike | null;
   onSave: (input: { title: string; description: string; config: Record<string, unknown> }) => Promise<ActivityLike>;
   locale?: "en" | "fr" | "zh";
+  webDesignClient?: WebDesignExerciseClient;
 };
 
 type PreviewConsoleMessage = {
@@ -44,8 +122,35 @@ type PreviewPaneCopy = {
 type StudentWorkspaceCopy = PreviewPaneCopy & {
   files: string;
   editor: string;
+  saving: string;
+  remove: string;
   fullScreen: string;
   exitFullScreen: string;
+  testsTitle: string;
+  testsLoadError: string;
+  testsSaved: string;
+  testsSaveError: string;
+  referenceBundle: string;
+  useCurrentFiles: string;
+  addTest: string;
+  saveTests: string;
+  noTests: string;
+  testName: string;
+  testKind: string;
+  testCode: string;
+  sample: string;
+  hidden: string;
+  enabled: string;
+  weight: string;
+  runTests: string;
+  submit: string;
+  runningTests: string;
+  submitting: string;
+  result: string;
+  passed: string;
+  failed: string;
+  noRunner: string;
+  noCourse: string;
 };
 
 const fileLanguageOptions: Array<{ value: WebDesignFileLanguage; label: string }> = [
@@ -79,7 +184,32 @@ const copyByLocale = {
     clearConsole: "Clear",
     emptyConsole: "No messages",
     fullScreen: "Full screen",
-    exitFullScreen: "Exit full screen"
+    exitFullScreen: "Exit full screen",
+    testsTitle: "Playwright tests",
+    testsLoadError: "Unable to load web design tests.",
+    testsSaved: "Web design tests saved.",
+    testsSaveError: "Unable to save web design tests right now.",
+    referenceBundle: "Reference bundle",
+    useCurrentFiles: "Use current files as reference",
+    addTest: "Add test",
+    saveTests: "Save tests",
+    noTests: "No tests yet.",
+    testName: "Test name",
+    testKind: "Kind",
+    testCode: "Playwright test code",
+    sample: "Sample",
+    hidden: "Hidden",
+    enabled: "Enabled",
+    weight: "Weight",
+    runTests: "Run sample tests",
+    submit: "Submit",
+    runningTests: "Running...",
+    submitting: "Submitting...",
+    result: "Result",
+    passed: "Passed",
+    failed: "Failed",
+    noRunner: "Tests are not available yet.",
+    noCourse: "Open this exercise from a course to run tests."
   },
   fr: {
     authoringTitle: "Edition de l'exercice de conception web",
@@ -105,7 +235,32 @@ const copyByLocale = {
     clearConsole: "Effacer",
     emptyConsole: "Aucun message",
     fullScreen: "Plein ecran",
-    exitFullScreen: "Quitter le plein ecran"
+    exitFullScreen: "Quitter le plein ecran",
+    testsTitle: "Tests Playwright",
+    testsLoadError: "Impossible de charger les tests de conception web.",
+    testsSaved: "Les tests de conception web ont ete enregistres.",
+    testsSaveError: "Impossible d'enregistrer les tests de conception web pour le moment.",
+    referenceBundle: "Ensemble de reference",
+    useCurrentFiles: "Utiliser les fichiers actuels comme reference",
+    addTest: "Ajouter un test",
+    saveTests: "Enregistrer les tests",
+    noTests: "Aucun test pour le moment.",
+    testName: "Nom du test",
+    testKind: "Type",
+    testCode: "Code de test Playwright",
+    sample: "Exemple",
+    hidden: "Cache",
+    enabled: "Active",
+    weight: "Poids",
+    runTests: "Lancer les tests d'exemple",
+    submit: "Soumettre",
+    runningTests: "Execution...",
+    submitting: "Soumission...",
+    result: "Resultat",
+    passed: "Reussi",
+    failed: "Echoue",
+    noRunner: "Les tests ne sont pas encore disponibles.",
+    noCourse: "Ouvrez cet exercice depuis un cours pour lancer les tests."
   },
   zh: {
     authoringTitle: "网页设计练习编辑",
@@ -131,15 +286,42 @@ const copyByLocale = {
     clearConsole: "清除",
     emptyConsole: "暂无消息",
     fullScreen: "全屏",
-    exitFullScreen: "退出全屏"
+    exitFullScreen: "退出全屏",
+    testsTitle: "Playwright 测试",
+    testsLoadError: "无法加载网页设计测试。",
+    testsSaved: "网页设计测试已保存。",
+    testsSaveError: "暂时无法保存网页设计测试。",
+    referenceBundle: "参考文件包",
+    useCurrentFiles: "使用当前文件作为参考",
+    addTest: "添加测试",
+    saveTests: "保存测试",
+    noTests: "暂无测试。",
+    testName: "测试名称",
+    testKind: "类型",
+    testCode: "Playwright 测试代码",
+    sample: "示例",
+    hidden: "隐藏",
+    enabled: "启用",
+    weight: "权重",
+    runTests: "运行示例测试",
+    submit: "提交",
+    runningTests: "运行中...",
+    submitting: "提交中...",
+    result: "结果",
+    passed: "通过",
+    failed: "失败",
+    noRunner: "测试暂不可用。",
+    noCourse: "请从课程中打开此练习以运行测试。"
   }
 } as const;
 
 export function WebDesignCodingExerciseActivityView({
   activity,
   canManage,
+  course,
   onSave,
-  locale = "en"
+  locale = "en",
+  webDesignClient
 }: WebDesignCodingExerciseActivityViewProps) {
   const copy = copyByLocale[locale] ?? copyByLocale.en;
   const notifications = useNotifications();
@@ -152,6 +334,9 @@ export function WebDesignCodingExerciseActivityView({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [executingKind, setExecutingKind] = useState<"run" | "submit" | null>(null);
+  const [latestSubmission, setLatestSubmission] = useState<WebDesignExerciseSubmissionRecord | null>(null);
+  const [executionError, setExecutionError] = useState("");
 
   useEffect(() => {
     const nextConfig = parseWebDesignExerciseConfig(activity.config);
@@ -163,7 +348,34 @@ export function WebDesignCodingExerciseActivityView({
     setSaving(false);
     setError("");
     setIsFullScreen(false);
+    setExecutingKind(null);
+    setLatestSubmission(null);
+    setExecutionError("");
   }, [activity]);
+
+  useEffect(() => {
+    if (canManage || !course?.id || !webDesignClient) {
+      return;
+    }
+
+    let isMounted = true;
+    Promise.all([webDesignClient.listSubmissions(course.id, activity.id), webDesignClient.listRuns(course.id, activity.id)])
+      .then(([submissionsResult, runsResult]) => {
+        if (!isMounted) {
+          return;
+        }
+        setLatestSubmission(submissionsResult.submissions[0] ?? runsResult.submissions[0] ?? null);
+      })
+      .catch(() => {
+        if (isMounted) {
+          setLatestSubmission(null);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activity.id, canManage, course?.id, webDesignClient]);
 
   useEffect(() => {
     if (!isFullScreen) {
@@ -279,6 +491,32 @@ export function WebDesignCodingExerciseActivityView({
     });
   }
 
+  async function executeStudentTests(kind: "run" | "submit") {
+    if (!course?.id) {
+      setExecutionError(copy.noCourse);
+      return;
+    }
+
+    if (!webDesignClient) {
+      setExecutionError(copy.noRunner);
+      return;
+    }
+
+    setExecutingKind(kind);
+    setExecutionError("");
+    try {
+      const result =
+        kind === "run"
+          ? await webDesignClient.runCode(course.id, activity.id, { files: normalizedFiles })
+          : await webDesignClient.submitCode(course.id, activity.id, { files: normalizedFiles });
+      setLatestSubmission(result.submission);
+    } catch (err) {
+      setExecutionError(err instanceof Error ? err.message : copy.noRunner);
+    } finally {
+      setExecutingKind(null);
+    }
+  }
+
   if (canManage) {
     return (
       <form className="section stack" onSubmit={saveExercise}>
@@ -369,6 +607,14 @@ export function WebDesignCodingExerciseActivityView({
         </div>
 
         <PreviewPane copy={copy} previewDocument={previewDocument} />
+
+        <WebDesignTestsPanel
+          activityId={activity.id}
+          copy={copy}
+          courseId={course?.id ?? ""}
+          currentFiles={normalizedFiles}
+          webDesignClient={webDesignClient}
+        />
       </form>
     );
   }
@@ -382,11 +628,17 @@ export function WebDesignCodingExerciseActivityView({
           activePath={activePath}
           copy={copy}
           files={normalizedFiles}
+          executionError={executionError}
+          executingKind={executingKind}
+          latestSubmission={latestSubmission}
           onActivePathChange={setActivePath}
           onEnterFullScreen={() => setIsFullScreen(true)}
           onExitFullScreen={() => setIsFullScreen(false)}
+          onRunTests={() => executeStudentTests("run")}
+          onSubmit={() => executeStudentTests("submit")}
           onUpdateFile={updateFile}
           previewDocument={previewDocument}
+          testsAvailable={Boolean(course?.id && webDesignClient)}
         />
       </section>
 
@@ -406,12 +658,18 @@ export function WebDesignCodingExerciseActivityView({
             activePath={activePath}
             copy={copy}
             files={normalizedFiles}
+            executionError={executionError}
+            executingKind={executingKind}
             fullScreen
+            latestSubmission={latestSubmission}
             onActivePathChange={setActivePath}
             onEnterFullScreen={() => setIsFullScreen(true)}
             onExitFullScreen={() => setIsFullScreen(false)}
+            onRunTests={() => executeStudentTests("run")}
+            onSubmit={() => executeStudentTests("submit")}
             onUpdateFile={updateFile}
             previewDocument={previewDocument}
+            testsAvailable={Boolean(course?.id && webDesignClient)}
           />
         </div>
       ) : null}
@@ -423,40 +681,63 @@ function StudentWorkspace({
   activeFile,
   activePath,
   copy,
+  executionError,
+  executingKind,
   files,
   fullScreen = false,
+  latestSubmission,
   onActivePathChange,
   onEnterFullScreen,
   onExitFullScreen,
+  onRunTests,
+  onSubmit,
   onUpdateFile,
-  previewDocument
+  previewDocument,
+  testsAvailable
 }: {
   activeFile: WebDesignExerciseFile | undefined;
   activePath: string;
   copy: StudentWorkspaceCopy;
+  executionError: string;
+  executingKind: "run" | "submit" | null;
   files: readonly WebDesignExerciseFile[];
   fullScreen?: boolean;
+  latestSubmission: WebDesignExerciseSubmissionRecord | null;
   onActivePathChange: (path: string) => void;
   onEnterFullScreen: () => void;
   onExitFullScreen: () => void;
+  onRunTests: () => void;
+  onSubmit: () => void;
   onUpdateFile: (path: string, patch: Partial<WebDesignExerciseFile>) => void;
   previewDocument: string;
+  testsAvailable: boolean;
 }) {
   return (
     <div
       style={{
         display: "grid",
         gap: 12,
-        gridTemplateRows: "auto minmax(0, 1fr)",
+        gridTemplateRows: "auto auto minmax(0, 1fr)",
         height: fullScreen ? "100%" : undefined,
         minHeight: fullScreen ? 0 : undefined
       }}
     >
-      <div className="row" style={{ justifyContent: "flex-end" }}>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <div className="row">
+          <button type="button" className="secondary" onClick={onRunTests} disabled={!testsAvailable || executingKind !== null}>
+            {executingKind === "run" ? copy.runningTests : copy.runTests}
+          </button>
+          <button type="button" onClick={onSubmit} disabled={!testsAvailable || executingKind !== null}>
+            {executingKind === "submit" ? copy.submitting : copy.submit}
+          </button>
+        </div>
         <button type="button" className="secondary" onClick={fullScreen ? onExitFullScreen : onEnterFullScreen}>
           {fullScreen ? copy.exitFullScreen : copy.fullScreen}
         </button>
       </div>
+
+      <StudentTestResultPanel copy={copy} error={executionError} submission={latestSubmission} />
+
       <div
         style={{
           alignItems: "stretch",
@@ -511,6 +792,262 @@ function StudentWorkspace({
         <PreviewPane copy={copy} previewDocument={previewDocument} showConsole fillHeight={fullScreen} />
       </div>
     </div>
+  );
+}
+
+function StudentTestResultPanel({
+  copy,
+  error,
+  submission
+}: {
+  copy: StudentWorkspaceCopy;
+  error: string;
+  submission: WebDesignExerciseSubmissionRecord | null;
+}) {
+  if (!error && !submission) {
+    return null;
+  }
+
+  return (
+    <section
+      className="stack"
+      style={{
+        border: "1px solid rgba(13, 27, 71, 0.12)",
+        borderRadius: 8,
+        gap: 8,
+        padding: 12
+      }}
+    >
+      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+        <h3 style={{ margin: 0 }}>{copy.result}</h3>
+        {submission ? (
+          <strong style={{ color: submission.status === "completed" ? "#166534" : "#b42318" }}>
+            {submission.score ?? 0}/{submission.maxScore ?? 0}
+          </strong>
+        ) : null}
+      </div>
+      {error ? <p className="error" style={{ margin: 0 }}>{error}</p> : null}
+      {submission?.message ? <p className="muted" style={{ margin: 0 }}>{submission.message}</p> : null}
+      {submission?.testResults.length ? (
+        <div className="stack" style={{ gap: 6 }}>
+          {submission.testResults.map((result) => (
+            <div
+              key={result.id}
+              className="row"
+              style={{
+                alignItems: "center",
+                borderTop: "1px solid rgba(13, 27, 71, 0.08)",
+                justifyContent: "space-between",
+                paddingTop: 6
+              }}
+            >
+              <span>{result.name}</span>
+              <span style={{ color: result.status === "completed" ? "#166534" : "#b42318", fontWeight: 700 }}>
+                {result.status === "completed" ? copy.passed : copy.failed}
+                {result.message ? `: ${result.message}` : ""}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function WebDesignTestsPanel({
+  activityId,
+  copy,
+  courseId,
+  currentFiles,
+  webDesignClient
+}: {
+  activityId: string;
+  copy: StudentWorkspaceCopy;
+  courseId: string;
+  currentFiles: readonly WebDesignExerciseFile[];
+  webDesignClient?: WebDesignExerciseClient;
+}) {
+  const notifications = useNotifications();
+  const [tests, setTests] = useState<WebDesignExerciseTestRecord[]>([]);
+  const [referenceFiles, setReferenceFiles] = useState<WebDesignExerciseFile[]>(() => currentFiles.map((file) => ({ ...file })));
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!courseId || !webDesignClient) {
+      setReferenceFiles(currentFiles.map((file) => ({ ...file })));
+      return;
+    }
+
+    let isMounted = true;
+    setLoading(true);
+    webDesignClient
+      .listTests(courseId, activityId)
+      .then((result) => {
+        if (!isMounted) {
+          return;
+        }
+        setTests(result.tests);
+        setReferenceFiles(result.referenceBundle?.files.length ? result.referenceBundle.files : currentFiles.map((file) => ({ ...file })));
+      })
+      .catch((err) => {
+        if (isMounted) {
+          notifications.error(err instanceof Error ? err.message : copy.testsLoadError);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activityId, copy.testsLoadError, courseId, currentFiles, notifications, webDesignClient]);
+
+  async function saveTests() {
+    if (!courseId || !webDesignClient) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await webDesignClient.saveTests(courseId, activityId, {
+        referenceFiles,
+        tests: tests.map((test) => ({
+          id: test.id,
+          name: test.name,
+          kind: test.kind,
+          testCode: test.testCode,
+          isEnabled: test.isEnabled,
+          weight: test.weight,
+          metadata: test.metadata
+        }))
+      });
+      setTests(result.tests);
+      setReferenceFiles(result.referenceBundle?.files.length ? result.referenceBundle.files : referenceFiles);
+      notifications.success(copy.testsSaved);
+    } catch (err) {
+      notifications.error(err instanceof Error ? err.message : copy.testsSaveError);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function addTest() {
+    setTests((current) => [
+      ...current,
+      {
+        id: `web-test-${Date.now()}`,
+        name: `Test ${current.length + 1}`,
+        kind: "hidden",
+        testCode: 'await expect(page.locator("body")).toBeVisible();',
+        isEnabled: true,
+        weight: 1,
+        orderIndex: current.length,
+        metadata: {},
+        validationSummary: {},
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ]);
+  }
+
+  function updateTest(testId: string, patch: Partial<WebDesignExerciseTestRecord>) {
+    setTests((current) => current.map((test) => (test.id === testId ? { ...test, ...patch } : test)));
+  }
+
+  function removeTest(testId: string) {
+    setTests((current) => current.filter((test) => test.id !== testId));
+  }
+
+  return (
+    <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
+      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+        <h3 style={{ margin: 0 }}>{copy.testsTitle}</h3>
+        <div className="row">
+          <button type="button" className="secondary" onClick={() => setReferenceFiles(currentFiles.map((file) => ({ ...file })))}>
+            {copy.useCurrentFiles}
+          </button>
+          <button type="button" className="secondary" onClick={addTest}>
+            {copy.addTest}
+          </button>
+          <button type="button" onClick={saveTests} disabled={saving || loading || !courseId || !webDesignClient}>
+            {saving ? copy.saving : copy.saveTests}
+          </button>
+        </div>
+      </div>
+
+      <p className="muted" style={{ margin: 0 }}>
+        {copy.referenceBundle}: {referenceFiles.map((file) => file.path).join(", ")}
+      </p>
+
+      {tests.length ? (
+        <div className="stack" style={{ gap: 12 }}>
+          {tests.map((test) => (
+            <section key={test.id} className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.12)", borderRadius: 8, padding: 14 }}>
+              <div className="row" style={{ alignItems: "end" }}>
+                <div className="field" style={{ flex: "1 1 220px" }}>
+                  <label htmlFor={`web-design-test-name-${test.id}`}>{copy.testName}</label>
+                  <input
+                    id={`web-design-test-name-${test.id}`}
+                    value={test.name}
+                    onChange={(event) => updateTest(test.id, { name: event.target.value })}
+                  />
+                </div>
+                <div className="field" style={{ flex: "0 1 150px" }}>
+                  <label htmlFor={`web-design-test-kind-${test.id}`}>{copy.testKind}</label>
+                  <select
+                    id={`web-design-test-kind-${test.id}`}
+                    value={test.kind}
+                    onChange={(event) => updateTest(test.id, { kind: event.target.value as WebDesignExerciseTestKind })}
+                  >
+                    <option value="sample">{copy.sample}</option>
+                    <option value="hidden">{copy.hidden}</option>
+                  </select>
+                </div>
+                <div className="field" style={{ flex: "0 1 110px" }}>
+                  <label htmlFor={`web-design-test-weight-${test.id}`}>{copy.weight}</label>
+                  <input
+                    id={`web-design-test-weight-${test.id}`}
+                    min={0}
+                    type="number"
+                    value={test.weight}
+                    onChange={(event) => updateTest(test.id, { weight: Number(event.target.value) || 0 })}
+                  />
+                </div>
+                <label className="row" style={{ gap: 8, minHeight: 42 }}>
+                  <input
+                    type="checkbox"
+                    checked={test.isEnabled}
+                    onChange={(event) => updateTest(test.id, { isEnabled: event.target.checked })}
+                  />
+                  {copy.enabled}
+                </label>
+                <button type="button" className="secondary" onClick={() => removeTest(test.id)}>
+                  {copy.remove}
+                </button>
+              </div>
+              <div className="stack">
+                <span>{copy.testCode}</span>
+                <MonacoCodeEditor
+                  id={`web-design-test-code-${test.id}`}
+                  value={test.testCode}
+                  onChange={(value) => updateTest(test.id, { testCode: value })}
+                  language="javascript"
+                  minHeight={220}
+                />
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <p className="muted" style={{ margin: 0 }}>
+          {loading ? copy.saving : copy.noTests}
+        </p>
+      )}
+    </section>
   );
 }
 
