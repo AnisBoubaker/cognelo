@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const codingExerciseTemplateInsertionToken = "{{ STUDENT_CODE }}";
+export const codingExerciseTestInsertionToken = "{{ TEST_CODE }}";
 
 export const codingExerciseExecutionModeSchema = z.literal("template");
 
@@ -126,11 +127,19 @@ export function normalizeCodingExerciseSampleTests(value: unknown) {
 
 export function parseCodingExercisePrivateConfig(value: unknown) {
   const parsed = codingExercisePrivateConfigSchema.parse(value ?? {});
+  const hiddenSupportCode = parsed.hiddenSupportCode.trim();
+  const mergedTemplateSource = parsed.templateSource.trim()
+    ? hiddenSupportCode
+      ? `${hiddenSupportCode}\n\n${parsed.templateSource}`
+      : parsed.templateSource
+    : hiddenSupportCode || buildCodingExerciseTemplateSource(parsed.templatePrefix, parsed.templateSuffix);
 
-  if (parsed.templateSource.trim()) {
-    const templateParts = splitCodingExerciseTemplateSource(parsed.templateSource);
+  if (mergedTemplateSource.trim()) {
+    const templateParts = splitCodingExerciseTemplateSource(mergedTemplateSource);
     return {
       ...parsed,
+      hiddenSupportCode: "",
+      templateSource: mergedTemplateSource,
       templatePrefix: templateParts.prefix,
       templateSuffix: templateParts.suffix
     };
@@ -138,6 +147,7 @@ export function parseCodingExercisePrivateConfig(value: unknown) {
 
   return {
     ...parsed,
+    hiddenSupportCode: "",
     templateSource: buildCodingExerciseTemplateSource(parsed.templatePrefix, parsed.templateSuffix)
   };
 }
@@ -149,25 +159,40 @@ export function buildCodingExerciseSource(params: {
   testCode?: string;
 }) {
   const sections: string[] = [];
-  const hiddenSupportCode = params.privateConfig.hiddenSupportCode.trim();
   const templateSource = params.privateConfig.templateSource || buildCodingExerciseTemplateSource(params.privateConfig.templatePrefix, params.privateConfig.templateSuffix);
   const testCode = (params.testCode ?? "").trim();
-
-  if (hiddenSupportCode) {
-    sections.push(params.privateConfig.hiddenSupportCode);
+  if (testCode && !templateSource.includes(codingExerciseTestInsertionToken)) {
+    throw new Error("The template must include {{ TEST_CODE }} before test code can be used.");
   }
+  let composedTemplateSource = templateSource;
 
-  if (templateSource.includes(codingExerciseTemplateInsertionToken)) {
-    sections.push(templateSource.replace(codingExerciseTemplateInsertionToken, params.studentSourceCode));
-  } else if (templateSource.trim().length > 0) {
-    sections.push(templateSource);
+  if (composedTemplateSource.includes(codingExerciseTemplateInsertionToken)) {
+    composedTemplateSource = injectCodingExerciseTemplateCode(
+      composedTemplateSource,
+      codingExerciseTemplateInsertionToken,
+      params.studentSourceCode
+    );
+  } else if (composedTemplateSource.trim().length > 0) {
+    sections.push(composedTemplateSource);
     sections.push(params.studentSourceCode);
+    composedTemplateSource = "";
   } else {
     sections.push(params.studentSourceCode);
+    composedTemplateSource = "";
   }
 
-  if (testCode) {
-    sections.push(params.testCode ?? "");
+  if (composedTemplateSource) {
+    if (composedTemplateSource.includes(codingExerciseTestInsertionToken)) {
+      composedTemplateSource = injectCodingExerciseTemplateCode(
+        composedTemplateSource,
+        codingExerciseTestInsertionToken,
+        testCode
+      );
+    }
+  }
+
+  if (composedTemplateSource) {
+    sections.push(composedTemplateSource);
   }
 
   const runtimeEpilogue = getCodingExerciseRuntimeEpilogue(params.config.language);
@@ -212,7 +237,8 @@ export function buildCodingExerciseStudentTemplateSource(
   visibleLineNumbers: number[],
   language: string
 ) {
-  const lines = templateSource.split("\n");
+  const studentVisibleTemplateSource = templateSource.replaceAll(codingExerciseTestInsertionToken, "");
+  const lines = studentVisibleTemplateSource.split("\n");
   const markerLineIndex = lines.findIndex((line) => line.includes(codingExerciseTemplateInsertionToken));
   const visibleLineNumberSet = new Set(visibleLineNumbers);
 
@@ -230,6 +256,14 @@ export function buildCodingExerciseStudentTemplateSource(
   const markerIndentation = getLeadingWhitespace(lines[markerLineIndex] ?? "");
 
   return [...projectedPrefix, `${markerIndentation}${codingExerciseTemplateInsertionToken}`, ...projectedSuffix].join("\n");
+}
+
+export function codingExerciseTemplateRequiresTestCodeMarker(templateSource: string, tests: Array<{ testCode?: string | null }>) {
+  if (templateSource.includes(codingExerciseTestInsertionToken)) {
+    return false;
+  }
+
+  return tests.some((test) => typeof test.testCode === "string" && test.testCode.trim().length > 0);
 }
 
 export function alignCodingExerciseStarterCodeToTemplate(starterCode: string, templateSource: string) {
@@ -343,8 +377,12 @@ function getCodingExerciseHiddenPlaceholderIndentation(hiddenLines: string[], pr
 }
 
 function getCodingExerciseTemplateInsertionIndentation(templateSource: string) {
+  return getCodingExerciseTemplateTokenIndentation(templateSource, codingExerciseTemplateInsertionToken);
+}
+
+function getCodingExerciseTemplateTokenIndentation(templateSource: string, token: string) {
   const lines = templateSource.split("\n");
-  const markerLineIndex = lines.findIndex((line) => line.includes(codingExerciseTemplateInsertionToken));
+  const markerLineIndex = lines.findIndex((line) => line.includes(token));
   if (markerLineIndex === -1) {
     return "";
   }
@@ -362,6 +400,24 @@ function getCodingExerciseTemplateInsertionIndentation(templateSource: string) {
   }
 
   return "";
+}
+
+function injectCodingExerciseTemplateCode(templateSource: string, token: string, code: string) {
+  if (!templateSource.includes(token)) {
+    return templateSource;
+  }
+
+  if (!code.trim()) {
+    return templateSource.replace(token, "");
+  }
+
+  const insertionIndentation = getCodingExerciseTemplateTokenIndentation(templateSource, token);
+  const normalizedLines = dedentCodingExerciseLines(code.split("\n"));
+  const alignedCode = normalizedLines
+    .map((line) => (line.trim().length ? `${insertionIndentation}${line}` : ""))
+    .join("\n");
+
+  return templateSource.replace(token, alignedCode);
 }
 
 function dedentCodingExerciseLines(lines: string[]) {

@@ -14,7 +14,7 @@ Teachers will be able to:
 - choose the learner language/runtime
 - provide starter code and visible sample tests
 - add optional per-test harness code for visible and hidden tests
-- provide hidden support code and a hidden template scaffold with a `{{ STUDENT_CODE }}` insertion marker, including for exercises that would otherwise be plain full-program prompts
+- provide a template scaffold with a `{{ STUDENT_CODE }}` insertion marker, and optionally a `{{ TEST_CODE }}` insertion marker for per-test harness execution
 - choose which scaffold lines remain visible to students while hidden blocks collapse to a language-appropriate `Hidden code` placeholder
 - define hidden tests and grading rules
 - run submissions against a remote Judge0 service
@@ -64,7 +64,6 @@ The first implementation pass keeps only student-visible fields in `Activity.con
 Private plugin-owned data stores:
 
 - teacher reference solution
-- hidden support code
 - hidden template scaffold
 - visible line selections for the student-safe scaffold projection
 - hidden test harness code and metadata
@@ -104,7 +103,7 @@ Behavior:
 - `run` is for learner-visible sample execution
 - `submit` evaluates against plugin-owned hidden tests
 - `hidden-tests` is teacher/admin only and carries the private reference solution
-- Judge0 source is assembled server-side from public student code plus any private support/template pieces and per-test harness code
+- Judge0 source is assembled server-side from the private template plus student code, then per-test harness code is injected at `{{ TEST_CODE }}` when present
 - enabled hidden tests are validated against the teacher reference solution before they are saved
 
 For development, Judge0 runs locally in Docker on `http://localhost:2358`.

@@ -7,6 +7,7 @@ import {
   buildCodingExerciseStudentTemplateProjectionFromSource,
   buildCodingExerciseStudentTemplateSource,
   buildCodingExerciseTemplateSource,
+  codingExerciseTemplateRequiresTestCodeMarker,
   codingExerciseTemplateInsertionToken,
   normalizeCodingExerciseSampleTests,
   parseCodingExerciseConfig,
@@ -344,6 +345,15 @@ export function CodingExerciseActivityView({
         throw new Error(t("templateSourceMissingMarker"));
       }
 
+      if (
+        codingExerciseTemplateRequiresTestCodeMarker(normalizedPrivateConfig.templateSource, [
+          ...normalizeCodingExerciseSampleTests(config.sampleTests),
+          ...hiddenTests
+        ])
+      ) {
+        throw new Error(t("templateTestCodeMissingMarker"));
+      }
+
       await onSave({
         title,
         description: config.prompt,
@@ -479,7 +489,7 @@ export function CodingExerciseActivityView({
           </div>
 
           <div className="stack">
-            <span>{t("starterCode")}</span>
+            <label className="editor-section-label">{t("starterCode")}</label>
             <CodeEditor
               value={config.starterCode}
               onChange={(value) => setConfig((current) => ({ ...current, starterCode: value }))}
@@ -489,7 +499,7 @@ export function CodingExerciseActivityView({
           </div>
 
           <div className="stack">
-            <span>{t("referenceSolution")}</span>
+            <label className="editor-section-label">{t("referenceSolution")}</label>
             <p className="muted" style={{ margin: 0 }}>
               {t("referenceSolutionHelp")}
             </p>
@@ -505,20 +515,7 @@ export function CodingExerciseActivityView({
           </div>
 
           <div className="stack">
-            <span>{t("hiddenSupportCode")}</span>
-            <p className="muted" style={{ margin: 0 }}>
-              {t("hiddenSupportCodeHelp")}
-            </p>
-            <CodeEditor
-              value={privateConfig.hiddenSupportCode}
-              onChange={(value) => setPrivateConfig((current) => ({ ...current, hiddenSupportCode: value }))}
-              language={config.language}
-              minHeight={180}
-            />
-          </div>
-
-          <div className="stack">
-            <span>{t("templateSource")}</span>
+            <label className="editor-section-label">{t("templateSource")}</label>
             <p className="muted" style={{ margin: 0 }}>
               {t("templateSourceHelp")}
             </p>
@@ -618,7 +615,7 @@ export function CodingExerciseActivityView({
                       <textarea rows={3} value={test.output} onChange={(event) => updateSampleTest(index, "output", event.target.value)} />
                     </div>
                     <div className="stack">
-                      <span>{t("testHarnessCode")}</span>
+                      <label className="editor-section-label">{t("testHarnessCode")}</label>
                       <p className="muted" style={{ margin: 0 }}>
                         {t("testHarnessCodeHelp")}
                       </p>
@@ -691,7 +688,7 @@ export function CodingExerciseActivityView({
                       />
                     </div>
                     <div className="stack">
-                      <span>{t("testHarnessCode")}</span>
+                      <label className="editor-section-label">{t("testHarnessCode")}</label>
                       <p className="muted" style={{ margin: 0 }}>
                         {t("testHarnessCodeHelp")}
                       </p>
@@ -798,7 +795,7 @@ export function CodingExerciseActivityView({
               <textarea rows={4} value={sampleExpectedOutput} onChange={(event) => setSampleExpectedOutput(event.target.value)} />
             </div>
             <div className="stack">
-              <span>{t("testHarnessCode")}</span>
+              <label className="editor-section-label">{t("testHarnessCode")}</label>
               <p className="muted" style={{ margin: 0 }}>
                 {t("visibleTestHarnessHelp")}
               </p>
