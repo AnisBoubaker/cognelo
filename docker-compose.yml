@@ -53,6 +53,20 @@ services:
       - ./infra/judge0/judge0.conf
     restart: unless-stopped
 
+  web-design-runner:
+    image: mcr.microsoft.com/playwright:v1.59.1-noble
+    working_dir: /workspace
+    command: ["bash", "-lc", "npm install && npm run dev --workspace @cognelo/web-design-runner"]
+    environment:
+      PORT: "3456"
+    ports:
+      - "3456:3456"
+    volumes:
+      - .:/workspace
+      - web-design-runner-node-modules:/workspace/node_modules
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   judge0-postgres-data:
+  web-design-runner-node-modules:

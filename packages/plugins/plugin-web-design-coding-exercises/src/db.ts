@@ -1,8 +1,13 @@
 export const webDesignCodingExercisesDatabaseModule = {
   namespace: "plugin_web_design_coding_exercises",
-  tables: [],
+  tables: [
+    "PluginWebDesignExerciseReferenceBundle",
+    "PluginWebDesignExerciseTest",
+    "PluginWebDesignExerciseSubmission",
+    "PluginWebDesignExerciseTestResult"
+  ],
   notes: [
-    "The first implementation slice stores only student-visible exercise files in shared activity config.",
-    "Private Playwright tests, teacher reference file bundles, and submission history should be added as plugin-owned tables before graded submissions are enabled."
+    "Student-visible exercise files live in shared activity config.",
+    "Private teacher reference file bundles, Playwright tests, student submissions, and per-test results live in plugin-owned tables so hidden grading internals are never exposed in the browser payload."
   ]
 } as const;

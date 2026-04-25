@@ -9,7 +9,10 @@ import {
   type CodingExerciseHiddenTest,
   type ParsonsAttempt,
   type ParsonsAttemptEvaluation,
-  type ParsonsAttemptState
+  type ParsonsAttemptState,
+  type WebDesignExerciseReferenceBundle,
+  type WebDesignExerciseSubmission,
+  type WebDesignExerciseTest
 } from "@/lib/api";
 
 type ActivityRendererProps<T extends JSXElementConstructor<any>> = ComponentProps<T> & { groupId?: string };
@@ -90,6 +93,59 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
   );
 }
 
+function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<typeof WebDesignCodingExerciseActivityView>) {
+  const { groupId, ...activityProps } = props;
+  return (
+    <WebDesignCodingExerciseActivityView
+      {...activityProps}
+      webDesignClient={{
+        listTests: async (courseId, activityId) => {
+          const result = groupId
+            ? await api.groupWebDesignExerciseTests(courseId, groupId, activityId)
+            : await api.webDesignExerciseTests(courseId, activityId);
+          return {
+            tests: result.tests as WebDesignExerciseTest[],
+            referenceBundle: result.referenceBundle as WebDesignExerciseReferenceBundle | null
+          };
+        },
+        saveTests: async (courseId, activityId, input) => {
+          const result = groupId
+            ? await api.saveGroupWebDesignExerciseTests(courseId, groupId, activityId, input)
+            : await api.saveWebDesignExerciseTests(courseId, activityId, input);
+          return {
+            tests: result.tests as WebDesignExerciseTest[],
+            referenceBundle: result.referenceBundle as WebDesignExerciseReferenceBundle | null
+          };
+        },
+        runCode: async (courseId, activityId, input) => {
+          const result = groupId
+            ? await api.runGroupWebDesignExercise(courseId, groupId, activityId, input)
+            : await api.runWebDesignExercise(courseId, activityId, input);
+          return { submission: result.submission as WebDesignExerciseSubmission };
+        },
+        listRuns: async (courseId, activityId) => {
+          const result = groupId
+            ? await api.groupWebDesignExerciseRuns(courseId, groupId, activityId)
+            : await api.webDesignExerciseRuns(courseId, activityId);
+          return { submissions: result.submissions as WebDesignExerciseSubmission[] };
+        },
+        submitCode: async (courseId, activityId, input) => {
+          const result = groupId
+            ? await api.submitGroupWebDesignExercise(courseId, groupId, activityId, input)
+            : await api.submitWebDesignExercise(courseId, activityId, input);
+          return { submission: result.submission as WebDesignExerciseSubmission };
+        },
+        listSubmissions: async (courseId, activityId) => {
+          const result = groupId
+            ? await api.groupWebDesignExerciseSubmissions(courseId, groupId, activityId)
+            : await api.webDesignExerciseSubmissions(courseId, activityId);
+          return { submissions: result.submissions as WebDesignExerciseSubmission[] };
+        }
+      }}
+    />
+  );
+}
+
 type ParsonsAttemptClientShape = ParsonsAttempt & {
   latestState: ParsonsAttemptState;
   resultSummary: Record<string, unknown>;
@@ -115,5 +171,5 @@ export const activityRenderers = {
   "coding-exercise": CodingExerciseActivityRenderer,
   "parsons-problem": ParsonsActivityRenderer,
   mcq: McqActivityView,
-  "web-design-coding-exercise": WebDesignCodingExerciseActivityView
+  "web-design-coding-exercise": WebDesignCodingExerciseActivityRenderer
 } as const;

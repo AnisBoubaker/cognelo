@@ -41,6 +41,9 @@
       ],
       "@cognelo/plugin-mcq": [
         "../../packages/plugins/plugin-mcq/src/index.ts"
+      ],
+      "@cognelo/plugin-web-design-coding-exercises": [
+        "../../packages/plugins/plugin-web-design-coding-exercises/src/index.ts"
       ]
     }
   },

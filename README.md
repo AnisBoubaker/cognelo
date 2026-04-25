@@ -161,6 +161,12 @@ If you are developing the coding-exercises plugin, also start Judge0 locally:
 docker compose up -d judge0-db judge0-redis judge0-server judge0-worker
 ```
 
+If you are developing the web-design-coding-exercises plugin, also start the Dockerized Playwright runner:
+
+```bash
+npm run dev:runner
+```
+
 3. Install dependencies:
 
 ```bash
@@ -197,6 +203,7 @@ Open:
 Web: http://localhost:3000
 API: http://localhost:3001
 Judge0 (dev): http://localhost:2358
+Web design runner (dev): http://localhost:3456
 ```
 
 Judge0-related environment variables:
@@ -206,6 +213,12 @@ JUDGE0_BASE_URL=http://localhost:2358
 JUDGE0_AUTH_HEADER=X-Auth-Token
 JUDGE0_AUTH_TOKEN=dev-local-token
 JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS=true
+```
+
+Web design runner environment variable:
+
+```text
+WEB_DESIGN_RUNNER_URL=http://localhost:3456
 ```
 
 ## Frontend Notes

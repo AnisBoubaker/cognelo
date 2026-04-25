@@ -235,6 +235,65 @@ export type CodingExerciseExecution = {
   updatedAt: string;
 };
 
+export type WebDesignExerciseFile = {
+  id: string;
+  path: string;
+  language: "html" | "css" | "javascript";
+  starterCode: string;
+  isEditable: boolean;
+  orderIndex: number;
+};
+
+export type WebDesignExerciseTest = {
+  id: string;
+  name: string;
+  kind: "sample" | "hidden";
+  testCode: string;
+  isEnabled: boolean;
+  weight: number;
+  orderIndex: number;
+  metadata: Record<string, unknown>;
+  validationSummary: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WebDesignExerciseReferenceBundle = {
+  files: WebDesignExerciseFile[];
+  validationSummary: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WebDesignExerciseTestResult = {
+  id: string;
+  testId: string | null;
+  name: string;
+  status: "pending" | "completed" | "failed";
+  weight: number;
+  score: number | null;
+  message: string | null;
+  durationMs: number | null;
+  details: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type WebDesignExerciseSubmission = {
+  id: string;
+  activityId: string;
+  userId: string;
+  kind: "run" | "submit";
+  status: "pending" | "completed" | "failed";
+  files: WebDesignExerciseFile[];
+  resultSummary: Record<string, unknown>;
+  score: number | null;
+  maxScore: number | null;
+  message: string | null;
+  createdAt: string;
+  updatedAt: string;
+  testResults: WebDesignExerciseTestResult[];
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 export class ApiError extends Error {
@@ -389,6 +448,49 @@ export const api = {
     }),
   codingExerciseSubmissions: (courseId: string, activityId: string) =>
     request<{ executions: CodingExerciseExecution[] }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/submit`),
+  webDesignExerciseTests: (courseId: string, activityId: string) =>
+    request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
+      `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/tests`
+    ),
+  saveWebDesignExerciseTests: (
+    courseId: string,
+    activityId: string,
+    input: {
+      referenceFiles: WebDesignExerciseFile[];
+      tests: Array<Omit<WebDesignExerciseTest, "orderIndex" | "createdAt" | "updatedAt" | "validationSummary">>;
+    }
+  ) =>
+    request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
+      `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/tests`,
+      {
+        method: "PUT",
+        body: JSON.stringify(input)
+      }
+    ),
+  runWebDesignExercise: (courseId: string, activityId: string, input: { files: WebDesignExerciseFile[] }) =>
+    request<{ submission: WebDesignExerciseSubmission }>(
+      `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/run`,
+      {
+        method: "POST",
+        body: JSON.stringify(input)
+      }
+    ),
+  webDesignExerciseRuns: (courseId: string, activityId: string) =>
+    request<{ submissions: WebDesignExerciseSubmission[] }>(
+      `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/run`
+    ),
+  submitWebDesignExercise: (courseId: string, activityId: string, input: { files: WebDesignExerciseFile[] }) =>
+    request<{ submission: WebDesignExerciseSubmission }>(
+      `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/submit`,
+      {
+        method: "POST",
+        body: JSON.stringify(input)
+      }
+    ),
+  webDesignExerciseSubmissions: (courseId: string, activityId: string) =>
+    request<{ submissions: WebDesignExerciseSubmission[] }>(
+      `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/submit`
+    ),
   createActivity: (courseId: string, input: ActivityInput) =>
     request<{ activity: Activity }>(`/courses/${courseId}/activities`, {
       method: "POST",
@@ -589,5 +691,49 @@ export const api = {
   groupCodingExerciseSubmissions: (courseId: string, groupId: string, activityId: string) =>
     request<{ executions: CodingExerciseExecution[] }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/submit`
+    ),
+  groupWebDesignExerciseTests: (courseId: string, groupId: string, activityId: string) =>
+    request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/web-design-coding-exercises/tests`
+    ),
+  saveGroupWebDesignExerciseTests: (
+    courseId: string,
+    groupId: string,
+    activityId: string,
+    input: {
+      referenceFiles: WebDesignExerciseFile[];
+      tests: Array<Omit<WebDesignExerciseTest, "orderIndex" | "createdAt" | "updatedAt" | "validationSummary">>;
+    }
+  ) =>
+    request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/web-design-coding-exercises/tests`,
+      {
+        method: "PUT",
+        body: JSON.stringify(input)
+      }
+    ),
+  runGroupWebDesignExercise: (courseId: string, groupId: string, activityId: string, input: { files: WebDesignExerciseFile[] }) =>
+    request<{ submission: WebDesignExerciseSubmission }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/web-design-coding-exercises/run`,
+      {
+        method: "POST",
+        body: JSON.stringify(input)
+      }
+    ),
+  groupWebDesignExerciseRuns: (courseId: string, groupId: string, activityId: string) =>
+    request<{ submissions: WebDesignExerciseSubmission[] }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/web-design-coding-exercises/run`
+    ),
+  submitGroupWebDesignExercise: (courseId: string, groupId: string, activityId: string, input: { files: WebDesignExerciseFile[] }) =>
+    request<{ submission: WebDesignExerciseSubmission }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/web-design-coding-exercises/submit`,
+      {
+        method: "POST",
+        body: JSON.stringify(input)
+      }
+    ),
+  groupWebDesignExerciseSubmissions: (courseId: string, groupId: string, activityId: string) =>
+    request<{ submissions: WebDesignExerciseSubmission[] }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/web-design-coding-exercises/submit`
     )
 };

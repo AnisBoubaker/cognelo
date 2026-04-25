@@ -5,7 +5,11 @@
   "type": "module",
   "main": "src/index.ts",
   "dependencies": {
+    "@cognelo/activity-sdk": "0.1.0",
     "@cognelo/activity-ui": "0.1.0",
+    "@cognelo/config": "0.1.0",
+    "@cognelo/core": "0.1.0",
+    "@cognelo/db": "0.1.0",
     "react": "^19.2.5",
     "zod": "^3.23.8"
   },

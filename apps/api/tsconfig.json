@@ -60,6 +60,12 @@
       "@cognelo/plugin-mcq/server": [
         "../../packages/plugins/plugin-mcq/src/server.ts"
       ],
+      "@cognelo/plugin-web-design-coding-exercises": [
+        "../../packages/plugins/plugin-web-design-coding-exercises/src/index.ts"
+      ],
+      "@cognelo/plugin-web-design-coding-exercises/server": [
+        "../../packages/plugins/plugin-web-design-coding-exercises/src/server.ts"
+      ],
       "@cognelo/config": [
         "../../packages/config/src/index.ts"
       ]
