@@ -77,6 +77,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - The top header separates primary app navigation from personal controls.
 - The visual theme should reflect the Cognelo logo palette in a restrained, product-like way.
 - Syntax-colored code rendering should be shared across activities through `packages/activity-ui`.
+- Markdown text rendering for authored prompts/descriptions should be shared across activities and core pages through `packages/activity-ui` rather than reimplemented per plugin.
 - The shared code editor should grow vertically with its content.
 - Monaco should be exposed as a shared editor primitive through `packages/activity-ui` for student coding flows and future plugin reuse, while lightweight authoring editors can remain plugin-specific or use the in-house editor where that fits better.
 - Save confirmations and user-facing error notifications should prefer the shared bottom-right notification system over inline “saved” messages when the message is transient and not tied to a specific field.

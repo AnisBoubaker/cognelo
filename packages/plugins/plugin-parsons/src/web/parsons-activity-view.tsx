@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { CodeEditor, CodeRenderer, codeLanguageOptions, normalizeCodeLanguage, useNotifications } from "@cognelo/activity-ui";
+import { CodeEditor, CodeRenderer, MarkdownRenderer, codeLanguageOptions, normalizeCodeLanguage, useNotifications } from "@cognelo/activity-ui";
 import {
   createParsonsGroup,
   createParsonsPrecedenceRule,
@@ -649,13 +649,13 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
         </section>
       ) : null}
 
-      <section className="section stack">
-        <div>
-          <p className="eyebrow">{t("parsons.studentEyebrow")}</p>
-          <h2>{t("parsons.studentTitle")}</h2>
-          <p className="muted">{prompt}</p>
-          {course ? <p className="muted">{t("parsons.inCourse", { title: course.title })}</p> : null}
-        </div>
+        <section className="section stack">
+          <div>
+            <p className="eyebrow">{t("parsons.studentEyebrow")}</p>
+            <h2>{t("parsons.studentTitle")}</h2>
+            <MarkdownRenderer markdown={prompt} className="muted" compact />
+            {course ? <p className="muted">{t("parsons.inCourse", { title: course.title })}</p> : null}
+          </div>
 
         <div className="parsons-toolbar row">
           <button className="secondary" type="button" onClick={resetWorkspace}>

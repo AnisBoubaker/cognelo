@@ -22,7 +22,7 @@ apps/
   web/                 Next.js frontend
   packages/
     activity-sdk/        Plugin registries and shared plugin contracts
-    activity-ui/         Shared plugin-facing UI such as code editor/renderer
+    activity-ui/         Shared plugin-facing UI such as code editor/renderer/markdown/notifications
     config/              Environment validation
   contracts/           Shared DTO schemas and types
   core/                Services and authorization
@@ -54,7 +54,7 @@ The intended boundary is:
 - **Core tables stay generic**: `Activity`, `ActivityType`, `Course`, and related auth/course tables remain shared.
 - **Plugin tables belong to the plugin**: plugin-specific persistence is declared in the plugin package's database module rather than by modifying core tables for plugin-specific concerns.
 - **Plugin HTTP handlers belong to the plugin**: the API app provides a generic dispatcher route, while plugin-specific subroutes are declared in plugin packages.
-- **Shared services stay shared**: reusable pieces such as the syntax-colored code editor, code renderer, and shared notification system live in `@cognelo/activity-ui`.
+- **Shared services stay shared**: reusable pieces such as the syntax-colored code editor, code renderer, Markdown renderer, and shared notification system live in `@cognelo/activity-ui`.
 - **Remote execution stays outside the API app**: activities that run learner code should call an external sandbox service such as Judge0 from server-side plugin routes.
 
 Plugin packages can export:

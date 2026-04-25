@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, type FormEvent, useEffect, useRef, useState } from "react";
-import { CodeEditor, MonacoCodeEditor, codeLanguageOptions, useNotifications } from "@cognelo/activity-ui";
+import { CodeEditor, MarkdownRenderer, MonacoCodeEditor, codeLanguageOptions, useNotifications } from "@cognelo/activity-ui";
 import {
   alignCodingExerciseStarterCodeToTemplate,
   buildCodingExerciseStudentTemplateProjectionFromSource,
@@ -754,7 +754,7 @@ export function CodingExerciseActivityView({
       ) : (
         <div className="stack">
           <h2>{activity.title}</h2>
-          <p>{config.prompt}</p>
+          <MarkdownRenderer markdown={config.prompt} />
           <MonacoCodeEditor
             id={`coding-exercise-student-${activity.id}`}
             ariaLabel={activity.title || t("starterCode")}

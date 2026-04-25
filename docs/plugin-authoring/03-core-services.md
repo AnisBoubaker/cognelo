@@ -79,12 +79,13 @@ That context includes:
 
 For beginners, this is much easier than designing a totally separate API architecture.
 
-## Shared UI: Code Editor, Code Renderer, And Notifications
+## Shared UI: Code Editor, Code Renderer, Markdown, And Notifications
 
 Shared UI primitives live in:
 
 - [packages/activity-ui/src/code-editor.tsx](../../packages/activity-ui/src/code-editor.tsx)
 - [packages/activity-ui/src/code-renderer.tsx](../../packages/activity-ui/src/code-renderer.tsx)
+- [packages/activity-ui/src/markdown-renderer.tsx](../../packages/activity-ui/src/markdown-renderer.tsx)
 - [packages/activity-ui/src/notifications.tsx](../../packages/activity-ui/src/notifications.tsx)
 
 These are especially useful for programming-learning activities.
@@ -103,6 +104,12 @@ These are especially useful for programming-learning activities.
 - line numbers
 - normalized language handling
 
+### What `MarkdownRenderer` Gives You
+
+- shared Markdown display for authored prompts and descriptions
+- one rendering path for both core pages and plugins
+- safer HTML handling instead of ad hoc `dangerouslySetInnerHTML` usage in each plugin
+
 ### What `useNotifications()` Gives You
 
 - shared bottom-right snackbar-style notifications
@@ -116,7 +123,7 @@ Prefer it over inline “saved” messages when the feedback does not need to st
 ### Example
 
 ```tsx
-import { CodeEditor, CodeRenderer, useNotifications } from "@cognelo/activity-ui";
+import { CodeEditor, CodeRenderer, MarkdownRenderer, useNotifications } from "@cognelo/activity-ui";
 
 export function Demo() {
   const [value, setValue] = useState("print('hello')");
@@ -124,6 +131,7 @@ export function Demo() {
 
   return (
     <section className="stack">
+      <MarkdownRenderer markdown={"## Prompt\nWrite `hello` to the console."} />
       <CodeEditor value={value} onChange={setValue} language="python" />
       <CodeRenderer code={value} language="python" showLineNumbers />
       <button type="button" onClick={() => notifications.success("Saved.")}>

@@ -560,6 +560,81 @@ a.card:hover,
   font-weight: 700;
 }
 
+.markdown-renderer {
+  color: inherit;
+  display: grid;
+  gap: 12px;
+  line-height: 1.6;
+}
+
+.markdown-renderer.is-compact {
+  gap: 8px;
+}
+
+.markdown-renderer > :first-child {
+  margin-top: 0;
+}
+
+.markdown-renderer > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-renderer h1,
+.markdown-renderer h2,
+.markdown-renderer h3,
+.markdown-renderer h4,
+.markdown-renderer h5,
+.markdown-renderer h6 {
+  line-height: 1.15;
+  margin: 0;
+}
+
+.markdown-renderer p,
+.markdown-renderer ul,
+.markdown-renderer ol,
+.markdown-renderer pre,
+.markdown-renderer blockquote {
+  margin: 0;
+}
+
+.markdown-renderer ul,
+.markdown-renderer ol {
+  padding-left: 22px;
+}
+
+.markdown-renderer code {
+  background: rgba(13, 27, 71, 0.06);
+  border-radius: 6px;
+  font-family: "SFMono-Regular", ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.95em;
+  padding: 0.12rem 0.35rem;
+}
+
+.markdown-renderer pre {
+  background: rgba(238, 244, 251, 0.96);
+  border: 1px solid rgba(13, 27, 71, 0.08);
+  border-radius: 12px;
+  overflow-x: auto;
+  padding: 14px 16px;
+}
+
+.markdown-renderer pre code {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+}
+
+.markdown-renderer a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.markdown-renderer blockquote {
+  border-left: 3px solid rgba(46, 131, 216, 0.22);
+  color: var(--muted);
+  padding-left: 12px;
+}
+
 .field-readonly input[readonly] {
   background: linear-gradient(180deg, rgba(238, 244, 251, 0.96), rgba(245, 248, 252, 0.96));
   border-color: color-mix(in srgb, var(--brand-blue), white 72%);

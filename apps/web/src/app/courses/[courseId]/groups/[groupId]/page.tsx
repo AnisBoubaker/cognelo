@@ -1,5 +1,6 @@
 "use client";
 
+import { MarkdownRenderer } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChangeEvent, FocusEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
@@ -1635,7 +1636,11 @@ function GroupActivityCard({
         <strong>
           <Link href={`/courses/${courseId}/groups/${groupId}/activities/assigned/${assignment.activity.id}`}>{assignment.activity.title}</Link>
         </strong>
-        <span className="table-meta-note muted">{assignment.activity.description || t("common.noDescription")}</span>
+        {assignment.activity.description ? (
+          <MarkdownRenderer markdown={assignment.activity.description} className="table-meta-note muted" compact />
+        ) : (
+          <span className="table-meta-note muted">{t("common.noDescription")}</span>
+        )}
       </div>
       <div className="field assignment-date-field">
         <label className="sr-only" htmlFor={`available-from-${assignment.id}`}>{t("groupPage.availableFrom")}</label>
