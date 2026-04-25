@@ -11,6 +11,7 @@ type MonacoCodeEditorProps = {
   onChange: (value: string) => void;
   language?: string;
   minHeight?: number;
+  height?: number | string;
   id?: string;
   ariaLabel?: string;
   readOnly?: boolean;
@@ -23,6 +24,7 @@ export function MonacoCodeEditor({
   onChange,
   language = "text",
   minHeight = 260,
+  height,
   id,
   ariaLabel,
   readOnly = false,
@@ -93,6 +95,7 @@ export function MonacoCodeEditor({
         background: "rgba(248, 251, 255, 0.94)",
         border: "1px solid color-mix(in srgb, var(--brand-blue), white 72%)",
         borderRadius: 8,
+        height,
         minHeight,
         overflow: "hidden"
       }}
@@ -101,7 +104,7 @@ export function MonacoCodeEditor({
         beforeMount={configureMonaco}
         onMount={handleEditorMount}
         defaultLanguage={editorLanguage}
-        height={minHeight}
+        height={height ?? minHeight}
         language={editorLanguage}
         onChange={(nextValue) => {
           const nextText = nextValue ?? "";

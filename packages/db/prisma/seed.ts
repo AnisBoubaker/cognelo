@@ -69,8 +69,11 @@ async function main() {
   const parsonsType = activityTypesByKey.get("parsons-problem");
   const mcqType = activityTypesByKey.get("mcq");
   const codingExerciseType = activityTypesByKey.get("coding-exercise");
-  if (!placeholderType || !parsonsType || !mcqType || !codingExerciseType) {
-    throw new Error(`Missing seeded activity types from plugin registry: ${listActivityDefinitions().map((definition) => definition.key).join(", ")}`);
+  const missingSeededActivityTypes = listActivityDefinitions()
+    .map((definition) => definition.key)
+    .filter((key) => !activityTypesByKey.has(key));
+  if (!placeholderType || !parsonsType || !mcqType || !codingExerciseType || missingSeededActivityTypes.length > 0) {
+    throw new Error(`Missing seeded activity types from plugin registry: ${missingSeededActivityTypes.join(", ")}`);
   }
 
   const course = await prisma.course.upsert({

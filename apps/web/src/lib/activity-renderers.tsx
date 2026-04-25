@@ -2,6 +2,7 @@ import type { ComponentProps, JSXElementConstructor } from "react";
 import { CodingExerciseActivityView } from "@cognelo/plugin-coding-exercises";
 import { ParsonsActivityView } from "@cognelo/plugin-parsons";
 import { McqActivityView } from "@cognelo/plugin-mcq";
+import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
 import {
   api,
   type CodingExerciseExecution,
@@ -113,5 +114,6 @@ export type ParsonsAttemptsClient = {
 export const activityRenderers = {
   "coding-exercise": CodingExerciseActivityRenderer,
   "parsons-problem": ParsonsActivityRenderer,
-  mcq: McqActivityView
+  mcq: McqActivityView,
+  "web-design-coding-exercise": WebDesignCodingExerciseActivityView
 } as const;

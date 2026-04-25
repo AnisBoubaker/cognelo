@@ -4,6 +4,7 @@ import { homeworkGraderServerPlugin } from "@cognelo/plugin-homework-grader/serv
 import { parsonsServerPlugin } from "@cognelo/plugin-parsons/server";
 import { placeholderServerPlugin } from "@cognelo/plugin-placeholder/server";
 import { mcqServerPlugin } from "@cognelo/plugin-mcq/server";
+import { webDesignCodingExercisesServerPlugin } from "@cognelo/plugin-web-design-coding-exercises/server";
 
 export type ServerActivityRecord = {
   id: string;
@@ -50,7 +51,8 @@ const serverPlugins: readonly ServerActivityPlugin[] = [
   homeworkGraderServerPlugin,
   parsonsServerPlugin,
   mcqServerPlugin,
-  codingExercisesServerPlugin
+  codingExercisesServerPlugin,
+  webDesignCodingExercisesServerPlugin
 ];
 
 function normalizePath(path: string | readonly string[]) {
