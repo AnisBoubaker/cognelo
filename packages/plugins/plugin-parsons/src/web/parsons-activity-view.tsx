@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { CodeEditor, CodeRenderer, codeLanguageOptions, normalizeCodeLanguage } from "@cognelo/activity-ui";
+import { CodeEditor, CodeRenderer, codeLanguageOptions, normalizeCodeLanguage, useNotifications } from "@cognelo/activity-ui";
 import {
   createParsonsGroup,
   createParsonsPrecedenceRule,
@@ -64,6 +64,7 @@ type ParsonsActivityViewProps = {
 };
 
 export function ParsonsActivityView({ activity, course, canManage, onSave, attemptsClient, t }: ParsonsActivityViewProps) {
+  const notifications = useNotifications();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -77,7 +78,6 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
   const [precedenceDraft, setPrecedenceDraft] = useState<{ beforeGroupId: string; afterGroupId: string } | null>(null);
   const [blocks, setBlocks] = useState<ParsonsBlock[]>([]);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-  const [saveMessage, setSaveMessage] = useState("");
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -106,6 +106,7 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
     setSelectedBlockId(null);
     setFeedback("");
     setAttempt(null);
+    setError("");
   }, [activity]);
 
   useEffect(() => {
@@ -217,7 +218,6 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
   async function saveParsonsProblem(event: FormEvent) {
     event.preventDefault();
     setSaving(true);
-    setSaveMessage("");
     setError("");
     try {
       const nextActivity = await onSave({
@@ -237,9 +237,10 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
       setPrecedenceRules(savedConfig.precedenceRules);
       setBlocks(resetParsonsBlocks(savedConfig));
       setSelectedBlockId(null);
-      setSaveMessage(t("parsons.saved"));
+      notifications.success(t("parsons.saved"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("parsons.saveError"));
+      notifications.error(err instanceof Error ? err.message : t("parsons.saveError"));
+      setError("");
     } finally {
       setSaving(false);
     }
@@ -327,7 +328,13 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
 
   function checkSolution() {
     const result = evaluateParsonsSolution(blocksRef.current, parseParsonsConfig(activity.config));
-    setFeedback(formatFeedback(result));
+    const nextFeedback = formatFeedback(result);
+    setFeedback(nextFeedback);
+    if (result.isCorrect) {
+      notifications.success(nextFeedback);
+    } else {
+      notifications.info(nextFeedback);
+    }
 
     void persistAttemptUpdate({
       state: buildAttemptStateSnapshot(blocksRef.current, selectedBlockIdRef.current, result),
@@ -456,7 +463,6 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
   return (
     <>
       {error ? <p className="error">{error}</p> : null}
-      {saveMessage ? <p className="success-message">{saveMessage}</p> : null}
 
       {canManage ? (
         <section className="section stack">

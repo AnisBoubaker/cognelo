@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useNotifications } from "@cognelo/activity-ui";
 import type { CourseInput } from "@cognelo/contracts";
 import type { Course } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -13,6 +14,7 @@ type Props = {
 
 export function CourseForm({ initial, submitLabel, onSubmit }: Props) {
   const { t } = useI18n();
+  const notifications = useNotifications();
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [status, setStatus] = useState(initial?.status ?? "draft");
@@ -26,7 +28,8 @@ export function CourseForm({ initial, submitLabel, onSubmit }: Props) {
     try {
       await onSubmit({ title, description, status });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("courseForm.saveError"));
+      notifications.error(err instanceof Error ? err.message : t("courseForm.saveError"));
+      setError("");
     } finally {
       setSaving(false);
     }

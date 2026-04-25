@@ -21,13 +21,15 @@ Cognelo has:
 - `apps/web`: frontend app
 - `apps/api`: backend API app
 - `packages/activity-sdk`: plugin registration and plugin contracts
-- `packages/activity-ui`: shared code editor/renderer
+- `packages/activity-ui`: shared code editor/renderer/notifications
 - `packages/core`: shared business logic
 - `packages/contracts`: shared schemas/types
 - `packages/db`: Prisma schema, migrations, seed
 - `packages/plugins/*`: plugin packages
 
 Plugins own activity-specific behavior. The platform owns generic auth, course/activity CRUD, route dispatch, and shared UI primitives.
+
+For transient confirmations and non-field-specific errors in plugin UI, use `useNotifications()` from `@cognelo/activity-ui` instead of adding a plugin-local inline “saved” banner.
 
 ## Minimal Plugin Flow
 

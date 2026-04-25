@@ -28,6 +28,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Shared plugin-facing UI belongs in `packages/activity-ui`.
 - Shared plugin registries belong in `packages/activity-sdk`.
 - Untrusted learner code must run in an external sandbox service, not inside the Cognelo API process.
+- Cross-app notifications should use the shared notification service from `@cognelo/activity-ui` (`NotificationProvider` mounted in the web app, `useNotifications()` in core and plugin UI) rather than per-form inline success banners.
 
 ## Implemented Platform Foundations
 
@@ -78,6 +79,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Syntax-colored code rendering should be shared across activities through `packages/activity-ui`.
 - The shared code editor should grow vertically with its content.
 - Monaco should be exposed as a shared editor primitive through `packages/activity-ui` for student coding flows and future plugin reuse, while lightweight authoring editors can remain plugin-specific or use the in-house editor where that fits better.
+- Save confirmations and user-facing error notifications should prefer the shared bottom-right notification system over inline “saved” messages when the message is transient and not tied to a specific field.
 - Group participant management uses an inline panel form in the group workspace with an email-first flow.
 - Read-only inherited fields in forms should have a visible locked treatment rather than appearing identical to editable fields.
 - The student group workspace should stay intentionally minimal: assigned activities and visible course materials only, with no management forms, settings, or participant management.

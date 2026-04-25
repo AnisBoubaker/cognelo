@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, type FormEvent, useEffect, useRef, useState } from "react";
-import { CodeEditor, MonacoCodeEditor, codeLanguageOptions } from "@cognelo/activity-ui";
+import { CodeEditor, MonacoCodeEditor, codeLanguageOptions, useNotifications } from "@cognelo/activity-ui";
 import {
   alignCodingExerciseStarterCodeToTemplate,
   buildCodingExerciseStudentTemplateProjectionFromSource,
@@ -132,6 +132,7 @@ export function CodingExerciseActivityView({
   const pluginLocale = normalizeCodingExercisesLocale(locale);
   const t = (key: Parameters<typeof formatCodingExercisesMessage>[1], values?: Record<string, string | number>) =>
     formatCodingExercisesMessage(pluginLocale, key, values);
+  const notifications = useNotifications();
   const codingExerciseLanguageOptions = codeLanguageOptions.map((option) => ({
     ...option,
     disabled: disabledCodingExerciseLanguages.has(option.value)
@@ -146,7 +147,6 @@ export function CodingExerciseActivityView({
   const [expandedSampleTestIds, setExpandedSampleTestIds] = useState<string[]>([]);
   const [expandedHiddenTestIds, setExpandedHiddenTestIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState("");
   const [error, setError] = useState("");
   const [editorCode, setEditorCode] = useState("");
   const [sampleInput, setSampleInput] = useState("");
@@ -200,7 +200,6 @@ export function CodingExerciseActivityView({
       setExpandedSampleTestIds([]);
       setExpandedHiddenTestIds([]);
     }
-    setSaveMessage("");
     setError("");
     previousActivityIdRef.current = activity.id;
   }, [activity]);
@@ -336,7 +335,6 @@ export function CodingExerciseActivityView({
     event.preventDefault();
     setSaving(true);
     setError("");
-    setSaveMessage("");
 
     try {
       const normalizedPrivateConfig = getPersistedPrivateConfig(privateConfig);
@@ -388,7 +386,8 @@ export function CodingExerciseActivityView({
         setReferenceValidationSummary(result.referenceSolution?.validationSummary ?? null);
       }
 
-      setSaveMessage(t("saved"));
+      notifications.success(t("saved"));
+      setError("");
     } catch (err) {
       if (isApiErrorLike(err) && err.code === "REFERENCE_SOLUTION_VALIDATION_FAILED") {
         const details = normalizeObject(err.details);
@@ -397,7 +396,8 @@ export function CodingExerciseActivityView({
           setReferenceValidationSummary(validationSummary);
         }
       }
-      setError(err instanceof Error ? err.message : t("saveError"));
+      notifications.error(err instanceof Error ? err.message : t("saveError"));
+      setError("");
     } finally {
       setSaving(false);
     }
@@ -745,8 +745,6 @@ export function CodingExerciseActivityView({
           </section>
 
           {error ? <p className="error">{error}</p> : null}
-          {saveMessage ? <p className="muted">{saveMessage}</p> : null}
-
           <div className="row">
             <button type="submit" disabled={saving}>
               {saving ? t("saving") : t("saveCodingExercise")}
