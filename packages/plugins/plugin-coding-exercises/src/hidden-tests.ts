@@ -1,6 +1,6 @@
 import { Prisma, prisma } from "@cognelo/db";
 import { assertCanManageCourse, AppError } from "@cognelo/core";
-import { codingExerciseHiddenTestsInputSchema } from "./coding-exercises";
+import { codingExerciseHiddenTestsInputSchema, codingExerciseTemplateRequiresTestCodeMarker, parseCodingExercisePrivateConfig } from "./coding-exercises";
 import { getCodingExerciseReferenceSolution, validateReferenceSolutionAgainstHiddenTests } from "./executions";
 
 const codingExerciseHiddenTestsClient = prisma as typeof prisma & {
@@ -59,6 +59,15 @@ export async function replaceCodingExerciseHiddenTests(params: {
     seenIds.add(test.id);
   }
 
+  const privateConfig = parseCodingExercisePrivateConfig(input.privateConfig);
+  if (codingExerciseTemplateRequiresTestCodeMarker(privateConfig.templateSource, [...input.sampleTests, ...input.tests])) {
+    throw new AppError(
+      400,
+      "TEST_CODE_MARKER_REQUIRED",
+      "Add {{ TEST_CODE }} to the template before saving tests that include test code."
+    );
+  }
+
   const validationSummary = await validateReferenceSolutionAgainstHiddenTests({
     activityConfig: params.activityConfig,
     sourceCode: input.referenceSolution,
@@ -68,7 +77,7 @@ export async function replaceCodingExerciseHiddenTests(params: {
       testCode: test.testCode,
       orderIndex: index
     })),
-    privateConfig: input.privateConfig
+    privateConfig
   });
 
   if (!validationSummary.accepted) {
@@ -148,12 +157,12 @@ export async function replaceCodingExerciseHiddenTests(params: {
       create: {
         activityId: params.activityId,
         sourceCode: input.referenceSolution,
-        privateConfig: input.privateConfig as Prisma.InputJsonValue,
+        privateConfig: privateConfig as Prisma.InputJsonValue,
         validationSummary: validationSummary as Prisma.InputJsonValue
       },
       update: {
         sourceCode: input.referenceSolution,
-        privateConfig: input.privateConfig as Prisma.InputJsonValue,
+        privateConfig: privateConfig as Prisma.InputJsonValue,
         validationSummary: validationSummary as Prisma.InputJsonValue
       }
     });
