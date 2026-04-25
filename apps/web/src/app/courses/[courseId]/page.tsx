@@ -1,5 +1,6 @@
 "use client";
 
+import { MarkdownRenderer } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
@@ -404,7 +405,11 @@ export default function CourseDetailPage() {
               <div className="hero-meta">
                 <p className="eyebrow">{t(`status.${course.status}`)}</p>
                 <h1>{course.title}</h1>
-                <p className="muted">{course.description || t("common.noDescription")}</p>
+                {course.description ? (
+                  <MarkdownRenderer markdown={course.description} className="muted" compact />
+                ) : (
+                  <p className="muted">{t("common.noDescription")}</p>
+                )}
               </div>
               <div className="hero-actions">
                 <Link className="button secondary" href={`/courses/${course.id}/edit`}>

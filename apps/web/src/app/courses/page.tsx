@@ -1,5 +1,6 @@
 "use client";
 
+import { MarkdownRenderer } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
@@ -48,7 +49,11 @@ export default function CoursesPage() {
             >
               <span className="eyebrow">{t(`status.${course.status}`)}</span>
               <h2>{course.title}</h2>
-              <p className="muted">{course.description || t("courses.emptyDescription")}</p>
+              {course.description ? (
+                <MarkdownRenderer markdown={course.description} className="muted" compact />
+              ) : (
+                <p className="muted">{t("courses.emptyDescription")}</p>
+              )}
               <p className="muted">{t("courses.activityCount", { count: course.activities?.length ?? 0 })}</p>
             </Link>
           ))}
