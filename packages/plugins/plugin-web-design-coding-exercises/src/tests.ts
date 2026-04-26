@@ -2,11 +2,14 @@ import { Prisma, prisma } from "@cognelo/db";
 import { assertCanManageCourse, AppError } from "@cognelo/core";
 import {
   normalizeWebDesignExerciseConfig,
+  parseWebDesignExerciseConfig,
   webDesignExerciseTestsInputSchema,
+  webDesignPromptIncludesExpectedResult,
+  webDesignPromptRequestsCroppedExpectedResult,
   type WebDesignExerciseFile,
   type WebDesignExerciseTestKind
 } from "./web-design-coding-exercises";
-import { runWebDesignTestsInRunner, type WebDesignRunnerResult } from "./runner";
+import { captureWebDesignScreenshotInRunner, runWebDesignTestsInRunner, type WebDesignRunnerResult } from "./runner";
 
 type WebDesignExerciseTestRecord = {
   id: string;
@@ -62,6 +65,7 @@ export async function listWebDesignExerciseTests(params: { activityId: string })
 
 export async function replaceWebDesignExerciseTests(params: {
   activityId: string;
+  activityConfig: Record<string, unknown> | undefined;
   courseId: string;
   user: { id: string; email: string; name: string | null; roles: ("admin" | "teacher" | "student")[] };
   input: unknown;
@@ -86,6 +90,23 @@ export async function replaceWebDesignExerciseTests(params: {
     files: referenceFiles,
     tests: input.tests
   });
+  const activityConfig = parseWebDesignExerciseConfig(params.activityConfig);
+  const shouldCaptureExpectedResult = input.shouldCaptureExpectedResult ?? webDesignPromptIncludesExpectedResult(activityConfig.prompt);
+  const shouldCropExpectedResult = input.shouldCropExpectedResult ?? webDesignPromptRequestsCroppedExpectedResult(activityConfig.prompt);
+  const expectedResult = shouldCaptureExpectedResult
+    ? await captureWebDesignScreenshotInRunner({ files: referenceFiles, trimWhitespace: shouldCropExpectedResult })
+    : null;
+  const referenceSummary = {
+    ...validation.referenceSummary,
+    expectedResult: expectedResult
+      ? {
+          imageDataUrl: expectedResult.imageDataUrl,
+          generatedAt: new Date().toISOString(),
+          durationMs: expectedResult.durationMs,
+          viewport: expectedResult.viewport
+        }
+      : null
+  };
 
   await prisma.$transaction(async (transaction) => {
     await transaction.pluginWebDesignExerciseTest.deleteMany({
@@ -114,16 +135,32 @@ export async function replaceWebDesignExerciseTests(params: {
       create: {
         activityId: params.activityId,
         files: referenceFiles as unknown as Prisma.InputJsonValue,
-        validationSummary: validation.referenceSummary as Prisma.InputJsonValue
+        validationSummary: referenceSummary as Prisma.InputJsonValue
       },
       update: {
         files: referenceFiles as unknown as Prisma.InputJsonValue,
-        validationSummary: validation.referenceSummary as Prisma.InputJsonValue
+        validationSummary: referenceSummary as Prisma.InputJsonValue
       }
     });
   });
 
   return listWebDesignExerciseTests({ activityId: params.activityId });
+}
+
+export async function getWebDesignExpectedResult(params: { activityId: string; activityConfig: Record<string, unknown> | undefined }) {
+  const activityConfig = parseWebDesignExerciseConfig(params.activityConfig);
+  if (!webDesignPromptIncludesExpectedResult(activityConfig.prompt)) {
+    return { imageDataUrl: null };
+  }
+
+  const referenceBundle = await prisma.pluginWebDesignExerciseReferenceBundle.findUnique({
+    where: { activityId: params.activityId }
+  });
+  const validationSummary = normalizeJsonObject(referenceBundle?.validationSummary);
+  const expectedResult = normalizeJsonObject(validationSummary.expectedResult);
+  const imageDataUrl = typeof expectedResult.imageDataUrl === "string" ? expectedResult.imageDataUrl : null;
+
+  return { imageDataUrl };
 }
 
 async function validateReferenceBundle(params: {
@@ -174,12 +211,28 @@ async function validateReferenceBundle(params: {
   if (result.status !== "completed") {
     const failedTests = result.tests.filter((test) => test.status === "failed");
     const firstFailure = failedTests[0];
+    const referenceSummary = {
+      phase: "reference-validation",
+      status: "failed",
+      enabledTestCount: enabledTests.length,
+      failedCount: failedTests.length,
+      score: result.score,
+      maxScore: result.maxScore,
+      durationMs: result.durationMs
+    };
     throw new AppError(
       400,
       "WEB_DESIGN_REFERENCE_VALIDATION_FAILED",
       firstFailure
         ? `Reference validation failed for "${firstFailure.name}": ${firstFailure.message ?? "The test failed."}`
-        : "Reference validation failed."
+        : "Reference validation failed.",
+      {
+        failedCount: failedTests.length,
+        validationSummary: {
+          referenceSummary,
+          testSummaries: Object.fromEntries(testSummaries)
+        }
+      }
     );
   }
 

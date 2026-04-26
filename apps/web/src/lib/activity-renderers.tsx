@@ -117,6 +117,11 @@ function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<ty
             referenceBundle: result.referenceBundle as WebDesignExerciseReferenceBundle | null
           };
         },
+        getExpectedResult: async (courseId, activityId) => {
+          return groupId
+            ? await api.groupWebDesignExerciseExpectedResult(courseId, groupId, activityId)
+            : await api.webDesignExerciseExpectedResult(courseId, activityId);
+        },
         runCode: async (courseId, activityId, input) => {
           const result = groupId
             ? await api.runGroupWebDesignExercise(courseId, groupId, activityId, input)

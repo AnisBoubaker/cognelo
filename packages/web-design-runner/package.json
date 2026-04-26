@@ -6,6 +6,7 @@
   "main": "src/index.ts",
   "dependencies": {
     "@playwright/test": "1.59.1",
+    "sharp": "^0.34.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {

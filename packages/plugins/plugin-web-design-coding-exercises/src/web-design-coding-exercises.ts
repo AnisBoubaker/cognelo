@@ -39,12 +39,26 @@ export const webDesignExerciseTestInputSchema = z.object({
 });
 
 export const webDesignExerciseTestsInputSchema = z.object({
+  shouldCaptureExpectedResult: z.boolean().optional(),
+  shouldCropExpectedResult: z.boolean().optional(),
   referenceFiles: z.array(webDesignExerciseFileSchema).min(1).max(12),
   tests: z.array(webDesignExerciseTestInputSchema).max(80)
 });
 
 export type WebDesignExerciseTestInput = z.infer<typeof webDesignExerciseTestInputSchema>;
 export type WebDesignExerciseTestsInput = z.infer<typeof webDesignExerciseTestsInputSchema>;
+
+export const webDesignExpectedResultToken = "{{ EXPECTED_RESULT }}";
+export const webDesignExpectedResultCroppedToken = "{{ EXPECTED_RESULT_CROPPED }}";
+export const webDesignExpectedResultTokenPattern = /{{\s*EXPECTED_RESULT(?:_CROPPED)?\s*}}/g;
+
+export function webDesignPromptIncludesExpectedResult(value: string) {
+  return value.includes(webDesignExpectedResultToken) || value.includes(webDesignExpectedResultCroppedToken);
+}
+
+export function webDesignPromptRequestsCroppedExpectedResult(value: string) {
+  return value.includes(webDesignExpectedResultCroppedToken);
+}
 
 export const defaultWebDesignExerciseFiles: WebDesignExerciseFile[] = [
   {

@@ -5,8 +5,13 @@ This file is for web-design-coding-exercises-specific memory only.
 ## Long-Term Plugin Decisions
 
 - This plugin is separate from `coding-exercise` because HTML/CSS/JS exercises need visual preview and browser-based grading rather than Judge0 stdin/stdout execution.
-- Student-facing authoring data lives in public `Activity.config`; private tests, reference solutions, grading internals, and submission history should live in plugin-owned persistence.
-- Students edit teacher-defined HTML/CSS/JS files in Monaco and preview the result in a sandboxed iframe.
+- Student-facing starter data lives in public `Activity.config`; private tests, teacher solution files, grading internals, and submission history should live in plugin-owned persistence.
+- Students edit teacher-defined starter HTML/CSS/JS files in Monaco and preview their own result in a sandboxed iframe.
+- Teacher solution files are private reference-bundle data, not public activity config. The teacher authoring UI may preview the solution, but students must not see the solution bundle.
+- Teacher authoring is organized into top-level tabs: Setup, Solution, Student starting files, and Tests. Solution files and student starting files keep their own nested file tabs. Adding or removing a solution file should add or remove the matching student starter file; starter files may be marked read-only for students.
+- Teacher Playwright tests should use the same compact pattern as the coding-exercise plugin: separate sample/hidden sections, collapsible test rows, icon-only actions, and pass/fail/skipped validation badges from the last reference-solution validation.
+- When reference validation fails during test save, the API should return per-test validation details. The UI should update failed rows inline and keep the snackbar short, e.g. only saying how many tests failed.
+- If a prompt contains `{{ EXPECTED_RESULT }}`, saving tests and solution should generate a full Playwright screenshot of the private solution bundle and store only the image artifact in reference metadata. `{{ EXPECTED_RESULT_CROPPED }}` does the same but asks the runner to trim large plain background regions while preserving padding around visible content. Student prompt rendering may replace either token with this screenshot, but must never receive solution source files.
 - Browser preview should be client-side and sandboxed for fast feedback, with `allow-scripts` and `allow-modals` so student code can use JavaScript and modal APIs such as `alert()`.
 - The student preview should expose a plugin-local console panel fed by an iframe `postMessage` bridge rather than relying on the browser developer console.
 - Preview JavaScript should be loaded as Blob-backed script resources mapped back to original file paths so runtime errors can show useful file/line/column information when the browser provides it.
@@ -19,7 +24,7 @@ This file is for web-design-coding-exercises-specific memory only.
 
 ## Current Implementation Slice
 
-- Current implementation provides public config parsing, activity registration, authoring UI, student file editing, sandboxed iframe preview, preview console capture, modal support, improved runtime error reporting, student full-screen/focus mode, and plugin-owned persistence tables for reference bundles, Playwright tests, submissions, and per-test results.
+- Current implementation provides public config parsing for student starter files, activity registration, tabbed solution/starter authoring UI, separate collapsible sample/hidden Playwright test authoring with validation badges and inline failure cards, expected-result screenshot generation for `{{ EXPECTED_RESULT }}` and cropped screenshot generation for `{{ EXPECTED_RESULT_CROPPED }}`, student file editing, sandboxed iframe preview, preview console capture, modal support, improved runtime error reporting, student full-screen/focus mode, and plugin-owned persistence tables for reference bundles, Playwright tests, submissions, and per-test results.
 - Teacher/admin test management uses the plugin route `web-design-coding-exercises/tests` to persist a private reference file bundle plus sample/hidden Playwright test code.
 - Student run/submit routes use the Docker-backed `packages/web-design-runner` service through `WEB_DESIGN_RUNNER_URL`; sample tests are used for run and hidden tests are used for submit.
 - Reference validation executes enabled teacher tests against the reference bundle before saving and stores per-test validation summaries for passed or skipped tests.

@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage } from "node:http";
 import { chromium, expect, type Page } from "@playwright/test";
+import sharp from "sharp";
 import { z } from "zod";
 
 const fileSchema = z.object({
@@ -21,9 +22,24 @@ const runInputSchema = z.object({
   timeoutMs: z.number().int().min(1000).max(30000).default(8000)
 });
 
+const screenshotInputSchema = z.object({
+  files: z.array(fileSchema).min(1).max(12),
+  timeoutMs: z.number().int().min(1000).max(30000).default(8000),
+  trimWhitespace: z.boolean().default(false),
+  viewport: z
+    .object({
+      width: z.number().int().min(320).max(1920).default(1024),
+      height: z.number().int().min(240).max(2000).default(768)
+    })
+    .default({ width: 1024, height: 768 })
+});
+
 type RunInput = z.infer<typeof runInputSchema>;
+type ScreenshotInput = z.infer<typeof screenshotInputSchema>;
 
 const port = Number(process.env.PORT ?? 3456);
+const screenshotWhitespacePadding = 150;
+const screenshotBackgroundTolerance = 12;
 
 const server = createServer(async (request, response) => {
   response.setHeader("Content-Type", "application/json");
@@ -32,6 +48,14 @@ const server = createServer(async (request, response) => {
     if (request.method === "GET" && request.url === "/health") {
       response.writeHead(200);
       response.end(JSON.stringify({ ok: true }));
+      return;
+    }
+
+    if (request.method === "POST" && request.url === "/screenshot") {
+      const input = screenshotInputSchema.parse(JSON.parse(await readBody(request)));
+      const result = await captureWebDesignScreenshot(input);
+      response.writeHead(200);
+      response.end(JSON.stringify(result));
       return;
     }
 
@@ -60,6 +84,109 @@ const server = createServer(async (request, response) => {
 server.listen(port, () => {
   console.log(`Web design runner listening on ${port}`);
 });
+
+async function captureWebDesignScreenshot(input: ScreenshotInput) {
+  const browser = await chromium.launch({
+    headless: true
+  });
+  const startedAt = Date.now();
+
+  try {
+    const context = await browser.newContext({
+      javaScriptEnabled: true,
+      viewport: input.viewport
+    });
+    const page = await context.newPage();
+    page.setDefaultTimeout(input.timeoutMs);
+    await page.setContent(buildPreviewDocument(input.files), {
+      waitUntil: "load",
+      timeout: input.timeoutMs
+    });
+    const image = await page.screenshot({
+      fullPage: true,
+      type: "png"
+    });
+    const outputImage = input.trimWhitespace ? await trimScreenshotWhitespace(image, screenshotWhitespacePadding) : image;
+
+    return {
+      imageDataUrl: `data:image/png;base64,${outputImage.toString("base64")}`,
+      durationMs: Date.now() - startedAt,
+      viewport: input.viewport
+    };
+  } finally {
+    await browser.close();
+  }
+}
+
+async function trimScreenshotWhitespace(image: Buffer, padding: number) {
+  const source = sharp(image);
+  const { data, info } = await source.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const bounds = findVisiblePixelBounds(data, info.width, info.height);
+
+  if (!bounds) {
+    return image;
+  }
+
+  const left = Math.max(0, bounds.left - padding);
+  const top = Math.max(0, bounds.top - padding);
+  const right = Math.min(info.width - 1, bounds.right + padding);
+  const bottom = Math.min(info.height - 1, bounds.bottom + padding);
+  const width = Math.max(1, right - left + 1);
+  const height = Math.max(1, bottom - top + 1);
+
+  if (left === 0 && top === 0 && width === info.width && height === info.height) {
+    return image;
+  }
+
+  return sharp(image)
+    .extract({ left, top, width, height })
+    .png()
+    .toBuffer();
+}
+
+function findVisiblePixelBounds(data: Buffer, width: number, height: number) {
+  const background = readPixel(data, 0);
+  let left = width;
+  let top = height;
+  let right = -1;
+  let bottom = -1;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const offset = (y * width + x) * 4;
+      if (!isBackgroundPixel(data, offset, background)) {
+        left = Math.min(left, x);
+        top = Math.min(top, y);
+        right = Math.max(right, x);
+        bottom = Math.max(bottom, y);
+      }
+    }
+  }
+
+  if (right < left || bottom < top) {
+    return null;
+  }
+
+  return { left, top, right, bottom };
+}
+
+function readPixel(data: Buffer, offset: number) {
+  return {
+    red: data[offset],
+    green: data[offset + 1],
+    blue: data[offset + 2],
+    alpha: data[offset + 3]
+  };
+}
+
+function isBackgroundPixel(data: Buffer, offset: number, background: ReturnType<typeof readPixel>) {
+  return (
+    Math.abs(data[offset] - background.red) <= screenshotBackgroundTolerance &&
+    Math.abs(data[offset + 1] - background.green) <= screenshotBackgroundTolerance &&
+    Math.abs(data[offset + 2] - background.blue) <= screenshotBackgroundTolerance &&
+    Math.abs(data[offset + 3] - background.alpha) <= screenshotBackgroundTolerance
+  );
+}
 
 async function runWebDesignTests(input: RunInput) {
   const browser = await chromium.launch({
