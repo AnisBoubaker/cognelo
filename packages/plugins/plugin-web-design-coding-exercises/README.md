@@ -2,13 +2,13 @@
 
 This README is for the web-design-coding-exercises plugin only.
 
-It documents plugin-specific architecture, browser preview boundaries, and planned Playwright grading. Platform-wide architecture belongs in the root [README.md](../../../README.md).
+It documents plugin-specific architecture, browser preview boundaries, and Playwright grading. Platform-wide architecture belongs in the root [README.md](../../../README.md).
 
 ## Purpose
 
 `@cognelo/plugin-web-design-coding-exercises` provides the `web-design-coding-exercise` activity type.
 
-Teachers can define a private HTML/CSS/JavaScript solution bundle and a separate student starter bundle. Students work only from the starter bundle in Monaco editor tabs and see their own result immediately in a sandboxed iframe.
+Teachers can define a private HTML/CSS/JavaScript solution bundle and a separate student starter bundle. Activity-bank authoring stores the reusable source version; assigning that bank activity to a course creates a course-local copy. Students work only from the copied starter bundle in Monaco editor tabs and see their own result immediately in a sandboxed iframe.
 
 Teachers can include `{{ EXPECTED_RESULT }}` in the prompt to show students a visual target, or `{{ EXPECTED_RESULT_CROPPED }}` to trim large plain background regions around that target. Cognelo replaces either token with a screenshot generated from the private solution bundle; the student browser receives only the image artifact, never the solution source files.
 
@@ -53,6 +53,10 @@ Plugin-owned persistence:
 - `PluginWebDesignExerciseTest`: sample and hidden Playwright tests
 - `PluginWebDesignExerciseSubmission`: student run/submit file bundle and overall result summary
 - `PluginWebDesignExerciseTestResult`: normalized per-test result records
+- `PluginBankWebDesignExerciseReferenceBundle`: bank-owned private reference bundle for reusable authoring
+- `PluginBankWebDesignExerciseTest`: bank-owned sample and hidden Playwright tests
+
+When a web-design bank activity is copied into a course, the plugin's server hook copies the bank reference bundle and tests into the course-owned plugin tables. After that, course edits and bank edits are independent.
 
 ## Playwright Grading
 
@@ -61,13 +65,20 @@ Implemented plugin subroutes:
 ```text
 GET    /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/tests
 PUT    /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/tests
+GET    /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/expected-result
 GET    /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/run
 POST   /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/run
 GET    /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/submit
 POST   /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/submit
+
+GET    /api/activity-banks/:activityBankId/activities/:bankActivityId/web-design-coding-exercises/tests
+PUT    /api/activity-banks/:activityBankId/activities/:bankActivityId/web-design-coding-exercises/tests
+GET    /api/activity-banks/:activityBankId/activities/:bankActivityId/web-design-coding-exercises/expected-result
 ```
 
-The same routes are available through group-scoped assigned activity dispatch. The test-management route is teacher/admin-only and persists the reference bundle plus sample/hidden Playwright tests. Enabled tests must pass against the teacher reference bundle before they are saved. Student run uses enabled sample tests; student submit uses enabled hidden tests.
+The same learner run/submit routes are available through group-scoped assigned activity dispatch. Bank routes are available through the generic activity-bank plugin dispatcher; they are not hardcoded as web-design-specific API route files in `apps/api`.
+
+The test-management route is teacher/admin-only for course copies and bank-owner/admin-only for bank activities. It persists the reference bundle plus sample/hidden Playwright tests. Enabled tests must pass against the teacher reference bundle before they are saved. Student run uses enabled sample tests; student submit uses enabled hidden tests.
 
 The submit flow is:
 

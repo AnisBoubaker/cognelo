@@ -154,6 +154,10 @@ Then export a server plugin in `src/server.ts` and register it in:
 
 - [packages/activity-sdk/src/server.ts](../../packages/activity-sdk/src/server.ts)
 
+Do not add plugin-specific route files under `apps/api`. The API app owns generic dispatchers for course activities, assigned section/group activities, and activity-bank activities. Plugin-specific behavior belongs in the plugin route definitions.
+
+If the same route must work in both course-copy and bank-authoring contexts, branch on `context.courseId` and `context.activityBankId`.
+
 ## Step 5: Add Client-Side API Helpers
 
 If your plugin route is called from the browser, add a helper in:
@@ -165,6 +169,16 @@ Example:
 ```ts
 submitTracingQuiz: (courseId: string, activityId: string, input: { answer: string }) =>
   request<{ ok: true }>(`/courses/${courseId}/activities/${activityId}/tracing-quiz/submission`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  })
+```
+
+For bank-authoring plugin routes, use the activity-bank dispatcher path:
+
+```ts
+saveTracingQuizBankData: (activityBankId: string, bankActivityId: string, input: { answer: string }) =>
+  request<{ ok: true }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/tracing-quiz/submission`, {
     method: "POST",
     body: JSON.stringify(input)
   })
@@ -185,6 +199,34 @@ Good reasons to add persistence:
 - grade summaries
 - hint histories
 - event streams
+- private bank-owned reference data that should be copied into course-owned plugin tables when assigned
+
+## Step 7: Copy Private Bank Data If Needed
+
+The platform copies generic bank activity config/title/metadata into a course activity when the teacher adds a bank activity to a course. If your plugin has private bank-owned data, such as tests or reference files, the plugin must copy that data through a server hook.
+
+Example:
+
+```ts
+export const tracingQuizServerPlugin: ServerActivityPlugin = {
+  key: "tracing-quiz",
+  routes: [tracingQuizSubmitRoute],
+  hooks: {
+    onCourseActivityCreatedFromBankVersion: async ({ activity, bankActivityId }) => {
+      if (activity.activityType.key !== "tracing-quiz") {
+        return;
+      }
+
+      await copyBankTracingQuizDataToCourseActivity({
+        bankActivityId,
+        activityId: activity.id
+      });
+    }
+  }
+};
+```
+
+This preserves the copy semantics: later bank edits do not affect existing course activity copies.
 
 ## Recommended Development Order
 
@@ -196,7 +238,8 @@ For beginners, this sequence is usually easier than trying to build everything a
 4. make authoring changes save
 5. add plugin route(s)
 6. add database storage
-7. add research instrumentation
+7. add bank-to-course copy hooks for plugin-owned private data
+8. add research instrumentation
 
 ## A Good First Milestone
 

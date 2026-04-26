@@ -13,7 +13,7 @@ In practice, plugin data usually falls into two buckets:
 
 ## `config` Vs `metadata`
 
-Every activity already has:
+Every bank activity, activity version, and course activity already has:
 
 - `config`
 - `metadata`
@@ -42,6 +42,7 @@ Good rule:
 
 - if a learner would experience the change directly, it is probably `config`
 - if a researcher or administrator would use the value to group or analyze activities, it is probably `metadata`
+- if the value is private, such as hidden tests or reference solutions, it belongs in plugin-owned tables rather than public `config`
 
 ## Plugin-Owned Tables
 
@@ -56,6 +57,8 @@ Examples:
 - one row per telemetry event
 
 Parsons already uses this model with plugin-specific attempt tables.
+
+Some plugins need both bank-owned and course-owned plugin tables. For example, a reusable bank activity may have private reference data, and assigning it to a course should copy that private data into course-owned plugin tables. Use server plugin hooks for that copy step so later bank edits do not mutate existing course activities.
 
 ## Why Research-Friendly Design Matters
 
@@ -73,7 +76,8 @@ If you design your plugin data carefully, you make future analysis much easier.
 
 A good pattern is:
 
-- store labels and conditions on `Activity.metadata`
+- store reusable labels and conditions on `BankActivity.metadata` or `ActivityVersion.metadata`
+- copy labels into `Activity.metadata` when the course needs a local snapshot
 - store event-level traces in plugin tables
 - store rollup summaries in plugin tables or summary JSON fields
 

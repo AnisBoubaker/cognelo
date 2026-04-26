@@ -98,6 +98,10 @@ GET    /api/courses/:courseId/activities/:activityId/coding-exercises/hidden-tes
 PUT    /api/courses/:courseId/activities/:activityId/coding-exercises/hidden-tests
 ```
 
+The run/submit routes are also available through group-scoped assigned activity dispatch. Hidden-test management is course-authoring-only for now; activity-bank authoring currently edits public config, while course copies own the private reference solution and hidden tests.
+
+Plugin routes are declared in this package and mounted by the platform's generic dispatchers. Do not add coding-exercise-specific API route files in `apps/api`.
+
 Behavior:
 
 - `run` is for learner-visible sample execution

@@ -15,6 +15,8 @@ These define common concepts such as:
 - users
 - roles
 - activity lifecycle
+- subject creation/update
+- activity bank creation/update
 - course creation/update
 - activity creation/update
 
@@ -39,10 +41,11 @@ This service already handles:
 - listing activity types
 - looking up activity definitions
 - creating activities
+- creating course activity copies from activity-bank versions
 - updating activities
 - deleting activities
 
-When an activity is created or updated, the core service:
+When a local course activity is created or updated, the core service:
 
 1. loads the activity definition for the chosen activity type
 2. merges `defaultConfig` with incoming config
@@ -51,6 +54,10 @@ When an activity is created or updated, the core service:
 5. stores the result in the generic `Activity` table
 
 This is a big convenience. It means your plugin does not need its own separate “create activity” endpoint just to validate plugin config.
+
+When an activity is created from an activity bank, the core service copies the selected/latest `ActivityVersion` into a course-local `Activity`. The course activity keeps provenance fields (`bankActivityId`, `activityVersionId`) but is not live-linked to future bank edits.
+
+Plugins that store private bank-owned data can use `ServerActivityPlugin.hooks.onCourseActivityCreatedFromBankVersion` to copy that data into course-owned plugin tables.
 
 ## Plugin Route Dispatch
 
@@ -61,6 +68,8 @@ The shared plugin route system lives in:
 and is consumed by the API route:
 
 - [apps/api/src/app/api/courses/[courseId]/activities/[activityId]/[...pluginPath]/route.ts](../../apps/api/src/app/api/courses/[courseId]/activities/[activityId]/[...pluginPath]/route.ts)
+- [apps/api/src/app/api/activity-banks/[activityBankId]/activities/[bankActivityId]/[...pluginPath]/route.ts](../../apps/api/src/app/api/activity-banks/[activityBankId]/activities/[bankActivityId]/[...pluginPath]/route.ts)
+- [apps/api/src/app/api/courses/[courseId]/groups/[groupId]/activities/assigned/[activityId]/[...pluginPath]/route.ts](../../apps/api/src/app/api/courses/[courseId]/groups/[groupId]/activities/assigned/[activityId]/[...pluginPath]/route.ts)
 
 What this gives you:
 
@@ -72,7 +81,8 @@ What this gives you:
 That context includes:
 
 - the current user
-- the course id
+- the course id when dispatched in a course or assigned-activity context
+- the activity bank id when dispatched in a bank-authoring context
 - the activity id
 - the current activity record
 - the matched plugin path
@@ -196,6 +206,7 @@ Try not to rebuild these in plugin code:
 - auth
 - generic activity CRUD
 - generic course membership logic
+- generic subject/activity-bank/course-copy logic
 - generic syntax-highlighted code editing
 - base request validation patterns
 

@@ -27,7 +27,7 @@ Current config shape:
 
 ## Current State
 
-This plugin is still a scaffold. It does not yet own dedicated persistence tables or activity-specific UX beyond registration metadata.
+This plugin is still a scaffold. It does not yet own dedicated persistence tables, bank-to-course copy hooks, or activity-specific UX beyond registration metadata.
 
 ## Contributor Workflow
 

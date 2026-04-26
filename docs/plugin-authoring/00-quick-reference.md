@@ -27,7 +27,7 @@ Cognelo has:
 - `packages/db`: Prisma schema, migrations, seed
 - `packages/plugins/*`: plugin packages
 
-Plugins own activity-specific behavior. The platform owns generic auth, course/activity CRUD, route dispatch, and shared UI primitives.
+Plugins own activity-specific behavior. The platform owns generic auth, subject/activity-bank/course/activity CRUD, route dispatch, activity copying, and shared UI primitives.
 
 For authored rich text display, use `MarkdownRenderer` from `@cognelo/activity-ui`. For transient confirmations and non-field-specific errors, use `useNotifications()` instead of adding a plugin-local inline “saved” banner.
 
@@ -41,7 +41,8 @@ For authored rich text display, use `MarkdownRenderer` from `@cognelo/activity-u
 6. If needed, export a React renderer
 7. Register it in `apps/web/src/lib/activity-renderers.tsx`
 8. If needed, add plugin tables in `packages/db/prisma/schema.prisma`
-9. If needed, add browser API helpers in `apps/web/src/lib/api.ts`
+9. If the plugin stores private bank-owned data, add a server hook to copy it into course-owned plugin tables when a bank version is assigned to a course
+10. If needed, add browser API helpers in `apps/web/src/lib/api.ts`
 
 ## Required Registration Points
 
@@ -165,6 +166,9 @@ Typical shape:
 type ServerActivityPlugin = {
   key: string;
   routes?: readonly PluginRouteDefinition[];
+  hooks?: {
+    onCourseActivityCreatedFromBankVersion?: CourseActivityCreatedFromBankVersionHook;
+  };
 };
 ```
 
@@ -213,8 +217,12 @@ export const tracingQuizPlugin: ActivityPlugin = {
 Plugin routes are dispatched through the generic API route:
 
 - [apps/api/src/app/api/courses/[courseId]/activities/[activityId]/[...pluginPath]/route.ts](../../apps/api/src/app/api/courses/[courseId]/activities/[activityId]/[...pluginPath]/route.ts)
+- [apps/api/src/app/api/activity-banks/[activityBankId]/activities/[bankActivityId]/[...pluginPath]/route.ts](../../apps/api/src/app/api/activity-banks/[activityBankId]/activities/[bankActivityId]/[...pluginPath]/route.ts)
+- [apps/api/src/app/api/courses/[courseId]/groups/[groupId]/activities/assigned/[activityId]/[...pluginPath]/route.ts](../../apps/api/src/app/api/courses/[courseId]/groups/[groupId]/activities/assigned/[activityId]/[...pluginPath]/route.ts)
 
 You define route objects, not new app route files.
+
+`context.courseId` is present in course and assigned-activity contexts. `context.activityBankId` is present in bank-authoring contexts. A plugin route that supports both should branch on these fields and keep the actual behavior in the plugin package.
 
 Example:
 
@@ -267,6 +275,8 @@ Use `Activity.config` for:
 - learner-visible behavior
 - prompt/content setup
 
+Use `BankActivity.config` / `ActivityVersion.config` for reusable bank authoring state. When a bank activity is assigned to a course, this generic config is copied into the course `Activity.config`.
+
 Use `Activity.metadata` for:
 
 - research tags
@@ -276,6 +286,8 @@ Use `Activity.metadata` for:
 
 Use plugin-owned tables for:
 
+- private bank-owned authoring data
+- private course-owned reference/test data copied from a bank
 - attempts
 - submissions
 - event streams

@@ -433,7 +433,7 @@ import { tracingQuizServerPlugin } from "@cognelo/plugin-tracing-quiz/server";
 
 and register it in the `serverPlugins` array.
 
-Now the generic API dispatcher can route requests to your plugin.
+Now the generic API dispatchers can route requests to your plugin. Cognelo has dispatchers for course activity authoring, section/group assigned activity work, and activity-bank authoring. Keep plugin behavior in plugin route definitions rather than creating plugin-specific route files under `apps/api`.
 
 ## Step 12: Add A Browser API Helper
 
@@ -455,6 +455,8 @@ submitTracingQuiz: (courseId: string, activityId: string, input: { answer: strin
 ```
 
 This makes it easy for your React component to call the plugin route.
+
+If the same plugin route is needed while authoring inside an activity bank, add a second helper that uses `/activity-banks/:activityBankId/activities/:bankActivityId/...`.
 
 ## Step 13: Wire The Student Submission UI
 
