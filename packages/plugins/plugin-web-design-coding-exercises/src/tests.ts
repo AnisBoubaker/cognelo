@@ -1,5 +1,6 @@
+import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
-import { assertCanManageCourse, AppError } from "@cognelo/core";
+import { assertCanManageActivityBank, assertCanManageCourse, AppError } from "@cognelo/core";
 import {
   normalizeWebDesignExerciseConfig,
   parseWebDesignExerciseConfig,
@@ -63,11 +64,76 @@ export async function listWebDesignExerciseTests(params: { activityId: string })
   };
 }
 
+export async function listBankWebDesignExerciseTests(params: { bankActivityId: string }) {
+  const [referenceBundle, tests] = await Promise.all([
+    prisma.pluginBankWebDesignExerciseReferenceBundle.findUnique({
+      where: { bankActivityId: params.bankActivityId }
+    }),
+    prisma.pluginBankWebDesignExerciseTest.findMany({
+      where: { bankActivityId: params.bankActivityId },
+      orderBy: [{ kind: "asc" }, { orderIndex: "asc" }, { createdAt: "asc" }]
+    })
+  ]);
+
+  return {
+    referenceBundle: referenceBundle ? toReferenceBundleRecord(referenceBundle) : null,
+    tests: tests.map((test) => toTestRecord(test))
+  };
+}
+
+export async function copyBankWebDesignExerciseTestsToCourseActivity(params: { bankActivityId: string; activityId: string }) {
+  const [referenceBundle, tests] = await Promise.all([
+    prisma.pluginBankWebDesignExerciseReferenceBundle.findUnique({
+      where: { bankActivityId: params.bankActivityId }
+    }),
+    prisma.pluginBankWebDesignExerciseTest.findMany({
+      where: { bankActivityId: params.bankActivityId },
+      orderBy: [{ kind: "asc" }, { orderIndex: "asc" }, { createdAt: "asc" }]
+    })
+  ]);
+
+  await prisma.$transaction(async (transaction) => {
+    await transaction.pluginWebDesignExerciseTest.deleteMany({
+      where: { activityId: params.activityId }
+    });
+
+    await transaction.pluginWebDesignExerciseReferenceBundle.deleteMany({
+      where: { activityId: params.activityId }
+    });
+
+    if (referenceBundle) {
+      await transaction.pluginWebDesignExerciseReferenceBundle.create({
+        data: {
+          activityId: params.activityId,
+          files: referenceBundle.files as Prisma.InputJsonValue,
+          validationSummary: referenceBundle.validationSummary as Prisma.InputJsonValue
+        }
+      });
+    }
+
+    if (tests.length) {
+      await transaction.pluginWebDesignExerciseTest.createMany({
+        data: tests.map((test) => ({
+          activityId: params.activityId,
+          name: test.name,
+          kind: test.kind,
+          testCode: test.testCode,
+          orderIndex: test.orderIndex,
+          isEnabled: test.isEnabled,
+          weight: test.weight,
+          metadata: test.metadata as Prisma.InputJsonValue,
+          validationSummary: test.validationSummary as Prisma.InputJsonValue
+        }))
+      });
+    }
+  });
+}
+
 export async function replaceWebDesignExerciseTests(params: {
   activityId: string;
   activityConfig: Record<string, unknown> | undefined;
   courseId: string;
-  user: { id: string; email: string; name: string | null; roles: ("admin" | "teacher" | "student")[] };
+  user: CurrentUser;
   input: unknown;
 }) {
   await assertCanManageCourse(params.user, params.courseId);
@@ -147,6 +213,90 @@ export async function replaceWebDesignExerciseTests(params: {
   return listWebDesignExerciseTests({ activityId: params.activityId });
 }
 
+export async function replaceBankWebDesignExerciseTests(params: {
+  activityBankId: string;
+  bankActivityId: string;
+  activityConfig: Record<string, unknown> | undefined;
+  user: CurrentUser;
+  input: unknown;
+}) {
+  await assertCanManageActivityBank(params.user, params.activityBankId);
+  const input = webDesignExerciseTestsInputSchema.parse(params.input);
+  const seenIds = new Set<string>();
+  for (const test of input.tests) {
+    if (seenIds.has(test.id)) {
+      throw new AppError(400, "WEB_DESIGN_TEST_DUPLICATE_ID", "Web design test ids must be unique.");
+    }
+    seenIds.add(test.id);
+  }
+
+  const referenceFiles = normalizeWebDesignExerciseConfig({
+    prompt: "",
+    files: input.referenceFiles,
+    previewEntry: input.referenceFiles.find((file) => file.language === "html")?.path ?? input.referenceFiles[0]?.path ?? "index.html",
+    maxEditorSeconds: 1800
+  }).files;
+  const validation = await validateReferenceBundle({
+    files: referenceFiles,
+    tests: input.tests
+  });
+  const activityConfig = parseWebDesignExerciseConfig(params.activityConfig);
+  const shouldCaptureExpectedResult = input.shouldCaptureExpectedResult ?? webDesignPromptIncludesExpectedResult(activityConfig.prompt);
+  const shouldCropExpectedResult = input.shouldCropExpectedResult ?? webDesignPromptRequestsCroppedExpectedResult(activityConfig.prompt);
+  const expectedResult = shouldCaptureExpectedResult
+    ? await captureWebDesignScreenshotInRunner({ files: referenceFiles, trimWhitespace: shouldCropExpectedResult })
+    : null;
+  const referenceSummary = {
+    ...validation.referenceSummary,
+    expectedResult: expectedResult
+      ? {
+          imageDataUrl: expectedResult.imageDataUrl,
+          generatedAt: new Date().toISOString(),
+          durationMs: expectedResult.durationMs,
+          viewport: expectedResult.viewport
+        }
+      : null
+  };
+
+  await prisma.$transaction(async (transaction) => {
+    await transaction.pluginBankWebDesignExerciseTest.deleteMany({
+      where: { bankActivityId: params.bankActivityId }
+    });
+
+    if (input.tests.length) {
+      await transaction.pluginBankWebDesignExerciseTest.createMany({
+        data: input.tests.map((test, index) => ({
+          id: test.id,
+          bankActivityId: params.bankActivityId,
+          name: test.name,
+          kind: test.kind,
+          testCode: test.testCode,
+          orderIndex: index,
+          isEnabled: test.isEnabled,
+          weight: test.weight,
+          metadata: test.metadata as Prisma.InputJsonValue,
+          validationSummary: (validation.testSummaries.get(test.id) ?? buildSkippedValidationSummary(test.isEnabled)) as Prisma.InputJsonValue
+        }))
+      });
+    }
+
+    await transaction.pluginBankWebDesignExerciseReferenceBundle.upsert({
+      where: { bankActivityId: params.bankActivityId },
+      create: {
+        bankActivityId: params.bankActivityId,
+        files: referenceFiles as unknown as Prisma.InputJsonValue,
+        validationSummary: referenceSummary as Prisma.InputJsonValue
+      },
+      update: {
+        files: referenceFiles as unknown as Prisma.InputJsonValue,
+        validationSummary: referenceSummary as Prisma.InputJsonValue
+      }
+    });
+  });
+
+  return listBankWebDesignExerciseTests({ bankActivityId: params.bankActivityId });
+}
+
 export async function getWebDesignExpectedResult(params: { activityId: string; activityConfig: Record<string, unknown> | undefined }) {
   const activityConfig = parseWebDesignExerciseConfig(params.activityConfig);
   if (!webDesignPromptIncludesExpectedResult(activityConfig.prompt)) {
@@ -155,6 +305,22 @@ export async function getWebDesignExpectedResult(params: { activityId: string; a
 
   const referenceBundle = await prisma.pluginWebDesignExerciseReferenceBundle.findUnique({
     where: { activityId: params.activityId }
+  });
+  const validationSummary = normalizeJsonObject(referenceBundle?.validationSummary);
+  const expectedResult = normalizeJsonObject(validationSummary.expectedResult);
+  const imageDataUrl = typeof expectedResult.imageDataUrl === "string" ? expectedResult.imageDataUrl : null;
+
+  return { imageDataUrl };
+}
+
+export async function getBankWebDesignExpectedResult(params: { bankActivityId: string; activityConfig: Record<string, unknown> | undefined }) {
+  const activityConfig = parseWebDesignExerciseConfig(params.activityConfig);
+  if (!webDesignPromptIncludesExpectedResult(activityConfig.prompt)) {
+    return { imageDataUrl: null };
+  }
+
+  const referenceBundle = await prisma.pluginBankWebDesignExerciseReferenceBundle.findUnique({
+    where: { bankActivityId: params.bankActivityId }
   });
   const validationSummary = normalizeJsonObject(referenceBundle?.validationSummary);
   const expectedResult = normalizeJsonObject(validationSummary.expectedResult);

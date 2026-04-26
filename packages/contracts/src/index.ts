@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const RoleKeySchema = z.enum(["admin", "teacher", "student"]);
+export const RoleKeySchema = z.enum(["admin", "course_manager", "teacher", "student"]);
 export type RoleKey = z.infer<typeof RoleKeySchema>;
 
 export const CourseStatusSchema = z.enum(["draft", "published", "archived"]);
@@ -56,6 +56,7 @@ export const ActivateAccountInputSchema = z
 export type ActivateAccountInput = z.infer<typeof ActivateAccountInputSchema>;
 
 export const CourseInputSchema = z.object({
+  subjectId: z.string().cuid(),
   title: z.string().min(2).max(160),
   description: z.string().max(4000).optional().default(""),
   status: CourseStatusSchema.optional().default("draft")
@@ -64,6 +65,42 @@ export type CourseInput = z.infer<typeof CourseInputSchema>;
 
 export const CourseUpdateSchema = CourseInputSchema.partial();
 export type CourseUpdate = z.infer<typeof CourseUpdateSchema>;
+
+export const SubjectInputSchema = z.object({
+  title: z.string().min(2).max(160),
+  description: z.string().max(4000).optional().default(""),
+  metadata: z.record(z.unknown()).optional().default({})
+});
+export type SubjectInput = z.infer<typeof SubjectInputSchema>;
+
+export const SubjectUpdateSchema = SubjectInputSchema.partial();
+export type SubjectUpdate = z.infer<typeof SubjectUpdateSchema>;
+
+export const ActivityBankInputSchema = z.object({
+  subjectId: z.string().cuid(),
+  title: z.string().min(2).max(160),
+  description: z.string().max(4000).optional().default(""),
+  ownerId: z.string().cuid().optional(),
+  metadata: z.record(z.unknown()).optional().default({})
+});
+export type ActivityBankInput = z.infer<typeof ActivityBankInputSchema>;
+
+export const ActivityBankUpdateSchema = ActivityBankInputSchema.omit({ subjectId: true }).partial();
+export type ActivityBankUpdate = z.infer<typeof ActivityBankUpdateSchema>;
+
+export const BankActivityInputSchema = z.object({
+  activityTypeKey: z.string().min(2).max(80),
+  title: z.string().min(2).max(180),
+  description: z.string().max(4000).optional().default(""),
+  lifecycle: ActivityLifecycleSchema.optional().default("draft"),
+  config: z.record(z.unknown()).optional().default({}),
+  metadata: z.record(z.unknown()).optional().default({}),
+  position: z.number().int().min(0).optional().default(0)
+});
+export type BankActivityInput = z.infer<typeof BankActivityInputSchema>;
+
+export const BankActivityUpdateSchema = BankActivityInputSchema.partial();
+export type BankActivityUpdate = z.infer<typeof BankActivityUpdateSchema>;
 
 export const CourseGroupInputSchema = z.object({
   title: z.string().min(2).max(160)
@@ -136,6 +173,8 @@ export const CourseGroupMaterialUpdateSchema = CourseMaterialBaseSchema.partial(
 export type CourseGroupMaterialUpdate = z.infer<typeof CourseGroupMaterialUpdateSchema>;
 
 export const ActivityInputSchema = z.object({
+  bankActivityId: z.string().cuid().optional(),
+  activityVersionId: z.string().cuid().optional(),
   activityTypeKey: z.string().min(2).max(80),
   title: z.string().min(2).max(180),
   description: z.string().max(4000).optional().default(""),

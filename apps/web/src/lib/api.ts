@@ -1,7 +1,11 @@
 import type {
   ActivateAccountInput,
   ActivityInput,
+  ActivityBankInput,
+  ActivityBankUpdate,
   ActivityUpdate,
+  BankActivityInput,
+  BankActivityUpdate,
   CourseGroupActivityInput,
   CourseGroupActivityUpdate,
   CourseGroupInput,
@@ -16,18 +20,77 @@ import type {
   CourseMaterialUpdate,
   CourseUpdate,
   CurrentUser,
-  MaterialKind
+  MaterialKind,
+  SubjectInput,
+  SubjectUpdate
 } from "@cognelo/contracts";
 
 export type Course = {
   id: string;
+  subjectId: string;
   title: string;
   description: string;
   status: "draft" | "published" | "archived";
+  subject?: Subject;
   memberships?: CourseMembership[];
   materials?: CourseMaterial[];
   activities?: Activity[];
   groups?: CourseGroup[];
+};
+
+export type Subject = {
+  id: string;
+  title: string;
+  description: string;
+  metadata?: Record<string, unknown>;
+  materials?: CourseMaterial[];
+  activityBanks?: ActivityBank[];
+  courses?: Course[];
+};
+
+export type ActivityBank = {
+  id: string;
+  subjectId: string;
+  title: string;
+  description: string;
+  ownerId: string;
+  metadata?: Record<string, unknown>;
+  subject?: Subject;
+  owner?: {
+    id: string;
+    email: string;
+    name: string | null;
+  };
+  activities?: BankActivity[];
+};
+
+export type BankActivity = {
+  id: string;
+  bankId: string;
+  activityTypeId: string;
+  title: string;
+  description: string;
+  lifecycle: string;
+  config?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  position: number;
+  currentVersionId?: string | null;
+  activityType: ActivityType;
+  currentVersion?: ActivityVersion | null;
+  versions?: ActivityVersion[];
+};
+
+export type ActivityVersion = {
+  id: string;
+  bankActivityId: string;
+  versionNumber: number;
+  activityTypeId: string;
+  title: string;
+  description: string;
+  lifecycle: string;
+  config?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
 };
 
 export type CourseMembership = {
@@ -122,12 +185,16 @@ export type ActivityDefinition = {
 
 export type Activity = {
   id: string;
+  bankActivityId?: string | null;
+  activityVersionId?: string | null;
   title: string;
   description: string;
   lifecycle: string;
   config?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   activityType: ActivityType;
+  bankActivity?: BankActivity | null;
+  activityVersion?: ActivityVersion | null;
   position: number;
 };
 
@@ -353,6 +420,43 @@ export const api = {
     }),
   logout: () => request<{ ok: true }>("/auth/logout", { method: "POST" }),
   me: () => request<{ user: CurrentUser }>("/users/me"),
+  subjects: () => request<{ subjects: Subject[] }>("/subjects"),
+  subject: (subjectId: string) => request<{ subject: Subject }>(`/subjects/${subjectId}`),
+  createSubject: (input: SubjectInput) =>
+    request<{ subject: Subject }>("/subjects", {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  updateSubject: (subjectId: string, input: SubjectUpdate) =>
+    request<{ subject: Subject }>(`/subjects/${subjectId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  activityBanks: (subjectId?: string) =>
+    request<{ activityBanks: ActivityBank[] }>(`/activity-banks${subjectId ? `?subjectId=${encodeURIComponent(subjectId)}` : ""}`),
+  activityBank: (activityBankId: string) => request<{ activityBank: ActivityBank }>(`/activity-banks/${activityBankId}`),
+  createActivityBank: (input: ActivityBankInput) =>
+    request<{ activityBank: ActivityBank }>("/activity-banks", {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  updateActivityBank: (activityBankId: string, input: ActivityBankUpdate) =>
+    request<{ activityBank: ActivityBank }>(`/activity-banks/${activityBankId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  bankActivities: (activityBankId: string) =>
+    request<{ activities: BankActivity[] }>(`/activity-banks/${activityBankId}/activities`),
+  createBankActivity: (activityBankId: string, input: BankActivityInput) =>
+    request<{ activity: BankActivity }>(`/activity-banks/${activityBankId}/activities`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  updateBankActivity: (activityBankId: string, bankActivityId: string, input: BankActivityUpdate) =>
+    request<{ activity: BankActivity }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
   courses: () => request<{ courses: Course[] }>("/courses"),
   course: (courseId: string) => request<{ course: Course }>(`/courses/${courseId}`),
   createCourse: (input: CourseInput) =>
@@ -463,8 +567,16 @@ export const api = {
     request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
       `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/tests`
     ),
+  bankWebDesignExerciseTests: (activityBankId: string, bankActivityId: string) =>
+    request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
+      `/activity-banks/${activityBankId}/activities/${bankActivityId}/web-design-coding-exercises/tests`
+    ),
   webDesignExerciseExpectedResult: (courseId: string, activityId: string) =>
     request<{ imageDataUrl: string | null }>(`/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/expected-result`),
+  bankWebDesignExerciseExpectedResult: (activityBankId: string, bankActivityId: string) =>
+    request<{ imageDataUrl: string | null }>(
+      `/activity-banks/${activityBankId}/activities/${bankActivityId}/web-design-coding-exercises/expected-result`
+    ),
   saveWebDesignExerciseTests: (
     courseId: string,
     activityId: string,
@@ -477,6 +589,23 @@ export const api = {
   ) =>
     request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
       `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/tests`,
+      {
+        method: "PUT",
+        body: JSON.stringify(input)
+      }
+    ),
+  saveBankWebDesignExerciseTests: (
+    activityBankId: string,
+    bankActivityId: string,
+    input: {
+      shouldCaptureExpectedResult?: boolean;
+      shouldCropExpectedResult?: boolean;
+      referenceFiles: WebDesignExerciseFile[];
+      tests: Array<Omit<WebDesignExerciseTest, "orderIndex" | "createdAt" | "updatedAt" | "validationSummary">>;
+    }
+  ) =>
+    request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
+      `/activity-banks/${activityBankId}/activities/${bankActivityId}/web-design-coding-exercises/tests`,
       {
         method: "PUT",
         body: JSON.stringify(input)

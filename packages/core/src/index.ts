@@ -5,4 +5,5 @@ export * from "./courses";
 export * from "./errors";
 export * from "./groups";
 export * from "./materials";
+export * from "./subjects";
 export * from "./users";

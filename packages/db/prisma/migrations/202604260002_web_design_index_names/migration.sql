@@ -1,0 +1,2 @@
+ALTER INDEX "PluginWebDesignExerciseSubmission_activityId_status_createdAt_i" RENAME TO "PluginWebDesignExerciseSubmission_activityId_status_created_idx";
+ALTER INDEX "PluginWebDesignExerciseSubmission_activityId_userId_createdAt_i" RENAME TO "PluginWebDesignExerciseSubmission_activityId_userId_created_idx";

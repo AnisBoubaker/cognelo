@@ -95,8 +95,13 @@ model User {
   roles           UserRole[]
   courses         CourseMembership[]
   createdCourses  Course[]           @relation("CourseCreator")
+  createdSubjects Subject[]          @relation("SubjectCreator")
+  createdSubjectMaterials SubjectMaterial[] @relation("SubjectMaterialCreator")
+  ownedActivityBanks ActivityBank[]   @relation("ActivityBankOwner")
   materials       CourseMaterial[]   @relation("MaterialCreator")
   activities      Activity[]         @relation("ActivityCreator")
+  createdBankActivities BankActivity[] @relation("BankActivityCreator")
+  createdActivityVersions ActivityVersion[] @relation("ActivityVersionCreator")
   createdGroups   CourseGroup[]      @relation("CourseGroupCreator")
   groupParticipants CourseGroupParticipant[]
   groupMaterials  CourseGroupMaterial[] @relation("GroupMaterialCreator")
@@ -129,20 +134,80 @@ model UserRole {
 
 model Course {
   id          String             @id @default(cuid())
+  subjectId   String
   title       String
   description String             @default("")
   status      CourseStatus       @default(draft)
   createdById String
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
+  subject     Subject            @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   createdBy   User               @relation("CourseCreator", fields: [createdById], references: [id])
   memberships CourseMembership[]
   materials   CourseMaterial[]
   activities  Activity[]
   groups      CourseGroup[]
 
+  @@index([subjectId])
   @@index([status])
   @@index([createdById])
+}
+
+model Subject {
+  id          String            @id @default(cuid())
+  title       String
+  description String            @default("")
+  metadata    Json              @default("{}")
+  createdById String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  createdBy   User              @relation("SubjectCreator", fields: [createdById], references: [id])
+  courses     Course[]
+  materials   SubjectMaterial[]
+  activityBanks ActivityBank[]
+
+  @@index([createdById])
+  @@index([updatedAt])
+}
+
+model SubjectMaterial {
+  id          String       @id @default(cuid())
+  subjectId   String
+  parentId    String?
+  title       String
+  kind        MaterialKind
+  body        String?
+  url         String?
+  metadata    Json         @default("{}")
+  position    Int          @default(0)
+  createdById String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  subject     Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdBy   User         @relation("SubjectMaterialCreator", fields: [createdById], references: [id])
+  parent      SubjectMaterial?  @relation("SubjectMaterialTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    SubjectMaterial[] @relation("SubjectMaterialTree")
+
+  @@index([subjectId, position])
+  @@index([subjectId, parentId, position])
+  @@index([kind])
+}
+
+model ActivityBank {
+  id          String     @id @default(cuid())
+  subjectId   String
+  title       String
+  description String     @default("")
+  ownerId     String
+  metadata    Json       @default("{}")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  subject     Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  owner       User       @relation("ActivityBankOwner", fields: [ownerId], references: [id])
+  activities  BankActivity[]
+
+  @@index([subjectId, updatedAt])
+  @@index([ownerId])
 }
 
 model CourseMembership {
@@ -291,11 +356,66 @@ model ActivityType {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   activities  Activity[]
+  bankActivities BankActivity[]
+  activityVersions ActivityVersion[]
+}
+
+model BankActivity {
+  id             String            @id @default(cuid())
+  bankId         String
+  activityTypeId String
+  title          String
+  description    String            @default("")
+  lifecycle      ActivityLifecycle @default(draft)
+  config         Json              @default("{}")
+  metadata       Json              @default("{}")
+  position       Int               @default(0)
+  currentVersionId String?
+  createdById    String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  bank           ActivityBank      @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  activityType   ActivityType      @relation(fields: [activityTypeId], references: [id])
+  currentVersion ActivityVersion?  @relation("CurrentBankActivityVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  createdBy      User              @relation("BankActivityCreator", fields: [createdById], references: [id])
+  versions       ActivityVersion[] @relation("BankActivityVersions")
+  courseActivities Activity[]
+  webDesignExerciseReferenceBundle PluginBankWebDesignExerciseReferenceBundle?
+  webDesignExerciseTests PluginBankWebDesignExerciseTest[]
+
+  @@index([bankId, position])
+  @@index([activityTypeId])
+  @@index([currentVersionId])
+}
+
+model ActivityVersion {
+  id             String            @id @default(cuid())
+  bankActivityId String
+  versionNumber  Int
+  activityTypeId String
+  title          String
+  description    String            @default("")
+  lifecycle      ActivityLifecycle @default(draft)
+  config         Json              @default("{}")
+  metadata       Json              @default("{}")
+  createdById    String
+  createdAt      DateTime          @default(now())
+  bankActivity   BankActivity      @relation("BankActivityVersions", fields: [bankActivityId], references: [id], onDelete: Cascade)
+  currentForBankActivities BankActivity[] @relation("CurrentBankActivityVersion")
+  activityType   ActivityType      @relation(fields: [activityTypeId], references: [id])
+  createdBy      User              @relation("ActivityVersionCreator", fields: [createdById], references: [id])
+  courseActivities Activity[]
+
+  @@unique([bankActivityId, versionNumber])
+  @@index([bankActivityId, createdAt])
+  @@index([activityTypeId])
 }
 
 model Activity {
   id             String            @id @default(cuid())
   courseId       String
+  bankActivityId String?
+  activityVersionId String?
   activityTypeId String
   title          String
   description    String            @default("")
@@ -307,6 +427,8 @@ model Activity {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   course         Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  bankActivity   BankActivity?     @relation(fields: [bankActivityId], references: [id], onDelete: SetNull)
+  activityVersion ActivityVersion? @relation(fields: [activityVersionId], references: [id], onDelete: SetNull)
   activityType   ActivityType      @relation(fields: [activityTypeId], references: [id])
   createdBy      User              @relation("ActivityCreator", fields: [createdById], references: [id])
   groupAssignments CourseGroupActivity[]
@@ -319,6 +441,8 @@ model Activity {
   webDesignExerciseSubmissions PluginWebDesignExerciseSubmission[]
 
   @@index([courseId, position])
+  @@index([bankActivityId])
+  @@index([activityVersionId])
   @@index([activityTypeId])
   @@index([lifecycle])
 }
@@ -492,4 +616,33 @@ model PluginWebDesignExerciseTestResult {
   @@index([submissionId])
   @@index([testId])
   @@index([status])
+}
+
+model PluginBankWebDesignExerciseReferenceBundle {
+  id                String       @id @default(cuid())
+  bankActivityId    String       @unique
+  files             Json         @default("[]")
+  validationSummary Json         @default("{}")
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  bankActivity      BankActivity @relation(fields: [bankActivityId], references: [id], onDelete: Cascade)
+}
+
+model PluginBankWebDesignExerciseTest {
+  id                String                          @id @default(cuid())
+  bankActivityId    String
+  name              String
+  kind              PluginWebDesignExerciseTestKind @default(hidden)
+  testCode          String
+  orderIndex        Int                             @default(0)
+  isEnabled         Boolean                         @default(true)
+  weight            Int                             @default(1)
+  metadata          Json                            @default("{}")
+  validationSummary Json                            @default("{}")
+  createdAt         DateTime                        @default(now())
+  updatedAt         DateTime                        @updatedAt
+  bankActivity      BankActivity                    @relation(fields: [bankActivityId], references: [id], onDelete: Cascade)
+
+  @@index([bankActivityId, kind, orderIndex])
+  @@index([bankActivityId, isEnabled])
 }

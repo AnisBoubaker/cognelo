@@ -13,6 +13,8 @@ export default function CoursesPage() {
   const { t } = useI18n();
   const [courses, setCourses] = useState<Course[]>([]);
   const [error, setError] = useState("");
+  const canCreateCourses =
+    user?.roles.includes("admin") || user?.roles.includes("course_manager") || user?.roles.includes("teacher");
 
   useEffect(() => {
     api
@@ -29,9 +31,11 @@ export default function CoursesPage() {
             <p className="eyebrow">{t("courses.eyebrow")}</p>
             <h1>{t("courses.title")}</h1>
           </div>
-          <Link className="button" href="/courses/new">
-            {t("courses.create")}
-          </Link>
+          {canCreateCourses ? (
+            <Link className="button" href="/courses/new">
+              {t("courses.create")}
+            </Link>
+          ) : null}
         </section>
         {error ? <p className="error">{error}</p> : null}
         <section className="grid">
@@ -41,6 +45,7 @@ export default function CoursesPage() {
               key={course.id}
               href={
                 user?.roles.includes("admin") ||
+                user?.roles.includes("course_manager") ||
                 user?.roles.includes("teacher") ||
                 (course.groups?.length ?? 0) !== 1
                   ? `/courses/${course.id}`
@@ -49,6 +54,7 @@ export default function CoursesPage() {
             >
               <span className="eyebrow">{t(`status.${course.status}`)}</span>
               <h2>{course.title}</h2>
+              {course.subject ? <p className="muted">{course.subject.title}</p> : null}
               {course.description ? (
                 <MarkdownRenderer markdown={course.description} className="muted" compact />
               ) : (

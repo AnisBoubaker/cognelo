@@ -26,7 +26,7 @@ const groupInclude = {
   activities: {
     include: {
       activity: {
-        include: { activityType: true }
+        include: { activityType: true, bankActivity: true, activityVersion: true }
       }
     },
     orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }]
@@ -272,7 +272,7 @@ export async function listGroupActivityAssignments(user: CurrentUser, courseId: 
     where: { groupId },
     include: {
       activity: {
-        include: { activityType: true }
+        include: { activityType: true, bankActivity: true, activityVersion: true }
       }
     },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }]
@@ -285,7 +285,7 @@ export async function getGroupAssignedActivity(user: CurrentUser, courseId: stri
     where: { groupId, activityId },
     include: {
       activity: {
-        include: { activityType: true }
+        include: { activityType: true, bankActivity: true, activityVersion: true }
       }
     }
   });
@@ -430,7 +430,7 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
     },
     include: {
       activity: {
-        include: { activityType: true }
+        include: { activityType: true, bankActivity: true, activityVersion: true }
       }
     }
   });
@@ -466,7 +466,7 @@ export async function updateGroupActivityAssignment(
     },
     include: {
       activity: {
-        include: { activityType: true }
+        include: { activityType: true, bankActivity: true, activityVersion: true }
       }
     }
   });

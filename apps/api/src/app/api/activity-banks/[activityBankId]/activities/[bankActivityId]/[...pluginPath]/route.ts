@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { resolvePluginRoute } from "@cognelo/activity-sdk/server";
-import { AppError, getActivity } from "@cognelo/core";
+import { AppError, getActivityBank } from "@cognelo/core";
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 
-type Params = { params: Promise<{ courseId: string; activityId: string; pluginPath: string[] }> };
+type Params = { params: Promise<{ activityBankId: string; bankActivityId: string; pluginPath: string[] }> };
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +13,15 @@ export function OPTIONS() {
 
 async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params["params"]>) {
   const user = await requireUser();
-  const { courseId, activityId, pluginPath } = params;
-  const activity = await getActivity(user, courseId, activityId);
-  const route = resolvePluginRoute(activity.activityType.key, pluginPath);
+  const { activityBankId, bankActivityId, pluginPath } = params;
+  const bank = await getActivityBank(user, activityBankId);
+  const activity = bank.activities.find((candidate) => candidate.id === bankActivityId);
 
+  if (!activity) {
+    throw new AppError(404, "BANK_ACTIVITY_NOT_FOUND", "The requested activity was not found in this activity bank.");
+  }
+
+  const route = resolvePluginRoute(activity.activityType.key, pluginPath);
   if (!route) {
     throw new AppError(404, "PLUGIN_ROUTE_NOT_FOUND", "The requested plugin route does not exist for this activity.");
   }
@@ -30,13 +35,11 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
     request,
     context: {
       user,
-      courseId,
-      activityId,
+      activityBankId,
+      activityId: activity.id,
       path: pluginPath,
       activity: {
         id: activity.id,
-        bankActivityId: activity.bankActivityId,
-        activityVersionId: activity.activityVersionId,
         title: activity.title,
         description: activity.description,
         lifecycle: activity.lifecycle,

@@ -1,24 +1,51 @@
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
-import { assertCanManageCourse } from "@cognelo/core";
+import { AppError, assertCanManageCourse } from "@cognelo/core";
 import {
   listRecentWebDesignExerciseSubmissions,
   runWebDesignExercise,
   submitWebDesignExercise,
   webDesignExerciseRunInputSchema
 } from "./executions";
-import { getWebDesignExpectedResult, listWebDesignExerciseTests, replaceWebDesignExerciseTests } from "./tests";
+import {
+  getBankWebDesignExpectedResult,
+  getWebDesignExpectedResult,
+  listBankWebDesignExerciseTests,
+  listWebDesignExerciseTests,
+  replaceBankWebDesignExerciseTests,
+  replaceWebDesignExerciseTests
+} from "./tests";
 
 export const webDesignExerciseTestsRoute: PluginRouteDefinition = {
   path: "web-design-coding-exercises/tests",
   activityTypeKeys: ["web-design-coding-exercise"],
   methods: {
     GET: async ({ context }) => {
+      if (context.activityBankId) {
+        return listBankWebDesignExerciseTests({
+          bankActivityId: context.activity.id
+        });
+      }
+      if (!context.courseId) {
+        throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "This plugin route requires a course or activity bank context.");
+      }
       await assertCanManageCourse(context.user, context.courseId);
       return listWebDesignExerciseTests({
         activityId: context.activity.id
       });
     },
     PUT: async ({ context, readJson }) => {
+      if (context.activityBankId) {
+        return replaceBankWebDesignExerciseTests({
+          activityBankId: context.activityBankId,
+          bankActivityId: context.activity.id,
+          activityConfig: context.activity.config,
+          user: context.user,
+          input: await readJson()
+        });
+      }
+      if (!context.courseId) {
+        throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "This plugin route requires a course or activity bank context.");
+      }
       return replaceWebDesignExerciseTests({
         activityId: context.activity.id,
         activityConfig: context.activity.config,
@@ -35,6 +62,12 @@ export const webDesignExerciseExpectedResultRoute: PluginRouteDefinition = {
   activityTypeKeys: ["web-design-coding-exercise"],
   methods: {
     GET: async ({ context }) => {
+      if (context.activityBankId) {
+        return getBankWebDesignExpectedResult({
+          bankActivityId: context.activity.id,
+          activityConfig: context.activity.config
+        });
+      }
       return getWebDesignExpectedResult({
         activityId: context.activity.id,
         activityConfig: context.activity.config

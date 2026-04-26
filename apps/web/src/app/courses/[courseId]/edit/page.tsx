@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { CourseForm } from "@/components/course-form";
-import { api, Course } from "@/lib/api";
+import { api, Course, Subject } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 export default function EditCoursePage() {
@@ -13,12 +13,15 @@ export default function EditCoursePage() {
   const router = useRouter();
   const { t } = useI18n();
   const [course, setCourse] = useState<Course | null>(null);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api
-      .course(courseId)
-      .then((result) => setCourse(result.course))
+    Promise.all([api.course(courseId), api.subjects()])
+      .then(([courseResult, subjectResult]) => {
+        setCourse(courseResult.course);
+        setSubjects(subjectResult.subjects);
+      })
       .catch((err) => setError(err instanceof Error ? err.message : t("editCourse.loadError")));
   }, [courseId, t]);
 
@@ -34,6 +37,7 @@ export default function EditCoursePage() {
           <section className="section">
             <CourseForm
               initial={course}
+              subjects={subjects}
               submitLabel={t("courseForm.save")}
               onSubmit={async (input) => {
                 const result = await api.updateCourse(courseId, input);
