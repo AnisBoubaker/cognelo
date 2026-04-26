@@ -36,6 +36,8 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
       path: pluginPath,
       activity: {
         id: activity.id,
+        bankActivityId: activity.bankActivityId,
+        activityVersionId: activity.activityVersionId,
         title: activity.title,
         description: activity.description,
         lifecycle: activity.lifecycle,

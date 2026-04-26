@@ -38,6 +38,8 @@ const messages: Record<Locale, MessageTree> = {
     },
     nav: {
       dashboard: "Dashboard",
+      subjects: "Subjects",
+      activityBanks: "Activity banks",
       courses: "Courses",
       newCourse: "New course",
       account: "Account",
@@ -110,6 +112,7 @@ const messages: Record<Locale, MessageTree> = {
       loadError: "Unable to load courses."
     },
     courseForm: {
+      subject: "Subject",
       title: "Title",
       description: "Description",
       status: "Publication status",
@@ -328,6 +331,8 @@ const messages: Record<Locale, MessageTree> = {
     },
     nav: {
       dashboard: "Tableau de bord",
+      subjects: "Sujets",
+      activityBanks: "Banques d'activités",
       courses: "Cours",
       newCourse: "Nouveau cours",
       account: "Compte",
@@ -400,6 +405,7 @@ const messages: Record<Locale, MessageTree> = {
       loadError: "Impossible de charger les cours."
     },
     courseForm: {
+      subject: "Sujet",
       title: "Titre",
       description: "Description",
       status: "Statut de publication",
@@ -618,6 +624,8 @@ const messages: Record<Locale, MessageTree> = {
     },
     nav: {
       dashboard: "仪表盘",
+      subjects: "学科",
+      activityBanks: "活动库",
       courses: "课程",
       newCourse: "新建课程",
       account: "账户",
@@ -690,6 +698,7 @@ const messages: Record<Locale, MessageTree> = {
       loadError: "无法加载课程。"
     },
     courseForm: {
+      subject: "学科",
       title: "标题",
       description: "描述",
       status: "发布状态",

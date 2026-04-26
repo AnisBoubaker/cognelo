@@ -10,6 +10,10 @@ export function isTeacher(user: CurrentUser) {
   return user.roles.includes("teacher") || isAdmin(user);
 }
 
+export function isCourseManager(user: CurrentUser) {
+  return user.roles.includes("course_manager") || isAdmin(user);
+}
+
 export async function getCourseMembership(userId: string, courseId: string) {
   return prisma.courseMembership.findMany({
     where: { userId, courseId }
@@ -17,7 +21,7 @@ export async function getCourseMembership(userId: string, courseId: string) {
 }
 
 export async function assertCanCreateCourse(user: CurrentUser) {
-  if (!isTeacher(user)) {
+  if (!isCourseManager(user)) {
     throw forbidden();
   }
 }

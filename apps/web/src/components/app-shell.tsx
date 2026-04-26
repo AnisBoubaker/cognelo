@@ -41,9 +41,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     return <main className="page">{t("common.redirecting")}</main>;
   }
 
-  const canCreateCourses = user.roles.includes("teacher") || user.roles.includes("admin");
+  const canCreateCourses =
+    user.roles.includes("course_manager") || user.roles.includes("teacher") || user.roles.includes("admin");
   const navItems = [
     { href: "/dashboard", label: t("nav.dashboard") },
+    ...(canCreateCourses ? [{ href: "/subjects", label: t("nav.subjects") }] : []),
+    ...(canCreateCourses ? [{ href: "/activity-banks", label: t("nav.activityBanks") }] : []),
     { href: "/courses", label: t("nav.courses") },
     ...(canCreateCourses ? [{ href: "/courses/new", label: t("nav.newCourse") }] : [])
   ];

@@ -1,14 +1,19 @@
 import { CourseInputSchema, CourseUpdateSchema, EnrollmentInputSchema } from "@cognelo/contracts";
 import { prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
-import { assertCanCreateCourse, assertCanManageCourse, assertCanViewCourse, isAdmin, isTeacher } from "./authorization";
+import { assertCanCreateCourse, assertCanManageCourse, assertCanViewCourse, isAdmin, isCourseManager, isTeacher } from "./authorization";
 import { notFound } from "./errors";
 
 const courseInclude = {
+  subject: {
+    include: {
+      materials: { orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }] }
+    }
+  },
   memberships: { include: { user: { select: { id: true, email: true, name: true } } } },
   materials: { orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }] },
   activities: {
-    include: { activityType: true },
+    include: { activityType: true, bankActivity: true, activityVersion: true },
     orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }]
   },
   groups: {
@@ -49,7 +54,7 @@ export async function listCourses(user: CurrentUser) {
     return prisma.course.findMany({ include: courseInclude, orderBy: { updatedAt: "desc" } });
   }
 
-  if (isTeacher(user)) {
+  if (isTeacher(user) || isCourseManager(user)) {
     return prisma.course.findMany({
       where: {
         OR: [{ createdById: user.id }, { memberships: { some: { userId: user.id } } }]
@@ -70,7 +75,7 @@ export async function getCourse(user: CurrentUser, courseId: string) {
   await assertCanViewCourse(user, courseId);
   const course = await prisma.course.findUnique({
     where: { id: courseId },
-    include: isAdmin(user) || isTeacher(user) ? courseInclude : buildCourseIncludeForStudent(user.id)
+    include: isAdmin(user) || isTeacher(user) || isCourseManager(user) ? courseInclude : buildCourseIncludeForStudent(user.id)
   });
   if (!course) {
     throw notFound("Course");
@@ -83,7 +88,10 @@ export async function createCourse(user: CurrentUser, input: unknown) {
   const data = CourseInputSchema.parse(input);
   return prisma.course.create({
     data: {
-      ...data,
+      subjectId: data.subjectId,
+      title: data.title,
+      description: data.description,
+      status: data.status,
       createdById: user.id,
       memberships: {
         create: {

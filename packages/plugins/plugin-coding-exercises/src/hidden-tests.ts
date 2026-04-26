@@ -1,3 +1,4 @@
+import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import { assertCanManageCourse, AppError } from "@cognelo/core";
 import { codingExerciseHiddenTestsInputSchema, codingExerciseTemplateRequiresTestCodeMarker, parseCodingExercisePrivateConfig } from "./coding-exercises";
@@ -46,7 +47,7 @@ export async function replaceCodingExerciseHiddenTests(params: {
   activityId: string;
   courseId: string;
   activityConfig: unknown;
-  user: { id: string; email: string; name: string | null; roles: ("admin" | "teacher" | "student")[] };
+  user: CurrentUser;
   input: unknown;
 }) {
   await assertCanManageCourse(params.user, params.courseId);

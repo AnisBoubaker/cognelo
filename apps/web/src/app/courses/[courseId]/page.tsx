@@ -7,7 +7,7 @@ import { ChangeEvent, FormEvent, PointerEvent, useEffect, useState } from "react
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
-import { api, ActivityDefinition, ActivityType, Course, CourseMaterial } from "@/lib/api";
+import { api, ActivityBank, ActivityDefinition, ActivityType, Course, CourseMaterial } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 export default function CourseDetailPage() {
@@ -19,8 +19,10 @@ export default function CourseDetailPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
+  const [activityBanks, setActivityBanks] = useState<ActivityBank[]>([]);
   const [activityTitle, setActivityTitle] = useState("");
   const [activityTypeKey, setActivityTypeKey] = useState("placeholder");
+  const [bankActivityId, setBankActivityId] = useState("");
   const [isAddingActivity, setIsAddingActivity] = useState(false);
   const [groupTitle, setGroupTitle] = useState("");
   const [isAddingGroup, setIsAddingGroup] = useState(false);
@@ -46,6 +48,12 @@ export default function CourseDetailPage() {
     setCourse(courseResult.course);
     setActivityTypes(typeResult.activityTypes);
     setActivityDefinitions(typeResult.registeredDefinitions);
+    if (courseResult.course.subjectId) {
+      const banksResult = await api.activityBanks(courseResult.course.subjectId);
+      setActivityBanks(banksResult.activityBanks);
+      const firstBankActivity = banksResult.activityBanks.flatMap((bank) => bank.activities ?? [])[0];
+      setBankActivityId((current) => current || firstBankActivity?.id || "");
+    }
   }
 
   useEffect(() => {
@@ -65,18 +73,22 @@ export default function CourseDetailPage() {
     event.preventDefault();
     setError("");
     try {
-      const selectedActivityCopy = activityCopy(activityTypeKey);
+      const selectedBankActivity = activityBanks.flatMap((bank) => bank.activities ?? []).find((activity) => activity.id === bankActivityId);
+      const selectedActivityCopy = activityCopy(selectedBankActivity?.activityType.key ?? activityTypeKey);
       await api.createActivity(courseId, {
-        title: activityTitle || selectedActivityCopy.defaultTitle || t("courseDetail.defaultActivityTitle"),
-        activityTypeKey,
+        title: activityTitle || selectedBankActivity?.title || selectedActivityCopy.defaultTitle || t("courseDetail.defaultActivityTitle"),
+        activityTypeKey: selectedBankActivity?.activityType.key ?? activityTypeKey,
+        bankActivityId: selectedBankActivity?.id,
+        activityVersionId: selectedBankActivity?.currentVersionId ?? undefined,
         lifecycle: "draft",
-        description: "",
+        description: selectedBankActivity?.description ?? "",
         config: {},
         metadata: { researchTags: [] },
         position: course?.activities?.length ?? 0
       });
       await refresh();
       setActivityTitle("");
+      setBankActivityId("");
       setIsAddingActivity(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("courseDetail.createActivityError"));
@@ -686,11 +698,25 @@ export default function CourseDetailPage() {
                               />
                             </div>
                             <div className="field">
+                              <label htmlFor="bankActivity">Activity bank item</label>
+                              <select id="bankActivity" value={bankActivityId} onChange={(event) => setBankActivityId(event.target.value)}>
+                                <option value="">Create local course activity</option>
+                                {activityBanks.map((bank) =>
+                                  (bank.activities ?? []).map((activity) => (
+                                    <option key={activity.id} value={activity.id}>
+                                      {bank.title}: {activity.title} v{activity.currentVersion?.versionNumber ?? 1}
+                                    </option>
+                                  ))
+                                )}
+                              </select>
+                            </div>
+                            <div className="field">
                               <label htmlFor="activityType">{t("courseDetail.activityType")}</label>
                               <select
                                 id="activityType"
                                 value={activityTypeKey}
                                 onChange={(event) => setActivityTypeKey(event.target.value)}
+                                disabled={Boolean(bankActivityId)}
                               >
                                 {activityTypes.map((type) => (
                                   <option key={type.id} value={type.key}>
@@ -724,7 +750,9 @@ export default function CourseDetailPage() {
                                   <Link href={`/courses/${course.id}/activities/${activity.id}`}>{activity.title}</Link>
                                 </strong>
                                 <span className="table-meta-note muted">
-                                  {activityCopy(activity.activityType.key).description || t(`activityLifecycle.${activity.lifecycle}`)}
+                                  {activity.activityVersion
+                                    ? `Bank version ${activity.activityVersion.versionNumber}`
+                                    : activityCopy(activity.activityType.key).description || t(`activityLifecycle.${activity.lifecycle}`)}
                                 </span>
                               </div>
                               <span className="eyebrow">{activityCopy(activity.activityType.key).name}</span>

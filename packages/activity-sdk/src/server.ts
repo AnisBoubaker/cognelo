@@ -8,6 +8,8 @@ import { webDesignCodingExercisesServerPlugin } from "@cognelo/plugin-web-design
 
 export type ServerActivityRecord = {
   id: string;
+  bankActivityId?: string | null;
+  activityVersionId?: string | null;
   title: string;
   description: string;
   lifecycle: string;
@@ -22,8 +24,9 @@ export type ServerActivityRecord = {
 
 export type PluginRouteContext = {
   user: CurrentUser;
-  courseId: string;
+  courseId?: string;
   groupId?: string;
+  activityBankId?: string;
   activityId: string;
   path: string[];
   activity: ServerActivityRecord;
@@ -41,9 +44,20 @@ export type PluginRouteDefinition = {
   methods: Partial<Record<"GET" | "POST" | "PATCH" | "PUT" | "DELETE", PluginRouteHandler>>;
 };
 
+export type CourseActivityCreatedFromBankVersionHook = (input: {
+  user: CurrentUser;
+  courseId: string;
+  activity: ServerActivityRecord;
+  bankActivityId: string;
+  activityVersionId: string;
+}) => Promise<void>;
+
 export type ServerActivityPlugin = {
   key: string;
   routes?: readonly PluginRouteDefinition[];
+  hooks?: {
+    onCourseActivityCreatedFromBankVersion?: CourseActivityCreatedFromBankVersionHook;
+  };
 };
 
 const serverPlugins: readonly ServerActivityPlugin[] = [
@@ -86,4 +100,16 @@ export function listPluginRoutes() {
       activityTypeKeys: route.activityTypeKeys ?? []
     }))
   );
+}
+
+export async function runCourseActivityCreatedFromBankVersionHooks(input: {
+  user: CurrentUser;
+  courseId: string;
+  activity: ServerActivityRecord;
+  bankActivityId: string;
+  activityVersionId: string;
+}) {
+  for (const plugin of serverPlugins) {
+    await plugin.hooks?.onCourseActivityCreatedFromBankVersion?.(input);
+  }
 }

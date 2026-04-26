@@ -1,5 +1,5 @@
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
-import { assertCanManageCourse } from "@cognelo/core";
+import { AppError, assertCanManageCourse } from "@cognelo/core";
 import {
   codingExerciseRunInputSchema,
   codingExerciseSubmitInputSchema,
@@ -8,6 +8,13 @@ import {
   submitCodingExercise
 } from "./executions";
 import { listCodingExerciseHiddenTests, replaceCodingExerciseHiddenTests } from "./hidden-tests";
+
+function requireCourseId(courseId: string | undefined) {
+  if (!courseId) {
+    throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "This plugin route requires a course context.");
+  }
+  return courseId;
+}
 
 export const codingExerciseRunRoute: PluginRouteDefinition = {
   path: "coding-exercises/run",
@@ -66,7 +73,8 @@ export const codingExerciseHiddenTestsRoute: PluginRouteDefinition = {
   activityTypeKeys: ["coding-exercise"],
   methods: {
     GET: async ({ context }) => {
-      await assertCanManageCourse(context.user, context.courseId);
+      const courseId = requireCourseId(context.courseId);
+      await assertCanManageCourse(context.user, courseId);
       const result = await listCodingExerciseHiddenTests({
         activityId: context.activity.id
       });
@@ -74,9 +82,10 @@ export const codingExerciseHiddenTestsRoute: PluginRouteDefinition = {
       return result;
     },
     PUT: async ({ context, readJson }) => {
+      const courseId = requireCourseId(context.courseId);
       const result = await replaceCodingExerciseHiddenTests({
         activityId: context.activity.id,
-        courseId: context.courseId,
+        courseId,
         activityConfig: context.activity.config,
         user: context.user,
         input: await readJson()
