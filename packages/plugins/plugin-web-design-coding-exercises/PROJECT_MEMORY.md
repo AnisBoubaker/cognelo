@@ -15,16 +15,16 @@ This file is for web-design-coding-exercises-specific memory only.
 - Graded submission should run through a Cognelo server route backed by an external Playwright runner service, not inside the web app or directly in the browser.
 - The external Playwright runner should run through Docker Compose using the official Playwright image, so browser binaries and OS dependencies are container-managed.
 - Playwright tests must stay teacher/admin-only and should be validated against the teacher reference solution before being saved.
+- Saving teacher tests is runner-dependent: all enabled sample and hidden tests are executed against the teacher reference bundle before persistence; failing validation rejects the save and leaves existing tests unchanged.
 
 ## Current Implementation Slice
 
 - Current implementation provides public config parsing, activity registration, authoring UI, student file editing, sandboxed iframe preview, preview console capture, modal support, improved runtime error reporting, student full-screen/focus mode, and plugin-owned persistence tables for reference bundles, Playwright tests, submissions, and per-test results.
 - Teacher/admin test management uses the plugin route `web-design-coding-exercises/tests` to persist a private reference file bundle plus sample/hidden Playwright test code.
 - Student run/submit routes use the Docker-backed `packages/web-design-runner` service through `WEB_DESIGN_RUNNER_URL`; sample tests are used for run and hidden tests are used for submit.
-- Reference validation currently records a pending-runner summary; the next step is to execute saved tests against the teacher reference bundle before accepting them.
+- Reference validation executes enabled teacher tests against the reference bundle before saving and stores per-test validation summaries for passed or skipped tests.
 
 ## Planned Next Modules
 
-- Add reference-solution validation so enabled hidden Playwright tests must pass against the teacher reference bundle before being saved.
 - Harden the Docker Playwright runner for production deployment with stricter resource constraints, no secrets in the runner, and constrained network access.
 - Add result history and teacher-facing review surfaces for submissions, test failures, and future research/analytics data.

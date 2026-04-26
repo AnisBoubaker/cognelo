@@ -71,17 +71,18 @@ async function runWebDesignTests(input: RunInput) {
     const context = await browser.newContext({
       javaScriptEnabled: true
     });
-    const page = await context.newPage();
-    page.setDefaultTimeout(input.timeoutMs);
-    await page.setContent(buildPreviewDocument(input.files), {
-      waitUntil: "load",
-      timeout: input.timeoutMs
-    });
+    const previewDocument = buildPreviewDocument(input.files);
 
     const results = [];
     for (const test of input.tests) {
       const testStartedAt = Date.now();
+      const page = await context.newPage();
+      page.setDefaultTimeout(input.timeoutMs);
       try {
+        await page.setContent(previewDocument, {
+          waitUntil: "load",
+          timeout: input.timeoutMs
+        });
         await runSingleTest(page, test.testCode, input.timeoutMs);
         results.push({
           id: test.id,
@@ -104,6 +105,8 @@ async function runWebDesignTests(input: RunInput) {
           message: error instanceof Error ? error.message : "Test failed.",
           details: {}
         });
+      } finally {
+        await page.close();
       }
     }
 
@@ -122,13 +125,25 @@ async function runWebDesignTests(input: RunInput) {
 }
 
 async function runSingleTest(page: Page, testCode: string, timeoutMs: number) {
-  const execute = new Function("page", "expect", `"use strict"; return (async () => {\n${testCode}\n})();`);
+  if (isFunctionWrappedTestCode(testCode)) {
+    throw new Error("Use plain Playwright test code. Do not wrap the test in a function.");
+  }
+
+  const execute = new Function("page", "expect", `"use strict"; return (async () => {\n${testCode}\n})();`) as (
+    page: Page,
+    expectApi: typeof expect
+  ) => Promise<unknown>;
   await Promise.race([
     execute(page, expect),
     new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(`Test timed out after ${timeoutMs}ms.`)), timeoutMs);
+      setTimeout(() => reject(new Error(`Test timed out after ${timeoutMs}ms.`)), timeoutMs + 1000);
     })
   ]);
+}
+
+function isFunctionWrappedTestCode(testCode: string) {
+  const normalized = testCode.trim().replace(/;+\s*$/, "");
+  return /^(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>/s.test(normalized) || /^async\s+function\b/s.test(normalized);
 }
 
 function buildPreviewDocument(files: RunInput["files"]) {

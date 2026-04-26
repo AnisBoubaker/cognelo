@@ -65,7 +65,7 @@ GET    /api/courses/:courseId/activities/:activityId/web-design-coding-exercises
 POST   /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/submit
 ```
 
-The same routes are available through group-scoped assigned activity dispatch. The test-management route is teacher/admin-only and persists the reference bundle plus sample/hidden Playwright tests. Student run uses enabled sample tests; student submit uses enabled hidden tests.
+The same routes are available through group-scoped assigned activity dispatch. The test-management route is teacher/admin-only and persists the reference bundle plus sample/hidden Playwright tests. Enabled tests must pass against the teacher reference bundle before they are saved. Student run uses enabled sample tests; student submit uses enabled hidden tests.
 
 The submit flow is:
 
@@ -78,6 +78,8 @@ The submit flow is:
 7. Cognelo stores filtered results and returns them to the browser
 
 The browser should never receive hidden tests or private reference files.
+
+When a teacher saves tests, Cognelo sends the reference bundle plus all enabled tests to the runner first. If any enabled test fails, the save is rejected and the previous saved tests remain in place. Disabled tests are persisted without being executed and are marked as skipped in their validation summary.
 
 ## Docker Runner
 
