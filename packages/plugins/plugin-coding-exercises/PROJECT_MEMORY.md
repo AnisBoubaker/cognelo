@@ -14,6 +14,7 @@ This file is for coding-exercises-specific memory only.
 - Practice runs and later submissions live in `PluginCodingExerciseExecution`.
 - The first execution route is `coding-exercises/run`, which stores each run server-side before and after the Judge0 request.
 - Hidden tests are managed through the teacher-only `coding-exercises/hidden-tests` route.
+- Hidden-test management currently belongs to course activity copies. Bank activity authoring stores reusable public config; adding bank-owned private coding test/reference data later should use plugin-owned bank tables plus a server hook to copy into course-owned plugin tables at assignment time.
 - Enabled hidden tests must validate against the private reference solution before they are saved.
 - Graded submissions are handled separately from sample runs through `coding-exercises/submit`.
 - Teacher authoring separates student-facing starter code from a private reference solution; the reference solution must never be stored in public activity config.
@@ -26,5 +27,6 @@ This file is for coding-exercises-specific memory only.
 - Teacher test authoring uses collapsible sample-test and hidden-test cards with saved validation status and per-test failure details.
 - The same coding-exercise activity UI should work in both course-scoped teacher pages and group-scoped student assigned-activity pages by swapping the API client boundary rather than forking the plugin UI.
 - Group-scoped student coding-exercise access uses assigned-activity routes under `groups/:groupId/activities/assigned/:activityId/...` to avoid route conflicts with teacher assignment-management endpoints.
+- Coding plugin routes must remain plugin-owned and mounted through generic course/group plugin dispatchers, not hardcoded as plugin-specific API route files in `apps/api`.
 - Student coding uses the shared Monaco editor from `@cognelo/activity-ui`, while teacher authoring still uses the in-house editor for the lighter authoring workflow.
 - Plugin-owned user-facing translations should live inside the plugin package rather than in the host app's global i18n file.

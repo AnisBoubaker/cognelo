@@ -21,7 +21,7 @@ The main MCQ source is written as text.
 
 ## Current State
 
-The plugin currently relies on core activity records only and does not persist student submissions yet.
+The plugin currently relies on core bank/course activity records only and does not persist student submissions yet. Assigning from an activity bank copies the generic MCQ config into the course activity; there is no plugin-owned private data to copy today.
 
 ## Contributor Workflow
 

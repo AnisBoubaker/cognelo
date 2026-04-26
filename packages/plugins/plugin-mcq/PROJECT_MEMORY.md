@@ -4,3 +4,4 @@ This file is for MCQ plugin memory only.
 - The source format is a Markdown-inspired grammar with `##` question headings and task-list style choice markers.
 - The plugin currently infers single-choice versus multiple-choice from the number of correct answers in each question.
 - The first version stores only authored MCQ content in the generic activity config; student submissions are not yet persisted.
+- Since there is no private plugin-owned authoring data yet, bank-to-course copying relies only on the platform's generic config copy.

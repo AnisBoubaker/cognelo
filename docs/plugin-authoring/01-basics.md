@@ -22,9 +22,9 @@ The plugin package provides the activity-specific behavior. The platform provide
 The platform already handles:
 
 - login and current-user lookup
-- course and activity storage
+- subject, activity-bank, course, section/group, and activity storage
 - authorization
-- activity creation and update flows
+- activity-bank authoring, course activity copy creation, and activity update flows
 - plugin route dispatch
 - shared code editing and syntax highlighting
 
@@ -70,8 +70,10 @@ When designing a plugin, ask:
 Examples of shared platform concerns:
 
 - user identity
-- course membership
+- course membership and section/group participation
+- activity-bank ownership
 - generic activity records
+- activity version provenance
 - generic activity metadata
 
 Examples of plugin-specific concerns:
@@ -88,14 +90,16 @@ As a rule:
 
 ## What Happens When A User Opens An Activity Page?
 
-The activity page in the web app is:
+There are three common activity contexts:
 
-- [apps/web/src/app/courses/[courseId]/activities/[activityId]/page.tsx](../../apps/web/src/app/courses/[courseId]/activities/[activityId]/page.tsx)
+- activity-bank authoring: [apps/web/src/app/activity-banks/[activityBankId]/activities/[bankActivityId]/page.tsx](../../apps/web/src/app/activity-banks/[activityBankId]/activities/[bankActivityId]/page.tsx)
+- course teacher authoring: [apps/web/src/app/courses/[courseId]/activities/[activityId]/page.tsx](../../apps/web/src/app/courses/[courseId]/activities/[activityId]/page.tsx)
+- section/group assigned activity work: [apps/web/src/app/courses/[courseId]/groups/[groupId]/activities/assigned/[activityId]/page.tsx](../../apps/web/src/app/courses/[courseId]/groups/[groupId]/activities/assigned/[activityId]/page.tsx)
 
 At a high level, it:
 
-1. loads the course
-2. loads the activity
+1. loads the surrounding context
+2. loads the activity or bank activity
 3. finds the renderer for that activity type
 4. renders the matching plugin UI
 
@@ -110,6 +114,8 @@ This is why frontend plugins must be registered there.
 The API app has a generic dispatcher route:
 
 - [apps/api/src/app/api/courses/[courseId]/activities/[activityId]/[...pluginPath]/route.ts](../../apps/api/src/app/api/courses/[courseId]/activities/[activityId]/[...pluginPath]/route.ts)
+- [apps/api/src/app/api/activity-banks/[activityBankId]/activities/[bankActivityId]/[...pluginPath]/route.ts](../../apps/api/src/app/api/activity-banks/[activityBankId]/activities/[bankActivityId]/[...pluginPath]/route.ts)
+- [apps/api/src/app/api/courses/[courseId]/groups/[groupId]/activities/assigned/[activityId]/[...pluginPath]/route.ts](../../apps/api/src/app/api/courses/[courseId]/groups/[groupId]/activities/assigned/[activityId]/[...pluginPath]/route.ts)
 
 This route:
 
@@ -119,6 +125,17 @@ This route:
 - calls the plugin handler
 
 So beginners do not need to create a brand-new top-level API route for every plugin feature. You define plugin route definitions and let the platform dispatch them.
+
+## How Activity Banks Relate To Courses
+
+Activity banks are reusable authoring spaces. A bank activity has versions. When a teacher adds a bank activity to a course, Cognelo copies the selected/latest version into a course-local activity.
+
+After copying:
+
+- course edits affect only the course activity copy
+- bank edits create a new version for future assignments
+- existing course copies do not change
+- plugins can copy private bank-owned data into course-owned plugin tables with a server hook
 
 ## Where Validation Happens
 

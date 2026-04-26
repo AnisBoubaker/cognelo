@@ -10,9 +10,9 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 ## Long-Term Platform Decisions
 
 - Use a monorepo with separate `apps/api` and `apps/web`.
-- Keep auth, authorization, users, courses, materials, and generic activity orchestration in core modules.
+- Keep auth, authorization, users, subjects, activity banks, courses, materials, and generic activity orchestration in core modules.
 - Keep activity business logic out of course models.
-- Store research metadata explicitly on activities and activity types.
+- Store research metadata explicitly on bank activities, activity versions, course activity copies, and activity types as appropriate.
 - Use Prisma/PostgreSQL with normalized tables and JSON fields only for extensible metadata/config.
 - Keep the first version as a modular monorepo, not a microservice split.
 - Favor shared contracts and service-layer logic over duplicating validation in each app.
@@ -36,13 +36,27 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Global authorization supports many-to-many user roles (`admin`, `teacher`, `student`) and is designed for more roles later.
 - Accounts can be activated on first login when a person was pre-added to a group participant list by email and no user record existed yet.
 - Courses support create, edit, archive, and draft/published/archived status.
-- Activities are attachable to courses through a plugin-style registry and are not hardcoded into the course model.
+- Subjects are first-class curriculum containers. A subject can own subject-level materials, activity banks, and courses.
+- Activity banks are first-class authoring spaces related to a subject and owned by an individual. Admins can later change ownership and sharing rules.
+- Activities are authored in activity banks as `BankActivity` records with version snapshots in `ActivityVersion`.
+- Adding an activity from a bank to a course creates a course-local `Activity` copy from the selected/latest `ActivityVersion`.
+- Course activity copies keep `bankActivityId` and `activityVersionId` for provenance, but they are not live references.
+- Editing a course activity changes only that course copy and what students in that course see.
+- Editing a bank activity creates a new version for future course assignments and does not affect existing course copies.
+- Plugins with private bank-owned data should copy that data into course-owned plugin tables through server plugin hooks when a course activity is created from a bank version.
+- Activities remain plugin-style registry entries and are not hardcoded into course models.
 - Course managers can remove activities directly from the course detail page.
+
+## Naming Model
+
+- The user-facing product concept formerly called a course group should move toward "section".
+- The current database/service name remains `CourseGroup` during this transition.
+- Use "section" in new product copy where feasible, but be careful when referencing existing code paths that still say `groups`.
 
 ## Group Participant Decisions
 
-- Course groups have explicit participant records separate from platform users.
-- Group participants support roles `student`, `ta`, and `teacher`.
+- Course sections/groups have explicit participant records separate from platform users.
+- Section/group participants support roles `student`, `ta`, and `teacher`.
 - Adding a participant by email links immediately to an existing user when the email already exists.
 - When the participant email matches an existing user, first name, last name, and external ID are treated as locked/read-only in the add-participant UI.
 - When the participant email does not match an existing user, the group participant record is created without a linked user account, and the actual user account is created only at first activation/login.
@@ -50,10 +64,10 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - A manager cannot remove themselves from the participant list of a group.
 - Existing-user lookup for participant enrollment is manager-only and happens before submit in the group participant UI.
 - Non-manager access to a group is tied to being added as a participant in that group, not only to broad course visibility.
-- Student-facing navigation should be group-first: students work from the group workspace, not the broad course workspace.
-- Student course access should resolve to visible published groups, and the course detail page should not act as the primary student workspace.
-- Student access to assigned activities should be group-scoped and assignment-aware rather than relying on course-level activity routes.
-- Student access to inherited course file materials from a group should respect group visibility rules and use group-scoped download routes.
+- Student-facing navigation should be section-first: students work from the section workspace, not the broad course workspace.
+- Student course access should resolve to visible published sections/groups, and the course detail page should not act as the primary student workspace.
+- Student access to assigned activities should be section/group-scoped and assignment-aware rather than relying on course-level activity routes.
+- Student access to inherited course file materials from a section/group should respect section/group visibility rules and use section/group-scoped download routes.
 
 ## Course Material Decisions
 
@@ -67,6 +81,8 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 
 ## Frontend Platform Decisions
 
+- Subjects and activity banks are top-level navigation items alongside courses.
+- Activity bank authoring pages should open the full plugin authoring UI, not only generic metadata.
 - The course materials area uses a compact table/list layout rather than large cards.
 - The add-material form is hidden by default and revealed from the course material section.
 - Materials can be edited and removed inline from the course detail page.
@@ -90,7 +106,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 
 - The web app has built-in i18n with `en`, `fr`, and `zh`.
 - Locale is stored client-side in `localStorage` and reflected on the document `lang` attribute.
-- Visible platform UI copy is translated across login, navigation, dashboard, course flows, materials UI, and activity management UI.
+- Visible platform UI copy is translated across login, navigation, dashboard, subject, activity-bank, course, material, and activity management UI.
 - Plugin/activity definitions can provide localized `name`, `description`, and `defaultTitle` through the activity registry.
 - The course detail page resolves plugin-localized activity labels from registry definitions instead of relying only on database display names.
 
@@ -101,7 +117,8 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Locale-prefixed routes are not implemented; localization is currently app-state driven on the frontend.
 - Plugin registration is explicit, not autodiscovered.
 - Judge0 dev infrastructure is local-Docker only; production still requires a separately managed Judge0 host with its own hardening, monitoring, and secrets management.
-- Some management-oriented course and group pages still exist for teachers/admins in the same route tree, so student simplicity relies on explicit student-first redirects and rendering branches rather than totally separate apps.
+- Some management-oriented course and section/group pages still exist for teachers/admins in the same route tree, so student simplicity relies on explicit student-first redirects and rendering branches rather than totally separate apps.
+- Plugin registration is explicit, not autodiscovered. This includes server plugin hooks such as copying plugin-owned bank data into course activity copies.
 
 ## Verification Habits
 

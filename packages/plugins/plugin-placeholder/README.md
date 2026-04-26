@@ -18,7 +18,7 @@ The placeholder plugin exists as a minimal activity shell while a real pedagogic
 
 ## Current State
 
-This plugin intentionally relies only on core activity records and does not currently need plugin-owned persistence or custom routes.
+This plugin intentionally relies only on core bank/course activity records and does not currently need plugin-owned persistence, bank-to-course copy hooks, or custom routes.
 
 ## Contributor Workflow
 

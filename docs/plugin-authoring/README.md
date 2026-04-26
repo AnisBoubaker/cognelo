@@ -61,7 +61,7 @@ packages/
 
 The main idea is simple:
 
-- the platform owns generic course/auth/activity infrastructure
+- the platform owns generic auth, subject, activity-bank, course, section/group, activity-copy, and dispatcher infrastructure
 - each plugin owns activity-specific behavior
 
 ## Fast Answer
@@ -74,6 +74,7 @@ If you just want the shortest possible summary:
 4. If it has API subroutes, register it in `packages/activity-sdk/src/server.ts`
 5. If it has a custom UI, register it in `apps/web/src/lib/activity-renderers.tsx`
 6. If it needs persistence, add Prisma models in `packages/db/prisma/schema.prisma`
+7. If it has private bank-owned data, add a server hook to copy it into course-owned plugin tables when assigned
 
 The rest of this handbook explains each step carefully.
 

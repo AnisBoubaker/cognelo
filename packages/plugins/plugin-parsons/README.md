@@ -84,7 +84,7 @@ POST   /api/courses/:courseId/activities/:activityId/parsons/attempt
 PATCH  /api/courses/:courseId/activities/:activityId/parsons/attempt
 ```
 
-These are mounted through the platform’s generic plugin dispatcher, not through a Parsons-specific file in `apps/api`.
+These are also available through group-scoped assigned activity dispatch for student work. They are mounted through the platform’s generic plugin dispatchers, not through Parsons-specific files in `apps/api`.
 
 ## UX Notes
 
