@@ -6,6 +6,7 @@ import {
   type WebDesignExerciseFile,
   type WebDesignExerciseTestKind
 } from "./web-design-coding-exercises";
+import { runWebDesignTestsInRunner, type WebDesignRunnerResult } from "./runner";
 
 type WebDesignExerciseTestRecord = {
   id: string;
@@ -81,11 +82,10 @@ export async function replaceWebDesignExerciseTests(params: {
     previewEntry: input.referenceFiles.find((file) => file.language === "html")?.path ?? input.referenceFiles[0]?.path ?? "index.html",
     maxEditorSeconds: 1800
   }).files;
-  const validationSummary = {
-    phase: "not-run",
-    status: "pending-runner",
-    message: "Reference validation will run after the Playwright runner is connected."
-  };
+  const validation = await validateReferenceBundle({
+    files: referenceFiles,
+    tests: input.tests
+  });
 
   await prisma.$transaction(async (transaction) => {
     await transaction.pluginWebDesignExerciseTest.deleteMany({
@@ -104,7 +104,7 @@ export async function replaceWebDesignExerciseTests(params: {
           isEnabled: test.isEnabled,
           weight: test.weight,
           metadata: test.metadata as Prisma.InputJsonValue,
-          validationSummary: validationSummary as Prisma.InputJsonValue
+          validationSummary: (validation.testSummaries.get(test.id) ?? buildSkippedValidationSummary(test.isEnabled)) as Prisma.InputJsonValue
         }))
       });
     }
@@ -114,16 +114,106 @@ export async function replaceWebDesignExerciseTests(params: {
       create: {
         activityId: params.activityId,
         files: referenceFiles as unknown as Prisma.InputJsonValue,
-        validationSummary: validationSummary as Prisma.InputJsonValue
+        validationSummary: validation.referenceSummary as Prisma.InputJsonValue
       },
       update: {
         files: referenceFiles as unknown as Prisma.InputJsonValue,
-        validationSummary: validationSummary as Prisma.InputJsonValue
+        validationSummary: validation.referenceSummary as Prisma.InputJsonValue
       }
     });
   });
 
   return listWebDesignExerciseTests({ activityId: params.activityId });
+}
+
+async function validateReferenceBundle(params: {
+  files: WebDesignExerciseFile[];
+  tests: Array<{
+    id: string;
+    name: string;
+    kind: WebDesignExerciseTestKind;
+    testCode: string;
+    isEnabled: boolean;
+    weight: number;
+  }>;
+}) {
+  const enabledTests = params.tests.filter((test) => test.isEnabled);
+  const disabledTestIds = new Set(params.tests.filter((test) => !test.isEnabled).map((test) => test.id));
+  const testSummaries = new Map<string, Record<string, unknown>>();
+
+  for (const testId of disabledTestIds) {
+    testSummaries.set(testId, buildSkippedValidationSummary(false));
+  }
+
+  if (!enabledTests.length) {
+    return {
+      referenceSummary: {
+        phase: "reference-validation",
+        status: "skipped",
+        enabledTestCount: 0,
+        message: "No enabled tests to validate."
+      },
+      testSummaries
+    };
+  }
+
+  const result = await runWebDesignTestsInRunner({
+    files: params.files,
+    tests: enabledTests.map((test) => ({
+      id: test.id,
+      name: test.name,
+      testCode: test.testCode,
+      weight: test.weight
+    }))
+  });
+
+  for (const testResult of result.tests) {
+    testSummaries.set(testResult.id, buildTestValidationSummary(testResult));
+  }
+
+  if (result.status !== "completed") {
+    const failedTests = result.tests.filter((test) => test.status === "failed");
+    const firstFailure = failedTests[0];
+    throw new AppError(
+      400,
+      "WEB_DESIGN_REFERENCE_VALIDATION_FAILED",
+      firstFailure
+        ? `Reference validation failed for "${firstFailure.name}": ${firstFailure.message ?? "The test failed."}`
+        : "Reference validation failed."
+    );
+  }
+
+  return {
+    referenceSummary: {
+      phase: "reference-validation",
+      status: "completed",
+      enabledTestCount: enabledTests.length,
+      score: result.score,
+      maxScore: result.maxScore,
+      durationMs: result.durationMs
+    },
+    testSummaries
+  };
+}
+
+function buildTestValidationSummary(testResult: WebDesignRunnerResult["tests"][number]) {
+  return {
+    phase: "reference-validation",
+    status: testResult.status,
+    score: testResult.score,
+    maxScore: testResult.weight,
+    durationMs: testResult.durationMs ?? null,
+    message: testResult.message ?? null,
+    details: testResult.details
+  };
+}
+
+function buildSkippedValidationSummary(isEnabled: boolean) {
+  return {
+    phase: "reference-validation",
+    status: isEnabled ? "not-run" : "skipped",
+    message: isEnabled ? "The test was not validated." : "Disabled tests are not run against the reference bundle."
+  };
 }
 
 function toReferenceBundleRecord(bundle: {

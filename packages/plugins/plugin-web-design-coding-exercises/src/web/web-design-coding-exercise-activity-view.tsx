@@ -913,8 +913,9 @@ function WebDesignTestsPanel({
 
     setSaving(true);
     try {
+      const nextReferenceFiles = currentFiles.map((file) => ({ ...file }));
       const result = await webDesignClient.saveTests(courseId, activityId, {
-        referenceFiles,
+        referenceFiles: nextReferenceFiles,
         tests: tests.map((test) => ({
           id: test.id,
           name: test.name,
@@ -926,7 +927,7 @@ function WebDesignTestsPanel({
         }))
       });
       setTests(result.tests);
-      setReferenceFiles(result.referenceBundle?.files.length ? result.referenceBundle.files : referenceFiles);
+      setReferenceFiles(result.referenceBundle?.files.length ? result.referenceBundle.files : nextReferenceFiles);
       notifications.success(copy.testsSaved);
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : copy.testsSaveError);
