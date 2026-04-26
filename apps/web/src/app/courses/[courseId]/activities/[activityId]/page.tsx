@@ -56,13 +56,13 @@ export default function ActivityPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel stack">
+        <section className="hero-panel hero-panel-compact">
           <div className="hero-meta">
             <p className="eyebrow">{localizedActivityName()}</p>
             <h1>{activity?.title ?? t("common.loading")}</h1>
             <p className="muted">{course ? `${t("parsons.inCourse", { title: course.title })}` : t("common.loading")}</p>
           </div>
-          <div className="row">
+          <div className="hero-actions">
             <Link className="button secondary" href={`/courses/${courseId}`}>
               {t("parsons.backToCourse")}
             </Link>
