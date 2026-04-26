@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { CurrentUser } from "@cognelo/contracts";
-import { api } from "@/lib/api";
+import { api, API_UNAUTHORIZED_EVENT } from "@/lib/api";
 
 type AuthState = {
   user: CurrentUser | null;
@@ -33,6 +33,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     void refresh();
   }, []);
+
+  useEffect(() => {
+    function handleUnauthorized() {
+      setUser(null);
+      setLoading(false);
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        void refresh();
+      }
+    }
+
+    function handleFocus() {
+      void refresh();
+    }
+
+    window.addEventListener(API_UNAUTHORIZED_EVENT, handleUnauthorized);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      window.removeEventListener(API_UNAUTHORIZED_EVENT, handleUnauthorized);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refresh();
+    }, 60_000);
+
+    return () => window.clearInterval(intervalId);
+  }, [user]);
 
   const value = useMemo<AuthState>(
     () => ({

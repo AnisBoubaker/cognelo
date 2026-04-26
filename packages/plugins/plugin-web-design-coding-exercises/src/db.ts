@@ -7,7 +7,7 @@ export const webDesignCodingExercisesDatabaseModule = {
     "PluginWebDesignExerciseTestResult"
   ],
   notes: [
-    "Student-visible exercise files live in shared activity config.",
-    "Private teacher reference file bundles, Playwright tests, student submissions, and per-test results live in plugin-owned tables so hidden grading internals are never exposed in the browser payload."
+    "Student-visible starter files live in shared activity config.",
+    "Private teacher solution/reference file bundles, Playwright tests, student submissions, and per-test results live in plugin-owned tables so hidden grading internals are never exposed in the student browser payload."
   ]
 } as const;

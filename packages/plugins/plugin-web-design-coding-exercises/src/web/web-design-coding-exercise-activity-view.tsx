@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownRenderer, MonacoCodeEditor, useNotifications } from "@cognelo/activity-ui";
 import {
   buildWebDesignPreviewDocument,
@@ -9,6 +9,9 @@ import {
   normalizeWebDesignExerciseConfig,
   normalizeWebDesignFilePath,
   parseWebDesignExerciseConfig,
+  webDesignExpectedResultTokenPattern,
+  webDesignPromptIncludesExpectedResult,
+  webDesignPromptRequestsCroppedExpectedResult,
   type WebDesignExerciseConfig,
   type WebDesignExerciseFile,
   type WebDesignExerciseTestKind,
@@ -83,10 +86,13 @@ type WebDesignExerciseClient = {
     courseId: string,
     activityId: string,
     input: {
+      shouldCaptureExpectedResult?: boolean;
+      shouldCropExpectedResult?: boolean;
       referenceFiles: WebDesignExerciseFile[];
       tests: Array<Omit<WebDesignExerciseTestRecord, "orderIndex" | "createdAt" | "updatedAt" | "validationSummary">>;
     }
   ) => Promise<{ tests: WebDesignExerciseTestRecord[]; referenceBundle: WebDesignExerciseReferenceBundleRecord | null }>;
+  getExpectedResult: (courseId: string, activityId: string) => Promise<{ imageDataUrl: string | null }>;
   runCode: (courseId: string, activityId: string, input: { files: WebDesignExerciseFile[] }) => Promise<{ submission: WebDesignExerciseSubmissionRecord }>;
   listRuns: (courseId: string, activityId: string) => Promise<{ submissions: WebDesignExerciseSubmissionRecord[] }>;
   submitCode: (
@@ -106,6 +112,11 @@ type WebDesignCodingExerciseActivityViewProps = {
   webDesignClient?: WebDesignExerciseClient;
 };
 
+type ApiErrorLike = Error & {
+  code?: string;
+  details?: unknown;
+};
+
 type PreviewConsoleMessage = {
   id: string;
   level: "debug" | "error" | "info" | "log" | "warn";
@@ -117,19 +128,27 @@ type PreviewPaneCopy = {
   console: string;
   clearConsole: string;
   emptyConsole: string;
+  expectedResult: string;
 };
 
 type StudentWorkspaceCopy = PreviewPaneCopy & {
   files: string;
+  solutionFiles: string;
+  starterFiles: string;
+  addFile: string;
   editor: string;
   saving: string;
   remove: string;
+  path: string;
+  language: string;
+  editable: string;
   fullScreen: string;
   exitFullScreen: string;
   testsTitle: string;
   testsLoadError: string;
   testsSaved: string;
   testsSaveError: string;
+  testsSaveValidationError: string;
   referenceBundle: string;
   useCurrentFiles: string;
   addTest: string;
@@ -138,6 +157,8 @@ type StudentWorkspaceCopy = PreviewPaneCopy & {
   testName: string;
   testKind: string;
   testCode: string;
+  confirmRemoveTest: string;
+  setupTab: string;
   sample: string;
   hidden: string;
   enabled: string;
@@ -151,6 +172,10 @@ type StudentWorkspaceCopy = PreviewPaneCopy & {
   failed: string;
   noRunner: string;
   noCourse: string;
+  fileCode: string;
+  solutionCode: string;
+  starterCode: string;
+  previewSolution: string;
 };
 
 const fileLanguageOptions: Array<{ value: WebDesignFileLanguage; label: string }> = [
@@ -159,6 +184,23 @@ const fileLanguageOptions: Array<{ value: WebDesignFileLanguage; label: string }
   { value: "javascript", label: "JavaScript" }
 ];
 
+function alignStarterFilesToSolutionFiles(starterFiles: readonly WebDesignExerciseFile[], solutionFiles: readonly WebDesignExerciseFile[]) {
+  return solutionFiles.map((solutionFile, index) => {
+    const starterFile = starterFiles.find((file) => normalizeWebDesignFilePath(file.path) === solutionFile.path);
+    return {
+      ...solutionFile,
+      id: starterFile?.id ?? `starter-${solutionFile.id}`,
+      starterCode: starterFile?.starterCode ?? "",
+      isEditable: starterFile?.isEditable ?? true,
+      orderIndex: index
+    };
+  });
+}
+
+function formatWebDesignCopy(template: string, values: Record<string, string>) {
+  return Object.entries(values).reduce((message, [key, value]) => message.replaceAll(`{${key}}`, value), template);
+}
+
 const copyByLocale = {
   en: {
     authoringTitle: "Web design exercise authoring",
@@ -166,7 +208,11 @@ const copyByLocale = {
     description: "Description",
     prompt: "Prompt",
     files: "Files",
+    solutionFiles: "Solution files",
+    starterFiles: "Student starting files",
     preview: "Preview",
+    previewSolution: "Solution preview",
+    expectedResult: "Expected result image",
     addFile: "Add file",
     remove: "Remove",
     path: "Path",
@@ -179,6 +225,8 @@ const copyByLocale = {
     duplicatePath: "Each file path must be unique.",
     missingFile: "Add at least one file.",
     fileCode: "File code",
+    solutionCode: "Teacher solution code",
+    starterCode: "Student starting code",
     editor: "Editor",
     console: "Console",
     clearConsole: "Clear",
@@ -187,16 +235,19 @@ const copyByLocale = {
     exitFullScreen: "Exit full screen",
     testsTitle: "Playwright tests",
     testsLoadError: "Unable to load web design tests.",
-    testsSaved: "Web design tests saved.",
-    testsSaveError: "Unable to save web design tests right now.",
+    testsSaved: "Web design tests and solution saved.",
+    testsSaveError: "Unable to save web design tests and solution right now.",
+    testsSaveValidationError: "Error saving because {count} tests failed.",
     referenceBundle: "Reference bundle",
-    useCurrentFiles: "Use current files as reference",
+    useCurrentFiles: "Use solution files as reference",
     addTest: "Add test",
-    saveTests: "Save tests",
+    saveTests: "Save tests and solution",
     noTests: "No tests yet.",
     testName: "Test name",
     testKind: "Kind",
     testCode: "Playwright test code",
+    confirmRemoveTest: "Delete this test?",
+    setupTab: "Setup",
     sample: "Sample",
     hidden: "Hidden",
     enabled: "Enabled",
@@ -217,7 +268,11 @@ const copyByLocale = {
     description: "Description",
     prompt: "Consigne",
     files: "Fichiers",
+    solutionFiles: "Fichiers de solution",
+    starterFiles: "Fichiers de depart etudiants",
     preview: "Apercu",
+    previewSolution: "Apercu de la solution",
+    expectedResult: "Image du resultat attendu",
     addFile: "Ajouter un fichier",
     remove: "Retirer",
     path: "Chemin",
@@ -230,6 +285,8 @@ const copyByLocale = {
     duplicatePath: "Chaque chemin de fichier doit etre unique.",
     missingFile: "Ajoutez au moins un fichier.",
     fileCode: "Code du fichier",
+    solutionCode: "Code de solution enseignant",
+    starterCode: "Code de depart etudiant",
     editor: "Editeur",
     console: "Console",
     clearConsole: "Effacer",
@@ -238,16 +295,19 @@ const copyByLocale = {
     exitFullScreen: "Quitter le plein ecran",
     testsTitle: "Tests Playwright",
     testsLoadError: "Impossible de charger les tests de conception web.",
-    testsSaved: "Les tests de conception web ont ete enregistres.",
-    testsSaveError: "Impossible d'enregistrer les tests de conception web pour le moment.",
+    testsSaved: "Les tests et la solution de conception web ont ete enregistres.",
+    testsSaveError: "Impossible d'enregistrer les tests et la solution de conception web pour le moment.",
+    testsSaveValidationError: "Erreur d'enregistrement : {count} tests ont echoue.",
     referenceBundle: "Ensemble de reference",
-    useCurrentFiles: "Utiliser les fichiers actuels comme reference",
+    useCurrentFiles: "Utiliser les fichiers de solution comme reference",
     addTest: "Ajouter un test",
-    saveTests: "Enregistrer les tests",
+    saveTests: "Enregistrer les tests et la solution",
     noTests: "Aucun test pour le moment.",
     testName: "Nom du test",
     testKind: "Type",
     testCode: "Code de test Playwright",
+    confirmRemoveTest: "Supprimer ce test ?",
+    setupTab: "Configuration",
     sample: "Exemple",
     hidden: "Cache",
     enabled: "Active",
@@ -268,7 +328,11 @@ const copyByLocale = {
     description: "说明",
     prompt: "题目",
     files: "文件",
+    solutionFiles: "参考答案文件",
+    starterFiles: "学生起始文件",
     preview: "预览",
+    previewSolution: "参考答案预览",
+    expectedResult: "预期结果图片",
     addFile: "添加文件",
     remove: "移除",
     path: "路径",
@@ -281,6 +345,8 @@ const copyByLocale = {
     duplicatePath: "每个文件路径必须唯一。",
     missingFile: "请至少添加一个文件。",
     fileCode: "文件代码",
+    solutionCode: "教师参考答案代码",
+    starterCode: "学生起始代码",
     editor: "编辑器",
     console: "控制台",
     clearConsole: "清除",
@@ -289,16 +355,19 @@ const copyByLocale = {
     exitFullScreen: "退出全屏",
     testsTitle: "Playwright 测试",
     testsLoadError: "无法加载网页设计测试。",
-    testsSaved: "网页设计测试已保存。",
-    testsSaveError: "暂时无法保存网页设计测试。",
+    testsSaved: "网页设计测试和参考答案已保存。",
+    testsSaveError: "暂时无法保存网页设计测试和参考答案。",
+    testsSaveValidationError: "保存失败，因为 {count} 个测试未通过。",
     referenceBundle: "参考文件包",
-    useCurrentFiles: "使用当前文件作为参考",
+    useCurrentFiles: "使用参考答案文件作为参考",
     addTest: "添加测试",
-    saveTests: "保存测试",
+    saveTests: "保存测试和参考答案",
     noTests: "暂无测试。",
     testName: "测试名称",
     testKind: "类型",
     testCode: "Playwright 测试代码",
+    confirmRemoveTest: "删除这个测试吗？",
+    setupTab: "设置",
     sample: "示例",
     hidden: "隐藏",
     enabled: "启用",
@@ -329,29 +398,105 @@ export function WebDesignCodingExerciseActivityView({
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);
   const [prompt, setPrompt] = useState(initialConfig.prompt);
-  const [files, setFiles] = useState<WebDesignExerciseFile[]>(initialConfig.files);
+  const [starterFiles, setStarterFiles] = useState<WebDesignExerciseFile[]>(initialConfig.files);
+  const [solutionFiles, setSolutionFiles] = useState<WebDesignExerciseFile[]>(initialConfig.files);
   const [activePath, setActivePath] = useState(initialConfig.files[0]?.path ?? "index.html");
+  const [activeSolutionPath, setActiveSolutionPath] = useState(initialConfig.files[0]?.path ?? "index.html");
+  const [activeStarterPath, setActiveStarterPath] = useState(initialConfig.files[0]?.path ?? "index.html");
+  const [activeAuthoringTab, setActiveAuthoringTab] = useState<"setup" | "solution" | "starter" | "tests">("setup");
   const [saving, setSaving] = useState(false);
+  const [validatingTests, setValidatingTests] = useState(false);
   const [error, setError] = useState("");
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [executingKind, setExecutingKind] = useState<"run" | "submit" | null>(null);
   const [latestSubmission, setLatestSubmission] = useState<WebDesignExerciseSubmissionRecord | null>(null);
   const [executionError, setExecutionError] = useState("");
+  const [expectedResultImageDataUrl, setExpectedResultImageDataUrl] = useState<string | null>(null);
+  const [authoringTests, setAuthoringTests] = useState<WebDesignExerciseTestRecord[]>([]);
+  const [authoringTestsLoaded, setAuthoringTestsLoaded] = useState(false);
+  const previousActivityIdRef = useRef(activity.id);
+  const referencePreloadActivityIdRef = useRef<string | null>(null);
+  const solutionDirtyRef = useRef(false);
+
+  const loadReferenceFiles = useCallback((files: readonly WebDesignExerciseFile[], options?: { force?: boolean }) => {
+    if (!files.length) {
+      return;
+    }
+    if (solutionDirtyRef.current && !options?.force) {
+      return;
+    }
+    const nextFiles = files.map((file, index) => ({ ...file, orderIndex: index }));
+    solutionDirtyRef.current = false;
+    setSolutionFiles(nextFiles);
+    setStarterFiles((current) => alignStarterFilesToSolutionFiles(current, nextFiles));
+    setActiveSolutionPath((current) => (nextFiles.some((file) => file.path === current) ? current : nextFiles[0]?.path ?? "index.html"));
+    setActiveStarterPath((current) => (nextFiles.some((file) => file.path === current) ? current : nextFiles[0]?.path ?? "index.html"));
+    setActivePath((current) => (nextFiles.some((file) => file.path === current) ? current : nextFiles[0]?.path ?? "index.html"));
+  }, []);
 
   useEffect(() => {
+    const isNewActivity = previousActivityIdRef.current !== activity.id;
+    previousActivityIdRef.current = activity.id;
     const nextConfig = parseWebDesignExerciseConfig(activity.config);
     setTitle(activity.title);
     setDescription(activity.description);
     setPrompt(nextConfig.prompt);
-    setFiles(nextConfig.files);
+    setStarterFiles(nextConfig.files);
     setActivePath(nextConfig.files[0]?.path ?? "index.html");
-    setSaving(false);
+    setActiveStarterPath(nextConfig.files[0]?.path ?? "index.html");
+    if (isNewActivity) {
+      setSolutionFiles(nextConfig.files);
+      setActiveSolutionPath(nextConfig.files[0]?.path ?? "index.html");
+      setActiveAuthoringTab("setup");
+    }
+    if (isNewActivity) {
+      setSaving(false);
+      setValidatingTests(false);
+    }
     setError("");
     setIsFullScreen(false);
     setExecutingKind(null);
     setLatestSubmission(null);
     setExecutionError("");
+    setExpectedResultImageDataUrl(null);
+    if (isNewActivity) {
+      referencePreloadActivityIdRef.current = null;
+      solutionDirtyRef.current = false;
+      setAuthoringTests([]);
+      setAuthoringTestsLoaded(false);
+    }
   }, [activity]);
+
+  useEffect(() => {
+    if (!canManage || !course?.id || !webDesignClient) {
+      return;
+    }
+    if (referencePreloadActivityIdRef.current === activity.id) {
+      return;
+    }
+    referencePreloadActivityIdRef.current = activity.id;
+
+    let isMounted = true;
+    webDesignClient
+      .listTests(course.id, activity.id)
+      .then((result) => {
+        if (isMounted && result.referenceBundle?.files.length) {
+          loadReferenceFiles(result.referenceBundle.files);
+        }
+        if (isMounted) {
+          setAuthoringTests(result.tests);
+          setAuthoringTestsLoaded(true);
+        }
+      })
+      .catch(() => {
+        referencePreloadActivityIdRef.current = null;
+        // The tests panel reports load failures; this preload is only for hydrating the solution editor.
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activity.id, canManage, course?.id, loadReferenceFiles, webDesignClient]);
 
   useEffect(() => {
     if (canManage || !course?.id || !webDesignClient) {
@@ -378,6 +523,31 @@ export function WebDesignCodingExerciseActivityView({
   }, [activity.id, canManage, course?.id, webDesignClient]);
 
   useEffect(() => {
+    if (!course?.id || !webDesignClient || !webDesignPromptIncludesExpectedResult(prompt)) {
+      setExpectedResultImageDataUrl(null);
+      return;
+    }
+
+    let isMounted = true;
+    webDesignClient
+      .getExpectedResult(course.id, activity.id)
+      .then((result) => {
+        if (isMounted) {
+          setExpectedResultImageDataUrl(result.imageDataUrl);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setExpectedResultImageDataUrl(null);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activity.id, course?.id, prompt, webDesignClient]);
+
+  useEffect(() => {
     if (!isFullScreen) {
       return;
     }
@@ -398,23 +568,36 @@ export function WebDesignCodingExerciseActivityView({
     };
   }, [isFullScreen]);
 
-  const normalizedFiles = useMemo(
+  const normalizedStarterFiles = useMemo(
     () =>
-      files
+      starterFiles
         .map((file, index) => ({ ...file, path: normalizeWebDesignFilePath(file.path), orderIndex: index }))
         .sort((left, right) => left.orderIndex - right.orderIndex),
-    [files]
+    [starterFiles]
   );
-  const activeFile = normalizedFiles.find((file) => file.path === activePath) ?? normalizedFiles[0];
-  const previewDocument = useMemo(() => buildWebDesignPreviewDocument(normalizedFiles), [normalizedFiles]);
-  const validationError = useMemo(() => validateFiles(normalizedFiles, copy.duplicatePath, copy.missingFile), [copy, normalizedFiles]);
+  const normalizedSolutionFiles = useMemo(
+    () =>
+      solutionFiles
+        .map((file, index) => ({ ...file, path: normalizeWebDesignFilePath(file.path), orderIndex: index }))
+        .sort((left, right) => left.orderIndex - right.orderIndex),
+    [solutionFiles]
+  );
+  const activeFile = normalizedStarterFiles.find((file) => file.path === activePath) ?? normalizedStarterFiles[0];
+  const activeSolutionFile = normalizedSolutionFiles.find((file) => file.path === activeSolutionPath) ?? normalizedSolutionFiles[0];
+  const activeStarterFile = normalizedStarterFiles.find((file) => file.path === activeStarterPath) ?? normalizedStarterFiles[0];
+  const studentPreviewDocument = useMemo(() => buildWebDesignPreviewDocument(normalizedStarterFiles), [normalizedStarterFiles]);
+  const solutionPreviewDocument = useMemo(() => buildWebDesignPreviewDocument(normalizedSolutionFiles), [normalizedSolutionFiles]);
+  const validationError = useMemo(
+    () => validateFiles(normalizedStarterFiles, copy.duplicatePath, copy.missingFile),
+    [copy, normalizedStarterFiles]
+  );
 
   async function saveExercise(event: FormEvent) {
     event.preventDefault();
     const nextConfig: WebDesignExerciseConfig = normalizeWebDesignExerciseConfig({
       prompt,
-      files: normalizedFiles,
-      previewEntry: normalizedFiles.find((file) => file.language === "html")?.path ?? normalizedFiles[0]?.path ?? "index.html",
+      files: normalizedStarterFiles,
+      previewEntry: normalizedStarterFiles.find((file) => file.language === "html")?.path ?? normalizedStarterFiles[0]?.path ?? "index.html",
       maxEditorSeconds: defaultWebDesignExerciseConfig.maxEditorSeconds
     });
 
@@ -425,6 +608,7 @@ export function WebDesignCodingExerciseActivityView({
     }
 
     setSaving(true);
+    setValidatingTests(true);
     setError("");
 
     try {
@@ -433,16 +617,81 @@ export function WebDesignCodingExerciseActivityView({
         description,
         config: nextConfig
       });
+      await saveSolutionAndTests();
       notifications.success(copy.saved);
     } catch (err) {
-      notifications.error(err instanceof Error ? err.message : copy.saveError);
+      if (!handleReferenceValidationError(err)) {
+        notifications.error(err instanceof Error ? err.message : copy.saveError);
+      }
     } finally {
       setSaving(false);
+      setValidatingTests(false);
     }
   }
 
-  function updateFile(path: string, patch: Partial<WebDesignExerciseFile>) {
-    setFiles((current) =>
+  async function saveSolutionAndTests(testsOverride?: WebDesignExerciseTestRecord[]) {
+    if (!course?.id || !webDesignClient) {
+      return null;
+    }
+
+    const testsToSave = testsOverride ?? (authoringTestsLoaded ? authoringTests : (await webDesignClient.listTests(course.id, activity.id)).tests);
+    const result = await webDesignClient.saveTests(course.id, activity.id, {
+      shouldCaptureExpectedResult: webDesignPromptIncludesExpectedResult(prompt),
+      shouldCropExpectedResult: webDesignPromptRequestsCroppedExpectedResult(prompt),
+      referenceFiles: normalizedSolutionFiles,
+      tests: testsToSave.map((test) => ({
+        id: test.id,
+        name: test.name,
+        kind: test.kind,
+        testCode: test.testCode,
+        isEnabled: test.isEnabled,
+        weight: test.weight,
+        metadata: test.metadata
+      }))
+    });
+    setAuthoringTests(result.tests);
+    setAuthoringTestsLoaded(true);
+    const savedReferenceFiles = result.referenceBundle?.files.length ? result.referenceBundle.files : normalizedSolutionFiles;
+    loadReferenceFiles(savedReferenceFiles, { force: true });
+    setExpectedResultImageDataUrl(getExpectedResultImageDataUrl(result.referenceBundle));
+    return result;
+  }
+
+  function handleReferenceValidationError(err: unknown) {
+    const details = normalizeWebDesignObject((err as ApiErrorLike).details);
+    const validationSummary = normalizeWebDesignObject(details.validationSummary);
+    const testSummaries = normalizeWebDesignObject(validationSummary.testSummaries);
+    const failedIds = Object.entries(testSummaries)
+      .filter(([, summary]) => getWebDesignValidationStatus(normalizeWebDesignObject(summary)) === "failed")
+      .map(([id]) => id);
+
+    if (!Object.keys(testSummaries).length) {
+      return false;
+    }
+
+    setAuthoringTests((current) =>
+      current.map((test) =>
+        Object.prototype.hasOwnProperty.call(testSummaries, test.id)
+          ? {
+              ...test,
+              validationSummary: normalizeWebDesignObject(testSummaries[test.id])
+            }
+          : test
+      )
+    );
+    setActiveAuthoringTab("tests");
+    notifications.error(
+      failedIds.length
+        ? formatWebDesignCopy(copy.testsSaveValidationError, { count: String(failedIds.length) })
+        : err instanceof Error
+          ? err.message
+          : copy.testsSaveError
+    );
+    return true;
+  }
+
+  function updateStudentFile(path: string, patch: Partial<WebDesignExerciseFile>) {
+    setStarterFiles((current) =>
       current.map((file) => {
         if (normalizeWebDesignFilePath(file.path) !== path) {
           return file;
@@ -462,28 +711,96 @@ export function WebDesignCodingExerciseActivityView({
     }
   }
 
-  function addFile() {
-    setFiles((current) => {
-      const nextNumber = current.length + 1;
-      const path = `script-${nextNumber}.js`;
-      return [
-        ...current,
-        {
-          id: `file-${Date.now()}`,
-          path,
-          language: inferWebDesignFileLanguage(path),
-          starterCode: "",
-          isEditable: true,
-          orderIndex: current.length
+  function updateSolutionFile(path: string, patch: Partial<WebDesignExerciseFile>) {
+    solutionDirtyRef.current = true;
+    setSolutionFiles((current) =>
+      current.map((file) => {
+        if (normalizeWebDesignFilePath(file.path) !== path) {
+          return file;
         }
-      ];
-    });
-    setActivePath(`script-${files.length + 1}.js`);
+        const nextPath = patch.path === undefined ? file.path : normalizeWebDesignFilePath(patch.path);
+        return {
+          ...file,
+          ...patch,
+          path: nextPath,
+          language: patch.path !== undefined && patch.language === undefined ? inferWebDesignFileLanguage(nextPath) : patch.language ?? file.language
+        };
+      })
+    );
+
+    if (patch.path !== undefined || patch.language !== undefined) {
+      setStarterFiles((current) =>
+        current.map((file) => {
+          if (normalizeWebDesignFilePath(file.path) !== path) {
+            return file;
+          }
+          const nextPath = patch.path === undefined ? file.path : normalizeWebDesignFilePath(patch.path);
+          return {
+            ...file,
+            path: nextPath,
+            language: patch.path !== undefined && patch.language === undefined ? inferWebDesignFileLanguage(nextPath) : patch.language ?? file.language
+          };
+        })
+      );
+    }
+
+    if (patch.path !== undefined && activeSolutionPath === path) {
+      setActiveSolutionPath(normalizeWebDesignFilePath(patch.path));
+    }
+    if (patch.path !== undefined && activeStarterPath === path) {
+      setActiveStarterPath(normalizeWebDesignFilePath(patch.path));
+    }
+    if (patch.path !== undefined && activePath === path) {
+      setActivePath(normalizeWebDesignFilePath(patch.path));
+    }
+  }
+
+  function updateStarterFile(path: string, patch: Partial<WebDesignExerciseFile>) {
+    setStarterFiles((current) =>
+      current.map((file) => (normalizeWebDesignFilePath(file.path) === path ? { ...file, ...patch, path: file.path, language: file.language } : file))
+    );
+  }
+
+  function addFile() {
+    solutionDirtyRef.current = true;
+    const nextNumber = solutionFiles.length + 1;
+    const path = `script-${nextNumber}.js`;
+    const language = inferWebDesignFileLanguage(path);
+    const orderIndex = solutionFiles.length;
+    const solutionFile: WebDesignExerciseFile = {
+      id: `solution-file-${Date.now()}`,
+      path,
+      language,
+      starterCode: "",
+      isEditable: true,
+      orderIndex
+    };
+    const starterFile: WebDesignExerciseFile = {
+      ...solutionFile,
+      id: `starter-file-${Date.now()}`,
+      isEditable: true
+    };
+
+    setSolutionFiles((current) => [...current, solutionFile]);
+    setStarterFiles((current) => [...current, starterFile]);
+    setActiveSolutionPath(path);
+    setActiveStarterPath(path);
   }
 
   function removeFile(path: string) {
-    setFiles((current) => {
+    solutionDirtyRef.current = true;
+    setSolutionFiles((current) => {
       const remaining = current.filter((file) => normalizeWebDesignFilePath(file.path) !== path);
+      if (activeSolutionPath === path) {
+        setActiveSolutionPath(remaining[0]?.path ?? "index.html");
+      }
+      return remaining;
+    });
+    setStarterFiles((current) => {
+      const remaining = current.filter((file) => normalizeWebDesignFilePath(file.path) !== path);
+      if (activeStarterPath === path) {
+        setActiveStarterPath(remaining[0]?.path ?? "index.html");
+      }
       if (activePath === path) {
         setActivePath(remaining[0]?.path ?? "index.html");
       }
@@ -507,8 +824,8 @@ export function WebDesignCodingExerciseActivityView({
     try {
       const result =
         kind === "run"
-          ? await webDesignClient.runCode(course.id, activity.id, { files: normalizedFiles })
-          : await webDesignClient.submitCode(course.id, activity.id, { files: normalizedFiles });
+          ? await webDesignClient.runCode(course.id, activity.id, { files: normalizedStarterFiles })
+          : await webDesignClient.submitCode(course.id, activity.id, { files: normalizedStarterFiles });
       setLatestSubmission(result.submission);
     } catch (err) {
       setExecutionError(err instanceof Error ? err.message : copy.noRunner);
@@ -518,103 +835,120 @@ export function WebDesignCodingExerciseActivityView({
   }
 
   if (canManage) {
+    const authoringTabs = [
+      { id: "setup", label: copy.setupTab },
+      { id: "solution", label: copy.solutionFiles },
+      { id: "starter", label: copy.starterFiles },
+      { id: "tests", label: copy.testsTitle }
+    ] as const;
+
     return (
       <form className="section stack" onSubmit={saveExercise}>
         <div className="stack">
           <h2>{copy.authoringTitle}</h2>
         </div>
 
-        <div className="field">
-          <label htmlFor="web-design-title">{copy.title}</label>
-          <input id="web-design-title" value={title} onChange={(event) => setTitle(event.target.value)} />
-        </div>
-
-        <div className="field">
-          <label htmlFor="web-design-description">{copy.description}</label>
-          <textarea id="web-design-description" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />
-        </div>
-
-        <div className="field">
-          <label htmlFor="web-design-prompt">{copy.prompt}</label>
-          <textarea id="web-design-prompt" rows={5} value={prompt} onChange={(event) => setPrompt(event.target.value)} />
-        </div>
-
-        <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0 }}>{copy.files}</h3>
-          <button type="button" className="secondary" onClick={addFile}>
-            {copy.addFile}
-          </button>
-        </div>
-
-        <div className="stack" style={{ gap: 12 }}>
-          {normalizedFiles.map((file) => (
-            <section key={file.id} className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.12)", borderRadius: 8, padding: 14 }}>
-              <div className="row" style={{ alignItems: "end" }}>
-                <div className="field" style={{ flex: "1 1 220px" }}>
-                  <label htmlFor={`web-design-path-${file.id}`}>{copy.path}</label>
-                  <input
-                    id={`web-design-path-${file.id}`}
-                    value={file.path}
-                    onChange={(event) => updateFile(file.path, { path: event.target.value })}
-                  />
-                </div>
-                <div className="field" style={{ flex: "0 1 180px" }}>
-                  <label htmlFor={`web-design-language-${file.id}`}>{copy.language}</label>
-                  <select
-                    id={`web-design-language-${file.id}`}
-                    value={file.language}
-                    onChange={(event) => updateFile(file.path, { language: event.target.value as WebDesignFileLanguage })}
-                  >
-                    {fileLanguageOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <label className="row" style={{ gap: 8, minHeight: 42 }}>
-                  <input
-                    type="checkbox"
-                    checked={file.isEditable}
-                    onChange={(event) => updateFile(file.path, { isEditable: event.target.checked })}
-                  />
-                  {copy.editable}
-                </label>
-                <button type="button" className="secondary" onClick={() => removeFile(file.path)} disabled={normalizedFiles.length <= 1}>
-                  {copy.remove}
-                </button>
-              </div>
-              <div className="stack">
-                <span>{copy.fileCode}</span>
-                <MonacoCodeEditor
-                  id={`web-design-author-${file.id}`}
-                  value={file.starterCode}
-                  onChange={(value) => updateFile(file.path, { starterCode: value })}
-                  language={file.language}
-                  minHeight={220}
-                />
-              </div>
-            </section>
+        <div className="row" role="tablist" aria-label={copy.authoringTitle} style={{ gap: 8 }}>
+          {authoringTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeAuthoringTab === tab.id}
+              className={activeAuthoringTab === tab.id ? undefined : "secondary"}
+              onClick={() => setActiveAuthoringTab(tab.id)}
+            >
+              {tab.label}
+            </button>
           ))}
         </div>
 
-        {error || validationError ? <p className="error">{error || validationError}</p> : null}
+        {activeAuthoringTab === "setup" ? (
+          <section className="stack" role="tabpanel">
+            <div className="field">
+              <label htmlFor="web-design-title">{copy.title}</label>
+              <input id="web-design-title" value={title} onChange={(event) => setTitle(event.target.value)} />
+            </div>
+
+            <div className="field">
+              <label htmlFor="web-design-description">{copy.description}</label>
+              <textarea id="web-design-description" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />
+            </div>
+
+            <div className="field">
+              <label htmlFor="web-design-prompt">{copy.prompt}</label>
+              <textarea id="web-design-prompt" rows={5} value={prompt} onChange={(event) => setPrompt(event.target.value)} />
+            </div>
+          </section>
+        ) : null}
+
+        {activeAuthoringTab === "solution" ? (
+          <section className="stack" role="tabpanel">
+            <AuthoringFileTabs
+              activeFile={activeSolutionFile}
+              activePath={activeSolutionPath}
+              codeLabel={copy.solutionCode}
+              copy={copy}
+              editorIdPrefix="web-design-solution"
+              files={normalizedSolutionFiles}
+              heading={copy.solutionFiles}
+              onActivePathChange={setActiveSolutionPath}
+              onAddFile={addFile}
+              onRemoveFile={removeFile}
+              onUpdateFile={updateSolutionFile}
+              showFileSettings
+            />
+
+            <section className="stack">
+              <h3 style={{ margin: 0 }}>{copy.previewSolution}</h3>
+              <PreviewPane copy={copy} previewDocument={solutionPreviewDocument} />
+              <ExpectedResultImage copy={copy} imageDataUrl={expectedResultImageDataUrl} prompt={prompt} />
+            </section>
+          </section>
+        ) : null}
+
+        {activeAuthoringTab === "starter" ? (
+          <section className="stack" role="tabpanel">
+            <AuthoringFileTabs
+              activeFile={activeStarterFile}
+              activePath={activeStarterPath}
+              codeLabel={copy.starterCode}
+              copy={copy}
+              editorIdPrefix="web-design-starter"
+              files={normalizedStarterFiles}
+              heading={copy.starterFiles}
+              onActivePathChange={setActiveStarterPath}
+              onUpdateFile={updateStarterFile}
+              showEditableToggle
+            />
+
+            {error || validationError ? <p className="error">{error || validationError}</p> : null}
+          </section>
+        ) : null}
+
+        {activeAuthoringTab === "tests" ? (
+          <WebDesignTestsPanel
+            activityId={activity.id}
+            copy={copy}
+            courseId={course?.id ?? ""}
+            currentFiles={normalizedSolutionFiles}
+            onReferenceFilesLoad={loadReferenceFiles}
+            onTestsChange={(tests) => {
+              setAuthoringTests(tests);
+              setAuthoringTestsLoaded(true);
+            }}
+            saving={validatingTests}
+            tests={authoringTests}
+            testsLoaded={authoringTestsLoaded}
+            webDesignClient={webDesignClient}
+          />
+        ) : null}
 
         <div className="row">
           <button type="submit" disabled={saving || Boolean(validationError)}>
             {saving ? copy.saving : copy.save}
           </button>
         </div>
-
-        <PreviewPane copy={copy} previewDocument={previewDocument} />
-
-        <WebDesignTestsPanel
-          activityId={activity.id}
-          copy={copy}
-          courseId={course?.id ?? ""}
-          currentFiles={normalizedFiles}
-          webDesignClient={webDesignClient}
-        />
       </form>
     );
   }
@@ -622,12 +956,12 @@ export function WebDesignCodingExerciseActivityView({
   return (
     <>
       <section className="section stack">
-        {prompt ? <MarkdownRenderer markdown={prompt} /> : null}
+        {prompt ? <ExpectedResultPrompt imageDataUrl={expectedResultImageDataUrl} markdown={prompt} /> : null}
         <StudentWorkspace
           activeFile={activeFile}
           activePath={activePath}
           copy={copy}
-          files={normalizedFiles}
+          files={normalizedStarterFiles}
           executionError={executionError}
           executingKind={executingKind}
           latestSubmission={latestSubmission}
@@ -636,8 +970,8 @@ export function WebDesignCodingExerciseActivityView({
           onExitFullScreen={() => setIsFullScreen(false)}
           onRunTests={() => executeStudentTests("run")}
           onSubmit={() => executeStudentTests("submit")}
-          onUpdateFile={updateFile}
-          previewDocument={previewDocument}
+          onUpdateFile={updateStudentFile}
+          previewDocument={studentPreviewDocument}
           testsAvailable={Boolean(course?.id && webDesignClient)}
         />
       </section>
@@ -657,7 +991,7 @@ export function WebDesignCodingExerciseActivityView({
             activeFile={activeFile}
             activePath={activePath}
             copy={copy}
-            files={normalizedFiles}
+            files={normalizedStarterFiles}
             executionError={executionError}
             executingKind={executingKind}
             fullScreen
@@ -667,13 +1001,183 @@ export function WebDesignCodingExerciseActivityView({
             onExitFullScreen={() => setIsFullScreen(false)}
             onRunTests={() => executeStudentTests("run")}
             onSubmit={() => executeStudentTests("submit")}
-            onUpdateFile={updateFile}
-            previewDocument={previewDocument}
+            onUpdateFile={updateStudentFile}
+            previewDocument={studentPreviewDocument}
             testsAvailable={Boolean(course?.id && webDesignClient)}
           />
         </div>
       ) : null}
     </>
+  );
+}
+
+function AuthoringFileTabs({
+  activeFile,
+  activePath,
+  codeLabel,
+  copy,
+  editorIdPrefix,
+  files,
+  heading,
+  onActivePathChange,
+  onAddFile,
+  onRemoveFile,
+  onUpdateFile,
+  showEditableToggle = false,
+  showFileSettings = false
+}: {
+  activeFile: WebDesignExerciseFile | undefined;
+  activePath: string;
+  codeLabel: string;
+  copy: StudentWorkspaceCopy;
+  editorIdPrefix: string;
+  files: readonly WebDesignExerciseFile[];
+  heading: string;
+  onActivePathChange: (path: string) => void;
+  onAddFile?: () => void;
+  onRemoveFile?: (path: string) => void;
+  onUpdateFile: (path: string, patch: Partial<WebDesignExerciseFile>) => void;
+  showEditableToggle?: boolean;
+  showFileSettings?: boolean;
+}) {
+  return (
+    <section className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.12)", borderRadius: 8, padding: 14 }}>
+      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+        <h3 style={{ margin: 0 }}>{heading}</h3>
+        {onAddFile ? (
+          <button type="button" className="secondary" onClick={onAddFile}>
+            {copy.addFile}
+          </button>
+        ) : null}
+      </div>
+
+      <div className="row" role="tablist" aria-label={heading} style={{ gap: 8 }}>
+        {files.map((file) => (
+          <button
+            key={file.id}
+            type="button"
+            role="tab"
+            aria-selected={file.path === activePath}
+            className={file.path === activePath ? undefined : "secondary"}
+            onClick={() => onActivePathChange(file.path)}
+            style={{ minWidth: 0 }}
+          >
+            {file.path}
+          </button>
+        ))}
+      </div>
+
+      {activeFile ? (
+        <>
+          {showFileSettings ? (
+            <div className="row" style={{ alignItems: "end" }}>
+              <div className="field" style={{ flex: "1 1 220px" }}>
+                <label htmlFor={`${editorIdPrefix}-path-${activeFile.id}`}>{copy.path}</label>
+                <input
+                  id={`${editorIdPrefix}-path-${activeFile.id}`}
+                  value={activeFile.path}
+                  onChange={(event) => onUpdateFile(activeFile.path, { path: event.target.value })}
+                />
+              </div>
+              <div className="field" style={{ flex: "0 1 180px" }}>
+                <label htmlFor={`${editorIdPrefix}-language-${activeFile.id}`}>{copy.language}</label>
+                <select
+                  id={`${editorIdPrefix}-language-${activeFile.id}`}
+                  value={activeFile.language}
+                  onChange={(event) => onUpdateFile(activeFile.path, { language: event.target.value as WebDesignFileLanguage })}
+                >
+                  {fileLanguageOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {onRemoveFile ? (
+                <button type="button" className="secondary" onClick={() => onRemoveFile(activeFile.path)} disabled={files.length <= 1}>
+                  {copy.remove}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {showEditableToggle ? (
+            <label className="checkbox-row" style={{ alignSelf: "start", flexWrap: "nowrap", whiteSpace: "nowrap" }}>
+              <input
+                type="checkbox"
+                checked={activeFile.isEditable}
+                onChange={(event) => onUpdateFile(activeFile.path, { isEditable: event.target.checked })}
+              />
+              {copy.editable}
+            </label>
+          ) : null}
+
+          <div className="stack">
+            <span>{codeLabel}</span>
+            <MonacoCodeEditor
+              id={`${editorIdPrefix}-${activeFile.id}`}
+              value={activeFile.starterCode}
+              onChange={(value) => onUpdateFile(activeFile.path, { starterCode: value })}
+              language={activeFile.language}
+              minHeight={260}
+            />
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+function ExpectedResultPrompt({ imageDataUrl, markdown }: { imageDataUrl: string | null; markdown: string }) {
+  if (!webDesignPromptIncludesExpectedResult(markdown)) {
+    return <MarkdownRenderer markdown={markdown} />;
+  }
+
+  const parts = markdown.split(webDesignExpectedResultTokenPattern);
+  return (
+    <div className="stack">
+      {parts.map((part, index) => (
+        <div key={`${index}-${part.slice(0, 12)}`} className="stack">
+          {part.trim() ? <MarkdownRenderer markdown={part} /> : null}
+          {index < parts.length - 1 && imageDataUrl ? (
+            <img
+              alt="Expected result"
+              src={imageDataUrl}
+              style={{
+                border: "1px solid rgba(13, 27, 71, 0.12)",
+                borderRadius: 8,
+                display: "block",
+                height: "auto",
+                maxWidth: "100%"
+              }}
+            />
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ExpectedResultImage({ copy, imageDataUrl, prompt }: { copy: StudentWorkspaceCopy; imageDataUrl: string | null; prompt: string }) {
+  if (!webDesignPromptIncludesExpectedResult(prompt) || !imageDataUrl) {
+    return null;
+  }
+
+  return (
+    <section className="stack" style={{ gap: 8 }}>
+      <h3 style={{ margin: 0 }}>{copy.expectedResult}</h3>
+      <img
+        alt={copy.expectedResult}
+        src={imageDataUrl}
+        style={{
+          border: "1px solid rgba(13, 27, 71, 0.12)",
+          borderRadius: 8,
+          display: "block",
+          height: "auto",
+          maxWidth: "100%"
+        }}
+      />
+    </section>
   );
 }
 
@@ -859,23 +1363,65 @@ function WebDesignTestsPanel({
   copy,
   courseId,
   currentFiles,
+  onReferenceFilesLoad,
+  onTestsChange,
+  saving,
+  tests,
+  testsLoaded,
   webDesignClient
 }: {
   activityId: string;
   copy: StudentWorkspaceCopy;
   courseId: string;
   currentFiles: readonly WebDesignExerciseFile[];
+  onReferenceFilesLoad?: (files: readonly WebDesignExerciseFile[], options?: { force?: boolean }) => void;
+  onTestsChange: (tests: WebDesignExerciseTestRecord[]) => void;
+  saving: boolean;
+  tests: WebDesignExerciseTestRecord[];
+  testsLoaded: boolean;
   webDesignClient?: WebDesignExerciseClient;
 }) {
   const notifications = useNotifications();
-  const [tests, setTests] = useState<WebDesignExerciseTestRecord[]>([]);
   const [referenceFiles, setReferenceFiles] = useState<WebDesignExerciseFile[]>(() => currentFiles.map((file) => ({ ...file })));
+  const [expandedTestIds, setExpandedTestIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const loadedTestsActivityIdRef = useRef<string | null>(null);
+
+  function setTests(updater: WebDesignExerciseTestRecord[] | ((current: WebDesignExerciseTestRecord[]) => WebDesignExerciseTestRecord[])) {
+    onTestsChange(typeof updater === "function" ? updater(tests) : updater);
+  }
+
+  useEffect(() => {
+    if (typeof document === "undefined" || document.getElementById("web-design-spinner-style")) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = "web-design-spinner-style";
+    style.textContent = "@keyframes web-design-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }";
+    document.head.appendChild(style);
+
+    return () => {
+      style.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    const failedIds = tests
+      .filter((test) => getWebDesignValidationStatus(test.validationSummary) === "failed")
+      .map((test) => test.id);
+    if (failedIds.length) {
+      setExpandedTestIds((current) => Array.from(new Set([...current, ...failedIds])));
+    }
+  }, [tests]);
 
   useEffect(() => {
     if (!courseId || !webDesignClient) {
+      loadedTestsActivityIdRef.current = null;
       setReferenceFiles(currentFiles.map((file) => ({ ...file })));
+      return;
+    }
+    if (loadedTestsActivityIdRef.current === activityId) {
       return;
     }
 
@@ -887,10 +1433,14 @@ function WebDesignTestsPanel({
         if (!isMounted) {
           return;
         }
-        setTests(result.tests);
-        setReferenceFiles(result.referenceBundle?.files.length ? result.referenceBundle.files : currentFiles.map((file) => ({ ...file })));
+        loadedTestsActivityIdRef.current = activityId;
+        onTestsChange(result.tests);
+        const nextReferenceFiles = result.referenceBundle?.files.length ? result.referenceBundle.files : currentFiles.map((file) => ({ ...file }));
+        setReferenceFiles(nextReferenceFiles);
+        onReferenceFilesLoad?.(nextReferenceFiles);
       })
       .catch((err) => {
+        loadedTestsActivityIdRef.current = null;
         if (isMounted) {
           notifications.error(err instanceof Error ? err.message : copy.testsLoadError);
         }
@@ -904,45 +1454,17 @@ function WebDesignTestsPanel({
     return () => {
       isMounted = false;
     };
-  }, [activityId, copy.testsLoadError, courseId, currentFiles, notifications, webDesignClient]);
+  }, [activityId, copy.testsLoadError, courseId, notifications, onReferenceFilesLoad, onTestsChange, webDesignClient]);
 
-  async function saveTests() {
-    if (!courseId || !webDesignClient) {
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const nextReferenceFiles = currentFiles.map((file) => ({ ...file }));
-      const result = await webDesignClient.saveTests(courseId, activityId, {
-        referenceFiles: nextReferenceFiles,
-        tests: tests.map((test) => ({
-          id: test.id,
-          name: test.name,
-          kind: test.kind,
-          testCode: test.testCode,
-          isEnabled: test.isEnabled,
-          weight: test.weight,
-          metadata: test.metadata
-        }))
-      });
-      setTests(result.tests);
-      setReferenceFiles(result.referenceBundle?.files.length ? result.referenceBundle.files : nextReferenceFiles);
-      notifications.success(copy.testsSaved);
-    } catch (err) {
-      notifications.error(err instanceof Error ? err.message : copy.testsSaveError);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function addTest() {
+  function addTest(kind: WebDesignExerciseTestKind) {
+    const id = `web-test-${Date.now()}`;
+    const count = tests.filter((test) => test.kind === kind).length;
     setTests((current) => [
       ...current,
       {
-        id: `web-test-${Date.now()}`,
-        name: `Test ${current.length + 1}`,
-        kind: "hidden",
+        id,
+        name: `${kind === "sample" ? copy.sample : copy.hidden} ${count + 1}`,
+        kind,
         testCode: 'await expect(page.locator("body")).toBeVisible();',
         isEnabled: true,
         weight: 1,
@@ -953,60 +1475,131 @@ function WebDesignTestsPanel({
         updatedAt: new Date().toISOString()
       }
     ]);
+    setExpandedTestIds((current) => [...current, id]);
   }
 
   function updateTest(testId: string, patch: Partial<WebDesignExerciseTestRecord>) {
     setTests((current) => current.map((test) => (test.id === testId ? { ...test, ...patch } : test)));
+    if (patch.id && patch.id !== testId) {
+      setExpandedTestIds((current) => current.map((id) => (id === testId ? patch.id as string : id)));
+    }
   }
 
   function removeTest(testId: string) {
+    if (!window.confirm(copy.confirmRemoveTest)) {
+      return;
+    }
+
     setTests((current) => current.filter((test) => test.id !== testId));
+    setExpandedTestIds((current) => current.filter((id) => id !== testId));
+  }
+
+  function toggleTest(testId: string) {
+    setExpandedTestIds((current) => (current.includes(testId) ? current.filter((id) => id !== testId) : [...current, testId]));
   }
 
   return (
     <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
       <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
         <h3 style={{ margin: 0 }}>{copy.testsTitle}</h3>
-        <div className="row">
-          <button type="button" className="secondary" onClick={() => setReferenceFiles(currentFiles.map((file) => ({ ...file })))}>
-            {copy.useCurrentFiles}
-          </button>
-          <button type="button" className="secondary" onClick={addTest}>
-            {copy.addTest}
-          </button>
-          <button type="button" onClick={saveTests} disabled={saving || loading || !courseId || !webDesignClient}>
-            {saving ? copy.saving : copy.saveTests}
-          </button>
-        </div>
+        <button
+          type="button"
+          className="secondary icon-button"
+          onClick={() => setReferenceFiles(currentFiles.map((file) => ({ ...file })))}
+          title={copy.useCurrentFiles}
+          aria-label={copy.useCurrentFiles}
+        >
+          <WebDesignActionIcon name="reference" />
+        </button>
       </div>
 
       <p className="muted" style={{ margin: 0 }}>
         {copy.referenceBundle}: {referenceFiles.map((file) => file.path).join(", ")}
       </p>
 
-      {tests.length ? (
-        <div className="stack" style={{ gap: 12 }}>
-          {tests.map((test) => (
-            <section key={test.id} className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.12)", borderRadius: 8, padding: 14 }}>
+      <WebDesignTestSection
+        copy={copy}
+        expandedTestIds={expandedTestIds}
+        kind="sample"
+        saving={saving}
+        onAddTest={() => addTest("sample")}
+        onRemoveTest={removeTest}
+        onToggleTest={toggleTest}
+        onUpdateTest={updateTest}
+        tests={tests.filter((test) => test.kind === "sample")}
+      />
+
+      <WebDesignTestSection
+        copy={copy}
+        expandedTestIds={expandedTestIds}
+        kind="hidden"
+        saving={saving}
+        onAddTest={() => addTest("hidden")}
+        onRemoveTest={removeTest}
+        onToggleTest={toggleTest}
+        onUpdateTest={updateTest}
+        tests={tests.filter((test) => test.kind === "hidden")}
+      />
+
+      {!tests.length ? (
+        <p className="muted" style={{ margin: 0 }}>
+          {loading || !testsLoaded ? copy.saving : copy.noTests}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function WebDesignTestSection({
+  copy,
+  expandedTestIds,
+  kind,
+  saving,
+  onAddTest,
+  onRemoveTest,
+  onToggleTest,
+  onUpdateTest,
+  tests
+}: {
+  copy: StudentWorkspaceCopy;
+  expandedTestIds: string[];
+  kind: WebDesignExerciseTestKind;
+  saving: boolean;
+  onAddTest: () => void;
+  onRemoveTest: (testId: string) => void;
+  onToggleTest: (testId: string) => void;
+  onUpdateTest: (testId: string, patch: Partial<WebDesignExerciseTestRecord>) => void;
+  tests: WebDesignExerciseTestRecord[];
+}) {
+  return (
+    <section className="stack" style={{ gap: 10 }}>
+      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+        <h4 style={{ margin: 0 }}>{kind === "sample" ? copy.sample : copy.hidden}</h4>
+        <button type="button" className="secondary icon-button" onClick={onAddTest} title={copy.addTest} aria-label={copy.addTest}>
+          <WebDesignActionIcon name="add" />
+        </button>
+      </div>
+
+      {tests.map((test) => (
+        <section key={test.id} className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.12)", borderRadius: 8, padding: 14 }}>
+          <button type="button" onClick={() => onToggleTest(test.id)} style={webDesignCollapsibleHeaderStyle}>
+            <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+              <span>{expandedTestIds.includes(test.id) ? "▾" : "▸"}</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{test.name || test.id}</span>
+            </span>
+            <WebDesignValidationBadge copy={copy} loading={saving && test.isEnabled} summary={test.validationSummary} />
+          </button>
+
+          {expandedTestIds.includes(test.id) ? (
+            <>
               <div className="row" style={{ alignItems: "end" }}>
                 <div className="field" style={{ flex: "1 1 220px" }}>
                   <label htmlFor={`web-design-test-name-${test.id}`}>{copy.testName}</label>
                   <input
                     id={`web-design-test-name-${test.id}`}
                     value={test.name}
-                    onChange={(event) => updateTest(test.id, { name: event.target.value })}
+                    onChange={(event) => onUpdateTest(test.id, { name: event.target.value })}
                   />
-                </div>
-                <div className="field" style={{ flex: "0 1 150px" }}>
-                  <label htmlFor={`web-design-test-kind-${test.id}`}>{copy.testKind}</label>
-                  <select
-                    id={`web-design-test-kind-${test.id}`}
-                    value={test.kind}
-                    onChange={(event) => updateTest(test.id, { kind: event.target.value as WebDesignExerciseTestKind })}
-                  >
-                    <option value="sample">{copy.sample}</option>
-                    <option value="hidden">{copy.hidden}</option>
-                  </select>
                 </div>
                 <div className="field" style={{ flex: "0 1 110px" }}>
                   <label htmlFor={`web-design-test-weight-${test.id}`}>{copy.weight}</label>
@@ -1015,19 +1608,15 @@ function WebDesignTestsPanel({
                     min={0}
                     type="number"
                     value={test.weight}
-                    onChange={(event) => updateTest(test.id, { weight: Number(event.target.value) || 0 })}
+                    onChange={(event) => onUpdateTest(test.id, { weight: Number(event.target.value) || 0 })}
                   />
                 </div>
                 <label className="row" style={{ gap: 8, minHeight: 42 }}>
-                  <input
-                    type="checkbox"
-                    checked={test.isEnabled}
-                    onChange={(event) => updateTest(test.id, { isEnabled: event.target.checked })}
-                  />
+                  <input type="checkbox" checked={test.isEnabled} onChange={(event) => onUpdateTest(test.id, { isEnabled: event.target.checked })} />
                   {copy.enabled}
                 </label>
-                <button type="button" className="secondary" onClick={() => removeTest(test.id)}>
-                  {copy.remove}
+                <button type="button" className="danger icon-button" onClick={() => onRemoveTest(test.id)} title={copy.remove} aria-label={copy.remove}>
+                  <WebDesignActionIcon name="remove" />
                 </button>
               </div>
               <div className="stack">
@@ -1035,22 +1624,174 @@ function WebDesignTestsPanel({
                 <MonacoCodeEditor
                   id={`web-design-test-code-${test.id}`}
                   value={test.testCode}
-                  onChange={(value) => updateTest(test.id, { testCode: value })}
+                  onChange={(value) => onUpdateTest(test.id, { testCode: value })}
                   language="javascript"
                   minHeight={220}
                 />
               </div>
-            </section>
-          ))}
-        </div>
-      ) : (
-        <p className="muted" style={{ margin: 0 }}>
-          {loading ? copy.saving : copy.noTests}
-        </p>
-      )}
+              <WebDesignValidationDetails summary={test.validationSummary} />
+            </>
+          ) : null}
+        </section>
+      ))}
     </section>
   );
 }
+
+function WebDesignValidationBadge({
+  copy,
+  loading,
+  summary
+}: {
+  copy: StudentWorkspaceCopy;
+  loading: boolean;
+  summary: Record<string, unknown>;
+}) {
+  const status = getWebDesignValidationStatus(summary);
+  if (loading) {
+    return (
+      <span className="muted" style={{ fontSize: 13 }}>
+        <WebDesignActionIcon name="spinner" />
+      </span>
+    );
+  }
+
+  if (status === "passed") {
+    return (
+      <span aria-label={copy.passed} style={{ color: "#157347", fontWeight: 800 }}>
+        ✓
+      </span>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <span aria-label={copy.failed} style={{ color: "#b42318", fontWeight: 800 }}>
+        ✕
+      </span>
+    );
+  }
+
+  if (status === "skipped") {
+    return (
+      <span className="muted" style={{ fontSize: 13, fontWeight: 700 }}>
+        -
+      </span>
+    );
+  }
+
+  return (
+    <span className="muted" style={{ fontSize: 13 }}>
+      -
+    </span>
+  );
+}
+
+function WebDesignValidationDetails({ summary }: { summary: Record<string, unknown> }) {
+  if (getWebDesignValidationStatus(summary) !== "failed") {
+    return null;
+  }
+
+  const message = typeof summary.message === "string" ? summary.message : "";
+  const durationMs = typeof summary.durationMs === "number" ? summary.durationMs : null;
+
+  if (!message && durationMs === null) {
+    return null;
+  }
+
+  return (
+    <section
+      className="stack"
+      style={{
+        background: "rgba(186, 26, 26, 0.05)",
+        border: "1px solid rgba(186, 26, 26, 0.18)",
+        borderRadius: 10,
+        padding: 12
+      }}
+    >
+      <strong style={{ color: "#8f1d1d" }}>{message || "Reference validation failed."}</strong>
+      {durationMs !== null ? (
+        <span className="muted" style={{ fontSize: 13 }}>
+          {durationMs}ms
+        </span>
+      ) : null}
+    </section>
+  );
+}
+
+function getWebDesignValidationStatus(summary: Record<string, unknown>) {
+  const status = typeof summary.status === "string" ? summary.status : "";
+  const score = typeof summary.score === "number" ? summary.score : null;
+  const maxScore = typeof summary.maxScore === "number" ? summary.maxScore : null;
+  const message = typeof summary.message === "string" ? summary.message : "";
+
+  if (status === "failed" || (maxScore !== null && score !== null && score < maxScore)) {
+    return "failed";
+  }
+  if (status === "completed" && (maxScore === null || score === null || score >= maxScore) && !message) {
+    return "passed";
+  }
+  if (status === "skipped") {
+    return "skipped";
+  }
+  return "";
+}
+
+function normalizeWebDesignObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function getExpectedResultImageDataUrl(referenceBundle: WebDesignExerciseReferenceBundleRecord | null | undefined) {
+  const validationSummary = normalizeWebDesignObject(referenceBundle?.validationSummary);
+  const expectedResult = normalizeWebDesignObject(validationSummary.expectedResult);
+  return typeof expectedResult.imageDataUrl === "string" ? expectedResult.imageDataUrl : null;
+}
+
+function WebDesignActionIcon({ name }: { name: "add" | "reference" | "remove" | "save" | "spinner" }) {
+  if (name === "spinner") {
+    return (
+      <span
+        aria-hidden="true"
+        style={{
+          animation: "web-design-spin 0.8s linear infinite",
+          border: "2px solid currentColor",
+          borderRightColor: "transparent",
+          borderRadius: "999px",
+          display: "inline-block",
+          height: 16,
+          width: 16
+        }}
+      />
+    );
+  }
+
+  const paths = {
+    add: "M12 5v14M5 12h14",
+    reference: "M4 4h16v12H7l-3 3V4z",
+    remove: "M6 6l12 12M18 6L6 18",
+    save: "M5 5h14v14H5zM8 5v5h8M8 16h8"
+  } satisfies Record<Exclude<typeof name, "spinner">, string>;
+
+  return (
+    <svg aria-hidden="true" fill="none" height="18" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="18">
+      <path d={paths[name]} />
+    </svg>
+  );
+}
+
+const webDesignCollapsibleHeaderStyle: CSSProperties = {
+  alignItems: "center",
+  background: "transparent",
+  border: 0,
+  color: "inherit",
+  cursor: "pointer",
+  display: "flex",
+  font: "inherit",
+  justifyContent: "space-between",
+  padding: 0,
+  textAlign: "left",
+  width: "100%"
+};
 
 function PreviewPane({
   copy,

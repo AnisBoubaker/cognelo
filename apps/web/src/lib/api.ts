@@ -308,6 +308,14 @@ export class ApiError extends Error {
   }
 }
 
+export const API_UNAUTHORIZED_EVENT = "cognelo:api-unauthorized";
+
+function notifyUnauthorized() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(API_UNAUTHORIZED_EVENT));
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}/api${path}`, {
     cache: "no-store",
@@ -321,6 +329,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 401 || body?.error?.code === "UNAUTHORIZED") {
+      notifyUnauthorized();
+    }
     throw new ApiError(body?.error?.message ?? "Request failed.", {
       code: body?.error?.code,
       details: body?.error?.details
@@ -452,10 +463,14 @@ export const api = {
     request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
       `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/tests`
     ),
+  webDesignExerciseExpectedResult: (courseId: string, activityId: string) =>
+    request<{ imageDataUrl: string | null }>(`/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/expected-result`),
   saveWebDesignExerciseTests: (
     courseId: string,
     activityId: string,
     input: {
+      shouldCaptureExpectedResult?: boolean;
+      shouldCropExpectedResult?: boolean;
       referenceFiles: WebDesignExerciseFile[];
       tests: Array<Omit<WebDesignExerciseTest, "orderIndex" | "createdAt" | "updatedAt" | "validationSummary">>;
     }
@@ -538,6 +553,9 @@ export const api = {
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
+      if (response.status === 401 || body?.error?.code === "UNAUTHORIZED") {
+        notifyUnauthorized();
+      }
       throw new Error(body?.error?.message ?? "Upload failed.");
     }
     return body as { material: CourseMaterial };
@@ -585,6 +603,9 @@ export const api = {
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
+      if (response.status === 401 || body?.error?.code === "UNAUTHORIZED") {
+        notifyUnauthorized();
+      }
       throw new Error(body?.error?.message ?? "Upload failed.");
     }
     return body as { material: CourseGroupMaterial };
@@ -696,11 +717,17 @@ export const api = {
     request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/web-design-coding-exercises/tests`
     ),
+  groupWebDesignExerciseExpectedResult: (courseId: string, groupId: string, activityId: string) =>
+    request<{ imageDataUrl: string | null }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/web-design-coding-exercises/expected-result`
+    ),
   saveGroupWebDesignExerciseTests: (
     courseId: string,
     groupId: string,
     activityId: string,
     input: {
+      shouldCaptureExpectedResult?: boolean;
+      shouldCropExpectedResult?: boolean;
       referenceFiles: WebDesignExerciseFile[];
       tests: Array<Omit<WebDesignExerciseTest, "orderIndex" | "createdAt" | "updatedAt" | "validationSummary">>;
     }

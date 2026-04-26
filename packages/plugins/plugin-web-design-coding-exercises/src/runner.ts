@@ -24,6 +24,17 @@ const runnerResultSchema = z.object({
 
 export type WebDesignRunnerResult = z.infer<typeof runnerResultSchema>;
 
+const runnerScreenshotSchema = z.object({
+  imageDataUrl: z.string().min(1),
+  durationMs: z.number().int(),
+  viewport: z.object({
+    width: z.number().int(),
+    height: z.number().int()
+  })
+});
+
+export type WebDesignRunnerScreenshot = z.infer<typeof runnerScreenshotSchema>;
+
 export async function runWebDesignTestsInRunner(params: {
   files: WebDesignExerciseFile[];
   tests: Array<{
@@ -64,6 +75,50 @@ export async function runWebDesignTestsInRunner(params: {
       502,
       "WEB_DESIGN_RUNNER_FAILED",
       error instanceof Error ? error.message : "The web design runner could not complete the tests."
+    );
+  }
+}
+
+export async function captureWebDesignScreenshotInRunner(params: {
+  files: WebDesignExerciseFile[];
+  timeoutMs?: number;
+  trimWhitespace?: boolean;
+  viewport?: {
+    width: number;
+    height: number;
+  };
+}) {
+  const env = getServerEnv();
+
+  try {
+    const response = await fetch(`${env.WEB_DESIGN_RUNNER_URL}/screenshot`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        files: params.files,
+        timeoutMs: params.timeoutMs ?? 8000,
+        trimWhitespace: params.trimWhitespace ?? false,
+        viewport: params.viewport ?? { width: 1024, height: 768 }
+      })
+    });
+    const body = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(body?.error?.message ?? "Runner screenshot request failed.");
+    }
+
+    return runnerScreenshotSchema.parse(body);
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError(
+      502,
+      "WEB_DESIGN_SCREENSHOT_FAILED",
+      error instanceof Error ? error.message : "The web design runner could not capture the expected result."
     );
   }
 }

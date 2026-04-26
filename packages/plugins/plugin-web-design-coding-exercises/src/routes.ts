@@ -6,7 +6,7 @@ import {
   submitWebDesignExercise,
   webDesignExerciseRunInputSchema
 } from "./executions";
-import { listWebDesignExerciseTests, replaceWebDesignExerciseTests } from "./tests";
+import { getWebDesignExpectedResult, listWebDesignExerciseTests, replaceWebDesignExerciseTests } from "./tests";
 
 export const webDesignExerciseTestsRoute: PluginRouteDefinition = {
   path: "web-design-coding-exercises/tests",
@@ -21,9 +21,23 @@ export const webDesignExerciseTestsRoute: PluginRouteDefinition = {
     PUT: async ({ context, readJson }) => {
       return replaceWebDesignExerciseTests({
         activityId: context.activity.id,
+        activityConfig: context.activity.config,
         courseId: context.courseId,
         user: context.user,
         input: await readJson()
+      });
+    }
+  }
+};
+
+export const webDesignExerciseExpectedResultRoute: PluginRouteDefinition = {
+  path: "web-design-coding-exercises/expected-result",
+  activityTypeKeys: ["web-design-coding-exercise"],
+  methods: {
+    GET: async ({ context }) => {
+      return getWebDesignExpectedResult({
+        activityId: context.activity.id,
+        activityConfig: context.activity.config
       });
     }
   }

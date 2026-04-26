@@ -8,7 +8,9 @@ It documents plugin-specific architecture, browser preview boundaries, and plann
 
 `@cognelo/plugin-web-design-coding-exercises` provides the `web-design-coding-exercise` activity type.
 
-Teachers can define a small HTML/CSS/JavaScript file bundle for students to edit. Students work in Monaco editor tabs and see the result immediately in a sandboxed iframe.
+Teachers can define a private HTML/CSS/JavaScript solution bundle and a separate student starter bundle. Students work only from the starter bundle in Monaco editor tabs and see their own result immediately in a sandboxed iframe.
+
+Teachers can include `{{ EXPECTED_RESULT }}` in the prompt to show students a visual target, or `{{ EXPECTED_RESULT_CROPPED }}` to trim large plain background regions around that target. Cognelo replaces either token with a screenshot generated from the private solution bundle; the student browser receives only the image artifact, never the solution source files.
 
 ## Package Contents
 
@@ -38,16 +40,16 @@ The plugin separates:
 - visual preview, which runs client-side in a sandboxed iframe
 - graded execution, which should run through an external Playwright runner service behind Cognelo routes
 
-The initial implementation keeps only student-visible fields in `Activity.config`:
+The implementation keeps only student-visible starter fields in `Activity.config`:
 
 - `prompt`
-- `files`
+- `files` (student starting files only)
 - `previewEntry`
 - `maxEditorSeconds`
 
 Plugin-owned persistence:
 
-- `PluginWebDesignExerciseReferenceBundle`: teacher reference file bundle and validation summary
+- `PluginWebDesignExerciseReferenceBundle`: private teacher solution file bundle and validation summary
 - `PluginWebDesignExerciseTest`: sample and hidden Playwright tests
 - `PluginWebDesignExerciseSubmission`: student run/submit file bundle and overall result summary
 - `PluginWebDesignExerciseTestResult`: normalized per-test result records
@@ -77,9 +79,11 @@ The submit flow is:
 6. the runner returns normalized test results
 7. Cognelo stores filtered results and returns them to the browser
 
-The browser should never receive hidden tests or private reference files.
+The student browser should never receive hidden tests or private solution/reference files. Teacher authoring loads the private reference bundle through teacher/admin-only plugin routes.
 
-When a teacher saves tests, Cognelo sends the reference bundle plus all enabled tests to the runner first. If any enabled test fails, the save is rejected and the previous saved tests remain in place. Disabled tests are persisted without being executed and are marked as skipped in their validation summary.
+When a teacher saves tests, Cognelo sends the private solution bundle plus all enabled tests to the runner first. If any enabled test fails, the save is rejected and the previous saved tests remain in place. Disabled tests are persisted without being executed and are marked as skipped in their validation summary.
+
+If the prompt contains `{{ EXPECTED_RESULT }}` or `{{ EXPECTED_RESULT_CROPPED }}`, saving tests and solution also asks the Playwright runner to render the private solution bundle and capture a PNG screenshot. The cropped token additionally trims large plain background regions while keeping padding around the visible content. The screenshot is stored in plugin-owned reference metadata and exposed to students through a student-safe expected-result route.
 
 ## Docker Runner
 
