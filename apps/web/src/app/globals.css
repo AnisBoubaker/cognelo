@@ -250,29 +250,72 @@ select:focus {
 }
 
 .tab-strip {
+  align-items: center;
+  background: rgba(238, 244, 251, 0.72);
+  border: 1px solid rgba(217, 225, 238, 0.95);
+  border-radius: 8px;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 4px;
+  padding: 4px;
 }
 
+[role="tablist"]:has(> button[role="tab"]) {
+  align-items: center;
+  background: rgba(238, 244, 251, 0.72);
+  border: 1px solid rgba(217, 225, 238, 0.95);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+}
+
+[role="tablist"] > button[role="tab"],
 .tab-button {
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
   box-shadow: none;
   color: var(--muted);
-  min-height: 40px;
-  padding: 0 18px;
+  min-height: 36px;
+  padding: 0 14px;
+  position: relative;
+}
+
+.tab-button:hover,
+[role="tablist"] > button[role="tab"]:hover {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(217, 225, 238, 0.92);
+  box-shadow: none;
+  color: var(--brand-ink);
+  transform: none;
+}
+
+.tab-button.is-active,
+.tab-button[aria-selected="true"],
+[role="tablist"] > button[role="tab"][aria-selected="true"] {
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--brand-blue), white 64%);
+  box-shadow: 0 1px 2px rgba(13, 27, 71, 0.06);
+  color: var(--brand-ink);
+}
+
+.tab-button.is-active::after,
+.tab-button[aria-selected="true"]::after,
+[role="tablist"] > button[role="tab"][aria-selected="true"]::after {
+  background: linear-gradient(90deg, var(--brand-teal), var(--brand-blue));
+  border-radius: 999px;
+  bottom: -5px;
+  content: "";
+  height: 3px;
+  left: 12px;
+  position: absolute;
+  right: 12px;
 }
 
 .tab-button:hover {
   box-shadow: none;
-}
-
-.tab-button.is-active {
-  background: linear-gradient(135deg, rgba(41, 213, 207, 0.16), rgba(46, 131, 216, 0.16));
-  border-color: color-mix(in srgb, var(--brand-blue), white 50%);
-  color: var(--brand-ink);
 }
 
 .account-menu {
