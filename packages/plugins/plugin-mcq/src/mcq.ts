@@ -117,7 +117,7 @@ function splitSections(lines: string[]): Section[] {
     const line = lines[index];
     const trimmed = line.trim();
 
-    if (trimmed.startsWith("```")) {
+    if (isFenceToggleLine(trimmed)) {
       inFence = !inFence;
     }
 
@@ -136,6 +136,13 @@ function splitSections(lines: string[]): Section[] {
 
   sections.push(current);
   return sections;
+}
+
+function isFenceToggleLine(trimmedLine: string) {
+  if (trimmedLine.startsWith("```")) {
+    return true;
+  }
+  return /^[-*]\s+\[(?:x|X| )\]\s*```/.test(trimmedLine);
 }
 
 function parseQuestionSection(
@@ -184,7 +191,7 @@ function parseQuestionSection(
     }
 
     if (!currentChoice.inFence) {
-      const match = line.text.match(/^\s*[-*]\s+\[(x|X| )\]\s+(.*)$/);
+      const match = line.text.match(/^\s*[-*]\s+\[(x|X| )\]\s*(.*)$/);
       if (match) {
         choices.push({
           line: currentChoice.line,

@@ -2,6 +2,8 @@ This file is for MCQ plugin memory only.
 
 - MCQ is intentionally text-first: the main authoring surface is a code-like editor, not a click-heavy form builder.
 - The source format is a Markdown-inspired grammar with `##` question headings and task-list style choice markers.
+- Choices may contain Markdown blocks, including fenced code blocks for code alternatives. Code-only choices can use a bare `- [ ]` or `- [x]` marker followed by a fenced code block.
+- MCQ config supports `randomizeChoices`; rendering shuffles displayed choices while preserving choice IDs for scoring.
 - The plugin currently infers single-choice versus multiple-choice from the number of correct answers in each question.
 - The first version stores only authored MCQ content in the generic activity config; student submissions are not yet persisted.
 - Since there is no private plugin-owned authoring data yet, bank-to-course copying relies only on the platform's generic config copy.

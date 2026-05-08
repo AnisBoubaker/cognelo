@@ -31,7 +31,8 @@ const supportedLanguages = new Set<string>([
 const mcqConfigSchema = z
   .object({
     source: z.string().min(20).max(30000),
-    defaultCodeLanguage: z.string().min(1).max(40).default("python")
+    defaultCodeLanguage: z.string().min(1).max(40).default("python"),
+    randomizeChoices: z.boolean().default(false)
   })
   .superRefine((value, context) => {
     if (!supportedLanguages.has(value.defaultCodeLanguage)) {
@@ -115,7 +116,8 @@ export const mcqPlugin: ActivityPlugin = {
       },
       defaultConfig: {
         source: defaultMcqSource,
-        defaultCodeLanguage: "python"
+        defaultCodeLanguage: "python",
+        randomizeChoices: false
       },
       configSchema: mcqConfigSchema
     }
