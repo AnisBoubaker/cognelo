@@ -1,4 +1,5 @@
 export * from "./activities";
+export * from "./ai-agents";
 export * from "./auth";
 export * from "./authorization";
 export * from "./courses";

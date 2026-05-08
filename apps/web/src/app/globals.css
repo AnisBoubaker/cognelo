@@ -651,6 +651,46 @@ a.card:hover,
   line-height: 1.35;
 }
 
+.ai-agent-list {
+  align-content: start;
+}
+
+.ai-agent-row {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.ai-agent-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.status-pill {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 10px;
+  text-transform: uppercase;
+}
+
+.status-pill.is-enabled {
+  background: color-mix(in srgb, var(--brand-teal), white 84%);
+  color: var(--accent-strong);
+}
+
+.status-pill.is-disabled {
+  background: color-mix(in srgb, var(--danger), white 88%);
+  color: var(--danger);
+}
+
+.status-pill.is-neutral {
+  background: color-mix(in srgb, var(--surface-2), white 18%);
+  color: var(--muted);
+}
+
 .editor-section-label {
   display: inline-block;
   font-weight: 700;

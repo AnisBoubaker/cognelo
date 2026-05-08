@@ -84,12 +84,20 @@ enum PluginWebDesignExerciseSubmissionStatus {
   failed
 }
 
+enum AiAgentProvider {
+  ollama
+  openai
+  codex
+  claude
+}
+
 model User {
   id              String             @id @default(cuid())
   email           String             @unique
   name            String?
   firstName       String?
   lastName        String?
+  metadata        Json               @default("{}")
   passwordHash    String
   isActive        Boolean            @default(true)
   createdAt       DateTime           @default(now())
@@ -107,11 +115,30 @@ model User {
   createdGroups   CourseGroup[]      @relation("CourseGroupCreator")
   groupParticipants CourseGroupParticipant[]
   groupMaterials  CourseGroupMaterial[] @relation("GroupMaterialCreator")
+  aiAgentConnections AiAgentConnection[]
   parsonsAttempts PluginParsonsAttempt[]
   codingExerciseExecutions PluginCodingExerciseExecution[]
   webDesignExerciseSubmissions PluginWebDesignExerciseSubmission[]
 
   @@index([email])
+}
+
+model AiAgentConnection {
+  id          String          @id @default(cuid())
+  ownerId     String?
+  provider    AiAgentProvider
+  displayName String
+  model       String
+  baseUrl     String?
+  apiKey      String?
+  isEnabled   Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  owner       User?           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([provider])
+  @@index([isEnabled])
 }
 
 model Role {
@@ -140,6 +167,7 @@ model Course {
   title       String
   description String             @default("")
   status      CourseStatus       @default(draft)
+  metadata    Json               @default("{}")
   createdById String
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt

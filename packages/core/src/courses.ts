@@ -1,5 +1,5 @@
-import { CourseInputSchema, CourseUpdateSchema, EnrollmentInputSchema } from "@cognelo/contracts";
-import { prisma } from "@cognelo/db";
+import { CourseInputSchema, CourseSettingsInputSchema, CourseUpdateSchema, EnrollmentInputSchema } from "@cognelo/contracts";
+import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 import { assertCanCreateCourse, assertCanManageCourse, assertCanViewCourse, isAdmin, isCourseManager, isTeacher } from "./authorization";
 import { notFound } from "./errors";
@@ -114,6 +114,35 @@ export async function updateCourse(user: CurrentUser, courseId: string, input: u
   });
 }
 
+export async function updateCourseSettings(user: CurrentUser, courseId: string, input: unknown) {
+  await assertCanManageCourse(user, courseId);
+  const data = CourseSettingsInputSchema.parse(input);
+  await assertAiAgentConnectionCanBeSelected(user, data.studentSupportAiAgentConnectionId);
+
+  const course = await prisma.course.findUnique({ where: { id: courseId }, select: { metadata: true } });
+  if (!course) {
+    throw notFound("Course");
+  }
+
+  const metadata = asMetadataRecord(course.metadata);
+  const aiSettings = asMetadataRecord(metadata.aiSettings);
+  const nextAiSettings = {
+    ...aiSettings,
+    studentSupportAiAgentConnectionId: data.studentSupportAiAgentConnectionId ?? null
+  };
+
+  return prisma.course.update({
+    where: { id: courseId },
+    data: {
+      metadata: {
+        ...metadata,
+        aiSettings: nextAiSettings
+      }
+    },
+    include: courseInclude
+  });
+}
+
 export async function archiveCourse(user: CurrentUser, courseId: string) {
   return updateCourse(user, courseId, { status: "archived" });
 }
@@ -129,4 +158,27 @@ export async function addCourseMembership(user: CurrentUser, courseId: string, i
     },
     include: { user: { select: { id: true, email: true, name: true } } }
   });
+}
+
+async function assertAiAgentConnectionCanBeSelected(user: CurrentUser, connectionId: string | null | undefined) {
+  if (!connectionId) {
+    return;
+  }
+  const connection = await prisma.aiAgentConnection.findFirst({
+    where: {
+      id: connectionId,
+      isEnabled: true,
+      OR: [{ ownerId: user.id }, { ownerId: null }]
+    }
+  });
+  if (!connection) {
+    throw notFound("AI agent connection");
+  }
+}
+
+function asMetadataRecord(value: Prisma.JsonValue | undefined): Record<string, Prisma.JsonValue> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, Prisma.JsonValue>;
 }

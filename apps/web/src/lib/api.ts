@@ -1,5 +1,7 @@
 import type {
   ActivateAccountInput,
+  AiAgentConnectionInput,
+  AiAgentConnectionUpdate,
   ActivityInput,
   ActivityBankInput,
   ActivityBankUpdate,
@@ -18,6 +20,7 @@ import type {
   CourseInput,
   CourseMaterialInput,
   CourseMaterialUpdate,
+  CourseSettingsInput,
   CourseUpdate,
   CurrentUser,
   MaterialKind,
@@ -26,12 +29,30 @@ import type {
   UserProfileUpdate
 } from "@cognelo/contracts";
 
+export type AiAgentConnection = {
+  id: string;
+  scope: "personal" | "global";
+  provider: "ollama" | "openai" | "codex" | "claude";
+  displayName: string;
+  model: string;
+  baseUrl: string | null;
+  hasApiKey: boolean;
+  isEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AiAgentPreferences = {
+  questionAuthoringAiAgentConnectionId: string | null;
+};
+
 export type Course = {
   id: string;
   subjectId: string;
   title: string;
   description: string;
   status: "draft" | "published" | "archived";
+  metadata?: Record<string, unknown>;
   subject?: Subject;
   memberships?: CourseMembership[];
   materials?: CourseMaterial[];
@@ -426,6 +447,26 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(input)
     }),
+  aiAgentConnections: () => request<{ connections: AiAgentConnection[]; preferences: AiAgentPreferences }>("/ai-agents"),
+  updateAiAgentPreferences: (input: AiAgentPreferences) =>
+    request<{ preferences: AiAgentPreferences }>("/ai-agents/preferences", {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  createAiAgentConnection: (input: AiAgentConnectionInput) =>
+    request<{ connection: AiAgentConnection }>("/ai-agents", {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  updateAiAgentConnection: (connectionId: string, input: AiAgentConnectionUpdate) =>
+    request<{ connection: AiAgentConnection }>(`/ai-agents/${connectionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  deleteAiAgentConnection: (connectionId: string) =>
+    request<{ ok: true }>(`/ai-agents/${connectionId}`, {
+      method: "DELETE"
+    }),
   subjects: () => request<{ subjects: Subject[] }>("/subjects"),
   subject: (subjectId: string) => request<{ subject: Subject }>(`/subjects/${subjectId}`),
   createSubject: (input: SubjectInput) =>
@@ -472,6 +513,11 @@ export const api = {
     }),
   updateCourse: (courseId: string, input: CourseUpdate) =>
     request<{ course: Course }>(`/courses/${courseId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  updateCourseSettings: (courseId: string, input: CourseSettingsInput) =>
+    request<{ course: Course }>(`/courses/${courseId}/settings`, {
       method: "PATCH",
       body: JSON.stringify(input)
     }),

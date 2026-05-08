@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useNotifications } from "@cognelo/activity-ui";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
+import { SettingsNav } from "@/components/settings-nav";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
@@ -56,12 +56,7 @@ export default function ProfileSettingsPage() {
         </section>
 
         <div className="settings-layout">
-          <aside className="settings-nav" aria-label={t("settings.navLabel")}>
-            <Link aria-current="page" className="is-active" href="/settings/profile">
-              <span>{t("settings.profileNav")}</span>
-              <small>{t("settings.profileNavText")}</small>
-            </Link>
-          </aside>
+          <SettingsNav />
 
           <section className="section stack">
             <div className="section-heading">

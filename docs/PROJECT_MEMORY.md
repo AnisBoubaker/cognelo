@@ -35,8 +35,11 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Authentication uses JWT stored in HttpOnly cookies.
 - Global authorization supports many-to-many user roles (`admin`, `teacher`, `student`) and is designed for more roles later.
 - Users have account-wide profile settings with editable first and last name fields. Email changes are intentionally admin-only.
+- AI agent/model connection settings are account-wide. Personal connections are owned by a user; global connections have no owner and are admin-managed for later teacher/course use.
 - Accounts can be activated on first login when a person was pre-added to a group participant list by email and no user record existed yet.
 - Courses support create, edit, archive, and draft/published/archived status.
+- Users have a generic `metadata` JSON field used for account-level preferences, including the selected AI agent for question authoring help.
+- Courses have a generic `metadata` JSON field used for course-level settings, including the selected AI agent for student support.
 - Subjects are first-class curriculum containers. A subject can own subject-level materials, activity banks, and courses.
 - Activity banks are first-class authoring spaces related to a subject and owned by an individual. Admins can later change ownership and sharing rules.
 - Activities are authored in activity banks as `BankActivity` records with version snapshots in `ActivityVersion`.
@@ -85,6 +88,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Subjects and activity banks are top-level navigation items alongside courses.
 - Activity bank authoring pages should open the full plugin authoring UI, not only generic metadata.
 - The course materials area uses a compact table/list layout rather than large cards.
+- Course workspaces include a Settings tab for course-wide settings. Current settings let teachers choose the student-support AI agent from their personal or global enabled connections.
 - The add-material form is hidden by default and revealed from the course material section.
 - Materials can be edited and removed inline from the course detail page.
 - Folders support expand/collapse.
@@ -93,6 +97,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - The app favicon uses the square Cognelo icon asset.
 - The top header separates primary app navigation from personal controls.
 - General account configuration lives under `/settings`, currently reached from the account menu and structured so future non-course-specific settings can be added beside `/settings/profile`.
+- AI agent configuration lives under `/settings/ai-agents` and uses the same settings navigation as profile configuration.
 - The visual theme should reflect the Cognelo logo palette in a restrained, product-like way.
 - Syntax-colored code rendering should be shared across activities through `packages/activity-ui`.
 - Markdown text rendering for authored prompts/descriptions should be shared across activities and core pages through `packages/activity-ui` rather than reimplemented per plugin.

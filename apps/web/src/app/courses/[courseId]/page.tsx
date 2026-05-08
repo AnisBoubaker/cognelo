@@ -7,7 +7,7 @@ import { ChangeEvent, FormEvent, PointerEvent, useEffect, useState } from "react
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
-import { api, ActivityBank, ActivityDefinition, ActivityType, Course, CourseMaterial } from "@/lib/api";
+import { api, ActivityBank, ActivityDefinition, ActivityType, AiAgentConnection, Course, CourseMaterial } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 export default function CourseDetailPage() {
@@ -20,6 +20,9 @@ export default function CourseDetailPage() {
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [activityBanks, setActivityBanks] = useState<ActivityBank[]>([]);
+  const [aiAgentConnections, setAiAgentConnections] = useState<AiAgentConnection[]>([]);
+  const [studentSupportAgentId, setStudentSupportAgentId] = useState("");
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [activityTitle, setActivityTitle] = useState("");
   const [activityTypeKey, setActivityTypeKey] = useState("placeholder");
   const [bankActivityId, setBankActivityId] = useState("");
@@ -48,6 +51,12 @@ export default function CourseDetailPage() {
     setCourse(courseResult.course);
     setActivityTypes(typeResult.activityTypes);
     setActivityDefinitions(typeResult.registeredDefinitions);
+    const aiSettings = getCourseAiSettings(courseResult.course);
+    setStudentSupportAgentId(aiSettings.studentSupportAiAgentConnectionId);
+    api
+      .aiAgentConnections()
+      .then((aiAgentResult) => setAiAgentConnections(aiAgentResult.connections.filter((connection) => connection.isEnabled)))
+      .catch(() => setAiAgentConnections([]));
     if (courseResult.course.subjectId) {
       const banksResult = await api.activityBanks(courseResult.course.subjectId);
       setActivityBanks(banksResult.activityBanks);
@@ -122,6 +131,22 @@ export default function CourseDetailPage() {
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("courseDetail.removeActivityError"));
+    }
+  }
+
+  async function saveCourseSettings(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    setIsSavingSettings(true);
+    try {
+      const result = await api.updateCourseSettings(courseId, {
+        studentSupportAiAgentConnectionId: studentSupportAgentId || null
+      });
+      setCourse(result.course);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.settingsSaveError"));
+    } finally {
+      setIsSavingSettings(false);
     }
   }
 
@@ -861,6 +886,47 @@ export default function CourseDetailPage() {
                       )}
                     </section>
                   )
+                },
+                {
+                  id: "settings",
+                  label: t("courseDetail.settingsTab"),
+                  render: () => (
+                    <section className="section stack">
+                      <div className="section-heading">
+                        <div>
+                          <p className="eyebrow">{t("courseDetail.settingsEyebrow")}</p>
+                          <h2>{t("courseDetail.settingsTitle")}</h2>
+                        </div>
+                      </div>
+
+                      <form className="form" onSubmit={saveCourseSettings}>
+                        <div className="field">
+                          <label htmlFor="studentSupportAgent">{t("courseDetail.studentSupportAgent")}</label>
+                          <select
+                            id="studentSupportAgent"
+                            value={studentSupportAgentId}
+                            onChange={(event) => setStudentSupportAgentId(event.target.value)}
+                          >
+                            <option value="">{t("courseDetail.noAiAgentSelected")}</option>
+                            {aiAgentConnections.map((connection) => (
+                              <option key={connection.id} value={connection.id}>
+                                {formatAiAgentOption(connection, t)}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="muted">{t("courseDetail.studentSupportAgentHelp")}</p>
+                        </div>
+
+                        {aiAgentConnections.length ? null : <p className="muted">{t("courseDetail.noAiAgentsAvailable")}</p>}
+
+                        <div className="row">
+                          <button disabled={isSavingSettings} type="submit">
+                            {isSavingSettings ? t("common.saving") : t("courseDetail.saveSettings")}
+                          </button>
+                        </div>
+                      </form>
+                    </section>
+                  )
                 }
               ]}
             />
@@ -876,6 +942,25 @@ export default function CourseDetailPage() {
       </main>
     </AppShell>
   );
+}
+
+function getCourseAiSettings(course: Course) {
+  const metadata = course.metadata ?? {};
+  const aiSettings = metadata.aiSettings;
+  if (!aiSettings || typeof aiSettings !== "object" || Array.isArray(aiSettings)) {
+    return {
+      studentSupportAiAgentConnectionId: ""
+    };
+  }
+  const record = aiSettings as Record<string, unknown>;
+  return {
+    studentSupportAiAgentConnectionId: typeof record.studentSupportAiAgentConnectionId === "string" ? record.studentSupportAiAgentConnectionId : ""
+  };
+}
+
+function formatAiAgentOption(connection: AiAgentConnection, t: (key: string, vars?: Record<string, string | number>) => string) {
+  const scope = connection.scope === "global" ? t("courseDetail.aiAgentScopeGlobal") : t("courseDetail.aiAgentScopePersonal");
+  return `${connection.displayName} · ${t(`aiAgentProviders.${connection.provider}`)} · ${connection.model} · ${scope}`;
 }
 
 function formatBytes(bytes: number) {
