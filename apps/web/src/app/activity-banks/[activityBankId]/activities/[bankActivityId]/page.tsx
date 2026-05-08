@@ -28,13 +28,17 @@ export default function BankActivityAuthoringPage() {
   const [bank, setBank] = useState<ActivityBank | null>(null);
   const [activity, setActivity] = useState<BankActivity | null>(null);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
+  const [hasQuestionAuthoringAgent, setHasQuestionAuthoringAgent] = useState(false);
   const [error, setError] = useState("");
 
   async function loadPage() {
-    const [bankResult, typeResult] = await Promise.all([api.activityBank(activityBankId), api.activityTypes()]);
+    const [bankResult, typeResult, aiAgentResult] = await Promise.all([api.activityBank(activityBankId), api.activityTypes(), api.aiAgentConnections()]);
     const nextActivity = bankResult.activityBank.activities?.find((candidate) => candidate.id === bankActivityId) ?? null;
     setBank(bankResult.activityBank);
     setActivityDefinitions(typeResult.registeredDefinitions);
+    setHasQuestionAuthoringAgent(
+      aiAgentResult.connections.some((connection) => connection.id === aiAgentResult.preferences.questionAuthoringAiAgentConnectionId && connection.isEnabled)
+    );
     setActivity(nextActivity);
     if (!nextActivity) {
       setError(t("bankActivityPage.notFound"));
@@ -139,6 +143,13 @@ export default function BankActivityAuthoringPage() {
         <McqActivityView
           activity={renderedActivity}
           canManage
+          aiGenerationClient={
+            hasQuestionAuthoringAgent
+              ? {
+                  generate: (input) => api.generateBankMcqSource(activityBankId, bankActivityId, input)
+                }
+              : undefined
+          }
           onSave={saveActivity}
           locale={locale}
         />

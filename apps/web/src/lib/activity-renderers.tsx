@@ -151,6 +151,15 @@ function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<ty
   );
 }
 
+type McqActivityRendererProps = ActivityRendererProps<typeof McqActivityView> & {
+  mcqAiGenerationClient?: ComponentProps<typeof McqActivityView>["aiGenerationClient"];
+};
+
+function McqActivityRenderer(props: McqActivityRendererProps) {
+  const { groupId: _groupId, mcqAiGenerationClient, ...activityProps } = props;
+  return <McqActivityView {...activityProps} aiGenerationClient={mcqAiGenerationClient} />;
+}
+
 type ParsonsAttemptClientShape = ParsonsAttempt & {
   latestState: ParsonsAttemptState;
   resultSummary: Record<string, unknown>;
@@ -175,6 +184,6 @@ export type ParsonsAttemptsClient = {
 export const activityRenderers = {
   "coding-exercise": CodingExerciseActivityRenderer,
   "parsons-problem": ParsonsActivityRenderer,
-  mcq: McqActivityView,
+  mcq: McqActivityRenderer,
   "web-design-coding-exercise": WebDesignCodingExerciseActivityRenderer
 } as const;

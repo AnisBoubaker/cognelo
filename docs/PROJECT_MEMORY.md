@@ -86,6 +86,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 ## Frontend Platform Decisions
 
 - Subjects and activity banks are top-level navigation items alongside courses.
+- The subjects section follows the same list-first management pattern as other sections: `/subjects` shows the subject list with an Add action, `/subjects/:subjectId` shows linked activity banks/courses, and `/subjects/:subjectId/edit` edits subject metadata.
 - Activity bank authoring pages should open the full plugin authoring UI, not only generic metadata.
 - The course materials area uses a compact table/list layout rather than large cards.
 - Course workspaces include a Settings tab for course-wide settings. Current settings let teachers choose the student-support AI agent from their personal or global enabled connections.
@@ -98,6 +99,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - The top header separates primary app navigation from personal controls.
 - General account configuration lives under `/settings`, currently reached from the account menu and structured so future non-course-specific settings can be added beside `/settings/profile`.
 - AI agent configuration lives under `/settings/ai-agents` and uses the same settings navigation as profile configuration.
+- Plugin authoring UIs may expose AI-assisted generation only when the teacher has selected an enabled question-authoring AI agent. Calls should go through server-side plugin routes so stored API keys are never exposed to the browser.
 - The visual theme should reflect the Cognelo logo palette in a restrained, product-like way.
 - Syntax-colored code rendering should be shared across activities through `packages/activity-ui`.
 - Markdown text rendering for authored prompts/descriptions should be shared across activities and core pages through `packages/activity-ui` rather than reimplemented per plugin.
@@ -116,6 +118,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Visible platform UI copy is translated across login, navigation, dashboard, subject, activity-bank, course, material, and activity management UI.
 - Plugin/activity definitions can provide localized `name`, `description`, and `defaultTitle` through the activity registry.
 - The course detail page resolves plugin-localized activity labels from registry definitions instead of relying only on database display names.
+- Activity bank lists and authoring pages also resolve plugin-localized activity labels from registry definitions instead of relying only on database display names.
 
 ## Known MVP Constraints
 

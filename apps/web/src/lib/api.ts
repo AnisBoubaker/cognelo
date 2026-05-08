@@ -46,6 +46,17 @@ export type AiAgentPreferences = {
   questionAuthoringAiAgentConnectionId: string | null;
 };
 
+export type McqGenerationInput = {
+  description: string;
+  defaultCodeLanguage: string;
+  locale: "en" | "fr" | "zh";
+};
+
+export type McqGenerationResult = {
+  source: string;
+  attempts: number;
+};
+
 export type Course = {
   id: string;
   subjectId: string;
@@ -615,6 +626,16 @@ export const api = {
     }),
   codingExerciseSubmissions: (courseId: string, activityId: string) =>
     request<{ executions: CodingExerciseExecution[] }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/submit`),
+  generateMcqSource: (courseId: string, activityId: string, input: McqGenerationInput) =>
+    request<McqGenerationResult>(`/courses/${courseId}/activities/${activityId}/mcq/generate`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  generateBankMcqSource: (activityBankId: string, bankActivityId: string, input: McqGenerationInput) =>
+    request<McqGenerationResult>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/mcq/generate`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
   webDesignExerciseTests: (courseId: string, activityId: string) =>
     request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
       `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/tests`

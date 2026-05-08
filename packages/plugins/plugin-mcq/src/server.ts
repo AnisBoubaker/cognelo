@@ -1,4 +1,6 @@
+import { mcqGenerateRoute } from "./routes";
+
 export const mcqServerPlugin = {
   key: "mcq",
-  routes: []
+  routes: [mcqGenerateRoute]
 } as const;

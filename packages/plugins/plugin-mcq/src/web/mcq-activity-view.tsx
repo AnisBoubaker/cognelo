@@ -17,6 +17,9 @@ type McqActivityViewProps = {
   canManage: boolean;
   onSave: (input: { title: string; description: string; config: Record<string, unknown> }) => Promise<ActivityLike>;
   locale?: "en" | "fr" | "zh";
+  aiGenerationClient?: {
+    generate: (input: { description: string; defaultCodeLanguage: string; locale: "en" | "fr" | "zh" }) => Promise<{ source: string; attempts: number }>;
+  };
 };
 
 type StudentAnswerState = Record<string, string[]>;
@@ -40,6 +43,12 @@ const copyByLocale = {
     save: "Save multiple choice questions",
     saved: "Multiple choice questions activity saved.",
     saveError: "Unable to save the multiple choice questions activity right now.",
+    generate: "Generate source automatically",
+    generating: "Generating...",
+    generated: "Multiple choice questions source generated.",
+    generateHelp: "Use the description above to generate a valid MCQ source.",
+    generateDescriptionRequired: "Add a more detailed description before generating.",
+    generateError: "Unable to generate valid multiple choice questions right now.",
     studentPreview: "Student preview",
     question: "Question"
   },
@@ -56,6 +65,12 @@ const copyByLocale = {
     save: "Enregistrer les questions a choix multiples",
     saved: "L'activite de questions a choix multiples a ete enregistree.",
     saveError: "Impossible d'enregistrer l'activite de questions a choix multiples pour le moment.",
+    generate: "Generer l'enonce automatiquement",
+    generating: "Generation...",
+    generated: "Source des questions a choix multiples generee.",
+    generateHelp: "Utilise la description ci-dessus pour generer une source QCM valide.",
+    generateDescriptionRequired: "Ajoutez une description plus detaillee avant la generation.",
+    generateError: "Impossible de generer des questions a choix multiples valides pour le moment.",
     studentPreview: "Apercu etudiant",
     question: "Question"
   },
@@ -72,12 +87,18 @@ const copyByLocale = {
     save: "保存选择题",
     saved: "选择题活动已保存。",
     saveError: "暂时无法保存选择题活动。",
+    generate: "自动生成题目",
+    generating: "正在生成...",
+    generated: "选择题源码已生成。",
+    generateHelp: "根据上方说明生成有效的选择题源码。",
+    generateDescriptionRequired: "请先添加更详细的说明。",
+    generateError: "暂时无法生成有效的选择题。",
     studentPreview: "学生预览",
     question: "问题"
   }
 } as const;
 
-export function McqActivityView({ activity, canManage, onSave, locale = "en" }: McqActivityViewProps) {
+export function McqActivityView({ activity, canManage, onSave, locale = "en", aiGenerationClient }: McqActivityViewProps) {
   const copy = copyByLocale[locale] ?? copyByLocale.en;
   const notifications = useNotifications();
   const [title, setTitle] = useState(activity.title);
@@ -85,6 +106,7 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en" }: 
   const [source, setSource] = useState(String(activity.config?.source ?? fallbackConfig.source));
   const [defaultCodeLanguage, setDefaultCodeLanguage] = useState(String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage));
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [studentAnswers, setStudentAnswers] = useState<StudentAnswerState>({});
   const [submitted, setSubmitted] = useState(false);
@@ -143,6 +165,34 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en" }: 
     }
   }
 
+  async function generateMcqSource() {
+    if (!aiGenerationClient) {
+      return;
+    }
+    if (description.trim().length < 10) {
+      notifications.error(copy.generateDescriptionRequired);
+      return;
+    }
+
+    setGenerating(true);
+    setError("");
+    try {
+      const result = await aiGenerationClient.generate({
+        description,
+        defaultCodeLanguage,
+        locale
+      });
+      setSource(result.source);
+      setStudentAnswers({});
+      setSubmitted(false);
+      notifications.success(result.attempts > 1 ? `${copy.generated} (${result.attempts})` : copy.generated);
+    } catch (err) {
+      notifications.error(err instanceof Error ? err.message : copy.generateError);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   function updateSingleChoice(question: McqQuestion, choiceId: string) {
     setStudentAnswers((current) => ({
       ...current,
@@ -182,6 +232,15 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en" }: 
           <label htmlFor="mcq-description">{copy.description}</label>
           <textarea id="mcq-description" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />
         </div>
+
+        {aiGenerationClient ? (
+          <div className="stack" style={{ gap: 8 }}>
+            <button className="secondary" type="button" disabled={generating || description.trim().length < 10} onClick={generateMcqSource}>
+              {generating ? copy.generating : copy.generate}
+            </button>
+            <p className="muted">{copy.generateHelp}</p>
+          </div>
+        ) : null}
 
         <div className="field">
           <label htmlFor="mcq-default-language">{copy.defaultCodeLanguage}</label>

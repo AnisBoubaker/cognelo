@@ -6,7 +6,7 @@ import {
   type CurrentUser
 } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
-import { forbidden, notFound } from "./errors";
+import { AppError, forbidden, notFound } from "./errors";
 import { isAdmin } from "./authorization";
 
 export async function listAiAgentConnections(user: CurrentUser) {
@@ -97,6 +97,43 @@ export async function updateAiAgentPreferences(user: CurrentUser, input: unknown
   return getAiPreferences(updatedUser.metadata);
 }
 
+export async function getQuestionAuthoringAiAgentConnection(user: CurrentUser) {
+  const userRecord = await prisma.user.findUnique({ where: { id: user.id }, select: { metadata: true } });
+  const preferences = getAiPreferences(userRecord?.metadata);
+  if (!preferences.questionAuthoringAiAgentConnectionId) {
+    throw new AppError(400, "AI_AGENT_NOT_CONFIGURED", "No AI agent is configured for question authoring.");
+  }
+
+  const connection = await prisma.aiAgentConnection.findFirst({
+    where: {
+      id: preferences.questionAuthoringAiAgentConnectionId,
+      isEnabled: true,
+      OR: [{ ownerId: user.id }, { ownerId: null }]
+    }
+  });
+
+  if (!connection) {
+    throw notFound("AI agent connection");
+  }
+  if (!connection.apiKey && connection.provider !== "ollama") {
+    throw new AppError(400, "AI_AGENT_KEY_MISSING", "The selected AI agent connection does not have an API key.");
+  }
+
+  return connection;
+}
+
+export async function generateQuestionAuthoringText(
+  user: CurrentUser,
+  input: {
+    systemPrompt: string;
+    userPrompt: string;
+    maxOutputTokens?: number;
+  }
+) {
+  const connection = await getQuestionAuthoringAiAgentConnection(user);
+  return callAiAgent(connection, input);
+}
+
 async function getManageableConnection(user: CurrentUser, connectionId: string) {
   const connection = await prisma.aiAgentConnection.findUnique({ where: { id: connectionId } });
   if (!connection) {
@@ -182,4 +219,140 @@ function toPublicAiAgentConnection(connection: {
     createdAt: connection.createdAt.toISOString(),
     updatedAt: connection.updatedAt.toISOString()
   };
+}
+
+async function callAiAgent(
+  connection: {
+    provider: "ollama" | "openai" | "codex" | "claude";
+    model: string;
+    baseUrl: string | null;
+    apiKey: string | null;
+  },
+  input: {
+    systemPrompt: string;
+    userPrompt: string;
+    maxOutputTokens?: number;
+  }
+) {
+  if (connection.provider === "ollama") {
+    return callOllama(connection, input);
+  }
+  if (connection.provider === "claude") {
+    return callClaude(connection, input);
+  }
+  return callOpenAiCompatible(connection, input);
+}
+
+async function callOpenAiCompatible(
+  connection: { model: string; baseUrl: string | null; apiKey: string | null },
+  input: { systemPrompt: string; userPrompt: string; maxOutputTokens?: number }
+) {
+  const baseUrl = normalizeBaseUrl(connection.baseUrl ?? "https://api.openai.com/v1");
+  const response = await fetch(`${baseUrl}/responses`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${connection.apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: connection.model,
+      instructions: input.systemPrompt,
+      input: input.userPrompt,
+      max_output_tokens: input.maxOutputTokens ?? 4000
+    })
+  });
+  const payload = await readAiResponse(response);
+  return extractOpenAiText(payload);
+}
+
+async function callClaude(
+  connection: { model: string; baseUrl: string | null; apiKey: string | null },
+  input: { systemPrompt: string; userPrompt: string; maxOutputTokens?: number }
+) {
+  const baseUrl = normalizeBaseUrl(connection.baseUrl ?? "https://api.anthropic.com/v1");
+  const response = await fetch(`${baseUrl}/messages`, {
+    method: "POST",
+    headers: {
+      "x-api-key": connection.apiKey ?? "",
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: connection.model,
+      system: input.systemPrompt,
+      messages: [{ role: "user", content: input.userPrompt }],
+      max_tokens: input.maxOutputTokens ?? 4000
+    })
+  });
+  const payload = await readAiResponse(response);
+  return extractClaudeText(payload);
+}
+
+async function callOllama(
+  connection: { model: string; baseUrl: string | null },
+  input: { systemPrompt: string; userPrompt: string }
+) {
+  const baseUrl = normalizeBaseUrl(connection.baseUrl ?? "http://localhost:11434");
+  const response = await fetch(`${baseUrl}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: connection.model,
+      stream: false,
+      messages: [
+        { role: "system", content: input.systemPrompt },
+        { role: "user", content: input.userPrompt }
+      ]
+    })
+  });
+  const payload = await readAiResponse(response);
+  return extractOllamaText(payload);
+}
+
+async function readAiResponse(response: Response) {
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = payload && typeof payload === "object" && "error" in payload ? JSON.stringify(payload.error) : response.statusText;
+    throw new AppError(response.status, "AI_AGENT_REQUEST_FAILED", `The AI agent request failed: ${message}`);
+  }
+  return payload;
+}
+
+function extractOpenAiText(payload: unknown) {
+  if (isRecord(payload) && typeof payload.output_text === "string") {
+    return payload.output_text;
+  }
+  if (isRecord(payload) && Array.isArray(payload.output)) {
+    return payload.output
+      .flatMap((item) => (isRecord(item) && Array.isArray(item.content) ? item.content : []))
+      .map((content) => (isRecord(content) && typeof content.text === "string" ? content.text : ""))
+      .join("\n")
+      .trim();
+  }
+  return "";
+}
+
+function extractClaudeText(payload: unknown) {
+  if (!isRecord(payload) || !Array.isArray(payload.content)) {
+    return "";
+  }
+  return payload.content.map((content) => (isRecord(content) && typeof content.text === "string" ? content.text : "")).join("\n").trim();
+}
+
+function extractOllamaText(payload: unknown) {
+  if (isRecord(payload) && isRecord(payload.message) && typeof payload.message.content === "string") {
+    return payload.message.content;
+  }
+  if (isRecord(payload) && typeof payload.response === "string") {
+    return payload.response;
+  }
+  return "";
+}
+
+function normalizeBaseUrl(value: string) {
+  return value.replace(/\/+$/, "");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
