@@ -22,7 +22,8 @@ import type {
   CurrentUser,
   MaterialKind,
   SubjectInput,
-  SubjectUpdate
+  SubjectUpdate,
+  UserProfileUpdate
 } from "@cognelo/contracts";
 
 export type Course = {
@@ -420,6 +421,11 @@ export const api = {
     }),
   logout: () => request<{ ok: true }>("/auth/logout", { method: "POST" }),
   me: () => request<{ user: CurrentUser }>("/users/me"),
+  updateMyProfile: (input: UserProfileUpdate) =>
+    request<{ user: CurrentUser }>("/users/me", {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
   subjects: () => request<{ subjects: Subject[] }>("/subjects"),
   subject: (subjectId: string) => request<{ subject: Subject }>(`/subjects/${subjectId}`),
   createSubject: (input: SubjectInput) =>

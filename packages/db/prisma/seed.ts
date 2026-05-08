@@ -14,10 +14,12 @@ async function upsertRole(key: string, name: string, description: string) {
 
 async function upsertUser(email: string, name: string, roleKeys: string[]) {
   const passwordHash = await bcrypt.hash("Password123!", 12);
+  const [firstName = "", ...lastNameParts] = name.trim().split(/\s+/);
+  const lastName = lastNameParts.join(" ");
   const user = await prisma.user.upsert({
     where: { email },
-    update: { name, passwordHash, isActive: true },
-    create: { email, name, passwordHash }
+    update: { name, firstName, lastName, passwordHash, isActive: true },
+    create: { email, name, firstName, lastName, passwordHash }
   });
 
   for (const key of roleKeys) {

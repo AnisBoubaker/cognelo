@@ -71,12 +71,16 @@ function toCurrentUser(user: {
   id: string;
   email: string;
   name: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
   roles: { role: { key: string } }[];
 }): CurrentUser {
   return {
     id: user.id,
     email: user.email,
     name: user.name,
+    firstName: user.firstName ?? firstNameFromName(user.name),
+    lastName: user.lastName ?? lastNameFromName(user.name),
     roles: user.roles.map((userRole) => userRole.role.key as CurrentUser["roles"][number])
   };
 }
@@ -106,6 +110,8 @@ export async function activatePendingAccount(input: unknown, secret: string) {
       data: {
         email: normalizedEmail,
         name: buildName(firstParticipant.firstName, firstParticipant.lastName),
+        firstName: firstParticipant.firstName,
+        lastName: firstParticipant.lastName,
         passwordHash,
         isActive: true
       },
@@ -238,4 +244,20 @@ function highestParticipantRole(
 
 function buildName(firstName: string, lastName: string) {
   return `${firstName} ${lastName}`.trim();
+}
+
+function firstNameFromName(name: string | null) {
+  const trimmed = name?.trim() ?? "";
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed.split(/\s+/)[0] ?? null;
+}
+
+function lastNameFromName(name: string | null) {
+  const trimmed = name?.trim() ?? "";
+  if (!trimmed.includes(" ")) {
+    return null;
+  }
+  return trimmed.split(/\s+/).slice(1).join(" ");
 }

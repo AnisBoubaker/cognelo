@@ -34,6 +34,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 
 - Authentication uses JWT stored in HttpOnly cookies.
 - Global authorization supports many-to-many user roles (`admin`, `teacher`, `student`) and is designed for more roles later.
+- Users have account-wide profile settings with editable first and last name fields. Email changes are intentionally admin-only.
 - Accounts can be activated on first login when a person was pre-added to a group participant list by email and no user record existed yet.
 - Courses support create, edit, archive, and draft/published/archived status.
 - Subjects are first-class curriculum containers. A subject can own subject-level materials, activity banks, and courses.
@@ -91,6 +92,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Branding uses the project logo from `docs/brand`.
 - The app favicon uses the square Cognelo icon asset.
 - The top header separates primary app navigation from personal controls.
+- General account configuration lives under `/settings`, currently reached from the account menu and structured so future non-course-specific settings can be added beside `/settings/profile`.
 - The visual theme should reflect the Cognelo logo palette in a restrained, product-like way.
 - Syntax-colored code rendering should be shared across activities through `packages/activity-ui`.
 - Markdown text rendering for authored prompts/descriptions should be shared across activities and core pages through `packages/activity-ui` rather than reimplemented per plugin.

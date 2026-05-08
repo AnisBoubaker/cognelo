@@ -88,6 +88,8 @@ model User {
   id              String             @id @default(cuid())
   email           String             @unique
   name            String?
+  firstName       String?
+  lastName        String?
   passwordHash    String
   isActive        Boolean            @default(true)
   createdAt       DateTime           @default(now())
