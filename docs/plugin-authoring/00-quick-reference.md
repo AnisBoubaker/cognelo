@@ -31,6 +31,8 @@ Plugins own activity-specific behavior. The platform owns generic auth, subject/
 
 For authored rich text display, use `MarkdownRenderer` from `@cognelo/activity-ui`. For transient confirmations and non-field-specific errors, use `useNotifications()` instead of adding a plugin-local inline “saved” banner.
 
+For every plugin authoring or settings form, use `useUnsavedChangesGuard` from `@cognelo/activity-ui`. Keep a saved snapshot, compute `isDirty`, and provide `onSave` plus `onDiscard` so shared navigation can offer continue editing, save and leave, or discard and leave.
+
 ## Minimal Plugin Flow
 
 1. Create `packages/plugins/plugin-your-plugin`
@@ -41,8 +43,9 @@ For authored rich text display, use `MarkdownRenderer` from `@cognelo/activity-u
 6. If needed, export a React renderer
 7. Register it in `apps/web/src/lib/activity-renderers.tsx`
 8. If needed, add plugin tables in `packages/db/prisma/schema.prisma`
-9. If the plugin stores private bank-owned data, add a server hook to copy it into course-owned plugin tables when a bank version is assigned to a course
-10. If needed, add browser API helpers in `apps/web/src/lib/api.ts`
+9. If the plugin exposes any authoring or settings form, register unsaved-change behavior with `useUnsavedChangesGuard`
+10. If the plugin stores private bank-owned data, add a server hook to copy it into course-owned plugin tables when a bank version is assigned to a course
+11. If needed, add browser API helpers in `apps/web/src/lib/api.ts`
 
 ## Required Registration Points
 

@@ -74,6 +74,10 @@ Current plugin-owned tables:
 - `PluginCodingExerciseReferenceSolution`
 - `PluginCodingExerciseExecution`
 
+## Authoring UX
+
+The teacher authoring UI is a form surface and must stay registered with the shared `useUnsavedChangesGuard` hook from `@cognelo/activity-ui`. Any future coding-exercise authoring tabs or settings panels should do the same so navigation can offer continue editing, save and leave, or discard and leave.
+
 ## Judge0 Integration
 
 The browser should never call Judge0 directly.

@@ -16,8 +16,9 @@ When creating a new plugin, a safe order is:
 6. verify the activity type appears
 7. add routes if needed
 8. add persistence if needed
-9. add a bank-to-course copy hook if the plugin owns private bank data
-10. add docs
+9. add unsaved-change protection with `useUnsavedChangesGuard` for every authoring or settings form
+10. add a bank-to-course copy hook if the plugin owns private bank data
+11. add docs
 
 ## Commands
 
@@ -53,6 +54,8 @@ Check that:
 - the plugin appears in `/api/activity-types`
 - a new activity can be created
 - a bank activity can be authored if the plugin supports teacher authoring
+- authoring/settings forms warn before navigation when there are unsaved changes
+- save-and-leave and discard-and-leave both behave correctly from the unsaved-changes dialog
 - assigning from an activity bank creates an independent course copy
 - the activity renders your component
 - saving config works

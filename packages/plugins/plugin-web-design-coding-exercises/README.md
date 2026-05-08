@@ -58,6 +58,10 @@ Plugin-owned persistence:
 
 When a web-design bank activity is copied into a course, the plugin's server hook copies the bank reference bundle and tests into the course-owned plugin tables. After that, course edits and bank edits are independent.
 
+## Authoring UX
+
+The teacher authoring UI is tabbed, but it still behaves as one guarded form. Keep it registered with `useUnsavedChangesGuard` from `@cognelo/activity-ui`, and register any future web-design authoring/settings panels with the same dirty/save/discard pattern.
+
 ## Playwright Grading
 
 Implemented plugin subroutes:

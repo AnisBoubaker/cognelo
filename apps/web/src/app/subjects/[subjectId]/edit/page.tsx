@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { api, type Subject } from "@/lib/api";
@@ -15,6 +16,7 @@ export default function EditSubjectPage() {
   const [subject, setSubject] = useState<Subject | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [savedSnapshot, setSavedSnapshot] = useState({ title: "", description: "" });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -25,22 +27,49 @@ export default function EditSubjectPage() {
         setSubject(result.subject);
         setTitle(result.subject.title);
         setDescription(result.subject.description ?? "");
+        setSavedSnapshot({ title: result.subject.title, description: result.subject.description ?? "" });
       })
       .catch((err) => setError(err instanceof Error ? err.message : t("editSubject.loadError")));
   }, [subjectId, t]);
 
-  async function saveSubject(event: FormEvent) {
-    event.preventDefault();
+  const currentSnapshot = useMemo(() => ({ title, description }), [description, title]);
+  const hasUnsavedChanges = currentSnapshot.title !== savedSnapshot.title || currentSnapshot.description !== savedSnapshot.description;
+
+  const discardChanges = useCallback(() => {
+    setTitle(savedSnapshot.title);
+    setDescription(savedSnapshot.description);
+    setError("");
+  }, [savedSnapshot]);
+
+  const saveSubjectChanges = useCallback(async () => {
     setSaving(true);
     setError("");
     try {
       const result = await api.updateSubject(subjectId, { title, description });
+      setSavedSnapshot({ title, description });
       router.push(`/subjects/${result.subject.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("editSubject.saveError"));
+      throw err;
     } finally {
       setSaving(false);
     }
+  }, [description, router, subjectId, t, title]);
+
+  useUnsavedChangesGuard(
+    useMemo(
+      () => ({
+        isDirty: hasUnsavedChanges,
+        onSave: saveSubjectChanges,
+        onDiscard: discardChanges
+      }),
+      [discardChanges, hasUnsavedChanges, saveSubjectChanges]
+    )
+  );
+
+  async function saveSubject(event: FormEvent) {
+    event.preventDefault();
+    await saveSubjectChanges();
   }
 
   return (

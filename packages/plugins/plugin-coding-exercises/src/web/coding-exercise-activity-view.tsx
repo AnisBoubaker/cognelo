@@ -1,7 +1,7 @@
 "use client";
 
-import { type CSSProperties, type FormEvent, useEffect, useRef, useState } from "react";
-import { CodeEditor, MarkdownRenderer, MonacoCodeEditor, codeLanguageOptions, useNotifications } from "@cognelo/activity-ui";
+import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CodeEditor, MarkdownRenderer, MonacoCodeEditor, codeLanguageOptions, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   alignCodingExerciseStarterCodeToTemplate,
   buildCodingExerciseStudentTemplateProjectionFromSource,
@@ -37,6 +37,14 @@ type HiddenTest = {
 };
 
 type SampleTest = CodingExerciseConfig["sampleTests"][number];
+
+type CodingExerciseSnapshot = {
+  title: string;
+  config: CodingExerciseConfig;
+  hiddenTests: HiddenTest[];
+  referenceSolution: string;
+  privateConfig: CodingExercisePrivateConfig;
+};
 
 type CodingExecution = {
   id: string;
@@ -143,6 +151,15 @@ export function CodingExerciseActivityView({
   const [hiddenTests, setHiddenTests] = useState<HiddenTest[]>([]);
   const [referenceSolution, setReferenceSolution] = useState("");
   const [privateConfig, setPrivateConfig] = useState<CodingExercisePrivateConfig>(() => parseCodingExercisePrivateConfig({}));
+  const [savedSnapshot, setSavedSnapshot] = useState<CodingExerciseSnapshot>(() =>
+    buildCodingExerciseSnapshot({
+      title: activity.title,
+      config: normalizeCodingExerciseConfigForDisplay(parseCodingExerciseConfig(activity.config ?? fallbackConfig)),
+      hiddenTests: [],
+      referenceSolution: "",
+      privateConfig: parseCodingExercisePrivateConfig({})
+    })
+  );
   const [referenceValidationSummary, setReferenceValidationSummary] = useState<Record<string, unknown> | null>(null);
   const [expandedSampleTestIds, setExpandedSampleTestIds] = useState<string[]>([]);
   const [expandedHiddenTestIds, setExpandedHiddenTestIds] = useState<string[]>([]);
@@ -185,6 +202,17 @@ export function CodingExerciseActivityView({
     const sampleTests = normalizeCodingExerciseSampleTests(nextConfig.sampleTests);
     setTitle(activity.title);
     setConfig(nextConfig);
+    if (!canManage) {
+      setSavedSnapshot(
+        buildCodingExerciseSnapshot({
+          title: activity.title,
+          config: nextConfig,
+          hiddenTests: [],
+          referenceSolution: "",
+          privateConfig: parseCodingExercisePrivateConfig({})
+        })
+      );
+    }
     setEditorCode(alignCodingExerciseStarterCodeToTemplate(nextConfig.starterCode, nextConfig.studentTemplateSource));
     setSelectedSampleTestId(sampleTests[0]?.id ?? "");
     setSampleInput(sampleTests[0]?.input ?? "");
@@ -215,6 +243,15 @@ export function CodingExerciseActivityView({
         setHiddenTests(result.tests);
         setReferenceSolution(result.referenceSolution?.sourceCode ?? "");
         setPrivateConfig(parseCodingExercisePrivateConfig(result.referenceSolution?.privateConfig ?? {}));
+        setSavedSnapshot(
+          buildCodingExerciseSnapshot({
+            title,
+            config,
+            hiddenTests: result.tests,
+            referenceSolution: result.referenceSolution?.sourceCode ?? "",
+            privateConfig: parseCodingExercisePrivateConfig(result.referenceSolution?.privateConfig ?? {})
+          })
+        );
         setReferenceValidationSummary(result.referenceSolution?.validationSummary ?? null);
       })
       .catch((err) => setError(err instanceof Error ? err.message : t("loadHiddenTestsError")));
@@ -331,8 +368,29 @@ export function CodingExerciseActivityView({
     );
   }
 
-  async function saveActivityAndHiddenTests(event: FormEvent) {
-    event.preventDefault();
+  const currentSnapshot = useMemo(
+    () =>
+      buildCodingExerciseSnapshot({
+        title,
+        config,
+        hiddenTests,
+        referenceSolution,
+        privateConfig
+      }),
+    [config, hiddenTests, privateConfig, referenceSolution, title]
+  );
+  const hasUnsavedChanges = canManage && !codingExerciseSnapshotsEqual(currentSnapshot, savedSnapshot);
+
+  const discardChanges = useCallback(() => {
+    setTitle(savedSnapshot.title);
+    setConfig(savedSnapshot.config);
+    setHiddenTests(savedSnapshot.hiddenTests);
+    setReferenceSolution(savedSnapshot.referenceSolution);
+    setPrivateConfig(savedSnapshot.privateConfig);
+    setError("");
+  }, [savedSnapshot]);
+
+  const saveCodingExercise = useCallback(async () => {
     setSaving(true);
     setError("");
 
@@ -383,7 +441,18 @@ export function CodingExerciseActivityView({
         setHiddenTests(result.tests);
         setReferenceSolution(result.referenceSolution?.sourceCode ?? "");
         setPrivateConfig(parseCodingExercisePrivateConfig(result.referenceSolution?.privateConfig ?? {}));
+        setSavedSnapshot(
+          buildCodingExerciseSnapshot({
+            title,
+            config,
+            hiddenTests: result.tests,
+            referenceSolution: result.referenceSolution?.sourceCode ?? "",
+            privateConfig: parseCodingExercisePrivateConfig(result.referenceSolution?.privateConfig ?? {})
+          })
+        );
         setReferenceValidationSummary(result.referenceSolution?.validationSummary ?? null);
+      } else {
+        setSavedSnapshot(currentSnapshot);
       }
 
       notifications.success(t("saved"));
@@ -398,9 +467,26 @@ export function CodingExerciseActivityView({
       }
       notifications.error(err instanceof Error ? err.message : t("saveError"));
       setError("");
+      throw err;
     } finally {
       setSaving(false);
     }
+  }, [activity.id, canManage, codingClient, config, course?.id, currentSnapshot, hiddenTests, notifications, onSave, privateConfig, referenceSolution, t, title]);
+
+  useUnsavedChangesGuard(
+    useMemo(
+      () => ({
+        isDirty: hasUnsavedChanges,
+        onSave: saveCodingExercise,
+        onDiscard: discardChanges
+      }),
+      [discardChanges, hasUnsavedChanges, saveCodingExercise]
+    )
+  );
+
+  async function saveActivityAndHiddenTests(event: FormEvent) {
+    event.preventDefault();
+    await saveCodingExercise();
   }
 
   async function runCode() {
@@ -871,6 +957,14 @@ function getPersistedPrivateConfig(privateConfig: CodingExercisePrivateConfig): 
     templatePrefix: templateParts.prefix,
     templateSuffix: templateParts.suffix
   };
+}
+
+function buildCodingExerciseSnapshot(input: CodingExerciseSnapshot): CodingExerciseSnapshot {
+  return JSON.parse(JSON.stringify(input)) as CodingExerciseSnapshot;
+}
+
+function codingExerciseSnapshotsEqual(left: CodingExerciseSnapshot, right: CodingExerciseSnapshot) {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function normalizeCodingExerciseConfigForDisplay(config: CodingExerciseConfig): CodingExerciseConfig {

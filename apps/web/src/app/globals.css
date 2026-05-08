@@ -1048,6 +1048,34 @@ a.card:hover,
   z-index: 50;
 }
 
+.dialog-backdrop {
+  align-items: center;
+  background: rgba(13, 27, 71, 0.34);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 20px;
+  position: fixed;
+  z-index: 90;
+}
+
+.dialog-panel {
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--brand-blue), white 74%);
+  border-radius: 8px;
+  box-shadow: 0 24px 70px rgba(13, 27, 71, 0.24);
+  max-width: 560px;
+  padding: 22px;
+  width: min(100%, 560px);
+}
+
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .table-actions {
   align-items: center;
   display: flex;

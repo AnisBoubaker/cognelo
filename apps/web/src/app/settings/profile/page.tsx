@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useNotifications } from "@cognelo/activity-ui";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { SettingsNav } from "@/components/settings-nav";
@@ -14,6 +14,7 @@ export default function ProfileSettingsPage() {
   const notifications = useNotifications();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [savedSnapshot, setSavedSnapshot] = useState({ firstName: "", lastName: "" });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -21,27 +22,58 @@ export default function ProfileSettingsPage() {
     if (!user) {
       return;
     }
-    setFirstName(user.firstName ?? firstNameFromName(user.name));
-    setLastName(user.lastName ?? lastNameFromName(user.name));
+    const nextSnapshot = {
+      firstName: user.firstName ?? firstNameFromName(user.name),
+      lastName: user.lastName ?? lastNameFromName(user.name)
+    };
+    setFirstName(nextSnapshot.firstName);
+    setLastName(nextSnapshot.lastName);
+    setSavedSnapshot(nextSnapshot);
   }, [user]);
 
   const roles = useMemo(() => user?.roles.map((role) => t(`roles.${role}`)).join(", ") ?? "", [t, user]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const currentSnapshot = useMemo(() => ({ firstName, lastName }), [firstName, lastName]);
+  const hasUnsavedChanges = currentSnapshot.firstName !== savedSnapshot.firstName || currentSnapshot.lastName !== savedSnapshot.lastName;
+
+  const discardChanges = useCallback(() => {
+    setFirstName(savedSnapshot.firstName);
+    setLastName(savedSnapshot.lastName);
+    setError("");
+  }, [savedSnapshot]);
+
+  const saveProfile = useCallback(async () => {
     setError("");
     setSaving(true);
     try {
       await api.updateMyProfile({ firstName, lastName });
       await refresh();
+      setSavedSnapshot({ firstName, lastName });
       notifications.success(t("settings.profileSaved"));
     } catch (err) {
       const message = err instanceof Error ? err.message : t("settings.profileSaveError");
       setError(message);
       notifications.error(message);
+      throw err;
     } finally {
       setSaving(false);
     }
+  }, [firstName, lastName, notifications, refresh, t]);
+
+  useUnsavedChangesGuard(
+    useMemo(
+      () => ({
+        isDirty: hasUnsavedChanges,
+        onSave: saveProfile,
+        onDiscard: discardChanges
+      }),
+      [discardChanges, hasUnsavedChanges, saveProfile]
+    )
+  );
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await saveProfile();
   }
 
   return (
