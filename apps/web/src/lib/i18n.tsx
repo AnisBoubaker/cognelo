@@ -42,6 +42,7 @@ const messages: Record<Locale, MessageTree> = {
       activityBanks: "Activity banks",
       courses: "Courses",
       newCourse: "New course",
+      settings: "Settings",
       account: "Account",
       accountMenu: "Open account menu"
     },
@@ -52,6 +53,7 @@ const messages: Record<Locale, MessageTree> = {
     },
     roles: {
       admin: "Admin",
+      course_manager: "Course manager",
       teacher: "Teacher",
       student: "Student"
     },
@@ -102,6 +104,24 @@ const messages: Record<Locale, MessageTree> = {
       researchEyebrow: "Research",
       researchTitle: "Metadata first",
       researchText: "Activities carry configurable metadata from the start."
+    },
+    settings: {
+      eyebrow: "Settings",
+      title: "General settings",
+      subtitle: "Manage account-wide preferences that are not tied to a specific course.",
+      navLabel: "Settings",
+      profileNav: "Profile",
+      profileNavText: "Name, email, and roles",
+      profileEyebrow: "Profile",
+      profileTitle: "Your profile",
+      firstName: "First name",
+      lastName: "Last name",
+      email: "Email",
+      emailLocked: "Email changes must be handled by an administrator.",
+      roles: "Roles",
+      saveProfile: "Save profile",
+      profileSaved: "Profile saved.",
+      profileSaveError: "Unable to save your profile."
     },
     courses: {
       eyebrow: "Courses",
@@ -335,6 +355,7 @@ const messages: Record<Locale, MessageTree> = {
       activityBanks: "Banques d'activités",
       courses: "Cours",
       newCourse: "Nouveau cours",
+      settings: "Configuration",
       account: "Compte",
       accountMenu: "Ouvrir le menu du compte"
     },
@@ -345,6 +366,7 @@ const messages: Record<Locale, MessageTree> = {
     },
     roles: {
       admin: "Admin",
+      course_manager: "Gestionnaire de cours",
       teacher: "Enseignant",
       student: "Étudiant"
     },
@@ -395,6 +417,24 @@ const messages: Record<Locale, MessageTree> = {
       researchEyebrow: "Recherche",
       researchTitle: "Métadonnées d'abord",
       researchText: "Les activités portent des métadonnées configurables dès le départ."
+    },
+    settings: {
+      eyebrow: "Configuration",
+      title: "Configuration générale",
+      subtitle: "Gérez les préférences globales qui ne sont pas liées à un cours précis.",
+      navLabel: "Configuration",
+      profileNav: "Profil",
+      profileNavText: "Nom, courriel et rôles",
+      profileEyebrow: "Profil",
+      profileTitle: "Votre profil",
+      firstName: "Prénom",
+      lastName: "Nom",
+      email: "Courriel",
+      emailLocked: "Le courriel ne peut être modifié que par un administrateur.",
+      roles: "Rôles",
+      saveProfile: "Enregistrer le profil",
+      profileSaved: "Profil enregistré.",
+      profileSaveError: "Impossible d'enregistrer votre profil."
     },
     courses: {
       eyebrow: "Cours",
@@ -628,6 +668,7 @@ const messages: Record<Locale, MessageTree> = {
       activityBanks: "活动库",
       courses: "课程",
       newCourse: "新建课程",
+      settings: "设置",
       account: "账户",
       accountMenu: "打开账户菜单"
     },
@@ -638,6 +679,7 @@ const messages: Record<Locale, MessageTree> = {
     },
     roles: {
       admin: "管理员",
+      course_manager: "课程管理员",
       teacher: "教师",
       student: "学生"
     },
@@ -688,6 +730,24 @@ const messages: Record<Locale, MessageTree> = {
       researchEyebrow: "研究",
       researchTitle: "元数据优先",
       researchText: "活动从一开始就支持可配置元数据。"
+    },
+    settings: {
+      eyebrow: "设置",
+      title: "通用设置",
+      subtitle: "管理不属于某一门课程的账户级偏好。",
+      navLabel: "设置",
+      profileNav: "个人资料",
+      profileNavText: "姓名、邮箱和角色",
+      profileEyebrow: "个人资料",
+      profileTitle: "你的个人资料",
+      firstName: "名",
+      lastName: "姓",
+      email: "邮箱",
+      emailLocked: "邮箱只能由管理员修改。",
+      roles: "角色",
+      saveProfile: "保存个人资料",
+      profileSaved: "个人资料已保存。",
+      profileSaveError: "无法保存个人资料。"
     },
     courses: {
       eyebrow: "课程",

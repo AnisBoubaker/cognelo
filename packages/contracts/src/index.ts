@@ -55,6 +55,12 @@ export const ActivateAccountInputSchema = z
   });
 export type ActivateAccountInput = z.infer<typeof ActivateAccountInputSchema>;
 
+export const UserProfileUpdateSchema = z.object({
+  firstName: z.string().trim().min(1).max(120),
+  lastName: z.string().trim().min(1).max(120)
+});
+export type UserProfileUpdate = z.infer<typeof UserProfileUpdateSchema>;
+
 export const CourseInputSchema = z.object({
   subjectId: z.string().cuid(),
   title: z.string().min(2).max(160),
@@ -234,5 +240,7 @@ export type CurrentUser = {
   id: string;
   email: string;
   name: string | null;
+  firstName: string | null;
+  lastName: string | null;
   roles: RoleKey[];
 };

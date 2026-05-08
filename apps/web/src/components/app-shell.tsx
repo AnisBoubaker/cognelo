@@ -92,6 +92,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <LocaleSwitcher showLabel />
                 </div>
                 <div className="account-popover-section">
+                  <Link
+                    className="button secondary account-settings-link"
+                    href="/settings/profile"
+                    role="menuitem"
+                    onClick={() => setIsAccountMenuOpen(false)}
+                  >
+                    {t("nav.settings")}
+                  </Link>
                   <button
                     className="secondary account-logout"
                     type="button"

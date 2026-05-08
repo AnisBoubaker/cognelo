@@ -37,7 +37,7 @@ docs/
 ## Core Modules
 
 - Auth: login, logout, current-user token verification
-- Users: `/users/me`
+- Users: `/users/me` plus account-wide profile settings
 - Authorization: global roles plus course memberships and activity-bank ownership
 - Subjects: shared curriculum containers for subject-level material and activity banks
 - Activity banks: reusable activity authoring libraries scoped to a subject and owned by an individual
@@ -80,6 +80,7 @@ Core endpoints:
 POST   /api/auth/login
 POST   /api/auth/logout
 GET    /api/users/me
+PATCH  /api/users/me
 GET    /api/subjects
 POST   /api/subjects
 GET    /api/subjects/:subjectId
@@ -277,11 +278,13 @@ WEB_DESIGN_RUNNER_URL=http://localhost:3456
 
 ## Frontend Notes
 
-- Login, dashboard, subjects, activity banks, courses, course detail, and edit flows are translated in English, French, and Chinese.
+- Login, dashboard, settings, subjects, activity banks, courses, course detail, and edit flows are translated in English, French, and Chinese.
 - Locale selection is client-side and persisted in `localStorage`.
 - The header and login page use the Cognelo logo from the repo's brand assets.
 - The favicon/app icon uses the square Cognelo icon asset served from `apps/web/src/app/icon.png`.
 - The top navigation separates primary app routes from the account dropdown.
+- Account-wide configuration lives under `/settings`, with the current profile editor at `/settings/profile`.
+- Users can update their first and last name from profile settings; email changes are reserved for administrators.
 - Course materials support links, uploads, folders, edit/remove, expand/collapse, and drag/drop ordering.
 - Activity banks are first-class authoring spaces. Course activities are copied from bank versions rather than edited live in the bank.
 

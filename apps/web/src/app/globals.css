@@ -396,6 +396,7 @@ select:focus {
 }
 
 .account-popover .locale-switcher select,
+.account-settings-link,
 .account-logout {
   width: 100%;
 }
@@ -605,6 +606,51 @@ a.card:hover,
   font-weight: 700;
 }
 
+.form-grid-two {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-layout {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(210px, 0.28fr) minmax(0, 1fr);
+}
+
+.settings-nav {
+  background: rgba(238, 244, 251, 0.74);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+}
+
+.settings-nav a {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+}
+
+.settings-nav a:hover,
+.settings-nav a.is-active {
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--brand-blue), white 70%);
+}
+
+.settings-nav a span {
+  font-weight: 800;
+}
+
+.settings-nav a small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 .editor-section-label {
   display: inline-block;
   font-weight: 700;
@@ -686,6 +732,13 @@ a.card:hover,
 }
 
 .field-readonly input[readonly] {
+  background: linear-gradient(180deg, rgba(238, 244, 251, 0.96), rgba(245, 248, 252, 0.96));
+  border-color: color-mix(in srgb, var(--brand-blue), white 72%);
+  color: var(--muted);
+  cursor: default;
+}
+
+.field-locked input[readonly] {
   background: linear-gradient(180deg, rgba(238, 244, 251, 0.96), rgba(245, 248, 252, 0.96));
   border-color: color-mix(in srgb, var(--brand-blue), white 72%);
   color: var(--muted);
@@ -1535,6 +1588,11 @@ a.card:hover,
   }
 
   .split {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid-two,
+  .settings-layout {
     grid-template-columns: 1fr;
   }
 
