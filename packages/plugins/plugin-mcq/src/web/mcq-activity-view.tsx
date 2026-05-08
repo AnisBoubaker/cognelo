@@ -69,6 +69,10 @@ const copyByLocale = {
     generateHelp: "Use the description above to generate a valid MCQ source.",
     generateDescriptionRequired: "Add a more detailed description before generating.",
     generateError: "Unable to generate valid multiple choice questions right now.",
+    replaceGeneratedTitle: "Replace existing source?",
+    replaceGeneratedMessage: "Generating a new source will replace the current multiple choice questions source.",
+    keepCurrentSource: "Keep current source",
+    replaceCurrentSource: "Replace source",
     studentPreview: "Student preview",
     question: "Question"
   },
@@ -93,6 +97,10 @@ const copyByLocale = {
     generateHelp: "Utilise la description ci-dessus pour generer une source QCM valide.",
     generateDescriptionRequired: "Ajoutez une description plus detaillee avant la generation.",
     generateError: "Impossible de generer des questions a choix multiples valides pour le moment.",
+    replaceGeneratedTitle: "Remplacer la source existante?",
+    replaceGeneratedMessage: "La generation d'une nouvelle source remplacera la source actuelle des questions a choix multiples.",
+    keepCurrentSource: "Conserver la source",
+    replaceCurrentSource: "Remplacer la source",
     studentPreview: "Apercu etudiant",
     question: "Question"
   },
@@ -117,6 +125,10 @@ const copyByLocale = {
     generateHelp: "根据上方说明生成有效的选择题源码。",
     generateDescriptionRequired: "请先添加更详细的说明。",
     generateError: "暂时无法生成有效的选择题。",
+    replaceGeneratedTitle: "替换现有源码？",
+    replaceGeneratedMessage: "生成新的源码会替换当前选择题源码。",
+    keepCurrentSource: "保留当前源码",
+    replaceCurrentSource: "替换源码",
     studentPreview: "学生预览",
     question: "问题"
   }
@@ -133,6 +145,7 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
   const [savedSnapshot, setSavedSnapshot] = useState<McqFormSnapshot>(() => snapshotFromActivity(activity));
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [showReplaceGenerationDialog, setShowReplaceGenerationDialog] = useState(false);
   const [error, setError] = useState("");
   const [studentAnswers, setStudentAnswers] = useState<StudentAnswerState>({});
   const [submitted, setSubmitted] = useState(false);
@@ -147,6 +160,7 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
     setStudentAnswers({});
     setSubmitted(false);
     setError("");
+    setShowReplaceGenerationDialog(false);
   }, [activity]);
 
   const parsedMcq = useMemo(() => parseMcqSource(source, defaultCodeLanguage), [defaultCodeLanguage, source]);
@@ -191,6 +205,7 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
     setStudentAnswers({});
     setSubmitted(false);
     setError("");
+    setShowReplaceGenerationDialog(false);
   }, [savedSnapshot]);
 
   const saveMcqChanges = useCallback(async () => {
@@ -240,7 +255,7 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
     await saveMcqChanges();
   }
 
-  async function generateMcqSource() {
+  function requestMcqGeneration() {
     if (!aiGenerationClient) {
       return;
     }
@@ -248,8 +263,21 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
       notifications.error(copy.generateDescriptionRequired);
       return;
     }
+    if (source.trim().length > 0) {
+      setShowReplaceGenerationDialog(true);
+      return;
+    }
+
+    void generateMcqSource();
+  }
+
+  async function generateMcqSource() {
+    if (!aiGenerationClient) {
+      return;
+    }
 
     setGenerating(true);
+    setShowReplaceGenerationDialog(false);
     setError("");
     try {
       const result = await aiGenerationClient.generate({
@@ -310,10 +338,30 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
 
         {aiGenerationClient ? (
           <div className="stack" style={{ gap: 8 }}>
-            <button className="secondary" type="button" disabled={generating || description.trim().length < 10} onClick={generateMcqSource}>
+            <button className="secondary" type="button" disabled={generating || description.trim().length < 10} onClick={requestMcqGeneration}>
               {generating ? copy.generating : copy.generate}
             </button>
             <p className="muted">{copy.generateHelp}</p>
+          </div>
+        ) : null}
+
+        {showReplaceGenerationDialog ? (
+          <div className="dialog-backdrop" role="presentation">
+            <div aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="mcq-ai-replace-title">
+              <div className="stack" style={{ gap: 8 }}>
+                <p className="eyebrow">{copy.generate}</p>
+                <h2 id="mcq-ai-replace-title">{copy.replaceGeneratedTitle}</h2>
+                <p className="muted">{copy.replaceGeneratedMessage}</p>
+              </div>
+              <div className="dialog-actions">
+                <button className="secondary" type="button" onClick={() => setShowReplaceGenerationDialog(false)}>
+                  {copy.keepCurrentSource}
+                </button>
+                <button type="button" onClick={() => void generateMcqSource()}>
+                  {copy.replaceCurrentSource}
+                </button>
+              </div>
+            </div>
           </div>
         ) : null}
 
