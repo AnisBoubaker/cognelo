@@ -294,9 +294,11 @@ WEB_DESIGN_RUNNER_URL=http://localhost:3456
 - Account-wide configuration lives under `/settings`, with the current profile editor at `/settings/profile`.
 - Users can update their first and last name from profile settings; email changes are reserved for administrators.
 - AI agent connection settings live under `/settings/ai-agents`; users can create personal connections, choose their question-authoring helper, and admins can create global connections for later course use.
+- Plugin authoring screens can use the selected question-authoring AI agent through server-side plugin routes; the MCQ plugin uses this to generate validated MCQ source from a teacher description.
+- The subjects area uses a list-first management flow: add subjects from the list header, open a subject detail page, and edit subject metadata from a dedicated edit page.
 - Course materials support links, uploads, folders, edit/remove, expand/collapse, and drag/drop ordering.
 - Course workspaces include a Settings tab where teachers can choose the student-support AI agent from their personal connections or admin-managed global connections.
-- Activity banks are first-class authoring spaces. Course activities are copied from bank versions rather than edited live in the bank.
+- Activity banks are first-class authoring spaces. Course activities are copied from bank versions rather than edited live in the bank, and activity type labels are localized from plugin registry definitions.
 
 ## Plugin Contributor Workflow
 

@@ -17,6 +17,7 @@ export default function ActivityPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [activity, setActivity] = useState<Activity | null>(null);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
+  const [hasQuestionAuthoringAgent, setHasQuestionAuthoringAgent] = useState(false);
   const [error, setError] = useState("");
 
   const canManage = user?.roles.includes("admin") || user?.roles.includes("teacher");
@@ -24,14 +25,18 @@ export default function ActivityPage() {
 
   useEffect(() => {
     async function refresh() {
-      const [courseResult, activityResult, typeResult] = await Promise.all([
+      const [courseResult, activityResult, typeResult, aiAgentResult] = await Promise.all([
         api.course(courseId),
         api.activity(courseId, activityId),
-        api.activityTypes()
+        api.activityTypes(),
+        api.aiAgentConnections()
       ]);
       setCourse(courseResult.course);
       setActivity(activityResult.activity);
       setActivityDefinitions(typeResult.registeredDefinitions);
+      setHasQuestionAuthoringAgent(
+        aiAgentResult.connections.some((connection) => connection.id === aiAgentResult.preferences.questionAuthoringAiAgentConnectionId && connection.isEnabled)
+      );
     }
 
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("activityPage.loadError")));
@@ -72,7 +77,21 @@ export default function ActivityPage() {
         {error ? <p className="error">{error}</p> : null}
 
         {activity && ActivityRenderer ? (
-          <ActivityRenderer activity={activity} canManage={Boolean(canManage)} course={course} onSave={saveActivity} t={t} locale={locale} />
+          <ActivityRenderer
+            activity={activity}
+            canManage={Boolean(canManage)}
+            course={course}
+            mcqAiGenerationClient={
+              canManage && hasQuestionAuthoringAgent
+                ? {
+                    generate: (input) => api.generateMcqSource(courseId, activityId, input)
+                  }
+                : undefined
+            }
+            onSave={saveActivity}
+            t={t}
+            locale={locale}
+          />
         ) : activity ? (
           <section className="section stack">
             <h2>{t("parsons.unsupportedTitle")}</h2>

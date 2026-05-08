@@ -18,6 +18,7 @@ export default function GroupActivityPage() {
   const [group, setGroup] = useState<CourseGroup | null>(null);
   const [activity, setActivity] = useState<Activity | null>(null);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
+  const [hasQuestionAuthoringAgent, setHasQuestionAuthoringAgent] = useState(false);
   const [error, setError] = useState("");
 
   const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
@@ -26,16 +27,20 @@ export default function GroupActivityPage() {
 
   useEffect(() => {
     async function refresh() {
-      const [courseResult, groupResult, activityResult, typeResult] = await Promise.all([
+      const [courseResult, groupResult, activityResult, typeResult, aiAgentResult] = await Promise.all([
         api.course(courseId),
         api.group(courseId, groupId),
         api.groupActivity(courseId, groupId, activityId),
-        api.activityTypes()
+        api.activityTypes(),
+        api.aiAgentConnections()
       ]);
       setCourse(courseResult.course);
       setGroup(groupResult.group);
       setActivity(activityResult.activity);
       setActivityDefinitions(typeResult.registeredDefinitions);
+      setHasQuestionAuthoringAgent(
+        aiAgentResult.connections.some((connection) => connection.id === aiAgentResult.preferences.questionAuthoringAiAgentConnectionId && connection.isEnabled)
+      );
     }
 
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("activityPage.loadError")));
@@ -84,6 +89,13 @@ export default function GroupActivityPage() {
             canManage={Boolean(canManage)}
             course={course ? { id: course.id, title: course.title } : null}
             groupId={groupId}
+            mcqAiGenerationClient={
+              canManage && hasQuestionAuthoringAgent
+                ? {
+                    generate: (input) => api.generateMcqSource(courseId, activityId, input)
+                  }
+                : undefined
+            }
             onSave={saveActivity}
             t={t}
             locale={locale}
