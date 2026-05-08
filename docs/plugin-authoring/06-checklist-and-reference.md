@@ -56,6 +56,7 @@ Check that:
 - a bank activity can be authored if the plugin supports teacher authoring
 - authoring/settings forms warn before navigation when there are unsaved changes
 - save-and-leave and discard-and-leave both behave correctly from the unsaved-changes dialog
+- AI generation confirms before replacing non-empty authoring/configuration fields
 - assigning from an activity bank creates an independent course copy
 - the activity renders your component
 - saving config works

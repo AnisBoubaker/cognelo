@@ -33,6 +33,8 @@ For authored rich text display, use `MarkdownRenderer` from `@cognelo/activity-u
 
 For every plugin authoring or settings form, use `useUnsavedChangesGuard` from `@cognelo/activity-ui`. Keep a saved snapshot, compute `isDirty`, and provide `onSave` plus `onDiscard` so shared navigation can offer continue editing, save and leave, or discard and leave.
 
+If a plugin adds AI-assisted generation that writes into authoring/configuration fields, confirm before replacing any non-empty existing content. Treat generation as a destructive overwrite unless it appends into a clearly separate draft area.
+
 ## Minimal Plugin Flow
 
 1. Create `packages/plugins/plugin-your-plugin`
