@@ -74,7 +74,12 @@ const copyByLocale = {
     keepCurrentSource: "Keep current source",
     replaceCurrentSource: "Replace source",
     studentPreview: "Student preview",
-    question: "Question"
+    question: "Question",
+    checkAnswers: "Check answers",
+    reset: "Reset",
+    score: "Score",
+    correct: "Correct.",
+    incorrect: "Not quite. Review your choices and try again."
   },
   fr: {
     authoringTitle: "Edition des questions a choix multiples",
@@ -102,7 +107,12 @@ const copyByLocale = {
     keepCurrentSource: "Conserver la source",
     replaceCurrentSource: "Remplacer la source",
     studentPreview: "Apercu etudiant",
-    question: "Question"
+    question: "Question",
+    checkAnswers: "Verifier les reponses",
+    reset: "Reinitialiser",
+    score: "Score",
+    correct: "Correct.",
+    incorrect: "Pas tout a fait. Revoyez vos choix et reessayez."
   },
   zh: {
     authoringTitle: "选择题编辑",
@@ -130,7 +140,12 @@ const copyByLocale = {
     keepCurrentSource: "保留当前源码",
     replaceCurrentSource: "替换源码",
     studentPreview: "学生预览",
-    question: "问题"
+    question: "问题",
+    checkAnswers: "检查答案",
+    reset: "重置",
+    score: "得分",
+    correct: "正确。",
+    incorrect: "还不完全正确。请检查选项后再试。"
   }
 } as const;
 
@@ -391,7 +406,7 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
 
         <div className="mcq-authoring-grid">
           <div className="stack">
-            <span>{copy.source}</span>
+            <h3>{copy.source}</h3>
             <CodeEditor id="mcq-source" value={source} onChange={setSource} language="markdown" minHeight={620} />
           </div>
 
@@ -410,34 +425,15 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
               onSingleChoice={updateSingleChoice}
               onMultipleChoice={updateMultipleChoice}
               questionLabel={copy.question}
+              checkAnswersLabel={copy.checkAnswers}
+              resetLabel={copy.reset}
+              scoreLabel={copy.score}
+              correctLabel={copy.correct}
+              incorrectLabel={copy.incorrect}
               randomizeChoices={randomizeChoices}
             />
           </section>
         </div>
-
-        {parsedMcq.questions.length ? (
-          <div className="row">
-            <button type="button" onClick={() => setSubmitted(true)}>
-              Check answers
-            </button>
-            <button
-              className="secondary"
-              type="button"
-              onClick={() => {
-                setStudentAnswers({});
-                setSubmitted(false);
-              }}
-            >
-              Reset
-            </button>
-          </div>
-        ) : null}
-
-        {submitted && score ? (
-          <p className="muted">
-            Score: {score.correct} / {score.total}
-          </p>
-        ) : null}
 
         {parsedMcq.errors.length ? (
           <section className="stack" style={{ border: "1px solid rgba(210, 61, 71, 0.25)", borderRadius: 10, padding: 16 }}>
@@ -476,6 +472,11 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
         onSingleChoice={updateSingleChoice}
         onMultipleChoice={updateMultipleChoice}
         questionLabel={copy.question}
+        checkAnswersLabel={copy.checkAnswers}
+        resetLabel={copy.reset}
+        scoreLabel={copy.score}
+        correctLabel={copy.correct}
+        incorrectLabel={copy.incorrect}
         randomizeChoices={randomizeChoices}
       />
     </section>
@@ -492,6 +493,11 @@ function McqStudentView({
   onSingleChoice,
   onMultipleChoice,
   questionLabel,
+  checkAnswersLabel,
+  resetLabel,
+  scoreLabel,
+  correctLabel,
+  incorrectLabel,
   randomizeChoices
 }: {
   parsedMcq: ParsedMcq;
@@ -503,6 +509,11 @@ function McqStudentView({
   onSingleChoice: (question: McqQuestion, choiceId: string) => void;
   onMultipleChoice: (question: McqQuestion, choiceId: string, checked: boolean) => void;
   questionLabel: string;
+  checkAnswersLabel: string;
+  resetLabel: string;
+  scoreLabel: string;
+  correctLabel: string;
+  incorrectLabel: string;
   randomizeChoices: boolean;
 }) {
   const questions = useMemo(
@@ -529,6 +540,8 @@ function McqStudentView({
             selected={selected}
             submitted={submitted}
             questionLabel={questionLabel}
+            correctLabel={correctLabel}
+            incorrectLabel={incorrectLabel}
             onSingleChoice={onSingleChoice}
             onMultipleChoice={onMultipleChoice}
           />
@@ -538,17 +551,17 @@ function McqStudentView({
       {parsedMcq.questions.length ? (
         <div className="row">
           <button type="button" onClick={onSubmit}>
-            Check answers
+            {checkAnswersLabel}
           </button>
           <button className="secondary" type="button" onClick={onReset}>
-            Reset
+            {resetLabel}
           </button>
         </div>
       ) : null}
 
       {submitted && score ? (
         <p className="muted">
-          Score: {score.correct} / {score.total}
+          {scoreLabel}: {score.correct} / {score.total}
         </p>
       ) : null}
     </div>
@@ -561,6 +574,8 @@ function McqQuestionCard({
   selected,
   submitted,
   questionLabel,
+  correctLabel,
+  incorrectLabel,
   onSingleChoice,
   onMultipleChoice
 }: {
@@ -569,6 +584,8 @@ function McqQuestionCard({
   selected: string[];
   submitted: boolean;
   questionLabel: string;
+  correctLabel: string;
+  incorrectLabel: string;
   onSingleChoice: (question: McqQuestion, choiceId: string) => void;
   onMultipleChoice: (question: McqQuestion, choiceId: string, checked: boolean) => void;
 }) {
@@ -628,7 +645,7 @@ function McqQuestionCard({
       </div>
 
       {submitted ? (
-        <p className={isCorrect ? "muted" : "error"}>{isCorrect ? "Correct." : "Not quite. Review your choices and try again."}</p>
+        <p className={isCorrect ? "muted" : "error"}>{isCorrect ? correctLabel : incorrectLabel}</p>
       ) : null}
     </article>
   );
