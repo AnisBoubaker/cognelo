@@ -90,6 +90,7 @@ These are also available through group-scoped assigned activity dispatch for stu
 
 - student rows render in a compact editor-like style
 - syntax highlighting and line numbers come from shared `@cognelo/activity-ui`
+- teacher authoring is registered with the shared `useUnsavedChangesGuard`; future Parsons authoring/settings forms should register the same dirty/save/discard behavior
 - scrambling is random on each fresh try/reset
 - order feedback counts minimally misplaced units instead of cascading false counts
 - groups are stored as line ranges so edits inside a group keep the group coherent

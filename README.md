@@ -295,6 +295,7 @@ WEB_DESIGN_RUNNER_URL=http://localhost:3456
 - Users can update their first and last name from profile settings; email changes are reserved for administrators.
 - AI agent connection settings live under `/settings/ai-agents`; users can create personal connections, choose their question-authoring helper, and admins can create global connections for later course use.
 - Plugin authoring screens can use the selected question-authoring AI agent through server-side plugin routes; the MCQ plugin uses this to generate validated MCQ source from a teacher description.
+- All core and plugin authoring/settings forms should register unsaved-change state through `useUnsavedChangesGuard` from `@cognelo/activity-ui`. Registered forms show a shared confirmation dialog before internal navigation, with actions to continue editing, save and leave, or discard changes. Browser refresh/close uses the native browser warning.
 - The subjects area uses a list-first management flow: add subjects from the list header, open a subject detail page, and edit subject metadata from a dedicated edit page.
 - Course materials support links, uploads, folders, edit/remove, expand/collapse, and drag/drop ordering.
 - Course workspaces include a Settings tab where teachers can choose the student-support AI agent from their personal connections or admin-managed global connections.

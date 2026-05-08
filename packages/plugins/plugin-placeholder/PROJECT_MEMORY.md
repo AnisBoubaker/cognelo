@@ -7,4 +7,5 @@ This file is for placeholder-plugin memory only.
 - The placeholder plugin should stay minimal.
 - It is a reference example for the plugin boundary more than a feature-heavy activity.
 - If it ever grows real behavior, that behavior should remain inside this package.
+- If it ever grows custom authoring or settings forms, those forms must use the shared unsaved-change guard.
 - It currently needs no plugin-owned persistence or bank-to-course copy hook because generic bank/course activity config is enough.

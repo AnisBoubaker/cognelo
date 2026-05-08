@@ -37,6 +37,14 @@ const messages: Record<Locale, MessageTree> = {
       saving: "Saving...",
       time: "Time"
     },
+    unsavedChanges: {
+      eyebrow: "Unsaved changes",
+      title: "Leave this page?",
+      message: "Some changes have not been saved. Choose what you want to do before leaving.",
+      continueEditing: "Continue editing",
+      saveAndLeave: "Save and leave",
+      discardAndLeave: "Discard changes"
+    },
     nav: {
       dashboard: "Dashboard",
       subjects: "Subjects",
@@ -483,6 +491,14 @@ const messages: Record<Locale, MessageTree> = {
       saving: "Enregistrement...",
       time: "Heure"
     },
+    unsavedChanges: {
+      eyebrow: "Changements non sauvegardés",
+      title: "Quitter cette page?",
+      message: "Certains changements n'ont pas été sauvegardés. Choisissez quoi faire avant de quitter.",
+      continueEditing: "Continuer l'édition",
+      saveAndLeave: "Sauvegarder et quitter",
+      discardAndLeave: "Annuler les changements"
+    },
     nav: {
       dashboard: "Tableau de bord",
       subjects: "Sujets",
@@ -928,6 +944,14 @@ const messages: Record<Locale, MessageTree> = {
       save: "保存",
       saving: "保存中...",
       time: "时间"
+    },
+    unsavedChanges: {
+      eyebrow: "未保存的更改",
+      title: "离开此页面？",
+      message: "有些更改尚未保存。离开前请选择要执行的操作。",
+      continueEditing: "继续编辑",
+      saveAndLeave: "保存并离开",
+      discardAndLeave: "放弃更改"
     },
     nav: {
       dashboard: "仪表盘",

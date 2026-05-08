@@ -1,8 +1,8 @@
 "use client";
 
 import katex from "katex";
-import { type FormEvent, Fragment, useEffect, useMemo, useState } from "react";
-import { CodeEditor, CodeRenderer, codeLanguageOptions, useNotifications } from "@cognelo/activity-ui";
+import { type FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { CodeEditor, CodeRenderer, codeLanguageOptions, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   parseMcqSource,
   renderInlineMarkdown,
@@ -32,6 +32,14 @@ type McqActivityViewProps = {
 };
 
 type StudentAnswerState = Record<string, string[]>;
+
+type McqFormSnapshot = {
+  title: string;
+  description: string;
+  source: string;
+  defaultCodeLanguage: string;
+  randomizeChoices: boolean;
+};
 
 const fallbackConfig = {
   source: "",
@@ -122,6 +130,7 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
   const [source, setSource] = useState(String(activity.config?.source ?? fallbackConfig.source));
   const [defaultCodeLanguage, setDefaultCodeLanguage] = useState(String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage));
   const [randomizeChoices, setRandomizeChoices] = useState(Boolean(activity.config?.randomizeChoices ?? fallbackConfig.randomizeChoices));
+  const [savedSnapshot, setSavedSnapshot] = useState<McqFormSnapshot>(() => snapshotFromActivity(activity));
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
@@ -134,6 +143,7 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
     setSource(String(activity.config?.source ?? fallbackConfig.source));
     setDefaultCodeLanguage(String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage));
     setRandomizeChoices(Boolean(activity.config?.randomizeChoices ?? fallbackConfig.randomizeChoices));
+    setSavedSnapshot(snapshotFromActivity(activity));
     setStudentAnswers({});
     setSubmitted(false);
     setError("");
@@ -160,8 +170,30 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
     };
   }, [parsedMcq.questions, studentAnswers, submitted]);
 
-  async function saveMcq(event: FormEvent) {
-    event.preventDefault();
+  const currentSnapshot = useMemo(
+    () => ({
+      title,
+      description,
+      source,
+      defaultCodeLanguage,
+      randomizeChoices
+    }),
+    [defaultCodeLanguage, description, randomizeChoices, source, title]
+  );
+  const hasUnsavedChanges = canManage && !snapshotsEqual(currentSnapshot, savedSnapshot);
+
+  const discardChanges = useCallback(() => {
+    setTitle(savedSnapshot.title);
+    setDescription(savedSnapshot.description);
+    setSource(savedSnapshot.source);
+    setDefaultCodeLanguage(savedSnapshot.defaultCodeLanguage);
+    setRandomizeChoices(savedSnapshot.randomizeChoices);
+    setStudentAnswers({});
+    setSubmitted(false);
+    setError("");
+  }, [savedSnapshot]);
+
+  const saveMcqChanges = useCallback(async () => {
     setSaving(true);
     setError("");
 
@@ -175,13 +207,37 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
           randomizeChoices
         }
       });
+      setSavedSnapshot({
+        title,
+        description,
+        source,
+        defaultCodeLanguage,
+        randomizeChoices
+      });
       notifications.success(copy.saved);
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : copy.saveError);
       setError("");
+      throw err;
     } finally {
       setSaving(false);
     }
+  }, [copy.saveError, copy.saved, defaultCodeLanguage, description, notifications, onSave, randomizeChoices, source, title]);
+
+  useUnsavedChangesGuard(
+    useMemo(
+      () => ({
+        isDirty: hasUnsavedChanges,
+        onSave: saveMcqChanges,
+        onDiscard: discardChanges
+      }),
+      [discardChanges, hasUnsavedChanges, saveMcqChanges]
+    )
+  );
+
+  async function saveMcq(event: FormEvent) {
+    event.preventDefault();
+    await saveMcqChanges();
   }
 
   async function generateMcqSource() {
@@ -478,6 +534,26 @@ function shuffleChoices(choices: McqChoice[]) {
     [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
   }
   return shuffled;
+}
+
+function snapshotFromActivity(activity: ActivityLike): McqFormSnapshot {
+  return {
+    title: activity.title,
+    description: activity.description,
+    source: String(activity.config?.source ?? fallbackConfig.source),
+    defaultCodeLanguage: String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage),
+    randomizeChoices: Boolean(activity.config?.randomizeChoices ?? fallbackConfig.randomizeChoices)
+  };
+}
+
+function snapshotsEqual(left: McqFormSnapshot, right: McqFormSnapshot) {
+  return (
+    left.title === right.title &&
+    left.description === right.description &&
+    left.source === right.source &&
+    left.defaultCodeLanguage === right.defaultCodeLanguage &&
+    left.randomizeChoices === right.randomizeChoices
+  );
 }
 
 function MarkdownBlocksView({ blocks, compact = false }: { blocks: McqBlock[]; compact?: boolean }) {

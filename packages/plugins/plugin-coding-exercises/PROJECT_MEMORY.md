@@ -30,3 +30,4 @@ This file is for coding-exercises-specific memory only.
 - Coding plugin routes must remain plugin-owned and mounted through generic course/group plugin dispatchers, not hardcoded as plugin-specific API route files in `apps/api`.
 - Student coding uses the shared Monaco editor from `@cognelo/activity-ui`, while teacher authoring still uses the in-house editor for the lighter authoring workflow.
 - Plugin-owned user-facing translations should live inside the plugin package rather than in the host app's global i18n file.
+- Teacher authoring forms must register with the shared unsaved-change guard from `@cognelo/activity-ui`; future coding-exercise tabs/settings should keep `isDirty`, save, and discard behavior wired through `useUnsavedChangesGuard`.

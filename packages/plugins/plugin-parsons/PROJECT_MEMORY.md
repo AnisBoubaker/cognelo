@@ -9,6 +9,7 @@ This file is for Parsons-specific memory only.
 ## Current Feature Decisions
 
 - Teachers author the reference solution in a syntax-colored editor with line numbers.
+- Teacher authoring forms use the shared unsaved-change guard from `@cognelo/activity-ui`; future Parsons authoring/settings panels should register with `useUnsavedChangesGuard`.
 - Teachers create groups from editor-adjacent line selection rather than from a separate line-to-group assignment form.
 - Groups are stored as line ranges, not per-line selections.
 - Teachers can mark a group as strict or flexible internally.

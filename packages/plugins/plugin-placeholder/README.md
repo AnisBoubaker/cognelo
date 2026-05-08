@@ -20,6 +20,8 @@ The placeholder plugin exists as a minimal activity shell while a real pedagogic
 
 This plugin intentionally relies only on core bank/course activity records and does not currently need plugin-owned persistence, bank-to-course copy hooks, or custom routes.
 
+If this placeholder ever grows custom authoring or settings UI, that form should register with `useUnsavedChangesGuard` from `@cognelo/activity-ui`.
+
 ## Contributor Workflow
 
 When changing this plugin, update:

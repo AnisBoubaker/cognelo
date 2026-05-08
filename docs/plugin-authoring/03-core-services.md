@@ -89,7 +89,7 @@ That context includes:
 
 For beginners, this is much easier than designing a totally separate API architecture.
 
-## Shared UI: Code Editor, Code Renderer, Markdown, And Notifications
+## Shared UI: Code Editor, Code Renderer, Markdown, Notifications, And Unsaved Changes
 
 Shared UI primitives live in:
 
@@ -97,6 +97,7 @@ Shared UI primitives live in:
 - [packages/activity-ui/src/code-renderer.tsx](../../packages/activity-ui/src/code-renderer.tsx)
 - [packages/activity-ui/src/markdown-renderer.tsx](../../packages/activity-ui/src/markdown-renderer.tsx)
 - [packages/activity-ui/src/notifications.tsx](../../packages/activity-ui/src/notifications.tsx)
+- [packages/activity-ui/src/unsaved-changes.tsx](../../packages/activity-ui/src/unsaved-changes.tsx)
 
 These are especially useful for programming-learning activities.
 
@@ -130,14 +131,40 @@ Use this for transient confirmations and non-field-specific errors.
 
 Prefer it over inline “saved” messages when the feedback does not need to stay attached to a specific form field.
 
+### What `useUnsavedChangesGuard()` Gives You
+
+- a shared dirty-form registration point for plugin and core forms
+- the platform dialog for internal navigation, with continue editing, save and leave, or discard and leave actions
+- browser-native `beforeunload` protection for refresh and tab close
+
+Every plugin authoring or settings form should register with this hook. Keep an initial saved snapshot, compute `isDirty` from the current local state, and provide `onSave` and `onDiscard` callbacks. This avoids duplicating navigation prompts inside each plugin and keeps course, bank, and settings forms consistent.
+
 ### Example
 
 ```tsx
-import { CodeEditor, CodeRenderer, MarkdownRenderer, useNotifications } from "@cognelo/activity-ui";
+import {
+  CodeEditor,
+  CodeRenderer,
+  MarkdownRenderer,
+  useNotifications,
+  useUnsavedChangesGuard
+} from "@cognelo/activity-ui";
 
 export function Demo() {
   const [value, setValue] = useState("print('hello')");
+  const [savedValue, setSavedValue] = useState(value);
   const notifications = useNotifications();
+
+  useUnsavedChangesGuard({
+    id: "demo-plugin-form",
+    isDirty: value !== savedValue,
+    onSave: async () => {
+      await saveValue(value);
+      setSavedValue(value);
+      notifications.success("Saved.");
+    },
+    onDiscard: () => setValue(savedValue)
+  });
 
   return (
     <section className="stack">

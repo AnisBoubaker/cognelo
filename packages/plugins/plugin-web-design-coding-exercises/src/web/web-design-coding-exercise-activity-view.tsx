@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MarkdownRenderer, MonacoCodeEditor, useNotifications } from "@cognelo/activity-ui";
+import { MarkdownRenderer, MonacoCodeEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   buildWebDesignPreviewDocument,
   defaultWebDesignExerciseConfig,
@@ -41,6 +41,15 @@ type WebDesignExerciseTestRecord = {
   validationSummary: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+};
+
+type WebDesignAuthoringSnapshot = {
+  title: string;
+  description: string;
+  prompt: string;
+  starterFiles: WebDesignExerciseFile[];
+  solutionFiles: WebDesignExerciseFile[];
+  authoringTests: WebDesignExerciseTestRecord[];
 };
 
 type WebDesignExerciseReferenceBundleRecord = {
@@ -400,6 +409,16 @@ export function WebDesignCodingExerciseActivityView({
   const [prompt, setPrompt] = useState(initialConfig.prompt);
   const [starterFiles, setStarterFiles] = useState<WebDesignExerciseFile[]>(initialConfig.files);
   const [solutionFiles, setSolutionFiles] = useState<WebDesignExerciseFile[]>(initialConfig.files);
+  const [savedSnapshot, setSavedSnapshot] = useState<WebDesignAuthoringSnapshot>(() =>
+    buildWebDesignAuthoringSnapshot({
+      title: activity.title,
+      description: activity.description,
+      prompt: initialConfig.prompt,
+      starterFiles: initialConfig.files,
+      solutionFiles: initialConfig.files,
+      authoringTests: []
+    })
+  );
   const [activePath, setActivePath] = useState(initialConfig.files[0]?.path ?? "index.html");
   const [activeSolutionPath, setActiveSolutionPath] = useState(initialConfig.files[0]?.path ?? "index.html");
   const [activeStarterPath, setActiveStarterPath] = useState(initialConfig.files[0]?.path ?? "index.html");
@@ -442,6 +461,18 @@ export function WebDesignCodingExerciseActivityView({
     setDescription(activity.description);
     setPrompt(nextConfig.prompt);
     setStarterFiles(nextConfig.files);
+    if (!canManage) {
+      setSavedSnapshot(
+        buildWebDesignAuthoringSnapshot({
+          title: activity.title,
+          description: activity.description,
+          prompt: nextConfig.prompt,
+          starterFiles: nextConfig.files,
+          solutionFiles: nextConfig.files,
+          authoringTests: []
+        })
+      );
+    }
     setActivePath(nextConfig.files[0]?.path ?? "index.html");
     setActiveStarterPath(nextConfig.files[0]?.path ?? "index.html");
     if (isNewActivity) {
@@ -486,6 +517,17 @@ export function WebDesignCodingExerciseActivityView({
         if (isMounted) {
           setAuthoringTests(result.tests);
           setAuthoringTestsLoaded(true);
+          const nextSolutionFiles = result.referenceBundle?.files.length ? result.referenceBundle.files : solutionFiles;
+          setSavedSnapshot(
+            buildWebDesignAuthoringSnapshot({
+              title,
+              description,
+              prompt,
+              starterFiles,
+              solutionFiles: nextSolutionFiles,
+              authoringTests: result.tests
+            })
+          );
         }
       })
       .catch(() => {
@@ -591,9 +633,32 @@ export function WebDesignCodingExerciseActivityView({
     () => validateFiles(normalizedStarterFiles, copy.duplicatePath, copy.missingFile),
     [copy, normalizedStarterFiles]
   );
+  const currentSnapshot = useMemo(
+    () =>
+      buildWebDesignAuthoringSnapshot({
+        title,
+        description,
+        prompt,
+        starterFiles: normalizedStarterFiles,
+        solutionFiles: normalizedSolutionFiles,
+        authoringTests
+      }),
+    [authoringTests, description, normalizedSolutionFiles, normalizedStarterFiles, prompt, title]
+  );
+  const hasUnsavedChanges = canManage && !webDesignAuthoringSnapshotsEqual(currentSnapshot, savedSnapshot);
 
-  async function saveExercise(event: FormEvent) {
-    event.preventDefault();
+  const discardChanges = useCallback(() => {
+    setTitle(savedSnapshot.title);
+    setDescription(savedSnapshot.description);
+    setPrompt(savedSnapshot.prompt);
+    setStarterFiles(savedSnapshot.starterFiles);
+    setSolutionFiles(savedSnapshot.solutionFiles);
+    setAuthoringTests(savedSnapshot.authoringTests);
+    setAuthoringTestsLoaded(true);
+    setError("");
+  }, [savedSnapshot]);
+
+  const saveWebDesignExercise = useCallback(async () => {
     const nextConfig: WebDesignExerciseConfig = normalizeWebDesignExerciseConfig({
       prompt,
       files: normalizedStarterFiles,
@@ -618,15 +683,33 @@ export function WebDesignCodingExerciseActivityView({
         config: nextConfig
       });
       await saveSolutionAndTests();
+      setSavedSnapshot(currentSnapshot);
       notifications.success(copy.saved);
     } catch (err) {
       if (!handleReferenceValidationError(err)) {
         notifications.error(err instanceof Error ? err.message : copy.saveError);
       }
+      throw err;
     } finally {
       setSaving(false);
       setValidatingTests(false);
     }
+  }, [copy, currentSnapshot, description, normalizedStarterFiles, notifications, onSave, prompt, title]);
+
+  useUnsavedChangesGuard(
+    useMemo(
+      () => ({
+        isDirty: hasUnsavedChanges,
+        onSave: saveWebDesignExercise,
+        onDiscard: discardChanges
+      }),
+      [discardChanges, hasUnsavedChanges, saveWebDesignExercise]
+    )
+  );
+
+  async function saveExercise(event: FormEvent) {
+    event.preventDefault();
+    await saveWebDesignExercise();
   }
 
   async function saveSolutionAndTests(testsOverride?: WebDesignExerciseTestRecord[]) {
@@ -1933,6 +2016,14 @@ function consoleLevelColor(level: PreviewConsoleMessage["level"]) {
     return "#c4b5fd";
   }
   return "#e8edf7";
+}
+
+function buildWebDesignAuthoringSnapshot(snapshot: WebDesignAuthoringSnapshot): WebDesignAuthoringSnapshot {
+  return JSON.parse(JSON.stringify(snapshot)) as WebDesignAuthoringSnapshot;
+}
+
+function webDesignAuthoringSnapshotsEqual(left: WebDesignAuthoringSnapshot, right: WebDesignAuthoringSnapshot) {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function validateFiles(files: readonly WebDesignExerciseFile[], duplicatePathMessage: string, missingFileMessage: string) {

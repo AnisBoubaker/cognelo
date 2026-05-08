@@ -29,6 +29,8 @@ Current config shape:
 
 This plugin is still a scaffold. It does not yet own dedicated persistence tables, bank-to-course copy hooks, or activity-specific UX beyond registration metadata.
 
+When this plugin gains teacher authoring or settings UI, the first form implementation should register with `useUnsavedChangesGuard` from `@cognelo/activity-ui` so navigation uses the platform-wide unsaved-change dialog.
+
 ## Contributor Workflow
 
 When changing this plugin, update:

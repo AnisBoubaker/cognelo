@@ -100,6 +100,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - General account configuration lives under `/settings`, currently reached from the account menu and structured so future non-course-specific settings can be added beside `/settings/profile`.
 - AI agent configuration lives under `/settings/ai-agents` and uses the same settings navigation as profile configuration.
 - Plugin authoring UIs may expose AI-assisted generation only when the teacher has selected an enabled question-authoring AI agent. Calls should go through server-side plugin routes so stored API keys are never exposed to the browser.
+- Unsaved-change protection is a shared frontend concern exposed from `@cognelo/activity-ui` and mounted in the web app through `UnsavedChangesProvider`. Every new core or plugin authoring/settings form should register dirty/save/discard behavior with `useUnsavedChangesGuard`; internal links and browser back/forward show the custom dialog, while refresh/close uses the browser-native beforeunload prompt. Main course/profile/subject forms and the MCQ, coding-exercise, Parsons, and web-design-coding-exercise authoring UIs use it.
 - The visual theme should reflect the Cognelo logo palette in a restrained, product-like way.
 - Syntax-colored code rendering should be shared across activities through `packages/activity-ui`.
 - Markdown text rendering for authored prompts/descriptions should be shared across activities and core pages through `packages/activity-ui` rather than reimplemented per plugin.

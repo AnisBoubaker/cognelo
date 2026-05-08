@@ -1,7 +1,7 @@
 "use client";
 
-import { type FormEvent, useEffect, useRef, useState } from "react";
-import { CodeEditor, CodeRenderer, MarkdownRenderer, codeLanguageOptions, normalizeCodeLanguage, useNotifications } from "@cognelo/activity-ui";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CodeEditor, CodeRenderer, MarkdownRenderer, codeLanguageOptions, normalizeCodeLanguage, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   createParsonsGroup,
   createParsonsPrecedenceRule,
@@ -63,6 +63,17 @@ type ParsonsActivityViewProps = {
   t: (key: string, vars?: Record<string, string | number>) => string;
 };
 
+type ParsonsAuthoringSnapshot = {
+  title: string;
+  description: string;
+  prompt: string;
+  solution: string;
+  language: string;
+  stripIndentation: boolean;
+  groups: ParsonsGroup[];
+  precedenceRules: ParsonsPrecedenceRule[];
+};
+
 export function ParsonsActivityView({ activity, course, canManage, onSave, attemptsClient, t }: ParsonsActivityViewProps) {
   const notifications = useNotifications();
   const [title, setTitle] = useState("");
@@ -73,6 +84,7 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
   const [stripIndentation, setStripIndentation] = useState(false);
   const [groups, setGroups] = useState<ParsonsGroup[]>([]);
   const [precedenceRules, setPrecedenceRules] = useState<ParsonsPrecedenceRule[]>([]);
+  const [savedSnapshot, setSavedSnapshot] = useState<ParsonsAuthoringSnapshot>(() => parsonsSnapshotFromActivity(activity));
   const [selectedLines, setSelectedLines] = useState<number[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [precedenceDraft, setPrecedenceDraft] = useState<{ beforeGroupId: string; afterGroupId: string } | null>(null);
@@ -99,6 +111,7 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
     setStripIndentation(config.stripIndentation);
     setGroups(config.groups);
     setPrecedenceRules(config.precedenceRules);
+    setSavedSnapshot(parsonsSnapshotFromActivity(activity));
     setSelectedLines([]);
     setSelectedGroupId(null);
     setPrecedenceDraft(null);
@@ -215,8 +228,25 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
     }
   }
 
-  async function saveParsonsProblem(event: FormEvent) {
-    event.preventDefault();
+  const currentSnapshot = useMemo(
+    () => buildParsonsSnapshot({ title, description, prompt, solution, language, stripIndentation, groups, precedenceRules }),
+    [description, groups, language, precedenceRules, prompt, solution, stripIndentation, title]
+  );
+  const hasUnsavedChanges = canManage && !parsonsSnapshotsEqual(currentSnapshot, savedSnapshot);
+
+  const discardChanges = useCallback(() => {
+    setTitle(savedSnapshot.title);
+    setDescription(savedSnapshot.description);
+    setPrompt(savedSnapshot.prompt);
+    setSolution(savedSnapshot.solution);
+    setLanguage(savedSnapshot.language);
+    setStripIndentation(savedSnapshot.stripIndentation);
+    setGroups(savedSnapshot.groups);
+    setPrecedenceRules(savedSnapshot.precedenceRules);
+    setError("");
+  }, [savedSnapshot]);
+
+  const saveParsonsChanges = useCallback(async () => {
     setSaving(true);
     setError("");
     try {
@@ -235,15 +265,33 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
       const savedConfig = parseParsonsConfig(nextActivity.config);
       setGroups(savedConfig.groups);
       setPrecedenceRules(savedConfig.precedenceRules);
+      setSavedSnapshot(parsonsSnapshotFromActivity(nextActivity));
       setBlocks(resetParsonsBlocks(savedConfig));
       setSelectedBlockId(null);
       notifications.success(t("parsons.saved"));
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : t("parsons.saveError"));
       setError("");
+      throw err;
     } finally {
       setSaving(false);
     }
+  }, [description, groups, language, notifications, onSave, precedenceRules, prompt, solution, stripIndentation, t, title]);
+
+  useUnsavedChangesGuard(
+    useMemo(
+      () => ({
+        isDirty: hasUnsavedChanges,
+        onSave: saveParsonsChanges,
+        onDiscard: discardChanges
+      }),
+      [discardChanges, hasUnsavedChanges, saveParsonsChanges]
+    )
+  );
+
+  async function saveParsonsProblem(event: FormEvent) {
+    event.preventDefault();
+    await saveParsonsChanges();
   }
 
   function moveBlock(index: number, direction: -1 | 1) {
@@ -771,6 +819,28 @@ function ParsonsControlIcon({ direction }: { direction: "up" | "down" | "left" |
       <path d={paths[direction]} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
     </svg>
   );
+}
+
+function parsonsSnapshotFromActivity(activity: ActivityLike) {
+  const config = parseParsonsConfig(activity.config);
+  return buildParsonsSnapshot({
+    title: activity.title,
+    description: activity.description,
+    prompt: config.prompt,
+    solution: config.solution,
+    language: normalizeCodeLanguage(config.language),
+    stripIndentation: config.stripIndentation,
+    groups: config.groups,
+    precedenceRules: config.precedenceRules
+  });
+}
+
+function buildParsonsSnapshot(snapshot: ParsonsAuthoringSnapshot): ParsonsAuthoringSnapshot {
+  return JSON.parse(JSON.stringify(snapshot)) as ParsonsAuthoringSnapshot;
+}
+
+function parsonsSnapshotsEqual(left: ParsonsAuthoringSnapshot, right: ParsonsAuthoringSnapshot) {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function renderSelectionRail(

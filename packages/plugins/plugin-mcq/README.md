@@ -27,6 +27,8 @@ The plugin currently relies on core bank/course activity records only and does n
 
 When a teacher has selected an enabled question-authoring AI agent in global settings, the authoring UI can generate MCQ source from the activity description. The server route keeps the agent key private, injects subject/default-language/syntax requirements into the prompt, validates the generated source with the MCQ parser, and retries correction up to three total model calls before returning an error.
 
+The MCQ authoring UI must stay registered with `useUnsavedChangesGuard` from `@cognelo/activity-ui`. Any new MCQ authoring option, generated-content panel, or settings form should participate in that same dirty/save/discard flow.
+
 ## Contributor Workflow
 
 When changing this plugin, update:
