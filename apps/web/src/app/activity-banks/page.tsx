@@ -26,7 +26,7 @@ export default function ActivityBanksPage() {
   }
 
   useEffect(() => {
-    loadPage().catch((err) => setError(err instanceof Error ? err.message : "Unable to load activity banks."));
+    loadPage().catch((err) => setError(err instanceof Error ? err.message : t("activityBanks.loadError")));
   }, []);
 
   async function createActivityBank(event: FormEvent) {
@@ -42,7 +42,7 @@ export default function ActivityBanksPage() {
       });
       router.push(`/activity-banks/${result.activityBank.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to create activity bank.");
+      setError(err instanceof Error ? err.message : t("activityBanks.createError"));
     } finally {
       setSavingBank(false);
     }
@@ -53,9 +53,9 @@ export default function ActivityBanksPage() {
       <main className="page stack">
         <section className="hero-panel hero-panel-compact">
           <div className="hero-meta">
-            <p className="eyebrow">Reusable activities</p>
+            <p className="eyebrow">{t("activityBanks.eyebrow")}</p>
             <h1>{t("nav.activityBanks")}</h1>
-            <p className="muted">Select a bank to manage its activities, or add a new bank.</p>
+            <p className="muted">{t("activityBanks.subtitle")}</p>
           </div>
         </section>
 
@@ -65,8 +65,8 @@ export default function ActivityBanksPage() {
           <div className="section stack">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">Banks</p>
-                <h2>Activity banks</h2>
+                <p className="eyebrow">{t("activityBanks.listEyebrow")}</p>
+                <h2>{t("activityBanks.listTitle")}</h2>
               </div>
             </div>
             {activityBanks.length ? (
@@ -75,24 +75,24 @@ export default function ActivityBanksPage() {
                   <Link className="table-row table-row-link" href={`/activity-banks/${bank.id}`} key={bank.id}>
                     <span className="table-main table-main-stack">
                       <strong>{bank.title}</strong>
-                      <span className="table-meta-note muted">{bank.subject?.title ?? "No subject"}</span>
+                      <span className="table-meta-note muted">{bank.subject?.title ?? t("activityBanks.noSubject")}</span>
                     </span>
-                    <span className="table-meta muted">{bank.activities?.length ?? 0} activities</span>
+                    <span className="table-meta muted">{t("activityBanks.activityCount", { count: bank.activities?.length ?? 0 })}</span>
                     <span className="table-meta muted">{bank.owner?.name ?? bank.owner?.email ?? ""}</span>
-                    <span className="table-meta muted">Open</span>
+                    <span className="table-meta muted">{t("common.open")}</span>
                   </Link>
                 ))}
               </div>
             ) : (
-              <p className="muted">No activity banks yet.</p>
+              <p className="muted">{t("activityBanks.empty")}</p>
             )}
           </div>
 
           <div className="section stack">
-            <h2>Add activity bank</h2>
+            <h2>{t("activityBanks.addTitle")}</h2>
             <form className="form" onSubmit={createActivityBank}>
               <div className="field">
-                <label htmlFor="bank-subject">Subject</label>
+                <label htmlFor="bank-subject">{t("activityBanks.subjectLabel")}</label>
                 <select id="bank-subject" value={bankSubjectId} onChange={(event) => setBankSubjectId(event.target.value)} required>
                   {subjects.map((subject) => (
                     <option key={subject.id} value={subject.id}>
@@ -102,11 +102,11 @@ export default function ActivityBanksPage() {
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="bank-title">Title</label>
+                <label htmlFor="bank-title">{t("activityBanks.titleLabel")}</label>
                 <input id="bank-title" value={bankTitle} minLength={2} required onChange={(event) => setBankTitle(event.target.value)} />
               </div>
               <div className="field">
-                <label htmlFor="bank-description">Description</label>
+                <label htmlFor="bank-description">{t("activityBanks.descriptionLabel")}</label>
                 <textarea id="bank-description" value={bankDescription} onChange={(event) => setBankDescription(event.target.value)} />
               </div>
               <button type="submit" disabled={savingBank || !bankSubjectId}>

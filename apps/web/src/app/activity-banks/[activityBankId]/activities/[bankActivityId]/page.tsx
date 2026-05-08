@@ -1,13 +1,14 @@
 "use client";
 
 import { CodingExerciseActivityView } from "@cognelo/plugin-coding-exercises";
+import { McqActivityView } from "@cognelo/plugin-mcq";
 import { ParsonsActivityView } from "@cognelo/plugin-parsons";
 import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { api, type ActivityBank, type ActivityType, type BankActivity } from "@/lib/api";
+import { api, type ActivityBank, type ActivityDefinition, type ActivityType, type BankActivity } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 type ActivityLike = {
@@ -26,20 +27,22 @@ export default function BankActivityAuthoringPage() {
   const { locale, t } = useI18n();
   const [bank, setBank] = useState<ActivityBank | null>(null);
   const [activity, setActivity] = useState<BankActivity | null>(null);
+  const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [error, setError] = useState("");
 
   async function loadPage() {
-    const result = await api.activityBank(activityBankId);
-    const nextActivity = result.activityBank.activities?.find((candidate) => candidate.id === bankActivityId) ?? null;
-    setBank(result.activityBank);
+    const [bankResult, typeResult] = await Promise.all([api.activityBank(activityBankId), api.activityTypes()]);
+    const nextActivity = bankResult.activityBank.activities?.find((candidate) => candidate.id === bankActivityId) ?? null;
+    setBank(bankResult.activityBank);
+    setActivityDefinitions(typeResult.registeredDefinitions);
     setActivity(nextActivity);
     if (!nextActivity) {
-      setError("Activity not found in this bank.");
+      setError(t("bankActivityPage.notFound"));
     }
   }
 
   useEffect(() => {
-    loadPage().catch((err) => setError(err instanceof Error ? err.message : "Unable to load bank activity."));
+    loadPage().catch((err) => setError(err instanceof Error ? err.message : t("bankActivityPage.loadError")));
   }, [activityBankId, bankActivityId]);
 
   const renderedActivity = useMemo<ActivityLike | null>(() => {
@@ -59,7 +62,7 @@ export default function BankActivityAuthoringPage() {
 
   async function saveActivity(input: { title: string; description: string; config: Record<string, unknown> }) {
     if (!activity) {
-      throw new Error("Activity not loaded.");
+      throw new Error(t("bankActivityPage.activityNotLoaded"));
     }
     const result = await api.updateBankActivity(activityBankId, activity.id, {
       title: input.title,
@@ -89,11 +92,11 @@ export default function BankActivityAuthoringPage() {
       ) => api.saveBankWebDesignExerciseTests(activityBankId, activityId, input),
       getExpectedResult: async (_courseId: string, activityId: string) => api.bankWebDesignExerciseExpectedResult(activityBankId, activityId),
       runCode: async () => {
-        throw new Error("Run is not available while authoring activity bank items.");
+        throw new Error(t("bankActivityPage.runUnavailable"));
       },
       listRuns: async () => ({ submissions: [] }),
       submitCode: async () => {
-        throw new Error("Submit is not available while authoring activity bank items.");
+        throw new Error(t("bankActivityPage.submitUnavailable"));
       },
       listSubmissions: async () => ({ submissions: [] })
     }),
@@ -131,6 +134,17 @@ export default function BankActivityAuthoringPage() {
       );
     }
 
+    if (renderedActivity.activityType.key === "mcq") {
+      return (
+        <McqActivityView
+          activity={renderedActivity}
+          canManage
+          onSave={saveActivity}
+          locale={locale}
+        />
+      );
+    }
+
     if (renderedActivity.activityType.key === "web-design-coding-exercise") {
       return (
         <WebDesignCodingExerciseActivityView
@@ -146,8 +160,8 @@ export default function BankActivityAuthoringPage() {
 
     return (
       <section className="section stack">
-        <h2>Unsupported activity type</h2>
-        <p className="muted">This activity type does not have a bank authoring view yet.</p>
+        <h2>{t("bankActivityPage.unsupportedTitle")}</h2>
+        <p className="muted">{t("bankActivityPage.unsupportedText")}</p>
       </section>
     );
   }
@@ -160,13 +174,13 @@ export default function BankActivityAuthoringPage() {
             <p className="eyebrow">{bank?.title ?? t("nav.activityBanks")}</p>
             <h1>{activity?.title ?? t("common.loading")}</h1>
             <p className="muted">
-              {activity?.activityType.name}
+              {activity ? activityTypeLabel(activity.activityType.key) : ""}
               {activity?.currentVersion ? ` · v${activity.currentVersion.versionNumber}` : ""}
             </p>
           </div>
           <div className="hero-actions">
             <Link className="button secondary" href={`/activity-banks/${activityBankId}`}>
-              Back to bank
+              {t("bankActivityPage.backToBank")}
             </Link>
           </div>
         </section>
@@ -175,7 +189,7 @@ export default function BankActivityAuthoringPage() {
 
         <section className="section stack">
           <p className="muted">
-            Changes saved here update the activity bank activity and create a new activity version for future course assignments.
+            {t("bankActivityPage.versionNote")}
           </p>
         </section>
 
@@ -183,4 +197,10 @@ export default function BankActivityAuthoringPage() {
       </main>
     </AppShell>
   );
+
+  function activityTypeLabel(activityTypeKey: string) {
+    const definition = activityDefinitions.find((candidate) => candidate.key === activityTypeKey);
+    const localized = definition?.i18n?.[locale];
+    return localized?.name ?? definition?.name ?? activity?.activityType.name ?? activityTypeKey;
+  }
 }
