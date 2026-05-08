@@ -1515,6 +1515,17 @@ a.card:hover,
   background: rgba(46, 131, 216, 0.22);
 }
 
+.mcq-authoring-grid {
+  align-items: start;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.95fr);
+}
+
+.mcq-authoring-preview {
+  min-width: 0;
+}
+
 .parsons-inline-code .code-renderer-line {
   gap: 10px;
 }
@@ -1661,6 +1672,10 @@ a.card:hover,
 
   .form-grid-two,
   .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .mcq-authoring-grid {
     grid-template-columns: 1fr;
   }
 
