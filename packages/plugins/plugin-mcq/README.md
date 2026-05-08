@@ -10,6 +10,8 @@ Teachers author MCQ content in an advanced editor using a Markdown-like grammar 
 
 Students see a rendered MCQ activity with single-choice or multi-choice controls inferred from the authored answer key.
 
+During authoring, the complete source editor and rendered preview appear side by side. The source remains one copyable text block so teachers can paste or save a full activity outside Cognelo.
+
 ## Authoring Model
 
 The main MCQ source is written as text.

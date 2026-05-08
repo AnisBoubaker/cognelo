@@ -389,10 +389,55 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
           </span>
         </label>
 
-        <div className="stack">
-          <span>{copy.source}</span>
-          <CodeEditor id="mcq-source" value={source} onChange={setSource} language="markdown" minHeight={420} />
+        <div className="mcq-authoring-grid">
+          <div className="stack">
+            <span>{copy.source}</span>
+            <CodeEditor id="mcq-source" value={source} onChange={setSource} language="markdown" minHeight={620} />
+          </div>
+
+          <section className="stack mcq-authoring-preview">
+            <h3>{copy.studentPreview}</h3>
+            <McqStudentView
+              parsedMcq={parsedMcq}
+              studentAnswers={studentAnswers}
+              submitted={submitted}
+              score={score}
+              onSubmit={() => setSubmitted(true)}
+              onReset={() => {
+                setStudentAnswers({});
+                setSubmitted(false);
+              }}
+              onSingleChoice={updateSingleChoice}
+              onMultipleChoice={updateMultipleChoice}
+              questionLabel={copy.question}
+              randomizeChoices={randomizeChoices}
+            />
+          </section>
         </div>
+
+        {parsedMcq.questions.length ? (
+          <div className="row">
+            <button type="button" onClick={() => setSubmitted(true)}>
+              Check answers
+            </button>
+            <button
+              className="secondary"
+              type="button"
+              onClick={() => {
+                setStudentAnswers({});
+                setSubmitted(false);
+              }}
+            >
+              Reset
+            </button>
+          </div>
+        ) : null}
+
+        {submitted && score ? (
+          <p className="muted">
+            Score: {score.correct} / {score.total}
+          </p>
+        ) : null}
 
         {parsedMcq.errors.length ? (
           <section className="stack" style={{ border: "1px solid rgba(210, 61, 71, 0.25)", borderRadius: 10, padding: 16 }}>
@@ -412,24 +457,6 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
           </button>
         </div>
 
-        <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
-          <h3>{copy.studentPreview}</h3>
-          <McqStudentView
-            parsedMcq={parsedMcq}
-            studentAnswers={studentAnswers}
-            submitted={submitted}
-            score={score}
-            onSubmit={() => setSubmitted(true)}
-            onReset={() => {
-              setStudentAnswers({});
-              setSubmitted(false);
-            }}
-            onSingleChoice={updateSingleChoice}
-            onMultipleChoice={updateMultipleChoice}
-            questionLabel={copy.question}
-            randomizeChoices={randomizeChoices}
-          />
-        </section>
       </form>
     );
   }
@@ -493,65 +520,18 @@ function McqStudentView({
 
       {questions.map((question, index) => {
         const selected = studentAnswers[question.id] ?? [];
-        const expected = question.choices.filter((choice) => choice.isCorrect).map((choice) => choice.id).sort();
-        const actual = [...selected].sort();
-        const isCorrect = submitted && expected.length === actual.length && expected.every((choiceId, position) => choiceId === actual[position]);
 
         return (
-          <article key={question.id} className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 18 }}>
-            <div className="stack" style={{ gap: 6 }}>
-              <p className="eyebrow">{questionLabel} {index + 1}</p>
-              <h3 style={{ margin: 0 }}>{question.title}</h3>
-            </div>
-
-            <MarkdownBlocksView blocks={question.promptBlocks} />
-
-            <div className="stack" style={{ gap: 12 }}>
-              {question.choices.map((choice) => {
-                const checked = selected.includes(choice.id);
-                return (
-                  <label
-                    key={choice.id}
-                    style={{
-                      alignItems: "flex-start",
-                      border: "1px solid rgba(13, 27, 71, 0.12)",
-                      borderRadius: 10,
-                      cursor: "pointer",
-                      display: "flex",
-                      gap: 12,
-                      justifyContent: "flex-start",
-                      padding: 12
-                    }}
-                  >
-                    <input
-                      checked={checked}
-                      name={question.id}
-                      type={question.mode === "single" ? "radio" : "checkbox"}
-                      style={{
-                        flex: "0 0 auto",
-                        margin: "0.15rem 0 0",
-                        minHeight: 0,
-                        padding: 0,
-                        width: "auto"
-                      }}
-                      onChange={(event) =>
-                        question.mode === "single"
-                          ? onSingleChoice(question, choice.id)
-                          : onMultipleChoice(question, choice.id, event.target.checked)
-                      }
-                    />
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <MarkdownBlocksView blocks={choice.blocks} compact />
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-
-            {submitted ? (
-              <p className={isCorrect ? "muted" : "error"}>{isCorrect ? "Correct." : "Not quite. Review your choices and try again."}</p>
-            ) : null}
-          </article>
+          <McqQuestionCard
+            key={question.id}
+            question={question}
+            index={index}
+            selected={selected}
+            submitted={submitted}
+            questionLabel={questionLabel}
+            onSingleChoice={onSingleChoice}
+            onMultipleChoice={onMultipleChoice}
+          />
         );
       })}
 
@@ -572,6 +552,85 @@ function McqStudentView({
         </p>
       ) : null}
     </div>
+  );
+}
+
+function McqQuestionCard({
+  question,
+  index,
+  selected,
+  submitted,
+  questionLabel,
+  onSingleChoice,
+  onMultipleChoice
+}: {
+  question: McqQuestion;
+  index: number;
+  selected: string[];
+  submitted: boolean;
+  questionLabel: string;
+  onSingleChoice: (question: McqQuestion, choiceId: string) => void;
+  onMultipleChoice: (question: McqQuestion, choiceId: string, checked: boolean) => void;
+}) {
+  const expected = question.choices.filter((choice) => choice.isCorrect).map((choice) => choice.id).sort();
+  const actual = [...selected].sort();
+  const isCorrect = submitted && expected.length === actual.length && expected.every((choiceId, position) => choiceId === actual[position]);
+
+  return (
+    <article className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 18 }}>
+      <div className="stack" style={{ gap: 6 }}>
+        <p className="eyebrow">{questionLabel} {index + 1}</p>
+        <h3 style={{ margin: 0 }}>{question.title}</h3>
+      </div>
+
+      <MarkdownBlocksView blocks={question.promptBlocks} />
+
+      <div className="stack" style={{ gap: 12 }}>
+        {question.choices.map((choice) => {
+          const checked = selected.includes(choice.id);
+          return (
+            <label
+              key={choice.id}
+              style={{
+                alignItems: "flex-start",
+                border: "1px solid rgba(13, 27, 71, 0.12)",
+                borderRadius: 10,
+                cursor: "pointer",
+                display: "flex",
+                gap: 12,
+                justifyContent: "flex-start",
+                padding: 12
+              }}
+            >
+              <input
+                checked={checked}
+                name={question.id}
+                type={question.mode === "single" ? "radio" : "checkbox"}
+                style={{
+                  flex: "0 0 auto",
+                  margin: "0.15rem 0 0",
+                  minHeight: 0,
+                  padding: 0,
+                  width: "auto"
+                }}
+                onChange={(event) =>
+                  question.mode === "single"
+                    ? onSingleChoice(question, choice.id)
+                    : onMultipleChoice(question, choice.id, event.target.checked)
+                }
+              />
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <MarkdownBlocksView blocks={choice.blocks} compact />
+              </span>
+            </label>
+          );
+        })}
+      </div>
+
+      {submitted ? (
+        <p className={isCorrect ? "muted" : "error"}>{isCorrect ? "Correct." : "Not quite. Review your choices and try again."}</p>
+      ) : null}
+    </article>
   );
 }
 
@@ -603,6 +662,7 @@ function snapshotsEqual(left: McqFormSnapshot, right: McqFormSnapshot) {
     left.randomizeChoices === right.randomizeChoices
   );
 }
+
 
 function MarkdownBlocksView({ blocks, compact = false }: { blocks: McqBlock[]; compact?: boolean }) {
   return (
