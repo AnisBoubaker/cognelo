@@ -18,6 +18,8 @@ The main MCQ source is written as text.
 - `- [x]` defines a correct answer
 - `- [ ]` defines an incorrect answer
 - fenced code blocks are syntax-highlighted in the rendered student view
+- choices can contain fenced code blocks, including code-only alternatives where the marker line is followed by the code block
+- the activity option `randomizeChoices` can show choices in randomized order while keeping grading tied to stable choice IDs
 
 ## Current State
 

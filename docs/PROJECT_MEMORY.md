@@ -119,6 +119,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Plugin/activity definitions can provide localized `name`, `description`, and `defaultTitle` through the activity registry.
 - The course detail page resolves plugin-localized activity labels from registry definitions instead of relying only on database display names.
 - Activity bank lists and authoring pages also resolve plugin-localized activity labels from registry definitions instead of relying only on database display names.
+- MCQ choices can include fenced code blocks, and MCQ activities can opt into randomized choice display without changing stable choice IDs used for scoring.
 
 ## Known MVP Constraints
 

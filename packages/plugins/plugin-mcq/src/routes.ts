@@ -126,6 +126,8 @@ function buildSystemPrompt(input: {
     "- Each question starts with a level-2 Markdown heading: `## Question N`.",
     "- The prompt follows the heading.",
     "- Choices must use task-list syntax: `- [x] correct choice` and `- [ ] incorrect choice`.",
+    "- Choices may be code alternatives. For a code-only choice, write the marker on its own line and put a fenced code block immediately below it.",
+    "- Example code choice: `- [ ]` followed by a fenced code block using the default code language or an explicit fence language.",
     "- Each question must include at least three choices.",
     "- Each question must include at least one correct choice.",
     "- Use one correct choice for single-answer questions and multiple `[x]` choices only when the question clearly asks for multiple answers.",

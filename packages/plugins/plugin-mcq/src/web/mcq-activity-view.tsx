@@ -3,7 +3,16 @@
 import katex from "katex";
 import { type FormEvent, Fragment, useEffect, useMemo, useState } from "react";
 import { CodeEditor, CodeRenderer, codeLanguageOptions, useNotifications } from "@cognelo/activity-ui";
-import { parseMcqSource, renderInlineMarkdown, renderInlineTokens, type InlineToken, type ParsedMcq, type McqBlock, type McqQuestion } from "../mcq";
+import {
+  parseMcqSource,
+  renderInlineMarkdown,
+  renderInlineTokens,
+  type InlineToken,
+  type ParsedMcq,
+  type McqBlock,
+  type McqChoice,
+  type McqQuestion
+} from "../mcq";
 
 type ActivityLike = {
   id: string;
@@ -26,16 +35,19 @@ type StudentAnswerState = Record<string, string[]>;
 
 const fallbackConfig = {
   source: "",
-  defaultCodeLanguage: "python"
+  defaultCodeLanguage: "python",
+  randomizeChoices: false
 };
 
 const copyByLocale = {
   en: {
     authoringTitle: "Multiple choice questions authoring",
-    authoringHelp: "Write the activity as text. Use ## headings for questions and task-list syntax like - [x] and - [ ] for the choices.",
+    authoringHelp: "Write the activity as text. Use ## headings for questions and task-list syntax like - [x] and - [ ] for the choices. A choice can contain a code block.",
     title: "Title",
     description: "Description",
     defaultCodeLanguage: "Default code language",
+    randomizeChoices: "Randomize choices",
+    randomizeChoicesHelp: "Show answer choices in a random order for students.",
     source: "Multiple choice questions source",
     parsingIssues: "Parsing issues",
     line: "Line",
@@ -54,10 +66,12 @@ const copyByLocale = {
   },
   fr: {
     authoringTitle: "Edition des questions a choix multiples",
-    authoringHelp: "Redigez l'activite sous forme de texte. Utilisez des titres ## pour les questions et la syntaxe de liste de taches comme - [x] et - [ ] pour les choix.",
+    authoringHelp: "Redigez l'activite sous forme de texte. Utilisez des titres ## pour les questions et la syntaxe de liste de taches comme - [x] et - [ ] pour les choix. Un choix peut contenir un bloc de code.",
     title: "Titre",
     description: "Description",
     defaultCodeLanguage: "Langage de code par defaut",
+    randomizeChoices: "Melanger les choix",
+    randomizeChoicesHelp: "Affiche les choix de reponse dans un ordre aleatoire pour les etudiants.",
     source: "Source des questions a choix multiples",
     parsingIssues: "Problemes d'analyse",
     line: "Ligne",
@@ -80,6 +94,8 @@ const copyByLocale = {
     title: "标题",
     description: "说明",
     defaultCodeLanguage: "默认代码语言",
+    randomizeChoices: "随机排列选项",
+    randomizeChoicesHelp: "向学生随机显示答案选项。",
     source: "选择题源码",
     parsingIssues: "解析问题",
     line: "第",
@@ -105,6 +121,7 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
   const [description, setDescription] = useState(activity.description);
   const [source, setSource] = useState(String(activity.config?.source ?? fallbackConfig.source));
   const [defaultCodeLanguage, setDefaultCodeLanguage] = useState(String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage));
+  const [randomizeChoices, setRandomizeChoices] = useState(Boolean(activity.config?.randomizeChoices ?? fallbackConfig.randomizeChoices));
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
@@ -116,6 +133,7 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
     setDescription(activity.description);
     setSource(String(activity.config?.source ?? fallbackConfig.source));
     setDefaultCodeLanguage(String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage));
+    setRandomizeChoices(Boolean(activity.config?.randomizeChoices ?? fallbackConfig.randomizeChoices));
     setStudentAnswers({});
     setSubmitted(false);
     setError("");
@@ -153,7 +171,8 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
         description,
         config: {
           source,
-          defaultCodeLanguage
+          defaultCodeLanguage,
+          randomizeChoices
         }
       });
       notifications.success(copy.saved);
@@ -253,6 +272,19 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
           </select>
         </div>
 
+        <label style={{ alignItems: "flex-start", display: "flex", gap: 12 }}>
+          <input
+            checked={randomizeChoices}
+            type="checkbox"
+            style={{ flex: "0 0 auto", marginTop: 4, minHeight: 0, width: "auto" }}
+            onChange={(event) => setRandomizeChoices(event.target.checked)}
+          />
+          <span className="stack" style={{ gap: 4 }}>
+            <strong>{copy.randomizeChoices}</strong>
+            <span className="muted">{copy.randomizeChoicesHelp}</span>
+          </span>
+        </label>
+
         <div className="stack">
           <span>{copy.source}</span>
           <CodeEditor id="mcq-source" value={source} onChange={setSource} language="markdown" minHeight={420} />
@@ -291,6 +323,7 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
             onSingleChoice={updateSingleChoice}
             onMultipleChoice={updateMultipleChoice}
             questionLabel={copy.question}
+            randomizeChoices={randomizeChoices}
           />
         </section>
       </form>
@@ -312,6 +345,7 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", ai
         onSingleChoice={updateSingleChoice}
         onMultipleChoice={updateMultipleChoice}
         questionLabel={copy.question}
+        randomizeChoices={randomizeChoices}
       />
     </section>
   );
@@ -326,7 +360,8 @@ function McqStudentView({
   onReset,
   onSingleChoice,
   onMultipleChoice,
-  questionLabel
+  questionLabel,
+  randomizeChoices
 }: {
   parsedMcq: ParsedMcq;
   studentAnswers: StudentAnswerState;
@@ -337,12 +372,22 @@ function McqStudentView({
   onSingleChoice: (question: McqQuestion, choiceId: string) => void;
   onMultipleChoice: (question: McqQuestion, choiceId: string, checked: boolean) => void;
   questionLabel: string;
+  randomizeChoices: boolean;
 }) {
+  const questions = useMemo(
+    () =>
+      parsedMcq.questions.map((question) => ({
+        ...question,
+        choices: randomizeChoices ? shuffleChoices(question.choices) : question.choices
+      })),
+    [parsedMcq.questions, randomizeChoices]
+  );
+
   return (
     <div className="stack">
       {parsedMcq.introBlocks.length ? <MarkdownBlocksView blocks={parsedMcq.introBlocks} /> : null}
 
-      {parsedMcq.questions.map((question, index) => {
+      {questions.map((question, index) => {
         const selected = studentAnswers[question.id] ?? [];
         const expected = question.choices.filter((choice) => choice.isCorrect).map((choice) => choice.id).sort();
         const actual = [...selected].sort();
@@ -424,6 +469,15 @@ function McqStudentView({
       ) : null}
     </div>
   );
+}
+
+function shuffleChoices(choices: McqChoice[]) {
+  const shuffled = [...choices];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
 }
 
 function MarkdownBlocksView({ blocks, compact = false }: { blocks: McqBlock[]; compact?: boolean }) {
