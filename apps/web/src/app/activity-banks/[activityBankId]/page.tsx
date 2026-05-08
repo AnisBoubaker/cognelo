@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { api, type ActivityBank, type ActivityType, type BankActivity } from "@/lib/api";
+import { api, type ActivityBank, type ActivityDefinition, type ActivityType, type BankActivity } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 type EditingActivityState = {
@@ -18,9 +18,10 @@ type EditingActivityState = {
 export default function ActivityBankDetailPage() {
   const params = useParams<{ activityBankId: string }>();
   const activityBankId = params.activityBankId;
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [bank, setBank] = useState<ActivityBank | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
+  const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [activityTitle, setActivityTitle] = useState("");
   const [activityDescription, setActivityDescription] = useState("");
   const [activityTypeKey, setActivityTypeKey] = useState("placeholder");
@@ -33,11 +34,12 @@ export default function ActivityBankDetailPage() {
     const [bankResult, typesResult] = await Promise.all([api.activityBank(activityBankId), api.activityTypes()]);
     setBank(bankResult.activityBank);
     setActivityTypes(typesResult.activityTypes);
+    setActivityDefinitions(typesResult.registeredDefinitions);
     setActivityTypeKey((current) => current || typesResult.activityTypes[0]?.key || "placeholder");
   }
 
   useEffect(() => {
-    loadPage().catch((err) => setError(err instanceof Error ? err.message : "Unable to load activity bank."));
+    loadPage().catch((err) => setError(err instanceof Error ? err.message : t("activityBankDetail.loadError")));
   }, [activityBankId]);
 
   async function createBankActivity(event: FormEvent) {
@@ -61,7 +63,7 @@ export default function ActivityBankDetailPage() {
       setActivityDescription("");
       await loadPage();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to create bank activity.");
+      setError(err instanceof Error ? err.message : t("activityBankDetail.createActivityError"));
     } finally {
       setSavingActivity(false);
     }
@@ -94,10 +96,16 @@ export default function ActivityBankDetailPage() {
       setEditingActivity(null);
       await loadPage();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update bank activity.");
+      setError(err instanceof Error ? err.message : t("activityBankDetail.updateActivityError"));
     } finally {
       setSavingEdit(false);
     }
+  }
+
+  function activityTypeLabel(activityTypeKey: string) {
+    const definition = activityDefinitions.find((candidate) => candidate.key === activityTypeKey);
+    const localized = definition?.i18n?.[locale];
+    return localized?.name ?? definition?.name ?? activityTypes.find((type) => type.key === activityTypeKey)?.name ?? activityTypeKey;
   }
 
   return (
@@ -110,18 +118,18 @@ export default function ActivityBankDetailPage() {
             {bank?.description ? <p className="muted">{bank.description}</p> : null}
           </div>
           <Link className="button secondary" href="/activity-banks">
-            Back to activity banks
+            {t("activityBankDetail.backToBanks")}
           </Link>
         </section>
 
         {error ? <p className="error">{error}</p> : null}
 
         <section className="section stack">
-          <h2>Add activity</h2>
+          <h2>{t("activityBankDetail.addActivityTitle")}</h2>
           <form className="form inline-panel" onSubmit={createBankActivity}>
             <div className="grid compact-form-grid">
               <div className="field">
-                <label htmlFor="bank-activity-title">Activity title</label>
+                <label htmlFor="bank-activity-title">{t("activityBankDetail.activityTitleLabel")}</label>
                 <input
                   id="bank-activity-title"
                   value={activityTitle}
@@ -131,18 +139,18 @@ export default function ActivityBankDetailPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="bank-activity-type">Activity type</label>
+                <label htmlFor="bank-activity-type">{t("activityBankDetail.activityTypeLabel")}</label>
                 <select id="bank-activity-type" value={activityTypeKey} onChange={(event) => setActivityTypeKey(event.target.value)}>
                   {activityTypes.map((type) => (
                     <option key={type.id} value={type.key}>
-                      {type.name}
+                      {activityTypeLabel(type.key)}
                     </option>
                   ))}
                 </select>
               </div>
             </div>
             <div className="field">
-              <label htmlFor="bank-activity-description">Description</label>
+              <label htmlFor="bank-activity-description">{t("activityBankDetail.descriptionLabel")}</label>
               <textarea
                 id="bank-activity-description"
                 value={activityDescription}
@@ -158,33 +166,33 @@ export default function ActivityBankDetailPage() {
         <section className="section stack">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Contained activities</p>
-              <h2>Activities</h2>
+              <p className="eyebrow">{t("activityBankDetail.activitiesEyebrow")}</p>
+              <h2>{t("activityBankDetail.activitiesTitle")}</h2>
             </div>
           </div>
 
           {bank?.activities?.length ? (
             <div className="table-list">
               <div className="table-row table-head" aria-hidden="true">
-                <span>Title</span>
-                <span>Type</span>
-                <span>Status</span>
-                <span>Version</span>
+                <span>{t("activityBankDetail.titleHeader")}</span>
+                <span>{t("activityBankDetail.typeHeader")}</span>
+                <span>{t("activityBankDetail.statusHeader")}</span>
+                <span>{t("activityBankDetail.versionHeader")}</span>
               </div>
               {bank.activities.map((activity) => (
                 <div className="table-row" key={activity.id}>
                   <div className="table-main table-main-stack">
                     <strong>{activity.title}</strong>
-                    <span className="table-meta-note muted">{activity.description || "No description"}</span>
+                    <span className="table-meta-note muted">{activity.description || t("common.noDescription")}</span>
                   </div>
-                  <span className="eyebrow">{activity.activityType.name}</span>
+                  <span className="eyebrow">{activityTypeLabel(activity.activityType.key)}</span>
                   <span className="table-meta muted">{t(`activityLifecycle.${activity.lifecycle}`)}</span>
                   <div className="table-actions">
                     <span className="table-meta muted">v{activity.currentVersion?.versionNumber ?? 1}</span>
                     <Link
                       className="button secondary icon-button"
                       href={`/activity-banks/${bank.id}/activities/${activity.id}`}
-                      title="Edit"
+                      title={t("common.edit")}
                     >
                       <EditIcon />
                     </Link>
@@ -193,16 +201,16 @@ export default function ActivityBankDetailPage() {
               ))}
             </div>
           ) : (
-            <p className="muted">No activities in this bank yet.</p>
+            <p className="muted">{t("activityBankDetail.noActivities")}</p>
           )}
         </section>
 
         {editingActivity ? (
           <section className="section stack">
-            <h2>Edit activity</h2>
+            <h2>{t("activityBankDetail.editActivityTitle")}</h2>
             <form className="form" onSubmit={saveActivityEdit}>
               <div className="field">
-                <label htmlFor="edit-activity-title">Title</label>
+                <label htmlFor="edit-activity-title">{t("activityBankDetail.titleHeader")}</label>
                 <input
                   id="edit-activity-title"
                   value={editingActivity.title}
@@ -212,7 +220,7 @@ export default function ActivityBankDetailPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="edit-activity-description">Description</label>
+                <label htmlFor="edit-activity-description">{t("activityBankDetail.descriptionLabel")}</label>
                 <textarea
                   id="edit-activity-description"
                   value={editingActivity.description}
@@ -220,7 +228,7 @@ export default function ActivityBankDetailPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="edit-activity-type">Activity type</label>
+                <label htmlFor="edit-activity-type">{t("activityBankDetail.activityTypeLabel")}</label>
                 <select
                   id="edit-activity-type"
                   value={editingActivity.activityTypeKey}
@@ -228,13 +236,13 @@ export default function ActivityBankDetailPage() {
                 >
                   {activityTypes.map((type) => (
                     <option key={type.id} value={type.key}>
-                      {type.name}
+                      {activityTypeLabel(type.key)}
                     </option>
                   ))}
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="edit-activity-lifecycle">Status</label>
+                <label htmlFor="edit-activity-lifecycle">{t("activityBankDetail.statusHeader")}</label>
                 <select
                   id="edit-activity-lifecycle"
                   value={editingActivity.lifecycle}
