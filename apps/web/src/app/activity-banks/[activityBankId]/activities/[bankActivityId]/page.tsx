@@ -4,6 +4,7 @@ import { CodingExerciseActivityView } from "@cognelo/plugin-coding-exercises";
 import { McqActivityView } from "@cognelo/plugin-mcq";
 import { ParsonsActivityView } from "@cognelo/plugin-parsons";
 import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
+import { useNotifications } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -21,14 +22,19 @@ type ActivityLike = {
   activityType: ActivityType;
 };
 
+type ActivityLifecycle = "draft" | "published" | "paused" | "archived";
+
 export default function BankActivityAuthoringPage() {
   const params = useParams<{ activityBankId: string; bankActivityId: string }>();
   const { activityBankId, bankActivityId } = params;
   const { locale, t } = useI18n();
+  const notifications = useNotifications();
   const [bank, setBank] = useState<ActivityBank | null>(null);
   const [activity, setActivity] = useState<BankActivity | null>(null);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [hasQuestionAuthoringAgent, setHasQuestionAuthoringAgent] = useState(false);
+  const [lifecycleDraft, setLifecycleDraft] = useState<ActivityLifecycle>("draft");
+  const [savingLifecycle, setSavingLifecycle] = useState(false);
   const [error, setError] = useState("");
 
   async function loadPage() {
@@ -40,6 +46,7 @@ export default function BankActivityAuthoringPage() {
       aiAgentResult.connections.some((connection) => connection.id === aiAgentResult.preferences.questionAuthoringAiAgentConnectionId && connection.isEnabled)
     );
     setActivity(nextActivity);
+    setLifecycleDraft((nextActivity?.lifecycle ?? "draft") as ActivityLifecycle);
     if (!nextActivity) {
       setError(t("bankActivityPage.notFound"));
     }
@@ -75,6 +82,7 @@ export default function BankActivityAuthoringPage() {
       activityTypeKey: activity.activityType.key
     });
     setActivity(result.activity);
+    setLifecycleDraft(result.activity.lifecycle as ActivityLifecycle);
     return {
       id: result.activity.id,
       title: result.activity.title,
@@ -84,6 +92,31 @@ export default function BankActivityAuthoringPage() {
       metadata: result.activity.metadata,
       activityType: result.activity.activityType
     };
+  }
+
+  async function updateLifecycle(nextLifecycle: ActivityLifecycle) {
+    if (!activity || savingLifecycle) {
+      return;
+    }
+
+    const previousLifecycle = lifecycleDraft;
+    setLifecycleDraft(nextLifecycle);
+    setSavingLifecycle(true);
+    setError("");
+
+    try {
+      const result = await api.updateBankActivity(activityBankId, activity.id, {
+        lifecycle: nextLifecycle
+      });
+      setActivity(result.activity);
+      setLifecycleDraft(result.activity.lifecycle as ActivityLifecycle);
+      notifications.success(t("bankActivityPage.statusSaved"));
+    } catch (err) {
+      setLifecycleDraft(previousLifecycle);
+      notifications.error(err instanceof Error ? err.message : t("bankActivityPage.statusSaveError"));
+    } finally {
+      setSavingLifecycle(false);
+    }
   }
 
   const bankWebDesignClient = useMemo(
@@ -186,6 +219,7 @@ export default function BankActivityAuthoringPage() {
             <h1>{activity?.title ?? t("common.loading")}</h1>
             <p className="muted">
               {activity ? activityTypeLabel(activity.activityType.key) : ""}
+              {activity ? ` · ${t(`activityLifecycle.${activity.lifecycle}`)}` : ""}
               {activity?.currentVersion ? ` · v${activity.currentVersion.versionNumber}` : ""}
             </p>
           </div>
@@ -202,6 +236,22 @@ export default function BankActivityAuthoringPage() {
           <p className="muted">
             {t("bankActivityPage.versionNote")}
           </p>
+          {activity ? (
+            <div className="field" style={{ maxWidth: 360 }}>
+              <label htmlFor="bank-activity-lifecycle">{t("bankActivityPage.statusLabel")}</label>
+              <select
+                id="bank-activity-lifecycle"
+                value={lifecycleDraft}
+                disabled={savingLifecycle}
+                onChange={(event) => void updateLifecycle(event.target.value as ActivityLifecycle)}
+              >
+                <option value="draft">{t("activityLifecycle.draft")}</option>
+                <option value="published">{t("activityLifecycle.published")}</option>
+                <option value="paused">{t("activityLifecycle.paused")}</option>
+                <option value="archived">{t("activityLifecycle.archived")}</option>
+              </select>
+            </div>
+          ) : null}
         </section>
 
         {renderAuthoring()}

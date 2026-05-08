@@ -259,6 +259,9 @@ const messages: Record<Locale, MessageTree> = {
       unsupportedTitle: "Unsupported activity type",
       unsupportedText: "This activity type does not have a bank authoring view yet.",
       backToBank: "Back to bank",
+      statusLabel: "Publication status",
+      statusSaved: "Publication status updated.",
+      statusSaveError: "Unable to update publication status.",
       versionNote: "Changes saved here update the activity bank activity and create a new activity version for future course assignments."
     },
     courseForm: {
@@ -713,6 +716,9 @@ const messages: Record<Locale, MessageTree> = {
       unsupportedTitle: "Type d'activité non pris en charge",
       unsupportedText: "Ce type d'activité n'a pas encore de vue d'édition dans les banques.",
       backToBank: "Retour à la banque",
+      statusLabel: "Statut de publication",
+      statusSaved: "Statut de publication mis à jour.",
+      statusSaveError: "Impossible de mettre à jour le statut de publication.",
       versionNote: "Les changements enregistrés ici mettent à jour l'activité de la banque et créent une nouvelle version pour les prochaines assignations aux cours."
     },
     courseForm: {
@@ -1167,6 +1173,9 @@ const messages: Record<Locale, MessageTree> = {
       unsupportedTitle: "不支持的活动类型",
       unsupportedText: "此活动类型还没有活动库编辑视图。",
       backToBank: "返回活动库",
+      statusLabel: "发布状态",
+      statusSaved: "发布状态已更新。",
+      statusSaveError: "无法更新发布状态。",
       versionNote: "在这里保存的更改会更新活动库活动，并为之后的课程分配创建新版本。"
     },
     courseForm: {
