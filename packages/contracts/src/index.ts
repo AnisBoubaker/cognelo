@@ -32,6 +32,12 @@ export type CourseGroupStatus = z.infer<typeof CourseGroupStatusSchema>;
 export const CourseGroupParticipantRoleSchema = z.enum(["teacher", "ta", "student"]);
 export type CourseGroupParticipantRole = z.infer<typeof CourseGroupParticipantRoleSchema>;
 
+export const AiAgentProviderSchema = z.enum(["ollama", "openai", "codex", "claude"]);
+export type AiAgentProvider = z.infer<typeof AiAgentProviderSchema>;
+
+export const AiAgentScopeSchema = z.enum(["personal", "global"]);
+export type AiAgentScope = z.infer<typeof AiAgentScopeSchema>;
+
 export const LoginInputSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8)
@@ -61,6 +67,25 @@ export const UserProfileUpdateSchema = z.object({
 });
 export type UserProfileUpdate = z.infer<typeof UserProfileUpdateSchema>;
 
+export const AiAgentConnectionInputSchema = z.object({
+  displayName: z.string().trim().min(2).max(160),
+  provider: AiAgentProviderSchema,
+  model: z.string().trim().min(1).max(160),
+  baseUrl: z.string().trim().url().max(500).optional().nullable(),
+  apiKey: z.string().trim().max(2000).optional().nullable(),
+  scope: AiAgentScopeSchema.optional().default("personal"),
+  isEnabled: z.boolean().optional().default(true)
+});
+export type AiAgentConnectionInput = z.infer<typeof AiAgentConnectionInputSchema>;
+
+export const AiAgentConnectionUpdateSchema = AiAgentConnectionInputSchema.partial();
+export type AiAgentConnectionUpdate = z.infer<typeof AiAgentConnectionUpdateSchema>;
+
+export const AiAgentPreferencesInputSchema = z.object({
+  questionAuthoringAiAgentConnectionId: z.string().cuid().nullable().optional()
+});
+export type AiAgentPreferencesInput = z.infer<typeof AiAgentPreferencesInputSchema>;
+
 export const CourseInputSchema = z.object({
   subjectId: z.string().cuid(),
   title: z.string().min(2).max(160),
@@ -71,6 +96,11 @@ export type CourseInput = z.infer<typeof CourseInputSchema>;
 
 export const CourseUpdateSchema = CourseInputSchema.partial();
 export type CourseUpdate = z.infer<typeof CourseUpdateSchema>;
+
+export const CourseSettingsInputSchema = z.object({
+  studentSupportAiAgentConnectionId: z.string().cuid().nullable().optional()
+});
+export type CourseSettingsInput = z.infer<typeof CourseSettingsInputSchema>;
 
 export const SubjectInputSchema = z.object({
   title: z.string().min(2).max(160),

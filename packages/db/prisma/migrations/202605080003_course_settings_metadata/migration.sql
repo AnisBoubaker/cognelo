@@ -1,0 +1,1 @@
+ALTER TABLE "Course" ADD COLUMN "metadata" JSONB NOT NULL DEFAULT '{}';

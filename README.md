@@ -38,10 +38,12 @@ docs/
 
 - Auth: login, logout, current-user token verification
 - Users: `/users/me` plus account-wide profile settings
+- AI agent connections: account-wide model/provider connection records, with admin-managed global entries
 - Authorization: global roles plus course memberships and activity-bank ownership
 - Subjects: shared curriculum containers for subject-level material and activity banks
 - Activity banks: reusable activity authoring libraries scoped to a subject and owned by an individual
 - Courses: create, list, read, update, archive; courses belong to a subject and receive activity copies from banks
+- Course settings: course-level AI agent selection for student support
 - Memberships: basic course membership creation
 - Materials: generic typed course material records
 - Activities: typed course-local activity copies with JSON config and research metadata
@@ -81,6 +83,10 @@ POST   /api/auth/login
 POST   /api/auth/logout
 GET    /api/users/me
 PATCH  /api/users/me
+GET    /api/ai-agents
+POST   /api/ai-agents
+PATCH  /api/ai-agents/:connectionId
+DELETE /api/ai-agents/:connectionId
 GET    /api/subjects
 POST   /api/subjects
 GET    /api/subjects/:subjectId
@@ -97,6 +103,7 @@ POST   /api/courses
 GET    /api/courses/:courseId
 PATCH  /api/courses/:courseId
 DELETE /api/courses/:courseId
+PATCH  /api/courses/:courseId/settings
 POST   /api/courses/:courseId/memberships
 GET    /api/courses/:courseId/groups
 POST   /api/courses/:courseId/groups
@@ -143,6 +150,7 @@ Concrete plugin routes are documented in the owning plugin package.
 Core Prisma entities include:
 
 - `User`
+- `AiAgentConnection`
 - `Role`
 - `UserRole`
 - `Subject`
@@ -285,7 +293,9 @@ WEB_DESIGN_RUNNER_URL=http://localhost:3456
 - The top navigation separates primary app routes from the account dropdown.
 - Account-wide configuration lives under `/settings`, with the current profile editor at `/settings/profile`.
 - Users can update their first and last name from profile settings; email changes are reserved for administrators.
+- AI agent connection settings live under `/settings/ai-agents`; users can create personal connections, choose their question-authoring helper, and admins can create global connections for later course use.
 - Course materials support links, uploads, folders, edit/remove, expand/collapse, and drag/drop ordering.
+- Course workspaces include a Settings tab where teachers can choose the student-support AI agent from their personal connections or admin-managed global connections.
 - Activity banks are first-class authoring spaces. Course activities are copied from bank versions rather than edited live in the bank.
 
 ## Plugin Contributor Workflow
