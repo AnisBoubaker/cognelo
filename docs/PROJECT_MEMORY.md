@@ -104,6 +104,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Unsaved-change protection is a shared frontend concern exposed from `@cognelo/activity-ui` and mounted in the web app through `UnsavedChangesProvider`. Every new core or plugin authoring/settings form should register dirty/save/discard behavior with `useUnsavedChangesGuard`; internal links and browser back/forward show the custom dialog, while refresh/close uses the browser-native beforeunload prompt. Main course/profile/subject forms and the MCQ, coding-exercise, Parsons, and web-design-coding-exercise authoring UIs use it.
 - The visual theme should reflect the Cognelo logo palette in a restrained, product-like way.
 - Syntax-colored code rendering should be shared across activities through `packages/activity-ui`.
+- Shared Markdown code rendering highlights fenced code block contents with their declared language, so Markdown authoring editors such as MCQ can show syntax coloring inside ```c-style fences without custom plugin rendering.
 - Markdown text rendering for authored prompts/descriptions should be shared across activities and core pages through `packages/activity-ui` rather than reimplemented per plugin.
 - The shared code editor should grow vertically with its content.
 - Monaco should be exposed as a shared editor primitive through `packages/activity-ui` for student coding flows and future plugin reuse, while lightweight authoring editors can remain plugin-specific or use the in-house editor where that fits better.
