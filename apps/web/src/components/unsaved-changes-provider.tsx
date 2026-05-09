@@ -105,6 +105,9 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
         await guard.onSave();
       }
       navigateToPendingHref();
+    } catch {
+      // The form-level save handler already reports the validation error.
+      // Keep the dialog open so the user can continue editing or discard.
     } finally {
       setSaving(false);
     }

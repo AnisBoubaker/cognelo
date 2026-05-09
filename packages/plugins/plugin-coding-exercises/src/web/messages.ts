@@ -67,6 +67,8 @@ type MessageKey =
   | "loadHiddenTestsError"
   | "loadHistoryError"
   | "saveError"
+  | "referenceSolutionValidationFailed"
+  | "referenceSolutionGenericFailure"
   | "runError"
   | "submitError"
   | "passed"
@@ -84,7 +86,12 @@ type MessageKey =
   | "test"
   | "statusPending"
   | "statusCompleted"
-  | "statusFailed";
+  | "statusFailed"
+  | "judgeStatusAccepted"
+  | "judgeStatusWrongAnswer"
+  | "judgeStatusCompilationError"
+  | "judgeStatusRuntimeError"
+  | "judgeStatusTimeLimitExceeded";
 
 type MessageCatalog = Record<MessageKey, string>;
 
@@ -156,6 +163,8 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
     loadHiddenTestsError: "Unable to load hidden tests.",
     loadHistoryError: "Unable to load coding exercise history.",
     saveError: "Unable to save the coding exercise right now.",
+    referenceSolutionValidationFailed: "The reference solution failed test \"{testName}\": {reason}",
+    referenceSolutionGenericFailure: "The reference solution did not pass one of the saved tests.",
     runError: "Unable to run code right now.",
     submitError: "Unable to submit code right now.",
     passed: "Passed",
@@ -173,7 +182,12 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
     test: "Test",
     statusPending: "pending",
     statusCompleted: "completed",
-    statusFailed: "failed"
+    statusFailed: "failed",
+    judgeStatusAccepted: "Accepted",
+    judgeStatusWrongAnswer: "Wrong answer",
+    judgeStatusCompilationError: "Compilation error",
+    judgeStatusRuntimeError: "Runtime error",
+    judgeStatusTimeLimitExceeded: "Time limit exceeded"
   },
   fr: {
     authoringTitle: "Configuration de l'exercice de programmation",
@@ -242,6 +256,8 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
     loadHiddenTestsError: "Impossible de charger les tests cachés.",
     loadHistoryError: "Impossible de charger l'historique de l'exercice.",
     saveError: "Impossible d'enregistrer l'exercice pour le moment.",
+    referenceSolutionValidationFailed: "La solution de référence a échoué au test « {testName} » : {reason}",
+    referenceSolutionGenericFailure: "La solution de référence n’a pas réussi l’un des tests enregistrés.",
     runError: "Impossible d'exécuter le code pour le moment.",
     submitError: "Impossible de soumettre le code pour le moment.",
     passed: "Réussi",
@@ -259,7 +275,12 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
     test: "Test",
     statusPending: "en attente",
     statusCompleted: "terminé",
-    statusFailed: "échoué"
+    statusFailed: "échoué",
+    judgeStatusAccepted: "Accepté",
+    judgeStatusWrongAnswer: "Mauvaise réponse",
+    judgeStatusCompilationError: "Erreur de compilation",
+    judgeStatusRuntimeError: "Erreur à l’exécution",
+    judgeStatusTimeLimitExceeded: "Temps limite dépassé"
   },
   zh: {
     authoringTitle: "编程练习设置",
@@ -328,6 +349,8 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
     loadHiddenTestsError: "无法加载隐藏测试。",
     loadHistoryError: "无法加载编程练习历史记录。",
     saveError: "暂时无法保存编程练习。",
+    referenceSolutionValidationFailed: "参考答案未通过测试“{testName}”：{reason}",
+    referenceSolutionGenericFailure: "参考答案未通过某个已保存的测试。",
     runError: "暂时无法运行代码。",
     submitError: "暂时无法提交代码。",
     passed: "通过",
@@ -345,7 +368,12 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
     test: "测试",
     statusPending: "进行中",
     statusCompleted: "已完成",
-    statusFailed: "失败"
+    statusFailed: "失败",
+    judgeStatusAccepted: "通过",
+    judgeStatusWrongAnswer: "答案错误",
+    judgeStatusCompilationError: "编译错误",
+    judgeStatusRuntimeError: "运行时错误",
+    judgeStatusTimeLimitExceeded: "超过时间限制"
   }
 };
 

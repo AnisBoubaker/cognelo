@@ -183,7 +183,7 @@ export default function BankActivityAuthoringPage() {
         <CodingExerciseActivityView
           activity={renderedActivity}
           canManage
-          course={null}
+          course={{ id: activityBankId, title: bank?.title ?? "" }}
           onSave={saveActivity}
           locale={locale}
           codingClient={bankCodingExerciseClient}
