@@ -14,7 +14,7 @@ This file is for coding-exercises-specific memory only.
 - Practice runs and later submissions live in `PluginCodingExerciseExecution`.
 - The first execution route is `coding-exercises/run`, which stores each run server-side before and after the Judge0 request.
 - Hidden tests are managed through the teacher-only `coding-exercises/hidden-tests` route.
-- Hidden-test management currently belongs to course activity copies. Bank activity authoring stores reusable public config; adding bank-owned private coding test/reference data later should use plugin-owned bank tables plus a server hook to copy into course-owned plugin tables at assignment time.
+- Bank activity authoring now has bank-owned private coding test/reference tables; course assignment copies those private records into course-owned plugin tables so coding exercises persist the same authoring data in banks and courses.
 - Enabled hidden tests must validate against the private reference solution before they are saved.
 - Graded submissions are handled separately from sample runs through `coding-exercises/submit`.
 - Teacher authoring separates student-facing starter code from a private reference solution; the reference solution must never be stored in public activity config.
@@ -31,3 +31,5 @@ This file is for coding-exercises-specific memory only.
 - Student coding uses the shared Monaco editor from `@cognelo/activity-ui`, while teacher authoring still uses the in-house editor for the lighter authoring workflow.
 - Plugin-owned user-facing translations should live inside the plugin package rather than in the host app's global i18n file.
 - Teacher authoring forms must register with the shared unsaved-change guard from `@cognelo/activity-ui`; future coding-exercise tabs/settings should keep `isDirty`, save, and discard behavior wired through `useUnsavedChangesGuard`.
+- AI-assisted coding-exercise authoring uses the selected question-authoring AI agent. Prompt generation fills only the student-facing prompt from description/language/subject context; asset generation fills starter code, reference solution, template, visible tests, and at least five hidden tests after server-side validation against Judge0.
+- AI-generated coding-exercise prompts should be concrete scenario-based tasks rather than meta/concept-only prompts. For example, teach pointer/reference concepts through a small realistic use case instead of asking students to "illustrate pass-by-reference".

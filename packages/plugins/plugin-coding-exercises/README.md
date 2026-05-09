@@ -73,10 +73,16 @@ Current plugin-owned tables:
 - `PluginCodingExerciseHiddenTest`
 - `PluginCodingExerciseReferenceSolution`
 - `PluginCodingExerciseExecution`
+- `PluginBankCodingExerciseHiddenTest`
+- `PluginBankCodingExerciseReferenceSolution`
+
+Activity-bank authoring persists the same private reference solution, hidden template data, and tests in bank-owned plugin tables. When a bank activity is assigned to a course, the plugin hook copies that private data into course-owned plugin tables so future bank edits and course edits diverge safely.
 
 ## Authoring UX
 
 The teacher authoring UI is a form surface and must stay registered with the shared `useUnsavedChangesGuard` hook from `@cognelo/activity-ui`. Any future coding-exercise authoring tabs or settings panels should do the same so navigation can offer continue editing, save and leave, or discard and leave.
+
+When a teacher has selected an enabled question-authoring AI agent in global settings, the authoring UI can generate the student-facing prompt from the activity description, language, and subject context. It can also generate starter code, the reference solution, template, one visible sample test, and at least five hidden tests. Generated solution/test assets are validated server-side against Judge0 before they are inserted into the form.
 
 ## Judge0 Integration
 

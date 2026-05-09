@@ -1,12 +1,40 @@
 import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
-import { assertCanManageCourse, AppError } from "@cognelo/core";
+import { assertCanManageActivityBank, assertCanManageCourse, AppError } from "@cognelo/core";
 import { codingExerciseHiddenTestsInputSchema, codingExerciseTemplateRequiresTestCodeMarker, parseCodingExercisePrivateConfig } from "./coding-exercises";
 import { getCodingExerciseReferenceSolution, validateReferenceSolutionAgainstHiddenTests } from "./executions";
 
 const codingExerciseHiddenTestsClient = prisma as typeof prisma & {
   pluginCodingExerciseReferenceSolution: {
     upsert(args: Prisma.PluginCodingExerciseReferenceSolutionUpsertArgs): Promise<unknown>;
+  };
+  pluginBankCodingExerciseReferenceSolution: {
+    findUnique(
+      args: Prisma.PluginBankCodingExerciseReferenceSolutionFindUniqueArgs
+    ): Promise<{
+      sourceCode: string;
+      privateConfig: unknown;
+      validationSummary: unknown;
+      createdAt: Date;
+      updatedAt: Date;
+    } | null>;
+    upsert(args: Prisma.PluginBankCodingExerciseReferenceSolutionUpsertArgs): Promise<unknown>;
+  };
+  pluginBankCodingExerciseHiddenTest: {
+    findMany(args: Prisma.PluginBankCodingExerciseHiddenTestFindManyArgs): Promise<
+      Array<{
+        id: string;
+        name: string;
+        stdin: string;
+        expectedOutput: string;
+        isEnabled: boolean;
+        weight: number;
+        orderIndex: number;
+        metadata: unknown;
+        createdAt: Date;
+        updatedAt: Date;
+      }>
+    >;
   };
 };
 
@@ -43,6 +71,23 @@ export async function listCodingExerciseHiddenTests(params: { activityId: string
   };
 }
 
+export async function listBankCodingExerciseHiddenTests(params: { bankActivityId: string }) {
+  const [tests, referenceSolution] = await Promise.all([
+    codingExerciseHiddenTestsClient.pluginBankCodingExerciseHiddenTest.findMany({
+      where: { bankActivityId: params.bankActivityId },
+      orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }]
+    }),
+    codingExerciseHiddenTestsClient.pluginBankCodingExerciseReferenceSolution.findUnique({
+      where: { bankActivityId: params.bankActivityId }
+    })
+  ]);
+
+  return {
+    tests: tests.map((test) => toHiddenTestRecord(test)),
+    referenceSolution: referenceSolution ? toReferenceSolutionRecord(referenceSolution) : null
+  };
+}
+
 export async function replaceCodingExerciseHiddenTests(params: {
   activityId: string;
   courseId: string;
@@ -51,6 +96,158 @@ export async function replaceCodingExerciseHiddenTests(params: {
   input: unknown;
 }) {
   await assertCanManageCourse(params.user, params.courseId);
+  const input = await validateCodingExerciseHiddenTestsInput({
+    activityConfig: params.activityConfig,
+    input: params.input
+  });
+
+  await codingExerciseHiddenTestsClient.$transaction(async (transaction) => {
+    await transaction.pluginCodingExerciseHiddenTest.deleteMany({
+      where: { activityId: params.activityId }
+    });
+
+    if (input.tests.length) {
+      await transaction.pluginCodingExerciseHiddenTest.createMany({
+        data: input.tests.map((test, index) => ({
+          activityId: params.activityId,
+          id: test.id,
+          name: test.name,
+          stdin: test.stdin,
+          expectedOutput: test.expectedOutput,
+          orderIndex: index,
+          isEnabled: test.isEnabled,
+          weight: test.weight,
+          metadata: {
+            testCode: test.testCode
+          } as Prisma.InputJsonValue
+        }))
+      });
+    }
+
+    await (transaction as typeof codingExerciseHiddenTestsClient).pluginCodingExerciseReferenceSolution.upsert({
+      where: { activityId: params.activityId },
+      create: {
+        activityId: params.activityId,
+        sourceCode: input.referenceSolution,
+        privateConfig: input.privateConfig as Prisma.InputJsonValue,
+        validationSummary: input.validationSummary as Prisma.InputJsonValue
+      },
+      update: {
+        sourceCode: input.referenceSolution,
+        privateConfig: input.privateConfig as Prisma.InputJsonValue,
+        validationSummary: input.validationSummary as Prisma.InputJsonValue
+      }
+    });
+  });
+
+  return listCodingExerciseHiddenTests({ activityId: params.activityId });
+}
+
+export async function replaceBankCodingExerciseHiddenTests(params: {
+  activityBankId: string;
+  bankActivityId: string;
+  activityConfig: unknown;
+  user: CurrentUser;
+  input: unknown;
+}) {
+  await assertCanManageActivityBank(params.user, params.activityBankId);
+  const input = await validateCodingExerciseHiddenTestsInput({
+    activityConfig: params.activityConfig,
+    input: params.input
+  });
+
+  await codingExerciseHiddenTestsClient.$transaction(async (transaction) => {
+    await transaction.pluginBankCodingExerciseHiddenTest.deleteMany({
+      where: { bankActivityId: params.bankActivityId }
+    });
+
+    if (input.tests.length) {
+      await transaction.pluginBankCodingExerciseHiddenTest.createMany({
+        data: input.tests.map((test, index) => ({
+          bankActivityId: params.bankActivityId,
+          id: test.id,
+          name: test.name,
+          stdin: test.stdin,
+          expectedOutput: test.expectedOutput,
+          orderIndex: index,
+          isEnabled: test.isEnabled,
+          weight: test.weight,
+          metadata: {
+            testCode: test.testCode
+          } as Prisma.InputJsonValue
+        }))
+      });
+    }
+
+    await (transaction as typeof codingExerciseHiddenTestsClient).pluginBankCodingExerciseReferenceSolution.upsert({
+      where: { bankActivityId: params.bankActivityId },
+      create: {
+        bankActivityId: params.bankActivityId,
+        sourceCode: input.referenceSolution,
+        privateConfig: input.privateConfig as Prisma.InputJsonValue,
+        validationSummary: input.validationSummary as Prisma.InputJsonValue
+      },
+      update: {
+        sourceCode: input.referenceSolution,
+        privateConfig: input.privateConfig as Prisma.InputJsonValue,
+        validationSummary: input.validationSummary as Prisma.InputJsonValue
+      }
+    });
+  });
+
+  return listBankCodingExerciseHiddenTests({ bankActivityId: params.bankActivityId });
+}
+
+export async function copyBankCodingExerciseDataToCourseActivity(params: { bankActivityId: string; activityId: string }) {
+  const [tests, referenceSolution] = await Promise.all([
+    prisma.pluginBankCodingExerciseHiddenTest.findMany({
+      where: { bankActivityId: params.bankActivityId },
+      orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }]
+    }),
+    prisma.pluginBankCodingExerciseReferenceSolution.findUnique({
+      where: { bankActivityId: params.bankActivityId }
+    })
+  ]);
+
+  await prisma.$transaction(async (transaction) => {
+    await transaction.pluginCodingExerciseHiddenTest.deleteMany({
+      where: { activityId: params.activityId }
+    });
+
+    await transaction.pluginCodingExerciseReferenceSolution.deleteMany({
+      where: { activityId: params.activityId }
+    });
+
+    if (tests.length) {
+      await transaction.pluginCodingExerciseHiddenTest.createMany({
+        data: tests.map((test) => ({
+          activityId: params.activityId,
+          id: test.id,
+          name: test.name,
+          stdin: test.stdin,
+          expectedOutput: test.expectedOutput,
+          orderIndex: test.orderIndex,
+          isEnabled: test.isEnabled,
+          weight: test.weight,
+          metadata: test.metadata as Prisma.InputJsonValue
+        }))
+      });
+    }
+
+    if (referenceSolution) {
+      await transaction.pluginCodingExerciseReferenceSolution.create({
+        data: {
+          activityId: params.activityId,
+          sourceCode: referenceSolution.sourceCode,
+          privateConfig: referenceSolution.privateConfig as Prisma.InputJsonValue,
+          validationSummary: referenceSolution.validationSummary as Prisma.InputJsonValue
+        }
+      });
+    }
+  });
+}
+
+async function validateCodingExerciseHiddenTestsInput(params: { activityConfig: unknown; input: unknown }) {
   const input = codingExerciseHiddenTestsInputSchema.parse(params.input);
   const seenIds = new Set<string>();
   for (const test of input.tests) {
@@ -130,46 +327,11 @@ export async function replaceCodingExerciseHiddenTests(params: {
     );
   }
 
-  await codingExerciseHiddenTestsClient.$transaction(async (transaction) => {
-    await transaction.pluginCodingExerciseHiddenTest.deleteMany({
-      where: { activityId: params.activityId }
-    });
-
-    if (input.tests.length) {
-      await transaction.pluginCodingExerciseHiddenTest.createMany({
-        data: input.tests.map((test, index) => ({
-          activityId: params.activityId,
-          id: test.id,
-          name: test.name,
-          stdin: test.stdin,
-          expectedOutput: test.expectedOutput,
-          orderIndex: index,
-          isEnabled: test.isEnabled,
-          weight: test.weight,
-          metadata: {
-            testCode: test.testCode
-          } as Prisma.InputJsonValue
-        }))
-      });
-    }
-
-    await (transaction as typeof codingExerciseHiddenTestsClient).pluginCodingExerciseReferenceSolution.upsert({
-      where: { activityId: params.activityId },
-      create: {
-        activityId: params.activityId,
-        sourceCode: input.referenceSolution,
-        privateConfig: privateConfig as Prisma.InputJsonValue,
-        validationSummary: validationSummary as Prisma.InputJsonValue
-      },
-      update: {
-        sourceCode: input.referenceSolution,
-        privateConfig: privateConfig as Prisma.InputJsonValue,
-        validationSummary: validationSummary as Prisma.InputJsonValue
-      }
-    });
-  });
-
-  return listCodingExerciseHiddenTests({ activityId: params.activityId });
+  return {
+    ...input,
+    privateConfig,
+    validationSummary
+  };
 }
 
 function toHiddenTestRecord(test: {
@@ -202,4 +364,20 @@ function toHiddenTestRecord(test: {
 function getHiddenTestCode(value: unknown) {
   const metadata = normalizeMetadata(value);
   return typeof metadata.testCode === "string" ? metadata.testCode : "";
+}
+
+function toReferenceSolutionRecord(referenceSolution: {
+  sourceCode: string;
+  privateConfig: unknown;
+  validationSummary: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    sourceCode: referenceSolution.sourceCode,
+    privateConfig: parseCodingExercisePrivateConfig(referenceSolution.privateConfig),
+    validationSummary: normalizeMetadata(referenceSolution.validationSummary),
+    createdAt: referenceSolution.createdAt.toISOString(),
+    updatedAt: referenceSolution.updatedAt.toISOString()
+  };
 }

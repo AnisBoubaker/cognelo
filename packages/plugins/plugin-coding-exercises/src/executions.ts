@@ -549,6 +549,7 @@ async function validateReferenceSolutionTestGroup(params: {
       weight: testCase.weight,
       statusId: result.status?.id ?? null,
       statusLabel: result.status?.description ?? null,
+      expectedOutput: testCase.expectedOutput,
       stdout: result.stdout ?? null,
       stderr: result.stderr ?? null,
       compileOutput: result.compile_output ?? null,

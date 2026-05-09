@@ -17,6 +17,10 @@ import {
 
 type ActivityRendererProps<T extends JSXElementConstructor<any>> = ComponentProps<T> & { groupId?: string };
 
+type CodingExerciseActivityRendererProps = ActivityRendererProps<typeof CodingExerciseActivityView> & {
+  codingExerciseAiGenerationClient?: ComponentProps<typeof CodingExerciseActivityView>["aiGenerationClient"];
+};
+
 function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActivityView>) {
   const { groupId, ...activityProps } = props;
   return (
@@ -40,11 +44,12 @@ function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActi
   );
 }
 
-function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof CodingExerciseActivityView>) {
-  const { groupId, ...activityProps } = props;
+function CodingExerciseActivityRenderer(props: CodingExerciseActivityRendererProps) {
+  const { groupId, codingExerciseAiGenerationClient, ...activityProps } = props;
   return (
     <CodingExerciseActivityView
       {...activityProps}
+      aiGenerationClient={codingExerciseAiGenerationClient}
       codingClient={{
         listHiddenTests: async (courseId, activityId) => {
           const result = groupId

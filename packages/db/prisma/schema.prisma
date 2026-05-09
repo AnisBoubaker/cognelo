@@ -412,6 +412,8 @@ model BankActivity {
   courseActivities Activity[]
   webDesignExerciseReferenceBundle PluginBankWebDesignExerciseReferenceBundle?
   webDesignExerciseTests PluginBankWebDesignExerciseTest[]
+  codingExerciseHiddenTests PluginBankCodingExerciseHiddenTest[]
+  codingExerciseReferenceSolution PluginBankCodingExerciseReferenceSolution?
 
   @@index([bankId, position])
   @@index([activityTypeId])
@@ -541,6 +543,35 @@ model PluginCodingExerciseReferenceSolution {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   activity          Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+}
+
+model PluginBankCodingExerciseHiddenTest {
+  id             String       @id @default(cuid())
+  bankActivityId String
+  name           String
+  stdin          String       @default("")
+  expectedOutput String       @default("")
+  orderIndex     Int          @default(0)
+  isEnabled      Boolean      @default(true)
+  weight         Int          @default(1)
+  metadata       Json         @default("{}")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  bankActivity   BankActivity @relation(fields: [bankActivityId], references: [id], onDelete: Cascade)
+
+  @@index([bankActivityId, orderIndex])
+  @@index([bankActivityId, isEnabled])
+}
+
+model PluginBankCodingExerciseReferenceSolution {
+  id                String       @id @default(cuid())
+  bankActivityId    String       @unique
+  sourceCode        String
+  privateConfig     Json         @default("{}")
+  validationSummary Json         @default("{}")
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  bankActivity      BankActivity @relation(fields: [bankActivityId], references: [id], onDelete: Cascade)
 }
 
 model PluginCodingExerciseExecution {
