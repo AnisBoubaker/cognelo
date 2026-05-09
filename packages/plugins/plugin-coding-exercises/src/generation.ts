@@ -30,14 +30,26 @@ export const codingExerciseAssetsGenerationInputSchema = z.object({
   locale: z.enum(["en", "fr", "zh"]).default("en")
 });
 
-const generatedAssetsSchema = z.object({
-  starterCode: z.string().max(40000).default(""),
-  referenceSolution: z.string().min(1).max(60000),
-  templateSource: z.string().min(1).max(120000),
-  templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([]),
-  sampleTests: z.array(sampleTestSchema).min(1).max(10),
-  hiddenTests: z.array(codingExerciseHiddenTestSchema).min(5).max(50)
-});
+const generatedAssetsSchema = z
+  .object({
+    status: z.enum(["ok", "warning"]).optional().default("ok"),
+    warningMessage: z.string().max(1200).optional().default(""),
+    starterCode: z.string().max(40000).default(""),
+    referenceSolution: z.string().min(1).max(60000),
+    templateSource: z.string().min(1).max(120000),
+    templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([]),
+    sampleTests: z.array(sampleTestSchema).min(1).max(10),
+    hiddenTests: z.array(codingExerciseHiddenTestSchema).min(5).max(50)
+  })
+  .superRefine((assets, context) => {
+    if (assets.status === "warning" && assets.warningMessage.trim().length < 10) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["warningMessage"],
+        message: "warningMessage is required when status is warning."
+      });
+    }
+  });
 
 const generatedAssetsImpossibleSchema = z.object({
   status: z.literal("error"),
@@ -174,6 +186,7 @@ function buildAssetsGenerationSystemPrompt(input: { language: string; locale: Ge
     "Required JSON shape:",
     "If the exercise is coherent and possible, return this shape:",
     "{",
+    '  "status": "ok",',
     '  "starterCode": "student-visible starter code",',
     '  "referenceSolution": "complete teacher-only solution code",',
     '  "templateSource": "full execution scaffold containing {{ STUDENT_CODE }} and optionally {{ TEST_CODE }}",',
@@ -182,7 +195,14 @@ function buildAssetsGenerationSystemPrompt(input: { language: string; locale: Ge
     '  "hiddenTests": [{"id":"hidden-1","name":"...","stdin":"...","expectedOutput":"...","testCode":"","isEnabled":true,"weight":1}]',
     "}",
     "",
-    "If the exercise is impossible, contradictory, or too underspecified to generate a correct reference solution and tests, return this shape instead:",
+    "If the exercise can be generated but requires assumptions, return the same assets shape with:",
+    "{",
+    '  "status": "warning",',
+    '  "warningMessage": "localized explanation of the assumptions made",',
+    '  "...": "all normal asset fields are still required"',
+    "}",
+    "",
+    "If the exercise is totally impossible to generate, return this shape instead:",
     "{",
     '  "status": "error",',
     '  "message": "localized explanation shown to the teacher"',
@@ -192,9 +212,12 @@ function buildAssetsGenerationSystemPrompt(input: { language: string; locale: Ge
     `- Programming language: ${input.language}.`,
     "- The selected programming language is authoritative. Generate code, starter code, reference solution, templates, and tests for that language only.",
     "- If the teacher description or student prompt mentions another programming language, adapt the exercise to the selected programming language instead of following the conflicting language mention.",
-    "- Use the error shape when requirements contradict each other, such as asking a function to receive one parameter but return the sum of two parameters.",
-    "- Use the error shape when the prompt does not define enough input/output behavior to create meaningful tests.",
+    "- Respect the student-facing prompt as much as possible.",
+    "- Use the error shape only when the prompt makes generation totally impossible, for example when core requirements are mutually contradictory and no reasonable assumptions could produce valid tests.",
+    "- If the prompt is ambiguous but still permits a plausible generation, generate assets anyway with status warning and explain the assumptions in warningMessage.",
+    "- If the prompt leaves some edge cases undefined but normal behavior is testable, generate assets with status warning, test the defined behavior, and explain which edge cases were not tested or how they were interpreted.",
     "- The error message must be concise, actionable, and written in the current UI/content language.",
+    "- warningMessage must be concise, actionable, and written in the current UI/content language.",
     `- The templateSource must contain ${codingExerciseTemplateInsertionToken}.`,
     `- The templateSource must contain ${codingExerciseTemplateInsertionToken} exactly once.`,
     `- The templateSource may contain ${codingExerciseTestInsertionToken} at most once.`,
@@ -359,10 +382,7 @@ function validateGeneratedPrompt(prompt: string) {
 }
 
 function isGenericConceptPrompt(prompt: string) {
-  const normalized = prompt
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase();
+  const normalized = normalizeForHeuristics(prompt);
 
   return [
     /illustre[rz]?\s+(le\s+)?/,
@@ -372,6 +392,13 @@ function isGenericConceptPrompt(prompt: string) {
     /fonction\s+qui\s+(illustre|montre|porte\s+sur)/,
     /permet\s+d['’]illustrer/
   ].some((pattern) => pattern.test(normalized));
+}
+
+function normalizeForHeuristics(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
 }
 
 function collectValidationIssues(validationSummary: Record<string, unknown>) {
