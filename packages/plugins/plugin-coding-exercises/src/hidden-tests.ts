@@ -72,6 +72,7 @@ export async function listCodingExerciseHiddenTests(params: { activityId: string
 }
 
 export async function listBankCodingExerciseHiddenTests(params: { bankActivityId: string }) {
+  assertBankCodingExerciseStorageAvailable();
   const [tests, referenceSolution] = await Promise.all([
     codingExerciseHiddenTestsClient.pluginBankCodingExerciseHiddenTest.findMany({
       where: { bankActivityId: params.bankActivityId },
@@ -101,6 +102,10 @@ export async function replaceCodingExerciseHiddenTests(params: {
     input: params.input
   });
 
+  if (input.validateOnly) {
+    return toValidatedHiddenTestsResponse(input);
+  }
+
   await codingExerciseHiddenTestsClient.$transaction(async (transaction) => {
     await transaction.pluginCodingExerciseHiddenTest.deleteMany({
       where: { activityId: params.activityId }
@@ -110,7 +115,6 @@ export async function replaceCodingExerciseHiddenTests(params: {
       await transaction.pluginCodingExerciseHiddenTest.createMany({
         data: input.tests.map((test, index) => ({
           activityId: params.activityId,
-          id: test.id,
           name: test.name,
           stdin: test.stdin,
           expectedOutput: test.expectedOutput,
@@ -118,6 +122,7 @@ export async function replaceCodingExerciseHiddenTests(params: {
           isEnabled: test.isEnabled,
           weight: test.weight,
           metadata: {
+            stableId: test.id,
             testCode: test.testCode
           } as Prisma.InputJsonValue
         }))
@@ -150,11 +155,16 @@ export async function replaceBankCodingExerciseHiddenTests(params: {
   user: CurrentUser;
   input: unknown;
 }) {
+  assertBankCodingExerciseStorageAvailable();
   await assertCanManageActivityBank(params.user, params.activityBankId);
   const input = await validateCodingExerciseHiddenTestsInput({
     activityConfig: params.activityConfig,
     input: params.input
   });
+
+  if (input.validateOnly) {
+    return toValidatedHiddenTestsResponse(input);
+  }
 
   await codingExerciseHiddenTestsClient.$transaction(async (transaction) => {
     await transaction.pluginBankCodingExerciseHiddenTest.deleteMany({
@@ -165,7 +175,6 @@ export async function replaceBankCodingExerciseHiddenTests(params: {
       await transaction.pluginBankCodingExerciseHiddenTest.createMany({
         data: input.tests.map((test, index) => ({
           bankActivityId: params.bankActivityId,
-          id: test.id,
           name: test.name,
           stdin: test.stdin,
           expectedOutput: test.expectedOutput,
@@ -173,6 +182,7 @@ export async function replaceBankCodingExerciseHiddenTests(params: {
           isEnabled: test.isEnabled,
           weight: test.weight,
           metadata: {
+            stableId: test.id,
             testCode: test.testCode
           } as Prisma.InputJsonValue
         }))
@@ -199,6 +209,7 @@ export async function replaceBankCodingExerciseHiddenTests(params: {
 }
 
 export async function copyBankCodingExerciseDataToCourseActivity(params: { bankActivityId: string; activityId: string }) {
+  assertBankCodingExerciseStorageAvailable();
   const [tests, referenceSolution] = await Promise.all([
     prisma.pluginBankCodingExerciseHiddenTest.findMany({
       where: { bankActivityId: params.bankActivityId },
@@ -222,14 +233,16 @@ export async function copyBankCodingExerciseDataToCourseActivity(params: { bankA
       await transaction.pluginCodingExerciseHiddenTest.createMany({
         data: tests.map((test) => ({
           activityId: params.activityId,
-          id: test.id,
           name: test.name,
           stdin: test.stdin,
           expectedOutput: test.expectedOutput,
           orderIndex: test.orderIndex,
           isEnabled: test.isEnabled,
           weight: test.weight,
-          metadata: test.metadata as Prisma.InputJsonValue
+          metadata: {
+            ...normalizeMetadata(test.metadata),
+            stableId: getHiddenTestStableId(test)
+          } as Prisma.InputJsonValue
         }))
       });
     }
@@ -267,7 +280,7 @@ async function validateCodingExerciseHiddenTestsInput(params: { activityConfig: 
   }
 
   const validationSummary = await validateReferenceSolutionAgainstHiddenTests({
-    activityConfig: params.activityConfig,
+    activityConfig: input.activityConfig ?? params.activityConfig,
     sourceCode: input.referenceSolution,
     sampleTests: input.sampleTests,
     hiddenTests: input.tests.map((test, index) => ({
@@ -334,6 +347,26 @@ async function validateCodingExerciseHiddenTestsInput(params: { activityConfig: 
   };
 }
 
+function toValidatedHiddenTestsResponse(input: Awaited<ReturnType<typeof validateCodingExerciseHiddenTestsInput>>) {
+  const timestamp = new Date().toISOString();
+  return {
+    tests: input.tests.map((test, index) => ({
+      ...test,
+      orderIndex: index,
+      metadata: { stableId: test.id },
+      createdAt: timestamp,
+      updatedAt: timestamp
+    })),
+    referenceSolution: {
+      sourceCode: input.referenceSolution,
+      privateConfig: input.privateConfig,
+      validationSummary: input.validationSummary,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    }
+  };
+}
+
 function toHiddenTestRecord(test: {
   id: string;
   name: string;
@@ -347,7 +380,7 @@ function toHiddenTestRecord(test: {
   updatedAt: Date;
 }): HiddenTestRecord {
   return {
-    id: test.id,
+    id: getHiddenTestStableId(test),
     name: test.name,
     stdin: test.stdin,
     expectedOutput: test.expectedOutput,
@@ -364,6 +397,24 @@ function toHiddenTestRecord(test: {
 function getHiddenTestCode(value: unknown) {
   const metadata = normalizeMetadata(value);
   return typeof metadata.testCode === "string" ? metadata.testCode : "";
+}
+
+function assertBankCodingExerciseStorageAvailable() {
+  if (
+    !codingExerciseHiddenTestsClient.pluginBankCodingExerciseHiddenTest ||
+    !codingExerciseHiddenTestsClient.pluginBankCodingExerciseReferenceSolution
+  ) {
+    throw new AppError(
+      500,
+      "CODING_EXERCISE_BANK_STORAGE_UNAVAILABLE",
+      "Coding exercise bank storage is unavailable. Run Prisma generate and restart the API server."
+    );
+  }
+}
+
+function getHiddenTestStableId(test: { id: string; metadata: unknown }) {
+  const metadata = normalizeMetadata(test.metadata);
+  return typeof metadata.stableId === "string" && metadata.stableId.trim() ? metadata.stableId : test.id;
 }
 
 function toReferenceSolutionRecord(referenceSolution: {

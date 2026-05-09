@@ -645,6 +645,8 @@ export const api = {
       sampleTests: Array<{ id: string; input: string; output: string; testCode: string; title: string }>;
       referenceSolution: string;
       privateConfig?: CodingExerciseReferenceSolution["privateConfig"];
+      activityConfig?: Record<string, unknown>;
+      validateOnly?: boolean;
     }
   ) =>
     request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
@@ -704,6 +706,8 @@ export const api = {
       sampleTests: Array<{ id: string; input: string; output: string; testCode: string; title: string }>;
       referenceSolution: string;
       privateConfig?: CodingExerciseReferenceSolution["privateConfig"];
+      activityConfig?: Record<string, unknown>;
+      validateOnly?: boolean;
     }
   ) =>
     request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(

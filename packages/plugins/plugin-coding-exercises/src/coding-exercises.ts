@@ -51,7 +51,9 @@ export const codingExerciseHiddenTestsInputSchema = z.object({
   tests: z.array(codingExerciseHiddenTestSchema).max(50),
   sampleTests: z.array(sampleTestSchema).max(10).default([]),
   referenceSolution: z.string().max(60000).default(""),
-  privateConfig: codingExercisePrivateConfigSchema.default({})
+  privateConfig: codingExercisePrivateConfigSchema.default({}),
+  activityConfig: codingExerciseConfigSchema.optional(),
+  validateOnly: z.boolean().default(false)
 });
 
 const judge0LanguageNameCandidates: Record<string, readonly string[]> = {

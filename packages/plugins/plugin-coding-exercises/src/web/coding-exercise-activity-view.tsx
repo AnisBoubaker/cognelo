@@ -94,7 +94,14 @@ type CodingExerciseClient = {
   saveHiddenTests: (
     courseId: string,
     activityId: string,
-    input: { tests: HiddenTest[]; sampleTests: SampleTest[]; referenceSolution: string; privateConfig: CodingExercisePrivateConfig }
+    input: {
+      tests: HiddenTest[];
+      sampleTests: SampleTest[];
+      referenceSolution: string;
+      privateConfig: CodingExercisePrivateConfig;
+      activityConfig?: Record<string, unknown>;
+      validateOnly?: boolean;
+    }
   ) => Promise<{
     tests: HiddenTest[];
     referenceSolution: { sourceCode: string; privateConfig: CodingExercisePrivateConfig; validationSummary: Record<string, unknown> } | null;
@@ -293,6 +300,7 @@ export function CodingExerciseActivityView({
           })
         );
         setReferenceValidationSummary(result.referenceSolution?.validationSummary ?? null);
+        setError("");
       })
       .catch((err) => setError(err instanceof Error ? err.message : t("loadHiddenTestsError")));
   }, [activity.id, canManage, course?.id]);
@@ -433,7 +441,7 @@ export function CodingExerciseActivityView({
     setError("");
   }, [savedSnapshot]);
 
-  const saveCodingExercise = useCallback(async () => {
+  const saveCodingExercise = useCallback(async (options?: { rethrow?: boolean }) => {
     setSaving(true);
     setError("");
 
@@ -453,34 +461,46 @@ export function CodingExerciseActivityView({
         throw new Error(t("templateTestCodeMissingMarker"));
       }
 
+      const persistedActivityConfig = {
+        prompt: config.prompt,
+        language: config.language,
+        executionMode: "template",
+        starterCode: config.starterCode,
+        studentTemplateSource: buildCodingExerciseStudentTemplateSource(
+          normalizedPrivateConfig.templateSource,
+          normalizedPrivateConfig.templateVisibleLineNumbers,
+          config.language
+        ),
+        sampleTests: normalizeCodingExerciseSampleTests(config.sampleTests),
+        maxEditorSeconds: config.maxEditorSeconds
+      };
+      const hiddenTestsInput = {
+        tests: hiddenTests.map((test, index) => ({
+          ...test,
+          orderIndex: index
+        })),
+        sampleTests: normalizeCodingExerciseSampleTests(config.sampleTests),
+        referenceSolution,
+        privateConfig: normalizedPrivateConfig,
+        activityConfig: persistedActivityConfig
+      };
+
+      if (canManage && course?.id && codingClient) {
+        const validationResult = await codingClient.saveHiddenTests(course.id, activity.id, {
+          ...hiddenTestsInput,
+          validateOnly: true
+        });
+        setReferenceValidationSummary(validationResult.referenceSolution?.validationSummary ?? null);
+      }
+
       await onSave({
         title,
         description,
-        config: {
-          prompt: config.prompt,
-          language: config.language,
-          executionMode: "template",
-          starterCode: config.starterCode,
-          studentTemplateSource: buildCodingExerciseStudentTemplateSource(
-            normalizedPrivateConfig.templateSource,
-            normalizedPrivateConfig.templateVisibleLineNumbers,
-            config.language
-          ),
-          sampleTests: normalizeCodingExerciseSampleTests(config.sampleTests),
-          maxEditorSeconds: config.maxEditorSeconds
-        }
+        config: persistedActivityConfig
       });
 
       if (canManage && course?.id && codingClient) {
-        const result = await codingClient.saveHiddenTests(course.id, activity.id, {
-          tests: hiddenTests.map((test, index) => ({
-            ...test,
-            orderIndex: index
-          })),
-          sampleTests: normalizeCodingExerciseSampleTests(config.sampleTests),
-          referenceSolution,
-          privateConfig: normalizedPrivateConfig
-        });
+        const result = await codingClient.saveHiddenTests(course.id, activity.id, hiddenTestsInput);
         setHiddenTests(result.tests);
         setReferenceSolution(result.referenceSolution?.sourceCode ?? "");
         setPrivateConfig(parseCodingExercisePrivateConfig(result.referenceSolution?.privateConfig ?? {}));
@@ -508,10 +528,18 @@ export function CodingExerciseActivityView({
         if (validationSummary) {
           setReferenceValidationSummary(validationSummary);
         }
+        notifications.error(formatReferenceValidationFailureMessage(details, pluginLocale));
+        setError("");
+        if (options?.rethrow) {
+          throw err;
+        }
+        return;
       }
       notifications.error(err instanceof Error ? err.message : t("saveError"));
       setError("");
-      throw err;
+      if (options?.rethrow) {
+        throw err;
+      }
     } finally {
       setSaving(false);
     }
@@ -521,7 +549,7 @@ export function CodingExerciseActivityView({
     useMemo(
       () => ({
         isDirty: hasUnsavedChanges,
-        onSave: saveCodingExercise,
+        onSave: () => saveCodingExercise({ rethrow: true }),
         onDiscard: discardChanges
       }),
       [discardChanges, hasUnsavedChanges, saveCodingExercise]
@@ -632,7 +660,7 @@ export function CodingExerciseActivityView({
       setExpandedSampleTestIds(result.sampleTests.map((test) => test.id));
       setExpandedHiddenTestIds(generatedHiddenTests.map((test) => test.id));
       if (result.status === "warning" && result.warningMessage) {
-        notifications.info(result.warningMessage, { durationMs: null });
+        notifications.warning(result.warningMessage);
       }
       notifications.success(result.attempts > 1 ? `${t("generatedAssets")} (${result.attempts})` : t("generatedAssets"));
     } catch (err) {
@@ -1223,6 +1251,67 @@ function normalizeCodingExerciseConfigForDisplay(config: CodingExerciseConfig): 
 
 function isApiErrorLike(value: unknown): value is { code?: string; details?: unknown } {
   return value instanceof Error && "code" in value;
+}
+
+function formatReferenceValidationFailureMessage(details: Record<string, unknown> | null, locale: CodingExercisesLocale) {
+  const validationSummary = normalizeObject(details?.validationSummary);
+  const firstFailedTest = validationSummary ? findFirstFailedReferenceValidationTest(validationSummary) : null;
+  const testName =
+    firstFailedTest && typeof firstFailedTest.name === "string" && firstFailedTest.name.trim()
+      ? firstFailedTest.name
+      : formatCodingExercisesMessage(locale, "test");
+  const reason =
+    getReferenceValidationFailureReason(firstFailedTest, locale) || formatCodingExercisesMessage(locale, "referenceSolutionGenericFailure");
+
+  return formatCodingExercisesMessage(locale, "referenceSolutionValidationFailed", {
+    testName,
+    reason
+  });
+}
+
+function findFirstFailedReferenceValidationTest(validationSummary: Record<string, unknown>) {
+  for (const groupKey of ["sampleTests", "hiddenTests"]) {
+    const group = normalizeObject(validationSummary[groupKey]);
+    const tests = Array.isArray(group?.tests) ? (group.tests as Array<Record<string, unknown>>) : [];
+    const failed = tests.find((test) => test && typeof test === "object" && test.passed === false);
+    if (failed) {
+      return failed;
+    }
+  }
+  return null;
+}
+
+function getReferenceValidationFailureReason(test: Record<string, unknown> | null, locale: CodingExercisesLocale) {
+  if (!test) {
+    return "";
+  }
+  for (const key of ["message", "stderr", "compileOutput", "statusLabel"]) {
+    const value = test[key];
+    if (typeof value === "string" && value.trim()) {
+      return key === "statusLabel" ? formatJudgeStatusLabel(value, locale) : value;
+    }
+  }
+  return "";
+}
+
+function formatJudgeStatusLabel(value: string, locale: CodingExercisesLocale) {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "accepted") {
+    return formatCodingExercisesMessage(locale, "judgeStatusAccepted");
+  }
+  if (normalized === "wrong answer") {
+    return formatCodingExercisesMessage(locale, "judgeStatusWrongAnswer");
+  }
+  if (normalized === "compilation error") {
+    return formatCodingExercisesMessage(locale, "judgeStatusCompilationError");
+  }
+  if (normalized === "runtime error" || normalized.startsWith("runtime error ")) {
+    return formatCodingExercisesMessage(locale, "judgeStatusRuntimeError");
+  }
+  if (normalized === "time limit exceeded") {
+    return formatCodingExercisesMessage(locale, "judgeStatusTimeLimitExceeded");
+  }
+  return value;
 }
 
 function getReferenceValidationTests(summary: Record<string, unknown> | null, groupKey: "sampleTests" | "hiddenTests") {
