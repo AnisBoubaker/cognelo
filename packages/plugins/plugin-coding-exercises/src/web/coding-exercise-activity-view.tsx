@@ -40,6 +40,7 @@ type SampleTest = CodingExerciseConfig["sampleTests"][number];
 
 type CodingExerciseSnapshot = {
   title: string;
+  description: string;
   config: CodingExerciseConfig;
   hiddenTests: HiddenTest[];
   referenceSolution: string;
@@ -147,15 +148,17 @@ export function CodingExerciseActivityView({
   }));
   const previousActivityIdRef = useRef(activity.id);
   const [title, setTitle] = useState(activity.title);
+  const [description, setDescription] = useState(activity.description);
   const [config, setConfig] = useState<CodingExerciseConfig>(() => parseCodingExerciseConfig(activity.config ?? fallbackConfig));
   const [hiddenTests, setHiddenTests] = useState<HiddenTest[]>([]);
   const [referenceSolution, setReferenceSolution] = useState("");
   const [privateConfig, setPrivateConfig] = useState<CodingExercisePrivateConfig>(() => parseCodingExercisePrivateConfig({}));
   const [savedSnapshot, setSavedSnapshot] = useState<CodingExerciseSnapshot>(() =>
-    buildCodingExerciseSnapshot({
-      title: activity.title,
-      config: normalizeCodingExerciseConfigForDisplay(parseCodingExerciseConfig(activity.config ?? fallbackConfig)),
-      hiddenTests: [],
+        buildCodingExerciseSnapshot({
+          title: activity.title,
+          description: activity.description,
+          config: normalizeCodingExerciseConfigForDisplay(parseCodingExerciseConfig(activity.config ?? fallbackConfig)),
+          hiddenTests: [],
       referenceSolution: "",
       privateConfig: parseCodingExercisePrivateConfig({})
     })
@@ -201,11 +204,13 @@ export function CodingExerciseActivityView({
     const nextConfig = normalizeCodingExerciseConfigForDisplay(parseCodingExerciseConfig(activity.config ?? fallbackConfig));
     const sampleTests = normalizeCodingExerciseSampleTests(nextConfig.sampleTests);
     setTitle(activity.title);
+    setDescription(activity.description);
     setConfig(nextConfig);
     if (!canManage) {
       setSavedSnapshot(
         buildCodingExerciseSnapshot({
           title: activity.title,
+          description: activity.description,
           config: nextConfig,
           hiddenTests: [],
           referenceSolution: "",
@@ -246,6 +251,7 @@ export function CodingExerciseActivityView({
         setSavedSnapshot(
           buildCodingExerciseSnapshot({
             title,
+            description,
             config,
             hiddenTests: result.tests,
             referenceSolution: result.referenceSolution?.sourceCode ?? "",
@@ -372,17 +378,19 @@ export function CodingExerciseActivityView({
     () =>
       buildCodingExerciseSnapshot({
         title,
+        description,
         config,
         hiddenTests,
         referenceSolution,
         privateConfig
       }),
-    [config, hiddenTests, privateConfig, referenceSolution, title]
+    [config, description, hiddenTests, privateConfig, referenceSolution, title]
   );
   const hasUnsavedChanges = canManage && !codingExerciseSnapshotsEqual(currentSnapshot, savedSnapshot);
 
   const discardChanges = useCallback(() => {
     setTitle(savedSnapshot.title);
+    setDescription(savedSnapshot.description);
     setConfig(savedSnapshot.config);
     setHiddenTests(savedSnapshot.hiddenTests);
     setReferenceSolution(savedSnapshot.referenceSolution);
@@ -412,7 +420,7 @@ export function CodingExerciseActivityView({
 
       await onSave({
         title,
-        description: config.prompt,
+        description,
         config: {
           prompt: config.prompt,
           language: config.language,
@@ -444,6 +452,7 @@ export function CodingExerciseActivityView({
         setSavedSnapshot(
           buildCodingExerciseSnapshot({
             title,
+            description,
             config,
             hiddenTests: result.tests,
             referenceSolution: result.referenceSolution?.sourceCode ?? "",
@@ -471,7 +480,7 @@ export function CodingExerciseActivityView({
     } finally {
       setSaving(false);
     }
-  }, [activity.id, canManage, codingClient, config, course?.id, currentSnapshot, hiddenTests, notifications, onSave, privateConfig, referenceSolution, t, title]);
+  }, [activity.id, canManage, codingClient, config, course?.id, currentSnapshot, description, hiddenTests, notifications, onSave, privateConfig, referenceSolution, t, title]);
 
   useUnsavedChangesGuard(
     useMemo(
@@ -562,6 +571,16 @@ export function CodingExerciseActivityView({
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="field">
+            <label htmlFor="coding-description">{t("description")}</label>
+            <textarea
+              id="coding-description"
+              rows={3}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
           </div>
 
           <div className="field">
