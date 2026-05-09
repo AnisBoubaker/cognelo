@@ -140,6 +140,26 @@ export default function BankActivityAuthoringPage() {
     [activityBankId]
   );
 
+  const bankCodingExerciseClient = useMemo(
+    () => ({
+      listHiddenTests: async (_courseId: string, activityId: string) => api.bankCodingExerciseHiddenTests(activityBankId, activityId),
+      saveHiddenTests: async (
+        _courseId: string,
+        activityId: string,
+        input: Parameters<typeof api.saveBankCodingExerciseHiddenTests>[2]
+      ) => api.saveBankCodingExerciseHiddenTests(activityBankId, activityId, input),
+      runCode: async () => {
+        throw new Error(t("bankActivityPage.runUnavailable"));
+      },
+      listRuns: async () => ({ executions: [] }),
+      submitCode: async () => {
+        throw new Error(t("bankActivityPage.submitUnavailable"));
+      },
+      listSubmissions: async () => ({ executions: [] })
+    }),
+    [activityBankId, t]
+  );
+
   function renderAuthoring() {
     if (!renderedActivity) {
       return <p>{t("common.loading")}</p>;
@@ -150,7 +170,7 @@ export default function BankActivityAuthoringPage() {
         <ParsonsActivityView
           activity={renderedActivity}
           canManage
-          course={null}
+          course={{ id: activityBankId, title: bank?.title ?? "" }}
           onSave={saveActivity}
           attemptsClient={undefined}
           t={t}
@@ -166,7 +186,15 @@ export default function BankActivityAuthoringPage() {
           course={null}
           onSave={saveActivity}
           locale={locale}
-          codingClient={undefined}
+          codingClient={bankCodingExerciseClient}
+          aiGenerationClient={
+            hasQuestionAuthoringAgent
+              ? {
+                  generatePrompt: (input) => api.generateBankCodingExercisePrompt(activityBankId, bankActivityId, input),
+                  generateAssets: (input) => api.generateBankCodingExerciseAssets(activityBankId, bankActivityId, input)
+                }
+              : undefined
+          }
         />
       );
     }

@@ -109,12 +109,40 @@ type CodingExerciseClient = {
   listSubmissions: (courseId: string, activityId: string) => Promise<{ executions: CodingExecution[] }>;
 };
 
+type CodingExerciseAiGenerationClient = {
+  generatePrompt: (input: { description: string; language: string; locale: CodingExercisesLocale }) => Promise<{ prompt: string; attempts: number }>;
+  generateAssets: (input: {
+    description: string;
+    prompt: string;
+    language: string;
+    locale: CodingExercisesLocale;
+  }) => Promise<
+    | {
+        status?: "ok";
+        starterCode: string;
+        referenceSolution: string;
+        templateSource: string;
+        templateVisibleLineNumbers: number[];
+        sampleTests: SampleTest[];
+        hiddenTests: Array<Omit<HiddenTest, "orderIndex" | "metadata" | "createdAt" | "updatedAt">>;
+        validationSummary: Record<string, unknown>;
+        attempts: number;
+      }
+    | {
+        status: "error";
+        message: string;
+        attempts: number;
+      }
+  >;
+};
+
 type CodingExerciseActivityViewProps = {
   activity: ActivityLike;
   canManage: boolean;
   course?: { id?: string; title: string } | null;
   onSave: (input: { title: string; description: string; config: Record<string, unknown> }) => Promise<ActivityLike>;
   codingClient?: CodingExerciseClient;
+  aiGenerationClient?: CodingExerciseAiGenerationClient;
   locale?: string;
 };
 
@@ -136,6 +164,7 @@ export function CodingExerciseActivityView({
   course,
   onSave,
   codingClient,
+  aiGenerationClient,
   locale
 }: CodingExerciseActivityViewProps) {
   const pluginLocale = normalizeCodingExercisesLocale(locale);
@@ -167,6 +196,9 @@ export function CodingExerciseActivityView({
   const [expandedSampleTestIds, setExpandedSampleTestIds] = useState<string[]>([]);
   const [expandedHiddenTestIds, setExpandedHiddenTestIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [generatingPrompt, setGeneratingPrompt] = useState(false);
+  const [generatingAssets, setGeneratingAssets] = useState(false);
+  const [replacementDialog, setReplacementDialog] = useState<"prompt" | "assets" | null>(null);
   const [error, setError] = useState("");
   const [editorCode, setEditorCode] = useState("");
   const [sampleInput, setSampleInput] = useState("");
@@ -234,6 +266,7 @@ export function CodingExerciseActivityView({
       setExpandedHiddenTestIds([]);
     }
     setError("");
+    setReplacementDialog(null);
     previousActivityIdRef.current = activity.id;
   }, [activity]);
 
@@ -395,6 +428,7 @@ export function CodingExerciseActivityView({
     setHiddenTests(savedSnapshot.hiddenTests);
     setReferenceSolution(savedSnapshot.referenceSolution);
     setPrivateConfig(savedSnapshot.privateConfig);
+    setReplacementDialog(null);
     setError("");
   }, [savedSnapshot]);
 
@@ -498,6 +532,112 @@ export function CodingExerciseActivityView({
     await saveCodingExercise();
   }
 
+  function requestPromptGeneration() {
+    if (!aiGenerationClient) {
+      return;
+    }
+    if (description.trim().length < 10) {
+      notifications.error(t("generatePromptDescriptionRequired"));
+      return;
+    }
+    if (config.prompt.trim()) {
+      setReplacementDialog("prompt");
+      return;
+    }
+    void generatePrompt();
+  }
+
+  async function generatePrompt() {
+    if (!aiGenerationClient) {
+      return;
+    }
+
+    setGeneratingPrompt(true);
+    setReplacementDialog(null);
+    setError("");
+    try {
+      const result = await aiGenerationClient.generatePrompt({
+        description,
+        language: config.language,
+        locale: pluginLocale
+      });
+      setConfig((current) => ({ ...current, prompt: result.prompt }));
+      notifications.success(result.attempts > 1 ? `${t("generatedPrompt")} (${result.attempts})` : t("generatedPrompt"));
+    } catch (err) {
+      notifications.error(err instanceof Error ? err.message : t("generatePromptError"));
+    } finally {
+      setGeneratingPrompt(false);
+    }
+  }
+
+  function requestAssetsGeneration() {
+    if (!aiGenerationClient) {
+      return;
+    }
+    if (config.prompt.trim().length < 10) {
+      notifications.error(t("generateAssetsPromptRequired"));
+      return;
+    }
+    if (hasExistingGeneratedAssetContent(config, privateConfig, referenceSolution, hiddenTests)) {
+      setReplacementDialog("assets");
+      return;
+    }
+    void generateAssets();
+  }
+
+  async function generateAssets() {
+    if (!aiGenerationClient) {
+      return;
+    }
+
+    setGeneratingAssets(true);
+    setReplacementDialog(null);
+    setError("");
+    try {
+      const result = await aiGenerationClient.generateAssets({
+        description,
+        prompt: config.prompt,
+        language: config.language,
+        locale: pluginLocale
+      });
+      if (result.status === "error") {
+        notifications.error(result.message);
+        return;
+      }
+      setConfig((current) => ({
+        ...current,
+        starterCode: result.starterCode,
+        studentTemplateSource: result.templateSource,
+        sampleTests: normalizeCodingExerciseSampleTests(result.sampleTests)
+      }));
+      setReferenceSolution(result.referenceSolution);
+      setPrivateConfig(
+        parseCodingExercisePrivateConfig({
+          templateSource: result.templateSource,
+          templateVisibleLineNumbers: result.templateVisibleLineNumbers
+        })
+      );
+      const generatedAt = Date.now();
+      const generatedHiddenTests = result.hiddenTests.map((test, index) => ({
+        ...test,
+        id: `${test.id}-${generatedAt}-${index + 1}`.slice(0, 80),
+        orderIndex: index,
+        metadata: {},
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }));
+      setHiddenTests(generatedHiddenTests);
+      setReferenceValidationSummary(result.validationSummary);
+      setExpandedSampleTestIds(result.sampleTests.map((test) => test.id));
+      setExpandedHiddenTestIds(generatedHiddenTests.map((test) => test.id));
+      notifications.success(result.attempts > 1 ? `${t("generatedAssets")} (${result.attempts})` : t("generatedAssets"));
+    } catch (err) {
+      notifications.error(err instanceof Error ? err.message : t("generateAssetsError"));
+    } finally {
+      setGeneratingAssets(false);
+    }
+  }
+
   async function runCode() {
     if (!course?.id || !codingClient) {
       return;
@@ -583,6 +723,17 @@ export function CodingExerciseActivityView({
             />
           </div>
 
+          {aiGenerationClient ? (
+            <button
+              className="secondary"
+              type="button"
+              disabled={generatingPrompt || description.trim().length < 10}
+              onClick={requestPromptGeneration}
+            >
+              {generatingPrompt ? t("generatingPrompt") : t("generatePrompt")}
+            </button>
+          ) : null}
+
           <div className="field">
             <label htmlFor="coding-prompt">{t("prompt")}</label>
             <textarea
@@ -592,6 +743,44 @@ export function CodingExerciseActivityView({
               onChange={(event) => setConfig((current) => ({ ...current, prompt: event.target.value }))}
             />
           </div>
+
+          {aiGenerationClient ? (
+            <button
+              className="secondary"
+              type="button"
+              disabled={generatingAssets || config.prompt.trim().length < 10}
+              onClick={requestAssetsGeneration}
+            >
+              {generatingAssets ? t("generatingAssets") : t("generateAssets")}
+            </button>
+          ) : null}
+
+          {replacementDialog ? (
+            <div className="dialog-backdrop" role="presentation">
+              <div
+                aria-modal="true"
+                className="dialog-panel"
+                role="dialog"
+                aria-labelledby={`coding-generation-replace-${replacementDialog}`}
+              >
+                <div className="stack" style={{ gap: 8 }}>
+                  <p className="eyebrow">{replacementDialog === "prompt" ? t("generatePrompt") : t("generateAssets")}</p>
+                  <h2 id={`coding-generation-replace-${replacementDialog}`}>
+                    {replacementDialog === "prompt" ? t("replacePromptTitle") : t("replaceAssetsTitle")}
+                  </h2>
+                  <p className="muted">{replacementDialog === "prompt" ? t("replacePromptMessage") : t("replaceAssetsMessage")}</p>
+                </div>
+                <div className="dialog-actions">
+                  <button className="secondary" type="button" onClick={() => setReplacementDialog(null)}>
+                    {replacementDialog === "prompt" ? t("keepCurrentPrompt") : t("keepCurrentAssets")}
+                  </button>
+                  <button type="button" onClick={() => (replacementDialog === "prompt" ? void generatePrompt() : void generateAssets())}>
+                    {replacementDialog === "prompt" ? t("replaceCurrentPrompt") : t("replaceCurrentAssets")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="stack">
             <label className="editor-section-label">{t("starterCode")}</label>
@@ -984,6 +1173,24 @@ function buildCodingExerciseSnapshot(input: CodingExerciseSnapshot): CodingExerc
 
 function codingExerciseSnapshotsEqual(left: CodingExerciseSnapshot, right: CodingExerciseSnapshot) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function hasExistingGeneratedAssetContent(
+  config: CodingExerciseConfig,
+  privateConfig: CodingExercisePrivateConfig,
+  referenceSolution: string,
+  hiddenTests: HiddenTest[]
+) {
+  const normalizedSampleTests = normalizeCodingExerciseSampleTests(config.sampleTests);
+  const templateSource = privateConfig.templateSource.trim();
+
+  return Boolean(
+    config.starterCode.trim() ||
+      referenceSolution.trim() ||
+      normalizedSampleTests.length ||
+      hiddenTests.length ||
+      (templateSource && templateSource !== codingExerciseTemplateInsertionToken)
+  );
 }
 
 function normalizeCodingExerciseConfigForDisplay(config: CodingExerciseConfig): CodingExerciseConfig {

@@ -57,6 +57,50 @@ export type McqGenerationResult = {
   attempts: number;
 };
 
+export type CodingExercisePromptGenerationInput = {
+  description: string;
+  language: string;
+  locale: "en" | "fr" | "zh";
+};
+
+export type CodingExercisePromptGenerationResult = {
+  prompt: string;
+  attempts: number;
+};
+
+export type CodingExerciseAssetsGenerationInput = {
+  description: string;
+  prompt: string;
+  language: string;
+  locale: "en" | "fr" | "zh";
+};
+
+export type CodingExerciseAssetsGenerationResult =
+  | {
+      status?: "ok";
+      starterCode: string;
+      referenceSolution: string;
+      templateSource: string;
+      templateVisibleLineNumbers: number[];
+      sampleTests: Array<{ id: string; input: string; output: string; testCode: string; title: string }>;
+      hiddenTests: Array<{
+        id: string;
+        name: string;
+        stdin: string;
+        expectedOutput: string;
+        testCode: string;
+        isEnabled: boolean;
+        weight: number;
+      }>;
+      validationSummary: Record<string, unknown>;
+      attempts: number;
+    }
+  | {
+      status: "error";
+      message: string;
+      attempts: number;
+    };
+
 export type Course = {
   id: string;
   subjectId: string;
@@ -597,8 +641,9 @@ export const api = {
     activityId: string,
     input: {
       tests: Array<Omit<CodingExerciseHiddenTest, "orderIndex" | "metadata" | "createdAt" | "updatedAt"> & { orderIndex?: number }>;
-      sampleTests: Array<{ id: string; input: string; output: string; title: string }>;
+      sampleTests: Array<{ id: string; input: string; output: string; testCode: string; title: string }>;
       referenceSolution: string;
+      privateConfig?: CodingExerciseReferenceSolution["privateConfig"];
     }
   ) =>
     request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
@@ -626,6 +671,16 @@ export const api = {
     }),
   codingExerciseSubmissions: (courseId: string, activityId: string) =>
     request<{ executions: CodingExerciseExecution[] }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/submit`),
+  generateCodingExercisePrompt: (courseId: string, activityId: string, input: CodingExercisePromptGenerationInput) =>
+    request<CodingExercisePromptGenerationResult>(`/courses/${courseId}/activities/${activityId}/coding-exercises/generate-prompt`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  generateCodingExerciseAssets: (courseId: string, activityId: string, input: CodingExerciseAssetsGenerationInput) =>
+    request<CodingExerciseAssetsGenerationResult>(`/courses/${courseId}/activities/${activityId}/coding-exercises/generate-assets`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
   generateMcqSource: (courseId: string, activityId: string, input: McqGenerationInput) =>
     request<McqGenerationResult>(`/courses/${courseId}/activities/${activityId}/mcq/generate`, {
       method: "POST",
@@ -636,6 +691,43 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input)
     }),
+  bankCodingExerciseHiddenTests: (activityBankId: string, bankActivityId: string) =>
+    request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
+      `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-exercises/hidden-tests`
+    ),
+  saveBankCodingExerciseHiddenTests: (
+    activityBankId: string,
+    bankActivityId: string,
+    input: {
+      tests: Array<Omit<CodingExerciseHiddenTest, "orderIndex" | "metadata" | "createdAt" | "updatedAt"> & { orderIndex?: number }>;
+      sampleTests: Array<{ id: string; input: string; output: string; testCode: string; title: string }>;
+      referenceSolution: string;
+      privateConfig?: CodingExerciseReferenceSolution["privateConfig"];
+    }
+  ) =>
+    request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
+      `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-exercises/hidden-tests`,
+      {
+        method: "PUT",
+        body: JSON.stringify(input)
+      }
+    ),
+  generateBankCodingExercisePrompt: (activityBankId: string, bankActivityId: string, input: CodingExercisePromptGenerationInput) =>
+    request<CodingExercisePromptGenerationResult>(
+      `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-exercises/generate-prompt`,
+      {
+        method: "POST",
+        body: JSON.stringify(input)
+      }
+    ),
+  generateBankCodingExerciseAssets: (activityBankId: string, bankActivityId: string, input: CodingExerciseAssetsGenerationInput) =>
+    request<CodingExerciseAssetsGenerationResult>(
+      `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-exercises/generate-assets`,
+      {
+        method: "POST",
+        body: JSON.stringify(input)
+      }
+    ),
   webDesignExerciseTests: (courseId: string, activityId: string) =>
     request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
       `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/tests`
@@ -875,8 +967,9 @@ export const api = {
     activityId: string,
     input: {
       tests: Array<Omit<CodingExerciseHiddenTest, "orderIndex" | "metadata" | "createdAt" | "updatedAt"> & { orderIndex?: number }>;
-      sampleTests: Array<{ id: string; input: string; output: string; title: string }>;
+      sampleTests: Array<{ id: string; input: string; output: string; testCode: string; title: string }>;
       referenceSolution: string;
+      privateConfig?: CodingExerciseReferenceSolution["privateConfig"];
     }
   ) =>
     request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(

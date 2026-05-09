@@ -8,7 +8,7 @@ type NotificationInput = {
   message: string;
   title?: string;
   variant?: NotificationVariant;
-  durationMs?: number;
+  durationMs?: number | null;
 };
 
 type NotificationRecord = NotificationInput & {
@@ -123,9 +123,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     };
 
     setNotifications((current) => [...current, notification]);
-    const durationMs = input.durationMs ?? (variant === "error" ? 9000 : 5500);
-    const timerId = setTimeout(() => dismiss(id), durationMs);
-    timerIdsRef.current.set(id, timerId);
+    const durationMs = input.durationMs ?? (variant === "error" ? null : 5500);
+    if (typeof durationMs === "number" && durationMs > 0) {
+      const timerId = setTimeout(() => dismiss(id), durationMs);
+      timerIdsRef.current.set(id, timerId);
+    }
   };
 
   const value = useMemo<NotificationsContextValue>(

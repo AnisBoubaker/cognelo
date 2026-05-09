@@ -88,6 +88,14 @@ export default function ActivityPage() {
                   }
                 : undefined
             }
+            codingExerciseAiGenerationClient={
+              canManage && hasQuestionAuthoringAgent
+                ? {
+                    generatePrompt: (input) => api.generateCodingExercisePrompt(courseId, activityId, input),
+                    generateAssets: (input) => api.generateCodingExerciseAssets(courseId, activityId, input)
+                  }
+                : undefined
+            }
             onSave={saveActivity}
             t={t}
             locale={locale}
