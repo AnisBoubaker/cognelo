@@ -118,7 +118,8 @@ type CodingExerciseAiGenerationClient = {
     locale: CodingExercisesLocale;
   }) => Promise<
     | {
-        status?: "ok";
+        status?: "ok" | "warning";
+        warningMessage?: string;
         starterCode: string;
         referenceSolution: string;
         templateSource: string;
@@ -630,6 +631,9 @@ export function CodingExerciseActivityView({
       setReferenceValidationSummary(result.validationSummary);
       setExpandedSampleTestIds(result.sampleTests.map((test) => test.id));
       setExpandedHiddenTestIds(generatedHiddenTests.map((test) => test.id));
+      if (result.status === "warning" && result.warningMessage) {
+        notifications.info(result.warningMessage, { durationMs: null });
+      }
       notifications.success(result.attempts > 1 ? `${t("generatedAssets")} (${result.attempts})` : t("generatedAssets"));
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : t("generateAssetsError"));

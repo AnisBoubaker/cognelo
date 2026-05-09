@@ -77,7 +77,8 @@ export type CodingExerciseAssetsGenerationInput = {
 
 export type CodingExerciseAssetsGenerationResult =
   | {
-      status?: "ok";
+      status?: "ok" | "warning";
+      warningMessage?: string;
       starterCode: string;
       referenceSolution: string;
       templateSource: string;
