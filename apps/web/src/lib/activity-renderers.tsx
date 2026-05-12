@@ -21,11 +21,16 @@ type CodingExerciseActivityRendererProps = ActivityRendererProps<typeof CodingEx
   codingExerciseAiGenerationClient?: ComponentProps<typeof CodingExerciseActivityView>["aiGenerationClient"];
 };
 
-function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActivityView>) {
-  const { groupId, ...activityProps } = props;
+type ParsonsActivityRendererProps = ActivityRendererProps<typeof ParsonsActivityView> & {
+  parsonsAiGenerationClient?: ComponentProps<typeof ParsonsActivityView>["aiGenerationClient"];
+};
+
+function ParsonsActivityRenderer(props: ParsonsActivityRendererProps) {
+  const { groupId, parsonsAiGenerationClient, ...activityProps } = props;
   return (
     <ParsonsActivityView
       {...activityProps}
+      aiGenerationClient={parsonsAiGenerationClient}
       attemptsClient={{
         ensureAttempt: async (activityId, courseId, input) => {
           const result = groupId

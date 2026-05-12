@@ -1,11 +1,11 @@
 export * from "./attempt-types";
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 
-import { parsonsAttemptRoute } from "./routes";
+import { parsonsAttemptRoute, parsonsGenerateRoute } from "./routes";
 
 export const parsonsServerPlugin: ServerActivityPlugin = {
   key: "parsons",
-  routes: [parsonsAttemptRoute]
+  routes: [parsonsAttemptRoute, parsonsGenerateRoute]
 };
 
 export * from "./attempt-types";

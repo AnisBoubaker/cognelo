@@ -57,6 +57,26 @@ export type McqGenerationResult = {
   attempts: number;
 };
 
+export type ParsonsGenerationInput = {
+  description: string;
+  language: string;
+  locale: "en" | "fr" | "zh";
+};
+
+export type ParsonsGenerationResult =
+  | {
+      status?: "ok" | "warning";
+      warningMessage?: string;
+      prompt: string;
+      solution: string;
+      attempts: number;
+    }
+  | {
+      status: "error";
+      message: string;
+      attempts: number;
+    };
+
 export type CodingExercisePromptGenerationInput = {
   description: string;
   language: string;
@@ -691,6 +711,16 @@ export const api = {
     }),
   generateBankMcqSource: (activityBankId: string, bankActivityId: string, input: McqGenerationInput) =>
     request<McqGenerationResult>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/mcq/generate`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  generateParsonsProblem: (courseId: string, activityId: string, input: ParsonsGenerationInput) =>
+    request<ParsonsGenerationResult>(`/courses/${courseId}/activities/${activityId}/parsons/generate`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  generateBankParsonsProblem: (activityBankId: string, bankActivityId: string, input: ParsonsGenerationInput) =>
+    request<ParsonsGenerationResult>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/parsons/generate`, {
       method: "POST",
       body: JSON.stringify(input)
     }),

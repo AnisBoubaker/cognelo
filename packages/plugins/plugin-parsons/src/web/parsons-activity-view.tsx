@@ -61,6 +61,23 @@ type ParsonsActivityViewProps = {
   onSave: (input: { title: string; description: string; config: Record<string, unknown> }) => Promise<ActivityLike>;
   attemptsClient?: ParsonsAttemptsClient;
   t: (key: string, vars?: Record<string, string | number>) => string;
+  locale?: "en" | "fr" | "zh";
+  aiGenerationClient?: {
+    generate: (input: { description: string; language: string; locale: "en" | "fr" | "zh" }) => Promise<
+      | {
+          status?: "ok" | "warning";
+          warningMessage?: string;
+          prompt: string;
+          solution: string;
+          attempts: number;
+        }
+      | {
+          status: "error";
+          message: string;
+          attempts: number;
+        }
+    >;
+  };
 };
 
 type ParsonsAuthoringSnapshot = {
@@ -74,7 +91,7 @@ type ParsonsAuthoringSnapshot = {
   precedenceRules: ParsonsPrecedenceRule[];
 };
 
-export function ParsonsActivityView({ activity, course, canManage, onSave, attemptsClient, t }: ParsonsActivityViewProps) {
+export function ParsonsActivityView({ activity, course, canManage, onSave, attemptsClient, t, locale = "en", aiGenerationClient }: ParsonsActivityViewProps) {
   const notifications = useNotifications();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -93,6 +110,8 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [showReplaceGenerationDialog, setShowReplaceGenerationDialog] = useState(false);
   const [attempt, setAttempt] = useState<ParsonsAttemptLike | null>(null);
   const attemptRef = useRef<ParsonsAttemptLike | null>(null);
   const blocksRef = useRef<ParsonsBlock[]>([]);
@@ -120,6 +139,8 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
     setFeedback("");
     setAttempt(null);
     setError("");
+    setGenerating(false);
+    setShowReplaceGenerationDialog(false);
   }, [activity]);
 
   useEffect(() => {
@@ -292,6 +313,69 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
   async function saveParsonsProblem(event: FormEvent) {
     event.preventDefault();
     await saveParsonsChanges();
+  }
+
+  function requestParsonsGeneration() {
+    if (!aiGenerationClient) {
+      return;
+    }
+    if (description.trim().length < 10) {
+      notifications.error(t("parsons.generateDescriptionRequired"));
+      return;
+    }
+    if (prompt.trim().length > 0 || solution.trim().length > 0) {
+      setShowReplaceGenerationDialog(true);
+      return;
+    }
+
+    void generateParsonsProblem();
+  }
+
+  async function generateParsonsProblem() {
+    if (!aiGenerationClient) {
+      return;
+    }
+
+    setGenerating(true);
+    setShowReplaceGenerationDialog(false);
+    setError("");
+    try {
+      const result = await aiGenerationClient.generate({
+        description,
+        language,
+        locale
+      });
+
+      if (result.status === "error") {
+        notifications.error(result.message);
+        return;
+      }
+
+      setPrompt(result.prompt);
+      handleSolutionChange(result.solution);
+      setSelectedLines([]);
+      setSelectedGroupId(null);
+      setSelectedBlockId(null);
+      setPrecedenceDraft(null);
+      setFeedback("");
+      setGroups([]);
+      setPrecedenceRules([]);
+      setBlocks(
+        resetParsonsBlocks(
+          parseParsonsConfig({ prompt: result.prompt, solution: result.solution, language, stripIndentation, groups: [], precedenceRules: [] })
+        )
+      );
+
+      if (result.status === "warning") {
+        notifications.warning(result.warningMessage || t("parsons.generatedWithWarning"));
+      } else {
+        notifications.success(result.attempts > 1 ? `${t("parsons.generated")} (${result.attempts})` : t("parsons.generated"));
+      }
+    } catch (err) {
+      notifications.error(err instanceof Error ? err.message : t("parsons.generateError"));
+    } finally {
+      setGenerating(false);
+    }
   }
 
   function moveBlock(index: number, direction: -1 | 1) {
@@ -524,9 +608,47 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
               <input id="activity-title" minLength={2} required value={title} onChange={(event) => setTitle(event.target.value)} />
             </div>
             <div className="field">
+              <label htmlFor="parsons-language">{t("parsons.language")}</label>
+              <select id="parsons-language" value={language} onChange={(event) => setLanguage(event.target.value)}>
+                {codeLanguageOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
               <label htmlFor="activity-description">{t("parsons.activityDescription")}</label>
               <textarea id="activity-description" value={description} onChange={(event) => setDescription(event.target.value)} />
             </div>
+            {aiGenerationClient ? (
+              <div className="stack" style={{ gap: 8 }}>
+                <button className="secondary" disabled={generating || description.trim().length < 10} type="button" onClick={requestParsonsGeneration}>
+                  {generating ? t("parsons.generating") : t("parsons.generate")}
+                </button>
+                <p className="muted">{t("parsons.generateHelp")}</p>
+              </div>
+            ) : null}
+
+            {showReplaceGenerationDialog ? (
+              <div className="dialog-backdrop" role="presentation">
+                <div aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="parsons-ai-replace-title">
+                  <div className="stack" style={{ gap: 8 }}>
+                    <p className="eyebrow">{t("parsons.generate")}</p>
+                    <h2 id="parsons-ai-replace-title">{t("parsons.replaceGeneratedTitle")}</h2>
+                    <p className="muted">{t("parsons.replaceGeneratedMessage")}</p>
+                  </div>
+                  <div className="dialog-actions">
+                    <button className="secondary" type="button" onClick={() => setShowReplaceGenerationDialog(false)}>
+                      {t("parsons.keepCurrentGenerated")}
+                    </button>
+                    <button type="button" onClick={() => void generateParsonsProblem()}>
+                      {t("parsons.replaceCurrentGenerated")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <div className="field">
               <label htmlFor="parsons-prompt">{t("parsons.prompt")}</label>
               <textarea id="parsons-prompt" required value={prompt} onChange={(event) => setPrompt(event.target.value)} />
@@ -545,22 +667,10 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
                 value={solution}
               />
             </div>
-            <div className="split parsons-authoring-grid">
-              <div className="field">
-                <label htmlFor="parsons-language">{t("parsons.language")}</label>
-                <select id="parsons-language" value={language} onChange={(event) => setLanguage(event.target.value)}>
-                  {codeLanguageOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <label className="checkbox-row">
-                <input checked={stripIndentation} type="checkbox" onChange={(event) => setStripIndentation(event.target.checked)} />
-                <span>{t("parsons.stripIndentation")}</span>
-              </label>
-            </div>
+            <label className="checkbox-row">
+              <input checked={stripIndentation} type="checkbox" onChange={(event) => setStripIndentation(event.target.checked)} />
+              <span>{t("parsons.stripIndentation")}</span>
+            </label>
             <section className="inline-panel stack">
               <div className="row wrap parsons-group-toolbar">
                 <div className="stack stack-tight">
