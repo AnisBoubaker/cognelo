@@ -1,7 +1,8 @@
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import {
-  codingExerciseGenerateAssetsRoute,
   codingExerciseGeneratePromptRoute,
+  codingExerciseGenerateSolutionRoute,
+  codingExerciseGenerateTestsRoute,
   codingExerciseHiddenTestsRoute,
   codingExerciseRunRoute,
   codingExerciseSubmitRoute
@@ -15,7 +16,8 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
     codingExerciseSubmitRoute,
     codingExerciseHiddenTestsRoute,
     codingExerciseGeneratePromptRoute,
-    codingExerciseGenerateAssetsRoute
+    codingExerciseGenerateSolutionRoute,
+    codingExerciseGenerateTestsRoute
   ],
   hooks: {
     onCourseActivityCreatedFromBankVersion: async ({ activity, bankActivityId }) => {

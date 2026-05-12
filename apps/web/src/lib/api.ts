@@ -88,14 +88,22 @@ export type CodingExercisePromptGenerationResult = {
   attempts: number;
 };
 
-export type CodingExerciseAssetsGenerationInput = {
+export type CodingExerciseGenerationBaseInput = {
   description: string;
   prompt: string;
   language: string;
   locale: "en" | "fr" | "zh";
 };
 
-export type CodingExerciseAssetsGenerationResult =
+export type CodingExerciseSolutionGenerationInput = CodingExerciseGenerationBaseInput;
+
+export type CodingExerciseTestsGenerationInput = CodingExerciseGenerationBaseInput & {
+  referenceSolution: string;
+  templateSource: string;
+  templateVisibleLineNumbers: number[];
+};
+
+export type CodingExerciseSolutionGenerationResult =
   | {
       status?: "ok" | "warning";
       warningMessage?: string;
@@ -103,6 +111,18 @@ export type CodingExerciseAssetsGenerationResult =
       referenceSolution: string;
       templateSource: string;
       templateVisibleLineNumbers: number[];
+      attempts: number;
+    }
+  | {
+      status: "error";
+      message: string;
+      attempts: number;
+    };
+
+export type CodingExerciseTestsGenerationResult =
+  | {
+      status?: "ok" | "warning";
+      warningMessage?: string;
       sampleTests: Array<{ id: string; input: string; output: string; testCode: string; title: string }>;
       hiddenTests: Array<{
         id: string;
@@ -699,8 +719,13 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input)
     }),
-  generateCodingExerciseAssets: (courseId: string, activityId: string, input: CodingExerciseAssetsGenerationInput) =>
-    request<CodingExerciseAssetsGenerationResult>(`/courses/${courseId}/activities/${activityId}/coding-exercises/generate-assets`, {
+  generateCodingExerciseSolution: (courseId: string, activityId: string, input: CodingExerciseSolutionGenerationInput) =>
+    request<CodingExerciseSolutionGenerationResult>(`/courses/${courseId}/activities/${activityId}/coding-exercises/generate-solution`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  generateCodingExerciseTests: (courseId: string, activityId: string, input: CodingExerciseTestsGenerationInput) =>
+    request<CodingExerciseTestsGenerationResult>(`/courses/${courseId}/activities/${activityId}/coding-exercises/generate-tests`, {
       method: "POST",
       body: JSON.stringify(input)
     }),
@@ -755,9 +780,17 @@ export const api = {
         body: JSON.stringify(input)
       }
     ),
-  generateBankCodingExerciseAssets: (activityBankId: string, bankActivityId: string, input: CodingExerciseAssetsGenerationInput) =>
-    request<CodingExerciseAssetsGenerationResult>(
-      `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-exercises/generate-assets`,
+  generateBankCodingExerciseSolution: (activityBankId: string, bankActivityId: string, input: CodingExerciseSolutionGenerationInput) =>
+    request<CodingExerciseSolutionGenerationResult>(
+      `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-exercises/generate-solution`,
+      {
+        method: "POST",
+        body: JSON.stringify(input)
+      }
+    ),
+  generateBankCodingExerciseTests: (activityBankId: string, bankActivityId: string, input: CodingExerciseTestsGenerationInput) =>
+    request<CodingExerciseTestsGenerationResult>(
+      `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-exercises/generate-tests`,
       {
         method: "POST",
         body: JSON.stringify(input)

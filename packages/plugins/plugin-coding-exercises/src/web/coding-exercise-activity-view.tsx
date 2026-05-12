@@ -118,7 +118,7 @@ type CodingExerciseClient = {
 
 type CodingExerciseAiGenerationClient = {
   generatePrompt: (input: { description: string; language: string; locale: CodingExercisesLocale }) => Promise<{ prompt: string; attempts: number }>;
-  generateAssets: (input: {
+  generateSolution: (input: {
     description: string;
     prompt: string;
     language: string;
@@ -131,6 +131,26 @@ type CodingExerciseAiGenerationClient = {
         referenceSolution: string;
         templateSource: string;
         templateVisibleLineNumbers: number[];
+        attempts: number;
+      }
+    | {
+        status: "error";
+        message: string;
+        attempts: number;
+      }
+  >;
+  generateTests: (input: {
+    description: string;
+    prompt: string;
+    language: string;
+    locale: CodingExercisesLocale;
+    referenceSolution: string;
+    templateSource: string;
+    templateVisibleLineNumbers: number[];
+  }) => Promise<
+    | {
+        status?: "ok" | "warning";
+        warningMessage?: string;
         sampleTests: SampleTest[];
         hiddenTests: Array<Omit<HiddenTest, "orderIndex" | "metadata" | "createdAt" | "updatedAt">>;
         validationSummary: Record<string, unknown>;
@@ -179,6 +199,12 @@ export function CodingExerciseActivityView({
   const t = (key: Parameters<typeof formatCodingExercisesMessage>[1], values?: Record<string, string | number>) =>
     formatCodingExercisesMessage(pluginLocale, key, values);
   const notifications = useNotifications();
+  const aiGenerationDraftRef = useRef<{
+    prompt: string;
+    referenceSolution: string;
+    privateConfig: CodingExercisePrivateConfig;
+    language: string;
+  } | null>(null);
   const codingExerciseLanguageOptions = codeLanguageOptions.map((option) => ({
     ...option,
     disabled: disabledCodingExerciseLanguages.has(option.value)
@@ -205,8 +231,9 @@ export function CodingExerciseActivityView({
   const [expandedHiddenTestIds, setExpandedHiddenTestIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [generatingPrompt, setGeneratingPrompt] = useState(false);
-  const [generatingAssets, setGeneratingAssets] = useState(false);
-  const [replacementDialog, setReplacementDialog] = useState<"prompt" | "assets" | null>(null);
+  const [generatingSolution, setGeneratingSolution] = useState(false);
+  const [generatingTests, setGeneratingTests] = useState(false);
+  const [replacementDialog, setReplacementDialog] = useState<"prompt" | "solution" | "tests" | null>(null);
   const [error, setError] = useState("");
   const [editorCode, setEditorCode] = useState("");
   const [sampleInput, setSampleInput] = useState("");
@@ -272,6 +299,7 @@ export function CodingExerciseActivityView({
       setReferenceValidationSummary(null);
       setExpandedSampleTestIds([]);
       setExpandedHiddenTestIds([]);
+      aiGenerationDraftRef.current = null;
     }
     setError("");
     setReplacementDialog(null);
@@ -289,6 +317,7 @@ export function CodingExerciseActivityView({
         setHiddenTests(result.tests);
         setReferenceSolution(result.referenceSolution?.sourceCode ?? "");
         setPrivateConfig(parseCodingExercisePrivateConfig(result.referenceSolution?.privateConfig ?? {}));
+        aiGenerationDraftRef.current = null;
         setSavedSnapshot(
           buildCodingExerciseSnapshot({
             title,
@@ -392,6 +421,7 @@ export function CodingExerciseActivityView({
   }
 
   function toggleTemplateVisibleLine(lineIndex: number) {
+    aiGenerationDraftRef.current = null;
     setPrivateConfig((current) => {
       const visibleLineNumbers = current.templateVisibleLineNumbers.includes(lineIndex)
         ? current.templateVisibleLineNumbers.filter((value) => value !== lineIndex)
@@ -599,31 +629,31 @@ export function CodingExerciseActivityView({
     }
   }
 
-  function requestAssetsGeneration() {
+  function requestSolutionGeneration() {
     if (!aiGenerationClient) {
       return;
     }
     if (config.prompt.trim().length < 10) {
-      notifications.error(t("generateAssetsPromptRequired"));
+      notifications.error(t("generateSolutionPromptRequired"));
       return;
     }
-    if (hasExistingGeneratedAssetContent(config, privateConfig, referenceSolution, hiddenTests)) {
-      setReplacementDialog("assets");
+    if (hasExistingGeneratedSolutionContent(config, privateConfig, referenceSolution)) {
+      setReplacementDialog("solution");
       return;
     }
-    void generateAssets();
+    void generateSolution();
   }
 
-  async function generateAssets() {
+  async function generateSolution() {
     if (!aiGenerationClient) {
       return;
     }
 
-    setGeneratingAssets(true);
+    setGeneratingSolution(true);
     setReplacementDialog(null);
     setError("");
     try {
-      const result = await aiGenerationClient.generateAssets({
+      const result = await aiGenerationClient.generateSolution({
         description,
         prompt: config.prompt,
         language: config.language,
@@ -636,8 +666,7 @@ export function CodingExerciseActivityView({
       setConfig((current) => ({
         ...current,
         starterCode: result.starterCode,
-        studentTemplateSource: result.templateSource,
-        sampleTests: normalizeCodingExerciseSampleTests(result.sampleTests)
+        studentTemplateSource: result.templateSource
       }));
       setReferenceSolution(result.referenceSolution);
       setPrivateConfig(
@@ -646,6 +675,80 @@ export function CodingExerciseActivityView({
           templateVisibleLineNumbers: result.templateVisibleLineNumbers
         })
       );
+      aiGenerationDraftRef.current = {
+        prompt: config.prompt,
+        referenceSolution: result.referenceSolution,
+        privateConfig: parseCodingExercisePrivateConfig({
+          templateSource: result.templateSource,
+          templateVisibleLineNumbers: result.templateVisibleLineNumbers
+        }),
+        language: config.language
+      };
+      setReferenceValidationSummary(null);
+      if (result.status === "warning" && result.warningMessage) {
+        notifications.warning(result.warningMessage);
+      }
+      notifications.success(result.attempts > 1 ? `${t("generatedSolution")} (${result.attempts})` : t("generatedSolution"));
+    } catch (err) {
+      notifications.error(err instanceof Error ? err.message : t("generateSolutionError"));
+    } finally {
+      setGeneratingSolution(false);
+    }
+  }
+
+  function requestTestsGeneration() {
+    if (!aiGenerationClient) {
+      return;
+    }
+    const draft = aiGenerationDraftRef.current;
+    const promptForGeneration = config.prompt.trim() ? config.prompt : draft?.prompt ?? "";
+    const referenceSolutionForGeneration = referenceSolution.trim() ? referenceSolution : draft?.referenceSolution ?? "";
+    if (promptForGeneration.trim().length < 10) {
+      notifications.error(t("generateTestsPromptRequired"));
+      return;
+    }
+    if (!referenceSolutionForGeneration.trim()) {
+      notifications.error(t("generateTestsReferenceRequired"));
+      return;
+    }
+    if (hasExistingGeneratedTestContent(config, hiddenTests)) {
+      setReplacementDialog("tests");
+      return;
+    }
+    void generateTests();
+  }
+
+  async function generateTests() {
+    if (!aiGenerationClient) {
+      return;
+    }
+
+    setGeneratingTests(true);
+    setReplacementDialog(null);
+    setError("");
+    try {
+      const draft = aiGenerationDraftRef.current;
+      const promptForGeneration = config.prompt.trim() ? config.prompt : draft?.prompt ?? "";
+      const referenceSolutionForGeneration = referenceSolution.trim() ? referenceSolution : draft?.referenceSolution ?? "";
+      const privateConfigForGeneration = draft?.referenceSolution === referenceSolutionForGeneration ? draft.privateConfig : privateConfig;
+      const persistedPrivateConfig = getPersistedPrivateConfig(privateConfigForGeneration);
+      const result = await aiGenerationClient.generateTests({
+        description,
+        prompt: promptForGeneration,
+        language: config.language || draft?.language || "python",
+        locale: pluginLocale,
+        referenceSolution: referenceSolutionForGeneration,
+        templateSource: persistedPrivateConfig.templateSource,
+        templateVisibleLineNumbers: persistedPrivateConfig.templateVisibleLineNumbers
+      });
+      if (result.status === "error") {
+        notifications.error(result.message);
+        return;
+      }
+      setConfig((current) => ({
+        ...current,
+        sampleTests: normalizeCodingExerciseSampleTests(result.sampleTests)
+      }));
       const generatedAt = Date.now();
       const generatedHiddenTests = result.hiddenTests.map((test, index) => ({
         ...test,
@@ -662,11 +765,11 @@ export function CodingExerciseActivityView({
       if (result.status === "warning" && result.warningMessage) {
         notifications.warning(result.warningMessage);
       }
-      notifications.success(result.attempts > 1 ? `${t("generatedAssets")} (${result.attempts})` : t("generatedAssets"));
+      notifications.success(result.attempts > 1 ? `${t("generatedTests")} (${result.attempts})` : t("generatedTests"));
     } catch (err) {
-      notifications.error(err instanceof Error ? err.message : t("generateAssetsError"));
+      notifications.error(err instanceof Error ? err.message : t("generateTestsError"));
     } finally {
-      setGeneratingAssets(false);
+      setGeneratingTests(false);
     }
   }
 
@@ -713,6 +816,68 @@ export function CodingExerciseActivityView({
     }
   }
 
+  function getReplacementDialogEyebrow() {
+    if (replacementDialog === "prompt") {
+      return t("generatePrompt");
+    }
+    if (replacementDialog === "solution") {
+      return t("generateSolution");
+    }
+    return t("generateTests");
+  }
+
+  function getReplacementDialogTitle() {
+    if (replacementDialog === "prompt") {
+      return t("replacePromptTitle");
+    }
+    if (replacementDialog === "solution") {
+      return t("replaceSolutionTitle");
+    }
+    return t("replaceTestsTitle");
+  }
+
+  function getReplacementDialogMessage() {
+    if (replacementDialog === "prompt") {
+      return t("replacePromptMessage");
+    }
+    if (replacementDialog === "solution") {
+      return t("replaceSolutionMessage");
+    }
+    return t("replaceTestsMessage");
+  }
+
+  function getKeepReplacementLabel() {
+    if (replacementDialog === "prompt") {
+      return t("keepCurrentPrompt");
+    }
+    if (replacementDialog === "solution") {
+      return t("keepCurrentSolution");
+    }
+    return t("keepCurrentTests");
+  }
+
+  function getReplaceReplacementLabel() {
+    if (replacementDialog === "prompt") {
+      return t("replaceCurrentPrompt");
+    }
+    if (replacementDialog === "solution") {
+      return t("replaceCurrentSolution");
+    }
+    return t("replaceCurrentTests");
+  }
+
+  function confirmReplacementGeneration() {
+    if (replacementDialog === "prompt") {
+      void generatePrompt();
+      return;
+    }
+    if (replacementDialog === "solution") {
+      void generateSolution();
+      return;
+    }
+    void generateTests();
+  }
+
   return (
     <section className="section stack">
       {canManage ? (
@@ -734,6 +899,7 @@ export function CodingExerciseActivityView({
                 if (disabledCodingExerciseLanguages.has(nextLanguage)) {
                   return;
                 }
+                aiGenerationDraftRef.current = null;
                 setConfig((current) => ({ ...current, language: nextLanguage }));
               }}
             >
@@ -772,7 +938,10 @@ export function CodingExerciseActivityView({
               id="coding-prompt"
               rows={5}
               value={config.prompt}
-              onChange={(event) => setConfig((current) => ({ ...current, prompt: event.target.value }))}
+              onChange={(event) => {
+                aiGenerationDraftRef.current = null;
+                setConfig((current) => ({ ...current, prompt: event.target.value }));
+              }}
             />
           </div>
 
@@ -780,10 +949,10 @@ export function CodingExerciseActivityView({
             <button
               className="secondary"
               type="button"
-              disabled={generatingAssets || config.prompt.trim().length < 10}
-              onClick={requestAssetsGeneration}
+              disabled={generatingSolution || config.prompt.trim().length < 10}
+              onClick={requestSolutionGeneration}
             >
-              {generatingAssets ? t("generatingAssets") : t("generateAssets")}
+              {generatingSolution ? t("generatingSolution") : t("generateSolution")}
             </button>
           ) : null}
 
@@ -796,18 +965,16 @@ export function CodingExerciseActivityView({
                 aria-labelledby={`coding-generation-replace-${replacementDialog}`}
               >
                 <div className="stack" style={{ gap: 8 }}>
-                  <p className="eyebrow">{replacementDialog === "prompt" ? t("generatePrompt") : t("generateAssets")}</p>
-                  <h2 id={`coding-generation-replace-${replacementDialog}`}>
-                    {replacementDialog === "prompt" ? t("replacePromptTitle") : t("replaceAssetsTitle")}
-                  </h2>
-                  <p className="muted">{replacementDialog === "prompt" ? t("replacePromptMessage") : t("replaceAssetsMessage")}</p>
+                  <p className="eyebrow">{getReplacementDialogEyebrow()}</p>
+                  <h2 id={`coding-generation-replace-${replacementDialog}`}>{getReplacementDialogTitle()}</h2>
+                  <p className="muted">{getReplacementDialogMessage()}</p>
                 </div>
                 <div className="dialog-actions">
                   <button className="secondary" type="button" onClick={() => setReplacementDialog(null)}>
-                    {replacementDialog === "prompt" ? t("keepCurrentPrompt") : t("keepCurrentAssets")}
+                    {getKeepReplacementLabel()}
                   </button>
-                  <button type="button" onClick={() => (replacementDialog === "prompt" ? void generatePrompt() : void generateAssets())}>
-                    {replacementDialog === "prompt" ? t("replaceCurrentPrompt") : t("replaceCurrentAssets")}
+                  <button type="button" onClick={confirmReplacementGeneration}>
+                    {getReplaceReplacementLabel()}
                   </button>
                 </div>
               </div>
@@ -829,7 +996,15 @@ export function CodingExerciseActivityView({
             <p className="muted" style={{ margin: 0 }}>
               {t("referenceSolutionHelp")}
             </p>
-            <CodeEditor value={referenceSolution} onChange={setReferenceSolution} language={config.language} minHeight={220} />
+            <CodeEditor
+              value={referenceSolution}
+              onChange={(value) => {
+                aiGenerationDraftRef.current = null;
+                setReferenceSolution(value);
+              }}
+              language={config.language}
+              minHeight={220}
+            />
             {referenceValidationSummary ? (
               <p className="muted" style={{ margin: 0 }}>
                 {t("lastValidationSummary", {
@@ -850,7 +1025,8 @@ export function CodingExerciseActivityView({
             </p>
             <CodeEditor
               value={privateConfig.templateSource || buildCodingExerciseTemplateSource("", "")}
-              onChange={(value) =>
+              onChange={(value) => {
+                aiGenerationDraftRef.current = null;
                 setPrivateConfig((current) => {
                   const nextTemplate = value || buildCodingExerciseTemplateSource("", "");
                   const templateParts = splitCodingExerciseTemplateSource(nextTemplate);
@@ -863,8 +1039,8 @@ export function CodingExerciseActivityView({
                     templatePrefix: templateParts.prefix,
                     templateSuffix: templateParts.suffix
                   };
-                })
-              }
+                });
+              }}
               language={config.language}
               getLineClassName={(lineIndex) =>
                 privateConfig.templateVisibleLineNumbers.includes(lineIndex)
@@ -898,6 +1074,17 @@ export function CodingExerciseActivityView({
               }
             />
           </div>
+
+          {aiGenerationClient ? (
+            <button
+              className="secondary"
+              type="button"
+              disabled={generatingTests || config.prompt.trim().length < 10 || !referenceSolution.trim()}
+              onClick={requestTestsGeneration}
+            >
+              {generatingTests ? t("generatingTests") : t("generateTests")}
+            </button>
+          ) : null}
 
           <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
             <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
@@ -1207,22 +1394,23 @@ function codingExerciseSnapshotsEqual(left: CodingExerciseSnapshot, right: Codin
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function hasExistingGeneratedAssetContent(
+function hasExistingGeneratedSolutionContent(
   config: CodingExerciseConfig,
   privateConfig: CodingExercisePrivateConfig,
-  referenceSolution: string,
-  hiddenTests: HiddenTest[]
+  referenceSolution: string
 ) {
-  const normalizedSampleTests = normalizeCodingExerciseSampleTests(config.sampleTests);
   const templateSource = privateConfig.templateSource.trim();
 
   return Boolean(
     config.starterCode.trim() ||
       referenceSolution.trim() ||
-      normalizedSampleTests.length ||
-      hiddenTests.length ||
       (templateSource && templateSource !== codingExerciseTemplateInsertionToken)
   );
+}
+
+function hasExistingGeneratedTestContent(config: CodingExerciseConfig, hiddenTests: HiddenTest[]) {
+  const normalizedSampleTests = normalizeCodingExerciseSampleTests(config.sampleTests);
+  return Boolean(normalizedSampleTests.length || hiddenTests.length);
 }
 
 function normalizeCodingExerciseConfigForDisplay(config: CodingExerciseConfig): CodingExerciseConfig {
