@@ -174,6 +174,14 @@ export default function BankActivityAuthoringPage() {
           onSave={saveActivity}
           attemptsClient={undefined}
           t={t}
+          locale={locale}
+          aiGenerationClient={
+            hasQuestionAuthoringAgent
+              ? {
+                  generate: (input) => api.generateBankParsonsProblem(activityBankId, bankActivityId, input)
+                }
+              : undefined
+          }
         />
       );
     }

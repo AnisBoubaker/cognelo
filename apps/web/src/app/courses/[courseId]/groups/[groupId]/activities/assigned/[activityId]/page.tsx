@@ -89,6 +89,13 @@ export default function GroupActivityPage() {
             canManage={Boolean(canManage)}
             course={course ? { id: course.id, title: course.title } : null}
             groupId={groupId}
+            parsonsAiGenerationClient={
+              canManage && hasQuestionAuthoringAgent
+                ? {
+                    generate: (input) => api.generateParsonsProblem(courseId, activityId, input)
+                  }
+                : undefined
+            }
             mcqAiGenerationClient={
               canManage && hasQuestionAuthoringAgent
                 ? {
