@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "PluginBankCodingExerciseHiddenTest_bankActivityId_order_idx" RENAME TO "PluginBankCodingExerciseHiddenTest_bankActivityId_orderInde_idx";
