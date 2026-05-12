@@ -199,7 +199,8 @@ export default function BankActivityAuthoringPage() {
             hasQuestionAuthoringAgent
               ? {
                   generatePrompt: (input) => api.generateBankCodingExercisePrompt(activityBankId, bankActivityId, input),
-                  generateAssets: (input) => api.generateBankCodingExerciseAssets(activityBankId, bankActivityId, input)
+                  generateSolution: (input) => api.generateBankCodingExerciseSolution(activityBankId, bankActivityId, input),
+                  generateTests: (input) => api.generateBankCodingExerciseTests(activityBankId, bankActivityId, input)
                 }
               : undefined
           }

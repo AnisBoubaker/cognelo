@@ -4,7 +4,6 @@ import {
   codingExerciseHiddenTestSchema,
   codingExerciseTestInsertionToken,
   codingExerciseTemplateInsertionToken,
-  codingExerciseTemplateRequiresTestCodeMarker,
   parseCodingExercisePrivateConfig,
   sampleTestSchema
 } from "./coding-exercises";
@@ -23,26 +22,38 @@ export const codingExercisePromptGenerationInputSchema = z.object({
   locale: z.enum(["en", "fr", "zh"]).default("en")
 });
 
-export const codingExerciseAssetsGenerationInputSchema = z.object({
+export const codingExerciseSolutionGenerationInputSchema = z.object({
   description: z.string().max(4000).default(""),
   prompt: z.string().min(10).max(12000),
   language: z.string().min(1).max(40),
   locale: z.enum(["en", "fr", "zh"]).default("en")
 });
 
-const generatedAssetsSchema = z
+export const codingExerciseTestsGenerationInputSchema = z.object({
+  description: z.string().max(4000).default(""),
+  prompt: z.string().min(10).max(12000),
+  language: z.string().min(1).max(40),
+  locale: z.enum(["en", "fr", "zh"]).default("en"),
+  referenceSolution: z.string().min(1).max(60000),
+  templateSource: z.string().min(1).max(120000),
+  templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([])
+});
+
+const generatedImpossibleSchema = z.object({
+  status: z.literal("error"),
+  message: z.string().min(10).max(1200)
+});
+
+const generatedSolutionSchema = z
   .object({
     status: z.enum(["ok", "warning"]).optional().default("ok"),
     warningMessage: z.string().max(1200).optional().default(""),
-    starterCode: z.string().max(40000).default(""),
     referenceSolution: z.string().min(1).max(60000),
     templateSource: z.string().min(1).max(120000),
-    templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([]),
-    sampleTests: z.array(sampleTestSchema).min(1).max(10),
-    hiddenTests: z.array(codingExerciseHiddenTestSchema).min(5).max(50)
+    templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([])
   })
-  .superRefine((assets, context) => {
-    if (assets.status === "warning" && assets.warningMessage.trim().length < 10) {
+  .superRefine((solution, context) => {
+    if (solution.status === "warning" && solution.warningMessage.trim().length < 10) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["warningMessage"],
@@ -51,10 +62,22 @@ const generatedAssetsSchema = z
     }
   });
 
-const generatedAssetsImpossibleSchema = z.object({
-  status: z.literal("error"),
-  message: z.string().min(10).max(1200)
-});
+const generatedTestsSchema = z
+  .object({
+    status: z.enum(["ok", "warning"]).optional().default("ok"),
+    warningMessage: z.string().max(1200).optional().default(""),
+    sampleTests: z.array(sampleTestSchema).min(1).max(10),
+    hiddenTests: z.array(codingExerciseHiddenTestSchema).min(1).max(15)
+  })
+  .superRefine((tests, context) => {
+    if (tests.status === "warning" && tests.warningMessage.trim().length < 10) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["warningMessage"],
+        message: "warningMessage is required when status is warning."
+      });
+    }
+  });
 
 export async function generateCodingExercisePrompt(input: {
   user: Parameters<typeof generateQuestionAuthoringText>[0];
@@ -96,7 +119,7 @@ export async function generateCodingExercisePrompt(input: {
   });
 }
 
-export async function generateCodingExerciseAssets(input: {
+export async function generateCodingExerciseSolution(input: {
   user: Parameters<typeof generateQuestionAuthoringText>[0];
   description: string;
   prompt: string;
@@ -104,8 +127,79 @@ export async function generateCodingExerciseAssets(input: {
   locale: GenerationLocale;
   subject: SubjectContext;
 }) {
-  const systemPrompt = buildAssetsGenerationSystemPrompt(input);
-  let userPrompt = buildAssetsInitialPrompt(input);
+  const systemPrompt = buildSolutionGenerationSystemPrompt(input);
+  let userPrompt = buildSolutionInitialPrompt(input);
+  let lastPayload: unknown = null;
+  let lastIssues: string[] = [];
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const raw = await generateQuestionAuthoringText(input.user, {
+      systemPrompt,
+      userPrompt,
+      maxOutputTokens: 5000
+    });
+    const parsed = parseGeneratedJson(raw);
+    if (!parsed.ok) {
+      lastPayload = raw;
+      lastIssues = [parsed.issue];
+      userPrompt = buildCorrectionPrompt("JSON payload", raw, lastIssues);
+      continue;
+    }
+
+    const impossible = generatedImpossibleSchema.safeParse(parsed.value);
+    if (impossible.success) {
+      if (isMissingProvidedContextError(impossible.data.message)) {
+        lastPayload = parsed.value;
+        lastIssues = [
+          "The request already includes the student-facing prompt, reference solution, and template. Generate tests from the provided context instead of returning a missing-context error."
+        ];
+        userPrompt = buildCorrectionPrompt("JSON payload", JSON.stringify(parsed.value, null, 2), lastIssues);
+        continue;
+      }
+      return {
+        status: "error" as const,
+        message: impossible.data.message,
+        attempts: attempt
+      };
+    }
+
+    const validation = validateGeneratedSolution({
+      payload: parsed.value,
+      language: input.language
+    });
+
+    if (!validation.issues.length && validation.solution) {
+      return {
+        ...validation.solution,
+        starterCode: "",
+        attempts: attempt
+      };
+    }
+
+    lastPayload = parsed.value;
+    lastIssues = validation.issues;
+    userPrompt = buildCorrectionPrompt("JSON payload", JSON.stringify(parsed.value, null, 2), validation.issues);
+  }
+
+  throw new AppError(422, "CODING_EXERCISE_SOLUTION_GENERATION_INVALID", "The AI agent could not generate a valid coding exercise solution.", {
+    issues: lastIssues,
+    payload: lastPayload
+  });
+}
+
+export async function generateCodingExerciseTests(input: {
+  user: Parameters<typeof generateQuestionAuthoringText>[0];
+  description: string;
+  prompt: string;
+  language: string;
+  locale: GenerationLocale;
+  subject: SubjectContext;
+  referenceSolution: string;
+  templateSource: string;
+  templateVisibleLineNumbers: number[];
+}) {
+  const systemPrompt = buildTestsGenerationSystemPrompt(input);
+  let userPrompt = buildTestsInitialPrompt(input);
   let lastPayload: unknown = null;
   let lastIssues: string[] = [];
 
@@ -123,7 +217,7 @@ export async function generateCodingExerciseAssets(input: {
       continue;
     }
 
-    const impossible = generatedAssetsImpossibleSchema.safeParse(parsed.value);
+    const impossible = generatedImpossibleSchema.safeParse(parsed.value);
     if (impossible.success) {
       return {
         status: "error" as const,
@@ -132,15 +226,18 @@ export async function generateCodingExerciseAssets(input: {
       };
     }
 
-    const validation = await validateGeneratedAssets({
+    const validation = await validateGeneratedTests({
       payload: parsed.value,
       prompt: input.prompt,
-      language: input.language
+      language: input.language,
+      referenceSolution: input.referenceSolution,
+      templateSource: input.templateSource,
+      templateVisibleLineNumbers: input.templateVisibleLineNumbers
     });
 
-    if (!validation.issues.length && validation.assets && validation.validationSummary) {
+    if (!validation.issues.length && validation.tests && validation.validationSummary) {
       return {
-        ...validation.assets,
+        ...validation.tests,
         validationSummary: validation.validationSummary,
         attempts: attempt
       };
@@ -151,7 +248,7 @@ export async function generateCodingExerciseAssets(input: {
     userPrompt = buildCorrectionPrompt("JSON payload", JSON.stringify(parsed.value, null, 2), validation.issues);
   }
 
-  throw new AppError(422, "CODING_EXERCISE_ASSET_GENERATION_INVALID", "The AI agent could not generate valid coding exercise assets.", {
+  throw new AppError(422, "CODING_EXERCISE_TEST_GENERATION_INVALID", "The AI agent could not generate valid coding exercise tests.", {
     issues: lastIssues,
     payload: lastPayload
   });
@@ -178,31 +275,27 @@ function buildPromptGenerationSystemPrompt(input: { language: string; locale: Ge
   ].join("\n");
 }
 
-function buildAssetsGenerationSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext }) {
+function buildSolutionGenerationSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext }) {
   return [
-    "You generate structured assets for Cognelo coding exercises.",
+    "You generate teacher-reviewable reference solutions for Cognelo coding exercises.",
     "Return only valid JSON. Do not wrap the JSON in Markdown fences. Do not add explanations.",
     "",
-    "Required JSON shape:",
-    "If the exercise is coherent and possible, return this shape:",
+    "Required JSON shape when generation is possible:",
     "{",
     '  "status": "ok",',
-    '  "starterCode": "student-visible starter code",',
     '  "referenceSolution": "complete teacher-only solution code",',
-    '  "templateSource": "full execution scaffold containing {{ STUDENT_CODE }} and optionally {{ TEST_CODE }}",',
-    '  "templateVisibleLineNumbers": [0, 1],',
-    '  "sampleTests": [{"id":"sample-1","title":"...","input":"...","output":"...","testCode":""}],',
-    '  "hiddenTests": [{"id":"hidden-1","name":"...","stdin":"...","expectedOutput":"...","testCode":"","isEnabled":true,"weight":1}]',
+    `  "templateSource": "${codingExerciseTemplateInsertionToken} or ${codingExerciseTemplateInsertionToken}\\n\\n${codingExerciseTestInsertionToken}",`,
+    '  "templateVisibleLineNumbers": []',
     "}",
     "",
-    "If the exercise can be generated but requires assumptions, return the same assets shape with:",
+    "If the solution can be generated but requires assumptions, return the same shape with:",
     "{",
     '  "status": "warning",',
     '  "warningMessage": "localized explanation of the assumptions made",',
-    '  "...": "all normal asset fields are still required"',
+    '  "...": "all normal solution fields are still required"',
     "}",
     "",
-    "If the exercise is totally impossible to generate, return this shape instead:",
+    "If the exercise is totally impossible to solve, return this shape instead:",
     "{",
     '  "status": "error",',
     '  "message": "localized explanation shown to the teacher"',
@@ -210,33 +303,67 @@ function buildAssetsGenerationSystemPrompt(input: { language: string; locale: Ge
     "",
     "Rules:",
     `- Programming language: ${input.language}.`,
-    "- The selected programming language is authoritative. Generate code, starter code, reference solution, templates, and tests for that language only.",
-    "- If the teacher description or student prompt mentions another programming language, adapt the exercise to the selected programming language instead of following the conflicting language mention.",
-    "- Respect the student-facing prompt as much as possible.",
-    "- Use the error shape only when the prompt makes generation totally impossible, for example when core requirements are mutually contradictory and no reasonable assumptions could produce valid tests.",
-    "- If the prompt is ambiguous but still permits a plausible generation, generate assets anyway with status warning and explain the assumptions in warningMessage.",
-    "- If the prompt leaves some edge cases undefined but normal behavior is testable, generate assets with status warning, test the defined behavior, and explain which edge cases were not tested or how they were interpreted.",
-    "- The error message must be concise, actionable, and written in the current UI/content language.",
-    "- warningMessage must be concise, actionable, and written in the current UI/content language.",
-    `- The templateSource must contain ${codingExerciseTemplateInsertionToken}.`,
-    `- The templateSource must contain ${codingExerciseTemplateInsertionToken} exactly once.`,
-    `- The templateSource may contain ${codingExerciseTestInsertionToken} at most once.`,
-    `- Include ${codingExerciseTestInsertionToken} in templateSource if any sample or hidden test has testCode.`,
-    `- If templateSource contains ${codingExerciseTestInsertionToken}, every sampleTests and hiddenTests entry must include non-empty testCode.`,
-    "- When tests use testCode, the referenceSolution and starterCode must not define a main function unless every testCode is only statements injected inside that same main.",
+    "- The selected programming language is authoritative. Generate code for that language only.",
+    "- Generate only the reference solution and execution template; do not generate starter code or tests.",
+    "- The app will intentionally clear starterCode after solution generation so the teacher can decide what students should receive.",
+    "- Choose exactly one execution pattern:",
+    `  1. Full program: templateSource is exactly ${codingExerciseTemplateInsertionToken}. Use this when the student should write a complete executable program that reads input and prints output.`,
+    `  2. Callable unit: templateSource is exactly ${codingExerciseTemplateInsertionToken}\\n\\n${codingExerciseTestInsertionToken}. Use this when the student should write a function, method, class, helper, or other code that tests need to call.`,
+    "- Do not generate body-insertion templates. Do not indent the student insertion marker inside another function, class, method, main, or block.",
+    "- referenceSolution must have the same shape as the expected student answer: a complete program for full-program exercises, or complete top-level declarations/functions/classes for callable-unit exercises.",
+    "- templateVisibleLineNumbers should normally be an empty array for AI-generated solutions.",
+    "- If the prompt is ambiguous but still permits a plausible solution, generate one with status warning and explain the assumption.",
+    "- warningMessage and error message must be concise, actionable, and written in the current UI/content language.",
+    "",
+    `Current UI/content language: ${localeName(input.locale)}.`,
+    "",
+    "Subject context:",
+    `Title: ${input.subject.title}`,
+    `Description: ${input.subject.description || "No subject description provided."}`
+  ].join("\n");
+}
+
+function buildTestsGenerationSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext }) {
+  return [
+    "You generate visible and hidden test cases for Cognelo coding exercises.",
+    "Return only valid JSON. Do not wrap the JSON in Markdown fences. Do not add explanations.",
+    "",
+    "Required JSON shape when generation is possible:",
+    "{",
+    '  "status": "ok",',
+    '  "sampleTests": [{"id":"sample-1","title":"...","input":"...","output":"...","testCode":""}],',
+    '  "hiddenTests": [{"id":"hidden-1","name":"...","stdin":"...","expectedOutput":"...","testCode":"","isEnabled":true,"weight":1}]',
+    "}",
+    "",
+    "If tests can be generated but require assumptions, return the same shape with:",
+    "{",
+    '  "status": "warning",',
+    '  "warningMessage": "localized explanation of the assumptions made",',
+    '  "...": "all normal test fields are still required"',
+    "}",
+    "",
+    "If useful tests are totally impossible to generate, return this shape instead:",
+    "{",
+    '  "status": "error",',
+    '  "message": "localized explanation shown to the teacher"',
+    "}",
+    "",
+    "Rules:",
+    `- Programming language: ${input.language}.`,
+    "- The selected programming language is authoritative. Generate test harness code for that language only.",
+    "- Base tests on the student-facing prompt, the reviewed reference solution, and the provided template.",
     "- Generate exactly one visible sample test unless the exercise truly needs more.",
-    "- Generate at least five enabled hidden tests.",
-    "- Hidden tests should cover normal cases, edge cases, and common mistakes.",
+    "- Let the exercise scope decide the number of hidden tests, but never generate more than 15 hidden tests.",
+    "- Generate enough hidden tests to cover normal cases, edge cases, and common mistakes.",
     "- IDs must be stable, lowercase, and unique.",
     "- The reference solution must pass every generated sample and hidden test.",
-    "- Compute every output from the referenceSolution logic. Do not guess expected outputs from the prompt examples.",
-    "- If validation reports stdout that differs from expected output, correct the test output fields unless the referenceSolution is clearly wrong.",
-    "- Prefer stdin/expectedOutput tests. Use testCode only when stdin/output is insufficient.",
-    `- For C function exercises that need multiple hidden fixtures, prefer this robust pattern: templateSource is \`#include <stdio.h>\\n\\n${codingExerciseTemplateInsertionToken}\\n\\n${codingExerciseTestInsertionToken}\`; starterCode/referenceSolution define only the requested function(s), not main; every sample and hidden testCode provides its own int main(void) function and expectedOutput.`,
-    "- For C function exercises using that robust pattern, leave input/stdin empty and put all test setup, calls, and printf checks inside testCode.",
-    "- Do not wrap {{ STUDENT_CODE }} inside a C function body unless referenceSolution contains only the replacement body statements. The safer default is to inject complete student functions at top level.",
-    "- Keep starterCode incomplete; it should help students start without solving the exercise.",
-    "- templateVisibleLineNumbers are zero-based line indexes in templateSource that students may see as read-only scaffold lines.",
+    "- Compute every expected output from the reference solution logic. Do not guess.",
+    `- If the template contains ${codingExerciseTestInsertionToken}, every sample and hidden test must include non-empty testCode, and testCode must run the reference/student code and print the expected output.`,
+    `- If the template does not contain ${codingExerciseTestInsertionToken}, every testCode field must be empty and tests must use stdin plus expected output only.`,
+    "- For full-program tests, put input in input/stdin and expected printed output in output/expectedOutput.",
+    "- For callable-unit tests, usually leave input/stdin empty and put setup, calls, assertions, and printed output in testCode.",
+    "- Use assertions only when they do not hide the required expected output; the validation still compares stdout to output/expectedOutput.",
+    "- warningMessage and error message must be concise, actionable, and written in the current UI/content language.",
     "",
     `Current UI/content language: ${localeName(input.locale)}.`,
     "Use that language for test names/titles.",
@@ -247,9 +374,9 @@ function buildAssetsGenerationSystemPrompt(input: { language: string; locale: Ge
   ].join("\n");
 }
 
-function buildAssetsInitialPrompt(input: { description: string; prompt: string }) {
+function buildSolutionInitialPrompt(input: { description: string; prompt: string }) {
   return [
-    "Generate coding exercise assets for this prompt.",
+    "Generate a reference solution and execution template for this coding exercise.",
     "",
     "Activity description:",
     input.description.trim() || "No separate description provided.",
@@ -259,40 +386,119 @@ function buildAssetsInitialPrompt(input: { description: string; prompt: string }
   ].join("\n");
 }
 
-async function validateGeneratedAssets(input: { payload: unknown; prompt: string; language: string }) {
-  const parsed = generatedAssetsSchema.safeParse(input.payload);
+function buildTestsInitialPrompt(input: { description: string; prompt: string; referenceSolution: string; templateSource: string }) {
+  return [
+    "Generate coding exercise tests from the complete context below.",
+    "The student-facing prompt, reviewed reference solution, and template source are all provided. Do not return a missing-context error.",
+    "",
+    "Activity description:",
+    "<activity_description>",
+    input.description.trim() || "No separate description provided.",
+    "</activity_description>",
+    "",
+    "Student-facing prompt:",
+    "<student_prompt>",
+    input.prompt.trim(),
+    "</student_prompt>",
+    "",
+    "Reference solution:",
+    "<reference_solution>",
+    input.referenceSolution,
+    "</reference_solution>",
+    "",
+    "Template source:",
+    "<template_source>",
+    input.templateSource,
+    "</template_source>"
+  ].join("\n");
+}
+
+function validateGeneratedSolution(input: { payload: unknown; language: string }) {
+  const parsed = generatedSolutionSchema.safeParse(input.payload);
   if (!parsed.success) {
     return {
       issues: parsed.error.issues.map((issue) => `${issue.path.join(".") || "payload"}: ${issue.message}`)
     };
   }
 
-  const assets = parsed.data;
+  const solution = parsed.data;
   const issues: string[] = [];
-  const allTestIds = [...assets.sampleTests.map((test) => test.id), ...assets.hiddenTests.map((test) => test.id)];
-  const duplicateIds = allTestIds.filter((id, index) => allTestIds.indexOf(id) !== index);
-  const enabledHiddenCount = assets.hiddenTests.filter((test) => test.isEnabled).length;
-  const languageIssues = collectGeneratedLanguageIssues(input.language, assets);
-  const templateIssues = collectGeneratedTemplateIssues(input.language, assets);
+  const languageIssues = collectGeneratedLanguageIssues(input.language, {
+    starterCode: "",
+    referenceSolution: solution.referenceSolution,
+    templateSource: solution.templateSource
+  });
+  issues.push(...languageIssues);
+  issues.push(...collectGeneratedTemplateShapeIssues(solution.templateSource));
+
+  if (issues.length) {
+    return { issues };
+  }
+
   const privateConfig = parseCodingExercisePrivateConfig({
-    templateSource: assets.templateSource,
-    templateVisibleLineNumbers: assets.templateVisibleLineNumbers
+    templateSource: solution.templateSource,
+    templateVisibleLineNumbers: solution.templateVisibleLineNumbers
   });
 
+  return {
+    solution: {
+      ...solution,
+      templateSource: privateConfig.templateSource,
+      templateVisibleLineNumbers: privateConfig.templateVisibleLineNumbers
+    },
+    issues: []
+  };
+}
+
+async function validateGeneratedTests(input: {
+  payload: unknown;
+  prompt: string;
+  language: string;
+  referenceSolution: string;
+  templateSource: string;
+  templateVisibleLineNumbers: number[];
+}) {
+  const parsed = generatedTestsSchema.safeParse(input.payload);
+  if (!parsed.success) {
+    return {
+      issues: parsed.error.issues.map((issue) => `${issue.path.join(".") || "payload"}: ${issue.message}`)
+    };
+  }
+
+  const tests = parsed.data;
+  const issues: string[] = [];
+  const allTestIds = [...tests.sampleTests.map((test) => test.id), ...tests.hiddenTests.map((test) => test.id)];
+  const duplicateIds = allTestIds.filter((id, index) => allTestIds.indexOf(id) !== index);
   if (duplicateIds.length) {
     issues.push(`Test ids must be unique. Duplicates: ${[...new Set(duplicateIds)].join(", ")}.`);
   }
-  if (enabledHiddenCount < 5) {
-    issues.push("At least five hidden tests must be enabled.");
+  issues.push(...collectGeneratedTemplateShapeIssues(input.templateSource));
+  const templateUsesTestCode = input.templateSource.includes(codingExerciseTestInsertionToken);
+  const allTests = [
+    ...tests.sampleTests.map((test) => ({ name: test.title || test.id, testCode: test.testCode })),
+    ...tests.hiddenTests.map((test) => ({ name: test.name || test.id, testCode: test.testCode }))
+  ];
+  const testsWithCode = allTests.filter((test) => test.testCode.trim().length > 0);
+  const testsWithoutCode = allTests.filter((test) => test.testCode.trim().length === 0);
+  if (templateUsesTestCode && testsWithoutCode.length) {
+    issues.push(
+      `When templateSource contains ${codingExerciseTestInsertionToken}, every sample and hidden test must include non-empty testCode. Missing: ${testsWithoutCode
+        .map((test) => test.name)
+        .join(", ")}.`
+    );
   }
-  issues.push(...languageIssues);
-  issues.push(...templateIssues);
-  if (!privateConfig.templateSource.includes(codingExerciseTemplateInsertionToken)) {
-    issues.push(`templateSource must include ${codingExerciseTemplateInsertionToken}.`);
+  if (!templateUsesTestCode && testsWithCode.length) {
+    issues.push(
+      `When templateSource does not contain ${codingExerciseTestInsertionToken}, generated tests must leave testCode empty. Present: ${testsWithCode
+        .map((test) => test.name)
+        .join(", ")}.`
+    );
   }
-  if (codingExerciseTemplateRequiresTestCodeMarker(privateConfig.templateSource, [...assets.sampleTests, ...assets.hiddenTests])) {
-    issues.push("templateSource must include {{ TEST_CODE }} when any test includes testCode.");
-  }
+
+  const privateConfig = parseCodingExercisePrivateConfig({
+    templateSource: input.templateSource,
+    templateVisibleLineNumbers: input.templateVisibleLineNumbers
+  });
 
   if (issues.length) {
     return { issues };
@@ -303,14 +509,14 @@ async function validateGeneratedAssets(input: { payload: unknown; prompt: string
       prompt: input.prompt,
       language: input.language,
       executionMode: "template",
-      starterCode: assets.starterCode,
-      studentTemplateSource: assets.templateSource,
-      sampleTests: assets.sampleTests,
+      starterCode: "",
+      studentTemplateSource: privateConfig.templateSource,
+      sampleTests: tests.sampleTests,
       maxEditorSeconds: 1800
     },
-    sourceCode: assets.referenceSolution,
-    sampleTests: assets.sampleTests,
-    hiddenTests: assets.hiddenTests.map((test, index) => ({
+    sourceCode: input.referenceSolution,
+    sampleTests: tests.sampleTests,
+    hiddenTests: tests.hiddenTests.map((test, index) => ({
       ...test,
       orderIndex: index
     })),
@@ -318,21 +524,21 @@ async function validateGeneratedAssets(input: { payload: unknown; prompt: string
   });
 
   if (!validationSummary.accepted) {
-    const repairedAssets = repairExpectedOutputsFromValidation(assets, validationSummary);
-    if (repairedAssets) {
+    const repairedTests = repairTestExpectedOutputsFromValidation(tests, validationSummary);
+    if (repairedTests) {
       const repairedValidationSummary = await validateReferenceSolutionAgainstHiddenTests({
         activityConfig: {
           prompt: input.prompt,
           language: input.language,
           executionMode: "template",
-          starterCode: repairedAssets.starterCode,
-          studentTemplateSource: repairedAssets.templateSource,
-          sampleTests: repairedAssets.sampleTests,
+          starterCode: "",
+          studentTemplateSource: privateConfig.templateSource,
+          sampleTests: repairedTests.sampleTests,
           maxEditorSeconds: 1800
         },
-        sourceCode: repairedAssets.referenceSolution,
-        sampleTests: repairedAssets.sampleTests,
-        hiddenTests: repairedAssets.hiddenTests.map((test, index) => ({
+        sourceCode: input.referenceSolution,
+        sampleTests: repairedTests.sampleTests,
+        hiddenTests: repairedTests.hiddenTests.map((test, index) => ({
           ...test,
           orderIndex: index
         })),
@@ -341,11 +547,7 @@ async function validateGeneratedAssets(input: { payload: unknown; prompt: string
 
       if (repairedValidationSummary.accepted) {
         return {
-          assets: {
-            ...repairedAssets,
-            templateSource: privateConfig.templateSource,
-            templateVisibleLineNumbers: privateConfig.templateVisibleLineNumbers
-          },
+          tests: repairedTests,
           validationSummary: repairedValidationSummary,
           issues: []
         };
@@ -360,11 +562,7 @@ async function validateGeneratedAssets(input: { payload: unknown; prompt: string
   }
 
   return {
-    assets: {
-      ...assets,
-      templateSource: privateConfig.templateSource,
-      templateVisibleLineNumbers: privateConfig.templateVisibleLineNumbers
-    },
+    tests,
     validationSummary,
     issues: []
   };
@@ -422,8 +620,8 @@ function collectValidationIssues(validationSummary: Record<string, unknown>) {
   return issues;
 }
 
-function repairExpectedOutputsFromValidation(
-  assets: z.infer<typeof generatedAssetsSchema>,
+function repairTestExpectedOutputsFromValidation(
+  tests: z.infer<typeof generatedTestsSchema>,
   validationSummary: Record<string, unknown>
 ) {
   const sampleResults = getValidationTests(validationSummary.sampleTests);
@@ -446,7 +644,7 @@ function repairExpectedOutputsFromValidation(
       .map((test) => [String(test.id), String(test.stdout)] as const)
   );
 
-  const sampleTests = assets.sampleTests.map((test) => {
+  const sampleTests = tests.sampleTests.map((test) => {
     const stdout = sampleStdoutById.get(test.id);
     if (stdout === undefined || test.output === stdout) {
       return test;
@@ -457,7 +655,7 @@ function repairExpectedOutputsFromValidation(
       output: stdout
     };
   });
-  const hiddenTests = assets.hiddenTests.map((test) => {
+  const hiddenTests = tests.hiddenTests.map((test) => {
     const stdout = hiddenStdoutById.get(test.id);
     if (stdout === undefined || test.expectedOutput === stdout) {
       return test;
@@ -471,7 +669,7 @@ function repairExpectedOutputsFromValidation(
 
   return changed
     ? {
-        ...assets,
+        ...tests,
         sampleTests,
         hiddenTests
       }
@@ -490,7 +688,34 @@ function isWrongAnswerWithStdout(test: Record<string, unknown>) {
   return (statusId === 4 || /wrong answer/i.test(statusLabel)) && typeof test.stdout === "string";
 }
 
-function collectGeneratedLanguageIssues(language: string, assets: z.infer<typeof generatedAssetsSchema>) {
+function isMissingProvidedContextError(message: string) {
+  const normalized = message
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+
+  return /missing|does not include|not include|need|needed|required|without|cannot|can't|unable/.test(normalized) &&
+    /prompt|problem statement|reference solution|solution|template|context|expected output/.test(normalized);
+}
+
+function collectGeneratedTemplateShapeIssues(templateSource: string) {
+  const normalized = templateSource.replace(/\r\n/g, "\n").trim();
+  const fullProgramTemplate = codingExerciseTemplateInsertionToken;
+  const callableUnitTemplate = `${codingExerciseTemplateInsertionToken}\n\n${codingExerciseTestInsertionToken}`;
+  if (normalized !== fullProgramTemplate && normalized !== callableUnitTemplate) {
+    return [
+      `AI-generated templates must be exactly ${JSON.stringify(fullProgramTemplate)} for full-program exercises or ${JSON.stringify(
+        callableUnitTemplate
+      )} for callable-unit exercises.`
+    ];
+  }
+  return [];
+}
+
+function collectGeneratedLanguageIssues(
+  language: string,
+  assets: { starterCode: string; referenceSolution: string; templateSource: string }
+) {
   const normalized = language.trim().toLowerCase();
   const source = [assets.starterCode, assets.referenceSolution, assets.templateSource].join("\n\n");
   const issues: string[] = [];
@@ -506,90 +731,12 @@ function collectGeneratedLanguageIssues(language: string, assets: z.infer<typeof
   return issues;
 }
 
-function collectGeneratedTemplateIssues(language: string, assets: z.infer<typeof generatedAssetsSchema>) {
-  const issues: string[] = [];
-  const studentTokenCount = countOccurrences(assets.templateSource, codingExerciseTemplateInsertionToken);
-  const testTokenCount = countOccurrences(assets.templateSource, codingExerciseTestInsertionToken);
-  const tests = [
-    ...assets.sampleTests.map((test) => ({ id: test.id, name: test.title || test.id, testCode: test.testCode })),
-    ...assets.hiddenTests.map((test) => ({ id: test.id, name: test.name || test.id, testCode: test.testCode }))
-  ];
-  const testsWithTestCode = tests.filter((test) => test.testCode.trim().length > 0);
-  const testsWithoutTestCode = tests.filter((test) => test.testCode.trim().length === 0);
-  const templateUsesTestCode = assets.templateSource.includes(codingExerciseTestInsertionToken);
-  const normalizedLanguage = language.trim().toLowerCase();
-
-  if (studentTokenCount !== 1) {
-    issues.push(`templateSource must contain ${codingExerciseTemplateInsertionToken} exactly once; found ${studentTokenCount}.`);
-  }
-
-  if (testTokenCount > 1) {
-    issues.push(`templateSource may contain ${codingExerciseTestInsertionToken} at most once; found ${testTokenCount}.`);
-  }
-
-  if (templateUsesTestCode && testsWithoutTestCode.length) {
-    issues.push(
-      `When templateSource contains ${codingExerciseTestInsertionToken}, every sample and hidden test must include non-empty testCode. Missing: ${testsWithoutTestCode
-        .map((test) => test.name)
-        .join(", ")}.`
-    );
-  }
-
-  if (["c", "cpp"].includes(normalizedLanguage)) {
-    const templateDefinesMain = definesCMain(assets.templateSource);
-    const referenceDefinesMain = definesCMain(assets.referenceSolution);
-    const testsWithMain = testsWithTestCode.filter((test) => definesCMain(test.testCode));
-
-    if (templateDefinesMain && referenceDefinesMain) {
-      issues.push("For C/C++, templateSource and referenceSolution must not both define main because referenceSolution is injected into templateSource.");
-    }
-
-    if (testsWithMain.length && templateDefinesMain) {
-      issues.push("For C/C++ tests whose testCode defines main, templateSource must not also define main.");
-    }
-
-    if (testsWithMain.length && referenceDefinesMain) {
-      issues.push("For C/C++ tests whose testCode defines main, referenceSolution must define only the tested function(s), not main.");
-    }
-
-    if (templateUsesTestCode) {
-      const testsWithoutMain = tests.filter((test) => !definesCMain(test.testCode));
-      if (testsWithoutMain.length) {
-        issues.push(
-          `For C/C++ templates that contain ${codingExerciseTestInsertionToken}, every sample and hidden testCode must define its own int main(void). Missing main: ${testsWithoutMain
-            .map((test) => test.name)
-            .join(", ")}.`
-        );
-      }
-    }
-
-    if (!templateDefinesMain && !referenceDefinesMain && !testsWithMain.length) {
-      issues.push(
-        "For C/C++, the generated program must define exactly one main function after insertion. Provide main in referenceSolution, templateSource, or preferably in each testCode when testing standalone functions."
-      );
-    }
-  }
-
-  return issues;
-}
-
-function countOccurrences(source: string, needle: string) {
-  if (!needle) {
-    return 0;
-  }
-  return source.split(needle).length - 1;
-}
-
 function looksLikeC(source: string) {
   return /#include\s*<|int\s+main\s*\(|printf\s*\(|scanf\s*\(|\breturn\s+0\s*;/.test(source);
 }
 
 function looksLikePython(source: string) {
   return /^\s*def\s+\w+\s*\(|^\s*print\s*\(|^\s*if\s+__name__\s*==\s*["']__main__["']/m.test(source);
-}
-
-function definesCMain(source: string) {
-  return /\b(?:int|void)\s+main\s*\(/.test(source);
 }
 
 function buildCorrectionPrompt(label: string, previous: string, issues: string[]) {

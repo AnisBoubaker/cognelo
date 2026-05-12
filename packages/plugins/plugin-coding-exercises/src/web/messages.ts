@@ -15,15 +15,25 @@ type MessageKey =
   | "replacePromptMessage"
   | "keepCurrentPrompt"
   | "replaceCurrentPrompt"
-  | "generateAssets"
-  | "generatingAssets"
-  | "generatedAssets"
-  | "generateAssetsPromptRequired"
-  | "generateAssetsError"
-  | "replaceAssetsTitle"
-  | "replaceAssetsMessage"
-  | "keepCurrentAssets"
-  | "replaceCurrentAssets"
+  | "generateSolution"
+  | "generatingSolution"
+  | "generatedSolution"
+  | "generateSolutionPromptRequired"
+  | "generateSolutionError"
+  | "replaceSolutionTitle"
+  | "replaceSolutionMessage"
+  | "keepCurrentSolution"
+  | "replaceCurrentSolution"
+  | "generateTests"
+  | "generatingTests"
+  | "generatedTests"
+  | "generateTestsPromptRequired"
+  | "generateTestsReferenceRequired"
+  | "generateTestsError"
+  | "replaceTestsTitle"
+  | "replaceTestsMessage"
+  | "keepCurrentTests"
+  | "replaceCurrentTests"
   | "starterCode"
   | "referenceSolution"
   | "referenceSolutionHelp"
@@ -111,15 +121,25 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
     replacePromptMessage: "Generating a new prompt will replace the current prompt.",
     keepCurrentPrompt: "Keep current prompt",
     replaceCurrentPrompt: "Replace prompt",
-    generateAssets: "Generate solution and tests",
-    generatingAssets: "Generating solution and tests...",
-    generatedAssets: "Solution and tests generated.",
-    generateAssetsPromptRequired: "Add a prompt before generating the solution and tests.",
-    generateAssetsError: "Unable to generate a valid solution and tests right now.",
-    replaceAssetsTitle: "Replace existing solution and tests?",
-    replaceAssetsMessage: "Generating solution and tests will replace existing starter code, reference solution, template, visible tests, and hidden tests.",
-    keepCurrentAssets: "Keep current content",
-    replaceCurrentAssets: "Replace content",
+    generateSolution: "Generate solution automatically",
+    generatingSolution: "Generating solution...",
+    generatedSolution: "Reference solution generated.",
+    generateSolutionPromptRequired: "Add a prompt before generating the solution.",
+    generateSolutionError: "Unable to generate a valid solution right now.",
+    replaceSolutionTitle: "Replace existing solution?",
+    replaceSolutionMessage: "Generating a solution will clear starter code and replace the reference solution and template.",
+    keepCurrentSolution: "Keep current solution",
+    replaceCurrentSolution: "Replace solution",
+    generateTests: "Generate test cases automatically",
+    generatingTests: "Generating test cases...",
+    generatedTests: "Test cases generated.",
+    generateTestsPromptRequired: "Add a prompt before generating test cases.",
+    generateTestsReferenceRequired: "Add or generate a reference solution before generating test cases.",
+    generateTestsError: "Unable to generate valid test cases right now.",
+    replaceTestsTitle: "Replace existing test cases?",
+    replaceTestsMessage: "Generating test cases will replace existing visible sample tests and hidden tests.",
+    keepCurrentTests: "Keep current tests",
+    replaceCurrentTests: "Replace tests",
     starterCode: "Starter code",
     referenceSolution: "Reference solution",
     referenceSolutionHelp: "Teacher-only answer key. Hidden tests are validated against this code before they are saved.",
@@ -204,15 +224,25 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
     replacePromptMessage: "La generation d'une nouvelle consigne remplacera la consigne actuelle.",
     keepCurrentPrompt: "Conserver la consigne",
     replaceCurrentPrompt: "Remplacer la consigne",
-    generateAssets: "Generer la solution et les tests",
-    generatingAssets: "Generation de la solution et des tests...",
-    generatedAssets: "Solution et tests generes.",
-    generateAssetsPromptRequired: "Ajoutez une consigne avant de generer la solution et les tests.",
-    generateAssetsError: "Impossible de generer une solution et des tests valides pour le moment.",
-    replaceAssetsTitle: "Remplacer la solution et les tests existants?",
-    replaceAssetsMessage: "La generation remplacera le code de depart, la solution de reference, le gabarit, les tests visibles et les tests caches existants.",
-    keepCurrentAssets: "Conserver le contenu",
-    replaceCurrentAssets: "Remplacer le contenu",
+    generateSolution: "Generer la solution automatiquement",
+    generatingSolution: "Generation de la solution...",
+    generatedSolution: "Solution de reference generee.",
+    generateSolutionPromptRequired: "Ajoutez une consigne avant de generer la solution.",
+    generateSolutionError: "Impossible de generer une solution valide pour le moment.",
+    replaceSolutionTitle: "Remplacer la solution existante?",
+    replaceSolutionMessage: "La generation effacera le code de depart et remplacera la solution de reference et le gabarit.",
+    keepCurrentSolution: "Conserver la solution",
+    replaceCurrentSolution: "Remplacer la solution",
+    generateTests: "Generer les cas de test automatiquement",
+    generatingTests: "Generation des cas de test...",
+    generatedTests: "Cas de test generes.",
+    generateTestsPromptRequired: "Ajoutez une consigne avant de generer les cas de test.",
+    generateTestsReferenceRequired: "Ajoutez ou generez une solution de reference avant de generer les cas de test.",
+    generateTestsError: "Impossible de generer des cas de test valides pour le moment.",
+    replaceTestsTitle: "Remplacer les cas de test existants?",
+    replaceTestsMessage: "La generation remplacera les tests d'exemple visibles et les tests caches existants.",
+    keepCurrentTests: "Conserver les tests",
+    replaceCurrentTests: "Remplacer les tests",
     starterCode: "Code de départ",
     referenceSolution: "Solution de référence",
     referenceSolutionHelp: "Corrigé réservé à l'enseignant. Les tests cachés sont validés avec ce code avant l'enregistrement.",
@@ -297,15 +327,25 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
     replacePromptMessage: "生成新题目会替换当前题目。",
     keepCurrentPrompt: "保留当前题目",
     replaceCurrentPrompt: "替换题目",
-    generateAssets: "生成答案和测试",
-    generatingAssets: "正在生成答案和测试...",
-    generatedAssets: "答案和测试已生成。",
-    generateAssetsPromptRequired: "请先添加题目再生成答案和测试。",
-    generateAssetsError: "暂时无法生成有效答案和测试。",
-    replaceAssetsTitle: "替换现有答案和测试？",
-    replaceAssetsMessage: "生成会替换现有起始代码、参考答案、模板、可见测试和隐藏测试。",
-    keepCurrentAssets: "保留当前内容",
-    replaceCurrentAssets: "替换内容",
+    generateSolution: "自动生成答案",
+    generatingSolution: "正在生成答案...",
+    generatedSolution: "参考答案已生成。",
+    generateSolutionPromptRequired: "请先添加题目再生成答案。",
+    generateSolutionError: "暂时无法生成有效答案。",
+    replaceSolutionTitle: "替换现有答案？",
+    replaceSolutionMessage: "生成答案会清空起始代码，并替换参考答案和模板。",
+    keepCurrentSolution: "保留当前答案",
+    replaceCurrentSolution: "替换答案",
+    generateTests: "自动生成测试用例",
+    generatingTests: "正在生成测试用例...",
+    generatedTests: "测试用例已生成。",
+    generateTestsPromptRequired: "请先添加题目再生成测试用例。",
+    generateTestsReferenceRequired: "请先添加或生成参考答案，再生成测试用例。",
+    generateTestsError: "暂时无法生成有效测试用例。",
+    replaceTestsTitle: "替换现有测试用例？",
+    replaceTestsMessage: "生成测试用例会替换现有可见示例测试和隐藏测试。",
+    keepCurrentTests: "保留当前测试",
+    replaceCurrentTests: "替换测试",
     starterCode: "起始代码",
     referenceSolution: "参考答案",
     referenceSolutionHelp: "仅教师可见的答案。隐藏测试会先用这段代码验证，再保存。",

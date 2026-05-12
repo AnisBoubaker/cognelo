@@ -99,7 +99,8 @@ export default function ActivityPage() {
               canManage && hasQuestionAuthoringAgent
                 ? {
                     generatePrompt: (input) => api.generateCodingExercisePrompt(courseId, activityId, input),
-                    generateAssets: (input) => api.generateCodingExerciseAssets(courseId, activityId, input)
+                    generateSolution: (input) => api.generateCodingExerciseSolution(courseId, activityId, input),
+                    generateTests: (input) => api.generateCodingExerciseTests(courseId, activityId, input)
                   }
                 : undefined
             }

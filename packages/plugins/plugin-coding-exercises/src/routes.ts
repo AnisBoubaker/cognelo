@@ -8,10 +8,12 @@ import {
   submitCodingExercise
 } from "./executions";
 import {
-  codingExerciseAssetsGenerationInputSchema,
   codingExercisePromptGenerationInputSchema,
-  generateCodingExerciseAssets,
-  generateCodingExercisePrompt
+  codingExerciseSolutionGenerationInputSchema,
+  codingExerciseTestsGenerationInputSchema,
+  generateCodingExercisePrompt,
+  generateCodingExerciseSolution,
+  generateCodingExerciseTests
 } from "./generation";
 import {
   listBankCodingExerciseHiddenTests,
@@ -201,22 +203,46 @@ export const codingExerciseGeneratePromptRoute: PluginRouteDefinition = {
   }
 };
 
-export const codingExerciseGenerateAssetsRoute: PluginRouteDefinition = {
-  path: "coding-exercises/generate-assets",
+export const codingExerciseGenerateSolutionRoute: PluginRouteDefinition = {
+  path: "coding-exercises/generate-solution",
   activityTypeKeys: ["coding-exercise"],
   methods: {
     POST: async ({ context, readJson }) => {
-      const input = codingExerciseAssetsGenerationInputSchema.parse(await readJson());
+      const input = codingExerciseSolutionGenerationInputSchema.parse(await readJson());
       await assertCanManageGenerationContext(context);
       const subject = await resolveSubjectContext(context.activityBankId, context.courseId);
 
-      return generateCodingExerciseAssets({
+      return generateCodingExerciseSolution({
         user: context.user,
         description: input.description,
         prompt: input.prompt,
         language: input.language,
         locale: input.locale,
         subject
+      });
+    }
+  }
+};
+
+export const codingExerciseGenerateTestsRoute: PluginRouteDefinition = {
+  path: "coding-exercises/generate-tests",
+  activityTypeKeys: ["coding-exercise"],
+  methods: {
+    POST: async ({ context, readJson }) => {
+      const input = codingExerciseTestsGenerationInputSchema.parse(await readJson());
+      await assertCanManageGenerationContext(context);
+      const subject = await resolveSubjectContext(context.activityBankId, context.courseId);
+
+      return generateCodingExerciseTests({
+        user: context.user,
+        description: input.description,
+        prompt: input.prompt,
+        language: input.language,
+        locale: input.locale,
+        subject,
+        referenceSolution: input.referenceSolution,
+        templateSource: input.templateSource,
+        templateVisibleLineNumbers: input.templateVisibleLineNumbers
       });
     }
   }
