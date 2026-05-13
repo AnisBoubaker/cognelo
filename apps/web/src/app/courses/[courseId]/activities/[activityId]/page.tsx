@@ -79,31 +79,10 @@ export default function ActivityPage() {
         {activity && ActivityRenderer ? (
           <ActivityRenderer
             activity={activity}
+            activityRouteCourseId={courseId}
             canManage={Boolean(canManage)}
             course={course}
-            parsonsAiGenerationClient={
-              canManage && hasQuestionAuthoringAgent
-                ? {
-                    generate: (input) => api.generateParsonsProblem(courseId, activityId, input)
-                  }
-                : undefined
-            }
-            mcqAiGenerationClient={
-              canManage && hasQuestionAuthoringAgent
-                ? {
-                    generate: (input) => api.generateMcqSource(courseId, activityId, input)
-                  }
-                : undefined
-            }
-            codingExerciseAiGenerationClient={
-              canManage && hasQuestionAuthoringAgent
-                ? {
-                    generatePrompt: (input) => api.generateCodingExercisePrompt(courseId, activityId, input),
-                    generateSolution: (input) => api.generateCodingExerciseSolution(courseId, activityId, input),
-                    generateTests: (input) => api.generateCodingExerciseTests(courseId, activityId, input)
-                  }
-                : undefined
-            }
+            hasQuestionAuthoringAgent={hasQuestionAuthoringAgent}
             onSave={saveActivity}
             t={t}
             locale={locale}

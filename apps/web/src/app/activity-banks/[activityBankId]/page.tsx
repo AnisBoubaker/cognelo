@@ -22,18 +22,6 @@ const activityCategories: Array<{ id: ActivityCategoryId; labelKey: string }> = 
   { id: "miscellaneous", labelKey: "activityBankDetail.categoryMiscellaneous" }
 ];
 
-const allActivityCategories = "all" as const;
-
-// Default activity categories live here until Cognelo grows admin-managed activity classification.
-const activityCategoryAssignments: Record<string, { categoryIds: ActivityCategoryId[] | typeof allActivityCategories; source: "default" }> = {
-  "coding-exercise": { categoryIds: ["programming"], source: "default" },
-  "homework-grader": { categoryIds: ["programming"], source: "default" },
-  mcq: { categoryIds: allActivityCategories, source: "default" },
-  "parsons-problem": { categoryIds: ["programming"], source: "default" },
-  "web-design-coding-exercise": { categoryIds: ["programming"], source: "default" },
-  placeholder: { categoryIds: ["miscellaneous"], source: "default" }
-};
-
 export default function ActivityBankDetailPage() {
   const params = useParams<{ activityBankId: string }>();
   const router = useRouter();
@@ -155,11 +143,18 @@ export default function ActivityBankDetailPage() {
   }
 
   function activityTypeBelongsToCategory(activityTypeKey: string, categoryId: ActivityCategoryId) {
-    const assignment = activityCategoryAssignments[activityTypeKey];
-    if (!assignment) {
+    const defaultCategoryIds = activityDefinitions.find((candidate) => candidate.key === activityTypeKey)?.defaultCategoryIds;
+    if (defaultCategoryIds === "all") {
+      return true;
+    }
+    if (!defaultCategoryIds?.length) {
       return categoryId === "miscellaneous";
     }
-    return assignment.categoryIds === allActivityCategories || assignment.categoryIds.includes(categoryId);
+    return defaultCategoryIds.includes(categoryId);
+  }
+
+  function activityTypeIconName(activityTypeKey: string) {
+    return activityDefinitions.find((candidate) => candidate.key === activityTypeKey)?.icon ?? "placeholder";
   }
 
   const visibleActivityTypes = activityTypes.filter((type) => activityTypeBelongsToCategory(type.key, selectedCategoryId));
@@ -261,7 +256,7 @@ export default function ActivityBankDetailPage() {
                       disabled={savingActivity || !bank}
                       onClick={() => createBankActivity(type.key)}
                     >
-                      <ActivityTypeIcon activityTypeKey={type.key} />
+                      <ActivityTypeIcon iconName={activityTypeIconName(type.key)} />
                       <span>
                         <strong>{activityTypeLabel(type.key)}</strong>
                         <small>{activityTypeDescription(type.key)}</small>
@@ -367,8 +362,8 @@ function CloseIcon() {
   );
 }
 
-function ActivityTypeIcon({ activityTypeKey }: { activityTypeKey: string }) {
-  if (activityTypeKey === "mcq") {
+function ActivityTypeIcon({ iconName }: { iconName: NonNullable<ActivityDefinition["icon"]> }) {
+  if (iconName === "checklist") {
     return (
       <span className="activity-type-icon" aria-hidden="true">
         <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
@@ -379,7 +374,7 @@ function ActivityTypeIcon({ activityTypeKey }: { activityTypeKey: string }) {
     );
   }
 
-  if (activityTypeKey === "parsons-problem") {
+  if (iconName === "list-check") {
     return (
       <span className="activity-type-icon" aria-hidden="true">
         <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
@@ -390,7 +385,7 @@ function ActivityTypeIcon({ activityTypeKey }: { activityTypeKey: string }) {
     );
   }
 
-  if (activityTypeKey === "coding-exercise" || activityTypeKey === "web-design-coding-exercise") {
+  if (iconName === "code") {
     return (
       <span className="activity-type-icon" aria-hidden="true">
         <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
@@ -401,7 +396,7 @@ function ActivityTypeIcon({ activityTypeKey }: { activityTypeKey: string }) {
     );
   }
 
-  if (activityTypeKey === "homework-grader") {
+  if (iconName === "document-check") {
     return (
       <span className="activity-type-icon" aria-hidden="true">
         <svg fill="none" height="28" viewBox="0 0 32 32" width="28">

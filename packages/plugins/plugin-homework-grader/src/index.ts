@@ -14,6 +14,8 @@ export const homeworkGraderPlugin: ActivityPlugin = {
       key: "homework-grader",
       name: "Homework grader",
       description: "Future programming assignment submission and grading workflow.",
+      defaultCategoryIds: ["programming"],
+      icon: "document-check",
       i18n: {
         en: {
           name: "Homework grader",

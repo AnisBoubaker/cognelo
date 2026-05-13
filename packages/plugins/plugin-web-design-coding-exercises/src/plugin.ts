@@ -11,6 +11,8 @@ export const webDesignCodingExercisesPlugin: ActivityPlugin = {
       key: "web-design-coding-exercise",
       name: "Web design coding exercise",
       description: "Students edit HTML, CSS, and JavaScript files with a live sandboxed browser preview.",
+      defaultCategoryIds: ["programming"],
+      icon: "code",
       i18n: {
         en: {
           name: "Web design coding exercise",

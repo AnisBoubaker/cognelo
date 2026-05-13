@@ -89,6 +89,8 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - The subjects section follows the same list-first management pattern as other sections: `/subjects` shows the subject list with an Add action, `/subjects/:subjectId` shows linked activity banks/courses, and `/subjects/:subjectId/edit` edits subject metadata.
 - Activity bank authoring pages should open the full plugin authoring UI, not only generic metadata.
 - Activity bank creation uses an activity-type picker dialog grouped by activity categories. Categories are currently hardcoded defaults with support for all-category activities, but the structure should move toward admin-managed activity classification in a later revision.
+- Plugin activity definitions declare default picker metadata such as default category membership and a generic icon name. Activity-bank pages must read that metadata from registered definitions instead of hardcoding plugin activity keys.
+- Bank activity authoring pages must resolve plugin-specific authoring UIs through the app activity renderer registry, not by importing plugin packages or branching on plugin activity keys in route components.
 - The course materials area uses a compact table/list layout rather than large cards.
 - Course workspaces include a Settings tab for course-wide settings. Current settings let teachers choose the student-support AI agent from their personal or global enabled connections.
 - The add-material form is hidden by default and revealed from the course material section.

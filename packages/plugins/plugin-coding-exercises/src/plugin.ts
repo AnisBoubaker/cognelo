@@ -11,6 +11,8 @@ export const codingExercisesPlugin: ActivityPlugin = {
       key: "coding-exercise",
       name: "Coding exercise",
       description: "Students write code inside a teacher-defined scaffold and run or submit it through a sandboxed remote execution service.",
+      defaultCategoryIds: ["programming"],
+      icon: "code",
       i18n: {
         en: {
           name: "Coding exercise",
