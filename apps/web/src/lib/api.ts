@@ -289,6 +289,7 @@ export type ActivityDefinition = {
   key: string;
   name: string;
   description: string;
+  defaultConfig?: Record<string, unknown>;
   i18n?: Partial<
     Record<
       "en" | "fr" | "zh",

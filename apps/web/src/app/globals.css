@@ -1069,6 +1069,102 @@ a.card:hover,
   width: min(100%, 560px);
 }
 
+.activity-picker-dialog {
+  display: grid;
+  gap: 18px;
+  max-width: 920px;
+  width: min(100%, 920px);
+}
+
+.activity-picker-layout {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 360px;
+  overflow: hidden;
+}
+
+.activity-category-tabs {
+  background: var(--surface-2);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.activity-category-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+  color: var(--ink);
+  justify-content: flex-start;
+  min-height: 44px;
+  width: 100%;
+}
+
+.activity-category-tab:hover {
+  box-shadow: none;
+}
+
+.activity-category-tab.is-active {
+  background: #fff;
+  border-color: color-mix(in srgb, var(--brand-blue), white 74%);
+  box-shadow: 0 8px 20px rgba(13, 27, 71, 0.06);
+}
+
+.activity-type-options {
+  align-content: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  padding: 16px;
+}
+
+.activity-type-option {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  box-shadow: none;
+  color: var(--ink);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 54px 1fr;
+  justify-content: start;
+  min-height: 86px;
+  padding: 14px;
+  text-align: left;
+}
+
+.activity-type-option:hover {
+  border-color: color-mix(in srgb, var(--brand-blue), white 54%);
+  box-shadow: 0 12px 28px rgba(13, 27, 71, 0.08);
+}
+
+.activity-type-option strong,
+.activity-type-option small {
+  display: block;
+}
+
+.activity-type-option small {
+  color: var(--muted);
+  font-weight: 600;
+  line-height: 1.35;
+  margin-top: 4px;
+}
+
+.activity-type-icon {
+  align-items: center;
+  background: var(--surface-3);
+  border: 1px solid color-mix(in srgb, var(--brand-blue), white 78%);
+  border-radius: 8px;
+  color: var(--brand-ink);
+  display: inline-flex;
+  height: 54px;
+  justify-content: center;
+  width: 54px;
+}
+
 .dialog-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1703,6 +1799,26 @@ a.card:hover,
 
   .table-actions {
     justify-content: flex-start;
+  }
+
+  .activity-picker-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .activity-category-tabs {
+    border-bottom: 1px solid var(--line);
+    border-right: 0;
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .activity-category-tab {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  .activity-type-options {
+    grid-template-columns: 1fr;
   }
 
   .parsons-block {

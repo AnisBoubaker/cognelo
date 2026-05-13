@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { api, type ActivityBank, type ActivityDefinition, type ActivityType, type BankActivity } from "@/lib/api";
@@ -15,53 +15,72 @@ type EditingActivityState = {
   activityTypeKey: string;
 };
 
+type ActivityCategoryId = "programming" | "miscellaneous";
+
+const activityCategories: Array<{ id: ActivityCategoryId; labelKey: string }> = [
+  { id: "programming", labelKey: "activityBankDetail.categoryProgramming" },
+  { id: "miscellaneous", labelKey: "activityBankDetail.categoryMiscellaneous" }
+];
+
+const allActivityCategories = "all" as const;
+
+// Default activity categories live here until Cognelo grows admin-managed activity classification.
+const activityCategoryAssignments: Record<string, { categoryIds: ActivityCategoryId[] | typeof allActivityCategories; source: "default" }> = {
+  "coding-exercise": { categoryIds: ["programming"], source: "default" },
+  "homework-grader": { categoryIds: ["programming"], source: "default" },
+  mcq: { categoryIds: allActivityCategories, source: "default" },
+  "parsons-problem": { categoryIds: ["programming"], source: "default" },
+  "web-design-coding-exercise": { categoryIds: ["programming"], source: "default" },
+  placeholder: { categoryIds: ["miscellaneous"], source: "default" }
+};
+
 export default function ActivityBankDetailPage() {
   const params = useParams<{ activityBankId: string }>();
+  const router = useRouter();
   const activityBankId = params.activityBankId;
   const { locale, t } = useI18n();
   const [bank, setBank] = useState<ActivityBank | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
-  const [activityTitle, setActivityTitle] = useState("");
-  const [activityDescription, setActivityDescription] = useState("");
-  const [activityTypeKey, setActivityTypeKey] = useState("placeholder");
   const [editingActivity, setEditingActivity] = useState<EditingActivityState | null>(null);
   const [error, setError] = useState("");
   const [savingActivity, setSavingActivity] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [showActivityPicker, setShowActivityPicker] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<ActivityCategoryId>("programming");
 
   async function loadPage() {
     const [bankResult, typesResult] = await Promise.all([api.activityBank(activityBankId), api.activityTypes()]);
     setBank(bankResult.activityBank);
     setActivityTypes(typesResult.activityTypes);
     setActivityDefinitions(typesResult.registeredDefinitions);
-    setActivityTypeKey((current) => current || typesResult.activityTypes[0]?.key || "placeholder");
   }
 
   useEffect(() => {
     loadPage().catch((err) => setError(err instanceof Error ? err.message : t("activityBankDetail.loadError")));
   }, [activityBankId]);
 
-  async function createBankActivity(event: FormEvent) {
-    event.preventDefault();
+  async function createBankActivity(selectedActivityTypeKey: string) {
     if (!bank) {
       return;
     }
     setSavingActivity(true);
     setError("");
     try {
-      await api.createBankActivity(bank.id, {
-        title: activityTitle,
-        activityTypeKey,
-        description: activityDescription,
+      const definition = activityDefinitions.find((candidate) => candidate.key === selectedActivityTypeKey);
+      const localized = definition?.i18n?.[locale];
+      const activity = await api.createBankActivity(bank.id, {
+        title: localized?.defaultTitle ?? definition?.name ?? activityTypeLabel(selectedActivityTypeKey),
+        activityTypeKey: selectedActivityTypeKey,
+        description: localized?.description ?? definition?.description ?? "",
         lifecycle: "draft",
-        config: {},
+        config: definition?.defaultConfig ?? {},
         metadata: {},
         position: bank.activities?.length ?? 0
       });
-      setActivityTitle("");
-      setActivityDescription("");
+      setShowActivityPicker(false);
       await loadPage();
+      router.push(`/activity-banks/${bank.id}/activities/${activity.activity.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("activityBankDetail.createActivityError"));
     } finally {
@@ -108,6 +127,22 @@ export default function ActivityBankDetailPage() {
     return localized?.name ?? definition?.name ?? activityTypes.find((type) => type.key === activityTypeKey)?.name ?? activityTypeKey;
   }
 
+  function activityTypeDescription(activityTypeKey: string) {
+    const definition = activityDefinitions.find((candidate) => candidate.key === activityTypeKey);
+    const localized = definition?.i18n?.[locale];
+    return localized?.description ?? definition?.description ?? activityTypes.find((type) => type.key === activityTypeKey)?.description ?? "";
+  }
+
+  function activityTypeBelongsToCategory(activityTypeKey: string, categoryId: ActivityCategoryId) {
+    const assignment = activityCategoryAssignments[activityTypeKey];
+    if (!assignment) {
+      return categoryId === "miscellaneous";
+    }
+    return assignment.categoryIds === allActivityCategories || assignment.categoryIds.includes(categoryId);
+  }
+
+  const visibleActivityTypes = activityTypes.filter((type) => activityTypeBelongsToCategory(type.key, selectedCategoryId));
+
   return (
     <AppShell>
       <main className="page stack">
@@ -125,50 +160,14 @@ export default function ActivityBankDetailPage() {
         {error ? <p className="error">{error}</p> : null}
 
         <section className="section stack">
-          <h2>{t("activityBankDetail.addActivityTitle")}</h2>
-          <form className="form inline-panel" onSubmit={createBankActivity}>
-            <div className="grid compact-form-grid">
-              <div className="field">
-                <label htmlFor="bank-activity-title">{t("activityBankDetail.activityTitleLabel")}</label>
-                <input
-                  id="bank-activity-title"
-                  value={activityTitle}
-                  minLength={2}
-                  required
-                  onChange={(event) => setActivityTitle(event.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="bank-activity-type">{t("activityBankDetail.activityTypeLabel")}</label>
-                <select id="bank-activity-type" value={activityTypeKey} onChange={(event) => setActivityTypeKey(event.target.value)}>
-                  {activityTypes.map((type) => (
-                    <option key={type.id} value={type.key}>
-                      {activityTypeLabel(type.key)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="field">
-              <label htmlFor="bank-activity-description">{t("activityBankDetail.descriptionLabel")}</label>
-              <textarea
-                id="bank-activity-description"
-                value={activityDescription}
-                onChange={(event) => setActivityDescription(event.target.value)}
-              />
-            </div>
-            <button type="submit" disabled={savingActivity || !bank}>
-              {savingActivity ? t("common.saving") : t("common.create")}
-            </button>
-          </form>
-        </section>
-
-        <section className="section stack">
           <div className="section-heading">
             <div>
               <p className="eyebrow">{t("activityBankDetail.activitiesEyebrow")}</p>
               <h2>{t("activityBankDetail.activitiesTitle")}</h2>
             </div>
+            <button className="secondary" type="button" onClick={() => setShowActivityPicker(true)}>
+              {t("activityBankDetail.addActivityTitle")}
+            </button>
           </div>
 
           {bank?.activities?.length ? (
@@ -204,6 +203,55 @@ export default function ActivityBankDetailPage() {
             <p className="muted">{t("activityBankDetail.noActivities")}</p>
           )}
         </section>
+
+        {showActivityPicker ? (
+          <div className="dialog-backdrop" role="presentation">
+            <section aria-modal="true" className="dialog-panel activity-picker-dialog" role="dialog" aria-labelledby="activity-picker-title">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">{t("activityBankDetail.chooseActivityEyebrow")}</p>
+                  <h2 id="activity-picker-title">{t("activityBankDetail.chooseActivityTitle")}</h2>
+                </div>
+                <button className="secondary icon-button" type="button" onClick={() => setShowActivityPicker(false)} title={t("common.cancel")}>
+                  <CloseIcon />
+                </button>
+              </div>
+              <div className="activity-picker-layout">
+                <div className="activity-category-tabs" role="tablist" aria-label={t("activityBankDetail.categoryTabsLabel")}>
+                  {activityCategories.map((category) => (
+                    <button
+                      key={category.id}
+                      className={selectedCategoryId === category.id ? "activity-category-tab is-active" : "activity-category-tab"}
+                      type="button"
+                      role="tab"
+                      aria-selected={selectedCategoryId === category.id}
+                      onClick={() => setSelectedCategoryId(category.id)}
+                    >
+                      {t(category.labelKey)}
+                    </button>
+                  ))}
+                </div>
+                <div className="activity-type-options" role="tabpanel">
+                  {visibleActivityTypes.map((type) => (
+                    <button
+                      key={type.id}
+                      className="activity-type-option"
+                      type="button"
+                      disabled={savingActivity || !bank}
+                      onClick={() => createBankActivity(type.key)}
+                    >
+                      <ActivityTypeIcon activityTypeKey={type.key} />
+                      <span>
+                        <strong>{activityTypeLabel(type.key)}</strong>
+                        <small>{activityTypeDescription(type.key)}</small>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </div>
+        ) : null}
 
         {editingActivity ? (
           <section className="section stack">
@@ -287,5 +335,68 @@ function EditIcon() {
         strokeWidth="2"
       />
     </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
+      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function ActivityTypeIcon({ activityTypeKey }: { activityTypeKey: string }) {
+  if (activityTypeKey === "mcq") {
+    return (
+      <span className="activity-type-icon" aria-hidden="true">
+        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
+          <path d="M8 9h5M8 16h5M8 23h5M17 9h7M17 16h7M17 23h7" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+          <path d="M5 6h22v20H5z" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (activityTypeKey === "parsons-problem") {
+    return (
+      <span className="activity-type-icon" aria-hidden="true">
+        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
+          <path d="M7 8h18M7 14h13M7 20h18M7 26h10" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+          <path d="M5 5h22v22H5z" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (activityTypeKey === "coding-exercise" || activityTypeKey === "web-design-coding-exercise") {
+    return (
+      <span className="activity-type-icon" aria-hidden="true">
+        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
+          <path d="m13 10-6 6 6 6M19 10l6 6-6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+          <path d="M5 5h22v22H5z" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (activityTypeKey === "homework-grader") {
+    return (
+      <span className="activity-type-icon" aria-hidden="true">
+        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
+          <path d="M10 17l4 4 8-10" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+          <path d="M7 5h18v22H7z" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <span className="activity-type-icon" aria-hidden="true">
+      <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
+        <path d="M8 8h16v16H8z" stroke="currentColor" strokeWidth="2" />
+        <path d="M12 16h8M16 12v8" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+      </svg>
+    </span>
   );
 }
