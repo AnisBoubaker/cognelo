@@ -390,6 +390,20 @@ model ActivityType {
   activityVersions ActivityVersion[]
 }
 
+model ActivityPluginInstallation {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  packageName String
+  name        String
+  version     String   @default("0.1.0")
+  metadata    Json     @default("{}")
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isEnabled])
+}
+
 model BankActivity {
   id             String            @id @default(cuid())
   bankId         String

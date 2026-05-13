@@ -11,6 +11,7 @@ import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 import { AppError, forbidden, notFound } from "./errors";
 import { isAdmin, isCourseManager, isTeacher } from "./authorization";
+import { assertActivityTypePluginEnabled } from "./plugins";
 
 const subjectInclude = {
   materials: { orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }] },
@@ -332,6 +333,7 @@ async function resolveActivityType(activityTypeKey: string) {
   if (!activityType || !activityType.isEnabled) {
     throw new AppError(400, "UNKNOWN_ACTIVITY_TYPE", "The requested activity type is not available.");
   }
+  await assertActivityTypePluginEnabled(activityTypeKey);
   return activityType;
 }
 

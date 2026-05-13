@@ -59,6 +59,7 @@ The intended boundary is:
 - **Plugin tables belong to the plugin**: plugin-specific persistence is declared in the plugin package's database module rather than by modifying core tables for plugin-specific concerns.
 - **Plugin HTTP handlers belong to the plugin**: the API app provides a generic dispatcher route, while plugin-specific subroutes are declared in plugin packages.
 - **Bank-to-course copies are explicit**: author in an activity bank, create a new bank version when saving there, and copy the selected version into a course when assigning it to that course. Course edits mutate only the course copy.
+- **Plugin enablement is platform-managed**: installed activity plugins have `ActivityPluginInstallation` records. Admins can enable or disable installed plugins in Settings; disabled plugins are omitted from new activity creation and blocked by generic plugin route dispatch.
 - **Shared services stay shared**: reusable pieces such as the syntax-colored code editor, code renderer, Markdown renderer, and shared notification system live in `@cognelo/activity-ui`.
 - **Remote execution stays outside the API app**: activities that run learner code should call an external sandbox service such as Judge0 from server-side plugin routes.
 
@@ -121,6 +122,8 @@ PATCH  /api/courses/:courseId/materials/:materialId
 DELETE /api/courses/:courseId/materials/:materialId
 GET    /api/courses/:courseId/materials/:materialId/download
 GET    /api/activity-types
+GET    /api/plugins
+PATCH  /api/plugins/:pluginKey
 GET    /api/courses/:courseId/activities
 POST   /api/courses/:courseId/activities
 GET    /api/courses/:courseId/activities/:activityId
@@ -165,6 +168,7 @@ Core Prisma entities include:
 - `CourseMembership`
 - `CourseMaterial`
 - `ActivityType`
+- `ActivityPluginInstallation`
 - `Activity`
 
 Enums cover course status, course membership role, course section participant role, material kind, and activity lifecycle.

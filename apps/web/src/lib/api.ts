@@ -1,5 +1,6 @@
 import type {
   ActivateAccountInput,
+  ActivityPluginInstallationUpdate,
   AiAgentConnectionInput,
   AiAgentConnectionUpdate,
   ActivityInput,
@@ -44,6 +45,24 @@ export type AiAgentConnection = {
 
 export type AiAgentPreferences = {
   questionAuthoringAiAgentConnectionId: string | null;
+};
+
+export type ActivityPluginInstallation = {
+  id: string;
+  key: string;
+  packageName: string;
+  name: string;
+  version: string;
+  metadata: {
+    activityTypeKeys?: string[];
+    databaseNamespace?: string;
+    databaseTables?: string[];
+    databaseNotes?: string[];
+    [key: string]: unknown;
+  };
+  isEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type McqGenerationInput = {
@@ -565,6 +584,12 @@ export const api = {
   deleteAiAgentConnection: (connectionId: string) =>
     request<{ ok: true }>(`/ai-agents/${connectionId}`, {
       method: "DELETE"
+    }),
+  activityPlugins: () => request<{ plugins: ActivityPluginInstallation[] }>("/plugins"),
+  updateActivityPlugin: (pluginKey: string, input: ActivityPluginInstallationUpdate) =>
+    request<{ plugin: ActivityPluginInstallation }>(`/plugins/${pluginKey}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
     }),
   subjects: () => request<{ subjects: Subject[] }>("/subjects"),
   subject: (subjectId: string) => request<{ subject: Subject }>(`/subjects/${subjectId}`),

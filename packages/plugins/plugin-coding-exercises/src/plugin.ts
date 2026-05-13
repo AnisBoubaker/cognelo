@@ -4,6 +4,7 @@ import { codingExercisesDatabaseModule } from "./db";
 
 export const codingExercisesPlugin: ActivityPlugin = {
   key: "coding-exercises",
+  packageName: "@cognelo/plugin-coding-exercises",
   name: "Coding exercises",
   db: codingExercisesDatabaseModule,
   activities: [

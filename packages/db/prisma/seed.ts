@@ -121,6 +121,34 @@ async function main() {
   const activityTypesByKey = new Map<string, Awaited<ReturnType<typeof prisma.activityType.upsert>>>();
   const pluginKeyByActivityKey = new Map<string, string>();
   for (const plugin of listActivityPlugins()) {
+    await prisma.activityPluginInstallation.upsert({
+      where: { key: plugin.key },
+      update: {
+        packageName: plugin.packageName,
+        name: plugin.name,
+        version: plugin.version ?? "0.1.0",
+        metadata: {
+          activityTypeKeys: plugin.activities.map((activity) => activity.key),
+          databaseNamespace: plugin.db.namespace,
+          databaseTables: plugin.db.tables,
+          databaseNotes: plugin.db.notes ?? []
+        }
+      },
+      create: {
+        key: plugin.key,
+        packageName: plugin.packageName,
+        name: plugin.name,
+        version: plugin.version ?? "0.1.0",
+        metadata: {
+          activityTypeKeys: plugin.activities.map((activity) => activity.key),
+          databaseNamespace: plugin.db.namespace,
+          databaseTables: plugin.db.tables,
+          databaseNotes: plugin.db.notes ?? []
+        },
+        isEnabled: true
+      }
+    });
+
     for (const definition of plugin.activities) {
       pluginKeyByActivityKey.set(definition.key, plugin.key);
       const activityType = await prisma.activityType.upsert({

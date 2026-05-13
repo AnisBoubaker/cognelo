@@ -86,6 +86,7 @@ const defaultMcqSource = [
 
 export const mcqPlugin: ActivityPlugin = {
   key: "mcq",
+  packageName: "@cognelo/plugin-mcq",
   name: "Multpiple choice questions",
   db: {
     namespace: "plugin_mcq",

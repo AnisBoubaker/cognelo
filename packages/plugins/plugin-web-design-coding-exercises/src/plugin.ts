@@ -4,6 +4,7 @@ import { defaultWebDesignExerciseConfig, webDesignExerciseConfigSchema } from ".
 
 export const webDesignCodingExercisesPlugin: ActivityPlugin = {
   key: "web-design-coding-exercises",
+  packageName: "@cognelo/plugin-web-design-coding-exercises",
   name: "Web design coding exercises",
   db: webDesignCodingExercisesDatabaseModule,
   activities: [

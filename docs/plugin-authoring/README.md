@@ -74,8 +74,9 @@ If you just want the shortest possible summary:
 4. If it has API subroutes, register it in `packages/activity-sdk/src/server.ts`
 5. If it has a custom UI, register it in `apps/web/src/lib/activity-renderers.tsx`
 6. If it needs persistence, add Prisma models in `packages/db/prisma/schema.prisma`
-7. If it exposes any authoring or settings form, register that form with `useUnsavedChangesGuard` from `@cognelo/activity-ui`
-8. If it has private bank-owned data, add a server hook to copy it into course-owned plugin tables when assigned
+7. Seed or sync its `ActivityPluginInstallation` manifest so admins can enable or disable it from Settings
+8. If it exposes any authoring or settings form, register that form with `useUnsavedChangesGuard` from `@cognelo/activity-ui`
+9. If it has private bank-owned data, add a server hook to copy it into course-owned plugin tables when assigned
 
 The rest of this handbook explains each step carefully.
 

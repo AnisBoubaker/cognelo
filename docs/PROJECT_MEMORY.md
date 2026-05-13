@@ -91,6 +91,8 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Activity bank creation uses an activity-type picker dialog grouped by activity categories. Categories are currently hardcoded defaults with support for all-category activities, but the structure should move toward admin-managed activity classification in a later revision.
 - Plugin activity definitions declare default picker metadata such as default category membership and a generic icon name. Activity-bank pages must read that metadata from registered definitions instead of hardcoding plugin activity keys.
 - Bank activity authoring pages must resolve plugin-specific authoring UIs through the app activity renderer registry, not by importing plugin packages or branching on plugin activity keys in route components.
+- Installed activity plugins are represented by `ActivityPluginInstallation` records. Admins can enable or disable installed plugins from general settings; disabled plugins are removed from activity type listings, hidden from renderer selection for existing activities, and blocked at generic plugin route dispatch.
+- The current plugin installation model is manifest-backed and explicitly registered at build time. It is not filesystem autodiscovery yet, but it gives the platform a durable admin-managed enablement layer for later drop-in plugin installation work.
 - The course materials area uses a compact table/list layout rather than large cards.
 - Course workspaces include a Settings tab for course-wide settings. Current settings let teachers choose the student-support AI agent from their personal or global enabled connections.
 - The add-material form is hidden by default and revealed from the course material section.
@@ -134,7 +136,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - File storage is local only for now; production should move to object storage while preserving the same course-material abstraction.
 - Backend/server validation and error messages are not yet fully internationalized.
 - Locale-prefixed routes are not implemented; localization is currently app-state driven on the frontend.
-- Plugin registration is explicit, not autodiscovered.
+- Plugin registration is explicit, not autodiscovered. Installed plugins do have admin-managed enablement records, but adding a new plugin still requires build-time registry wiring.
 - Judge0 dev infrastructure is local-Docker only; production still requires a separately managed Judge0 host with its own hardening, monitoring, and secrets management.
 - Some management-oriented course and section/group pages still exist for teachers/admins in the same route tree, so student simplicity relies on explicit student-first redirects and rendering branches rather than totally separate apps.
 - Plugin registration is explicit, not autodiscovered. This includes server plugin hooks such as copying plugin-owned bank data into course activity copies.

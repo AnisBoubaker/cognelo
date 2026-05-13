@@ -121,7 +121,9 @@ export default function BankActivityAuthoringPage() {
       return <p>{t("common.loading")}</p>;
     }
 
-    const renderActivity = bankActivityRenderers[renderedActivity.activityType.key];
+    const renderActivity = activityDefinitions.some((definition) => definition.key === renderedActivity.activityType.key)
+      ? bankActivityRenderers[renderedActivity.activityType.key]
+      : null;
     if (renderActivity) {
       return renderActivity({
         activity: renderedActivity,

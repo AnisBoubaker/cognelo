@@ -89,6 +89,11 @@ export const AiAgentPreferencesInputSchema = z.object({
 });
 export type AiAgentPreferencesInput = z.infer<typeof AiAgentPreferencesInputSchema>;
 
+export const ActivityPluginInstallationUpdateSchema = z.object({
+  isEnabled: z.boolean()
+});
+export type ActivityPluginInstallationUpdate = z.infer<typeof ActivityPluginInstallationUpdateSchema>;
+
 export const CourseInputSchema = z.object({
   subjectId: RecordIdSchema,
   title: z.string().min(2).max(160),
