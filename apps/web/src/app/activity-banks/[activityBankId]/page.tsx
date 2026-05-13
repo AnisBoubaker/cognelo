@@ -60,6 +60,27 @@ export default function ActivityBankDetailPage() {
     loadPage().catch((err) => setError(err instanceof Error ? err.message : t("activityBankDetail.loadError")));
   }, [activityBankId]);
 
+  useEffect(() => {
+    if (!showActivityPicker) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowActivityPicker(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showActivityPicker]);
+
   async function createBankActivity(selectedActivityTypeKey: string) {
     if (!bank) {
       return;
