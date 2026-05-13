@@ -212,7 +212,12 @@ select:focus {
   width: fit-content;
 }
 
-.brand-logo-header .brand-logo-image,
+.brand-logo-header .brand-logo-image {
+  height: 48px;
+  width: auto;
+  max-width: min(100%, 100vw - 48px);
+}
+
 .brand-logo-hero .brand-logo-image {
   height: 90px;
   width: auto;

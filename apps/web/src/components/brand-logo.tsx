@@ -10,15 +10,18 @@ type BrandLogoProps = {
 };
 
 export function BrandLogo({ href, priority = false, size = "header" }: BrandLogoProps) {
+  const image = size === "header"
+    ? { src: "/brand/cognelo-logo-horiz.png", width: 1000, height: 340 }
+    : { src: "/brand/cognelo-logo-tight.png", width: 1100, height: 620 };
   const content = (
     <span className={`brand-logo brand-logo-${size}`}>
       <Image
         alt="Cognelo"
         className="brand-logo-image"
-        height={size === "hero" ? 620 : 620}
+        height={image.height}
         priority={priority}
-        src="/brand/cognelo-logo-tight.png"
-        width={size === "hero" ? 1100 : 1100}
+        src={image.src}
+        width={image.width}
       />
     </span>
   );
