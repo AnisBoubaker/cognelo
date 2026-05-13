@@ -97,6 +97,8 @@ export const mcqPlugin: ActivityPlugin = {
       key: "mcq",
       name: "Multpiple choice questions",
       description: "Single-choice and multiple-choice activities authored in a text-first Markdown-like format.",
+      defaultCategoryIds: "all",
+      icon: "checklist",
       i18n: {
         en: {
           name: "Multpiple choice questions",

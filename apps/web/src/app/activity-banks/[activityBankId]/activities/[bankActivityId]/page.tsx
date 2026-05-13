@@ -1,15 +1,12 @@
 "use client";
 
-import { CodingExerciseActivityView } from "@cognelo/plugin-coding-exercises";
-import { McqActivityView } from "@cognelo/plugin-mcq";
-import { ParsonsActivityView } from "@cognelo/plugin-parsons";
-import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
 import { useNotifications } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { api, type ActivityBank, type ActivityDefinition, type ActivityType, type BankActivity } from "@/lib/api";
+import { bankActivityRenderers } from "@/lib/activity-renderers";
 import { useI18n } from "@/lib/i18n";
 
 type ActivityLike = {
@@ -119,124 +116,23 @@ export default function BankActivityAuthoringPage() {
     }
   }
 
-  const bankWebDesignClient = useMemo(
-    () => ({
-      listTests: async (_courseId: string, activityId: string) => api.bankWebDesignExerciseTests(activityBankId, activityId),
-      saveTests: async (
-        _courseId: string,
-        activityId: string,
-        input: Parameters<typeof api.saveBankWebDesignExerciseTests>[2]
-      ) => api.saveBankWebDesignExerciseTests(activityBankId, activityId, input),
-      getExpectedResult: async (_courseId: string, activityId: string) => api.bankWebDesignExerciseExpectedResult(activityBankId, activityId),
-      runCode: async () => {
-        throw new Error(t("bankActivityPage.runUnavailable"));
-      },
-      listRuns: async () => ({ submissions: [] }),
-      submitCode: async () => {
-        throw new Error(t("bankActivityPage.submitUnavailable"));
-      },
-      listSubmissions: async () => ({ submissions: [] })
-    }),
-    [activityBankId]
-  );
-
-  const bankCodingExerciseClient = useMemo(
-    () => ({
-      listHiddenTests: async (_courseId: string, activityId: string) => api.bankCodingExerciseHiddenTests(activityBankId, activityId),
-      saveHiddenTests: async (
-        _courseId: string,
-        activityId: string,
-        input: Parameters<typeof api.saveBankCodingExerciseHiddenTests>[2]
-      ) => api.saveBankCodingExerciseHiddenTests(activityBankId, activityId, input),
-      runCode: async () => {
-        throw new Error(t("bankActivityPage.runUnavailable"));
-      },
-      listRuns: async () => ({ executions: [] }),
-      submitCode: async () => {
-        throw new Error(t("bankActivityPage.submitUnavailable"));
-      },
-      listSubmissions: async () => ({ executions: [] })
-    }),
-    [activityBankId, t]
-  );
-
   function renderAuthoring() {
     if (!renderedActivity) {
       return <p>{t("common.loading")}</p>;
     }
 
-    if (renderedActivity.activityType.key === "parsons-problem") {
-      return (
-        <ParsonsActivityView
-          activity={renderedActivity}
-          canManage
-          course={{ id: activityBankId, title: bank?.title ?? "" }}
-          onSave={saveActivity}
-          attemptsClient={undefined}
-          t={t}
-          locale={locale}
-          aiGenerationClient={
-            hasQuestionAuthoringAgent
-              ? {
-                  generate: (input) => api.generateBankParsonsProblem(activityBankId, bankActivityId, input)
-                }
-              : undefined
-          }
-        />
-      );
-    }
-
-    if (renderedActivity.activityType.key === "coding-exercise") {
-      return (
-        <CodingExerciseActivityView
-          activity={renderedActivity}
-          canManage
-          course={{ id: activityBankId, title: bank?.title ?? "" }}
-          onSave={saveActivity}
-          locale={locale}
-          codingClient={bankCodingExerciseClient}
-          aiGenerationClient={
-            hasQuestionAuthoringAgent
-              ? {
-                  generatePrompt: (input) => api.generateBankCodingExercisePrompt(activityBankId, bankActivityId, input),
-                  generateSolution: (input) => api.generateBankCodingExerciseSolution(activityBankId, bankActivityId, input),
-                  generateTests: (input) => api.generateBankCodingExerciseTests(activityBankId, bankActivityId, input)
-                }
-              : undefined
-          }
-        />
-      );
-    }
-
-    if (renderedActivity.activityType.key === "mcq") {
-      return (
-        <McqActivityView
-          activity={renderedActivity}
-          canManage
-          aiGenerationClient={
-            hasQuestionAuthoringAgent
-              ? {
-                  generate: (input) => api.generateBankMcqSource(activityBankId, bankActivityId, input)
-                }
-              : undefined
-          }
-          onSave={saveActivity}
-          locale={locale}
-        />
-      );
-    }
-
-    if (renderedActivity.activityType.key === "web-design-coding-exercise") {
-      return (
-        <WebDesignCodingExerciseActivityView
-          activity={renderedActivity}
-          canManage
-          course={{ id: activityBankId }}
-          onSave={saveActivity}
-          locale={locale}
-          webDesignClient={bankWebDesignClient}
-        />
-      );
+    const renderActivity = bankActivityRenderers[renderedActivity.activityType.key];
+    if (renderActivity) {
+      return renderActivity({
+        activity: renderedActivity,
+        activityBankId,
+        bankActivityId,
+        bankTitle: bank?.title ?? "",
+        hasQuestionAuthoringAgent,
+        locale,
+        onSave: saveActivity,
+        t
+      });
     }
 
     return (

@@ -14,10 +14,16 @@ export type ActivityMessages = {
   defaultTitle?: string;
 };
 
+export type ActivityCategoryAssignment = readonly string[] | "all";
+
+export type ActivityIconName = "code" | "checklist" | "document-check" | "list-check" | "placeholder";
+
 export type ActivityDefinition = {
   key: string;
   name: string;
   description: string;
+  defaultCategoryIds?: ActivityCategoryAssignment;
+  icon?: ActivityIconName;
   i18n?: Partial<Record<PluginLocale, ActivityMessages>>;
   defaultConfig?: Record<string, unknown>;
   configSchema?: z.ZodTypeAny;

@@ -289,6 +289,8 @@ export type ActivityDefinition = {
   key: string;
   name: string;
   description: string;
+  defaultCategoryIds?: string[] | "all";
+  icon?: "code" | "checklist" | "document-check" | "list-check" | "placeholder";
   defaultConfig?: Record<string, unknown>;
   i18n?: Partial<
     Record<

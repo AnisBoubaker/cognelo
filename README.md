@@ -65,6 +65,7 @@ The intended boundary is:
 Plugin packages can export:
 
 - activity definitions
+- default picker metadata such as category membership and generic icon name
 - localized metadata and UI strings
 - database manifests
 - persistence/services
@@ -136,6 +137,8 @@ Plugin-specific subroutes are dispatched through:
 ```
 
 Concrete plugin routes are documented in the owning plugin package.
+
+The web app keeps plugin-specific React wiring in the activity renderer registry. Route components should consume registered activity definitions and renderer entries instead of importing plugin packages or branching on concrete plugin keys.
 
 ## Authorization Model
 

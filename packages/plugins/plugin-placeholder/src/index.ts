@@ -13,6 +13,8 @@ export const placeholderPlugin: ActivityPlugin = {
       key: "placeholder",
       name: "Placeholder activity",
       description: "A generic shell used while a pedagogical activity is being designed.",
+      defaultCategoryIds: ["miscellaneous"],
+      icon: "placeholder",
       i18n: {
         en: {
           name: "Placeholder activity",

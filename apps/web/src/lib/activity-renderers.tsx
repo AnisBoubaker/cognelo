@@ -1,4 +1,4 @@
-import type { ComponentProps, JSXElementConstructor } from "react";
+import type { ComponentProps, JSXElementConstructor, ReactNode } from "react";
 import { CodingExerciseActivityView } from "@cognelo/plugin-coding-exercises";
 import { ParsonsActivityView } from "@cognelo/plugin-parsons";
 import { McqActivityView } from "@cognelo/plugin-mcq";
@@ -15,22 +15,53 @@ import {
   type WebDesignExerciseTest
 } from "@/lib/api";
 
-type ActivityRendererProps<T extends JSXElementConstructor<any>> = ComponentProps<T> & { groupId?: string };
-
-type CodingExerciseActivityRendererProps = ActivityRendererProps<typeof CodingExerciseActivityView> & {
-  codingExerciseAiGenerationClient?: ComponentProps<typeof CodingExerciseActivityView>["aiGenerationClient"];
+type ActivityRendererProps<T extends JSXElementConstructor<any>> = ComponentProps<T> & {
+  activityRouteCourseId?: string;
+  groupId?: string;
+  hasQuestionAuthoringAgent?: boolean;
 };
 
-type ParsonsActivityRendererProps = ActivityRendererProps<typeof ParsonsActivityView> & {
-  parsonsAiGenerationClient?: ComponentProps<typeof ParsonsActivityView>["aiGenerationClient"];
+type RenderableActivity = {
+  id: string;
+  title: string;
+  description: string;
+  lifecycle: string;
+  config?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  activityType: {
+    id: string;
+    key: string;
+    name: string;
+    description: string;
+  };
 };
 
-function ParsonsActivityRenderer(props: ParsonsActivityRendererProps) {
-  const { groupId, parsonsAiGenerationClient, ...activityProps } = props;
+type SaveActivity = (input: { title: string; description: string; config: Record<string, unknown> }) => Promise<RenderableActivity>;
+
+type BankActivityRendererContext = {
+  activity: RenderableActivity;
+  activityBankId: string;
+  bankActivityId: string;
+  bankTitle: string;
+  hasQuestionAuthoringAgent: boolean;
+  locale: "en" | "fr" | "zh";
+  onSave: SaveActivity;
+  t: (key: string, params?: Record<string, string | number>) => string;
+};
+
+function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActivityView>) {
+  const { activityRouteCourseId, groupId, hasQuestionAuthoringAgent, ...activityProps } = props;
+  const courseId = activityRouteCourseId ?? activityProps.course?.id;
   return (
     <ParsonsActivityView
       {...activityProps}
-      aiGenerationClient={parsonsAiGenerationClient}
+      aiGenerationClient={
+        activityProps.canManage && hasQuestionAuthoringAgent && courseId
+          ? {
+              generate: (input) => api.generateParsonsProblem(courseId, activityProps.activity.id, input)
+            }
+          : undefined
+      }
       attemptsClient={{
         ensureAttempt: async (activityId, courseId, input) => {
           const result = groupId
@@ -49,12 +80,21 @@ function ParsonsActivityRenderer(props: ParsonsActivityRendererProps) {
   );
 }
 
-function CodingExerciseActivityRenderer(props: CodingExerciseActivityRendererProps) {
-  const { groupId, codingExerciseAiGenerationClient, ...activityProps } = props;
+function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof CodingExerciseActivityView>) {
+  const { activityRouteCourseId, groupId, hasQuestionAuthoringAgent, ...activityProps } = props;
+  const courseId = activityRouteCourseId ?? activityProps.course?.id;
   return (
     <CodingExerciseActivityView
       {...activityProps}
-      aiGenerationClient={codingExerciseAiGenerationClient}
+      aiGenerationClient={
+        activityProps.canManage && hasQuestionAuthoringAgent && courseId
+          ? {
+              generatePrompt: (input) => api.generateCodingExercisePrompt(courseId, activityProps.activity.id, input),
+              generateSolution: (input) => api.generateCodingExerciseSolution(courseId, activityProps.activity.id, input),
+              generateTests: (input) => api.generateCodingExerciseTests(courseId, activityProps.activity.id, input)
+            }
+          : undefined
+      }
       codingClient={{
         listHiddenTests: async (courseId, activityId) => {
           const result = groupId
@@ -104,7 +144,7 @@ function CodingExerciseActivityRenderer(props: CodingExerciseActivityRendererPro
 }
 
 function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<typeof WebDesignCodingExerciseActivityView>) {
-  const { groupId, ...activityProps } = props;
+  const { activityRouteCourseId: _activityRouteCourseId, groupId, hasQuestionAuthoringAgent: _hasQuestionAuthoringAgent, ...activityProps } = props;
   return (
     <WebDesignCodingExerciseActivityView
       {...activityProps}
@@ -161,13 +201,118 @@ function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<ty
   );
 }
 
-type McqActivityRendererProps = ActivityRendererProps<typeof McqActivityView> & {
-  mcqAiGenerationClient?: ComponentProps<typeof McqActivityView>["aiGenerationClient"];
-};
+function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView>) {
+  const { activityRouteCourseId, groupId: _groupId, hasQuestionAuthoringAgent, ...activityProps } = props;
+  const courseId = activityRouteCourseId;
+  return (
+    <McqActivityView
+      {...activityProps}
+      aiGenerationClient={
+        activityProps.canManage && hasQuestionAuthoringAgent && courseId
+          ? {
+              generate: (input) => api.generateMcqSource(courseId, activityProps.activity.id, input)
+            }
+          : undefined
+      }
+    />
+  );
+}
 
-function McqActivityRenderer(props: McqActivityRendererProps) {
-  const { groupId: _groupId, mcqAiGenerationClient, ...activityProps } = props;
-  return <McqActivityView {...activityProps} aiGenerationClient={mcqAiGenerationClient} />;
+function ParsonsBankActivityRenderer(context: BankActivityRendererContext) {
+  return (
+    <ParsonsActivityView
+      activity={context.activity}
+      canManage
+      course={{ id: context.activityBankId, title: context.bankTitle }}
+      onSave={context.onSave}
+      attemptsClient={undefined}
+      t={context.t}
+      locale={context.locale}
+      aiGenerationClient={
+        context.hasQuestionAuthoringAgent
+          ? {
+              generate: (input) => api.generateBankParsonsProblem(context.activityBankId, context.bankActivityId, input)
+            }
+          : undefined
+      }
+    />
+  );
+}
+
+function CodingExerciseBankActivityRenderer(context: BankActivityRendererContext) {
+  return (
+    <CodingExerciseActivityView
+      activity={context.activity}
+      canManage
+      course={{ id: context.activityBankId, title: context.bankTitle }}
+      onSave={context.onSave}
+      locale={context.locale}
+      codingClient={{
+        listHiddenTests: async (_courseId, activityId) => api.bankCodingExerciseHiddenTests(context.activityBankId, activityId),
+        saveHiddenTests: async (_courseId, activityId, input) => api.saveBankCodingExerciseHiddenTests(context.activityBankId, activityId, input),
+        runCode: async () => {
+          throw new Error(context.t("bankActivityPage.runUnavailable"));
+        },
+        listRuns: async () => ({ executions: [] }),
+        submitCode: async () => {
+          throw new Error(context.t("bankActivityPage.submitUnavailable"));
+        },
+        listSubmissions: async () => ({ executions: [] })
+      }}
+      aiGenerationClient={
+        context.hasQuestionAuthoringAgent
+          ? {
+              generatePrompt: (input) => api.generateBankCodingExercisePrompt(context.activityBankId, context.bankActivityId, input),
+              generateSolution: (input) => api.generateBankCodingExerciseSolution(context.activityBankId, context.bankActivityId, input),
+              generateTests: (input) => api.generateBankCodingExerciseTests(context.activityBankId, context.bankActivityId, input)
+            }
+          : undefined
+      }
+    />
+  );
+}
+
+function McqBankActivityRenderer(context: BankActivityRendererContext) {
+  return (
+    <McqActivityView
+      activity={context.activity}
+      canManage
+      aiGenerationClient={
+        context.hasQuestionAuthoringAgent
+          ? {
+              generate: (input) => api.generateBankMcqSource(context.activityBankId, context.bankActivityId, input)
+            }
+          : undefined
+      }
+      onSave={context.onSave}
+      locale={context.locale}
+    />
+  );
+}
+
+function WebDesignCodingExerciseBankActivityRenderer(context: BankActivityRendererContext) {
+  return (
+    <WebDesignCodingExerciseActivityView
+      activity={context.activity}
+      canManage
+      course={{ id: context.activityBankId }}
+      onSave={context.onSave}
+      locale={context.locale}
+      webDesignClient={{
+        listTests: async (_courseId, activityId) => api.bankWebDesignExerciseTests(context.activityBankId, activityId),
+        saveTests: async (_courseId, activityId, input) => api.saveBankWebDesignExerciseTests(context.activityBankId, activityId, input),
+        getExpectedResult: async (_courseId, activityId) => api.bankWebDesignExerciseExpectedResult(context.activityBankId, activityId),
+        runCode: async () => {
+          throw new Error(context.t("bankActivityPage.runUnavailable"));
+        },
+        listRuns: async () => ({ submissions: [] }),
+        submitCode: async () => {
+          throw new Error(context.t("bankActivityPage.submitUnavailable"));
+        },
+        listSubmissions: async () => ({ submissions: [] })
+      }}
+    />
+  );
 }
 
 type ParsonsAttemptClientShape = ParsonsAttempt & {
@@ -197,3 +342,10 @@ export const activityRenderers = {
   mcq: McqActivityRenderer,
   "web-design-coding-exercise": WebDesignCodingExerciseActivityRenderer
 } as const;
+
+export const bankActivityRenderers: Record<string, (context: BankActivityRendererContext) => ReactNode> = {
+  "coding-exercise": CodingExerciseBankActivityRenderer,
+  "parsons-problem": ParsonsBankActivityRenderer,
+  mcq: McqBankActivityRenderer,
+  "web-design-coding-exercise": WebDesignCodingExerciseBankActivityRenderer
+};
