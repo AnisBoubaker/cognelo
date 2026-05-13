@@ -88,6 +88,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Subjects and activity banks are top-level navigation items alongside courses.
 - The subjects section follows the same list-first management pattern as other sections: `/subjects` shows the subject list with an Add action, `/subjects/:subjectId` shows linked activity banks/courses, and `/subjects/:subjectId/edit` edits subject metadata.
 - Activity bank authoring pages should open the full plugin authoring UI, not only generic metadata.
+- Activity bank creation uses an activity-type picker dialog grouped by activity categories. Categories are currently hardcoded defaults with support for all-category activities, but the structure should move toward admin-managed activity classification in a later revision.
 - The course materials area uses a compact table/list layout rather than large cards.
 - Course workspaces include a Settings tab for course-wide settings. Current settings let teachers choose the student-support AI agent from their personal or global enabled connections.
 - The add-material form is hidden by default and revealed from the course material section.
