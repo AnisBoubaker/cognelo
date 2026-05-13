@@ -38,6 +38,9 @@ export type AiAgentProvider = z.infer<typeof AiAgentProviderSchema>;
 export const AiAgentScopeSchema = z.enum(["personal", "global"]);
 export type AiAgentScope = z.infer<typeof AiAgentScopeSchema>;
 
+export const RecordIdSchema = z.string().trim().min(1).max(191);
+export type RecordId = z.infer<typeof RecordIdSchema>;
+
 export const LoginInputSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8)
@@ -87,7 +90,7 @@ export const AiAgentPreferencesInputSchema = z.object({
 export type AiAgentPreferencesInput = z.infer<typeof AiAgentPreferencesInputSchema>;
 
 export const CourseInputSchema = z.object({
-  subjectId: z.string().cuid(),
+  subjectId: RecordIdSchema,
   title: z.string().min(2).max(160),
   description: z.string().max(4000).optional().default(""),
   status: CourseStatusSchema.optional().default("draft")
@@ -113,10 +116,10 @@ export const SubjectUpdateSchema = SubjectInputSchema.partial();
 export type SubjectUpdate = z.infer<typeof SubjectUpdateSchema>;
 
 export const ActivityBankInputSchema = z.object({
-  subjectId: z.string().cuid(),
+  subjectId: RecordIdSchema,
   title: z.string().min(2).max(160),
   description: z.string().max(4000).optional().default(""),
-  ownerId: z.string().cuid().optional(),
+  ownerId: RecordIdSchema.optional(),
   metadata: z.record(z.unknown()).optional().default({})
 });
 export type ActivityBankInput = z.infer<typeof ActivityBankInputSchema>;
@@ -164,7 +167,7 @@ export type CourseGroupUpdate = z.infer<typeof CourseGroupUpdateSchema>;
 const CourseMaterialBaseSchema = z.object({
   title: z.string().min(2).max(180),
   kind: MaterialKindSchema,
-  parentId: z.string().cuid().nullable().optional(),
+  parentId: RecordIdSchema.nullable().optional(),
   body: z.string().max(20000).optional(),
   url: z.string().url().optional(),
   metadata: z.record(z.unknown()).optional().default({}),
@@ -209,8 +212,8 @@ export const CourseGroupMaterialUpdateSchema = CourseMaterialBaseSchema.partial(
 export type CourseGroupMaterialUpdate = z.infer<typeof CourseGroupMaterialUpdateSchema>;
 
 export const ActivityInputSchema = z.object({
-  bankActivityId: z.string().cuid().optional(),
-  activityVersionId: z.string().cuid().optional(),
+  bankActivityId: RecordIdSchema.optional(),
+  activityVersionId: RecordIdSchema.optional(),
   activityTypeKey: z.string().min(2).max(80),
   title: z.string().min(2).max(180),
   description: z.string().max(4000).optional().default(""),
@@ -225,7 +228,7 @@ export const ActivityUpdateSchema = ActivityInputSchema.partial();
 export type ActivityUpdate = z.infer<typeof ActivityUpdateSchema>;
 
 export const CourseGroupActivityInputSchema = z.object({
-  activityId: z.string().cuid(),
+  activityId: RecordIdSchema,
   availableFrom: z.string().datetime().nullable().optional(),
   availableUntil: z.string().datetime().nullable().optional(),
   config: z.record(z.unknown()).optional().default({}),
@@ -253,7 +256,7 @@ export const CourseGroupParticipantInputSchema = z.object({
 export type CourseGroupParticipantInput = z.infer<typeof CourseGroupParticipantInputSchema>;
 
 export const EnrollmentInputSchema = z.object({
-  userId: z.string().cuid(),
+  userId: RecordIdSchema,
   role: CourseMembershipRoleSchema
 });
 export type EnrollmentInput = z.infer<typeof EnrollmentInputSchema>;
