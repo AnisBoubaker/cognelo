@@ -1,16 +1,26 @@
-import { getActivityDefinition, listActivityDefinitions } from "@cognelo/activity-sdk";
+import { getActivityDefinition, getActivityPluginForActivityType, listActivityDefinitions } from "@cognelo/activity-sdk";
 import { ActivityInputSchema, ActivityUpdateSchema } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 import { assertCanManageCourse, assertCanViewCourse } from "./authorization";
 import { AppError, notFound } from "./errors";
+import { assertActivityTypePluginEnabled, getEnabledActivityPluginKeys } from "./plugins";
 
 export async function listActivityTypes() {
-  return prisma.activityType.findMany({ where: { isEnabled: true }, orderBy: { name: "asc" } });
+  const enabledPluginKeys = await getEnabledActivityPluginKeys();
+  const activityTypes = await prisma.activityType.findMany({ where: { isEnabled: true }, orderBy: { name: "asc" } });
+  return activityTypes.filter((activityType) => {
+    const plugin = getActivityPluginForActivityType(activityType.key);
+    return plugin ? enabledPluginKeys.has(plugin.key) : false;
+  });
 }
 
-export function listRegisteredActivityDefinitions() {
-  return listActivityDefinitions();
+export async function listRegisteredActivityDefinitions() {
+  const enabledPluginKeys = await getEnabledActivityPluginKeys();
+  return listActivityDefinitions().filter((definition) => {
+    const plugin = getActivityPluginForActivityType(definition.key);
+    return plugin ? enabledPluginKeys.has(plugin.key) : false;
+  });
 }
 
 export async function getActivity(user: CurrentUser, courseId: string, activityId: string) {
@@ -47,6 +57,7 @@ export async function createActivity(user: CurrentUser, courseId: string, input:
   if (!activityType || !activityType.isEnabled) {
     throw new AppError(400, "UNKNOWN_ACTIVITY_TYPE", "The requested activity type is not available.");
   }
+  await assertActivityTypePluginEnabled(data.activityTypeKey);
 
   const definition = getActivityDefinition(data.activityTypeKey);
   const mergedConfig = { ...(definition?.defaultConfig ?? {}), ...data.config };
@@ -104,6 +115,7 @@ async function createCourseActivityFromBankVersion(
   if (!version) {
     throw notFound("Activity version");
   }
+  await assertActivityTypePluginEnabled(version.activityType.key);
   if (version.bankActivity.bank.subjectId !== course.subjectId) {
     throw new AppError(400, "ACTIVITY_BANK_SUBJECT_MISMATCH", "This activity bank does not belong to the course subject.");
   }
@@ -154,7 +166,7 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
   }
 
   const activityTypeId = data.activityTypeKey
-    ? (await prisma.activityType.findUniqueOrThrow({ where: { key: data.activityTypeKey } })).id
+    ? (await resolveEnabledActivityTypeId(data.activityTypeKey))
     : undefined;
 
   return prisma.activity.update({
@@ -170,6 +182,15 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
     },
     include: { activityType: true, bankActivity: true, activityVersion: true }
   });
+}
+
+async function resolveEnabledActivityTypeId(activityTypeKey: string) {
+  const activityType = await prisma.activityType.findUnique({ where: { key: activityTypeKey } });
+  if (!activityType || !activityType.isEnabled) {
+    throw new AppError(400, "UNKNOWN_ACTIVITY_TYPE", "The requested activity type is not available.");
+  }
+  await assertActivityTypePluginEnabled(activityTypeKey);
+  return activityType.id;
 }
 
 export async function deleteActivity(user: CurrentUser, courseId: string, activityId: string) {

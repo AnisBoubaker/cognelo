@@ -696,6 +696,73 @@ a.card:hover,
   color: var(--muted);
 }
 
+.plugin-settings-list {
+  display: grid;
+  gap: 12px;
+}
+
+.plugin-settings-row {
+  align-items: center;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.plugin-settings-state {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.switch-control {
+  display: inline-flex;
+  height: 28px;
+  position: relative;
+  width: 50px;
+}
+
+.switch-control input {
+  height: 1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.switch-control span {
+  background: var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  inset: 0;
+  position: absolute;
+  transition: background 0.16s ease;
+}
+
+.switch-control span::before {
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(13, 27, 71, 0.2);
+  content: "";
+  height: 22px;
+  left: 3px;
+  position: absolute;
+  top: 3px;
+  transition: transform 0.16s ease;
+  width: 22px;
+}
+
+.switch-control input:checked + span {
+  background: var(--brand-teal);
+}
+
+.switch-control input:checked + span::before {
+  transform: translateX(22px);
+}
+
+.switch-control input:disabled + span {
+  cursor: wait;
+  opacity: 0.62;
+}
+
 .editor-section-label {
   display: inline-block;
   font-weight: 700;
@@ -1809,6 +1876,15 @@ a.card:hover,
 
   .table-actions {
     justify-content: flex-start;
+  }
+
+  .plugin-settings-row {
+    align-items: start;
+    grid-template-columns: 1fr;
+  }
+
+  .plugin-settings-state {
+    justify-content: space-between;
   }
 
   .activity-picker-layout {

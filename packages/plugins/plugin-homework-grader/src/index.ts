@@ -3,6 +3,7 @@ import type { ActivityPlugin } from "@cognelo/activity-sdk";
 
 export const homeworkGraderPlugin: ActivityPlugin = {
   key: "homework-grader",
+  packageName: "@cognelo/plugin-homework-grader",
   name: "Homework grader",
   db: {
     namespace: "plugin_homework_grader",

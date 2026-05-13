@@ -2,6 +2,7 @@ import type { ActivityPlugin } from "@cognelo/activity-sdk";
 
 export const placeholderPlugin: ActivityPlugin = {
   key: "placeholder",
+  packageName: "@cognelo/plugin-placeholder",
   name: "Placeholder activity",
   db: {
     namespace: "plugin_placeholder",

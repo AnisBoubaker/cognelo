@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/components/auth-provider";
 import { useI18n } from "@/lib/i18n";
 
 const settingsItems = [
@@ -12,10 +13,14 @@ const settingsItems = [
 export function SettingsNav() {
   const pathname = usePathname();
   const { t } = useI18n();
+  const { user } = useAuth();
+  const visibleItems = user?.roles.includes("admin")
+    ? [...settingsItems, { href: "/settings/plugins", labelKey: "settings.pluginsNav", textKey: "settings.pluginsNavText" }]
+    : settingsItems;
 
   return (
     <aside className="settings-nav" aria-label={t("settings.navLabel")}>
-      {settingsItems.map((item) => {
+      {visibleItems.map((item) => {
         const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <Link key={item.href} aria-current={isActive ? "page" : undefined} className={isActive ? "is-active" : undefined} href={item.href}>

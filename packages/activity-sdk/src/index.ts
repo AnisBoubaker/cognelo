@@ -38,7 +38,9 @@ export type PluginDatabaseModule = {
 
 export type ActivityPlugin = {
   key: string;
+  packageName: string;
   name: string;
+  version?: string;
   db: PluginDatabaseModule;
   activities: ActivityDefinition[];
 };
@@ -72,6 +74,14 @@ export function listActivityDefinitions() {
 
 export function listActivityPlugins() {
   return [...plugins];
+}
+
+export function getActivityPlugin(key: string) {
+  return plugins.find((plugin) => plugin.key === key);
+}
+
+export function getActivityPluginForActivityType(activityTypeKey: string) {
+  return plugins.find((plugin) => plugin.activities.some((definition) => definition.key === activityTypeKey));
 }
 
 export function listPluginDatabaseModules() {

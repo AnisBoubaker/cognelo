@@ -60,6 +60,7 @@ const parsonsConfigSchema = z
 
 export const parsonsPlugin: ActivityPlugin = {
   key: "parsons",
+  packageName: "@cognelo/plugin-parsons",
   name: "Parsons",
   db: parsonsDatabaseModule,
   activities: [

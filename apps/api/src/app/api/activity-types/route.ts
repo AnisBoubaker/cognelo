@@ -9,7 +9,7 @@ export async function GET() {
   return handleRoute(async () => {
     return json({
       activityTypes: await listActivityTypes(),
-      registeredDefinitions: listRegisteredActivityDefinitions()
+      registeredDefinitions: await listRegisteredActivityDefinitions()
     });
   });
 }

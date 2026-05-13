@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { resolvePluginRoute } from "@cognelo/activity-sdk/server";
-import { AppError, getActivity } from "@cognelo/core";
+import { AppError, assertActivityTypePluginEnabled, getActivity } from "@cognelo/core";
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; activityId: string; pluginPath: string[] }> };
@@ -15,6 +15,7 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
   const user = await requireUser();
   const { courseId, activityId, pluginPath } = params;
   const activity = await getActivity(user, courseId, activityId);
+  await assertActivityTypePluginEnabled(activity.activityType.key);
   const route = resolvePluginRoute(activity.activityType.key, pluginPath);
 
   if (!route) {

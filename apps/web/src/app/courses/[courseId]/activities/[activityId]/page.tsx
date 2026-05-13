@@ -21,7 +21,10 @@ export default function ActivityPage() {
   const [error, setError] = useState("");
 
   const canManage = user?.roles.includes("admin") || user?.roles.includes("teacher");
-  const ActivityRenderer = activity ? activityRenderers[activity.activityType.key as keyof typeof activityRenderers] : null;
+  const ActivityRenderer =
+    activity && activityDefinitions.some((definition) => definition.key === activity.activityType.key)
+      ? activityRenderers[activity.activityType.key as keyof typeof activityRenderers]
+      : null;
 
   useEffect(() => {
     async function refresh() {

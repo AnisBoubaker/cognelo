@@ -23,7 +23,10 @@ export default function GroupActivityPage() {
 
   const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
   const canManage = user?.roles.includes("admin") || membershipRole === "owner" || membershipRole === "teacher";
-  const ActivityRenderer = activity ? activityRenderers[activity.activityType.key as keyof typeof activityRenderers] : null;
+  const ActivityRenderer =
+    activity && activityDefinitions.some((definition) => definition.key === activity.activityType.key)
+      ? activityRenderers[activity.activityType.key as keyof typeof activityRenderers]
+      : null;
 
   useEffect(() => {
     async function refresh() {
