@@ -509,7 +509,7 @@ const messages: Record<Locale, MessageTree> = {
     },
     nav: {
       dashboard: "Tableau de bord",
-      subjects: "Sujets",
+      subjects: "Matières",
       activityBanks: "Banques d'activités",
       courses: "Cours",
       newCourse: "Nouveau cours",
@@ -650,45 +650,45 @@ const messages: Record<Locale, MessageTree> = {
     },
     subjects: {
       eyebrow: "Programme",
-      subtitle: "Les sujets contiennent le matériel partagé des cours et organisent les banques d'activités.",
-      createTitle: "Créer un sujet",
-      listEyebrow: "Sujets",
-      listTitle: "Sujets disponibles",
+      subtitle: "Les matières contiennent le matériel partagé des cours et organisent les banques d'activités.",
+      createTitle: "Créer une matière",
+      listEyebrow: "Matières",
+      listTitle: "Matières disponibles",
       titleLabel: "Titre",
       descriptionLabel: "Description",
-      cardEyebrow: "Sujet",
+      cardEyebrow: "Matière",
       summary: "{banks} banques d'activités · {courses} cours",
-      empty: "Aucun sujet pour le moment.",
-      loadError: "Impossible de charger les sujets.",
-      createError: "Impossible de créer le sujet."
+      empty: "Aucune matière pour le moment.",
+      loadError: "Impossible de charger les matières.",
+      createError: "Impossible de créer la matière."
     },
     subjectDetail: {
-      eyebrow: "Sujet",
-      fallbackTitle: "Chargement du sujet...",
+      eyebrow: "Matière",
+      fallbackTitle: "Chargement de la matière...",
       activityBanksEyebrow: "Activités réutilisables",
       activityBanksTitle: "Banques d'activités",
-      emptyActivityBanks: "Aucune banque d'activités n'est liée à ce sujet pour le moment.",
+      emptyActivityBanks: "Aucune banque d'activités n'est liée à cette matière pour le moment.",
       coursesEyebrow: "Cours",
       coursesTitle: "Cours",
-      emptyCourses: "Aucun cours n'est lié à ce sujet pour le moment.",
-      loadError: "Impossible de charger le sujet."
+      emptyCourses: "Aucun cours n'est lié à cette matière pour le moment.",
+      loadError: "Impossible de charger la matière."
     },
     editSubject: {
-      eyebrow: "Modifier le sujet",
-      fallbackTitle: "Chargement du sujet...",
-      loadError: "Impossible de charger le sujet.",
-      saveError: "Impossible d'enregistrer le sujet."
+      eyebrow: "Modifier la matière",
+      fallbackTitle: "Chargement de la matière...",
+      loadError: "Impossible de charger la matière.",
+      saveError: "Impossible d'enregistrer la matière."
     },
     activityBanks: {
       eyebrow: "Activités réutilisables",
       subtitle: "Sélectionnez une banque pour gérer ses activités, ou ajoutez une nouvelle banque.",
       listEyebrow: "Banques",
       listTitle: "Banques d'activités",
-      noSubject: "Aucun sujet",
+      noSubject: "Aucune matière",
       activityCount: "{count} activités",
       empty: "Aucune banque d'activités pour le moment.",
       addTitle: "Ajouter une banque d'activités",
-      subjectLabel: "Sujet",
+      subjectLabel: "Matière",
       titleLabel: "Titre",
       descriptionLabel: "Description",
       loadError: "Impossible de charger les banques d'activités.",
@@ -732,7 +732,7 @@ const messages: Record<Locale, MessageTree> = {
       versionNote: "Les changements enregistrés ici mettent à jour l'activité de la banque et créent une nouvelle version pour les prochaines assignations aux cours."
     },
     courseForm: {
-      subject: "Sujet",
+      subject: "Matière",
       title: "Titre",
       description: "Description",
       status: "Statut de publication",
