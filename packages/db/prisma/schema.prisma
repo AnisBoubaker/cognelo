@@ -51,39 +51,6 @@ enum CourseGroupParticipantRole {
   student
 }
 
-enum PluginParsonsAttemptStatus {
-  in_progress
-  completed
-  abandoned
-}
-
-enum PluginCodingExerciseExecutionKind {
-  run
-  submit
-}
-
-enum PluginCodingExerciseExecutionStatus {
-  pending
-  completed
-  failed
-}
-
-enum PluginWebDesignExerciseTestKind {
-  sample
-  hidden
-}
-
-enum PluginWebDesignExerciseSubmissionKind {
-  run
-  submit
-}
-
-enum PluginWebDesignExerciseSubmissionStatus {
-  pending
-  completed
-  failed
-}
-
 enum AiAgentProvider {
   ollama
   openai
@@ -116,9 +83,6 @@ model User {
   groupParticipants CourseGroupParticipant[]
   groupMaterials  CourseGroupMaterial[] @relation("GroupMaterialCreator")
   aiAgentConnections AiAgentConnection[]
-  parsonsAttempts PluginParsonsAttempt[]
-  codingExerciseExecutions PluginCodingExerciseExecution[]
-  webDesignExerciseSubmissions PluginWebDesignExerciseSubmission[]
 
   @@index([email])
 }
@@ -397,11 +361,30 @@ model ActivityPluginInstallation {
   name        String
   version     String   @default("0.1.0")
   metadata    Json     @default("{}")
+  isActivated Boolean  @default(false)
   isEnabled   Boolean  @default(true)
+  activatedAt DateTime?
+  deactivatedAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  tableBackups ActivityPluginTableBackup[]
 
+  @@index([isActivated])
   @@index([isEnabled])
+}
+
+model ActivityPluginTableBackup {
+  id             String   @id @default(cuid())
+  pluginKey      String
+  pluginVersion  String
+  sourceTables   Json     @default("[]")
+  backupTables   Json     @default("[]")
+  restoredAt     DateTime?
+  createdAt      DateTime @default(now())
+  installation   ActivityPluginInstallation @relation(fields: [pluginKey], references: [key], onDelete: Cascade)
+
+  @@index([pluginKey, pluginVersion])
+  @@index([restoredAt])
 }
 
 model BankActivity {
@@ -424,10 +407,6 @@ model BankActivity {
   createdBy      User              @relation("BankActivityCreator", fields: [createdById], references: [id])
   versions       ActivityVersion[] @relation("BankActivityVersions")
   courseActivities Activity[]
-  webDesignExerciseReferenceBundle PluginBankWebDesignExerciseReferenceBundle?
-  webDesignExerciseTests PluginBankWebDesignExerciseTest[]
-  codingExerciseHiddenTests PluginBankCodingExerciseHiddenTest[]
-  codingExerciseReferenceSolution PluginBankCodingExerciseReferenceSolution?
 
   @@index([bankId, position])
   @@index([activityTypeId])
@@ -478,246 +457,10 @@ model Activity {
   activityType   ActivityType      @relation(fields: [activityTypeId], references: [id])
   createdBy      User              @relation("ActivityCreator", fields: [createdById], references: [id])
   groupAssignments CourseGroupActivity[]
-  parsonsAttempts PluginParsonsAttempt[]
-  codingExerciseHiddenTests PluginCodingExerciseHiddenTest[]
-  codingExerciseExecutions PluginCodingExerciseExecution[]
-  codingExerciseReferenceSolution PluginCodingExerciseReferenceSolution?
-  webDesignExerciseReferenceBundle PluginWebDesignExerciseReferenceBundle?
-  webDesignExerciseTests PluginWebDesignExerciseTest[]
-  webDesignExerciseSubmissions PluginWebDesignExerciseSubmission[]
 
   @@index([courseId, position])
   @@index([bankActivityId])
   @@index([activityVersionId])
   @@index([activityTypeId])
   @@index([lifecycle])
-}
-
-model PluginParsonsAttempt {
-  id                String                     @id @default(cuid())
-  activityId        String
-  userId            String
-  status            PluginParsonsAttemptStatus @default(in_progress)
-  latestState       Json                       @default("{}")
-  resultSummary     Json                       @default("{}")
-  checkCount        Int                        @default(0)
-  resetCount        Int                        @default(0)
-  moveCount         Int                        @default(0)
-  indentCount       Int                        @default(0)
-  startedAt         DateTime                   @default(now())
-  lastInteractionAt DateTime                   @default(now())
-  completedAt       DateTime?
-  createdAt         DateTime                   @default(now())
-  updatedAt         DateTime                   @updatedAt
-  activity          Activity                   @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  events            PluginParsonsAttemptEvent[]
-
-  @@index([activityId, userId, status])
-  @@index([userId, status])
-  @@index([activityId, lastInteractionAt])
-}
-
-model PluginParsonsAttemptEvent {
-  id        String               @id @default(cuid())
-  attemptId String
-  type      String
-  payload   Json                 @default("{}")
-  createdAt DateTime             @default(now())
-  attempt   PluginParsonsAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-
-  @@index([attemptId, createdAt])
-  @@index([type])
-}
-
-model PluginCodingExerciseHiddenTest {
-  id             String   @id @default(cuid())
-  activityId     String
-  name           String
-  stdin          String   @default("")
-  expectedOutput String   @default("")
-  orderIndex     Int      @default(0)
-  isEnabled      Boolean  @default(true)
-  weight         Int      @default(1)
-  metadata       Json     @default("{}")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  activity       Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
-
-  @@index([activityId, orderIndex])
-  @@index([activityId, isEnabled])
-}
-
-model PluginCodingExerciseReferenceSolution {
-  id                String   @id @default(cuid())
-  activityId        String   @unique
-  sourceCode        String
-  privateConfig     Json     @default("{}")
-  validationSummary Json     @default("{}")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  activity          Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
-}
-
-model PluginBankCodingExerciseHiddenTest {
-  id             String       @id @default(cuid())
-  bankActivityId String
-  name           String
-  stdin          String       @default("")
-  expectedOutput String       @default("")
-  orderIndex     Int          @default(0)
-  isEnabled      Boolean      @default(true)
-  weight         Int          @default(1)
-  metadata       Json         @default("{}")
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  bankActivity   BankActivity @relation(fields: [bankActivityId], references: [id], onDelete: Cascade)
-
-  @@index([bankActivityId, orderIndex])
-  @@index([bankActivityId, isEnabled])
-}
-
-model PluginBankCodingExerciseReferenceSolution {
-  id                String       @id @default(cuid())
-  bankActivityId    String       @unique
-  sourceCode        String
-  privateConfig     Json         @default("{}")
-  validationSummary Json         @default("{}")
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  bankActivity      BankActivity @relation(fields: [bankActivityId], references: [id], onDelete: Cascade)
-}
-
-model PluginCodingExerciseExecution {
-  id                    String                             @id @default(cuid())
-  activityId            String
-  userId                String
-  kind                  PluginCodingExerciseExecutionKind  @default(run)
-  status                PluginCodingExerciseExecutionStatus @default(pending)
-  languageKey           String
-  judge0LanguageId      Int
-  sourceCode            String
-  stdin                 String?   @default("")
-  expectedOutput        String?   @default("")
-  judge0Token           String?
-  stdout                String?
-  stderr                String?
-  compileOutput         String?
-  message               String?
-  timeSeconds           String?
-  memoryKb              Int?
-  judge0StatusId        Int?
-  judge0StatusLabel     String?
-  resultSummary         Json      @default("{}")
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  activity              Activity  @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([activityId, userId, createdAt])
-  @@index([userId, createdAt])
-  @@index([activityId, kind, createdAt])
-  @@index([judge0Token])
-}
-
-model PluginWebDesignExerciseReferenceBundle {
-  id                String   @id @default(cuid())
-  activityId        String   @unique
-  files             Json     @default("[]")
-  validationSummary Json     @default("{}")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  activity          Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
-}
-
-model PluginWebDesignExerciseTest {
-  id                String                          @id @default(cuid())
-  activityId        String
-  name              String
-  kind              PluginWebDesignExerciseTestKind @default(hidden)
-  testCode          String
-  orderIndex        Int                             @default(0)
-  isEnabled         Boolean                         @default(true)
-  weight            Int                             @default(1)
-  metadata          Json                            @default("{}")
-  validationSummary Json                            @default("{}")
-  createdAt         DateTime                        @default(now())
-  updatedAt         DateTime                        @updatedAt
-  activity          Activity                        @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  results           PluginWebDesignExerciseTestResult[]
-
-  @@index([activityId, kind, orderIndex])
-  @@index([activityId, isEnabled])
-}
-
-model PluginWebDesignExerciseSubmission {
-  id            String                                  @id @default(cuid())
-  activityId    String
-  userId        String
-  kind          PluginWebDesignExerciseSubmissionKind   @default(run)
-  status        PluginWebDesignExerciseSubmissionStatus @default(pending)
-  files         Json                                    @default("[]")
-  resultSummary Json                                    @default("{}")
-  score         Float?
-  maxScore      Float?
-  message       String?
-  createdAt     DateTime                                @default(now())
-  updatedAt     DateTime                                @updatedAt
-  activity      Activity                                @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  user          User                                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  testResults   PluginWebDesignExerciseTestResult[]
-
-  @@index([activityId, userId, createdAt])
-  @@index([userId, createdAt])
-  @@index([activityId, kind, createdAt])
-  @@index([activityId, status, createdAt])
-}
-
-model PluginWebDesignExerciseTestResult {
-  id           String                            @id @default(cuid())
-  submissionId String
-  testId       String?
-  name         String
-  status       PluginWebDesignExerciseSubmissionStatus
-  weight       Int                               @default(1)
-  score        Float?
-  message      String?
-  durationMs   Int?
-  details      Json                              @default("{}")
-  createdAt    DateTime                          @default(now())
-  submission   PluginWebDesignExerciseSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  test         PluginWebDesignExerciseTest?      @relation(fields: [testId], references: [id], onDelete: SetNull)
-
-  @@index([submissionId])
-  @@index([testId])
-  @@index([status])
-}
-
-model PluginBankWebDesignExerciseReferenceBundle {
-  id                String       @id @default(cuid())
-  bankActivityId    String       @unique
-  files             Json         @default("[]")
-  validationSummary Json         @default("{}")
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  bankActivity      BankActivity @relation(fields: [bankActivityId], references: [id], onDelete: Cascade)
-}
-
-model PluginBankWebDesignExerciseTest {
-  id                String                          @id @default(cuid())
-  bankActivityId    String
-  name              String
-  kind              PluginWebDesignExerciseTestKind @default(hidden)
-  testCode          String
-  orderIndex        Int                             @default(0)
-  isEnabled         Boolean                         @default(true)
-  weight            Int                             @default(1)
-  metadata          Json                            @default("{}")
-  validationSummary Json                            @default("{}")
-  createdAt         DateTime                        @default(now())
-  updatedAt         DateTime                        @updatedAt
-  bankActivity      BankActivity                    @relation(fields: [bankActivityId], references: [id], onDelete: Cascade)
-
-  @@index([bankActivityId, kind, orderIndex])
-  @@index([bankActivityId, isEnabled])
 }

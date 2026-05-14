@@ -1,5 +1,0 @@
--- RenameIndex
-ALTER INDEX "PluginBankWebDesignExerciseReferenceBundle_bankActivity_key" RENAME TO "PluginBankWebDesignExerciseReferenceBundle_bankActivityId_key";
-
--- RenameIndex
-ALTER INDEX "PluginBankWebDesignExerciseTest_bankActivityId_kind_order_idx" RENAME TO "PluginBankWebDesignExerciseTest_bankActivityId_kind_orderIn_idx";

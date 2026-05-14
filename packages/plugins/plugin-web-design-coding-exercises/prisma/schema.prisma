@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PluginWebDesignExerciseTestKind {
+  sample
+  hidden
+}
+
+enum PluginWebDesignExerciseSubmissionKind {
+  run
+  submit
+}
+
+enum PluginWebDesignExerciseSubmissionStatus {
+  pending
+  completed
+  failed
+}
+
+model PluginWebDesignExerciseReferenceBundle {
+  id                String   @id @default(cuid())
+  activityId        String   @unique
+  files             Json     @default("[]")
+  validationSummary Json     @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model PluginWebDesignExerciseTest {
+  id                String                          @id @default(cuid())
+  activityId        String
+  name              String
+  kind              PluginWebDesignExerciseTestKind @default(hidden)
+  testCode          String
+  orderIndex        Int                             @default(0)
+  isEnabled         Boolean                         @default(true)
+  weight            Int                             @default(1)
+  metadata          Json                            @default("{}")
+  validationSummary Json                            @default("{}")
+  createdAt         DateTime                        @default(now())
+  updatedAt         DateTime                        @updatedAt
+  results           PluginWebDesignExerciseTestResult[]
+
+  @@index([activityId, kind, orderIndex])
+  @@index([activityId, isEnabled])
+}
+
+model PluginWebDesignExerciseSubmission {
+  id            String                                  @id @default(cuid())
+  activityId    String
+  userId        String
+  kind          PluginWebDesignExerciseSubmissionKind   @default(run)
+  status        PluginWebDesignExerciseSubmissionStatus @default(pending)
+  files         Json                                    @default("[]")
+  resultSummary Json                                    @default("{}")
+  score         Float?
+  maxScore      Float?
+  message       String?
+  createdAt     DateTime                                @default(now())
+  updatedAt     DateTime                                @updatedAt
+  testResults   PluginWebDesignExerciseTestResult[]
+
+  @@index([activityId, userId, createdAt])
+  @@index([userId, createdAt])
+  @@index([activityId, kind, createdAt])
+  @@index([activityId, status, createdAt])
+}
+
+model PluginWebDesignExerciseTestResult {
+  id           String                                  @id @default(cuid())
+  submissionId String
+  testId       String?
+  name         String
+  status       PluginWebDesignExerciseSubmissionStatus
+  weight       Int                                     @default(1)
+  score        Float?
+  message      String?
+  durationMs   Int?
+  details      Json                                    @default("{}")
+  createdAt    DateTime                                @default(now())
+  submission   PluginWebDesignExerciseSubmission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  test         PluginWebDesignExerciseTest?            @relation(fields: [testId], references: [id], onDelete: SetNull)
+
+  @@index([submissionId])
+  @@index([testId])
+  @@index([status])
+}
+
+model PluginBankWebDesignExerciseReferenceBundle {
+  id                String   @id @default(cuid())
+  bankActivityId    String   @unique
+  files             Json     @default("[]")
+  validationSummary Json     @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model PluginBankWebDesignExerciseTest {
+  id                String                          @id @default(cuid())
+  bankActivityId    String
+  name              String
+  kind              PluginWebDesignExerciseTestKind @default(hidden)
+  testCode          String
+  orderIndex        Int                             @default(0)
+  isEnabled         Boolean                         @default(true)
+  weight            Int                             @default(1)
+  metadata          Json                            @default("{}")
+  validationSummary Json                            @default("{}")
+  createdAt         DateTime                        @default(now())
+  updatedAt         DateTime                        @updatedAt
+
+  @@index([bankActivityId, kind, orderIndex])
+  @@index([bankActivityId, isEnabled])
+}

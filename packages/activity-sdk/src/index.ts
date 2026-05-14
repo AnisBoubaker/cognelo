@@ -33,6 +33,10 @@ export type ActivityDefinition = {
 export type PluginDatabaseModule = {
   namespace: string;
   tables: readonly string[];
+  migrations?: readonly {
+    id: string;
+    statements: readonly string[];
+  }[];
   notes?: readonly string[];
 };
 

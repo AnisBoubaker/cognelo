@@ -212,17 +212,18 @@ If your renderer is not added there, the activity may exist in the database but 
 
 ## Prisma And The Shared Database
 
-Shared Prisma schema lives in:
+Shared platform Prisma schema lives in:
 
 - [packages/db/prisma/schema.prisma](../../packages/db/prisma/schema.prisma)
 
-Plugins can extend this shared schema with plugin-owned tables.
+Do not add plugin-owned activity data models there. A plugin that needs persistence owns its own Prisma schema, migrations, generated client, and database manifest inside the plugin package.
 
 That means:
 
-- there is one database
+- there is one physical database
 - plugin tables live alongside core tables
-- the ownership boundary is logical, not “separate database per plugin”
+- plugin code talks to plugin tables through a plugin-local Prisma client
+- the core Prisma client only models platform-owned data
 
 For beginners, this is easier than managing multiple services.
 

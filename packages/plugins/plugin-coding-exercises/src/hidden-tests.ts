@@ -1,7 +1,7 @@
 import type { CurrentUser } from "@cognelo/contracts";
-import { Prisma, prisma } from "@cognelo/db";
 import { assertCanManageActivityBank, assertCanManageCourse, AppError } from "@cognelo/core";
 import { codingExerciseHiddenTestsInputSchema, codingExerciseTemplateRequiresTestCodeMarker, parseCodingExercisePrivateConfig } from "./coding-exercises";
+import { Prisma, prisma } from "./db-client";
 import { getCodingExerciseReferenceSolution, validateReferenceSolutionAgainstHiddenTests } from "./executions";
 
 const codingExerciseHiddenTestsClient = prisma as typeof prisma & {

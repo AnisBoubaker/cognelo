@@ -1,8 +1,20 @@
 import bcrypt from "bcryptjs";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { listActivityDefinitions, listActivityPlugins } from "@cognelo/activity-sdk";
+import { prisma as codingExercisesPrisma } from "../../plugins/plugin-coding-exercises/src/db-client";
+import { prisma as webDesignCodingExercisesPrisma } from "../../plugins/plugin-web-design-coding-exercises/src/db-client";
 
 const prisma = new PrismaClient();
+
+async function ensurePluginLocalTables() {
+  for (const plugin of listActivityPlugins()) {
+    for (const migration of plugin.db.migrations ?? []) {
+      for (const statement of migration.statements) {
+        await prisma.$executeRawUnsafe(statement);
+      }
+    }
+  }
+}
 
 async function upsertRole(key: string, name: string, description: string) {
   return prisma.role.upsert({
@@ -109,6 +121,8 @@ async function upsertBankActivityWithVersion(params: {
 }
 
 async function main() {
+  await ensurePluginLocalTables();
+
   await upsertRole("admin", "Admin", "Full platform administration access.");
   await upsertRole("course_manager", "Course manager", "Can create subjects and courses.");
   await upsertRole("teacher", "Teacher", "Can create and manage courses and activities.");
@@ -132,7 +146,8 @@ async function main() {
           databaseNamespace: plugin.db.namespace,
           databaseTables: plugin.db.tables,
           databaseNotes: plugin.db.notes ?? []
-        }
+        },
+        isActivated: true
       },
       create: {
         key: plugin.key,
@@ -145,6 +160,7 @@ async function main() {
           databaseTables: plugin.db.tables,
           databaseNotes: plugin.db.notes ?? []
         },
+        isActivated: true,
         isEnabled: true
       }
     });
@@ -592,7 +608,7 @@ async function main() {
     }
   });
 
-  await prisma.pluginCodingExerciseReferenceSolution.upsert({
+  await codingExercisesPrisma.pluginCodingExerciseReferenceSolution.upsert({
     where: { activityId: "seed-activity-coding-template" },
     update: {
       sourceCode: ['  print_boxed("Ready");', '  print_boxed("Go!");'].join("\n"),
@@ -661,7 +677,7 @@ async function main() {
       orderIndex: 1
     }
   ]) {
-    await prisma.pluginCodingExerciseHiddenTest.upsert({
+    await codingExercisesPrisma.pluginCodingExerciseHiddenTest.upsert({
       where: { id: hiddenTest.id },
       update: {
         activityId: hiddenTest.activityId,
@@ -687,7 +703,7 @@ async function main() {
     });
   }
 
-  await prisma.pluginWebDesignExerciseReferenceBundle.upsert({
+  await webDesignCodingExercisesPrisma.pluginWebDesignExerciseReferenceBundle.upsert({
     where: { activityId: "seed-activity-web-design-profile-card" },
     update: {
       files: webDesignFiles,
@@ -700,7 +716,7 @@ async function main() {
     }
   });
 
-  await prisma.pluginBankWebDesignExerciseReferenceBundle.upsert({
+  await webDesignCodingExercisesPrisma.pluginBankWebDesignExerciseReferenceBundle.upsert({
     where: { bankActivityId: webDesignSeed.bankActivity.id },
     update: {
       files: webDesignFiles,
@@ -737,7 +753,7 @@ async function main() {
       orderIndex: 1
     }
   ]) {
-    await prisma.pluginWebDesignExerciseTest.upsert({
+    await webDesignCodingExercisesPrisma.pluginWebDesignExerciseTest.upsert({
       where: { id: test.id },
       update: {
         activityId: test.activityId,
@@ -764,7 +780,7 @@ async function main() {
       }
     });
 
-    await prisma.pluginBankWebDesignExerciseTest.upsert({
+    await webDesignCodingExercisesPrisma.pluginBankWebDesignExerciseTest.upsert({
       where: { id: `bank-${test.id}` },
       update: {
         bankActivityId: test.bankActivityId,
@@ -920,9 +936,13 @@ async function main() {
 main()
   .finally(async () => {
     await prisma.$disconnect();
+    await codingExercisesPrisma.$disconnect();
+    await webDesignCodingExercisesPrisma.$disconnect();
   })
   .catch(async (error) => {
     console.error(error);
     await prisma.$disconnect();
+    await codingExercisesPrisma.$disconnect();
+    await webDesignCodingExercisesPrisma.$disconnect();
     process.exit(1);
   });

@@ -56,6 +56,8 @@ Plugin-owned persistence:
 - `PluginBankWebDesignExerciseReferenceBundle`: bank-owned private reference bundle for reusable authoring
 - `PluginBankWebDesignExerciseTest`: bank-owned sample and hidden Playwright tests
 
+These tables are modeled in this plugin's local Prisma schema under `prisma/schema.prisma`; server-side persistence uses the plugin-local Prisma client from `src/db-client.ts`.
+
 When a web-design bank activity is copied into a course, the plugin's server hook copies the bank reference bundle and tests into the course-owned plugin tables. After that, course edits and bank edits are independent.
 
 ## Authoring UX

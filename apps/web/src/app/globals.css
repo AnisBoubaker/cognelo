@@ -711,7 +711,21 @@ a.card:hover,
 .plugin-settings-state {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
+  justify-content: flex-end;
+}
+
+.plugin-activation-actions {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.plugin-activation-actions .field {
+  min-width: 220px;
 }
 
 .switch-control {

@@ -1,5 +1,4 @@
 import type { CurrentUser } from "@cognelo/contracts";
-import { Prisma, prisma } from "@cognelo/db";
 import { assertCanManageActivityBank, assertCanManageCourse, AppError } from "@cognelo/core";
 import {
   normalizeWebDesignExerciseConfig,
@@ -10,6 +9,7 @@ import {
   type WebDesignExerciseFile,
   type WebDesignExerciseTestKind
 } from "./web-design-coding-exercises";
+import { Prisma, prisma } from "./db-client";
 import { captureWebDesignScreenshotInRunner, runWebDesignTestsInRunner, type WebDesignRunnerResult } from "./runner";
 
 type WebDesignExerciseTestRecord = {

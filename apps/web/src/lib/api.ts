@@ -60,9 +60,23 @@ export type ActivityPluginInstallation = {
     databaseNotes?: string[];
     [key: string]: unknown;
   };
+  isActivated: boolean;
   isEnabled: boolean;
+  activatedAt: string | null;
+  deactivatedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  tableBackups?: ActivityPluginTableBackup[];
+};
+
+export type ActivityPluginTableBackup = {
+  id: string;
+  pluginKey: string;
+  pluginVersion: string;
+  sourceTables: string[];
+  backupTables: Array<{ sourceTable: string; backupTable: string }>;
+  restoredAt: string | null;
+  createdAt: string;
 };
 
 export type McqGenerationInput = {

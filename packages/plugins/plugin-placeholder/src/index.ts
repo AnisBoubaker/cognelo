@@ -1,14 +1,11 @@
 import type { ActivityPlugin } from "@cognelo/activity-sdk";
+import { placeholderDatabaseModule } from "./db";
 
 export const placeholderPlugin: ActivityPlugin = {
   key: "placeholder",
   packageName: "@cognelo/plugin-placeholder",
   name: "Placeholder activity",
-  db: {
-    namespace: "plugin_placeholder",
-    tables: [],
-    notes: ["This plugin currently relies only on core activity records and does not need plugin-owned tables."]
-  },
+  db: placeholderDatabaseModule,
   activities: [
     {
       key: "placeholder",

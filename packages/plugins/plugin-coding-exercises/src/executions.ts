@@ -1,4 +1,3 @@
-import { Prisma, prisma } from "@cognelo/db";
 import { getServerEnv } from "@cognelo/config";
 import { AppError } from "@cognelo/core";
 import { z } from "zod";
@@ -9,6 +8,7 @@ import {
   type CodingExercisePrivateConfig,
   type CodingExerciseSampleTest
 } from "./coding-exercises";
+import { Prisma, prisma } from "./db-client";
 import { resolveJudge0Language, runJudge0Submission } from "./judge0";
 
 type CodingExerciseExecutionRow = {

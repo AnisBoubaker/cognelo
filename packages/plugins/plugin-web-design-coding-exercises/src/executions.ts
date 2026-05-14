@@ -1,4 +1,4 @@
-import { Prisma, prisma } from "@cognelo/db";
+import { Prisma, prisma } from "./db-client";
 import { AppError } from "@cognelo/core";
 import { z } from "zod";
 import { runWebDesignTestsInRunner } from "./runner";

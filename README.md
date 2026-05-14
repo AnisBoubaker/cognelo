@@ -56,10 +56,10 @@ Each activity plugin lives in its own package under `packages/plugins/plugin-*`.
 The intended boundary is:
 
 - **Core tables stay generic**: `Subject`, `ActivityBank`, `BankActivity`, `ActivityVersion`, `Activity`, `ActivityType`, `Course`, and related auth/course tables remain shared.
-- **Plugin tables belong to the plugin**: plugin-specific persistence is declared in the plugin package's database module rather than by modifying core tables for plugin-specific concerns.
+- **Plugin tables belong to the plugin**: plugin-specific persistence lives in plugin-local Prisma schemas, migrations, clients, and database modules rather than in the core Prisma schema.
 - **Plugin HTTP handlers belong to the plugin**: the API app provides a generic dispatcher route, while plugin-specific subroutes are declared in plugin packages.
 - **Bank-to-course copies are explicit**: author in an activity bank, create a new bank version when saving there, and copy the selected version into a course when assigning it to that course. Course edits mutate only the course copy.
-- **Plugin enablement is platform-managed**: installed activity plugins have `ActivityPluginInstallation` records. Admins can enable or disable installed plugins in Settings; disabled plugins are omitted from new activity creation and blocked by generic plugin route dispatch.
+- **Plugin activation and enablement are platform-managed**: installed activity plugins have `ActivityPluginInstallation` records. Newly discovered plugins start inactive and disabled; admins activate them first, then enable them when they should be available. Deactivation disables the plugin and renames plugin-owned tables into versioned backup tables that can be restored during reactivation. Plugin-local migrations provide the activation SQL for creating fresh empty plugin-owned tables when reactivated without restoring a backup.
 - **Shared services stay shared**: reusable pieces such as the syntax-colored code editor, code renderer, Markdown renderer, and shared notification system live in `@cognelo/activity-ui`.
 - **Remote execution stays outside the API app**: activities that run learner code should call an external sandbox service such as Judge0 from server-side plugin routes.
 
@@ -69,6 +69,7 @@ Plugin packages can export:
 - default picker metadata such as category membership and generic icon name
 - localized metadata and UI strings
 - database manifests
+- plugin-local Prisma schemas, migrations, and generated clients
 - persistence/services
 - server route definitions
 - web components
@@ -169,6 +170,7 @@ Core Prisma entities include:
 - `CourseMaterial`
 - `ActivityType`
 - `ActivityPluginInstallation`
+- `ActivityPluginTableBackup`
 - `Activity`
 
 Enums cover course status, course membership role, course section participant role, material kind, and activity lifecycle.
@@ -243,25 +245,19 @@ npm run dev:runner
 npm install
 ```
 
-4. Generate Prisma Client:
+4. Run core and plugin migrations, then generate Prisma clients:
 
 ```bash
-npm run db:generate
+npm run db:migrate:all
 ```
 
-5. Run migrations:
-
-```bash
-npm run db:migrate
-```
-
-6. Seed sample data:
+5. Seed sample data:
 
 ```bash
 npm run db:seed
 ```
 
-7. Start both apps:
+6. Start both apps:
 
 ```bash
 npm run dev

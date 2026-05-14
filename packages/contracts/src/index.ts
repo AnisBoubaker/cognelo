@@ -89,9 +89,11 @@ export const AiAgentPreferencesInputSchema = z.object({
 });
 export type AiAgentPreferencesInput = z.infer<typeof AiAgentPreferencesInputSchema>;
 
-export const ActivityPluginInstallationUpdateSchema = z.object({
-  isEnabled: z.boolean()
-});
+export const ActivityPluginInstallationUpdateSchema = z.union([
+  z.object({ action: z.literal("activate"), restoreBackupId: z.string().cuid().optional().nullable() }),
+  z.object({ action: z.literal("deactivate") }),
+  z.object({ isEnabled: z.boolean() })
+]);
 export type ActivityPluginInstallationUpdate = z.infer<typeof ActivityPluginInstallationUpdateSchema>;
 
 export const CourseInputSchema = z.object({
