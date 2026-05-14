@@ -117,7 +117,20 @@ export async function runCourseActivityCreatedFromBankVersionHooks(input: {
   bankActivityId: string;
   activityVersionId: string;
 }) {
-  for (const plugin of serverPlugins) {
+  await runCourseActivityCreatedFromBankVersionHooksForPlugins(serverPlugins, input);
+}
+
+export async function runCourseActivityCreatedFromBankVersionHooksForPlugins(
+  plugins: readonly ServerActivityPlugin[],
+  input: {
+    user: CurrentUser;
+    courseId: string;
+    activity: ServerActivityRecord;
+    bankActivityId: string;
+    activityVersionId: string;
+  }
+) {
+  for (const plugin of plugins) {
     await plugin.hooks?.onCourseActivityCreatedFromBankVersion?.(input);
   }
 }
@@ -128,7 +141,19 @@ export async function runBankActivityDeletedHooks(input: {
   bankActivityId: string;
   activityTypeKey: string;
 }) {
-  for (const plugin of serverPlugins) {
+  await runBankActivityDeletedHooksForPlugins(serverPlugins, input);
+}
+
+export async function runBankActivityDeletedHooksForPlugins(
+  plugins: readonly ServerActivityPlugin[],
+  input: {
+    user: CurrentUser;
+    activityBankId: string;
+    bankActivityId: string;
+    activityTypeKey: string;
+  }
+) {
+  for (const plugin of plugins) {
     await plugin.hooks?.onBankActivityDeleted?.(input);
   }
 }

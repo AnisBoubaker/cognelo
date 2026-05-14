@@ -9,6 +9,7 @@ dist
 *.log
 *.tsbuildinfo
 coverage
+TEST_COVERAGE_GAPS.tmp.txt
 packages/db/generated
 packages/plugins/*/src/generated
 storage

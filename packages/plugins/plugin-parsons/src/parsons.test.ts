@@ -51,6 +51,25 @@ describe("Parsons problem helpers", () => {
     ]);
   });
 
+  it("rebases groups when solution lines are deleted before or inside them", () => {
+    const groups = normalizeParsonsGroups([{ id: "group-1", label: "Body", startLine: 1, endLine: 2 }], 4);
+
+    expect(rebaseParsonsGroupsOnSolutionChange("a\nb\nc\nd", "b\nc\nd", groups)).toEqual([
+      { id: "group-1", label: "Body", startLine: 0, endLine: 1, orderSensitive: true }
+    ]);
+    expect(rebaseParsonsGroupsOnSolutionChange("a\nb\nc\nd", "a\nc\nd", groups)).toEqual([
+      { id: "group-1", label: "Body", startLine: 1, endLine: 1, orderSensitive: true }
+    ]);
+  });
+
+  it("keeps group spans stable when solution lines are reordered without net length changes", () => {
+    const groups = normalizeParsonsGroups([{ id: "group-1", label: "Body", startLine: 1, endLine: 2 }], 3);
+
+    expect(rebaseParsonsGroupsOnSolutionChange("a\nb\nc", "a\nc\nb", groups)).toEqual([
+      { id: "group-1", label: "Body", startLine: 1, endLine: 2, orderSensitive: true }
+    ]);
+  });
+
   it("handles precedence rules and dependency removal", () => {
     const groups = normalizeParsonsGroups(
       [

@@ -1,5 +1,36 @@
 import { describe, expect, it, vi } from "vitest";
-import { listPluginRoutes, resolvePluginRoute, runBankActivityDeletedHooks } from "./server";
+import {
+  listPluginRoutes,
+  resolvePluginRoute,
+  runBankActivityDeletedHooks,
+  runBankActivityDeletedHooksForPlugins,
+  runCourseActivityCreatedFromBankVersionHooksForPlugins,
+  type ServerActivityRecord,
+  type ServerActivityPlugin
+} from "./server";
+
+const user = {
+  id: "user-1",
+  email: "teacher@example.test",
+  name: null,
+  firstName: null,
+  lastName: null,
+  roles: ["teacher" as const]
+};
+
+const activity: ServerActivityRecord = {
+  id: "activity-1",
+  bankActivityId: "bank-activity-1",
+  activityVersionId: "version-1",
+  title: "Activity",
+  description: "",
+  lifecycle: "published",
+  activityType: {
+    key: "placeholder",
+    name: "Placeholder",
+    description: ""
+  }
+};
 
 describe("server activity SDK", () => {
   it("resolves plugin routes by normalized path and activity type", () => {
@@ -22,14 +53,7 @@ describe("server activity SDK", () => {
   it("runs bank deletion hooks without requiring every plugin to implement one", async () => {
     await expect(
       runBankActivityDeletedHooks({
-        user: {
-          id: "user-1",
-          email: "teacher@example.test",
-          name: null,
-          firstName: null,
-          lastName: null,
-          roles: ["teacher"]
-        },
+        user,
         activityBankId: "bank-1",
         bankActivityId: "bank-activity-1",
         activityTypeKey: "placeholder"
@@ -37,4 +61,69 @@ describe("server activity SDK", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("runs course copy hooks in plugin order with injectable plugin lists", async () => {
+    const calls: string[] = [];
+    const plugins: ServerActivityPlugin[] = [
+      {
+        key: "first",
+        hooks: {
+          onCourseActivityCreatedFromBankVersion: vi.fn(async () => {
+            calls.push("first");
+          })
+        }
+      },
+      { key: "no-hooks" },
+      {
+        key: "second",
+        hooks: {
+          onCourseActivityCreatedFromBankVersion: vi.fn(async () => {
+            calls.push("second");
+          })
+        }
+      }
+    ];
+
+    await runCourseActivityCreatedFromBankVersionHooksForPlugins(plugins, {
+      user,
+      courseId: "course-1",
+      activity,
+      bankActivityId: "bank-activity-1",
+      activityVersionId: "version-1"
+    });
+
+    expect(calls).toEqual(["first", "second"]);
+    expect(plugins[0].hooks?.onCourseActivityCreatedFromBankVersion).toHaveBeenCalledWith(
+      expect.objectContaining({ courseId: "course-1", activity })
+    );
+  });
+
+  it("stops hook execution and propagates failures", async () => {
+    const afterFailure = vi.fn();
+    const plugins: ServerActivityPlugin[] = [
+      {
+        key: "first",
+        hooks: {
+          onBankActivityDeleted: vi.fn(async () => {
+            throw new Error("copy cleanup failed");
+          })
+        }
+      },
+      {
+        key: "second",
+        hooks: {
+          onBankActivityDeleted: afterFailure
+        }
+      }
+    ];
+
+    await expect(
+      runBankActivityDeletedHooksForPlugins(plugins, {
+        user,
+        activityBankId: "bank-1",
+        bankActivityId: "bank-activity-1",
+        activityTypeKey: "placeholder"
+      })
+    ).rejects.toThrow("copy cleanup failed");
+    expect(afterFailure).not.toHaveBeenCalled();
+  });
 });
