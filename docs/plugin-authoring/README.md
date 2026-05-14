@@ -76,7 +76,7 @@ If you just want the shortest possible summary:
 6. If it needs persistence, add a plugin-local Prisma schema, migrations, client wrapper, and database manifest
 7. Seed or sync its `ActivityPluginInstallation` manifest so admins can activate it and then enable or disable it from Settings
 8. If it exposes any authoring or settings form, register that form with `useUnsavedChangesGuard` from `@cognelo/activity-ui`
-9. If it has private bank-owned data, add a server hook to copy it into course-owned plugin tables when assigned
+9. If it has private bank-owned data, add a server hook to copy it into course-owned plugin tables when assigned. This is required for correct copy semantics.
 
 The rest of this handbook explains each step carefully.
 

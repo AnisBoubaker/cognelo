@@ -57,7 +57,9 @@ This is a big convenience. It means your plugin does not need its own separate â
 
 When an activity is created from an activity bank, the core service copies the selected/latest `ActivityVersion` into a course-local `Activity`. The course activity keeps provenance fields (`bankActivityId`, `activityVersionId`) but is not live-linked to future bank edits.
 
-Plugins that store private bank-owned data can use `ServerActivityPlugin.hooks.onCourseActivityCreatedFromBankVersion` to copy that data into course-owned plugin tables.
+Plugins that store private bank-owned data must use `ServerActivityPlugin.hooks.onCourseActivityCreatedFromBankVersion` to copy that data into course-owned plugin tables.
+
+Core only creates the generic course-local `Activity` row and copies selected `ActivityVersion` fields. It does not know the schema or semantics of plugin-owned tables. If your plugin has bank-owned private rows, the hook is required. The hook should create independent course-owned rows keyed by the new `activity.id`, so future bank edits do not alter existing course activities.
 
 ## Plugin Route Dispatch
 

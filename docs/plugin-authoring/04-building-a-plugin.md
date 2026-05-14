@@ -205,6 +205,8 @@ Good reasons to add persistence:
 
 The platform copies generic bank activity config/title/metadata into a course activity when the teacher adds a bank activity to a course. If your plugin has private bank-owned data, such as tests or reference files, the plugin must copy that data through a server hook.
 
+Treat this as required whenever the plugin owns bank-specific tables. Without this hook, the teacher will see a course activity row, but plugin-specific private data such as hidden tests, reference solutions, rubrics, or reference files will be missing from the course copy.
+
 Example:
 
 ```ts
@@ -227,6 +229,8 @@ export const tracingQuizServerPlugin: ServerActivityPlugin = {
 ```
 
 This preserves the copy semantics: later bank edits do not affect existing course activity copies.
+
+When changing a plugin schema, ask this explicitly: "Does this new table contain bank-owned data that a course activity needs?" If yes, update the copy hook in the same change and verify bank assignment creates the expected course-owned rows.
 
 ## Recommended Development Order
 

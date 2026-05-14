@@ -60,6 +60,8 @@ Parsons already uses this model with plugin-specific attempt tables.
 
 Some plugins need both bank-owned and course-owned plugin tables. For example, a reusable bank activity may have private reference data, and assigning it to a course should copy that private data into course-owned plugin tables. Use server plugin hooks for that copy step so later bank edits do not mutate existing course activities.
 
+This copy step is mandatory for bank-owned private data. Core copies only generic activity/version data. Plugin-owned tables must be copied by the plugin into course-owned rows keyed by the new course `activity.id`. When adding or changing plugin tables, include a manual verification path: author in a bank, publish, add to a course, and confirm the course activity has its own plugin-owned rows.
+
 ## Why Research-Friendly Design Matters
 
 Cognelo already leans toward research-friendly activity architecture.

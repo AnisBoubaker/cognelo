@@ -135,7 +135,9 @@ After copying:
 - course edits affect only the course activity copy
 - bank edits create a new version for future assignments
 - existing course copies do not change
-- plugins can copy private bank-owned data into course-owned plugin tables with a server hook
+- plugins that own private bank-owned data must copy it into course-owned plugin tables with a server hook
+
+This last point is a plugin contract. The platform copies the generic activity/version fields, but it cannot infer plugin-specific tables. If your plugin stores bank-owned tests, reference solutions, rubrics, files, or other private authoring data, implement `onCourseActivityCreatedFromBankVersion` and copy independent course-owned rows for the new `activity.id`.
 
 ## Where Validation Happens
 

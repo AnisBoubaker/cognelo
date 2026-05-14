@@ -46,7 +46,7 @@ If a plugin adds AI-assisted generation that writes into authoring/configuration
 7. Register it in `apps/web/src/lib/activity-renderers.tsx`
 8. If needed, add plugin tables in `packages/db/prisma/schema.prisma`
 9. If the plugin exposes any authoring or settings form, register unsaved-change behavior with `useUnsavedChangesGuard`
-10. If the plugin stores private bank-owned data, add a server hook to copy it into course-owned plugin tables when a bank version is assigned to a course
+10. If the plugin stores private bank-owned data, add a server hook to copy it into course-owned plugin tables when a bank version is assigned to a course. This is mandatory; core does not know how to copy plugin-owned rows.
 11. If needed, add browser API helpers in `apps/web/src/lib/api.ts`
 
 ## Required Registration Points
@@ -298,6 +298,14 @@ Use plugin-owned tables for:
 - event streams
 - grade summaries
 - detailed telemetry
+
+Copy rule for plugin-owned data:
+
+- Core creates the course-local `Activity` copy and preserves `bankActivityId` / `activityVersionId`.
+- Core does not copy plugin-owned tables.
+- If a plugin stores private bank-owned rows, the plugin must implement `onCourseActivityCreatedFromBankVersion` in its server plugin and copy those rows into course-owned plugin tables keyed by the new `activity.id`.
+- The copied course rows must be independent snapshots. Later bank edits must not mutate existing course activity copies.
+- Any new plugin-owned bank table should be reviewed together with the hook and a manual test that assigns a bank activity to a course.
 
 ## Current Grading State
 
