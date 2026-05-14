@@ -153,6 +153,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Use `npm run typecheck --workspace @cognelo/web` for frontend-only changes.
 - Use `npm run build --workspace @cognelo/web` to confirm the Next.js web app still produces a valid production build.
 - Use `npm run db:migrate:all` after core or plugin Prisma schema changes so core migrations, plugin migration manifests, and generated clients stay aligned.
+- Use root `npm test` for the Vitest suite covering contracts, core lifecycle services, API route orchestration, and plugin copy/delete lifecycle contracts.
 - Use root `npm run typecheck` and `npm run build` when shared packages or both apps are touched.
 
 ## Seed Users

@@ -101,6 +101,7 @@ PATCH  /api/activity-banks/:activityBankId
 GET    /api/activity-banks/:activityBankId/activities
 POST   /api/activity-banks/:activityBankId/activities
 PATCH  /api/activity-banks/:activityBankId/activities/:bankActivityId
+DELETE /api/activity-banks/:activityBankId/activities/:bankActivityId
 GET    /api/courses
 POST   /api/courses
 GET    /api/courses/:courseId
@@ -257,7 +258,16 @@ npm run db:migrate:all
 npm run db:seed
 ```
 
-6. Start both apps:
+6. Run automated checks:
+
+```bash
+npm run typecheck
+npm test
+```
+
+The test suite uses Vitest for contracts, core service behavior, API route orchestration, and plugin lifecycle contracts. It intentionally does not include browser E2E tests yet.
+
+7. Start both apps:
 
 ```bash
 npm run dev

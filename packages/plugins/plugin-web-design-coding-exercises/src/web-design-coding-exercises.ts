@@ -134,8 +134,8 @@ export function normalizeWebDesignExerciseConfig(config: WebDesignExerciseConfig
 export function normalizeWebDesignFilePath(path: string) {
   return path
     .trim()
-    .replace(/^\/+/, "")
     .replace(/\\/g, "/")
+    .replace(/^\/+/, "")
     .replace(/\/+/g, "/");
 }
 

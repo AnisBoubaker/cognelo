@@ -198,6 +198,9 @@ async function deactivateActivityPlugin(plugin: ActivityPluginManifest) {
     if (!installation?.isActivated) {
       throw new AppError(400, "PLUGIN_NOT_ACTIVATED", "This plugin is not activated.");
     }
+    if (installation.isEnabled) {
+      throw new AppError(400, "PLUGIN_ENABLED", "Disable this plugin before deactivating it.");
+    }
 
     const existingTables = [];
     for (const tableName of plugin.db.tables) {
