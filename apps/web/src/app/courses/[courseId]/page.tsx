@@ -10,6 +10,14 @@ import { WorkspaceTabs } from "@/components/workspace-tabs";
 import { api, ActivityBank, ActivityDefinition, ActivityType, AiAgentConnection, Course, CourseMaterial } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
+type ActivityCategoryId = "programming" | "miscellaneous";
+type ActivityPickerTabId = "activity-banks" | ActivityCategoryId;
+
+const activityCategories: Array<{ id: ActivityCategoryId; labelKey: string }> = [
+  { id: "programming", labelKey: "activityBankDetail.categoryProgramming" },
+  { id: "miscellaneous", labelKey: "activityBankDetail.categoryMiscellaneous" }
+];
+
 export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();
   const courseId = params.courseId;
@@ -23,9 +31,9 @@ export default function CourseDetailPage() {
   const [aiAgentConnections, setAiAgentConnections] = useState<AiAgentConnection[]>([]);
   const [studentSupportAgentId, setStudentSupportAgentId] = useState("");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
-  const [activityTitle, setActivityTitle] = useState("");
-  const [activityTypeKey, setActivityTypeKey] = useState("placeholder");
-  const [bankActivityId, setBankActivityId] = useState("");
+  const [showActivityPicker, setShowActivityPicker] = useState(false);
+  const [selectedActivityPickerTab, setSelectedActivityPickerTab] = useState<ActivityPickerTabId>("activity-banks");
+  const [selectedActivityBankId, setSelectedActivityBankId] = useState("");
   const [isAddingActivity, setIsAddingActivity] = useState(false);
   const [groupTitle, setGroupTitle] = useState("");
   const [isAddingGroup, setIsAddingGroup] = useState(false);
@@ -60,8 +68,6 @@ export default function CourseDetailPage() {
     if (courseResult.course.subjectId) {
       const banksResult = await api.activityBanks(courseResult.course.subjectId);
       setActivityBanks(banksResult.activityBanks);
-      const firstBankActivity = banksResult.activityBanks.flatMap((bank) => bank.activities ?? [])[0];
-      setBankActivityId((current) => current || firstBankActivity?.id || "");
     }
   }
 
@@ -78,29 +84,83 @@ export default function CourseDetailPage() {
     }
   }, [canManage, course, courseId, router]);
 
-  async function createActivity(event: FormEvent) {
-    event.preventDefault();
+  useEffect(() => {
+    if (!showActivityPicker) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowActivityPicker(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showActivityPicker]);
+
+  useEffect(() => {
+    if (!activityBanks.length) {
+      setSelectedActivityBankId("");
+      return;
+    }
+
+    setSelectedActivityBankId((current) => (activityBanks.some((bank) => bank.id === current) ? current : activityBanks[0].id));
+  }, [activityBanks]);
+
+  async function createLocalActivity(selectedActivityTypeKey: string) {
     setError("");
+    setIsAddingActivity(true);
     try {
-      const selectedBankActivity = activityBanks.flatMap((bank) => bank.activities ?? []).find((activity) => activity.id === bankActivityId);
-      const selectedActivityCopy = activityCopy(selectedBankActivity?.activityType.key ?? activityTypeKey);
-      await api.createActivity(courseId, {
-        title: activityTitle || selectedBankActivity?.title || selectedActivityCopy.defaultTitle || t("courseDetail.defaultActivityTitle"),
-        activityTypeKey: selectedBankActivity?.activityType.key ?? activityTypeKey,
-        bankActivityId: selectedBankActivity?.id,
-        activityVersionId: selectedBankActivity?.currentVersionId ?? undefined,
+      const selectedActivityCopy = activityCopy(selectedActivityTypeKey);
+      const definition = activityDefinitions.find((candidate) => candidate.key === selectedActivityTypeKey);
+      const result = await api.createActivity(courseId, {
+        title: selectedActivityCopy.defaultTitle || t("courseDetail.defaultActivityTitle"),
+        activityTypeKey: selectedActivityTypeKey,
         lifecycle: "draft",
-        description: selectedBankActivity?.description ?? "",
+        description: selectedActivityCopy.description,
+        config: definition?.defaultConfig ?? {},
+        metadata: { researchTags: [] },
+        position: course?.activities?.length ?? 0
+      });
+      setShowActivityPicker(false);
+      await refresh();
+      router.push(`/courses/${courseId}/activities/${result.activity.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.createActivityError"));
+    } finally {
+      setIsAddingActivity(false);
+    }
+  }
+
+  async function attachBankActivity(bankActivity: NonNullable<ActivityBank["activities"]>[number]) {
+    setError("");
+    setIsAddingActivity(true);
+    try {
+      const result = await api.createActivity(courseId, {
+        title: bankActivity.title,
+        activityTypeKey: bankActivity.activityType.key,
+        bankActivityId: bankActivity.id,
+        activityVersionId: bankActivity.currentVersionId ?? undefined,
+        lifecycle: "draft",
+        description: bankActivity.description,
         config: {},
         metadata: { researchTags: [] },
         position: course?.activities?.length ?? 0
       });
+      setShowActivityPicker(false);
       await refresh();
-      setActivityTitle("");
-      setBankActivityId("");
-      setIsAddingActivity(false);
+      router.push(`/courses/${courseId}/activities/${result.activity.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("courseDetail.createActivityError"));
+    } finally {
+      setIsAddingActivity(false);
     }
   }
 
@@ -240,6 +300,21 @@ export default function CourseDetailPage() {
         "",
       defaultTitle: localized?.defaultTitle ?? definition?.name ?? activityTypeKey
     };
+  }
+
+  function activityTypeBelongsToCategory(activityTypeKey: string, categoryId: ActivityCategoryId) {
+    const defaultCategoryIds = activityDefinitions.find((candidate) => candidate.key === activityTypeKey)?.defaultCategoryIds;
+    if (defaultCategoryIds === "all") {
+      return true;
+    }
+    if (!defaultCategoryIds?.length) {
+      return categoryId === "miscellaneous";
+    }
+    return defaultCategoryIds.includes(categoryId);
+  }
+
+  function activityTypeIconName(activityTypeKey: string): NonNullable<ActivityDefinition["icon"]> {
+    return activityDefinitions.find((candidate) => candidate.key === activityTypeKey)?.icon ?? "placeholder";
   }
 
   if (course && !canManage) {
@@ -420,6 +495,23 @@ export default function CourseDetailPage() {
   const materials = course?.materials ?? [];
   const folders = materials.filter((material) => material.kind === "folder").sort(compareMaterials);
   const visibleMaterials = flattenMaterials(materials, collapsedFolderIds);
+  const attachedBankActivityIds = new Set(
+    (course?.activities ?? [])
+      .map((activity) => activity.bankActivityId)
+      .filter((bankActivityId): bankActivityId is string => Boolean(bankActivityId))
+  );
+  const selectedActivityBank = activityBanks.find((bank) => bank.id === selectedActivityBankId) ?? activityBanks[0];
+  const availableBankActivities = (selectedActivityBank?.activities ?? []).filter(
+    (activity) =>
+      activity.lifecycle === "published" &&
+      activity.currentVersionId &&
+      activity.currentVersion?.lifecycle === "published" &&
+      !attachedBankActivityIds.has(activity.id)
+  );
+  const visibleActivityTypes =
+    selectedActivityPickerTab === "activity-banks"
+      ? []
+      : activityTypes.filter((type) => activityTypeBelongsToCategory(type.key, selectedActivityPickerTab));
 
   function toggleFolder(folderId: string) {
     setCollapsedFolderIds((current) => {
@@ -699,77 +791,21 @@ export default function CourseDetailPage() {
                           <p className="eyebrow">{t("courseDetail.activitiesEyebrow")}</p>
                           <h2>{t("courseDetail.activitiesTitle")}</h2>
                         </div>
-                        <button className="secondary" type="button" onClick={() => setIsAddingActivity((current) => !current)}>
-                          {isAddingActivity ? t("common.cancel") : t("courseDetail.activityShellTitle")}
+                        <button className="secondary" type="button" onClick={() => setShowActivityPicker(true)}>
+                          {t("courseDetail.activityShellTitle")}
                         </button>
                       </div>
 
-                      {isAddingActivity ? (
-                        <form className="form inline-panel" onSubmit={createActivity}>
-                          <div>
-                            <p className="eyebrow">{t("courseDetail.activityShellEyebrow")}</p>
-                            <h2>{t("courseDetail.activityShellTitle")}</h2>
-                          </div>
-                          <div className="grid compact-form-grid">
-                            <div className="field">
-                              <label htmlFor="activityTitle">{t("courseDetail.activityTitle")}</label>
-                              <input
-                                id="activityTitle"
-                                value={activityTitle}
-                                onChange={(event) => setActivityTitle(event.target.value)}
-                                placeholder={t("courseDetail.defaultActivityTitle")}
-                                required
-                                minLength={2}
-                              />
-                            </div>
-                            <div className="field">
-                              <label htmlFor="bankActivity">Activity bank item</label>
-                              <select id="bankActivity" value={bankActivityId} onChange={(event) => setBankActivityId(event.target.value)}>
-                                <option value="">Create local course activity</option>
-                                {activityBanks.map((bank) =>
-                                  (bank.activities ?? []).map((activity) => (
-                                    <option key={activity.id} value={activity.id}>
-                                      {bank.title}: {activity.title} v{activity.currentVersion?.versionNumber ?? 1}
-                                    </option>
-                                  ))
-                                )}
-                              </select>
-                            </div>
-                            <div className="field">
-                              <label htmlFor="activityType">{t("courseDetail.activityType")}</label>
-                              <select
-                                id="activityType"
-                                value={activityTypeKey}
-                                onChange={(event) => setActivityTypeKey(event.target.value)}
-                                disabled={Boolean(bankActivityId)}
-                              >
-                                {activityTypes.map((type) => (
-                                  <option key={type.id} value={type.key}>
-                                    {activityCopy(type.key).name}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-                          <div className="row">
-                            <button type="submit">{t("courseDetail.attachActivity")}</button>
-                            <button className="secondary" type="button" onClick={() => setIsAddingActivity(false)}>
-                              {t("common.close")}
-                            </button>
-                          </div>
-                        </form>
-                      ) : null}
-
                       {course.activities?.length ? (
                         <div className="table-list">
-                          <div className="table-row table-row-groups table-head" aria-hidden="true">
+                          <div className="table-row table-row-activities table-head" aria-hidden="true">
                             <span>{t("courseDetail.titleHeader")}</span>
                             <span>{t("courseDetail.activityType")}</span>
                             <span>{t("courseDetail.statusHeader")}</span>
                             <span>{t("courseDetail.actionsHeader")}</span>
                           </div>
                           {course.activities.map((activity) => (
-                            <div className="table-row" key={activity.id}>
+                            <div className="table-row table-row-activities" key={activity.id}>
                               <div className="table-main table-main-stack">
                                 <strong>
                                   <Link href={`/courses/${course.id}/activities/${activity.id}`}>{activity.title}</Link>
@@ -935,6 +971,109 @@ export default function CourseDetailPage() {
                 {dragPreview.title}
               </div>
             ) : null}
+            {showActivityPicker ? (
+              <div className="dialog-backdrop" role="presentation">
+                <section
+                  aria-labelledby="course-activity-picker-title"
+                  aria-modal="true"
+                  className="dialog-panel activity-picker-dialog"
+                  role="dialog"
+                >
+                  <div className="section-heading">
+                    <div>
+                      <p className="eyebrow">{t("courseDetail.chooseActivityEyebrow")}</p>
+                      <h2 id="course-activity-picker-title">{t("courseDetail.chooseActivityTitle")}</h2>
+                    </div>
+                    <button className="secondary icon-button" onClick={() => setShowActivityPicker(false)} title={t("common.cancel")} type="button">
+                      <CloseIcon />
+                    </button>
+                  </div>
+                  <div className="activity-picker-layout">
+                    <div className="activity-category-tabs" role="tablist" aria-label={t("activityBankDetail.categoryTabsLabel")}>
+                      <button
+                        aria-selected={selectedActivityPickerTab === "activity-banks"}
+                        className={selectedActivityPickerTab === "activity-banks" ? "activity-category-tab is-active" : "activity-category-tab"}
+                        onClick={() => setSelectedActivityPickerTab("activity-banks")}
+                        role="tab"
+                        type="button"
+                      >
+                        {t("courseDetail.activityBanksPickerTab")}
+                      </button>
+                      {activityCategories.map((category) => (
+                        <button
+                          key={category.id}
+                          aria-selected={selectedActivityPickerTab === category.id}
+                          className={selectedActivityPickerTab === category.id ? "activity-category-tab is-active" : "activity-category-tab"}
+                          onClick={() => setSelectedActivityPickerTab(category.id)}
+                          role="tab"
+                          type="button"
+                        >
+                          {t(category.labelKey)}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="activity-type-options" role="tabpanel">
+                      {selectedActivityPickerTab === "activity-banks" ? (
+                        <div className="activity-bank-picker-panel">
+                          <div className="field">
+                            <label htmlFor="courseActivityBank">{t("courseDetail.activityBankPickerLabel")}</label>
+                            <select
+                              id="courseActivityBank"
+                              value={selectedActivityBank?.id ?? ""}
+                              onChange={(event) => setSelectedActivityBankId(event.target.value)}
+                              disabled={!activityBanks.length || isAddingActivity}
+                            >
+                              {activityBanks.map((bank) => (
+                                <option key={bank.id} value={bank.id}>
+                                  {bank.title}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {availableBankActivities.length ? (
+                            availableBankActivities.map((activity) => (
+                              <button
+                                key={activity.id}
+                                className="activity-type-option"
+                                disabled={isAddingActivity}
+                                onClick={() => attachBankActivity(activity)}
+                                type="button"
+                              >
+                                <ActivityTypeIcon iconName={activityTypeIconName(activity.activityType.key)} />
+                                <span>
+                                  <strong>{activity.title}</strong>
+                                  <small>
+                                    v{activity.currentVersion?.versionNumber ?? 1} · {activityCopy(activity.activityType.key).name}
+                                  </small>
+                                </span>
+                              </button>
+                            ))
+                          ) : (
+                            <p className="muted">{t("courseDetail.noAvailableBankActivities")}</p>
+                          )}
+                        </div>
+                      ) : (
+                        visibleActivityTypes.map((type) => (
+                          <button
+                            key={type.id}
+                            className="activity-type-option"
+                            disabled={isAddingActivity}
+                            onClick={() => createLocalActivity(type.key)}
+                            type="button"
+                          >
+                            <ActivityTypeIcon iconName={activityTypeIconName(type.key)} />
+                            <span>
+                              <strong>{activityCopy(type.key).name}</strong>
+                              <small>{activityCopy(type.key).description}</small>
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </section>
+              </div>
+            ) : null}
           </>
         ) : (
           <p>Loading course...</p>
@@ -1079,6 +1218,69 @@ function isMaterialDescendant(materials: CourseMaterial[], possibleChildId: stri
   }
 
   return false;
+}
+
+function CloseIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
+      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function ActivityTypeIcon({ iconName }: { iconName: NonNullable<ActivityDefinition["icon"]> }) {
+  if (iconName === "checklist") {
+    return (
+      <span className="activity-type-icon" aria-hidden="true">
+        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
+          <path d="M8 9h5M8 16h5M8 23h5M17 9h7M17 16h7M17 23h7" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+          <path d="M5 6h22v20H5z" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (iconName === "list-check") {
+    return (
+      <span className="activity-type-icon" aria-hidden="true">
+        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
+          <path d="M7 8h18M7 14h13M7 20h18M7 26h10" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+          <path d="M5 5h22v22H5z" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (iconName === "code") {
+    return (
+      <span className="activity-type-icon" aria-hidden="true">
+        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
+          <path d="m13 10-6 6 6 6M19 10l6 6-6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+          <path d="M5 5h22v22H5z" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (iconName === "document-check") {
+    return (
+      <span className="activity-type-icon" aria-hidden="true">
+        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
+          <path d="M10 17l4 4 8-10" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+          <path d="M7 5h18v22H7z" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <span className="activity-type-icon" aria-hidden="true">
+      <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
+        <path d="M8 8h16v16H8z" stroke="currentColor" strokeWidth="2" />
+        <path d="M12 16h8M16 12v8" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+      </svg>
+    </span>
+  );
 }
 
 function MaterialActionIcon({ name }: { name: "download" | "drag" | "edit" | "open" | "remove" }) {

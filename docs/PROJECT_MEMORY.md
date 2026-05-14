@@ -47,7 +47,8 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Course activity copies keep `bankActivityId` and `activityVersionId` for provenance, but they are not live references.
 - Editing a course activity changes only that course copy and what students in that course see.
 - Editing a bank activity creates a new version for future course assignments and does not affect existing course copies.
-- Plugins with private bank-owned data should copy that data into course-owned plugin tables through server plugin hooks when a course activity is created from a bank version.
+- Plugin copy contract: if a plugin owns private bank-owned data, it must copy that data into course-owned plugin tables through `onCourseActivityCreatedFromBankVersion` when a course activity is created from a bank version. Core only copies the generic `Activity` row and `ActivityVersion` data; plugin-owned tables are the plugin's responsibility.
+- New plugins or plugin schema changes that introduce bank-owned private data must include a bank-to-course copy hook and manual verification that the copied course activity has independent plugin-owned rows.
 - Activities remain plugin-style registry entries and are not hardcoded into course models.
 - Course managers can remove activities directly from the course detail page.
 
@@ -143,7 +144,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Plugin registration is explicit, not autodiscovered. Installed plugins do have admin-managed enablement records, but adding a new plugin still requires build-time registry wiring.
 - Judge0 dev infrastructure is local-Docker only; production still requires a separately managed Judge0 host with its own hardening, monitoring, and secrets management.
 - Some management-oriented course and section/group pages still exist for teachers/admins in the same route tree, so student simplicity relies on explicit student-first redirects and rendering branches rather than totally separate apps.
-- Plugin registration is explicit, not autodiscovered. This includes server plugin hooks such as copying plugin-owned bank data into course activity copies.
+- Plugin registration is explicit, not autodiscovered. This includes server plugin hooks such as copying plugin-owned bank data into course activity copies; missing hook registration means plugin-owned bank data will not be copied.
 
 ## Verification Habits
 

@@ -17,7 +17,7 @@ When creating a new plugin, a safe order is:
 7. add routes if needed
 8. add persistence if needed
 9. add unsaved-change protection with `useUnsavedChangesGuard` for every authoring or settings form
-10. add a bank-to-course copy hook if the plugin owns private bank data
+10. add a bank-to-course copy hook if the plugin owns private bank data. This is required, not optional.
 11. add docs
 
 ## Commands
@@ -57,13 +57,14 @@ Check that:
 - save-and-leave and discard-and-leave both behave correctly from the unsaved-changes dialog
 - AI generation confirms before replacing non-empty authoring/configuration fields
 - assigning from an activity bank creates an independent course copy
+- plugin-owned bank data is copied into independent course-owned plugin rows when a bank activity is assigned
 - the activity renders your component
 - saving config works
 - bank edits do not mutate existing course copies
 - invalid config is rejected
 - plugin routes respond correctly
 - unauthorized access is rejected
-- any plugin tables receive the expected records
+- any plugin tables receive the expected records, including both bank-owned and copied course-owned rows where applicable
 
 ## Best Reference Files
 
