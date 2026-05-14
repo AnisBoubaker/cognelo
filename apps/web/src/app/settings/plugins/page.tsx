@@ -14,6 +14,7 @@ export default function PluginSettingsPage() {
   const notifications = useNotifications();
   const [plugins, setPlugins] = useState<ActivityPluginInstallation[]>([]);
   const [savingKey, setSavingKey] = useState("");
+  const [selectedBackups, setSelectedBackups] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const isAdmin = user?.roles.includes("admin") ?? false;
@@ -47,6 +48,43 @@ export default function PluginSettingsPage() {
       notifications.success(t("settings.pluginUpdated"));
     } catch (err) {
       setPlugins(previousPlugins);
+      const message = err instanceof Error ? err.message : t("settings.pluginSaveError");
+      setError(message);
+      notifications.error(message);
+    } finally {
+      setSavingKey("");
+    }
+  }
+
+  async function activatePlugin(plugin: ActivityPluginInstallation) {
+    setSavingKey(plugin.key);
+    setError("");
+    try {
+      const result = await api.updateActivityPlugin(plugin.key, {
+        action: "activate",
+        restoreBackupId: selectedBackups[plugin.key] || null
+      });
+      setPlugins((current) => current.map((candidate) => (candidate.key === plugin.key ? result.plugin : candidate)));
+      notifications.success(t("settings.pluginActivated"));
+      await loadPlugins();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("settings.pluginSaveError");
+      setError(message);
+      notifications.error(message);
+    } finally {
+      setSavingKey("");
+    }
+  }
+
+  async function deactivatePlugin(plugin: ActivityPluginInstallation) {
+    setSavingKey(plugin.key);
+    setError("");
+    try {
+      const result = await api.updateActivityPlugin(plugin.key, { action: "deactivate" });
+      setPlugins((current) => current.map((candidate) => (candidate.key === plugin.key ? result.plugin : candidate)));
+      notifications.success(t("settings.pluginDeactivated"));
+      await loadPlugins();
+    } catch (err) {
       const message = err instanceof Error ? err.message : t("settings.pluginSaveError");
       setError(message);
       notifications.error(message);
@@ -99,18 +137,52 @@ export default function PluginSettingsPage() {
                     </div>
 
                     <div className="plugin-settings-state">
-                      <span className={`status-pill ${plugin.isEnabled ? "is-enabled" : "is-disabled"}`}>
-                        {plugin.isEnabled ? t("settings.pluginEnabled") : t("settings.pluginDisabled")}
+                      <span className={`status-pill ${plugin.isActivated ? "is-enabled" : "is-neutral"}`}>
+                        {plugin.isActivated ? t("settings.pluginActivatedBadge") : t("settings.pluginInactiveBadge")}
                       </span>
-                      <label className="switch-control">
-                        <input
-                          checked={plugin.isEnabled}
-                          disabled={savingKey === plugin.key}
-                          type="checkbox"
-                          onChange={(event) => void updatePlugin(plugin, event.target.checked)}
-                        />
-                        <span aria-hidden="true" />
-                      </label>
+                      {plugin.isActivated ? (
+                        <>
+                          <span className={`status-pill ${plugin.isEnabled ? "is-enabled" : "is-disabled"}`}>
+                            {plugin.isEnabled ? t("settings.pluginEnabled") : t("settings.pluginDisabled")}
+                          </span>
+                          <label className="switch-control">
+                            <input
+                              checked={plugin.isEnabled}
+                              disabled={savingKey === plugin.key}
+                              type="checkbox"
+                              onChange={(event) => void updatePlugin(plugin, event.target.checked)}
+                            />
+                            <span aria-hidden="true" />
+                          </label>
+                          {!plugin.isEnabled ? (
+                            <button className="secondary" disabled={savingKey === plugin.key} type="button" onClick={() => void deactivatePlugin(plugin)}>
+                              {t("settings.pluginDeactivate")}
+                            </button>
+                          ) : null}
+                        </>
+                      ) : (
+                        <div className="plugin-activation-actions">
+                          {plugin.tableBackups?.length ? (
+                            <label className="field">
+                              <span>{t("settings.pluginBackupLabel")}</span>
+                              <select
+                                value={selectedBackups[plugin.key] ?? ""}
+                                onChange={(event) => setSelectedBackups((current) => ({ ...current, [plugin.key]: event.target.value }))}
+                              >
+                                <option value="">{t("settings.pluginNoBackup")}</option>
+                                {plugin.tableBackups.map((backup) => (
+                                  <option key={backup.id} value={backup.id}>
+                                    {backup.pluginVersion} · {new Date(backup.createdAt).toLocaleString()}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          ) : null}
+                          <button disabled={savingKey === plugin.key} type="button" onClick={() => void activatePlugin(plugin)}>
+                            {t("settings.pluginActivate")}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </article>
                 ))}

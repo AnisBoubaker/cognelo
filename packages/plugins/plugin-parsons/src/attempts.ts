@@ -1,4 +1,4 @@
-import { Prisma, type PluginParsonsAttempt, type PluginParsonsAttemptEvent, prisma } from "@cognelo/db";
+import { Prisma, type PluginParsonsAttempt, type PluginParsonsAttemptEvent, prisma } from "./db-client";
 import {
   createInitialParsonsAttemptState,
   getParsonsConfigFingerprint,

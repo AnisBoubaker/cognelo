@@ -31,8 +31,7 @@ npm run typecheck
 If you changed Prisma schema:
 
 ```bash
-npm run db:generate
-npm run db:migrate
+npm run db:migrate:all
 ```
 
 If you changed seed behavior:

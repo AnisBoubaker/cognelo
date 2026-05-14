@@ -76,6 +76,8 @@ Current plugin-owned tables:
 - `PluginBankCodingExerciseHiddenTest`
 - `PluginBankCodingExerciseReferenceSolution`
 
+These tables are modeled in this plugin's local Prisma schema under `prisma/schema.prisma`; plugin server code uses the plugin-local Prisma client from `src/db-client.ts`, not the core Prisma client.
+
 Activity-bank authoring persists the same private reference solution, hidden template data, and tests in bank-owned plugin tables. When a bank activity is assigned to a course, the plugin hook copies that private data into course-owned plugin tables so future bank edits and course edits diverge safely.
 
 ## Authoring UX

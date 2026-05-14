@@ -536,8 +536,7 @@ npm run typecheck
 If you added Prisma models:
 
 ```bash
-npm run db:generate
-npm run db:migrate
+npm run db:migrate:all
 ```
 
 Then:

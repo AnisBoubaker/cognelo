@@ -322,8 +322,7 @@ npm run typecheck
 If Prisma changed:
 
 ```bash
-npm run db:generate
-npm run db:migrate
+npm run db:migrate:all
 ```
 
 If seed behavior changed:

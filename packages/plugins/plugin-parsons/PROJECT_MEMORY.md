@@ -47,4 +47,4 @@ The plugin is being built to support:
 
 - `npm run typecheck`
 - `npm run build`
-- `npm run db:generate` after schema changes touching Parsons persistence
+- `npm run db:migrate:all` after schema changes touching Parsons persistence

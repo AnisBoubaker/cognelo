@@ -46,7 +46,7 @@ Good rule:
 
 ## Plugin-Owned Tables
 
-When data gets larger, more detailed, or more activity-specific, create plugin-owned tables.
+When data gets larger, more detailed, or more activity-specific, create plugin-owned tables through a plugin-local Prisma schema and client.
 
 Examples:
 

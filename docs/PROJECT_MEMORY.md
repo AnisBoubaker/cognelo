@@ -91,7 +91,11 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Activity bank creation uses an activity-type picker dialog grouped by activity categories. Categories are currently hardcoded defaults with support for all-category activities, but the structure should move toward admin-managed activity classification in a later revision.
 - Plugin activity definitions declare default picker metadata such as default category membership and a generic icon name. Activity-bank pages must read that metadata from registered definitions instead of hardcoding plugin activity keys.
 - Bank activity authoring pages must resolve plugin-specific authoring UIs through the app activity renderer registry, not by importing plugin packages or branching on plugin activity keys in route components.
-- Installed activity plugins are represented by `ActivityPluginInstallation` records. Admins can enable or disable installed plugins from general settings; disabled plugins are removed from activity type listings, hidden from renderer selection for existing activities, and blocked at generic plugin route dispatch.
+- Installed activity plugins are represented by `ActivityPluginInstallation` records. Newly discovered plugins start inactive and disabled. Admins activate a plugin first, then explicitly enable it for activity creation/use.
+- Plugin-specific persistence is owned by plugin-local Prisma schemas, migrations, clients, and database modules. The core Prisma schema should not add plugin-owned activity data models.
+- Plugin activation syncs activity type records and validates that plugin-owned tables exist. Plugin-local migration statements can create fresh empty plugin-owned tables during activation when the admin does not restore a backup.
+- Plugin deactivation disables the plugin and renames its plugin-owned tables into backup tables recorded as `ActivityPluginTableBackup` rows. Reactivation can restore an unrestored backup for the same plugin version.
+- Disabled or inactive plugins are removed from activity type listings, hidden from renderer selection for existing activities, and blocked at generic plugin route dispatch.
 - The current plugin installation model is manifest-backed and explicitly registered at build time. It is not filesystem autodiscovery yet, but it gives the platform a durable admin-managed enablement layer for later drop-in plugin installation work.
 - The course materials area uses a compact table/list layout rather than large cards.
 - Course workspaces include a Settings tab for course-wide settings. Current settings let teachers choose the student-support AI agent from their personal or global enabled connections.
@@ -145,7 +149,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 
 - Use `npm run typecheck --workspace @cognelo/web` for frontend-only changes.
 - Use `npm run build --workspace @cognelo/web` to confirm the Next.js web app still produces a valid production build.
-- Use `npm run db:generate` after Prisma schema changes.
+- Use `npm run db:migrate:all` after core or plugin Prisma schema changes so core migrations, plugin migration manifests, and generated clients stay aligned.
 - Use root `npm run typecheck` and `npm run build` when shared packages or both apps are touched.
 
 ## Seed Users

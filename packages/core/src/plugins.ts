@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { getActivityPlugin, getActivityPluginForActivityType, listActivityPlugins } from "@cognelo/activity-sdk";
 import { ActivityPluginInstallationUpdateSchema } from "@cognelo/contracts";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -5,13 +6,20 @@ import { Prisma, prisma } from "@cognelo/db";
 import { isAdmin } from "./authorization";
 import { AppError, forbidden, notFound } from "./errors";
 
-function pluginMetadata(plugin: ReturnType<typeof listActivityPlugins>[number]) {
+type ActivityPluginManifest = ReturnType<typeof listActivityPlugins>[number];
+type PluginTransaction = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+function pluginMetadata(plugin: ActivityPluginManifest) {
   return {
     activityTypeKeys: plugin.activities.map((activity) => activity.key),
     databaseNamespace: plugin.db.namespace,
     databaseTables: plugin.db.tables,
     databaseNotes: plugin.db.notes ?? []
   };
+}
+
+function pluginVersion(plugin: ActivityPluginManifest) {
+  return plugin.version ?? "0.1.0";
 }
 
 export async function ensureActivityPluginInstallations() {
@@ -23,16 +31,17 @@ export async function ensureActivityPluginInstallations() {
         update: {
           packageName: plugin.packageName,
           name: plugin.name,
-          version: plugin.version ?? "0.1.0",
+          version: pluginVersion(plugin),
           metadata: pluginMetadata(plugin) as Prisma.InputJsonValue
         },
         create: {
           key: plugin.key,
           packageName: plugin.packageName,
           name: plugin.name,
-          version: plugin.version ?? "0.1.0",
+          version: pluginVersion(plugin),
           metadata: pluginMetadata(plugin) as Prisma.InputJsonValue,
-          isEnabled: true
+          isActivated: false,
+          isEnabled: false
         }
       })
     );
@@ -45,7 +54,10 @@ export async function listActivityPluginInstallations(user: CurrentUser) {
     throw forbidden();
   }
   await ensureActivityPluginInstallations();
-  return prisma.activityPluginInstallation.findMany({ orderBy: { name: "asc" } });
+  return prisma.activityPluginInstallation.findMany({
+    include: { tableBackups: { where: { restoredAt: null }, orderBy: { createdAt: "desc" } } },
+    orderBy: { name: "asc" }
+  });
 }
 
 export async function updateActivityPluginInstallation(user: CurrentUser, pluginKey: string, input: unknown) {
@@ -59,41 +71,19 @@ export async function updateActivityPluginInstallation(user: CurrentUser, plugin
   }
 
   const data = ActivityPluginInstallationUpdateSchema.parse(input);
-  const activityTypeKeys = plugin.activities.map((activity) => activity.key);
-
-  return prisma.$transaction(async (transaction) => {
-    const installation = await transaction.activityPluginInstallation.upsert({
-      where: { key: plugin.key },
-      update: {
-        packageName: plugin.packageName,
-        name: plugin.name,
-        version: plugin.version ?? "0.1.0",
-        metadata: pluginMetadata(plugin) as Prisma.InputJsonValue,
-        isEnabled: data.isEnabled
-      },
-      create: {
-        key: plugin.key,
-        packageName: plugin.packageName,
-        name: plugin.name,
-        version: plugin.version ?? "0.1.0",
-        metadata: pluginMetadata(plugin) as Prisma.InputJsonValue,
-        isEnabled: data.isEnabled
-      }
-    });
-
-    await transaction.activityType.updateMany({
-      where: { key: { in: activityTypeKeys } },
-      data: { isEnabled: data.isEnabled }
-    });
-
-    return installation;
-  });
+  if ("action" in data) {
+    if (data.action === "activate") {
+      return activateActivityPlugin(plugin, data.restoreBackupId ?? null);
+    }
+    return deactivateActivityPlugin(plugin);
+  }
+  return setActivityPluginEnabled(plugin, data.isEnabled);
 }
 
 export async function getEnabledActivityPluginKeys() {
   await ensureActivityPluginInstallations();
   const installations = await prisma.activityPluginInstallation.findMany({
-    where: { isEnabled: true },
+    where: { isActivated: true, isEnabled: true },
     select: { key: true }
   });
   return new Set(installations.map((installation) => installation.key));
@@ -105,7 +95,7 @@ export async function isActivityTypePluginEnabled(activityTypeKey: string) {
     return false;
   }
   const installation = await prisma.activityPluginInstallation.findUnique({ where: { key: plugin.key } });
-  return installation?.isEnabled ?? true;
+  return Boolean(installation?.isActivated && installation.isEnabled);
 }
 
 export async function assertActivityTypePluginEnabled(activityTypeKey: string) {
@@ -113,4 +103,278 @@ export async function assertActivityTypePluginEnabled(activityTypeKey: string) {
     return;
   }
   throw new AppError(400, "PLUGIN_DISABLED", "The activity plugin for this activity type is disabled.");
+}
+
+async function setActivityPluginEnabled(plugin: ActivityPluginManifest, isEnabled: boolean) {
+  return prisma.$transaction(async (transaction) => {
+    const installation = await transaction.activityPluginInstallation.findUnique({ where: { key: plugin.key } });
+    if (!installation?.isActivated) {
+      throw new AppError(400, "PLUGIN_NOT_ACTIVATED", "Activate this plugin before changing whether it is enabled.");
+    }
+    const updated = await transaction.activityPluginInstallation.update({
+      where: { key: plugin.key },
+      data: { isEnabled }
+    });
+    await transaction.activityType.updateMany({
+      where: { key: { in: plugin.activities.map((activity) => activity.key) } },
+      data: { isEnabled }
+    });
+    return updated;
+  });
+}
+
+async function activateActivityPlugin(plugin: ActivityPluginManifest, restoreBackupId: string | null) {
+  return prisma.$transaction(async (transaction) => {
+    const installation = await upsertPluginManifest(transaction, plugin);
+    if (installation.isActivated) {
+      return installation;
+    }
+
+    if (restoreBackupId) {
+      await restorePluginTableBackup(transaction, plugin, restoreBackupId);
+    }
+
+    let missingTables = await missingPluginTables(transaction, plugin.db.tables);
+    if (missingTables.length && !restoreBackupId && plugin.db.migrations?.length) {
+      await createPluginTables(transaction, plugin);
+      missingTables = await missingPluginTables(transaction, plugin.db.tables);
+    }
+
+    if (missingTables.length) {
+      const backups = await transaction.activityPluginTableBackup.findMany({
+        where: { pluginKey: plugin.key, pluginVersion: pluginVersion(plugin), restoredAt: null },
+        orderBy: { createdAt: "desc" }
+      });
+      throw new AppError(
+        409,
+        "PLUGIN_TABLES_MISSING",
+        "Plugin tables are missing. Apply the plugin migration or restore a matching backup before activation.",
+        { missingTables, backups }
+      );
+    }
+
+    for (const definition of plugin.activities) {
+      await transaction.activityType.upsert({
+        where: { key: definition.key },
+        update: {
+          name: definition.name,
+          description: definition.description,
+          metadata: { researchReady: true, plugin: plugin.key },
+          isEnabled: false
+        },
+        create: {
+          key: definition.key,
+          name: definition.name,
+          description: definition.description,
+          metadata: { researchReady: true, plugin: plugin.key },
+          isEnabled: false
+        }
+      });
+    }
+
+    return transaction.activityPluginInstallation.update({
+      where: { key: plugin.key },
+      data: {
+        isActivated: true,
+        isEnabled: false,
+        activatedAt: new Date(),
+        deactivatedAt: null
+      }
+    });
+  });
+}
+
+async function createPluginTables(transaction: PluginTransaction, plugin: ActivityPluginManifest) {
+  for (const migration of plugin.db.migrations ?? []) {
+    for (const statement of migration.statements) {
+      await transaction.$executeRawUnsafe(statement);
+    }
+  }
+}
+
+async function deactivateActivityPlugin(plugin: ActivityPluginManifest) {
+  return prisma.$transaction(async (transaction) => {
+    const installation = await transaction.activityPluginInstallation.findUnique({ where: { key: plugin.key } });
+    if (!installation?.isActivated) {
+      throw new AppError(400, "PLUGIN_NOT_ACTIVATED", "This plugin is not activated.");
+    }
+
+    const existingTables = [];
+    for (const tableName of plugin.db.tables) {
+      if (await tableExists(transaction, tableName)) {
+        existingTables.push(tableName);
+      }
+    }
+
+    const backupTables = existingTables.map((tableName, index) => ({
+      sourceTable: tableName,
+      backupTable: backupTableName(plugin, tableName, index)
+    }));
+
+    for (const table of backupTables) {
+      await renameTableOwnedObjects(transaction, table.sourceTable, table.backupTable);
+      await renameTable(transaction, table.sourceTable, table.backupTable);
+    }
+
+    const backup =
+      backupTables.length > 0
+        ? await transaction.activityPluginTableBackup.create({
+            data: {
+              pluginKey: plugin.key,
+              pluginVersion: pluginVersion(plugin),
+              sourceTables: backupTables.map((table) => table.sourceTable) as Prisma.InputJsonValue,
+              backupTables: backupTables as Prisma.InputJsonValue
+            }
+          })
+        : null;
+
+    await transaction.activityType.updateMany({
+      where: { key: { in: plugin.activities.map((activity) => activity.key) } },
+      data: { isEnabled: false }
+    });
+
+    return transaction.activityPluginInstallation.update({
+      where: { key: plugin.key },
+      data: {
+        isActivated: false,
+        isEnabled: false,
+        deactivatedAt: new Date(),
+        metadata: {
+          ...pluginMetadata(plugin),
+          lastBackupId: backup?.id ?? null
+        } as Prisma.InputJsonValue
+      }
+    });
+  });
+}
+
+async function upsertPluginManifest(transaction: PluginTransaction, plugin: ActivityPluginManifest) {
+  return transaction.activityPluginInstallation.upsert({
+    where: { key: plugin.key },
+    update: {
+      packageName: plugin.packageName,
+      name: plugin.name,
+      version: pluginVersion(plugin),
+      metadata: pluginMetadata(plugin) as Prisma.InputJsonValue
+    },
+    create: {
+      key: plugin.key,
+      packageName: plugin.packageName,
+      name: plugin.name,
+      version: pluginVersion(plugin),
+      metadata: pluginMetadata(plugin) as Prisma.InputJsonValue,
+      isActivated: false,
+      isEnabled: false
+    }
+  });
+}
+
+async function restorePluginTableBackup(transaction: PluginTransaction, plugin: ActivityPluginManifest, restoreBackupId: string) {
+  const backup = await transaction.activityPluginTableBackup.findFirst({
+    where: {
+      id: restoreBackupId,
+      pluginKey: plugin.key,
+      pluginVersion: pluginVersion(plugin),
+      restoredAt: null
+    }
+  });
+  if (!backup) {
+    throw notFound("Plugin table backup");
+  }
+
+  const backupTables = backup.backupTables as Array<{ sourceTable: string; backupTable: string }>;
+  for (const table of backupTables) {
+    assertKnownPluginTable(plugin, table.sourceTable);
+    assertSafeIdentifier(table.backupTable);
+    if (await tableExists(transaction, table.sourceTable)) {
+      throw new AppError(409, "PLUGIN_TABLE_ALREADY_EXISTS", "A plugin table already exists and cannot be restored over.", {
+        table: table.sourceTable
+      });
+    }
+    if (!(await tableExists(transaction, table.backupTable))) {
+      throw new AppError(409, "PLUGIN_BACKUP_TABLE_MISSING", "A plugin backup table is missing.", { table: table.backupTable });
+    }
+  }
+
+  for (const table of backupTables) {
+    await renameTable(transaction, table.backupTable, table.sourceTable);
+  }
+  await transaction.activityPluginTableBackup.update({
+    where: { id: backup.id },
+    data: { restoredAt: new Date() }
+  });
+}
+
+async function missingPluginTables(transaction: PluginTransaction, tableNames: readonly string[]) {
+  const missing = [];
+  for (const tableName of tableNames) {
+    if (!(await tableExists(transaction, tableName))) {
+      missing.push(tableName);
+    }
+  }
+  return missing;
+}
+
+async function tableExists(transaction: PluginTransaction, tableName: string) {
+  assertSafeIdentifier(tableName);
+  const rows = await transaction.$queryRaw<Array<{ exists: boolean }>>`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = ${tableName}
+    ) AS "exists"
+  `;
+  return rows[0]?.exists ?? false;
+}
+
+async function renameTable(transaction: PluginTransaction, from: string, to: string) {
+  assertSafeIdentifier(from);
+  assertSafeIdentifier(to);
+  await transaction.$executeRawUnsafe(`ALTER TABLE "public"."${from}" RENAME TO "${to}"`);
+}
+
+async function renameTableOwnedObjects(transaction: PluginTransaction, tableName: string, backupName: string) {
+  assertSafeIdentifier(tableName);
+  assertSafeIdentifier(backupName);
+
+  const constraints = await transaction.$queryRaw<Array<{ name: string }>>`
+    SELECT conname AS name
+    FROM pg_constraint
+    WHERE conrelid = to_regclass(${`public."${tableName}"`})
+    ORDER BY conname
+  `;
+  for (const [index, constraint] of constraints.entries()) {
+    assertSafeIdentifier(constraint.name);
+    await transaction.$executeRawUnsafe(`ALTER TABLE "public"."${tableName}" RENAME CONSTRAINT "${constraint.name}" TO "${backupName}_c${index}"`);
+  }
+
+  const indexes = await transaction.$queryRaw<Array<{ name: string }>>`
+    SELECT indexname AS name
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND tablename = ${tableName}
+    ORDER BY indexname
+  `;
+  for (const [index, tableIndex] of indexes.entries()) {
+    assertSafeIdentifier(tableIndex.name);
+    await transaction.$executeRawUnsafe(`ALTER INDEX "public"."${tableIndex.name}" RENAME TO "${backupName}_i${index}"`);
+  }
+}
+
+function backupTableName(plugin: ActivityPluginManifest, tableName: string, index: number) {
+  const hash = createHash("sha1").update(`${plugin.key}:${pluginVersion(plugin)}:${tableName}:${Date.now()}:${index}`).digest("hex").slice(0, 10);
+  return `bak_${hash}_${index}`;
+}
+
+function assertKnownPluginTable(plugin: ActivityPluginManifest, tableName: string) {
+  if (!plugin.db.tables.includes(tableName)) {
+    throw new AppError(400, "UNKNOWN_PLUGIN_TABLE", "The requested table is not owned by this plugin.");
+  }
+}
+
+function assertSafeIdentifier(identifier: string) {
+  if (!/^[A-Za-z_][A-Za-z0-9_]{0,62}$/.test(identifier)) {
+    throw new AppError(400, "UNSAFE_IDENTIFIER", "A plugin table identifier is invalid.");
+  }
 }

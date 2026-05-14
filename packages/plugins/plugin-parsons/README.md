@@ -65,6 +65,8 @@ Current plugin-owned tables:
 - `PluginParsonsAttempt`
 - `PluginParsonsAttemptEvent`
 
+These tables are modeled in this plugin's local Prisma schema under `prisma/schema.prisma`; attempt services use the plugin-local Prisma client from `src/db-client.ts`.
+
 Key behavior:
 
 - students get a persisted in-progress attempt

@@ -10,4 +10,5 @@ dist
 *.tsbuildinfo
 coverage
 packages/db/generated
+packages/plugins/*/src/generated
 storage
