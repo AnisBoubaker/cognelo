@@ -642,6 +642,11 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(input)
     }),
+  deleteBankActivity: (activityBankId: string, bankActivityId: string, input?: { force?: boolean }) =>
+    request<{ ok: true; courseCount: number }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}`, {
+      method: "DELETE",
+      body: JSON.stringify(input ?? {})
+    }),
   courses: () => request<{ courses: Course[] }>("/courses"),
   course: (courseId: string) => request<{ course: Course }>(`/courses/${courseId}`),
   createCourse: (input: CourseInput) =>

@@ -18,7 +18,8 @@ When creating a new plugin, a safe order is:
 8. add persistence if needed
 9. add unsaved-change protection with `useUnsavedChangesGuard` for every authoring or settings form
 10. add a bank-to-course copy hook if the plugin owns private bank data. This is required, not optional.
-11. add docs
+11. add a bank-activity delete cleanup hook if the plugin owns private bank data
+12. add docs
 
 ## Commands
 
@@ -58,6 +59,7 @@ Check that:
 - AI generation confirms before replacing non-empty authoring/configuration fields
 - assigning from an activity bank creates an independent course copy
 - plugin-owned bank data is copied into independent course-owned plugin rows when a bank activity is assigned
+- deleting a bank activity removes plugin-owned bank rows but leaves course-owned copied rows and submissions intact
 - the activity renders your component
 - saving config works
 - bank edits do not mutate existing course copies

@@ -1,6 +1,6 @@
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import { webDesignExerciseExpectedResultRoute, webDesignExerciseRunRoute, webDesignExerciseSubmitRoute, webDesignExerciseTestsRoute } from "./routes";
-import { copyBankWebDesignExerciseTestsToCourseActivity } from "./tests";
+import { copyBankWebDesignExerciseTestsToCourseActivity, deleteBankWebDesignExerciseData } from "./tests";
 
 export const webDesignCodingExercisesServerPlugin: ServerActivityPlugin = {
   key: "web-design-coding-exercises",
@@ -15,6 +15,13 @@ export const webDesignCodingExercisesServerPlugin: ServerActivityPlugin = {
         bankActivityId,
         activityId: activity.id
       });
+    },
+    onBankActivityDeleted: async ({ activityTypeKey, bankActivityId }) => {
+      if (activityTypeKey !== "web-design-coding-exercise") {
+        return;
+      }
+
+      await deleteBankWebDesignExerciseData({ bankActivityId });
     }
   }
 };

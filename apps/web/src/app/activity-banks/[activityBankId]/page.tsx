@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { api, type ActivityBank, type ActivityDefinition, type ActivityType, type BankActivity } from "@/lib/api";
+import { api, ApiError, type ActivityBank, type ActivityDefinition, type ActivityType, type BankActivity } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 type EditingActivityState = {
@@ -34,6 +34,7 @@ export default function ActivityBankDetailPage() {
   const [error, setError] = useState("");
   const [savingActivity, setSavingActivity] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingActivityId, setDeletingActivityId] = useState<string | null>(null);
   const [showActivityPicker, setShowActivityPicker] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<ActivityCategoryId>("programming");
 
@@ -130,6 +131,47 @@ export default function ActivityBankDetailPage() {
     }
   }
 
+  async function deleteActivity(activity: BankActivity) {
+    if (!bank) {
+      return;
+    }
+    const confirmed = window.confirm(t("activityBankDetail.deleteActivityConfirm", { title: activity.title }));
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingActivityId(activity.id);
+    setError("");
+    try {
+      await api.deleteBankActivity(bank.id, activity.id);
+      await loadPage();
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "BANK_ACTIVITY_IN_USE") {
+        const courseCount = getCourseCountFromDeleteError(err.details);
+        const forceConfirmed = window.confirm(
+          t("activityBankDetail.deleteActivityInUseConfirm", {
+            title: activity.title,
+            count: courseCount
+          })
+        );
+        if (forceConfirmed) {
+          try {
+            await api.deleteBankActivity(bank.id, activity.id, { force: true });
+            await loadPage();
+          } catch (forceErr) {
+            setError(forceErr instanceof Error ? forceErr.message : t("activityBankDetail.deleteActivityError"));
+          }
+          return;
+        }
+        return;
+      }
+
+      setError(err instanceof Error ? err.message : t("activityBankDetail.deleteActivityError"));
+    } finally {
+      setDeletingActivityId(null);
+    }
+  }
+
   function activityTypeLabel(activityTypeKey: string) {
     const definition = activityDefinitions.find((candidate) => candidate.key === activityTypeKey);
     const localized = definition?.i18n?.[locale];
@@ -211,6 +253,16 @@ export default function ActivityBankDetailPage() {
                     >
                       <EditIcon />
                     </Link>
+                    <button
+                      aria-label={t("activityBankDetail.deleteActivity", { title: activity.title })}
+                      className="danger icon-button"
+                      disabled={deletingActivityId === activity.id}
+                      onClick={() => deleteActivity(activity)}
+                      title={t("common.remove")}
+                      type="button"
+                    >
+                      <RemoveIcon />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -339,6 +391,16 @@ export default function ActivityBankDetailPage() {
   );
 }
 
+function getCourseCountFromDeleteError(details: unknown) {
+  if (details && typeof details === "object" && !Array.isArray(details)) {
+    const courseCount = (details as Record<string, unknown>).courseCount;
+    if (typeof courseCount === "number" && Number.isFinite(courseCount)) {
+      return courseCount;
+    }
+  }
+  return 0;
+}
+
 function EditIcon() {
   return (
     <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
@@ -350,6 +412,17 @@ function EditIcon() {
         strokeLinejoin="round"
         strokeWidth="2"
       />
+    </svg>
+  );
+}
+
+function RemoveIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
+      <path d="M6 7h12" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+      <path d="M9 7V5h6v2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+      <path d="M10 11v6M14 11v6" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+      <path d="M8 7l1 13h6l1-13" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
     </svg>
   );
 }

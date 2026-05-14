@@ -148,6 +148,11 @@ export type BankActivityInput = z.infer<typeof BankActivityInputSchema>;
 export const BankActivityUpdateSchema = BankActivityInputSchema.partial();
 export type BankActivityUpdate = z.infer<typeof BankActivityUpdateSchema>;
 
+export const BankActivityDeleteSchema = z.object({
+  force: z.boolean().optional().default(false)
+});
+export type BankActivityDelete = z.infer<typeof BankActivityDeleteSchema>;
+
 export const CourseGroupInputSchema = z.object({
   title: z.string().min(2).max(160)
 });
