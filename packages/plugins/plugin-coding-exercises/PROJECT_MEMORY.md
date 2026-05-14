@@ -15,7 +15,7 @@ This file is for coding-exercises-specific memory only.
 - The first execution route is `coding-exercises/run`, which stores each run server-side before and after the Judge0 request.
 - Hidden tests are managed through the teacher-only `coding-exercises/hidden-tests` route.
 - Bank activity authoring now has bank-owned private coding test/reference tables; course assignment must copy those private records into course-owned plugin tables via `onCourseActivityCreatedFromBankVersion` so coding exercises persist the same authoring data in banks and courses.
-- Any future coding-exercise bank-owned private table must be added to the bank-to-course copy hook and manually verified by publishing a bank activity, adding it to a course, and checking the course-owned plugin rows.
+- Any future coding-exercise bank-owned private table must be added to the bank-to-course copy hook and the bank-activity delete cleanup hook, then manually verified by publishing a bank activity, adding it to a course, checking the course-owned plugin rows, and deleting the bank activity.
 - Enabled hidden tests must validate against the private reference solution before they are saved.
 - Graded submissions are handled separately from sample runs through `coding-exercises/submit`.
 - Teacher authoring separates student-facing starter code from a private reference solution; the reference solution must never be stored in public activity config.

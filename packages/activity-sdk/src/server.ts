@@ -52,11 +52,19 @@ export type CourseActivityCreatedFromBankVersionHook = (input: {
   activityVersionId: string;
 }) => Promise<void>;
 
+export type BankActivityDeletedHook = (input: {
+  user: CurrentUser;
+  activityBankId: string;
+  bankActivityId: string;
+  activityTypeKey: string;
+}) => Promise<void>;
+
 export type ServerActivityPlugin = {
   key: string;
   routes?: readonly PluginRouteDefinition[];
   hooks?: {
     onCourseActivityCreatedFromBankVersion?: CourseActivityCreatedFromBankVersionHook;
+    onBankActivityDeleted?: BankActivityDeletedHook;
   };
 };
 
@@ -111,5 +119,16 @@ export async function runCourseActivityCreatedFromBankVersionHooks(input: {
 }) {
   for (const plugin of serverPlugins) {
     await plugin.hooks?.onCourseActivityCreatedFromBankVersion?.(input);
+  }
+}
+
+export async function runBankActivityDeletedHooks(input: {
+  user: CurrentUser;
+  activityBankId: string;
+  bankActivityId: string;
+  activityTypeKey: string;
+}) {
+  for (const plugin of serverPlugins) {
+    await plugin.hooks?.onBankActivityDeleted?.(input);
   }
 }

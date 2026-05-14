@@ -232,6 +232,8 @@ This preserves the copy semantics: later bank edits do not affect existing cours
 
 When changing a plugin schema, ask this explicitly: "Does this new table contain bank-owned data that a course activity needs?" If yes, update the copy hook in the same change and verify bank assignment creates the expected course-owned rows.
 
+Also ask: "Does this table contain bank-owned data that should disappear when the bank activity is deleted?" If yes, update `onBankActivityDeleted` in the same change. Delete only the bank-owned rows for that `bankActivityId`; never delete course-owned copied data from this hook.
+
 ## Recommended Development Order
 
 For beginners, this sequence is usually easier than trying to build everything at once:

@@ -273,9 +273,14 @@ const messages: Record<Locale, MessageTree> = {
       versionHeader: "Version",
       noActivities: "No activities in this bank yet.",
       editActivityTitle: "Edit activity",
+      deleteActivity: "Remove {title}",
+      deleteActivityConfirm: 'Remove "{title}" from this activity bank?',
+      deleteActivityInUseConfirm:
+        '"{title}" is used by {count} courses. Removing it will make those course activities lose their bank link and become course-local activities. Continue?',
       loadError: "Unable to load activity bank.",
       createActivityError: "Unable to create bank activity.",
-      updateActivityError: "Unable to update bank activity."
+      updateActivityError: "Unable to update bank activity.",
+      deleteActivityError: "Unable to remove bank activity."
     },
     bankActivityPage: {
       notFound: "Activity not found in this bank.",
@@ -762,9 +767,14 @@ const messages: Record<Locale, MessageTree> = {
       versionHeader: "Version",
       noActivities: "Aucune activité dans cette banque pour le moment.",
       editActivityTitle: "Modifier l'activité",
+      deleteActivity: "Supprimer {title}",
+      deleteActivityConfirm: "Supprimer \"{title}\" de cette banque d'activités ?",
+      deleteActivityInUseConfirm:
+        '"{title}" est utilisée par {count} cours. La suppression retirera le lien avec la banque et transformera ces activités en activités locales au cours. Continuer ?',
       loadError: "Impossible de charger la banque d'activités.",
       createActivityError: "Impossible de créer l'activité dans la banque.",
-      updateActivityError: "Impossible de mettre à jour l'activité dans la banque."
+      updateActivityError: "Impossible de mettre à jour l'activité dans la banque.",
+      deleteActivityError: "Impossible de supprimer l'activité de la banque."
     },
     bankActivityPage: {
       notFound: "Activité introuvable dans cette banque.",
@@ -1251,9 +1261,14 @@ const messages: Record<Locale, MessageTree> = {
       versionHeader: "版本",
       noActivities: "这个活动库还没有活动。",
       editActivityTitle: "编辑活动",
+      deleteActivity: "删除 {title}",
+      deleteActivityConfirm: '要从此活动库删除“{title}”吗？',
+      deleteActivityInUseConfirm:
+        "“{title}”已被 {count} 门课程使用。删除后，这些课程活动将失去活动库链接，并变为课程本地活动。是否继续？",
       loadError: "无法加载活动库。",
       createActivityError: "无法创建活动库活动。",
-      updateActivityError: "无法更新活动库活动。"
+      updateActivityError: "无法更新活动库活动。",
+      deleteActivityError: "无法删除活动库活动。"
     },
     bankActivityPage: {
       notFound: "在此活动库中找不到该活动。",

@@ -129,6 +129,17 @@ export async function copyBankWebDesignExerciseTestsToCourseActivity(params: { b
   });
 }
 
+export async function deleteBankWebDesignExerciseData(params: { bankActivityId: string }) {
+  await prisma.$transaction(async (transaction) => {
+    await transaction.pluginBankWebDesignExerciseTest.deleteMany({
+      where: { bankActivityId: params.bankActivityId }
+    });
+    await transaction.pluginBankWebDesignExerciseReferenceBundle.deleteMany({
+      where: { bankActivityId: params.bankActivityId }
+    });
+  });
+}
+
 export async function replaceWebDesignExerciseTests(params: {
   activityId: string;
   activityConfig: Record<string, unknown> | undefined;

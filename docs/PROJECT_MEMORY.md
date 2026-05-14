@@ -49,6 +49,8 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Editing a bank activity creates a new version for future course assignments and does not affect existing course copies.
 - Plugin copy contract: if a plugin owns private bank-owned data, it must copy that data into course-owned plugin tables through `onCourseActivityCreatedFromBankVersion` when a course activity is created from a bank version. Core only copies the generic `Activity` row and `ActivityVersion` data; plugin-owned tables are the plugin's responsibility.
 - New plugins or plugin schema changes that introduce bank-owned private data must include a bank-to-course copy hook and manual verification that the copied course activity has independent plugin-owned rows.
+- Plugin delete contract: if a plugin owns bank-owned private data, it must clean those rows through `onBankActivityDeleted` when a bank activity is deleted. Course-owned copied plugin rows must remain intact.
+- Deleting a bank activity that is used in courses is allowed only after a second confirmation. Existing course activities lose `bankActivityId` / `activityVersionId` through database `SetNull` relations and become fully course-local copies.
 - Activities remain plugin-style registry entries and are not hardcoded into course models.
 - Course managers can remove activities directly from the course detail page.
 

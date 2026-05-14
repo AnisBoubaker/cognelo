@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
-import { updateBankActivity } from "@cognelo/core";
+import { runBankActivityDeletedHooks } from "@cognelo/activity-sdk/server";
+import { deleteBankActivity, updateBankActivity } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
-type Params = { params: Promise<{ bankActivityId: string }> };
+type Params = { params: Promise<{ activityBankId: string; bankActivityId: string }> };
 
 export function OPTIONS() {
   return options();
@@ -13,5 +14,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { bankActivityId } = await params;
     return json({ activity: await updateBankActivity(user, bankActivityId, await readJson(request)) });
+  });
+}
+
+export async function DELETE(request: NextRequest, { params }: Params) {
+  return handleRoute(async () => {
+    const user = await requireUser();
+    const { activityBankId, bankActivityId } = await params;
+    const result = await deleteBankActivity(user, activityBankId, bankActivityId, await readJson(request));
+    await runBankActivityDeletedHooks({
+      user,
+      activityBankId,
+      bankActivityId,
+      activityTypeKey: result.activityTypeKey
+    });
+    return json({ ok: true, courseCount: result.courseCount });
   });
 }

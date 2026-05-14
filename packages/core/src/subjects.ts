@@ -2,6 +2,7 @@ import { getActivityDefinition } from "@cognelo/activity-sdk";
 import {
   ActivityBankInputSchema,
   ActivityBankUpdateSchema,
+  BankActivityDeleteSchema,
   BankActivityInputSchema,
   BankActivityUpdateSchema,
   SubjectInputSchema,
@@ -284,6 +285,43 @@ export async function updateBankActivity(user: CurrentUser, bankActivityId: stri
       }
     });
   });
+}
+
+export async function deleteBankActivity(user: CurrentUser, activityBankId: string, bankActivityId: string, input: unknown) {
+  const data = BankActivityDeleteSchema.parse(input);
+  const bankActivity = await prisma.bankActivity.findUnique({
+    where: { id: bankActivityId },
+    include: { bank: true, activityType: true }
+  });
+  if (!bankActivity || bankActivity.bankId !== activityBankId) {
+    throw notFound("Bank activity");
+  }
+  await assertCanManageActivityBank(user, bankActivity.bankId);
+
+  const courseUsages = await prisma.activity.findMany({
+    where: { bankActivityId },
+    distinct: ["courseId"],
+    select: { courseId: true }
+  });
+  if (courseUsages.length && !data.force) {
+    throw new AppError(
+      409,
+      "BANK_ACTIVITY_IN_USE",
+      "This activity is used by courses. Confirm again to remove the bank link from those course activities.",
+      { courseCount: courseUsages.length }
+    );
+  }
+
+  const deleted = await prisma.bankActivity.delete({
+    where: { id: bankActivityId },
+    include: { activityType: true }
+  });
+
+  return {
+    bankActivityId,
+    activityTypeKey: deleted.activityType.key,
+    courseCount: courseUsages.length
+  };
 }
 
 async function assertCanViewSubjects(user: CurrentUser) {

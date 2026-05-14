@@ -307,6 +307,14 @@ Copy rule for plugin-owned data:
 - The copied course rows must be independent snapshots. Later bank edits must not mutate existing course activity copies.
 - Any new plugin-owned bank table should be reviewed together with the hook and a manual test that assigns a bank activity to a course.
 
+Delete rule for plugin-owned bank data:
+
+- Deleting a bank activity removes the generic bank row and versions.
+- Course activities copied from it keep their local content/config but lose their bank provenance links and become course-local.
+- Core does not know how to delete plugin-owned bank rows.
+- If a plugin stores bank-owned private rows, it must implement `onBankActivityDeleted` and delete only the bank-owned rows for that `bankActivityId`.
+- The hook must not delete course-owned plugin rows, submissions, attempts, or copied reference/test data.
+
 ## Current Grading State
 
 There is no generic platform gradebook yet.

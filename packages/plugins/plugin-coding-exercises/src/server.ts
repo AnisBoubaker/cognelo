@@ -7,7 +7,7 @@ import {
   codingExerciseRunRoute,
   codingExerciseSubmitRoute
 } from "./routes";
-import { copyBankCodingExerciseDataToCourseActivity } from "./hidden-tests";
+import { copyBankCodingExerciseDataToCourseActivity, deleteBankCodingExerciseData } from "./hidden-tests";
 
 export const codingExercisesServerPlugin: ServerActivityPlugin = {
   key: "coding-exercises",
@@ -29,6 +29,13 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
         bankActivityId,
         activityId: activity.id
       });
+    },
+    onBankActivityDeleted: async ({ activityTypeKey, bankActivityId }) => {
+      if (activityTypeKey !== "coding-exercise") {
+        return;
+      }
+
+      await deleteBankCodingExerciseData({ bankActivityId });
     }
   }
 };
