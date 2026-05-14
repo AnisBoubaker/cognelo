@@ -116,6 +116,9 @@ async function createCourseActivityFromBankVersion(
     throw notFound("Activity version");
   }
   await assertActivityTypePluginEnabled(version.activityType.key);
+  if (version.lifecycle !== "published") {
+    throw new AppError(400, "BANK_ACTIVITY_NOT_PUBLISHED", "Publish this bank activity before adding it to a course.");
+  }
   if (version.bankActivity.bank.subjectId !== course.subjectId) {
     throw new AppError(400, "ACTIVITY_BANK_SUBJECT_MISMATCH", "This activity bank does not belong to the course subject.");
   }
