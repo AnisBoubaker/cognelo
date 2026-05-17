@@ -1503,7 +1503,7 @@ type I18nContextValue = {
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 
-function getMessage(locale: Locale, key: string) {
+export function getMessage(locale: Locale, key: string) {
   return key.split(".").reduce<string | MessageTree | undefined>((current, part) => {
     if (!current || typeof current === "string") {
       return current;
@@ -1512,7 +1512,7 @@ function getMessage(locale: Locale, key: string) {
   }, messages[locale]);
 }
 
-function interpolate(message: string, vars?: Record<string, string | number>) {
+export function interpolate(message: string, vars?: Record<string, string | number>) {
   if (!vars) {
     return message;
   }
@@ -1520,7 +1520,7 @@ function interpolate(message: string, vars?: Record<string, string | number>) {
   return message.replace(/\{(\w+)\}/g, (_, key) => String(vars[key] ?? `{${key}}`));
 }
 
-function detectInitialLocale() {
+export function detectInitialLocale() {
   if (typeof window === "undefined") {
     return "en" as Locale;
   }
@@ -1540,6 +1540,11 @@ function detectInitialLocale() {
   return "en";
 }
 
+export function translateMessage(locale: Locale, key: string, vars?: Record<string, string | number>) {
+  const message = getMessage(locale, key);
+  return typeof message === "string" ? interpolate(message, vars) : key;
+}
+
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>("en");
 
@@ -1556,10 +1561,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     () => ({
       locale,
       setLocale: (nextLocale) => setLocaleState(nextLocale),
-      t: (key, vars) => {
-        const message = getMessage(locale, key);
-        return typeof message === "string" ? interpolate(message, vars) : key;
-      }
+      t: (key, vars) => translateMessage(locale, key, vars)
     }),
     [locale]
   );
