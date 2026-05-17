@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const root = process.cwd();
@@ -8,7 +9,7 @@ const coreSchema = "packages/db/prisma/schema.prisma";
 const coreMigrationsDir = join(root, "packages/db/prisma/migrations");
 const pluginsDir = join(root, "packages/plugins");
 
-function run(label, command, args) {
+export function run(label, command, args) {
   console.log(`\n> ${label}`);
   const result = spawnSync(command, args, {
     cwd: root,
@@ -21,17 +22,19 @@ function run(label, command, args) {
   }
 }
 
-function pluginSchemas() {
-  if (!existsSync(pluginsDir)) {
+export function pluginSchemas(options = {}) {
+  const currentRoot = options.root ?? root;
+  const currentPluginsDir = options.pluginsDir ?? pluginsDir;
+  if (!existsSync(currentPluginsDir)) {
     return [];
   }
 
-  return readdirSync(pluginsDir)
-    .map((entry) => join(pluginsDir, entry))
+  return readdirSync(currentPluginsDir)
+    .map((entry) => join(currentPluginsDir, entry))
     .filter((entryPath) => statSync(entryPath).isDirectory())
     .map((pluginPath) => join(pluginPath, "prisma/schema.prisma"))
     .filter((schemaPath) => existsSync(schemaPath))
-    .map((schemaPath) => schemaPath.replace(`${root}/`, ""))
+    .map((schemaPath) => schemaPath.replace(`${currentRoot}/`, ""))
     .sort();
 }
 
@@ -86,9 +89,10 @@ function appliedCoreMigrations() {
   );
 }
 
-function coreMigrations() {
-  return readdirSync(coreMigrationsDir)
-    .map((entry) => join(coreMigrationsDir, entry))
+export function coreMigrations(options = {}) {
+  const currentCoreMigrationsDir = options.coreMigrationsDir ?? coreMigrationsDir;
+  return readdirSync(currentCoreMigrationsDir)
+    .map((entry) => join(currentCoreMigrationsDir, entry))
     .filter((entryPath) => statSync(entryPath).isDirectory())
     .map((migrationPath) => ({
       name: migrationPath.split("/").at(-1),
@@ -124,11 +128,25 @@ function applyCoreMigrations() {
   }
 }
 
-applyCoreMigrations();
-run("Core Prisma generate", "npx", ["prisma", "generate", "--schema", coreSchema]);
-run("Plugin migrations", "npx", ["tsx", "scripts/apply-plugin-migrations.ts"]);
+export function runAll(options = {}) {
+  const applyCoreMigrationsFn = options.applyCoreMigrationsFn ?? applyCoreMigrations;
+  const runCommand = options.runCommand ?? run;
+  const schemas = options.schemas ?? pluginSchemas();
 
-for (const schema of pluginSchemas()) {
-  const label = schema;
-  run(`Plugin Prisma generate: ${label}`, "npx", ["prisma", "generate", "--schema", schema]);
+  applyCoreMigrationsFn();
+  runCommand("Core Prisma generate", "npx", ["prisma", "generate", "--schema", coreSchema]);
+  runCommand("Plugin migrations", "npx", ["tsx", "scripts/apply-plugin-migrations.ts"]);
+
+  for (const schema of schemas) {
+    const label = schema;
+    runCommand(`Plugin Prisma generate: ${label}`, "npx", ["prisma", "generate", "--schema", schema]);
+  }
+}
+
+export function main() {
+  runAll();
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
 }
