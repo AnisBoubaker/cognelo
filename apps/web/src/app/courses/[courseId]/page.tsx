@@ -45,6 +45,14 @@ export default function CourseDetailPage() {
   const [assignAllAvailableUntil, setAssignAllAvailableUntil] = useState("");
   const [assignAllEnablePerGroupSettings, setAssignAllEnablePerGroupSettings] = useState(true);
   const [assignAllAssessmentMode, setAssignAllAssessmentMode] = useState<"formative" | "summative">("formative");
+  const [assignAllPointsPossible, setAssignAllPointsPossible] = useState("100");
+  const [assignAllGradingMode, setAssignAllGradingMode] = useState<"points" | "pass_fail">("points");
+  const [assignAllPassThresholdPoints, setAssignAllPassThresholdPoints] = useState("50");
+  const [assignAllPassThresholdOutOf, setAssignAllPassThresholdOutOf] = useState("100");
+  const [assignAllAttemptLimitMode, setAssignAllAttemptLimitMode] = useState<"unlimited" | "max_attempts" | "until_due">("unlimited");
+  const [assignAllMaxAttempts, setAssignAllMaxAttempts] = useState("1");
+  const [assignAllGradeStrategy, setAssignAllGradeStrategy] = useState<"latest" | "best" | "first" | "weighted_average">("latest");
+  const [assignAllDropLowestAttempt, setAssignAllDropLowestAttempt] = useState(false);
   const [assignAllSavingActivityId, setAssignAllSavingActivityId] = useState<string | null>(null);
   const [groupTitle, setGroupTitle] = useState("");
   const [isAddingGroup, setIsAddingGroup] = useState(false);
@@ -219,12 +227,40 @@ export default function CourseDetailPage() {
 
   function startAssigningActivityToAllGroups(activity: NonNullable<Course["activities"]>[number]) {
     const rule = getAllGroupsAssignmentRule(activity);
+    const gradebookSettings = rule?.gradebookSettings;
     setAssignAllActivityId(activity.id);
     setAssignAllAvailableFrom(toDateTimeLocalValue(rule?.availableFrom));
     setAssignAllAvailableUntil(toDateTimeLocalValue(rule?.availableUntil));
     setAssignAllEnablePerGroupSettings(rule?.enablePerGroupSettings ?? true);
     setAssignAllAssessmentMode(rule?.assessmentMode ?? "formative");
+    setAssignAllPointsPossible(String(gradebookSettings?.pointsPossible ?? 100));
+    setAssignAllGradingMode(gradebookSettings?.gradingMode ?? "points");
+    setAssignAllPassThresholdPoints(String(gradebookSettings?.passThresholdPoints ?? 50));
+    setAssignAllPassThresholdOutOf(String(gradebookSettings?.passThresholdOutOf ?? 100));
+    setAssignAllAttemptLimitMode(gradebookSettings?.attemptLimitMode ?? "unlimited");
+    setAssignAllMaxAttempts(String(gradebookSettings?.maxAttempts ?? 1));
+    setAssignAllGradeStrategy(gradebookSettings?.gradeStrategy ?? "latest");
+    setAssignAllDropLowestAttempt(gradebookSettings?.dropLowestAttempt ?? false);
     setError("");
+  }
+
+  function buildAssignAllGradebookSettings() {
+    const pointsPossible = Number(assignAllPointsPossible);
+    const passThresholdPoints = Number(assignAllPassThresholdPoints);
+    const passThresholdOutOf = Number(assignAllPassThresholdOutOf);
+    const maxAttempts = Number(assignAllMaxAttempts);
+    return {
+      pointsPossible: Number.isFinite(pointsPossible) && pointsPossible > 0 ? pointsPossible : 100,
+      gradingMode: assignAllGradingMode,
+      passThresholdPoints:
+        assignAllGradingMode === "pass_fail" && Number.isFinite(passThresholdPoints) ? passThresholdPoints : null,
+      passThresholdOutOf:
+        assignAllGradingMode === "pass_fail" && Number.isFinite(passThresholdOutOf) && passThresholdOutOf > 0 ? passThresholdOutOf : null,
+      attemptLimitMode: assignAllAttemptLimitMode,
+      maxAttempts: assignAllAttemptLimitMode === "max_attempts" && Number.isFinite(maxAttempts) && maxAttempts > 0 ? Math.floor(maxAttempts) : null,
+      gradeStrategy: assignAllGradeStrategy,
+      dropLowestAttempt: assignAllGradeStrategy === "weighted_average" ? assignAllDropLowestAttempt : false
+    };
   }
 
   async function assignActivityToAllGroups(event: FormEvent) {
@@ -240,13 +276,22 @@ export default function CourseDetailPage() {
         availableFrom: toIsoOrNull(assignAllAvailableFrom),
         availableUntil: toIsoOrNull(assignAllAvailableUntil),
         enablePerGroupSettings: assignAllEnablePerGroupSettings,
-        assessmentMode: assignAllAssessmentMode
+        assessmentMode: assignAllAssessmentMode,
+        ...(assignAllAssessmentMode === "summative" ? { gradebookSettings: buildAssignAllGradebookSettings() } : {})
       });
       setAssignAllActivityId(null);
       setAssignAllAvailableFrom("");
       setAssignAllAvailableUntil("");
       setAssignAllEnablePerGroupSettings(true);
       setAssignAllAssessmentMode("formative");
+      setAssignAllPointsPossible("100");
+      setAssignAllGradingMode("points");
+      setAssignAllPassThresholdPoints("50");
+      setAssignAllPassThresholdOutOf("100");
+      setAssignAllAttemptLimitMode("unlimited");
+      setAssignAllMaxAttempts("1");
+      setAssignAllGradeStrategy("latest");
+      setAssignAllDropLowestAttempt(false);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("courseDetail.assignAllGroupsError"));
@@ -992,6 +1037,119 @@ export default function CourseDetailPage() {
                                       <option value="summative">{t("groupPage.assessmentModeSummative")}</option>
                                     </select>
                                   </div>
+                                  {assignAllAssessmentMode === "summative" ? (
+                                    <div className="grid compact-form-grid">
+                                      <div className="field">
+                                        <label htmlFor={`assign-all-points-${activity.id}`}>{t("groupPage.pointsPossible")}</label>
+                                        <input
+                                          id={`assign-all-points-${activity.id}`}
+                                          type="number"
+                                          min="0.01"
+                                          step="0.01"
+                                          value={assignAllPointsPossible}
+                                          disabled={assignAllSavingActivityId === activity.id}
+                                          onChange={(event) => setAssignAllPointsPossible(event.target.value)}
+                                        />
+                                      </div>
+                                      <div className="field">
+                                        <label htmlFor={`assign-all-grading-mode-${activity.id}`}>{t("groupPage.gradingMode")}</label>
+                                        <select
+                                          id={`assign-all-grading-mode-${activity.id}`}
+                                          value={assignAllGradingMode}
+                                          disabled={assignAllSavingActivityId === activity.id}
+                                          onChange={(event) => setAssignAllGradingMode(event.target.value as "points" | "pass_fail")}
+                                        >
+                                          <option value="points">{t("groupPage.gradingModePoints")}</option>
+                                          <option value="pass_fail">{t("groupPage.gradingModePassFail")}</option>
+                                        </select>
+                                      </div>
+                                      {assignAllGradingMode === "pass_fail" ? (
+                                        <>
+                                          <div className="field">
+                                            <label htmlFor={`assign-all-pass-points-${activity.id}`}>{t("groupPage.passThresholdPoints")}</label>
+                                            <input
+                                              id={`assign-all-pass-points-${activity.id}`}
+                                              type="number"
+                                              min="0"
+                                              step="0.01"
+                                              value={assignAllPassThresholdPoints}
+                                              disabled={assignAllSavingActivityId === activity.id}
+                                              onChange={(event) => setAssignAllPassThresholdPoints(event.target.value)}
+                                            />
+                                          </div>
+                                          <div className="field">
+                                            <label htmlFor={`assign-all-pass-out-of-${activity.id}`}>{t("groupPage.passThresholdOutOf")}</label>
+                                            <input
+                                              id={`assign-all-pass-out-of-${activity.id}`}
+                                              type="number"
+                                              min="0.01"
+                                              step="0.01"
+                                              value={assignAllPassThresholdOutOf}
+                                              disabled={assignAllSavingActivityId === activity.id}
+                                              onChange={(event) => setAssignAllPassThresholdOutOf(event.target.value)}
+                                            />
+                                          </div>
+                                        </>
+                                      ) : null}
+                                      <div className="field">
+                                        <label htmlFor={`assign-all-attempt-mode-${activity.id}`}>{t("groupPage.attemptLimitMode")}</label>
+                                        <select
+                                          id={`assign-all-attempt-mode-${activity.id}`}
+                                          value={assignAllAttemptLimitMode}
+                                          disabled={assignAllSavingActivityId === activity.id}
+                                          onChange={(event) =>
+                                            setAssignAllAttemptLimitMode(event.target.value as "unlimited" | "max_attempts" | "until_due")
+                                          }
+                                        >
+                                          <option value="unlimited">{t("groupPage.attemptLimitUnlimited")}</option>
+                                          <option value="max_attempts">{t("groupPage.attemptLimitMax")}</option>
+                                          <option value="until_due">{t("groupPage.attemptLimitUntilDue")}</option>
+                                        </select>
+                                      </div>
+                                      {assignAllAttemptLimitMode === "max_attempts" ? (
+                                        <div className="field">
+                                          <label htmlFor={`assign-all-max-attempts-${activity.id}`}>{t("groupPage.maxAttempts")}</label>
+                                          <input
+                                            id={`assign-all-max-attempts-${activity.id}`}
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            value={assignAllMaxAttempts}
+                                            disabled={assignAllSavingActivityId === activity.id}
+                                            onChange={(event) => setAssignAllMaxAttempts(event.target.value)}
+                                          />
+                                        </div>
+                                      ) : null}
+                                      <div className="field">
+                                        <label htmlFor={`assign-all-grade-strategy-${activity.id}`}>{t("groupPage.gradeStrategy")}</label>
+                                        <select
+                                          id={`assign-all-grade-strategy-${activity.id}`}
+                                          value={assignAllGradeStrategy}
+                                          disabled={assignAllSavingActivityId === activity.id}
+                                          onChange={(event) =>
+                                            setAssignAllGradeStrategy(event.target.value as "latest" | "best" | "first" | "weighted_average")
+                                          }
+                                        >
+                                          <option value="latest">{t("groupPage.gradeStrategyLatest")}</option>
+                                          <option value="best">{t("groupPage.gradeStrategyBest")}</option>
+                                          <option value="first">{t("groupPage.gradeStrategyFirst")}</option>
+                                          <option value="weighted_average">{t("groupPage.gradeStrategyWeightedAverage")}</option>
+                                        </select>
+                                      </div>
+                                      {assignAllGradeStrategy === "weighted_average" ? (
+                                        <label className="checkbox-row" htmlFor={`assign-all-drop-lowest-${activity.id}`}>
+                                          <input
+                                            id={`assign-all-drop-lowest-${activity.id}`}
+                                            type="checkbox"
+                                            checked={assignAllDropLowestAttempt}
+                                            disabled={assignAllSavingActivityId === activity.id}
+                                            onChange={(event) => setAssignAllDropLowestAttempt(event.target.checked)}
+                                          />
+                                          <span>{t("groupPage.dropLowestAttempt")}</span>
+                                        </label>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
                                   <div className="row">
                                     <button disabled={assignAllSavingActivityId === activity.id} type="submit">
                                       {assignAllSavingActivityId === activity.id ? t("common.saving") : t("courseDetail.assignAllGroupsSave")}
@@ -1408,7 +1566,20 @@ function getAllGroupsAssignmentRule(activity: NonNullable<Course["activities"]>[
     availableFrom: typeof record.availableFrom === "string" ? record.availableFrom : null,
     availableUntil: typeof record.availableUntil === "string" ? record.availableUntil : null,
     enablePerGroupSettings: record.enablePerGroupSettings !== false,
-    assessmentMode: record.assessmentMode === "summative" ? "summative" as const : "formative" as const
+    assessmentMode: record.assessmentMode === "summative" ? "summative" as const : "formative" as const,
+    gradebookSettings:
+      record.gradebookSettings && typeof record.gradebookSettings === "object" && !Array.isArray(record.gradebookSettings)
+        ? (record.gradebookSettings as {
+            pointsPossible?: number;
+            gradingMode?: "points" | "pass_fail";
+            passThresholdPoints?: number | null;
+            passThresholdOutOf?: number | null;
+            attemptLimitMode?: "unlimited" | "max_attempts" | "until_due";
+            maxAttempts?: number | null;
+            gradeStrategy?: "latest" | "best" | "first" | "weighted_average";
+            dropLowestAttempt?: boolean;
+          })
+        : null
   };
 }
 

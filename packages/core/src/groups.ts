@@ -5,6 +5,7 @@ import {
   CourseGroupActivityUpdateSchema,
   CourseGroupInputSchema,
   CourseGroupParticipantInputSchema,
+  GradebookItemSettingsInputSchema,
   type CourseGroupParticipantRole,
   CourseGroupMaterialInputSchema,
   CourseGroupMaterialUpdateSchema,
@@ -17,12 +18,14 @@ import { AppError, notFound } from "./errors";
 
 type StudentAccessDb = Pick<typeof prisma, "role" | "userRole" | "courseMembership">;
 type GradebookItemDb = Pick<typeof prisma, "gradebookItem">;
+type GradebookItemSettingsInput = ReturnType<typeof normalizeGradebookItemSettings>;
 type CourseWideAssignmentMetadata = {
   enabled?: boolean;
   availableFrom?: string | null;
   availableUntil?: string | null;
   enablePerGroupSettings?: boolean;
   assessmentMode?: "formative" | "summative";
+  gradebookSettings?: GradebookItemSettingsInput;
 };
 
 const COURSE_WIDE_ASSIGNMENT_METADATA_KEY = "allGroupsAssignment";
@@ -126,6 +129,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   const activity = await assertActivityBelongsToCourse(courseId, activityId);
   const availableFrom = parseDateInput(data.availableFrom);
   const availableUntil = parseDateInput(data.availableUntil);
+  const gradebookSettings = data.gradebookSettings ? normalizeGradebookItemSettings(data.gradebookSettings) : undefined;
 
   return prisma.$transaction(async (tx) => {
     const activityMetadata = asMetadataRecord(activity.metadata);
@@ -139,7 +143,8 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
             availableFrom: data.availableFrom ?? null,
             availableUntil: data.availableUntil ?? null,
             enablePerGroupSettings: data.enablePerGroupSettings,
-            assessmentMode: data.assessmentMode
+            assessmentMode: data.assessmentMode,
+            ...(gradebookSettings ? { gradebookSettings } : {})
           }
         }
       }
@@ -192,7 +197,8 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
               groupId: group.id,
               groupActivityId: assignment.id,
               activityId,
-              titleSnapshot: activity.title
+              titleSnapshot: activity.title,
+              gradebookSettings
             })
           );
       })
@@ -599,7 +605,8 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
       groupId,
       groupActivityId: assignment.id,
       activityId: assignment.activityId,
-      titleSnapshot: activity.title
+      titleSnapshot: activity.title,
+      gradebookSettings: data.gradebookSettings ? normalizeGradebookItemSettings(data.gradebookSettings) : undefined
     });
 
     return assignment;
@@ -714,7 +721,10 @@ async function createCourseWideAssignmentsForGroup(
             groupId,
             groupActivityId: createdAssignment.id,
             activityId: createdAssignment.activityId,
-            titleSnapshot: activity?.title ?? "Activity"
+            titleSnapshot: activity?.title ?? "Activity",
+            gradebookSettings: getCourseWideAssignmentMetadata(activity?.metadata)?.gradebookSettings
+              ? normalizeGradebookItemSettings(getCourseWideAssignmentMetadata(activity?.metadata)?.gradebookSettings)
+              : undefined
           });
         })
     )
@@ -729,17 +739,20 @@ async function ensureGradebookItemForAssignment(
     groupActivityId: string;
     activityId: string;
     titleSnapshot: string;
+    gradebookSettings?: GradebookItemSettingsInput;
   }
 ) {
+  const settings = input.gradebookSettings;
   await tx.gradebookItem.upsert({
     where: { groupActivityId: input.groupActivityId },
-    update: {},
+    update: settings ? buildGradebookItemSettingsData(settings) : {},
     create: {
       courseId: input.courseId,
       groupId: input.groupId,
       groupActivityId: input.groupActivityId,
       activityId: input.activityId,
-      titleSnapshot: input.titleSnapshot
+      titleSnapshot: input.titleSnapshot,
+      ...(settings ? buildGradebookItemSettingsData(settings) : {})
     }
   });
 }
@@ -840,6 +853,36 @@ function getCourseWideAssignmentMetadata(value: Prisma.JsonValue | undefined): C
     return null;
   }
   return rule as CourseWideAssignmentMetadata;
+}
+
+function normalizeGradebookItemSettings(input: unknown) {
+  const settings = GradebookItemSettingsInputSchema.parse(input ?? {});
+  const gradingMode = settings.gradingMode ?? "points";
+  const attemptLimitMode = settings.attemptLimitMode ?? "unlimited";
+  const pointsPossible = settings.pointsPossible ?? 100;
+  return {
+    pointsPossible,
+    gradingMode,
+    passThresholdPoints: gradingMode === "pass_fail" ? settings.passThresholdPoints ?? pointsPossible / 2 : null,
+    passThresholdOutOf: gradingMode === "pass_fail" ? settings.passThresholdOutOf ?? pointsPossible : null,
+    attemptLimitMode,
+    maxAttempts: attemptLimitMode === "max_attempts" ? settings.maxAttempts ?? 1 : null,
+    gradeStrategy: settings.gradeStrategy ?? "latest",
+    dropLowestAttempt: settings.dropLowestAttempt ?? false
+  };
+}
+
+function buildGradebookItemSettingsData(settings: GradebookItemSettingsInput) {
+  return {
+    pointsPossible: settings.pointsPossible,
+    gradingMode: settings.gradingMode,
+    passThresholdPoints: settings.passThresholdPoints,
+    passThresholdOutOf: settings.passThresholdOutOf,
+    attemptLimitMode: settings.attemptLimitMode,
+    maxAttempts: settings.maxAttempts,
+    gradeStrategy: settings.gradeStrategy,
+    dropLowestAttempt: settings.dropLowestAttempt
+  };
 }
 
 function buildCourseWideGroupAssignmentMetadata(enablePerGroupSettings: boolean, assessmentMode: "formative" | "summative"): Prisma.InputJsonValue {

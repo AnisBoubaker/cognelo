@@ -498,6 +498,49 @@ describe("group services", () => {
     });
   });
 
+  it("applies gradebook policy settings when assigning a summative group activity", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
+    mockPrisma.activity.findFirst.mockResolvedValue({ id: "activity-1", courseId: "course-1", title: "Trace loops" });
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue(null);
+
+    await assignActivityToGroup(teacherUser, "course-1", "group-1", {
+      activityId: "activity-1",
+      metadata: { assessmentMode: "summative" },
+      gradebookSettings: {
+        pointsPossible: 25,
+        gradingMode: "pass_fail",
+        passThresholdPoints: 18,
+        passThresholdOutOf: 25,
+        attemptLimitMode: "max_attempts",
+        maxAttempts: 3,
+        gradeStrategy: "best"
+      }
+    });
+
+    expect(tx.gradebookItem.upsert).toHaveBeenCalledWith({
+      where: { groupActivityId: "assignment-created" },
+      update: expect.objectContaining({
+        pointsPossible: 25,
+        gradingMode: "pass_fail",
+        passThresholdPoints: 18,
+        passThresholdOutOf: 25,
+        attemptLimitMode: "max_attempts",
+        maxAttempts: 3,
+        gradeStrategy: "best"
+      }),
+      create: expect.objectContaining({
+        courseId: "course-1",
+        groupId: "group-1",
+        groupActivityId: "assignment-created",
+        activityId: "activity-1",
+        titleSnapshot: "Trace loops",
+        pointsPossible: 25,
+        gradingMode: "pass_fail",
+        maxAttempts: 3
+      })
+    });
+  });
+
   it("allows course-wide group assignments to be reordered inside a group", async () => {
     mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
     mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({

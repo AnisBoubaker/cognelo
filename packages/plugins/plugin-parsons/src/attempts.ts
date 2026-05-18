@@ -93,6 +93,28 @@ export async function ensureParsonsAttempt(params: {
   return toParsonsAttemptRecord(attempt, initialState);
 }
 
+export async function findLatestParsonsAttempt(params: {
+  activityId: string;
+  userId: string;
+  config: ParsonsConfig;
+  status?: "in_progress" | "completed" | "abandoned";
+}) {
+  const attempt = await prisma.pluginParsonsAttempt.findFirst({
+    where: {
+      activityId: params.activityId,
+      userId: params.userId,
+      ...(params.status ? { status: params.status } : {})
+    },
+    orderBy: [{ updatedAt: "desc" }]
+  });
+
+  if (!attempt) {
+    return null;
+  }
+
+  return toParsonsAttemptRecord(attempt, normalizeAttemptState(attempt.latestState, params.config));
+}
+
 export async function updateParsonsAttempt(params: {
   activityId: string;
   userId: string;

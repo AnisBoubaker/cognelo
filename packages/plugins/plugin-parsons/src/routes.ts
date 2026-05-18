@@ -4,12 +4,13 @@ import {
   AppError,
   assertCanManageActivityBank,
   assertCanManageCourse,
+  getActivityAttemptAvailability,
   recordActivityAttemptGradingResult,
   startActivityAttempt,
   submitActivityAttempt
 } from "@cognelo/core";
 import { prisma } from "@cognelo/db";
-import { ensureParsonsAttempt, updateParsonsAttempt } from "./attempts";
+import { ensureParsonsAttempt, findLatestParsonsAttempt, updateParsonsAttempt } from "./attempts";
 import { parsonsAttemptEnsureInputSchema, parsonsAttemptUpdateInputSchema } from "./attempt-types";
 import { generateParsonsProblem, parsonsGenerationInputSchema } from "./generation";
 import { buildParsonsGradingResult } from "./grading";
@@ -70,10 +71,29 @@ export const parsonsAttemptRoute: PluginRouteDefinition = {
   methods: {
     POST: async ({ context, readJson }) => {
       const input = parsonsAttemptEnsureInputSchema.parse(await readJson());
+      const config = parseParsonsConfig(context.activity.config);
+      if (context.courseId && context.groupId && context.activity.assignment?.metadata?.assessmentMode === "summative") {
+        const availability = await getActivityAttemptAvailability(context.user, {
+          courseId: context.courseId,
+          groupId: context.groupId,
+          activityId: context.activity.id
+        });
+        if (!availability.canStart) {
+          const latestCompletedAttempt = await findLatestParsonsAttempt({
+            activityId: context.activity.id,
+            userId: context.user.id,
+            config,
+            status: "completed"
+          });
+          if (latestCompletedAttempt) {
+            return { attempt: latestCompletedAttempt, attemptAvailability: availability };
+          }
+        }
+      }
       const attempt = await ensureParsonsAttempt({
         activityId: context.activity.id,
         userId: context.user.id,
-        config: parseParsonsConfig(context.activity.config),
+        config,
         forceNew: input.forceNew
       });
 

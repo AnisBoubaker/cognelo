@@ -27,6 +27,11 @@ export type SubmitActivityAttemptInput = {
   now?: Date;
 };
 
+export type ActivityAttemptAvailabilityInput = ActivityAttemptSource & {
+  participantId?: string;
+  now?: Date;
+};
+
 export type RecordActivityAttemptGradingResultInput = {
   attemptId: string;
   rawScore: number;
@@ -78,6 +83,24 @@ export async function startActivityAttempt(user: CurrentUser, input: StartActivi
       }
     });
   });
+}
+
+export async function getActivityAttemptAvailability(user: CurrentUser, input: ActivityAttemptAvailabilityInput) {
+  const context = await resolveAssignedActivityAttemptContext(user, {
+    ...input,
+    pluginKey: "availability-check",
+    pluginVersion: "0"
+  });
+
+  try {
+    await assertAttemptCanStart(context, input.now ?? new Date());
+    return { canStart: true as const, reason: null };
+  } catch (error) {
+    if (error instanceof AppError && (error.code === "ATTEMPT_LIMIT_REACHED" || error.code === "ATTEMPT_DUE_DATE_PASSED")) {
+      return { canStart: false as const, reason: error.code };
+    }
+    throw error;
+  }
 }
 
 export async function submitActivityAttempt(user: CurrentUser, input: SubmitActivityAttemptInput) {
