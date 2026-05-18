@@ -4,6 +4,7 @@ export * from "./auth";
 export * from "./authorization";
 export * from "./courses";
 export * from "./errors";
+export * from "./gradebook";
 export * from "./groups";
 export * from "./materials";
 export * from "./plugins";

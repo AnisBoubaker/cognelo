@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  getAssignedGroupActivityAttemptSource,
   listPluginRoutes,
   resolvePluginRoute,
   runBankActivityDeletedHooks,
@@ -33,6 +34,33 @@ const activity: ServerActivityRecord = {
 };
 
 describe("server activity SDK", () => {
+  it("extracts assigned group activity attempt source from plugin route context", () => {
+    expect(
+      getAssignedGroupActivityAttemptSource({
+        user,
+        courseId: "course-1",
+        groupId: "group-1",
+        activityId: "activity-1",
+        path: ["parsons", "attempt"],
+        activity
+      })
+    ).toEqual({
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1"
+    });
+
+    expect(() =>
+      getAssignedGroupActivityAttemptSource({
+        user,
+        courseId: "course-1",
+        activityId: "activity-1",
+        path: ["parsons", "attempt"],
+        activity
+      })
+    ).toThrow("Assigned group activity attempts require course and group route context.");
+  });
+
   it("resolves plugin routes by normalized path and activity type", () => {
     expect(resolvePluginRoute("coding-exercise", ["coding-exercises", "run"])?.path).toBe("coding-exercises/run");
     expect(resolvePluginRoute("mcq", ["coding-exercises", "run"])).toBeNull();
