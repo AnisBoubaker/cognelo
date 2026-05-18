@@ -53,6 +53,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Deleting a bank activity that is used in courses is allowed only after a second confirmation. Existing course activities lose `bankActivityId` / `activityVersionId` through database `SetNull` relations and become fully course-local copies.
 - Activities remain plugin-style registry entries and are not hardcoded into course models.
 - Course managers can remove activities directly from the course detail page.
+- Gradebook Phase 1 core schema foundation is present in core Prisma: `GradebookItem`, `ActivityAttempt`, `Grade`, and `GradeEvent`. A gradebook item is one assigned group activity (`CourseGroupActivity`) and grades/attempts attach to `CourseGroupParticipant` with optional linked `User`. Plugin-specific attempt artifacts remain plugin-owned; core owns normalized attempt/grade/audit metadata.
 
 ## Naming Model
 

@@ -175,8 +175,13 @@ Core Prisma entities include:
 - `ActivityPluginInstallation`
 - `ActivityPluginTableBackup`
 - `Activity`
+- `CourseGroupActivity`
+- `GradebookItem`
+- `ActivityAttempt`
+- `Grade`
+- `GradeEvent`
 
-Enums cover course status, course membership role, course section participant role, material kind, and activity lifecycle.
+Enums cover course status, course membership role, course section participant role, material kind, activity lifecycle, attempt lifecycle, grade source, grade event type, grading mode, attempt limit mode, and grade strategy.
 
 ## Content Model
 
@@ -194,6 +199,10 @@ Subject
     Section(s)
       participants
       activity availability/assignment rows
+        GradebookItem
+          ActivityAttempt(s)
+          Grade
+          GradeEvent(s)
 ```
 
 Activity banks are reusable authoring libraries. A bank activity keeps a mutable current record plus immutable `ActivityVersion` snapshots. Saving in the bank creates a new version for future course use.
