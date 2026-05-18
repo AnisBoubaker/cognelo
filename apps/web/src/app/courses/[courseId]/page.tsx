@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
+import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import { api, ActivityBank, ActivityDefinition, ActivityType, AiAgentConnection, Course, CourseMaterial } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -35,6 +36,11 @@ export default function CourseDetailPage() {
   const [selectedActivityPickerTab, setSelectedActivityPickerTab] = useState<ActivityPickerTabId>("activity-banks");
   const [selectedActivityBankId, setSelectedActivityBankId] = useState("");
   const [isAddingActivity, setIsAddingActivity] = useState(false);
+  const [assignAllActivityId, setAssignAllActivityId] = useState<string | null>(null);
+  const [assignAllAvailableFrom, setAssignAllAvailableFrom] = useState("");
+  const [assignAllAvailableUntil, setAssignAllAvailableUntil] = useState("");
+  const [assignAllEnablePerGroupSettings, setAssignAllEnablePerGroupSettings] = useState(true);
+  const [assignAllSavingActivityId, setAssignAllSavingActivityId] = useState<string | null>(null);
   const [groupTitle, setGroupTitle] = useState("");
   const [isAddingGroup, setIsAddingGroup] = useState(false);
   const [materialMode, setMaterialMode] = useState<"folder" | "github_repo" | "file">("github_repo");
@@ -191,6 +197,62 @@ export default function CourseDetailPage() {
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("courseDetail.removeActivityError"));
+    }
+  }
+
+  function startAssigningActivityToAllGroups(activity: NonNullable<Course["activities"]>[number]) {
+    const rule = getAllGroupsAssignmentRule(activity);
+    setAssignAllActivityId(activity.id);
+    setAssignAllAvailableFrom(toDateTimeLocalValue(rule?.availableFrom));
+    setAssignAllAvailableUntil(toDateTimeLocalValue(rule?.availableUntil));
+    setAssignAllEnablePerGroupSettings(rule?.enablePerGroupSettings ?? true);
+    setError("");
+  }
+
+  async function assignActivityToAllGroups(event: FormEvent) {
+    event.preventDefault();
+    if (!assignAllActivityId) {
+      return;
+    }
+
+    setError("");
+    setAssignAllSavingActivityId(assignAllActivityId);
+    try {
+      await api.assignActivityToAllCourseGroups(courseId, assignAllActivityId, {
+        availableFrom: toIsoOrNull(assignAllAvailableFrom),
+        availableUntil: toIsoOrNull(assignAllAvailableUntil),
+        enablePerGroupSettings: assignAllEnablePerGroupSettings
+      });
+      setAssignAllActivityId(null);
+      setAssignAllAvailableFrom("");
+      setAssignAllAvailableUntil("");
+      setAssignAllEnablePerGroupSettings(true);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.assignAllGroupsError"));
+    } finally {
+      setAssignAllSavingActivityId(null);
+    }
+  }
+
+  async function removeActivityFromAllGroupsPolicy(activity: NonNullable<Course["activities"]>[number]) {
+    const confirmed = window.confirm(t("courseDetail.removeAllGroupsPolicyConfirm", { title: activity.title }));
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+    setAssignAllSavingActivityId(activity.id);
+    try {
+      await api.removeActivityFromAllCourseGroupsPolicy(courseId, activity.id);
+      if (assignAllActivityId === activity.id) {
+        setAssignAllActivityId(null);
+      }
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.removeAllGroupsPolicyError"));
+    } finally {
+      setAssignAllSavingActivityId(null);
     }
   }
 
@@ -811,14 +873,38 @@ export default function CourseDetailPage() {
                                   <Link href={`/courses/${course.id}/activities/${activity.id}`}>{activity.title}</Link>
                                 </strong>
                                 <span className="table-meta-note muted">
-                                  {activity.activityVersion
-                                    ? `Bank version ${activity.activityVersion.versionNumber}`
-                                    : activityCopy(activity.activityType.key).description || t(`activityLifecycle.${activity.lifecycle}`)}
+                                  {activityCopy(activity.activityType.key).description || t(`activityLifecycle.${activity.lifecycle}`)}
                                 </span>
+                                {activity.activityVersion || getAllGroupsAssignmentRule(activity)?.enabled ? (
+                                  <span className="metadata-badges">
+                                    {activity.activityVersion ? (
+                                      <span className="metadata-badge">{`Bank version ${activity.activityVersion.versionNumber}`}</span>
+                                    ) : null}
+                                    {getAllGroupsAssignmentRule(activity)?.enabled ? (
+                                      <span className="metadata-badge is-course-wide">
+                                        {t("courseDetail.assignedToAllGroups")} ·{" "}
+                                        {formatAvailabilityWindow(
+                                          getAllGroupsAssignmentRule(activity)?.availableFrom,
+                                          getAllGroupsAssignmentRule(activity)?.availableUntil,
+                                          t
+                                        )}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                ) : null}
                               </div>
                               <span className="eyebrow">{activityCopy(activity.activityType.key).name}</span>
                               <span className="table-meta muted">{t(`activityLifecycle.${activity.lifecycle}`)}</span>
                               <div className="table-actions">
+                                <button
+                                  aria-label={t("courseDetail.assignAllGroups")}
+                                  className="secondary icon-button"
+                                  title={t("courseDetail.assignAllGroups")}
+                                  type="button"
+                                  onClick={() => startAssigningActivityToAllGroups(activity)}
+                                >
+                                  <MaterialActionIcon name="assign" />
+                                </button>
                                 <Link
                                   aria-label={t("courseDetail.openActivity")}
                                   className="button secondary icon-button"
@@ -837,6 +923,63 @@ export default function CourseDetailPage() {
                                   <MaterialActionIcon name="remove" />
                                 </button>
                               </div>
+                              {assignAllActivityId === activity.id ? (
+                                <form className="form inline-panel table-inline-form" onSubmit={assignActivityToAllGroups}>
+                                  <div>
+                                    <p className="eyebrow">{t("courseDetail.assignAllGroupsEyebrow")}</p>
+                                    <h2>{t("courseDetail.assignAllGroupsTitle")}</h2>
+                                    <p className="muted">{t("courseDetail.assignAllGroupsText")}</p>
+                                  </div>
+                                  <div className="grid compact-form-grid">
+                                    <div className="field">
+                                      <label htmlFor={`assign-all-from-${activity.id}`}>{t("groupPage.availableFrom")}</label>
+                                      <DateTimeMinuteInput
+                                        id={`assign-all-from-${activity.id}`}
+                                        value={assignAllAvailableFrom}
+                                        onChange={setAssignAllAvailableFrom}
+                                        disabled={assignAllSavingActivityId === activity.id}
+                                      />
+                                    </div>
+                                    <div className="field">
+                                      <label htmlFor={`assign-all-until-${activity.id}`}>{t("groupPage.availableUntil")}</label>
+                                      <DateTimeMinuteInput
+                                        id={`assign-all-until-${activity.id}`}
+                                        value={assignAllAvailableUntil}
+                                        onChange={setAssignAllAvailableUntil}
+                                        disabled={assignAllSavingActivityId === activity.id}
+                                      />
+                                    </div>
+                                  </div>
+                                  <label className="checkbox-row" htmlFor={`assign-all-overrides-${activity.id}`}>
+                                    <input
+                                      id={`assign-all-overrides-${activity.id}`}
+                                      type="checkbox"
+                                      checked={assignAllEnablePerGroupSettings}
+                                      disabled={assignAllSavingActivityId === activity.id}
+                                      onChange={(event) => setAssignAllEnablePerGroupSettings(event.target.checked)}
+                                    />
+                                    <span>{t("courseDetail.enablePerGroupSettings")}</span>
+                                  </label>
+                                  <div className="row">
+                                    <button disabled={assignAllSavingActivityId === activity.id} type="submit">
+                                      {assignAllSavingActivityId === activity.id ? t("common.saving") : t("courseDetail.assignAllGroupsSave")}
+                                    </button>
+                                    {getAllGroupsAssignmentRule(activity)?.enabled ? (
+                                      <button
+                                        className="danger"
+                                        disabled={assignAllSavingActivityId === activity.id}
+                                        type="button"
+                                        onClick={() => removeActivityFromAllGroupsPolicy(activity)}
+                                      >
+                                        {t("courseDetail.removeAllGroupsPolicy")}
+                                      </button>
+                                    ) : null}
+                                    <button className="secondary" type="button" onClick={() => setAssignAllActivityId(null)}>
+                                      {t("common.cancel")}
+                                    </button>
+                                  </div>
+                                </form>
+                              ) : null}
                             </div>
                           ))}
                         </div>
@@ -1102,6 +1245,40 @@ function formatAiAgentOption(connection: AiAgentConnection, t: (key: string, var
   return `${connection.displayName} · ${t(`aiAgentProviders.${connection.provider}`)} · ${connection.model} · ${scope}`;
 }
 
+function getAllGroupsAssignmentRule(activity: NonNullable<Course["activities"]>[number]) {
+  const rule = activity.metadata?.allGroupsAssignment;
+  if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
+    return null;
+  }
+  const record = rule as Record<string, unknown>;
+  return {
+    enabled: record.enabled === true,
+    availableFrom: typeof record.availableFrom === "string" ? record.availableFrom : null,
+    availableUntil: typeof record.availableUntil === "string" ? record.availableUntil : null,
+    enablePerGroupSettings: record.enablePerGroupSettings !== false
+  };
+}
+
+function toDateTimeLocalValue(value: string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return offsetDate.toISOString().slice(0, 16);
+}
+
+function toIsoOrNull(value: string) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 function formatBytes(bytes: number) {
   if (bytes < 1024) {
     return `${bytes} B`;
@@ -1283,8 +1460,16 @@ function ActivityTypeIcon({ iconName }: { iconName: NonNullable<ActivityDefiniti
   );
 }
 
-function MaterialActionIcon({ name }: { name: "download" | "drag" | "edit" | "open" | "remove" }) {
+function MaterialActionIcon({ name }: { name: "assign" | "download" | "drag" | "edit" | "open" | "remove" }) {
   const paths = {
+    assign: (
+      <>
+        <path d="M4 6h10" />
+        <path d="M4 12h8" />
+        <path d="M4 18h6" />
+        <path d="M15 16l2 2 4-5" />
+      </>
+    ),
     download: (
       <>
         <path d="M12 3v10" />

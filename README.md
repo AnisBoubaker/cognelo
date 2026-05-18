@@ -131,6 +131,8 @@ POST   /api/courses/:courseId/activities
 GET    /api/courses/:courseId/activities/:activityId
 PATCH  /api/courses/:courseId/activities/:activityId
 DELETE /api/courses/:courseId/activities/:activityId
+POST   /api/courses/:courseId/activities/:activityId/assign-all-groups
+DELETE /api/courses/:courseId/activities/:activityId/assign-all-groups
 ```
 
 Plugin-specific subroutes are dispatched through:
@@ -197,6 +199,8 @@ Subject
 Activity banks are reusable authoring libraries. A bank activity keeps a mutable current record plus immutable `ActivityVersion` snapshots. Saving in the bank creates a new version for future course use.
 
 Adding a bank activity to a course creates a course-local `Activity` copy from the selected version. The copy keeps `bankActivityId` and `activityVersionId` for traceability, but it is not a live reference. Editing the course copy affects only that course and its students. Editing the bank later creates a new version and does not alter existing course copies.
+
+Course activities can be assigned to every group from the course page. This stores an all-groups policy on the course activity metadata and creates or updates real `CourseGroupActivity` rows for every existing group; future groups inherit those rows at group creation. The policy can enable per-group settings, which preserves existing group availability dates and lets teachers edit dates inside a group. When per-group settings are disabled, course-level availability replaces group dates and group-local date edits are blocked. These course-wide group assignments remain group-related for grading. Removing the all-groups policy leaves the existing group assignment rows in place and converts them back to group-managed assignments.
 
 Plugins that store private authoring/grading data can participate in the copy step through server plugin hooks. For example, web-design coding exercises copy the private reference bundle and Playwright tests from bank plugin tables into course plugin tables when the course activity is created.
 

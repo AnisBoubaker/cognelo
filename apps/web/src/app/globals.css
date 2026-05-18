@@ -946,6 +946,10 @@ a.card:hover,
   grid-template-columns: minmax(260px, 1.5fr) minmax(180px, 0.7fr) 110px max-content;
 }
 
+.table-row-activities .table-inline-form {
+  grid-column: 1 / -1;
+}
+
 .table-row-assignments {
   grid-template-columns: 28px minmax(220px, 1.2fr) minmax(210px, 0.9fr) minmax(210px, 0.9fr) max-content;
 }
@@ -1069,6 +1073,34 @@ a.card:hover,
   font-size: 12px;
   margin-top: 2px;
   white-space: normal;
+}
+
+.metadata-badges {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.metadata-badge {
+  background: color-mix(in srgb, var(--surface-2), white 18%);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--ink), var(--muted) 42%);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 5px 8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.metadata-badge.is-course-wide {
+  background: color-mix(in srgb, var(--brand-teal), white 84%);
+  border-color: color-mix(in srgb, var(--brand-teal), white 54%);
+  color: var(--accent-strong);
 }
 
 .material-glyph {

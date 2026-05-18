@@ -954,6 +954,7 @@ export default function CourseGroupPage() {
                       {assignedActivities.length ? (
                         <div className="table-list">
                           <div className="table-row table-row-assignments table-head" aria-hidden="true">
+                            <span />
                             <span>{t("courseDetail.titleHeader")}</span>
                             <span>{t("groupPage.availableFrom")}</span>
                             <span>{t("groupPage.availableUntil")}</span>
@@ -1608,6 +1609,9 @@ function GroupActivityCard({
 }) {
   const [availableFrom, setAvailableFrom] = useState(toDateTimeLocalValue(assignment.availableFrom));
   const [availableUntil, setAvailableUntil] = useState(toDateTimeLocalValue(assignment.availableUntil));
+  const isCourseWideAssignment = assignment.metadata?.assignmentScope === "course_all_groups";
+  const canEditAvailability = canManage && (!isCourseWideAssignment || assignment.metadata?.enablePerGroupSettings !== false);
+  const canRemoveLocally = canManage && !isCourseWideAssignment;
 
   useEffect(() => {
     setAvailableFrom(toDateTimeLocalValue(assignment.availableFrom));
@@ -1630,7 +1634,9 @@ function GroupActivityCard({
         >
           <MaterialActionIcon name="drag" />
         </span>
-      ) : null}
+      ) : (
+        <span aria-hidden="true" />
+      )}
       <div className="table-main table-main-stack assignment-main">
         <span className="eyebrow">{activityLabel}</span>
         <strong>
@@ -1641,6 +1647,14 @@ function GroupActivityCard({
         ) : (
           <span className="table-meta-note muted">{t("common.noDescription")}</span>
         )}
+        {isCourseWideAssignment ? (
+          <span className="metadata-badges">
+            <span className="metadata-badge is-course-wide">{t("groupPage.courseWideAssignment")}</span>
+            {assignment.metadata?.enablePerGroupSettings === false ? (
+              <span className="metadata-badge">{t("groupPage.courseWideSettingsLocked")}</span>
+            ) : null}
+          </span>
+        ) : null}
       </div>
       <div className="field assignment-date-field">
         <label className="sr-only" htmlFor={`available-from-${assignment.id}`}>{t("groupPage.availableFrom")}</label>
@@ -1648,7 +1662,7 @@ function GroupActivityCard({
           id={`available-from-${assignment.id}`}
           value={availableFrom}
           onChange={setAvailableFrom}
-          disabled={saving || !canManage}
+          disabled={saving || !canEditAvailability}
         />
       </div>
       <div className="field assignment-date-field">
@@ -1657,7 +1671,7 @@ function GroupActivityCard({
           id={`available-until-${assignment.id}`}
           value={availableUntil}
           onChange={setAvailableUntil}
-          disabled={saving || !canManage}
+          disabled={saving || !canEditAvailability}
         />
       </div>
       <div className="table-actions">
@@ -1673,7 +1687,7 @@ function GroupActivityCard({
           aria-label={t("common.save")}
           className="icon-button"
           type="button"
-          disabled={saving || !canManage}
+          disabled={saving || !canEditAvailability}
           title={saving ? t("common.saving") : t("common.save")}
           onClick={() => void onSave(assignment.id, availableFrom, availableUntil)}
         >
@@ -1683,8 +1697,8 @@ function GroupActivityCard({
           aria-label={t("groupPage.removeAssignment")}
           className="danger icon-button"
           type="button"
-          disabled={saving || !canManage}
-          title={t("groupPage.removeAssignment")}
+          disabled={saving || !canRemoveLocally}
+          title={isCourseWideAssignment ? t("groupPage.courseWideAssignmentLocked") : t("groupPage.removeAssignment")}
           onClick={() => void onRemove(assignment.id, assignment.activity.title)}
         >
           <MaterialActionIcon name="remove" />
