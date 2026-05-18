@@ -25,13 +25,15 @@ const mockPrisma = vi.hoisted(() => ({
     update: vi.fn()
   },
   courseGroupActivity: {
-    findFirst: vi.fn()
+    findFirst: vi.fn(),
+    findMany: vi.fn()
   },
   courseGroupParticipant: {
     findFirst: vi.fn()
   },
   gradebookItem: {
-    findMany: vi.fn()
+    findMany: vi.fn(),
+    upsert: vi.fn()
   }
 }));
 
@@ -107,6 +109,8 @@ describe("gradebook attempt services", () => {
     mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue(participant);
     mockPrisma.activityAttempt.count.mockResolvedValue(0);
     mockPrisma.gradebookItem.findMany.mockResolvedValue([]);
+    mockPrisma.gradebookItem.upsert.mockResolvedValue({ id: "gradebook-item-1" });
+    mockPrisma.courseGroupActivity.findMany.mockResolvedValue([]);
     tx.activityAttempt.findFirst.mockResolvedValue({ attemptNumber: 2 });
     tx.activityAttempt.create.mockImplementation(async ({ data }) => ({ id: "attempt-3", ...data }));
     tx.activityAttempt.update.mockImplementation(async ({ data }) => ({ id: "attempt-1", ...data }));
@@ -536,6 +540,43 @@ describe("gradebook attempt services", () => {
           maxScore: 100
         }
       ]
+    });
+  });
+
+  it("backfills missing gradebook items from existing group activity assignments before listing", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    mockPrisma.courseGroupActivity.findMany.mockResolvedValue([
+      {
+        id: "assignment-1",
+        groupId: "group-1",
+        activityId: "activity-1",
+        group: { courseId: "course-1" },
+        activity: { id: "activity-1", title: "Existing activity" }
+      }
+    ]);
+
+    await getCourseGradebook(teacherUser, "course-1");
+
+    expect(mockPrisma.courseGroupActivity.findMany).toHaveBeenCalledWith({
+      where: {
+        group: { courseId: "course-1" },
+        gradebookItem: null
+      },
+      include: {
+        group: { select: { courseId: true } },
+        activity: { select: { id: true, title: true } }
+      }
+    });
+    expect(mockPrisma.gradebookItem.upsert).toHaveBeenCalledWith({
+      where: { groupActivityId: "assignment-1" },
+      update: {},
+      create: {
+        courseId: "course-1",
+        groupId: "group-1",
+        groupActivityId: "assignment-1",
+        activityId: "activity-1",
+        titleSnapshot: "Existing activity"
+      }
     });
   });
 });

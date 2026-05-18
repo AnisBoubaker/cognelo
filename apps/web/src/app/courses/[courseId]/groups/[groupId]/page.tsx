@@ -58,6 +58,7 @@ export default function CourseGroupPage() {
   const [assignActivityId, setAssignActivityId] = useState("");
   const [assignAvailableFrom, setAssignAvailableFrom] = useState("");
   const [assignAvailableUntil, setAssignAvailableUntil] = useState("");
+  const [assignAssessmentMode, setAssignAssessmentMode] = useState<"formative" | "summative">("formative");
   const [isAssigningActivity, setIsAssigningActivity] = useState(false);
   const [draggingAssignmentId, setDraggingAssignmentId] = useState<string | null>(null);
   const [assignmentDropTargetId, setAssignmentDropTargetId] = useState<string | null>(null);
@@ -654,12 +655,13 @@ export default function CourseGroupPage() {
         availableFrom: toIsoOrNull(assignAvailableFrom),
         availableUntil: toIsoOrNull(assignAvailableUntil),
         config: {},
-        metadata: {},
+        metadata: { assessmentMode: assignAssessmentMode },
         position: assignedActivities.length
       });
       await refresh();
       setAssignAvailableFrom("");
       setAssignAvailableUntil("");
+      setAssignAssessmentMode("formative");
       const remaining = assignableActivities.filter((activity) => activity.id !== assignActivityId);
       setAssignActivityId(remaining[0]?.id ?? "");
       setIsAssigningActivity(false);
@@ -954,6 +956,18 @@ export default function CourseGroupPage() {
                                 onChange={setAssignAvailableUntil}
                                 disabled={!canManage}
                               />
+                            </div>
+                            <div className="field">
+                              <label htmlFor="assignAssessmentMode">{t("groupPage.assessmentMode")}</label>
+                              <select
+                                id="assignAssessmentMode"
+                                value={assignAssessmentMode}
+                                onChange={(event) => setAssignAssessmentMode(event.target.value as "formative" | "summative")}
+                                disabled={!canManage}
+                              >
+                                <option value="formative">{t("groupPage.assessmentModeFormative")}</option>
+                                <option value="summative">{t("groupPage.assessmentModeSummative")}</option>
+                              </select>
                             </div>
                           </div>
                           {assignmentError ? <p className="error">{assignmentError}</p> : null}
@@ -1763,6 +1777,13 @@ function GroupActivityCard({
             ) : null}
           </span>
         ) : null}
+        <span className="metadata-badges">
+          <span className="metadata-badge">
+            {assignment.metadata?.assessmentMode === "summative"
+              ? t("groupPage.assessmentModeSummative")
+              : t("groupPage.assessmentModeFormative")}
+          </span>
+        </span>
       </div>
       <div className="field assignment-date-field">
         <label className="sr-only" htmlFor={`available-from-${assignment.id}`}>{t("groupPage.availableFrom")}</label>

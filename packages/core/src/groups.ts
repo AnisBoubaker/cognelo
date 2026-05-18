@@ -22,6 +22,7 @@ type CourseWideAssignmentMetadata = {
   availableFrom?: string | null;
   availableUntil?: string | null;
   enablePerGroupSettings?: boolean;
+  assessmentMode?: "formative" | "summative";
 };
 
 const COURSE_WIDE_ASSIGNMENT_METADATA_KEY = "allGroupsAssignment";
@@ -137,7 +138,8 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
             enabled: true,
             availableFrom: data.availableFrom ?? null,
             availableUntil: data.availableUntil ?? null,
-            enablePerGroupSettings: data.enablePerGroupSettings
+            enablePerGroupSettings: data.enablePerGroupSettings,
+            assessmentMode: data.assessmentMode
           }
         }
       }
@@ -157,7 +159,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
       groups.map((group) => {
         const existingAssignment = group.activities.find((assignment) => assignment.activityId === activityId);
         const nextPosition = existingAssignment?.position ?? group.activities.length;
-        const groupAssignmentMetadata = buildCourseWideGroupAssignmentMetadata(data.enablePerGroupSettings);
+        const groupAssignmentMetadata = buildCourseWideGroupAssignmentMetadata(data.enablePerGroupSettings, data.assessmentMode);
         return tx.courseGroupActivity
           .upsert({
             where: {
@@ -451,7 +453,17 @@ export async function getGroupAssignedActivity(user: CurrentUser, courseId: stri
     }
   }
 
-  return assignment.activity;
+  return {
+    ...assignment.activity,
+    assignment: {
+      id: assignment.id,
+      availableFrom: assignment.availableFrom,
+      availableUntil: assignment.availableUntil,
+      config: assignment.config,
+      metadata: assignment.metadata,
+      position: assignment.position
+    }
+  };
 }
 
 export async function addGroupParticipant(user: CurrentUser, courseId: string, groupId: string, input: unknown) {
@@ -673,7 +685,7 @@ async function createCourseWideAssignmentsForGroup(
       activityId: activity.id,
       availableFrom: parseDateInput(rule.availableFrom),
       availableUntil: parseDateInput(rule.availableUntil),
-      metadata: buildCourseWideGroupAssignmentMetadata(rule.enablePerGroupSettings ?? true),
+      metadata: buildCourseWideGroupAssignmentMetadata(rule.enablePerGroupSettings ?? true, rule.assessmentMode ?? "formative"),
       position: index
     };
   });
@@ -830,10 +842,11 @@ function getCourseWideAssignmentMetadata(value: Prisma.JsonValue | undefined): C
   return rule as CourseWideAssignmentMetadata;
 }
 
-function buildCourseWideGroupAssignmentMetadata(enablePerGroupSettings: boolean): Prisma.InputJsonValue {
+function buildCourseWideGroupAssignmentMetadata(enablePerGroupSettings: boolean, assessmentMode: "formative" | "summative"): Prisma.InputJsonValue {
   return {
     assignmentScope: COURSE_WIDE_ASSIGNMENT_SCOPE,
-    enablePerGroupSettings
+    enablePerGroupSettings,
+    assessmentMode
   };
 }
 

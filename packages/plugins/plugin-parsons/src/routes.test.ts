@@ -4,6 +4,9 @@ const mocks = vi.hoisted(() => ({
   assertCanManageCourse: vi.fn(),
   ensureParsonsAttempt: vi.fn(),
   generateParsonsProblem: vi.fn(),
+  recordActivityAttemptGradingResult: vi.fn(),
+  startActivityAttempt: vi.fn(),
+  submitActivityAttempt: vi.fn(),
   updateParsonsAttempt: vi.fn(),
   prisma: {
     course: { findUnique: vi.fn() }
@@ -14,7 +17,10 @@ vi.mock("@cognelo/core", async () => {
   const actual = await vi.importActual<typeof import("@cognelo/core")>("@cognelo/core");
   return {
     ...actual,
-    assertCanManageCourse: mocks.assertCanManageCourse
+    assertCanManageCourse: mocks.assertCanManageCourse,
+    recordActivityAttemptGradingResult: mocks.recordActivityAttemptGradingResult,
+    startActivityAttempt: mocks.startActivityAttempt,
+    submitActivityAttempt: mocks.submitActivityAttempt
   };
 });
 
@@ -56,9 +62,12 @@ describe("Parsons plugin routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.ensureParsonsAttempt.mockResolvedValue({ id: "attempt-1" });
-    mocks.updateParsonsAttempt.mockResolvedValue({ id: "attempt-1" });
+    mocks.updateParsonsAttempt.mockResolvedValue({ id: "attempt-1", latestState: { configFingerprint: "fingerprint-1" } });
     mocks.generateParsonsProblem.mockResolvedValue({ status: "ok" });
     mocks.prisma.course.findUnique.mockResolvedValue({ subject: { title: "Programming", description: "Basics" } });
+    mocks.startActivityAttempt.mockResolvedValue({ id: "core-attempt-1" });
+    mocks.submitActivityAttempt.mockResolvedValue({ id: "core-attempt-1" });
+    mocks.recordActivityAttemptGradingResult.mockResolvedValue({ id: "grade-1" });
   });
 
   it("ensures and updates attempts", async () => {
@@ -76,7 +85,7 @@ describe("Parsons plugin routes", () => {
         context,
         readJson: async () => ({ attemptId: "clx0000000000000000000000" })
       })
-    ).resolves.toEqual({ attempt: { id: "attempt-1" } });
+    ).resolves.toMatchObject({ attempt: { id: "attempt-1" } });
   });
 
   it("rejects invalid attempt updates and generates with manager permission", async () => {
@@ -97,5 +106,55 @@ describe("Parsons plugin routes", () => {
       })
     ).resolves.toEqual({ status: "ok" });
     expect(mocks.assertCanManageCourse).toHaveBeenCalled();
+  });
+
+  it("records a core gradebook attempt for summative submissions", async () => {
+    await expect(
+      parsonsAttemptRoute.methods.PATCH?.({
+        request: new Request("http://test.local"),
+        context: {
+          ...context,
+          groupId: "group-1",
+          activity: {
+            ...context.activity,
+            assignment: {
+              id: "assignment-1",
+              metadata: { assessmentMode: "summative" }
+            }
+          }
+        },
+        readJson: async () => ({
+          attemptId: "clx0000000000000000000000",
+          submit: true,
+          result: { isCorrect: true, orderCorrect: true, indentationCorrect: true, misplacedBlocks: 0, incorrectIndents: 0 }
+        })
+      })
+    ).resolves.toEqual({ attempt: { id: "attempt-1", latestState: { configFingerprint: "fingerprint-1" } } });
+
+    expect(mocks.startActivityAttempt).toHaveBeenCalledWith(
+      context.user,
+      expect.objectContaining({
+        courseId: "course-1",
+        groupId: "group-1",
+        activityId: "activity-1",
+        pluginKey: "parsons",
+        pluginAttemptRef: "attempt-1",
+        activityConfigFingerprint: "fingerprint-1"
+      })
+    );
+    expect(mocks.submitActivityAttempt).toHaveBeenCalledWith(context.user, {
+      attemptId: "core-attempt-1",
+      pluginAttemptRef: "attempt-1"
+    });
+    expect(mocks.recordActivityAttemptGradingResult).toHaveBeenCalledWith(
+      context.user,
+      expect.objectContaining({
+        attemptId: "core-attempt-1",
+        rawScore: 1,
+        rawMaxScore: 1,
+        source: "auto",
+        isPass: true
+      })
+    );
   });
 });

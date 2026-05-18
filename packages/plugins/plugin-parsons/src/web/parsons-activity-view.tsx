@@ -23,6 +23,10 @@ type ActivityLike = {
   title: string;
   description: string;
   config?: Record<string, unknown>;
+  assignment?: {
+    id: string;
+    metadata?: Record<string, unknown>;
+  };
 };
 
 type CourseLike = {
@@ -46,8 +50,9 @@ type ParsonsAttemptsClient = {
     input: {
       attemptId: string;
       state?: ParsonsAttemptStateLike;
-      event?: { type: "move" | "indent" | "reset" | "check"; payload?: Record<string, unknown> };
+      event?: { type: "move" | "indent" | "reset" | "check" | "submit"; payload?: Record<string, unknown> };
       result?: ParsonsAttemptEvaluation;
+      submit?: boolean;
       complete?: boolean;
       abandon?: boolean;
     }
@@ -119,6 +124,8 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
 
   const solutionLines = getSolutionLines(solution);
   const isInstrumentedStudentSession = Boolean(attemptsClient && course?.id && !canManage);
+  const assessmentMode = activity.assignment?.metadata?.assessmentMode === "summative" ? "summative" : "formative";
+  const isSummativeStudentSession = isInstrumentedStudentSession && assessmentMode === "summative";
 
   useEffect(() => {
     const config = parseParsonsConfig(activity.config);
@@ -213,8 +220,9 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
 
   async function persistAttemptUpdate(input: {
     state?: ParsonsAttemptStateLike;
-    event?: { type: "move" | "indent" | "reset" | "check"; payload?: Record<string, unknown> };
+    event?: { type: "move" | "indent" | "reset" | "check" | "submit"; payload?: Record<string, unknown> };
     result?: ParsonsAttemptEvaluation;
+    submit?: boolean;
     complete?: boolean;
     forceNew?: boolean;
   }) {
@@ -239,6 +247,7 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
         state: input.state,
         event: input.event,
         result: input.result,
+        submit: input.submit,
         complete: input.complete
       });
       setAttempt(result.attempt);
@@ -479,7 +488,33 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
         }
       },
       result,
-      complete: result.isCorrect
+      complete: false
+    });
+  }
+
+  function submitSolution() {
+    const result = evaluateParsonsSolution(blocksRef.current, parseParsonsConfig(activity.config));
+    const nextFeedback = formatFeedback(result);
+    setFeedback(nextFeedback);
+    if (result.isCorrect) {
+      notifications.success(nextFeedback);
+    } else {
+      notifications.info(nextFeedback);
+    }
+
+    void persistAttemptUpdate({
+      state: buildAttemptStateSnapshot(blocksRef.current, selectedBlockIdRef.current, result),
+      event: {
+        type: "submit",
+        payload: {
+          isCorrect: result.isCorrect,
+          misplacedBlocks: result.misplacedBlocks,
+          incorrectIndents: result.incorrectIndents
+        }
+      },
+      result,
+      submit: true,
+      complete: true
     });
   }
 
@@ -822,6 +857,11 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
           <button type="button" onClick={checkSolution}>
             {t("parsons.check")}
           </button>
+          {isSummativeStudentSession ? (
+            <button type="button" onClick={submitSolution} disabled={attempt?.status === "completed"}>
+              {t("parsons.submit")}
+            </button>
+          ) : null}
         </div>
 
         <p className="muted">{t("parsons.keyboardHint")}</p>

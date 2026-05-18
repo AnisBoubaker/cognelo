@@ -246,6 +246,7 @@ export type CourseGradebookFilters = {
 
 export async function getCourseGradebook(user: CurrentUser, courseId: string, filters: CourseGradebookFilters = {}) {
   await canManageCourseOrThrow(user, courseId);
+  await ensureCourseGradebookItems(courseId);
   const statusFilter = filters.status ?? "all";
   const items = await prisma.gradebookItem.findMany({
     where: {
@@ -355,6 +356,39 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
     activities: [...activities.values()].sort((left, right) => left.title.localeCompare(right.title)),
     rows
   };
+}
+
+async function ensureCourseGradebookItems(courseId: string) {
+  const assignments = await prisma.courseGroupActivity.findMany({
+    where: {
+      group: { courseId },
+      gradebookItem: null
+    },
+    include: {
+      group: { select: { courseId: true } },
+      activity: { select: { id: true, title: true } }
+    }
+  });
+
+  if (!assignments.length) {
+    return;
+  }
+
+  await Promise.all(
+    assignments.map((assignment) =>
+      prisma.gradebookItem.upsert({
+        where: { groupActivityId: assignment.id },
+        update: {},
+        create: {
+          courseId: assignment.group.courseId,
+          groupId: assignment.groupId,
+          groupActivityId: assignment.id,
+          activityId: assignment.activityId,
+          titleSnapshot: assignment.activity.title
+        }
+      })
+    )
+  );
 }
 
 export async function getCourseGradebookCsv(user: CurrentUser, courseId: string, filters: CourseGradebookFilters = {}) {
