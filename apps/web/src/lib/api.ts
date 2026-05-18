@@ -11,6 +11,7 @@ import type {
   BankActivityUpdate,
   CourseGroupActivityInput,
   CourseGroupActivityUpdate,
+  CourseAllGroupsActivityAssignmentInput,
   CourseGroupInput,
   CourseGroupParticipantInput,
   CourseGroupParticipantRole,
@@ -699,6 +700,15 @@ export const api = {
     request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}`),
   groupActivity: (courseId: string, groupId: string, activityId: string) =>
     request<{ activity: Activity }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}`),
+  assignActivityToAllCourseGroups: (courseId: string, activityId: string, input: CourseAllGroupsActivityAssignmentInput) =>
+    request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}/assign-all-groups`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  removeActivityFromAllCourseGroupsPolicy: (courseId: string, activityId: string) =>
+    request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}/assign-all-groups`, {
+      method: "DELETE"
+    }),
   ensureParsonsAttempt: (courseId: string, activityId: string, input?: { forceNew?: boolean }) =>
     request<{ attempt: ParsonsAttempt }>(`/courses/${courseId}/activities/${activityId}/parsons/attempt`, {
       method: "POST",

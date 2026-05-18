@@ -75,6 +75,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Student course access should resolve to visible published sections/groups, and the course detail page should not act as the primary student workspace.
 - Student access to assigned activities should be section/group-scoped and assignment-aware rather than relying on course-level activity routes.
 - Student access to inherited course file materials from a section/group should respect section/group visibility rules and use section/group-scoped download routes.
+- Teachers can assign a course activity to all current and future groups from the course activity list. The course-level rule is stored on the course activity metadata, but it materializes as real `CourseGroupActivity` rows for each group so grading and later group-scoped records can stay attached to the group. Course-wide assignment policy includes `enablePerGroupSettings`: when true, existing group availability dates are preserved and group pages can edit dates; when false, course-level dates overwrite existing group dates and group-local date edits are blocked. Group-local screens must not allow removing assignments whose metadata marks them as course-wide all-group assignments, but teachers may reorder them alongside group-specific assignments. Removing the all-groups rule from the course page must leave existing `CourseGroupActivity` rows in place and remove only the course-wide metadata marker, converting them back to normal group-managed assignments.
 
 ## Course Material Decisions
 

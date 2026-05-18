@@ -1,4 +1,5 @@
 import {
+  CourseAllGroupsActivityAssignmentInputSchema,
   CourseGroupStatus,
   CourseGroupActivityInputSchema,
   CourseGroupActivityUpdateSchema,
@@ -15,6 +16,15 @@ import { assertCanManageCourse, assertCanViewCourse, canManageCourse, isAdmin } 
 import { AppError, notFound } from "./errors";
 
 type StudentAccessDb = Pick<typeof prisma, "role" | "userRole" | "courseMembership">;
+type CourseWideAssignmentMetadata = {
+  enabled?: boolean;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
+  enablePerGroupSettings?: boolean;
+};
+
+const COURSE_WIDE_ASSIGNMENT_METADATA_KEY = "allGroupsAssignment";
+const COURSE_WIDE_ASSIGNMENT_SCOPE = "course_all_groups";
 
 const groupInclude = {
   materials: { orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }] },
@@ -83,22 +93,147 @@ export async function getCourseGroup(user: CurrentUser, courseId: string, groupI
 export async function createCourseGroup(user: CurrentUser, courseId: string, input: unknown) {
   await assertCanManageCourse(user, courseId);
   const data = CourseGroupInputSchema.parse(input);
-  return prisma.courseGroup.create({
-    data: {
-      ...data,
-      status: "draft",
-      courseId,
-      createdById: user.id,
-      participants: {
-        create: {
-          userId: user.id,
-          role: "teacher",
-          firstName: firstNameFromName(user.name),
-          lastName: lastNameFromName(user.name),
-          email: user.email
+  return prisma.$transaction(async (tx) => {
+    const group = await tx.courseGroup.create({
+      data: {
+        ...data,
+        status: "draft",
+        courseId,
+        createdById: user.id,
+        participants: {
+          create: {
+            userId: user.id,
+            role: "teacher",
+            firstName: firstNameFromName(user.name),
+            lastName: lastNameFromName(user.name),
+            email: user.email
+          }
         }
       }
-    }
+    });
+
+    await createCourseWideAssignmentsForGroup(tx, courseId, group.id);
+    return group;
+  });
+}
+
+export async function assignActivityToAllCourseGroups(user: CurrentUser, courseId: string, activityId: string, input: unknown) {
+  await assertCanManageCourse(user, courseId);
+  const data = CourseAllGroupsActivityAssignmentInputSchema.parse(input);
+  validateAvailability(data.availableFrom, data.availableUntil);
+  const activity = await assertActivityBelongsToCourse(courseId, activityId);
+  const availableFrom = parseDateInput(data.availableFrom);
+  const availableUntil = parseDateInput(data.availableUntil);
+
+  return prisma.$transaction(async (tx) => {
+    const activityMetadata = asMetadataRecord(activity.metadata);
+    await tx.activity.update({
+      where: { id: activityId },
+      data: {
+        metadata: {
+          ...activityMetadata,
+          [COURSE_WIDE_ASSIGNMENT_METADATA_KEY]: {
+            enabled: true,
+            availableFrom: data.availableFrom ?? null,
+            availableUntil: data.availableUntil ?? null,
+            enablePerGroupSettings: data.enablePerGroupSettings
+          }
+        }
+      }
+    });
+
+    const groups = await tx.courseGroup.findMany({
+      where: { courseId },
+      include: {
+        activities: {
+          select: { id: true, activityId: true, position: true },
+          orderBy: [{ position: "asc" }, { createdAt: "asc" }]
+        }
+      }
+    });
+
+    await Promise.all(
+      groups.map((group) => {
+        const existingAssignment = group.activities.find((assignment) => assignment.activityId === activityId);
+        const nextPosition = existingAssignment?.position ?? group.activities.length;
+        const groupAssignmentMetadata = buildCourseWideGroupAssignmentMetadata(data.enablePerGroupSettings);
+        return tx.courseGroupActivity.upsert({
+          where: {
+            groupId_activityId: {
+              groupId: group.id,
+              activityId
+            }
+          },
+          update: data.enablePerGroupSettings
+            ? {
+                metadata: groupAssignmentMetadata
+              }
+            : {
+                availableFrom,
+                availableUntil,
+                metadata: groupAssignmentMetadata
+              },
+          create: {
+            groupId: group.id,
+            activityId,
+            availableFrom,
+            availableUntil,
+            metadata: groupAssignmentMetadata,
+            position: nextPosition
+          }
+        });
+      })
+    );
+
+    return tx.activity.findFirst({
+      where: { id: activityId, courseId },
+      include: { activityType: true, bankActivity: true, activityVersion: true }
+    });
+  });
+}
+
+export async function removeActivityFromAllCourseGroupsPolicy(user: CurrentUser, courseId: string, activityId: string) {
+  await assertCanManageCourse(user, courseId);
+  const activity = await assertActivityBelongsToCourse(courseId, activityId);
+
+  return prisma.$transaction(async (tx) => {
+    const activityMetadata = asMetadataRecord(activity.metadata);
+    const { [COURSE_WIDE_ASSIGNMENT_METADATA_KEY]: _removedRule, ...nextActivityMetadata } = activityMetadata;
+    await tx.activity.update({
+      where: { id: activityId },
+      data: {
+        metadata: nextActivityMetadata
+      }
+    });
+
+    const assignments = await tx.courseGroupActivity.findMany({
+      where: {
+        activityId,
+        group: { courseId }
+      },
+      select: {
+        id: true,
+        metadata: true
+      }
+    });
+
+    await Promise.all(
+      assignments
+        .filter((assignment) => isCourseWideGroupAssignment(assignment.metadata))
+        .map((assignment) =>
+          tx.courseGroupActivity.update({
+            where: { id: assignment.id },
+            data: {
+              metadata: removeCourseWideGroupAssignmentMarker(assignment.metadata)
+            }
+          })
+        )
+    );
+
+    return tx.activity.findFirst({
+      where: { id: activityId, courseId },
+      include: { activityType: true, bankActivity: true, activityVersion: true }
+    });
   });
 }
 
@@ -454,6 +589,9 @@ export async function updateGroupActivityAssignment(
   if (!assignment) {
     throw notFound("Group activity assignment");
   }
+  if (isCourseWideGroupAssignment(assignment.metadata) && !isAllowedCourseWideGroupAssignmentUpdate(data, assignment.metadata)) {
+    throw new AppError(400, "COURSE_WIDE_GROUP_ACTIVITY_LOCKED", "This activity is assigned to all groups from the course.");
+  }
 
   return prisma.courseGroupActivity.update({
     where: { id: assignmentId },
@@ -486,8 +624,45 @@ export async function deleteGroupActivityAssignment(
   if (!assignment) {
     throw notFound("Group activity assignment");
   }
+  if (isCourseWideGroupAssignment(assignment.metadata)) {
+    throw new AppError(400, "COURSE_WIDE_GROUP_ACTIVITY_LOCKED", "This activity is assigned to all groups from the course.");
+  }
   await prisma.courseGroupActivity.delete({ where: { id: assignmentId } });
   return { ok: true };
+}
+
+async function createCourseWideAssignmentsForGroup(
+  tx: Pick<typeof prisma, "activity" | "courseGroupActivity">,
+  courseId: string,
+  groupId: string
+) {
+  const courseActivities = await tx.activity.findMany({
+    where: { courseId },
+    orderBy: [{ position: "asc" }, { createdAt: "asc" }]
+  });
+  const assignmentData = courseActivities.flatMap((activity, index) => {
+    const rule = getCourseWideAssignmentMetadata(activity.metadata);
+    if (!rule?.enabled) {
+      return [];
+    }
+    return {
+      groupId,
+      activityId: activity.id,
+      availableFrom: parseDateInput(rule.availableFrom),
+      availableUntil: parseDateInput(rule.availableUntil),
+      metadata: buildCourseWideGroupAssignmentMetadata(rule.enablePerGroupSettings ?? true),
+      position: index
+    };
+  });
+
+  if (!assignmentData.length) {
+    return;
+  }
+
+  await tx.courseGroupActivity.createMany({
+    data: assignmentData,
+    skipDuplicates: true
+  });
 }
 
 async function assertGroupBelongsToCourse(courseId: string, groupId: string) {
@@ -570,6 +745,58 @@ function validateAvailability(availableFrom: string | null | undefined, availabl
   if (new Date(availableUntil).getTime() < new Date(availableFrom).getTime()) {
     throw new AppError(400, "INVALID_AVAILABILITY_WINDOW", "The availability end must be after the start.");
   }
+}
+
+function asMetadataRecord(value: Prisma.JsonValue | undefined): Record<string, Prisma.JsonValue> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, Prisma.JsonValue>;
+}
+
+function getCourseWideAssignmentMetadata(value: Prisma.JsonValue | undefined): CourseWideAssignmentMetadata | null {
+  const metadata = asMetadataRecord(value);
+  const rule = metadata[COURSE_WIDE_ASSIGNMENT_METADATA_KEY];
+  if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
+    return null;
+  }
+  return rule as CourseWideAssignmentMetadata;
+}
+
+function buildCourseWideGroupAssignmentMetadata(enablePerGroupSettings: boolean): Prisma.InputJsonValue {
+  return {
+    assignmentScope: COURSE_WIDE_ASSIGNMENT_SCOPE,
+    enablePerGroupSettings
+  };
+}
+
+function isCourseWideGroupAssignment(value: Prisma.JsonValue | undefined) {
+  const metadata = asMetadataRecord(value);
+  return metadata.assignmentScope === COURSE_WIDE_ASSIGNMENT_SCOPE;
+}
+
+function canEditCourseWideGroupAssignmentSettings(value: Prisma.JsonValue | undefined) {
+  const metadata = asMetadataRecord(value);
+  return metadata.enablePerGroupSettings !== false;
+}
+
+function removeCourseWideGroupAssignmentMarker(value: Prisma.JsonValue | undefined): Prisma.InputJsonValue {
+  const metadata = asMetadataRecord(value);
+  const { assignmentScope: _removedScope, enablePerGroupSettings: _removedSetting, ...nextMetadata } = metadata;
+  return nextMetadata as Prisma.InputJsonValue;
+}
+
+function isAllowedCourseWideGroupAssignmentUpdate(
+  data: ReturnType<typeof CourseGroupActivityUpdateSchema.parse>,
+  metadata: Prisma.JsonValue | undefined
+) {
+  if (data.config !== undefined || data.metadata !== undefined) {
+    return false;
+  }
+  if (!canEditCourseWideGroupAssignmentSettings(metadata) && (data.availableFrom !== undefined || data.availableUntil !== undefined)) {
+    return false;
+  }
+  return true;
 }
 
 function buildVisibleGroupWhere(): Prisma.CourseGroupWhereInput {

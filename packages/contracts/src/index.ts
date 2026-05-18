@@ -249,6 +249,13 @@ export const CourseGroupActivityInputSchema = z.object({
 });
 export type CourseGroupActivityInput = z.infer<typeof CourseGroupActivityInputSchema>;
 
+export const CourseAllGroupsActivityAssignmentInputSchema = z.object({
+  availableFrom: z.string().datetime().nullable().optional(),
+  availableUntil: z.string().datetime().nullable().optional(),
+  enablePerGroupSettings: z.boolean().optional().default(true)
+});
+export type CourseAllGroupsActivityAssignmentInput = z.infer<typeof CourseAllGroupsActivityAssignmentInputSchema>;
+
 export const CourseGroupActivityUpdateSchema = z.object({
   availableFrom: z.string().datetime().nullable().optional(),
   availableUntil: z.string().datetime().nullable().optional(),
