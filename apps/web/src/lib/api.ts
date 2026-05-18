@@ -516,6 +516,54 @@ export type WebDesignExerciseSubmission = {
   testResults: WebDesignExerciseTestResult[];
 };
 
+export type GradebookStatus = "all" | "missing" | "late" | "needs_grading" | "graded";
+
+export type CourseGradebook = {
+  filters: {
+    groupId: string | null;
+    activityId: string | null;
+    status: GradebookStatus;
+  };
+  groups: Array<{ id: string; title: string }>;
+  activities: Array<{ id: string; title: string }>;
+  rows: CourseGradebookRow[];
+};
+
+export type CourseGradebookRow = {
+  gradebookItemId: string;
+  groupId: string;
+  groupTitle: string;
+  activityId: string;
+  activityTitle: string;
+  activityTypeName: string;
+  participantId: string;
+  participantName: string;
+  participantEmail: string;
+  externalId?: string | null;
+  status: Exclude<GradebookStatus, "all">;
+  score: number | null;
+  maxScore: number;
+  isPass: boolean | null;
+  latePenaltyApplied: boolean;
+  latePenaltyPercent: number | null;
+  selectedAttemptNumber: number | null;
+  attemptCount: number;
+  lateAttemptCount: number;
+  submittedAttemptCount: number;
+  needsGradingCount: number;
+  attempts: Array<{
+    id: string;
+    attemptNumber: number;
+    lifecycle: "started" | "submitted" | "graded";
+    startedAt: string;
+    submittedAt: string | null;
+    gradedAt: string | null;
+    isLate: boolean;
+    lateBySeconds: number | null;
+    durationSeconds: number | null;
+  }>;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 export class ApiError extends Error {
@@ -650,6 +698,33 @@ export const api = {
     }),
   courses: () => request<{ courses: Course[] }>("/courses"),
   course: (courseId: string) => request<{ course: Course }>(`/courses/${courseId}`),
+  courseGradebook: (courseId: string, filters?: { groupId?: string; activityId?: string; status?: GradebookStatus }) => {
+    const params = new URLSearchParams();
+    if (filters?.groupId) {
+      params.set("groupId", filters.groupId);
+    }
+    if (filters?.activityId) {
+      params.set("activityId", filters.activityId);
+    }
+    if (filters?.status && filters.status !== "all") {
+      params.set("status", filters.status);
+    }
+    const query = params.toString();
+    return request<{ gradebook: CourseGradebook }>(`/courses/${courseId}/gradebook${query ? `?${query}` : ""}`);
+  },
+  courseGradebookCsvUrl: (courseId: string, filters?: { groupId?: string; activityId?: string; status?: GradebookStatus }) => {
+    const params = new URLSearchParams({ format: "csv" });
+    if (filters?.groupId) {
+      params.set("groupId", filters.groupId);
+    }
+    if (filters?.activityId) {
+      params.set("activityId", filters.activityId);
+    }
+    if (filters?.status && filters.status !== "all") {
+      params.set("status", filters.status);
+    }
+    return `${API_URL}/api/courses/${courseId}/gradebook?${params.toString()}`;
+  },
   createCourse: (input: CourseInput) =>
     request<{ course: Course }>("/courses", {
       method: "POST",
