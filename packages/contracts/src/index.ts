@@ -239,12 +239,25 @@ export type ActivityInput = z.infer<typeof ActivityInputSchema>;
 export const ActivityUpdateSchema = ActivityInputSchema.partial();
 export type ActivityUpdate = z.infer<typeof ActivityUpdateSchema>;
 
+export const GradebookItemSettingsInputSchema = z.object({
+  pointsPossible: z.number().positive().max(100000).optional(),
+  gradingMode: z.enum(["points", "pass_fail"]).optional(),
+  passThresholdPoints: z.number().min(0).max(100000).nullable().optional(),
+  passThresholdOutOf: z.number().positive().max(100000).nullable().optional(),
+  attemptLimitMode: z.enum(["unlimited", "max_attempts", "until_due"]).optional(),
+  maxAttempts: z.number().int().positive().max(1000).nullable().optional(),
+  gradeStrategy: z.enum(["latest", "best", "first", "weighted_average"]).optional(),
+  dropLowestAttempt: z.boolean().optional()
+});
+export type GradebookItemSettingsInput = z.infer<typeof GradebookItemSettingsInputSchema>;
+
 export const CourseGroupActivityInputSchema = z.object({
   activityId: RecordIdSchema,
   availableFrom: z.string().datetime().nullable().optional(),
   availableUntil: z.string().datetime().nullable().optional(),
   config: z.record(z.unknown()).optional().default({}),
   metadata: z.record(z.unknown()).optional().default({}),
+  gradebookSettings: GradebookItemSettingsInputSchema.optional(),
   position: z.number().int().min(0).optional().default(0)
 });
 export type CourseGroupActivityInput = z.infer<typeof CourseGroupActivityInputSchema>;
@@ -256,7 +269,8 @@ export const CourseAllGroupsActivityAssignmentInputSchema = z.object({
   availableFrom: z.string().datetime().nullable().optional(),
   availableUntil: z.string().datetime().nullable().optional(),
   enablePerGroupSettings: z.boolean().optional().default(true),
-  assessmentMode: AssignedActivityAssessmentModeSchema.optional().default("formative")
+  assessmentMode: AssignedActivityAssessmentModeSchema.optional().default("formative"),
+  gradebookSettings: GradebookItemSettingsInputSchema.optional()
 });
 export type CourseAllGroupsActivityAssignmentInput = z.infer<typeof CourseAllGroupsActivityAssignmentInputSchema>;
 

@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   assertCanManageCourse: vi.fn(),
   ensureParsonsAttempt: vi.fn(),
+  findLatestParsonsAttempt: vi.fn(),
   generateParsonsProblem: vi.fn(),
+  getActivityAttemptAvailability: vi.fn(),
   recordActivityAttemptGradingResult: vi.fn(),
   startActivityAttempt: vi.fn(),
   submitActivityAttempt: vi.fn(),
@@ -18,6 +20,7 @@ vi.mock("@cognelo/core", async () => {
   return {
     ...actual,
     assertCanManageCourse: mocks.assertCanManageCourse,
+    getActivityAttemptAvailability: mocks.getActivityAttemptAvailability,
     recordActivityAttemptGradingResult: mocks.recordActivityAttemptGradingResult,
     startActivityAttempt: mocks.startActivityAttempt,
     submitActivityAttempt: mocks.submitActivityAttempt
@@ -30,6 +33,7 @@ vi.mock("@cognelo/db", () => ({
 
 vi.mock("./attempts", () => ({
   ensureParsonsAttempt: mocks.ensureParsonsAttempt,
+  findLatestParsonsAttempt: mocks.findLatestParsonsAttempt,
   updateParsonsAttempt: mocks.updateParsonsAttempt
 }));
 
@@ -62,6 +66,8 @@ describe("Parsons plugin routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.ensureParsonsAttempt.mockResolvedValue({ id: "attempt-1" });
+    mocks.findLatestParsonsAttempt.mockResolvedValue({ id: "completed-attempt-1", status: "completed" });
+    mocks.getActivityAttemptAvailability.mockResolvedValue({ canStart: true, reason: null });
     mocks.updateParsonsAttempt.mockResolvedValue({ id: "attempt-1", latestState: { configFingerprint: "fingerprint-1" } });
     mocks.generateParsonsProblem.mockResolvedValue({ status: "ok" });
     mocks.prisma.course.findUnique.mockResolvedValue({ subject: { title: "Programming", description: "Basics" } });
@@ -156,5 +162,32 @@ describe("Parsons plugin routes", () => {
         isPass: true
       })
     );
+  });
+
+  it("returns the completed summative attempt when the core attempt limit is reached", async () => {
+    mocks.getActivityAttemptAvailability.mockResolvedValueOnce({ canStart: false, reason: "ATTEMPT_LIMIT_REACHED" });
+
+    await expect(
+      parsonsAttemptRoute.methods.POST?.({
+        request: new Request("http://test.local"),
+        context: {
+          ...context,
+          groupId: "group-1",
+          activity: {
+            ...context.activity,
+            assignment: {
+              id: "assignment-1",
+              metadata: { assessmentMode: "summative" }
+            }
+          }
+        },
+        readJson: async () => ({})
+      })
+    ).resolves.toEqual({
+      attempt: { id: "completed-attempt-1", status: "completed" },
+      attemptAvailability: { canStart: false, reason: "ATTEMPT_LIMIT_REACHED" }
+    });
+
+    expect(mocks.ensureParsonsAttempt).not.toHaveBeenCalled();
   });
 });

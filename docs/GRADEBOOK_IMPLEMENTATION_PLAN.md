@@ -462,9 +462,13 @@ First plugin integration target:
 - Completed: add assignment-level `assessmentMode` metadata for direct group assignments and course-wide all-groups assignments.
 - Completed: default new assignments to formative activity behavior.
 - Completed: expose formative/summative selection in group assignment and course-wide all-groups assignment forms.
+- Completed: expose core gradebook policy settings in summative assignment forms: points possible, points/pass-fail grading mode, pass threshold, attempt limit mode, max attempts, grade strategy, and drop-lowest for weighted averages.
+- Completed: persist those settings into each materialized `GradebookItem`, including all current groups and future groups created from an all-groups rule.
 - Completed: pass group assignment metadata into plugin route and renderer context.
 - Completed: make Parsons checks analytics-only for formative activities.
-- Completed: make Parsons summative submissions create core attempts and automatic grades.
+- Completed: make Parsons summative submissions create core attempts and automatic grades, with the student-facing Parsons toolbar showing Submit instead of Check.
+- Completed: make completed summative Parsons attempts read-only when the attempt limit is reached, so students can review the attempt without starting or submitting another one.
+- Completed: suppress correct/incorrect validation messages in summative Parsons mode.
 
 ### Phase 7: Student Grade Visibility
 

@@ -126,6 +126,7 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
   const isInstrumentedStudentSession = Boolean(attemptsClient && course?.id && !canManage);
   const assessmentMode = activity.assignment?.metadata?.assessmentMode === "summative" ? "summative" : "formative";
   const isSummativeStudentSession = isInstrumentedStudentSession && assessmentMode === "summative";
+  const isReadOnlyStudentAttempt = isSummativeStudentSession && attempt?.status === "completed";
 
   useEffect(() => {
     const config = parseParsonsConfig(activity.config);
@@ -186,7 +187,7 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
         setAttempt(attempt);
         setBlocks(attempt.latestState.blocks);
         setSelectedBlockId(attempt.latestState.selectedBlockId ?? null);
-        setFeedback(attempt.latestState.lastEvaluation ? formatFeedback(attempt.latestState.lastEvaluation) : "");
+        setFeedback(isSummativeStudentSession ? "" : attempt.latestState.lastEvaluation ? formatFeedback(attempt.latestState.lastEvaluation) : "");
       })
       .catch((err) => {
         if (!cancelled) {
@@ -197,7 +198,7 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
     return () => {
       cancelled = true;
     };
-  }, [activity.id, attemptsClient, course?.id, isInstrumentedStudentSession, t]);
+  }, [activity.id, attemptsClient, course?.id, isInstrumentedStudentSession, isSummativeStudentSession, t]);
 
   function buildAttemptStateSnapshot(nextBlocks: ParsonsBlock[], nextSelectedBlockId: string | null, lastEvaluation?: ParsonsAttemptEvaluation | null) {
     return buildParsonsAttemptState(parseParsonsConfig(activity.config), nextBlocks, nextSelectedBlockId, lastEvaluation);
@@ -388,6 +389,9 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
   }
 
   function moveBlock(index: number, direction: -1 | 1) {
+    if (isReadOnlyStudentAttempt) {
+      return;
+    }
     const currentBlocks = blocksRef.current;
     const nextIndex = index + direction;
     if (nextIndex < 0 || nextIndex >= currentBlocks.length) {
@@ -424,6 +428,9 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
   }
 
   function adjustIndent(index: number, direction: -1 | 1) {
+    if (isReadOnlyStudentAttempt) {
+      return;
+    }
     const currentBlocks = blocksRef.current;
     const nextBlocks = currentBlocks.map((block, currentIndex) =>
       currentIndex === index ? { ...block, currentIndent: Math.max(0, Math.min(6, block.currentIndent + direction)) } : block
@@ -454,6 +461,9 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
   }
 
   async function resetWorkspace() {
+    if (isReadOnlyStudentAttempt) {
+      return;
+    }
     const config = parseParsonsConfig(activity.config);
     const nextBlocks = resetParsonsBlocks(config);
     setBlocks(nextBlocks);
@@ -468,6 +478,9 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
   }
 
   function checkSolution() {
+    if (isReadOnlyStudentAttempt) {
+      return;
+    }
     const result = evaluateParsonsSolution(blocksRef.current, parseParsonsConfig(activity.config));
     const nextFeedback = formatFeedback(result);
     setFeedback(nextFeedback);
@@ -493,13 +506,18 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
   }
 
   function submitSolution() {
+    if (isReadOnlyStudentAttempt) {
+      return;
+    }
     const result = evaluateParsonsSolution(blocksRef.current, parseParsonsConfig(activity.config));
-    const nextFeedback = formatFeedback(result);
-    setFeedback(nextFeedback);
-    if (result.isCorrect) {
-      notifications.success(nextFeedback);
-    } else {
-      notifications.info(nextFeedback);
+    if (!isSummativeStudentSession) {
+      const nextFeedback = formatFeedback(result);
+      setFeedback(nextFeedback);
+      if (result.isCorrect) {
+        notifications.success(nextFeedback);
+      } else {
+        notifications.info(nextFeedback);
+      }
     }
 
     void persistAttemptUpdate({
@@ -851,17 +869,18 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
           </div>
 
         <div className="parsons-toolbar row">
-          <button className="secondary" type="button" onClick={resetWorkspace}>
+          <button className="secondary" type="button" onClick={resetWorkspace} disabled={isReadOnlyStudentAttempt}>
             {t("parsons.reset")}
           </button>
-          <button type="button" onClick={checkSolution}>
-            {t("parsons.check")}
-          </button>
           {isSummativeStudentSession ? (
-            <button type="button" onClick={submitSolution} disabled={attempt?.status === "completed"}>
+            <button type="button" onClick={submitSolution} disabled={isReadOnlyStudentAttempt}>
               {t("parsons.submit")}
             </button>
-          ) : null}
+          ) : (
+            <button type="button" onClick={checkSolution}>
+              {t("parsons.check")}
+            </button>
+          )}
         </div>
 
         <p className="muted">{t("parsons.keyboardHint")}</p>
@@ -874,10 +893,17 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
               aria-pressed={selectedBlockId === block.id}
               className={`parsons-block parsons-block-row ${selectedBlockId === block.id ? "is-selected" : ""}`}
               key={block.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => setSelectedBlockId((current) => (current === block.id ? null : block.id))}
+              role={isReadOnlyStudentAttempt ? undefined : "button"}
+              tabIndex={isReadOnlyStudentAttempt ? undefined : 0}
+              onClick={() => {
+                if (!isReadOnlyStudentAttempt) {
+                  setSelectedBlockId((current) => (current === block.id ? null : block.id));
+                }
+              }}
               onKeyDown={(event) => {
+                if (isReadOnlyStudentAttempt) {
+                  return;
+                }
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
                   setSelectedBlockId((current) => (current === block.id ? null : block.id));
@@ -888,6 +914,7 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
                 <button
                   aria-label={t("parsons.moveUp")}
                   className="secondary icon-button"
+                  disabled={isReadOnlyStudentAttempt}
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -900,6 +927,7 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
                 <button
                   aria-label={t("parsons.moveDown")}
                   className="secondary icon-button"
+                  disabled={isReadOnlyStudentAttempt}
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -914,6 +942,7 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
                     <button
                       aria-label={t("parsons.outdent")}
                       className="secondary icon-button"
+                      disabled={isReadOnlyStudentAttempt}
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation();
@@ -926,6 +955,7 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
                     <button
                       aria-label={t("parsons.indent")}
                       className="secondary icon-button"
+                      disabled={isReadOnlyStudentAttempt}
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation();
