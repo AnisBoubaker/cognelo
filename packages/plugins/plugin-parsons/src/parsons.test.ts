@@ -16,6 +16,7 @@ import {
   getParsonsConfigFingerprint,
   parsonsAttemptUpdateInputSchema
 } from "./attempt-types";
+import { buildParsonsGradingResult } from "./grading";
 
 describe("Parsons problem helpers", () => {
   it("parses defaults and normalizes groups", () => {
@@ -98,5 +99,44 @@ describe("Parsons problem helpers", () => {
         complete: true
       })
     ).not.toThrow();
+  });
+
+  it("builds a core-compatible grading result from a Parsons evaluation", () => {
+    expect(
+      buildParsonsGradingResult({
+        isCorrect: true,
+        orderCorrect: true,
+        indentationCorrect: true,
+        misplacedBlocks: 0,
+        incorrectIndents: 0
+      })
+    ).toMatchObject({
+      rawScore: 1,
+      rawMaxScore: 1,
+      isPass: true,
+      analyticsPayload: {
+        orderCorrect: true,
+        indentationCorrect: true,
+        misplacedBlocks: 0,
+        incorrectIndents: 0
+      },
+      metadata: {
+        gradingModel: "parsons-correctness-v1"
+      }
+    });
+
+    expect(
+      buildParsonsGradingResult({
+        isCorrect: false,
+        orderCorrect: true,
+        indentationCorrect: false,
+        misplacedBlocks: 0,
+        incorrectIndents: 2
+      })
+    ).toMatchObject({
+      rawScore: 0.7,
+      rawMaxScore: 1,
+      isPass: false
+    });
   });
 });

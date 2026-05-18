@@ -18,12 +18,37 @@ export type ActivityCategoryAssignment = readonly string[] | "all";
 
 export type ActivityIconName = "code" | "checklist" | "document-check" | "list-check" | "placeholder";
 
+export type ActivityGradingCapability = {
+  supportsAttempts?: boolean;
+  supportsAutoGrading?: boolean;
+  supportsManualGrading?: boolean;
+  supportsFeedbackRenderer?: boolean;
+  supportsAnalyticsPayloads?: boolean;
+  defaultMaxAttempts?: number | null;
+};
+
+export type ActivityGradingResult = {
+  rawScore: number;
+  rawMaxScore: number;
+  isPass?: boolean | null;
+  feedback?: Record<string, unknown>;
+  analyticsPayload?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+};
+
+export type ActivityManualGradingContract = {
+  routePath?: string;
+  rendererKey?: string;
+};
+
 export type ActivityDefinition = {
   key: string;
   name: string;
   description: string;
   defaultCategoryIds?: ActivityCategoryAssignment;
   icon?: ActivityIconName;
+  grading?: ActivityGradingCapability;
+  manualGrading?: ActivityManualGradingContract;
   i18n?: Partial<Record<PluginLocale, ActivityMessages>>;
   defaultConfig?: Record<string, unknown>;
   configSchema?: z.ZodTypeAny;

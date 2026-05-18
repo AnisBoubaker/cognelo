@@ -59,9 +59,31 @@ export type BankActivityDeletedHook = (input: {
   activityTypeKey: string;
 }) => Promise<void>;
 
+export type PluginGradingResult = {
+  rawScore: number;
+  rawMaxScore: number;
+  isPass?: boolean | null;
+  feedback?: Record<string, unknown>;
+  analyticsPayload?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+};
+
+export type PluginGradingHandler = (input: {
+  user: CurrentUser;
+  courseId: string;
+  groupId: string;
+  activityId: string;
+  coreAttemptId: string;
+  pluginAttemptRef?: string | null;
+  activity: ServerActivityRecord;
+}) => Promise<PluginGradingResult>;
+
 export type ServerActivityPlugin = {
   key: string;
   routes?: readonly PluginRouteDefinition[];
+  grading?: {
+    gradeAttempt?: PluginGradingHandler;
+  };
   hooks?: {
     onCourseActivityCreatedFromBankVersion?: CourseActivityCreatedFromBankVersionHook;
     onBankActivityDeleted?: BankActivityDeletedHook;

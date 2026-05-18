@@ -42,6 +42,17 @@ describe("activity SDK registry", () => {
     expect(getActivityDefinition("placeholder")?.defaultCategoryIds).toContain("miscellaneous");
   });
 
+  it("exposes grading capability metadata on gradable activity definitions", () => {
+    expect(getActivityDefinition("parsons-problem")?.grading).toEqual(
+      expect.objectContaining({
+        supportsAttempts: true,
+        supportsAutoGrading: true,
+        supportsManualGrading: true,
+        supportsAnalyticsPayloads: true
+      })
+    );
+  });
+
   it("exposes plugin database manifests for lifecycle management", () => {
     const modules = listPluginDatabaseModules();
     expect(modules.map((module) => module.pluginKey)).toContain("placeholder");
