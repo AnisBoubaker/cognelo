@@ -430,19 +430,19 @@ First plugin integration target:
 - Completed: implement late penalty application.
 - Completed: store every grade change as `GradeEvent`.
 
-### Phase 6: Teacher Gradebook UI
+### Phase 6: Teacher Gradebook UI - Completed
 
-- Add course-wide gradebook tab/page.
-- Add group/section gradebook view.
-- Add activity submissions view.
-- Add participant history view.
-- Add filters:
+- Completed: add course-wide gradebook tab/page.
+- Completed: add group/section gradebook view.
+- Completed: add activity submissions view through the gradebook activity/status filters and per-activity rows.
+- Completed: add participant history view through per-row attempt history summaries.
+- Completed: add filters:
   - group
   - activity
   - missing
   - late
   - needs grading
-- Add CSV export.
+- Completed: add CSV export.
 
 ### Phase 7: Student Grade Visibility
 

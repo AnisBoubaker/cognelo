@@ -29,6 +29,9 @@ const mockPrisma = vi.hoisted(() => ({
   },
   courseGroupParticipant: {
     findFirst: vi.fn()
+  },
+  gradebookItem: {
+    findMany: vi.fn()
   }
 }));
 
@@ -42,7 +45,7 @@ vi.mock("@cognelo/db", () => ({
 
 vi.mock("./authorization", () => authMocks);
 
-const { recordActivityAttemptGradingResult, startActivityAttempt, submitActivityAttempt } = await import("./gradebook");
+const { getCourseGradebook, recordActivityAttemptGradingResult, startActivityAttempt, submitActivityAttempt } = await import("./gradebook");
 
 const studentUser: CurrentUser = {
   id: "student-1",
@@ -94,6 +97,7 @@ const participant = {
   id: "participant-1",
   userId: "student-1"
 };
+const testNow = new Date("2026-05-18T15:00:00.000Z");
 
 describe("gradebook attempt services", () => {
   beforeEach(() => {
@@ -102,6 +106,7 @@ describe("gradebook attempt services", () => {
     mockPrisma.courseGroupActivity.findFirst.mockResolvedValue(groupActivity);
     mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue(participant);
     mockPrisma.activityAttempt.count.mockResolvedValue(0);
+    mockPrisma.gradebookItem.findMany.mockResolvedValue([]);
     tx.activityAttempt.findFirst.mockResolvedValue({ attemptNumber: 2 });
     tx.activityAttempt.create.mockImplementation(async ({ data }) => ({ id: "attempt-3", ...data }));
     tx.activityAttempt.update.mockImplementation(async ({ data }) => ({ id: "attempt-1", ...data }));
@@ -427,5 +432,110 @@ describe("gradebook attempt services", () => {
         })
       })
     );
+  });
+
+  it("lists course gradebook rows for student participants and filters missing work", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    mockPrisma.gradebookItem.findMany.mockResolvedValue([
+      {
+        id: "gradebook-item-1",
+        titleSnapshot: "Loops",
+        pointsPossible: 100,
+        group: {
+          id: "group-1",
+          title: "Section A",
+          participants: [
+            {
+              id: "participant-1",
+              firstName: "Student",
+              lastName: "One",
+              email: "student@example.test",
+              externalId: "S001",
+              user: null
+            }
+          ]
+        },
+        activity: {
+          id: "activity-1",
+          title: "Loops",
+          activityType: { key: "parsons-problem", name: "Parsons problem" }
+        },
+        groupActivity: {
+          id: "assignment-1",
+          availableFrom: null,
+          availableUntil: null
+        },
+        grades: [],
+        attempts: []
+      },
+      {
+        id: "gradebook-item-2",
+        titleSnapshot: "Branches",
+        pointsPossible: 100,
+        group: {
+          id: "group-1",
+          title: "Section A",
+          participants: [
+            {
+              id: "participant-1",
+              firstName: "Student",
+              lastName: "One",
+              email: "student@example.test",
+              externalId: "S001",
+              user: null
+            }
+          ]
+        },
+        activity: {
+          id: "activity-2",
+          title: "Branches",
+          activityType: { key: "parsons-problem", name: "Parsons problem" }
+        },
+        groupActivity: {
+          id: "assignment-2",
+          availableFrom: null,
+          availableUntil: null
+        },
+        grades: [
+          {
+            participantId: "participant-1",
+            normalizedScore: 92,
+            normalizedMaxScore: 100,
+            isPass: null,
+            latePenaltyApplied: false,
+            latePenaltyPercent: null,
+            selectedAttempt: { attemptNumber: 1, isLate: false }
+          }
+        ],
+        attempts: [
+          {
+            id: "attempt-1",
+            participantId: "participant-1",
+            attemptNumber: 1,
+            lifecycle: "graded",
+            startedAt: testNow,
+            submittedAt: testNow,
+            gradedAt: testNow,
+            isLate: false,
+            lateBySeconds: null,
+            durationSeconds: 60
+          }
+        ]
+      }
+    ]);
+
+    await expect(getCourseGradebook(teacherUser, "course-1", { status: "missing" })).resolves.toMatchObject({
+      rows: [
+        {
+          gradebookItemId: "gradebook-item-1",
+          groupTitle: "Section A",
+          activityTitle: "Loops",
+          participantName: "Student One",
+          status: "missing",
+          score: null,
+          maxScore: 100
+        }
+      ]
+    });
   });
 });

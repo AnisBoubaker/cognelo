@@ -13,9 +13,11 @@ import {
   ActivityDefinition,
   ActivityType,
   Course,
+  CourseGradebook,
   CourseGroup,
   CourseGroupMaterial,
   CourseMaterial,
+  GradebookStatus,
   GroupParticipant,
   GroupParticipantCandidate
 } from "@/lib/api";
@@ -31,6 +33,9 @@ export default function CourseGroupPage() {
   const [group, setGroup] = useState<CourseGroup | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
+  const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
+  const [gradebookActivityId, setGradebookActivityId] = useState("");
+  const [gradebookStatus, setGradebookStatus] = useState<GradebookStatus>("all");
   const [groupTitle, setGroupTitle] = useState("");
   const [groupStatus, setGroupStatus] = useState<"draft" | "published">("draft");
   const [groupAvailableFrom, setGroupAvailableFrom] = useState("");
@@ -92,11 +97,23 @@ export default function CourseGroupPage() {
     setGroupAvailableUntil(toDateTimeLocalValue(groupResult.group.availableUntil));
     setActivityTypes(typeResult.activityTypes);
     setActivityDefinitions(typeResult.registeredDefinitions);
+    const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
+    const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher";
+    if (userCanManage) {
+      const gradebookResult = await api.courseGradebook(courseId, {
+        groupId,
+        activityId: gradebookActivityId || undefined,
+        status: gradebookStatus
+      });
+      setGradebook(gradebookResult.gradebook);
+    } else {
+      setGradebook(null);
+    }
   }
 
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("groupPage.loadError")));
-  }, [courseId, groupId, t]);
+  }, [courseId, groupId, t, user, gradebookActivityId, gradebookStatus]);
 
   const materials = group?.materials ?? [];
   const folders = materials.filter((material) => material.kind === "folder").sort(compareMaterials);
@@ -1349,6 +1366,97 @@ export default function CourseGroupPage() {
                   )
                 },
                 {
+                  id: "gradebook",
+                  label: t("groupPage.gradebookTab"),
+                  render: () => (
+                    <section className="section stack">
+                      <div className="section-heading">
+                        <div>
+                          <p className="eyebrow">{t("groupPage.gradebookEyebrow")}</p>
+                          <h2>{t("groupPage.gradebookTitle")}</h2>
+                        </div>
+                        <a
+                          className="button secondary"
+                          href={api.courseGradebookCsvUrl(courseId, {
+                            groupId,
+                            activityId: gradebookActivityId || undefined,
+                            status: gradebookStatus
+                          })}
+                        >
+                          {t("courseDetail.exportCsv")}
+                        </a>
+                      </div>
+                      <div className="form inline-panel gradebook-filters">
+                        <div className="field">
+                          <label htmlFor="group-gradebook-activity-filter">{t("courseDetail.activityFilter")}</label>
+                          <select
+                            id="group-gradebook-activity-filter"
+                            value={gradebookActivityId}
+                            onChange={(event) => setGradebookActivityId(event.target.value)}
+                          >
+                            <option value="">{t("courseDetail.allActivities")}</option>
+                            {(gradebook?.activities ?? []).map((activity) => (
+                              <option key={activity.id} value={activity.id}>
+                                {activity.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="field">
+                          <label htmlFor="group-gradebook-status-filter">{t("courseDetail.statusFilter")}</label>
+                          <select
+                            id="group-gradebook-status-filter"
+                            value={gradebookStatus}
+                            onChange={(event) => setGradebookStatus(event.target.value as GradebookStatus)}
+                          >
+                            <option value="all">{t("courseDetail.gradebookStatusAll")}</option>
+                            <option value="missing">{t("courseDetail.gradebookStatusMissing")}</option>
+                            <option value="late">{t("courseDetail.gradebookStatusLate")}</option>
+                            <option value="needs_grading">{t("courseDetail.gradebookStatusNeedsGrading")}</option>
+                            <option value="graded">{t("courseDetail.gradebookStatusGraded")}</option>
+                          </select>
+                        </div>
+                      </div>
+                      {gradebook?.rows.length ? (
+                        <div className="table-list">
+                          <div className="table-row table-row-gradebook table-head" aria-hidden="true">
+                            <span>{t("courseDetail.studentHeader")}</span>
+                            <span>{t("courseDetail.activityHeader")}</span>
+                            <span>{t("courseDetail.gradeHeader")}</span>
+                            <span>{t("courseDetail.statusHeader")}</span>
+                          </div>
+                          {gradebook.rows.map((row) => (
+                            <div className="table-row table-row-gradebook-group" key={`${row.gradebookItemId}-${row.participantId}`}>
+                              <div className="table-main table-main-stack">
+                                <strong>{row.participantName}</strong>
+                                <span className="table-meta-note muted">{row.participantEmail}</span>
+                              </div>
+                              <div className="table-main table-main-stack">
+                                <strong>{row.activityTitle}</strong>
+                                <span className="table-meta-note muted">{row.activityTypeName}</span>
+                              </div>
+                              <div className="table-main table-main-stack">
+                                <strong>{formatGradebookScore(row.score, row.maxScore)}</strong>
+                                <span className="table-meta-note muted">
+                                  {t("courseDetail.attemptSummary", {
+                                    count: row.attemptCount,
+                                    selected: row.selectedAttemptNumber ?? "-"
+                                  })}
+                                </span>
+                              </div>
+                              <span className={`participant-status is-${row.status.replace("_", "-")}`}>
+                                {t(`courseDetail.gradebookStatus.${row.status}`)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="muted">{t("courseDetail.noGradebookRows")}</p>
+                      )}
+                    </section>
+                  )
+                },
+                {
                   id: "participants",
                   label: t("groupPage.participantsTab"),
                   render: () => (
@@ -1780,6 +1888,17 @@ function formatAvailabilityValue(value: string) {
     hour12: false,
     hourCycle: "h23"
   }).format(date);
+}
+
+function formatGradebookScore(score: number | null, maxScore: number) {
+  if (score === null) {
+    return "-";
+  }
+  return `${formatGradeNumber(score)} / ${formatGradeNumber(maxScore)}`;
+}
+
+function formatGradeNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
 type MaterialTreeNode = {

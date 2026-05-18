@@ -236,6 +236,163 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
   });
 }
 
+export type CourseGradebookStatusFilter = "all" | "missing" | "late" | "needs_grading" | "graded";
+
+export type CourseGradebookFilters = {
+  groupId?: string | null;
+  activityId?: string | null;
+  status?: CourseGradebookStatusFilter | null;
+};
+
+export async function getCourseGradebook(user: CurrentUser, courseId: string, filters: CourseGradebookFilters = {}) {
+  await canManageCourseOrThrow(user, courseId);
+  const statusFilter = filters.status ?? "all";
+  const items = await prisma.gradebookItem.findMany({
+    where: {
+      courseId,
+      ...(filters.groupId ? { groupId: filters.groupId } : {}),
+      ...(filters.activityId ? { activityId: filters.activityId } : {})
+    },
+    include: {
+      group: {
+        select: {
+          id: true,
+          title: true,
+          participants: {
+            where: { role: "student" },
+            orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { email: "asc" }],
+            include: {
+              user: { select: { id: true, email: true, name: true } }
+            }
+          }
+        }
+      },
+      activity: {
+        select: {
+          id: true,
+          title: true,
+          activityType: { select: { key: true, name: true } }
+        }
+      },
+      groupActivity: {
+        select: {
+          id: true,
+          availableFrom: true,
+          availableUntil: true
+        }
+      },
+      grades: {
+        include: {
+          selectedAttempt: true
+        }
+      },
+      attempts: {
+        orderBy: [{ attemptNumber: "asc" }]
+      }
+    },
+    orderBy: [{ group: { title: "asc" } }, { titleSnapshot: "asc" }]
+  });
+
+  const groups = new Map<string, { id: string; title: string }>();
+  const activities = new Map<string, { id: string; title: string }>();
+
+  const rows = items.flatMap((item) => {
+    groups.set(item.group.id, { id: item.group.id, title: item.group.title });
+    activities.set(item.activity.id, { id: item.activity.id, title: item.activity.title });
+
+    return item.group.participants.flatMap((participant) => {
+      const grade = item.grades.find((candidate) => candidate.participantId === participant.id) ?? null;
+      const attempts = item.attempts.filter((attempt) => attempt.participantId === participant.id);
+      const status = getGradebookRowStatus(grade, attempts);
+      if (statusFilter !== "all" && status !== statusFilter) {
+        return [];
+      }
+
+      return {
+        gradebookItemId: item.id,
+        groupId: item.group.id,
+        groupTitle: item.group.title,
+        activityId: item.activity.id,
+        activityTitle: item.titleSnapshot || item.activity.title,
+        activityTypeName: item.activity.activityType.name,
+        participantId: participant.id,
+        participantName: formatParticipantName(participant),
+        participantEmail: participant.email,
+        externalId: participant.externalId,
+        status,
+        score: grade?.normalizedScore ?? null,
+        maxScore: grade?.normalizedMaxScore ?? item.pointsPossible,
+        isPass: grade?.isPass ?? null,
+        latePenaltyApplied: grade?.latePenaltyApplied ?? false,
+        latePenaltyPercent: grade?.latePenaltyPercent ?? null,
+        selectedAttemptNumber: grade?.selectedAttempt?.attemptNumber ?? null,
+        attemptCount: attempts.length,
+        lateAttemptCount: attempts.filter((attempt) => attempt.isLate).length,
+        submittedAttemptCount: attempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded").length,
+        needsGradingCount: attempts.filter((attempt) => attempt.lifecycle === "submitted").length,
+        attempts: attempts.map((attempt) => ({
+          id: attempt.id,
+          attemptNumber: attempt.attemptNumber,
+          lifecycle: attempt.lifecycle,
+          startedAt: attempt.startedAt.toISOString(),
+          submittedAt: attempt.submittedAt?.toISOString() ?? null,
+          gradedAt: attempt.gradedAt?.toISOString() ?? null,
+          isLate: attempt.isLate,
+          lateBySeconds: attempt.lateBySeconds,
+          durationSeconds: attempt.durationSeconds
+        }))
+      };
+    });
+  });
+
+  return {
+    filters: {
+      groupId: filters.groupId ?? null,
+      activityId: filters.activityId ?? null,
+      status: statusFilter
+    },
+    groups: [...groups.values()].sort((left, right) => left.title.localeCompare(right.title)),
+    activities: [...activities.values()].sort((left, right) => left.title.localeCompare(right.title)),
+    rows
+  };
+}
+
+export async function getCourseGradebookCsv(user: CurrentUser, courseId: string, filters: CourseGradebookFilters = {}) {
+  const gradebook = await getCourseGradebook(user, courseId, filters);
+  const headers = [
+    "Group",
+    "Activity",
+    "Participant",
+    "Email",
+    "External ID",
+    "Status",
+    "Score",
+    "Max Score",
+    "Pass",
+    "Attempts",
+    "Late Attempts",
+    "Needs Grading"
+  ];
+  const lines = [
+    headers,
+    ...gradebook.rows.map((row) => [
+      row.groupTitle,
+      row.activityTitle,
+      row.participantName,
+      row.participantEmail,
+      row.externalId ?? "",
+      row.status,
+      row.score ?? "",
+      row.maxScore,
+      row.isPass === null ? "" : row.isPass ? "pass" : "fail",
+      row.attemptCount,
+      row.lateAttemptCount,
+      row.needsGradingCount
+    ])
+  ];
+  return lines.map((line) => line.map(csvCell).join(",")).join("\n");
+}
+
 async function resolveAssignedActivityAttemptContext(user: CurrentUser, input: StartActivityAttemptInput) {
   const groupActivity = await prisma.courseGroupActivity.findFirst({
     where: {
@@ -326,6 +483,39 @@ async function assertCanUseAttempt(
     return;
   }
   throw forbidden();
+}
+
+async function canManageCourseOrThrow(user: CurrentUser, courseId: string) {
+  if (await canManageCourse(user, courseId)) {
+    return;
+  }
+  throw forbidden();
+}
+
+function getGradebookRowStatus(
+  grade: { normalizedScore: number; selectedAttempt?: { isLate: boolean } | null } | null,
+  attempts: Array<{ lifecycle: "started" | "submitted" | "graded"; isLate: boolean }>
+): CourseGradebookStatusFilter {
+  if (attempts.some((attempt) => attempt.lifecycle === "submitted")) {
+    return "needs_grading";
+  }
+  if (!grade) {
+    return "missing";
+  }
+  if (grade.selectedAttempt?.isLate || attempts.some((attempt) => attempt.lifecycle === "graded" && attempt.isLate)) {
+    return "late";
+  }
+  return "graded";
+}
+
+function formatParticipantName(participant: { firstName: string; lastName: string; email: string }) {
+  const name = `${participant.firstName} ${participant.lastName}`.trim();
+  return name || participant.email;
+}
+
+function csvCell(value: string | number | null | undefined) {
+  const text = value === null || value === undefined ? "" : String(value);
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
 function computeAttemptLateness(availableUntil: Date | null, graceMinutes: number | null, now: Date) {

@@ -958,6 +958,14 @@ a.card:hover,
   grid-template-columns: minmax(180px, 1fr) 110px minmax(220px, 1.1fr) minmax(140px, 0.8fr) 140px max-content;
 }
 
+.table-row-gradebook {
+  grid-template-columns: minmax(180px, 1fr) minmax(140px, 0.7fr) minmax(220px, 1fr) minmax(180px, 0.9fr) max-content;
+}
+
+.table-row-gradebook-group {
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1fr) minmax(180px, 0.9fr) max-content;
+}
+
 .table-row:first-child {
   border-top: 0;
 }
@@ -1362,6 +1370,28 @@ a.card:hover,
 .participant-status.is-pending {
   background: color-mix(in srgb, var(--brand-gold), white 82%);
   color: color-mix(in srgb, var(--brand-ink), black 10%);
+}
+
+.participant-status.is-missing {
+  background: color-mix(in srgb, var(--line), white 65%);
+  color: var(--muted);
+}
+
+.participant-status.is-late,
+.participant-status.is-needs-grading {
+  background: color-mix(in srgb, var(--brand-gold), white 78%);
+  color: color-mix(in srgb, var(--brand-ink), black 10%);
+}
+
+.participant-status.is-graded {
+  background: color-mix(in srgb, var(--brand-teal), white 84%);
+  color: var(--accent-strong);
+}
+
+.gradebook-filters {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .participant-role {

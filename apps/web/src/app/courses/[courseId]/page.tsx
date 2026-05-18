@@ -8,7 +8,7 @@ import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
-import { api, ActivityBank, ActivityDefinition, ActivityType, AiAgentConnection, Course, CourseMaterial } from "@/lib/api";
+import { api, ActivityBank, ActivityDefinition, ActivityType, AiAgentConnection, Course, CourseGradebook, CourseMaterial, GradebookStatus } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 type ActivityCategoryId = "programming" | "miscellaneous";
@@ -30,6 +30,10 @@ export default function CourseDetailPage() {
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [activityBanks, setActivityBanks] = useState<ActivityBank[]>([]);
   const [aiAgentConnections, setAiAgentConnections] = useState<AiAgentConnection[]>([]);
+  const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
+  const [gradebookGroupId, setGradebookGroupId] = useState("");
+  const [gradebookActivityId, setGradebookActivityId] = useState("");
+  const [gradebookStatus, setGradebookStatus] = useState<GradebookStatus>("all");
   const [studentSupportAgentId, setStudentSupportAgentId] = useState("");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [showActivityPicker, setShowActivityPicker] = useState(false);
@@ -65,6 +69,18 @@ export default function CourseDetailPage() {
     setCourse(courseResult.course);
     setActivityTypes(typeResult.activityTypes);
     setActivityDefinitions(typeResult.registeredDefinitions);
+    const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
+    const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher";
+    if (userCanManage) {
+      const gradebookResult = await api.courseGradebook(courseId, {
+        groupId: gradebookGroupId || undefined,
+        activityId: gradebookActivityId || undefined,
+        status: gradebookStatus
+      });
+      setGradebook(gradebookResult.gradebook);
+    } else {
+      setGradebook(null);
+    }
     const aiSettings = getCourseAiSettings(courseResult.course);
     setStudentSupportAgentId(aiSettings.studentSupportAiAgentConnectionId);
     api
@@ -79,7 +95,7 @@ export default function CourseDetailPage() {
 
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("courseDetail.loadError")));
-  }, [courseId, t]);
+  }, [courseId, t, user, gradebookGroupId, gradebookActivityId, gradebookStatus]);
 
   const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
   const canManage = user?.roles.includes("admin") || membershipRole === "owner" || membershipRole === "teacher";
@@ -1067,6 +1083,126 @@ export default function CourseDetailPage() {
                   )
                 },
                 {
+                  id: "gradebook",
+                  label: t("courseDetail.gradebookTab"),
+                  render: () => (
+                    <section className="section stack">
+                      <div className="section-heading">
+                        <div>
+                          <p className="eyebrow">{t("courseDetail.gradebookEyebrow")}</p>
+                          <h2>{t("courseDetail.gradebookTitle")}</h2>
+                        </div>
+                        <a
+                          className="button secondary"
+                          href={api.courseGradebookCsvUrl(courseId, {
+                            groupId: gradebookGroupId || undefined,
+                            activityId: gradebookActivityId || undefined,
+                            status: gradebookStatus
+                          })}
+                        >
+                          {t("courseDetail.exportCsv")}
+                        </a>
+                      </div>
+
+                      <div className="form inline-panel gradebook-filters">
+                        <div className="field">
+                          <label htmlFor="gradebook-group-filter">{t("courseDetail.groupFilter")}</label>
+                          <select id="gradebook-group-filter" value={gradebookGroupId} onChange={(event) => setGradebookGroupId(event.target.value)}>
+                            <option value="">{t("courseDetail.allGroups")}</option>
+                            {(gradebook?.groups ?? []).map((group) => (
+                              <option key={group.id} value={group.id}>
+                                {group.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="field">
+                          <label htmlFor="gradebook-activity-filter">{t("courseDetail.activityFilter")}</label>
+                          <select
+                            id="gradebook-activity-filter"
+                            value={gradebookActivityId}
+                            onChange={(event) => setGradebookActivityId(event.target.value)}
+                          >
+                            <option value="">{t("courseDetail.allActivities")}</option>
+                            {(gradebook?.activities ?? []).map((activity) => (
+                              <option key={activity.id} value={activity.id}>
+                                {activity.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="field">
+                          <label htmlFor="gradebook-status-filter">{t("courseDetail.statusFilter")}</label>
+                          <select
+                            id="gradebook-status-filter"
+                            value={gradebookStatus}
+                            onChange={(event) => setGradebookStatus(event.target.value as GradebookStatus)}
+                          >
+                            <option value="all">{t("courseDetail.gradebookStatusAll")}</option>
+                            <option value="missing">{t("courseDetail.gradebookStatusMissing")}</option>
+                            <option value="late">{t("courseDetail.gradebookStatusLate")}</option>
+                            <option value="needs_grading">{t("courseDetail.gradebookStatusNeedsGrading")}</option>
+                            <option value="graded">{t("courseDetail.gradebookStatusGraded")}</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {gradebook?.rows.length ? (
+                        <div className="table-list">
+                          <div className="table-row table-row-gradebook table-head" aria-hidden="true">
+                            <span>{t("courseDetail.studentHeader")}</span>
+                            <span>{t("courseDetail.groupHeader")}</span>
+                            <span>{t("courseDetail.activityHeader")}</span>
+                            <span>{t("courseDetail.gradeHeader")}</span>
+                            <span>{t("courseDetail.statusHeader")}</span>
+                          </div>
+                          {gradebook.rows.map((row) => (
+                            <div className="table-row table-row-gradebook" key={`${row.gradebookItemId}-${row.participantId}`}>
+                              <div className="table-main table-main-stack">
+                                <strong>{row.participantName}</strong>
+                                <span className="table-meta-note muted">{row.participantEmail}</span>
+                                {row.externalId ? <span className="metadata-badge">{row.externalId}</span> : null}
+                              </div>
+                              <span className="table-meta muted">{row.groupTitle}</span>
+                              <div className="table-main table-main-stack">
+                                <strong>{row.activityTitle}</strong>
+                                <span className="table-meta-note muted">{row.activityTypeName}</span>
+                              </div>
+                              <div className="table-main table-main-stack">
+                                <strong>{formatGradebookScore(row.score, row.maxScore)}</strong>
+                                <span className="table-meta-note muted">
+                                  {t("courseDetail.attemptSummary", {
+                                    count: row.attemptCount,
+                                    selected: row.selectedAttemptNumber ?? "-"
+                                  })}
+                                </span>
+                                {row.attempts.length ? (
+                                  <span className="table-meta-note muted">
+                                    {row.attempts
+                                      .map((attempt) =>
+                                        t("courseDetail.attemptHistoryItem", {
+                                          number: attempt.attemptNumber,
+                                          status: t(`courseDetail.attemptLifecycle.${attempt.lifecycle}`)
+                                        })
+                                      )
+                                      .join(" · ")}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <span className={`participant-status is-${row.status.replace("_", "-")}`}>
+                                {t(`courseDetail.gradebookStatus.${row.status}`)}
+                                {row.latePenaltyApplied && row.latePenaltyPercent !== null ? ` -${row.latePenaltyPercent}%` : ""}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="muted">{t("courseDetail.noGradebookRows")}</p>
+                      )}
+                    </section>
+                  )
+                },
+                {
                   id: "settings",
                   label: t("courseDetail.settingsTab"),
                   render: () => (
@@ -1337,6 +1473,17 @@ function formatAvailabilityValue(value: string) {
     hour12: false,
     hourCycle: "h23"
   }).format(date);
+}
+
+function formatGradebookScore(score: number | null, maxScore: number) {
+  if (score === null) {
+    return "-";
+  }
+  return `${formatGradeNumber(score)} / ${formatGradeNumber(maxScore)}`;
+}
+
+function formatGradeNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
 function compareMaterials(left: CourseMaterial, right: CourseMaterial) {
