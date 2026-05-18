@@ -394,17 +394,17 @@ These are implementation details rather than product-level blockers:
 - Completed: group activity assignment removal is handled by the `CourseGroupActivity` relation lifecycle.
 - Deferred until grade editing services exist: block grade editing after course archive.
 
-### Phase 3: Attempt Service Contract
+### Phase 3: Attempt Service Contract - Completed
 
-- Add core services to:
+- Completed: added core services to:
   - start attempt
   - submit attempt
   - record grading result
   - compute attempt number
   - enforce attempt limits
   - compute lateness
-- Add core route helpers or SDK utilities plugins can call.
-- Add tests for attempt limits, late attempts, and participant scoping.
+- Completed: added an activity SDK route-context helper plugins can call for assigned group activity attempts.
+- Completed: added tests for attempt limits, late attempts, participant scoping, and grade event creation.
 
 ### Phase 4: Plugin Grading Contract
 

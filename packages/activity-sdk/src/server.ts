@@ -68,6 +68,18 @@ export type ServerActivityPlugin = {
   };
 };
 
+export function getAssignedGroupActivityAttemptSource(context: PluginRouteContext) {
+  if (!context.courseId || !context.groupId) {
+    throw new Error("Assigned group activity attempts require course and group route context.");
+  }
+
+  return {
+    courseId: context.courseId,
+    groupId: context.groupId,
+    activityId: context.activityId
+  };
+}
+
 const serverPlugins: readonly ServerActivityPlugin[] = [
   placeholderServerPlugin,
   homeworkGraderServerPlugin,
