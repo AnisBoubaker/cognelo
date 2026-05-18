@@ -406,17 +406,17 @@ These are implementation details rather than product-level blockers:
 - Completed: added an activity SDK route-context helper plugins can call for assigned group activity attempts.
 - Completed: added tests for attempt limits, late attempts, participant scoping, and grade event creation.
 
-### Phase 4: Plugin Grading Contract
+### Phase 4: Plugin Grading Contract - Completed
 
-- Extend activity plugin definitions with grading capability metadata.
-- Define plugin grading result shape.
-- Define plugin manual grading UI contract.
-- Define plugin analytics payload contract.
-- Update at least one plugin as the first integration target.
+- Completed: extended activity plugin definitions with grading capability metadata.
+- Completed: defined plugin grading result shape.
+- Completed: defined plugin manual grading UI contract.
+- Completed: defined plugin analytics payload contract.
+- Completed: updated Parsons as the first integration target.
 
 First plugin integration target:
 
-- Parsons
+- Parsons - completed.
 
 ### Phase 5: Grade Normalization And Selection
 
