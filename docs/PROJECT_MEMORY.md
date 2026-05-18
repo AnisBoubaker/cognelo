@@ -54,6 +54,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Activities remain plugin-style registry entries and are not hardcoded into course models.
 - Course managers can remove activities directly from the course detail page.
 - Gradebook Phase 1 core schema foundation is present in core Prisma: `GradebookItem`, `ActivityAttempt`, `Grade`, and `GradeEvent`. A gradebook item is one assigned group activity (`CourseGroupActivity`) and grades/attempts attach to `CourseGroupParticipant` with optional linked `User`. Plugin-specific attempt artifacts remain plugin-owned; core owns normalized attempt/grade/audit metadata.
+- Gradebook Phase 2 lifecycle wiring creates a `GradebookItem` whenever a `CourseGroupActivity` is materialized through direct group assignment, course-wide all-groups assignment, or future-group inheritance of an all-groups rule. Removing the all-groups policy leaves those gradebook items intact because the underlying group assignments remain intact.
 
 ## Naming Model
 

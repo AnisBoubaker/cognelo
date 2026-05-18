@@ -386,13 +386,13 @@ These are implementation details rather than product-level blockers:
 - Completed: added core migration `202605180001_gradebook_foundation`.
 - Completed: added schema guard tests.
 
-### Phase 2: Gradebook Item Lifecycle
+### Phase 2: Gradebook Item Lifecycle - Completed
 
-- Create gradebook items when activities are assigned to groups.
-- Handle course-wide all-groups assignments by creating one gradebook item per materialized `CourseGroupActivity`.
-- Preserve gradebook items when all-groups policy is removed.
-- Handle removal of group activity assignments.
-- Block grade editing after course archive.
+- Completed: create gradebook items when activities are assigned to groups.
+- Completed: handle course-wide all-groups assignments by creating one gradebook item per materialized `CourseGroupActivity`.
+- Completed: preserve gradebook items when all-groups policy is removed.
+- Completed: group activity assignment removal is handled by the `CourseGroupActivity` relation lifecycle.
+- Deferred until grade editing services exist: block grade editing after course archive.
 
 ### Phase 3: Attempt Service Contract
 

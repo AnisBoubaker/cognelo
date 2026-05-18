@@ -12,9 +12,13 @@ const tx = vi.hoisted(() => ({
     findMany: vi.fn()
   },
   courseGroupActivity: {
+    create: vi.fn(),
     createMany: vi.fn(),
     findMany: vi.fn(),
     update: vi.fn(),
+    upsert: vi.fn()
+  },
+  gradebookItem: {
     upsert: vi.fn()
   },
   courseGroupParticipant: {
@@ -56,6 +60,9 @@ const mockPrisma = vi.hoisted(() => ({
   courseGroupHiddenCourseMaterial: {
     deleteMany: vi.fn(),
     findMany: vi.fn(),
+    upsert: vi.fn()
+  },
+  gradebookItem: {
     upsert: vi.fn()
   },
   courseGroupMaterial: {
@@ -130,6 +137,20 @@ describe("group services", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof tx) => unknown) => handler(tx));
+    tx.courseGroupActivity.create.mockImplementation(async (input: { data: { groupId: string; activityId: string } }) => ({
+      id: "assignment-created",
+      groupId: input.data.groupId,
+      activityId: input.data.activityId,
+      activity: { id: input.data.activityId }
+    }));
+    tx.courseGroupActivity.upsert.mockImplementation(
+      async (input: { where: { groupId_activityId: { groupId: string; activityId: string } } }) => ({
+        id: `assignment-${input.where.groupId_activityId.groupId}`,
+        groupId: input.where.groupId_activityId.groupId,
+        activityId: input.where.groupId_activityId.activityId
+      })
+    );
+    tx.gradebookItem.upsert.mockResolvedValue({ id: "gradebook-item-1" });
     authMocks.canManageCourse.mockResolvedValue(true);
     authMocks.isAdmin.mockReturnValue(false);
   });
@@ -159,10 +180,60 @@ describe("group services", () => {
     });
   });
 
+  it("creates gradebook items for course-wide assignments inherited by a new group", async () => {
+    tx.courseGroup.create.mockResolvedValue({ id: "group-1" });
+    tx.activity.findMany.mockResolvedValue([
+      {
+        id: "activity-1",
+        title: "Parsons warmup",
+        metadata: {
+          allGroupsAssignment: {
+            enabled: true,
+            availableFrom: "2026-05-18T13:00:00.000Z",
+            availableUntil: null,
+            enablePerGroupSettings: true
+          }
+        }
+      }
+    ]);
+
+    await createCourseGroup(teacherUser, "course-1", { title: "Team A" });
+
+    expect(tx.courseGroupActivity.upsert).toHaveBeenCalledWith({
+      where: {
+        groupId_activityId: {
+          groupId: "group-1",
+          activityId: "activity-1"
+        }
+      },
+      update: {},
+      create: {
+        groupId: "group-1",
+        activityId: "activity-1",
+        availableFrom: new Date("2026-05-18T13:00:00.000Z"),
+        availableUntil: null,
+        metadata: { assignmentScope: "course_all_groups", enablePerGroupSettings: true },
+        position: 0
+      }
+    });
+    expect(tx.gradebookItem.upsert).toHaveBeenCalledWith({
+      where: { groupActivityId: "assignment-group-1" },
+      update: {},
+      create: {
+        courseId: "course-1",
+        groupId: "group-1",
+        groupActivityId: "assignment-group-1",
+        activityId: "activity-1",
+        titleSnapshot: "Parsons warmup"
+      }
+    });
+  });
+
   it("assigns a course activity to all current groups and stores the future-group rule", async () => {
     mockPrisma.activity.findFirst.mockResolvedValue({
       id: "activity-1",
       courseId: "course-1",
+      title: "Loop practice",
       metadata: { researchTags: [] }
     });
     tx.courseGroup.findMany.mockResolvedValue([
@@ -215,6 +286,28 @@ describe("group services", () => {
         }
       })
     );
+    expect(tx.gradebookItem.upsert).toHaveBeenCalledWith({
+      where: { groupActivityId: "assignment-group-1" },
+      update: {},
+      create: {
+        courseId: "course-1",
+        groupId: "group-1",
+        groupActivityId: "assignment-group-1",
+        activityId: "activity-1",
+        titleSnapshot: "Loop practice"
+      }
+    });
+    expect(tx.gradebookItem.upsert).toHaveBeenCalledWith({
+      where: { groupActivityId: "assignment-group-2" },
+      update: {},
+      create: {
+        courseId: "course-1",
+        groupId: "group-2",
+        groupActivityId: "assignment-group-2",
+        activityId: "activity-1",
+        titleSnapshot: "Loop practice"
+      }
+    });
   });
 
   it("applies course-wide dates to existing group assignments when per-group settings are disabled", async () => {
@@ -372,6 +465,36 @@ describe("group services", () => {
     ).rejects.toMatchObject({ status: 400, code: "GROUP_ACTIVITY_EXISTS" });
 
     expect(mockPrisma.courseGroupActivity.create).not.toHaveBeenCalled();
+  });
+
+  it("creates a gradebook item when assigning an activity to a group", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
+    mockPrisma.activity.findFirst.mockResolvedValue({ id: "activity-1", courseId: "course-1", title: "Trace loops" });
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue(null);
+
+    await assignActivityToGroup(teacherUser, "course-1", "group-1", {
+      activityId: "activity-1"
+    });
+
+    expect(tx.courseGroupActivity.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          groupId: "group-1",
+          activityId: "activity-1"
+        })
+      })
+    );
+    expect(tx.gradebookItem.upsert).toHaveBeenCalledWith({
+      where: { groupActivityId: "assignment-created" },
+      update: {},
+      create: {
+        courseId: "course-1",
+        groupId: "group-1",
+        groupActivityId: "assignment-created",
+        activityId: "activity-1",
+        titleSnapshot: "Trace loops"
+      }
+    });
   });
 
   it("allows course-wide group assignments to be reordered inside a group", async () => {
