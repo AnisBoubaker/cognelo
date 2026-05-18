@@ -16,6 +16,7 @@ import { assertCanManageCourse, assertCanViewCourse, canManageCourse, isAdmin } 
 import { AppError, notFound } from "./errors";
 
 type StudentAccessDb = Pick<typeof prisma, "role" | "userRole" | "courseMembership">;
+type GradebookItemDb = Pick<typeof prisma, "gradebookItem">;
 type CourseWideAssignmentMetadata = {
   enabled?: boolean;
   availableFrom?: string | null;
@@ -157,31 +158,41 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
         const existingAssignment = group.activities.find((assignment) => assignment.activityId === activityId);
         const nextPosition = existingAssignment?.position ?? group.activities.length;
         const groupAssignmentMetadata = buildCourseWideGroupAssignmentMetadata(data.enablePerGroupSettings);
-        return tx.courseGroupActivity.upsert({
-          where: {
-            groupId_activityId: {
-              groupId: group.id,
-              activityId
-            }
-          },
-          update: data.enablePerGroupSettings
-            ? {
-                metadata: groupAssignmentMetadata
+        return tx.courseGroupActivity
+          .upsert({
+            where: {
+              groupId_activityId: {
+                groupId: group.id,
+                activityId
               }
-            : {
-                availableFrom,
-                availableUntil,
-                metadata: groupAssignmentMetadata
-              },
-          create: {
-            groupId: group.id,
-            activityId,
-            availableFrom,
-            availableUntil,
-            metadata: groupAssignmentMetadata,
-            position: nextPosition
-          }
-        });
+            },
+            update: data.enablePerGroupSettings
+              ? {
+                  metadata: groupAssignmentMetadata
+                }
+              : {
+                  availableFrom,
+                  availableUntil,
+                  metadata: groupAssignmentMetadata
+                },
+            create: {
+              groupId: group.id,
+              activityId,
+              availableFrom,
+              availableUntil,
+              metadata: groupAssignmentMetadata,
+              position: nextPosition
+            }
+          })
+          .then((assignment) =>
+            ensureGradebookItemForAssignment(tx, {
+              courseId,
+              groupId: group.id,
+              groupActivityId: assignment.id,
+              activityId,
+              titleSnapshot: activity.title
+            })
+          );
       })
     );
 
@@ -543,7 +554,7 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
   await assertCanManageCourse(user, courseId);
   await assertGroupBelongsToCourse(courseId, groupId);
   const data = CourseGroupActivityInputSchema.parse(input);
-  await assertActivityBelongsToCourse(courseId, data.activityId);
+  const activity = await assertActivityBelongsToCourse(courseId, data.activityId);
   validateAvailability(data.availableFrom, data.availableUntil);
 
   const existing = await prisma.courseGroupActivity.findFirst({
@@ -553,21 +564,33 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
     throw new AppError(400, "GROUP_ACTIVITY_EXISTS", "This activity is already assigned to the group.");
   }
 
-  return prisma.courseGroupActivity.create({
-    data: {
-      groupId,
-      activityId: data.activityId,
-      availableFrom: parseDateInput(data.availableFrom),
-      availableUntil: parseDateInput(data.availableUntil),
-      config: data.config as Prisma.InputJsonValue,
-      metadata: data.metadata as Prisma.InputJsonValue,
-      position: data.position
-    },
-    include: {
-      activity: {
-        include: { activityType: true, bankActivity: true, activityVersion: true }
+  return prisma.$transaction(async (tx) => {
+    const assignment = await tx.courseGroupActivity.create({
+      data: {
+        groupId,
+        activityId: data.activityId,
+        availableFrom: parseDateInput(data.availableFrom),
+        availableUntil: parseDateInput(data.availableUntil),
+        config: data.config as Prisma.InputJsonValue,
+        metadata: data.metadata as Prisma.InputJsonValue,
+        position: data.position
+      },
+      include: {
+        activity: {
+          include: { activityType: true, bankActivity: true, activityVersion: true }
+        }
       }
-    }
+    });
+
+    await ensureGradebookItemForAssignment(tx, {
+      courseId,
+      groupId,
+      groupActivityId: assignment.id,
+      activityId: assignment.activityId,
+      titleSnapshot: activity.title
+    });
+
+    return assignment;
   });
 }
 
@@ -632,7 +655,7 @@ export async function deleteGroupActivityAssignment(
 }
 
 async function createCourseWideAssignmentsForGroup(
-  tx: Pick<typeof prisma, "activity" | "courseGroupActivity">,
+  tx: Pick<typeof prisma, "activity" | "courseGroupActivity" | "gradebookItem">,
   courseId: string,
   groupId: string
 ) {
@@ -659,9 +682,53 @@ async function createCourseWideAssignmentsForGroup(
     return;
   }
 
-  await tx.courseGroupActivity.createMany({
-    data: assignmentData,
-    skipDuplicates: true
+  await Promise.all(
+    assignmentData.map((assignment) =>
+      tx.courseGroupActivity
+        .upsert({
+          where: {
+            groupId_activityId: {
+              groupId: assignment.groupId,
+              activityId: assignment.activityId
+            }
+          },
+          update: {},
+          create: assignment
+        })
+        .then((createdAssignment) => {
+          const activity = courseActivities.find((candidate) => candidate.id === assignment.activityId);
+          return ensureGradebookItemForAssignment(tx, {
+            courseId,
+            groupId,
+            groupActivityId: createdAssignment.id,
+            activityId: createdAssignment.activityId,
+            titleSnapshot: activity?.title ?? "Activity"
+          });
+        })
+    )
+  );
+}
+
+async function ensureGradebookItemForAssignment(
+  tx: GradebookItemDb,
+  input: {
+    courseId: string;
+    groupId: string;
+    groupActivityId: string;
+    activityId: string;
+    titleSnapshot: string;
+  }
+) {
+  await tx.gradebookItem.upsert({
+    where: { groupActivityId: input.groupActivityId },
+    update: {},
+    create: {
+      courseId: input.courseId,
+      groupId: input.groupId,
+      groupActivityId: input.groupActivityId,
+      activityId: input.activityId,
+      titleSnapshot: input.titleSnapshot
+    }
   });
 }
 

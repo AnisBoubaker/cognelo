@@ -211,6 +211,8 @@ Adding a bank activity to a course creates a course-local `Activity` copy from t
 
 Course activities can be assigned to every group from the course page. This stores an all-groups policy on the course activity metadata and creates or updates real `CourseGroupActivity` rows for every existing group; future groups inherit those rows at group creation. The policy can enable per-group settings, which preserves existing group availability dates and lets teachers edit dates inside a group. When per-group settings are disabled, course-level availability replaces group dates and group-local date edits are blocked. These course-wide group assignments remain group-related for grading. Removing the all-groups policy leaves the existing group assignment rows in place and converts them back to group-managed assignments.
 
+Each `CourseGroupActivity` assignment has one corresponding `GradebookItem`, created when the assignment is materialized directly, through an all-groups course policy, or by future-group inheritance.
+
 Plugins that store private authoring/grading data can participate in the copy step through server plugin hooks. For example, web-design coding exercises copy the private reference bundle and Playwright tests from bank plugin tables into course plugin tables when the course activity is created.
 
 Plugin-owned tables are documented in the owning plugin package rather than in the platform README.
