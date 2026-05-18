@@ -28,6 +28,10 @@ type RenderableActivity = {
   lifecycle: string;
   config?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  assignment?: {
+    id: string;
+    metadata?: Record<string, unknown>;
+  };
   activityType: {
     id: string;
     key: string;
@@ -328,8 +332,9 @@ export type ParsonsAttemptsClient = {
     input: {
       attemptId: string;
       state?: ParsonsAttemptState;
-      event?: { type: "move" | "indent" | "reset" | "check"; payload?: Record<string, unknown> };
+      event?: { type: "move" | "indent" | "reset" | "check" | "submit"; payload?: Record<string, unknown> };
       result?: ParsonsAttemptEvaluation;
+      submit?: boolean;
       complete?: boolean;
       abandon?: boolean;
     }

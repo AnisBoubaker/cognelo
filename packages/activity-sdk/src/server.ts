@@ -15,6 +15,14 @@ export type ServerActivityRecord = {
   lifecycle: string;
   config?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  assignment?: {
+    id: string;
+    availableFrom?: Date | string | null;
+    availableUntil?: Date | string | null;
+    config?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+    position?: number;
+  };
   activityType: {
     key: string;
     name: string;

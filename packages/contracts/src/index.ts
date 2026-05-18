@@ -249,10 +249,14 @@ export const CourseGroupActivityInputSchema = z.object({
 });
 export type CourseGroupActivityInput = z.infer<typeof CourseGroupActivityInputSchema>;
 
+export const AssignedActivityAssessmentModeSchema = z.enum(["formative", "summative"]);
+export type AssignedActivityAssessmentMode = z.infer<typeof AssignedActivityAssessmentModeSchema>;
+
 export const CourseAllGroupsActivityAssignmentInputSchema = z.object({
   availableFrom: z.string().datetime().nullable().optional(),
   availableUntil: z.string().datetime().nullable().optional(),
-  enablePerGroupSettings: z.boolean().optional().default(true)
+  enablePerGroupSettings: z.boolean().optional().default(true),
+  assessmentMode: AssignedActivityAssessmentModeSchema.optional().default("formative")
 });
 export type CourseAllGroupsActivityAssignmentInput = z.infer<typeof CourseAllGroupsActivityAssignmentInputSchema>;
 

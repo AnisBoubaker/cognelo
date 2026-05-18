@@ -59,6 +59,11 @@ It is intentionally a planning artifact. Implementation should proceed iterative
 
 ### Submission And Grading
 
+- Group activity assignments have an assessment mode:
+  - formative activity
+  - summative activity
+- Formative activity checks are recorded by the plugin for analytics/research, but they do not create core submissions or gradebook grades.
+- Summative activity submissions create core attempts, submissions, and grades when the plugin can grade immediately.
 - Every submission creates an attempt.
 - An attempt should not remain submitted without grading.
 - Teachers can manually grade or override automatic grades.
@@ -118,6 +123,14 @@ Core responsibilities:
 - store current gradebook grade
 - store grade/audit history
 - provide gradebook queries and exports
+
+Parsons initial grading behavior:
+
+- Formative Parsons activities keep the existing "Check answer" workflow and record check events in the plugin attempt tables.
+- Summative Parsons activities show a student "Submit" action. Submitting records the Parsons result, creates a core `ActivityAttempt`, submits it, and records an automatic grade.
+- The initial Parsons raw grade is `1/1` when order and indentation are both correct.
+- Partial Parsons credit currently gives `0.7` for correct order and `0.3` for correct indentation.
+- The next Parsons grading-settings slice should let teachers choose all-or-nothing vs partial credit, adjust order/indentation weights, and decide whether formative feedback is shown before summative submission.
 
 ### Gradebook UI
 
@@ -443,6 +456,15 @@ First plugin integration target:
   - late
   - needs grading
 - Completed: add CSV export.
+
+### Phase 6A: Formative/Summative Assignment Mode - Completed
+
+- Completed: add assignment-level `assessmentMode` metadata for direct group assignments and course-wide all-groups assignments.
+- Completed: default new assignments to formative activity behavior.
+- Completed: expose formative/summative selection in group assignment and course-wide all-groups assignment forms.
+- Completed: pass group assignment metadata into plugin route and renderer context.
+- Completed: make Parsons checks analytics-only for formative activities.
+- Completed: make Parsons summative submissions create core attempts and automatic grades.
 
 ### Phase 7: Student Grade Visibility
 

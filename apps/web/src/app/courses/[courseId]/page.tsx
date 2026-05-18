@@ -44,6 +44,7 @@ export default function CourseDetailPage() {
   const [assignAllAvailableFrom, setAssignAllAvailableFrom] = useState("");
   const [assignAllAvailableUntil, setAssignAllAvailableUntil] = useState("");
   const [assignAllEnablePerGroupSettings, setAssignAllEnablePerGroupSettings] = useState(true);
+  const [assignAllAssessmentMode, setAssignAllAssessmentMode] = useState<"formative" | "summative">("formative");
   const [assignAllSavingActivityId, setAssignAllSavingActivityId] = useState<string | null>(null);
   const [groupTitle, setGroupTitle] = useState("");
   const [isAddingGroup, setIsAddingGroup] = useState(false);
@@ -222,6 +223,7 @@ export default function CourseDetailPage() {
     setAssignAllAvailableFrom(toDateTimeLocalValue(rule?.availableFrom));
     setAssignAllAvailableUntil(toDateTimeLocalValue(rule?.availableUntil));
     setAssignAllEnablePerGroupSettings(rule?.enablePerGroupSettings ?? true);
+    setAssignAllAssessmentMode(rule?.assessmentMode ?? "formative");
     setError("");
   }
 
@@ -237,12 +239,14 @@ export default function CourseDetailPage() {
       await api.assignActivityToAllCourseGroups(courseId, assignAllActivityId, {
         availableFrom: toIsoOrNull(assignAllAvailableFrom),
         availableUntil: toIsoOrNull(assignAllAvailableUntil),
-        enablePerGroupSettings: assignAllEnablePerGroupSettings
+        enablePerGroupSettings: assignAllEnablePerGroupSettings,
+        assessmentMode: assignAllAssessmentMode
       });
       setAssignAllActivityId(null);
       setAssignAllAvailableFrom("");
       setAssignAllAvailableUntil("");
       setAssignAllEnablePerGroupSettings(true);
+      setAssignAllAssessmentMode("formative");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("courseDetail.assignAllGroupsError"));
@@ -976,6 +980,18 @@ export default function CourseDetailPage() {
                                     />
                                     <span>{t("courseDetail.enablePerGroupSettings")}</span>
                                   </label>
+                                  <div className="field">
+                                    <label htmlFor={`assign-all-mode-${activity.id}`}>{t("groupPage.assessmentMode")}</label>
+                                    <select
+                                      id={`assign-all-mode-${activity.id}`}
+                                      value={assignAllAssessmentMode}
+                                      disabled={assignAllSavingActivityId === activity.id}
+                                      onChange={(event) => setAssignAllAssessmentMode(event.target.value as "formative" | "summative")}
+                                    >
+                                      <option value="formative">{t("groupPage.assessmentModeFormative")}</option>
+                                      <option value="summative">{t("groupPage.assessmentModeSummative")}</option>
+                                    </select>
+                                  </div>
                                   <div className="row">
                                     <button disabled={assignAllSavingActivityId === activity.id} type="submit">
                                       {assignAllSavingActivityId === activity.id ? t("common.saving") : t("courseDetail.assignAllGroupsSave")}
@@ -1391,7 +1407,8 @@ function getAllGroupsAssignmentRule(activity: NonNullable<Course["activities"]>[
     enabled: record.enabled === true,
     availableFrom: typeof record.availableFrom === "string" ? record.availableFrom : null,
     availableUntil: typeof record.availableUntil === "string" ? record.availableUntil : null,
-    enablePerGroupSettings: record.enablePerGroupSettings !== false
+    enablePerGroupSettings: record.enablePerGroupSettings !== false,
+    assessmentMode: record.assessmentMode === "summative" ? "summative" as const : "formative" as const
   };
 }
 

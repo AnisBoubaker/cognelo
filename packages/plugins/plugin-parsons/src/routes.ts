@@ -1,9 +1,18 @@
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
-import { AppError, assertCanManageActivityBank, assertCanManageCourse } from "@cognelo/core";
+import type { Prisma } from "@prisma/client";
+import {
+  AppError,
+  assertCanManageActivityBank,
+  assertCanManageCourse,
+  recordActivityAttemptGradingResult,
+  startActivityAttempt,
+  submitActivityAttempt
+} from "@cognelo/core";
 import { prisma } from "@cognelo/db";
 import { ensureParsonsAttempt, updateParsonsAttempt } from "./attempts";
 import { parsonsAttemptEnsureInputSchema, parsonsAttemptUpdateInputSchema } from "./attempt-types";
 import { generateParsonsProblem, parsonsGenerationInputSchema } from "./generation";
+import { buildParsonsGradingResult } from "./grading";
 import { parseParsonsConfig } from "./parsons";
 
 type SubjectContext = {
@@ -81,6 +90,41 @@ export const parsonsAttemptRoute: PluginRouteDefinition = {
 
       if (!attempt) {
         throw new AppError(409, "ATTEMPT_STATE_INVALID", "The Parsons attempt could not be updated.");
+      }
+
+      if (input.submit && context.courseId && context.groupId && context.activity.assignment?.metadata?.assessmentMode === "summative") {
+        if (!input.result) {
+          throw new AppError(400, "PARSONS_SUBMISSION_RESULT_REQUIRED", "A Parsons submission requires a grading result.");
+        }
+        const coreAttempt = await startActivityAttempt(context.user, {
+          courseId: context.courseId,
+          groupId: context.groupId,
+          activityId: context.activity.id,
+          pluginKey: "parsons",
+          pluginVersion: "0.1.0",
+          pluginAttemptRef: attempt.id,
+          activityConfigFingerprint: attempt.latestState.configFingerprint,
+          metadata: {
+            mode: "summative"
+          }
+        });
+        const submittedAttempt = await submitActivityAttempt(context.user, {
+          attemptId: coreAttempt.id,
+          pluginAttemptRef: attempt.id
+        });
+        const gradingResult = buildParsonsGradingResult(input.result);
+        await recordActivityAttemptGradingResult(context.user, {
+          attemptId: submittedAttempt.id,
+          rawScore: gradingResult.rawScore,
+          rawMaxScore: gradingResult.rawMaxScore,
+          source: "auto",
+          isPass: gradingResult.isPass,
+          rawResult: {
+            evaluation: input.result,
+            analyticsPayload: gradingResult.analyticsPayload
+          } as Prisma.InputJsonValue,
+          normalizedResult: gradingResult.metadata as Prisma.InputJsonValue
+        });
       }
 
       return { attempt };

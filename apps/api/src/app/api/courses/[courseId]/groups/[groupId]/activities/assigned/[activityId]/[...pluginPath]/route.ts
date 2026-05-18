@@ -44,6 +44,17 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
         lifecycle: activity.lifecycle,
         config: (activity.config as Record<string, unknown> | null) ?? undefined,
         metadata: (activity.metadata as Record<string, unknown> | null) ?? undefined,
+        assignment:
+          "assignment" in activity
+            ? {
+                id: activity.assignment.id,
+                availableFrom: activity.assignment.availableFrom,
+                availableUntil: activity.assignment.availableUntil,
+                config: (activity.assignment.config as Record<string, unknown> | null) ?? undefined,
+                metadata: (activity.assignment.metadata as Record<string, unknown> | null) ?? undefined,
+                position: activity.assignment.position
+              }
+            : undefined,
         activityType: {
           key: activity.activityType.key,
           name: activity.activityType.name,

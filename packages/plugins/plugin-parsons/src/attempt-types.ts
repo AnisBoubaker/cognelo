@@ -32,7 +32,7 @@ export const parsonsAttemptEnsureInputSchema = z.object({
   forceNew: z.boolean().optional().default(false)
 });
 
-export const parsonsAttemptEventTypeSchema = z.enum(["move", "indent", "reset", "check"]);
+export const parsonsAttemptEventTypeSchema = z.enum(["move", "indent", "reset", "check", "submit"]);
 
 export const parsonsAttemptEventSchema = z.object({
   type: parsonsAttemptEventTypeSchema,
@@ -44,6 +44,7 @@ export const parsonsAttemptUpdateInputSchema = z.object({
   state: parsonsAttemptStateSchema.optional(),
   event: parsonsAttemptEventSchema.optional(),
   result: parsonsAttemptEvaluationSchema.optional(),
+  submit: z.boolean().optional().default(false),
   complete: z.boolean().optional().default(false),
   abandon: z.boolean().optional().default(false)
 });
@@ -51,7 +52,7 @@ export const parsonsAttemptUpdateInputSchema = z.object({
 export type ParsonsAttemptEvaluation = z.infer<typeof parsonsAttemptEvaluationSchema>;
 export type ParsonsAttemptState = z.infer<typeof parsonsAttemptStateSchema>;
 export type ParsonsAttemptEnsureInput = z.infer<typeof parsonsAttemptEnsureInputSchema>;
-export type ParsonsAttemptUpdateInput = z.infer<typeof parsonsAttemptUpdateInputSchema>;
+export type ParsonsAttemptUpdateInput = z.input<typeof parsonsAttemptUpdateInputSchema>;
 export type ParsonsAttemptEventType = z.infer<typeof parsonsAttemptEventTypeSchema>;
 
 export function createInitialParsonsAttemptState(config: ParsonsConfig): ParsonsAttemptState {

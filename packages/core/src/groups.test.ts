@@ -212,7 +212,7 @@ describe("group services", () => {
         activityId: "activity-1",
         availableFrom: new Date("2026-05-18T13:00:00.000Z"),
         availableUntil: null,
-        metadata: { assignmentScope: "course_all_groups", enablePerGroupSettings: true },
+        metadata: { assignmentScope: "course_all_groups", enablePerGroupSettings: true, assessmentMode: "formative" },
         position: 0
       }
     });
@@ -259,7 +259,8 @@ describe("group services", () => {
               enabled: true,
               availableFrom: "2026-05-18T13:00:00.000Z",
               availableUntil: "2026-05-25T13:00:00.000Z",
-              enablePerGroupSettings: true
+              enablePerGroupSettings: true,
+              assessmentMode: "formative"
             }
           })
         })
@@ -274,7 +275,7 @@ describe("group services", () => {
           activityId: "activity-1",
           availableFrom: new Date("2026-05-18T13:00:00.000Z"),
           availableUntil: new Date("2026-05-25T13:00:00.000Z"),
-          metadata: { assignmentScope: "course_all_groups", enablePerGroupSettings: true }
+          metadata: { assignmentScope: "course_all_groups", enablePerGroupSettings: true, assessmentMode: "formative" }
         })
       })
     );
@@ -282,7 +283,7 @@ describe("group services", () => {
       expect.objectContaining({
         where: { groupId_activityId: { groupId: "group-2", activityId: "activity-1" } },
         update: {
-          metadata: { assignmentScope: "course_all_groups", enablePerGroupSettings: true }
+          metadata: { assignmentScope: "course_all_groups", enablePerGroupSettings: true, assessmentMode: "formative" }
         }
       })
     );
@@ -334,7 +335,7 @@ describe("group services", () => {
         update: {
           availableFrom: new Date("2026-05-18T13:00:00.000Z"),
           availableUntil: new Date("2026-05-25T13:00:00.000Z"),
-          metadata: { assignmentScope: "course_all_groups", enablePerGroupSettings: false }
+          metadata: { assignmentScope: "course_all_groups", enablePerGroupSettings: false, assessmentMode: "formative" }
         }
       })
     );

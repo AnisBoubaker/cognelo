@@ -347,6 +347,14 @@ export type Activity = {
   lifecycle: string;
   config?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  assignment?: {
+    id: string;
+    availableFrom?: string | null;
+    availableUntil?: string | null;
+    config?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+    position?: number;
+  };
   activityType: ActivityType;
   bankActivity?: BankActivity | null;
   activityVersion?: ActivityVersion | null;
@@ -795,8 +803,9 @@ export const api = {
     input: {
       attemptId: string;
       state?: ParsonsAttemptState;
-      event?: { type: "move" | "indent" | "reset" | "check"; payload?: Record<string, unknown> };
+      event?: { type: "move" | "indent" | "reset" | "check" | "submit"; payload?: Record<string, unknown> };
       result?: ParsonsAttemptEvaluation;
+      submit?: boolean;
       complete?: boolean;
       abandon?: boolean;
     }
@@ -1147,8 +1156,9 @@ export const api = {
     input: {
       attemptId: string;
       state?: ParsonsAttemptState;
-      event?: { type: "move" | "indent" | "reset" | "check"; payload?: Record<string, unknown> };
+      event?: { type: "move" | "indent" | "reset" | "check" | "submit"; payload?: Record<string, unknown> };
       result?: ParsonsAttemptEvaluation;
+      submit?: boolean;
       complete?: boolean;
       abandon?: boolean;
     }
