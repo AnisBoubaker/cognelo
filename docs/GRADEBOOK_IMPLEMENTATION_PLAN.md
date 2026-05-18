@@ -374,17 +374,17 @@ These are implementation details rather than product-level blockers:
 - Confirm exact schema field names and enum values.
 - Confirm default gradebook item creation behavior when a group activity is assigned.
 
-### Phase 1: Core Schema Foundation
+### Phase 1: Core Schema Foundation - Completed
 
-- Add core Prisma models for gradebook items, attempts, grades, and grade events.
-- Add enums for attempt lifecycle, grade source, grade strategy, attempt limit mode, and grading mode.
-- Add indexes for gradebook views:
+- Completed: added core Prisma models for gradebook items, attempts, grades, and grade events.
+- Completed: added enums for attempt lifecycle, grade source, grade strategy, attempt limit mode, and grading mode.
+- Completed: added indexes for gradebook views:
   - course/group/activity
   - participant
   - gradebook item
   - attempt order
-- Add migration and seed updates.
-- Add core service tests.
+- Completed: added core migration `202605180001_gradebook_foundation`.
+- Completed: added schema guard tests.
 
 ### Phase 2: Gradebook Item Lifecycle
 

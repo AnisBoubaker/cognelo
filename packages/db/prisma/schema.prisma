@@ -58,6 +58,46 @@ enum AiAgentProvider {
   claude
 }
 
+enum GradebookGradingMode {
+  points
+  pass_fail
+}
+
+enum GradebookAttemptLimitMode {
+  unlimited
+  max_attempts
+  until_due
+}
+
+enum GradebookGradeStrategy {
+  latest
+  best
+  first
+  weighted_average
+}
+
+enum ActivityAttemptLifecycle {
+  started
+  submitted
+  graded
+}
+
+enum GradeSource {
+  auto
+  manual
+  override
+  regrade
+}
+
+enum GradeEventType {
+  auto_graded
+  manual_graded
+  overridden
+  regraded
+  released
+  hidden
+}
+
 model User {
   id              String             @id @default(cuid())
   email           String             @unique
@@ -83,6 +123,10 @@ model User {
   groupParticipants CourseGroupParticipant[]
   groupMaterials  CourseGroupMaterial[] @relation("GroupMaterialCreator")
   aiAgentConnections AiAgentConnection[]
+  activityAttempts ActivityAttempt[] @relation("ActivityAttemptUser")
+  grades          Grade[]            @relation("GradeUser")
+  gradedGrades    Grade[]            @relation("GradeGrader")
+  gradeEvents     GradeEvent[]       @relation("GradeEventActor")
 
   @@index([email])
 }
@@ -141,6 +185,8 @@ model Course {
   materials   CourseMaterial[]
   activities  Activity[]
   groups      CourseGroup[]
+  gradebookItems GradebookItem[]
+  activityAttempts ActivityAttempt[]
 
   @@index([subjectId])
   @@index([status])
@@ -260,6 +306,8 @@ model CourseGroup {
   activities  CourseGroupActivity[]
   participants CourseGroupParticipant[]
   hiddenCourseMaterials CourseGroupHiddenCourseMaterial[]
+  gradebookItems GradebookItem[]
+  activityAttempts ActivityAttempt[]
 
   @@index([courseId, updatedAt])
   @@index([status, availableFrom, availableUntil])
@@ -279,6 +327,9 @@ model CourseGroupParticipant {
   updatedAt    DateTime   @updatedAt
   group        CourseGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  activityAttempts ActivityAttempt[]
+  grades       Grade[]
+  gradeEvents  GradeEvent[]
 
   @@unique([groupId, email])
   @@index([groupId, createdAt])
@@ -322,6 +373,8 @@ model CourseGroupActivity {
   updatedAt      DateTime     @updatedAt
   group          CourseGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
   activity       Activity     @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  gradebookItem  GradebookItem?
+  activityAttempts ActivityAttempt[]
 
   @@unique([groupId, activityId])
   @@index([groupId, position])
@@ -430,6 +483,7 @@ model ActivityVersion {
   activityType   ActivityType      @relation(fields: [activityTypeId], references: [id])
   createdBy      User              @relation("ActivityVersionCreator", fields: [createdById], references: [id])
   courseActivities Activity[]
+  activityAttempts ActivityAttempt[]
 
   @@unique([bankActivityId, versionNumber])
   @@index([bankActivityId, createdAt])
@@ -457,10 +511,162 @@ model Activity {
   activityType   ActivityType      @relation(fields: [activityTypeId], references: [id])
   createdBy      User              @relation("ActivityCreator", fields: [createdById], references: [id])
   groupAssignments CourseGroupActivity[]
+  gradebookItems GradebookItem[]
+  activityAttempts ActivityAttempt[]
 
   @@index([courseId, position])
   @@index([bankActivityId])
   @@index([activityVersionId])
   @@index([activityTypeId])
   @@index([lifecycle])
+}
+
+model GradebookItem {
+  id                         String                    @id @default(cuid())
+  courseId                   String
+  groupId                    String
+  groupActivityId            String                    @unique
+  activityId                 String
+  titleSnapshot              String
+  pointsPossible             Float                     @default(100)
+  gradingMode                GradebookGradingMode      @default(points)
+  passThresholdPoints        Float?
+  passThresholdOutOf         Float?
+  attemptLimitMode           GradebookAttemptLimitMode @default(unlimited)
+  maxAttempts                Int?
+  gradeStrategy              GradebookGradeStrategy    @default(latest)
+  dropLowestAttempt          Boolean                   @default(false)
+  lateSubmissionsAllowed     Boolean                   @default(false)
+  latePenaltyPercent         Float?
+  latePenaltyIntervalMinutes Int?
+  latePenaltyMaxPercent      Float?
+  lateGracePeriodMinutes     Int?
+  gradesReleased             Boolean                   @default(false)
+  metadata                   Json                      @default("{}")
+  createdAt                  DateTime                  @default(now())
+  updatedAt                  DateTime                  @updatedAt
+  course                     Course                    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  group                      CourseGroup               @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupActivity              CourseGroupActivity       @relation(fields: [groupActivityId], references: [id], onDelete: Cascade)
+  activity                   Activity                  @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  attempts                   ActivityAttempt[]
+  grades                     Grade[]
+  events                     GradeEvent[]
+
+  @@index([courseId, groupId])
+  @@index([courseId, activityId])
+  @@index([groupId, activityId])
+  @@index([activityId])
+  @@index([gradesReleased])
+}
+
+model ActivityAttempt {
+  id                        String                   @id @default(cuid())
+  courseId                  String
+  groupId                   String
+  groupActivityId           String
+  activityId                String
+  gradebookItemId           String
+  participantId             String
+  userId                    String?
+  attemptNumber             Int
+  lifecycle                 ActivityAttemptLifecycle @default(started)
+  startedAt                 DateTime                 @default(now())
+  submittedAt               DateTime?
+  gradedAt                  DateTime?
+  durationSeconds           Int?
+  isLate                    Boolean                  @default(false)
+  lateBySeconds             Int?
+  activityVersionId         String?
+  activityConfigFingerprint String?
+  pluginKey                 String
+  pluginVersion             String
+  pluginAttemptRef          String?
+  metadata                  Json                     @default("{}")
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  course                    Course                   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  group                     CourseGroup              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupActivity             CourseGroupActivity      @relation(fields: [groupActivityId], references: [id], onDelete: Cascade)
+  activity                  Activity                 @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  gradebookItem             GradebookItem            @relation(fields: [gradebookItemId], references: [id], onDelete: Cascade)
+  participant               CourseGroupParticipant   @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  user                      User?                    @relation("ActivityAttemptUser", fields: [userId], references: [id], onDelete: SetNull)
+  activityVersion           ActivityVersion?         @relation(fields: [activityVersionId], references: [id], onDelete: SetNull)
+  selectedForGrades         Grade[]
+  gradeEvents               GradeEvent[]
+
+  @@unique([gradebookItemId, participantId, attemptNumber])
+  @@index([courseId, groupId, activityId])
+  @@index([gradebookItemId, participantId])
+  @@index([participantId, createdAt])
+  @@index([userId])
+  @@index([lifecycle])
+  @@index([pluginKey, pluginAttemptRef])
+  @@index([activityVersionId])
+}
+
+model Grade {
+  id                 String                 @id @default(cuid())
+  gradebookItemId    String
+  participantId      String
+  userId             String?
+  selectedAttemptId  String?
+  rawScore           Float
+  rawMaxScore        Float
+  normalizedScore    Float
+  normalizedMaxScore Float
+  isPass             Boolean?
+  latePenaltyApplied Boolean                @default(false)
+  latePenaltyPercent Float?
+  gradedByUserId     String?
+  gradedAt           DateTime               @default(now())
+  source             GradeSource
+  rawResult          Json                   @default("{}")
+  normalizedResult   Json                   @default("{}")
+  metadata           Json                   @default("{}")
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  gradebookItem      GradebookItem          @relation(fields: [gradebookItemId], references: [id], onDelete: Cascade)
+  participant        CourseGroupParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  user               User?                  @relation("GradeUser", fields: [userId], references: [id], onDelete: SetNull)
+  selectedAttempt    ActivityAttempt?       @relation(fields: [selectedAttemptId], references: [id], onDelete: SetNull)
+  gradedBy           User?                  @relation("GradeGrader", fields: [gradedByUserId], references: [id], onDelete: SetNull)
+  events             GradeEvent[]
+
+  @@unique([gradebookItemId, participantId])
+  @@index([participantId])
+  @@index([userId])
+  @@index([selectedAttemptId])
+  @@index([gradedByUserId])
+  @@index([source])
+  @@index([gradedAt])
+}
+
+model GradeEvent {
+  id              String                 @id @default(cuid())
+  gradeId         String?
+  gradebookItemId String
+  participantId   String
+  attemptId       String?
+  actorUserId     String?
+  eventType       GradeEventType
+  previousValue   Json?
+  nextValue       Json?
+  reason          String?
+  metadata        Json                   @default("{}")
+  createdAt       DateTime               @default(now())
+  grade           Grade?                 @relation(fields: [gradeId], references: [id], onDelete: SetNull)
+  gradebookItem   GradebookItem          @relation(fields: [gradebookItemId], references: [id], onDelete: Cascade)
+  participant     CourseGroupParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  attempt         ActivityAttempt?       @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  actor           User?                  @relation("GradeEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([gradeId, createdAt])
+  @@index([gradebookItemId, participantId, createdAt])
+  @@index([participantId])
+  @@index([attemptId])
+  @@index([actorUserId])
+  @@index([eventType])
+  @@index([createdAt])
 }
