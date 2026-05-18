@@ -213,7 +213,7 @@ Course activities can be assigned to every group from the course page. This stor
 
 Each `CourseGroupActivity` assignment has one corresponding `GradebookItem`, created when the assignment is materialized directly, through an all-groups course policy, or by future-group inheritance.
 
-Core gradebook services create numbered `ActivityAttempt` records for assigned group activities, enforce attempt limits, compute lateness at submission time, and record grading results with `GradeEvent` audit entries. Plugins keep their private attempt/submission artifacts in plugin tables and call the core services to keep gradebook records consistent.
+Core gradebook services create numbered `ActivityAttempt` records for assigned group activities, enforce attempt limits, compute lateness at submission time, normalize raw plugin scores to the gradebook item scale, apply pass/fail thresholds and late penalties, select the current grade across attempts, and record grading results with `GradeEvent` audit entries. Plugins keep their private attempt/submission artifacts in plugin tables and call the core services to keep gradebook records consistent.
 
 Activity plugins can declare grading capabilities, manual grading renderer hints, and core-compatible grading results. Parsons is the first plugin wired into this contract; it advertises attempt, automatic grading, manual grading, and analytics support, and its server plugin can convert a stored Parsons evaluation into a raw grading result.
 

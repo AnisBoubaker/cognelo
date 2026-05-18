@@ -418,17 +418,17 @@ First plugin integration target:
 
 - Parsons - completed.
 
-### Phase 5: Grade Normalization And Selection
+### Phase 5: Grade Normalization And Selection - Completed
 
-- Implement normalization from raw plugin points to gradebook points.
-- Implement pass/fail calculation.
-- Implement grade selection strategies:
+- Completed: implement normalization from raw plugin points to gradebook points.
+- Completed: implement pass/fail calculation.
+- Completed: implement grade selection strategies:
   - latest
   - best
   - first
   - weighted average
-- Implement late penalty application.
-- Store every grade change as `GradeEvent`.
+- Completed: implement late penalty application.
+- Completed: store every grade change as `GradeEvent`.
 
 ### Phase 6: Teacher Gradebook UI
 

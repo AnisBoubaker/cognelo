@@ -12,7 +12,8 @@ const tx = vi.hoisted(() => ({
     upsert: vi.fn()
   },
   gradeEvent: {
-    create: vi.fn()
+    create: vi.fn(),
+    findMany: vi.fn()
   }
 }));
 
@@ -73,9 +74,18 @@ const groupActivity = {
   },
   gradebookItem: {
     id: "gradebook-item-1",
+    pointsPossible: 100,
+    gradingMode: "points",
+    passThresholdPoints: null,
+    passThresholdOutOf: null,
     attemptLimitMode: "unlimited",
     maxAttempts: null,
+    gradeStrategy: "latest",
+    dropLowestAttempt: false,
     lateSubmissionsAllowed: false,
+    latePenaltyPercent: null,
+    latePenaltyIntervalMinutes: null,
+    latePenaltyMaxPercent: null,
     lateGracePeriodMinutes: null
   }
 };
@@ -98,6 +108,7 @@ describe("gradebook attempt services", () => {
     tx.grade.findUnique.mockResolvedValue(null);
     tx.grade.upsert.mockImplementation(async ({ create, update }) => ({ id: "grade-1", ...create, ...update }));
     tx.gradeEvent.create.mockResolvedValue({ id: "event-1" });
+    tx.gradeEvent.findMany.mockResolvedValue([]);
     authMocks.canManageCourse.mockResolvedValue(false);
   });
 
@@ -205,9 +216,15 @@ describe("gradebook attempt services", () => {
       gradebookItemId: "gradebook-item-1",
       participantId: "participant-1",
       userId: "student-1",
+      attemptNumber: 1,
+      isLate: false,
+      lateBySeconds: null,
       submittedAt: new Date("2026-05-18T15:00:00.000Z"),
       participant,
-      gradebookItem: { id: "gradebook-item-1" }
+      gradebookItem: {
+        ...groupActivity.gradebookItem,
+        id: "gradebook-item-1"
+      }
     });
 
     const now = new Date("2026-05-18T15:01:00.000Z");
@@ -236,6 +253,7 @@ describe("gradebook attempt services", () => {
           selectedAttemptId: "attempt-1",
           rawScore: 8,
           normalizedScore: 80,
+          normalizedMaxScore: 100,
           source: "auto"
         })
       })
@@ -249,5 +267,165 @@ describe("gradebook attempt services", () => {
         createdAt: now
       })
     });
+  });
+
+  it("normalizes raw scores, computes pass/fail, and applies late penalties", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    mockPrisma.activityAttempt.findUnique.mockResolvedValue({
+      id: "attempt-1",
+      courseId: "course-1",
+      gradebookItemId: "gradebook-item-1",
+      participantId: "participant-1",
+      userId: "student-1",
+      attemptNumber: 1,
+      isLate: true,
+      lateBySeconds: 7200,
+      submittedAt: new Date("2026-05-18T15:00:00.000Z"),
+      participant,
+      gradebookItem: {
+        ...groupActivity.gradebookItem,
+        gradingMode: "pass_fail",
+        passThresholdPoints: 60,
+        passThresholdOutOf: 100,
+        latePenaltyPercent: 10,
+        latePenaltyIntervalMinutes: 60,
+        latePenaltyMaxPercent: 15
+      }
+    });
+
+    await expect(
+      recordActivityAttemptGradingResult(teacherUser, {
+        attemptId: "attempt-1",
+        rawScore: 8,
+        rawMaxScore: 10,
+        source: "auto"
+      })
+    ).resolves.toMatchObject({
+      grade: {
+        rawScore: 8,
+        rawMaxScore: 10,
+        normalizedScore: 68,
+        normalizedMaxScore: 100,
+        isPass: true,
+        latePenaltyApplied: true,
+        latePenaltyPercent: 15
+      }
+    });
+  });
+
+  it("selects the best graded attempt from grade events", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    tx.gradeEvent.findMany.mockResolvedValue([
+      {
+        attemptId: "attempt-1",
+        nextValue: {
+          attemptId: "attempt-1",
+          attemptNumber: 1,
+          rawScore: 5,
+          rawMaxScore: 10,
+          normalizedScore: 50,
+          normalizedMaxScore: 100,
+          isPass: null
+        }
+      }
+    ]);
+    mockPrisma.activityAttempt.findUnique.mockResolvedValue({
+      id: "attempt-2",
+      courseId: "course-1",
+      gradebookItemId: "gradebook-item-1",
+      participantId: "participant-1",
+      userId: "student-1",
+      attemptNumber: 2,
+      isLate: false,
+      lateBySeconds: null,
+      submittedAt: new Date("2026-05-18T15:00:00.000Z"),
+      participant,
+      gradebookItem: {
+        ...groupActivity.gradebookItem,
+        gradeStrategy: "best"
+      }
+    });
+
+    await recordActivityAttemptGradingResult(teacherUser, {
+      attemptId: "attempt-2",
+      rawScore: 4,
+      rawMaxScore: 10,
+      source: "auto"
+    });
+
+    expect(tx.grade.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          selectedAttemptId: "attempt-1",
+          normalizedScore: 50
+        })
+      })
+    );
+  });
+
+  it("selects a weighted average grade and can drop the lowest attempt", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    tx.gradeEvent.findMany.mockResolvedValue([
+      {
+        attemptId: "attempt-1",
+        nextValue: {
+          attemptId: "attempt-1",
+          attemptNumber: 1,
+          rawScore: 4,
+          rawMaxScore: 10,
+          normalizedScore: 40,
+          normalizedMaxScore: 100,
+          isPass: null
+        }
+      },
+      {
+        attemptId: "attempt-2",
+        nextValue: {
+          attemptId: "attempt-2",
+          attemptNumber: 2,
+          rawScore: 7,
+          rawMaxScore: 10,
+          normalizedScore: 70,
+          normalizedMaxScore: 100,
+          isPass: null
+        }
+      }
+    ]);
+    mockPrisma.activityAttempt.findUnique.mockResolvedValue({
+      id: "attempt-3",
+      courseId: "course-1",
+      gradebookItemId: "gradebook-item-1",
+      participantId: "participant-1",
+      userId: "student-1",
+      attemptNumber: 3,
+      isLate: false,
+      lateBySeconds: null,
+      submittedAt: new Date("2026-05-18T15:00:00.000Z"),
+      participant,
+      gradebookItem: {
+        ...groupActivity.gradebookItem,
+        gradeStrategy: "weighted_average",
+        dropLowestAttempt: true
+      }
+    });
+
+    await recordActivityAttemptGradingResult(teacherUser, {
+      attemptId: "attempt-3",
+      rawScore: 10,
+      rawMaxScore: 10,
+      source: "auto"
+    });
+
+    expect(tx.grade.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          selectedAttemptId: "attempt-3",
+          rawScore: 85,
+          rawMaxScore: 100,
+          normalizedScore: 85,
+          normalizedMaxScore: 100
+        })
+      })
+    );
   });
 });
