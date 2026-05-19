@@ -9,7 +9,7 @@ import {
   type ParsonsAttemptState,
   type ParsonsAttemptUpdateInput
 } from "./attempt-types";
-import { defaultParsonsConfig, type ParsonsConfig } from "./parsons";
+import { defaultParsonsConfig, evaluateParsonsSolution, getParsonsSourceLines, type ParsonsBlock, type ParsonsConfig } from "./parsons";
 
 export type ParsonsAttemptRecord = {
   id: string;
@@ -225,7 +225,7 @@ export async function listParsonsGradebookAttempts(params: {
       userId: params.userId,
       ...(params.includeAttempts ? {} : { status: "completed" })
     },
-    orderBy: [{ startedAt: "asc" }],
+    orderBy: [{ lastInteractionAt: "desc" }, { startedAt: "desc" }],
     include: {
       events: {
         orderBy: [{ createdAt: "asc" }]
@@ -239,6 +239,50 @@ export async function listParsonsGradebookAttempts(params: {
   }));
 }
 
+export function evaluateParsonsAttemptStateForConfig(value: unknown, config: ParsonsConfig): ParsonsAttemptEvaluation {
+  const state = parsonsAttemptStateSchema.parse(value);
+  return evaluateParsonsSolution(remapSubmittedBlocksToCurrentConfig(state.blocks, config), config);
+}
+
+function remapSubmittedBlocksToCurrentConfig(blocks: ParsonsBlock[], config: ParsonsConfig): ParsonsBlock[] {
+  const sourceLines = getParsonsSourceLines(config);
+  const currentBlocksByText = new Map<string, ParsonsBlock[]>();
+  const currentBlocksByPhysicalLine = new Map<number, ParsonsBlock>();
+
+  sourceLines.forEach((line) => {
+    const block = {
+      id: `current-${line.sourceIndex}`,
+      displayText: config.stripIndentation ? line.text.trimStart() : line.text,
+      originalText: line.text,
+      sourceIndex: line.sourceIndex,
+      physicalLineIndex: line.physicalLineIndex,
+      unitId: line.unitId,
+      groupId: line.groupId,
+      expectedIndent: Math.max(0, Math.floor(countLeadingSpaces(line.text) / 2)),
+      currentIndent: config.stripIndentation ? 0 : Math.max(0, Math.floor(countLeadingSpaces(line.text) / 2))
+    };
+    const textMatches = currentBlocksByText.get(line.text) ?? [];
+    textMatches.push(block);
+    currentBlocksByText.set(line.text, textMatches);
+    currentBlocksByPhysicalLine.set(line.physicalLineIndex, block);
+  });
+
+  return blocks.map((block) => {
+    const textMatch = currentBlocksByText.get(block.originalText)?.shift();
+    const currentBlock = textMatch ?? currentBlocksByPhysicalLine.get(block.physicalLineIndex);
+    if (!currentBlock) {
+      return block;
+    }
+    return {
+      ...currentBlock,
+      id: block.id,
+      displayText: block.displayText,
+      originalText: block.originalText,
+      currentIndent: block.currentIndent
+    };
+  });
+}
+
 function normalizeAttemptState(value: unknown, config: ParsonsConfig): ParsonsAttemptState {
   const parsed = parsonsAttemptStateSchema.safeParse(value);
   if (parsed.success) {
@@ -249,6 +293,10 @@ function normalizeAttemptState(value: unknown, config: ParsonsConfig): ParsonsAt
 
 function normalizeResultSummary(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function countLeadingSpaces(value: string) {
+  return value.match(/^ */)?.[0].length ?? 0;
 }
 
 function toParsonsAttemptRecord(attempt: PluginParsonsAttempt, latestState: ParsonsAttemptState): ParsonsAttemptRecord {

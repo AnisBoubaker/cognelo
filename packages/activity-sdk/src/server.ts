@@ -152,6 +152,12 @@ export function listPluginRoutes() {
   );
 }
 
+export function resolvePluginGradingHandler(activityTypeKey: string) {
+  return serverPlugins.find((plugin) =>
+    plugin.grading?.gradeAttempt && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
+  )?.grading?.gradeAttempt ?? null;
+}
+
 export async function runCourseActivityCreatedFromBankVersionHooks(input: {
   user: CurrentUser;
   courseId: string;

@@ -24,6 +24,7 @@ const mockPrisma = vi.hoisted(() => ({
   $transaction: vi.fn(async (handler: (transaction: typeof tx) => unknown) => handler(tx)),
   activityAttempt: {
     count: vi.fn(),
+    findFirst: vi.fn(),
     findUnique: vi.fn(),
     update: vi.fn()
   },
@@ -57,8 +58,10 @@ vi.mock("@cognelo/db", () => ({
 vi.mock("./authorization", () => authMocks);
 
 const {
+  getActivityAttemptRegradeContext,
   getCourseGradebook,
   getStudentReleasedGrades,
+  overrideGradebookGrade,
   recordActivityAttemptGradingResult,
   setGradebookItemRelease,
   startActivityAttempt,
@@ -635,6 +638,119 @@ describe("gradebook attempt services", () => {
         nextValue: { gradesReleased: true },
         createdAt: now
       })
+    });
+  });
+
+  it("overrides a participant grade and writes an override audit event", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    mockPrisma.gradebookItem.findFirst.mockResolvedValue({
+      id: "gradebook-item-1",
+      courseId: "course-1",
+      pointsPossible: 100,
+      gradingMode: "points",
+      passThresholdPoints: null,
+      passThresholdOutOf: null,
+      gradeStrategy: "latest",
+      dropLowestAttempt: false,
+      latePenaltyPercent: null,
+      latePenaltyIntervalMinutes: null,
+      latePenaltyMaxPercent: null,
+      group: {
+        participants: [{ id: "participant-1", userId: "student-1" }]
+      }
+    });
+    tx.grade.findUnique.mockResolvedValue({
+      selectedAttemptId: "attempt-1",
+      rawScore: 80,
+      rawMaxScore: 100,
+      normalizedScore: 80,
+      normalizedMaxScore: 100,
+      isPass: null,
+      latePenaltyApplied: false,
+      latePenaltyPercent: null,
+      source: "auto"
+    });
+    const now = new Date("2026-05-19T13:00:00.000Z");
+
+    await expect(
+      overrideGradebookGrade(teacherUser, "course-1", {
+        gradebookItemId: "gradebook-item-1",
+        participantId: "participant-1",
+        score: 93,
+        reason: "Manual review",
+        now
+      })
+    ).resolves.toMatchObject({
+      source: "override",
+      normalizedScore: 93,
+      normalizedMaxScore: 100
+    });
+
+    expect(tx.grade.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { gradebookItemId_participantId: { gradebookItemId: "gradebook-item-1", participantId: "participant-1" } },
+        update: expect.objectContaining({
+          selectedAttemptId: null,
+          normalizedScore: 93,
+          source: "override"
+        })
+      })
+    );
+    expect(tx.gradeEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        gradebookItemId: "gradebook-item-1",
+        participantId: "participant-1",
+        actorUserId: "teacher-1",
+        eventType: "overridden",
+        reason: "Manual review",
+        previousValue: expect.objectContaining({ normalizedScore: 80 }),
+        nextValue: expect.objectContaining({ normalizedScore: 93 }),
+        createdAt: now
+      })
+    });
+  });
+
+  it("returns plugin grading context for an existing activity attempt", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    mockPrisma.activityAttempt.findFirst.mockResolvedValue({
+      id: "attempt-1",
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      pluginAttemptRef: "plugin-attempt-1",
+      activity: {
+        id: "activity-1",
+        bankActivityId: null,
+        activityVersionId: "version-1",
+        title: "Loops",
+        description: "Reorder the loop.",
+        lifecycle: "published",
+        config: { prompt: "Build it" },
+        metadata: {},
+        activityType: {
+          key: "parsons-problem",
+          name: "Parsons problem",
+          description: "Reorder code"
+        }
+      },
+      groupActivity: {
+        id: "assignment-1",
+        availableFrom: null,
+        availableUntil: null,
+        config: {},
+        metadata: { assessmentMode: "summative" },
+        position: 0
+      }
+    });
+
+    await expect(getActivityAttemptRegradeContext(teacherUser, "course-1", "attempt-1")).resolves.toMatchObject({
+      attemptId: "attempt-1",
+      pluginAttemptRef: "plugin-attempt-1",
+      activityTypeKey: "parsons-problem",
+      activity: {
+        id: "activity-1",
+        assignment: { id: "assignment-1" }
+      }
     });
   });
 

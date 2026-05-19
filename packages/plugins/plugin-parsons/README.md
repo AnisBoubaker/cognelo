@@ -91,6 +91,8 @@ These are also available through group-scoped assigned activity dispatch for stu
 
 The gradebook attempts route is teacher-only. It returns a participant's completed Parsons submissions by default and can include in-progress/abandoned attempts plus event history with `includeAttempts=true`; the course gradebook detailed-results page uses it for the Parsons "See answer" overlay.
 
+Parsons registers a server `gradeAttempt` handler for the platform gradebook regrade API. Teacher-triggered regrades resolve the stored plugin attempt reference, evaluate the submitted attempt state against the current course-local activity config, and let the core gradebook service record the updated grade plus a `regraded` audit event.
+
 ## UX Notes
 
 - student rows render in a compact editor-like style

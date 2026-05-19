@@ -27,7 +27,7 @@ vi.mock("./db-client", () => ({
   Prisma: {}
 }));
 
-const { ensureParsonsAttempt, listRecentParsonsAttemptSignals, updateParsonsAttempt } = await import("./attempts");
+const { ensureParsonsAttempt, listParsonsGradebookAttempts, listRecentParsonsAttemptSignals, updateParsonsAttempt } = await import("./attempts");
 
 const now = new Date("2026-01-01T00:00:00.000Z");
 const config = parseParsonsConfig({ solution: "a()\nb()" });
@@ -144,5 +144,30 @@ describe("Parsons attempts persistence helpers", () => {
       { id: "attempt-1", recentEvents: [{ id: "event-1", type: "move" }] }
     ]);
     expect(mockPrisma.pluginParsonsAttempt.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 5 }));
+  });
+
+  it("lists gradebook attempts by latest interaction timestamp first", async () => {
+    mockPrisma.pluginParsonsAttempt.findMany.mockResolvedValue([
+      {
+        ...attempt({ id: "attempt-1", status: "completed", completedAt: now }),
+        events: [{ id: "event-1", type: "submit", payload: {}, createdAt: now }]
+      }
+    ]);
+
+    await expect(
+      listParsonsGradebookAttempts({
+        activityId: "activity-1",
+        userId: "user-1",
+        config,
+        includeAttempts: true
+      })
+    ).resolves.toMatchObject([{ id: "attempt-1", events: [{ id: "event-1" }] }]);
+
+    expect(mockPrisma.pluginParsonsAttempt.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ lastInteractionAt: "desc" }, { startedAt: "desc" }],
+        include: { events: { orderBy: [{ createdAt: "asc" }] } }
+      })
+    );
   });
 });

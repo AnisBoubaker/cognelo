@@ -10,6 +10,30 @@ type ActivityAttemptSource = {
   activityId: string;
 };
 
+type GradebookPluginActivityRecord = {
+  id: string;
+  bankActivityId?: string | null;
+  activityVersionId?: string | null;
+  title: string;
+  description: string;
+  lifecycle: string;
+  config?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  assignment?: {
+    id: string;
+    availableFrom?: Date | string | null;
+    availableUntil?: Date | string | null;
+    config?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+    position?: number;
+  };
+  activityType: {
+    key: string;
+    name: string;
+    description: string;
+  };
+};
+
 export type StartActivityAttemptInput = ActivityAttemptSource & {
   participantId?: string;
   pluginKey: string;
@@ -45,6 +69,27 @@ export type RecordActivityAttemptGradingResultInput = {
   metadata?: JsonInput;
   reason?: string | null;
   now?: Date;
+};
+
+export type OverrideGradebookGradeInput = {
+  gradebookItemId: string;
+  participantId: string;
+  score: number;
+  maxScore?: number;
+  isPass?: boolean | null;
+  reason?: string | null;
+  metadata?: JsonInput;
+  now?: Date;
+};
+
+export type ActivityAttemptRegradeContext = {
+  attemptId: string;
+  courseId: string;
+  groupId: string;
+  activityId: string;
+  pluginAttemptRef: string | null;
+  activityTypeKey: string;
+  activity: GradebookPluginActivityRecord;
 };
 
 export async function startActivityAttempt(user: CurrentUser, input: StartActivityAttemptInput) {
@@ -257,6 +302,198 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
 
     return { attempt: gradedAttempt, grade };
   });
+}
+
+export async function overrideGradebookGrade(user: CurrentUser, courseId: string, input: OverrideGradebookGradeInput) {
+  await canManageCourseOrThrow(user, courseId);
+  const now = input.now ?? new Date();
+  const item = await prisma.gradebookItem.findFirst({
+    where: {
+      id: input.gradebookItemId,
+      courseId,
+      group: {
+        participants: {
+          some: {
+            id: input.participantId,
+            role: "student"
+          }
+        }
+      }
+    },
+    include: {
+      group: {
+        select: {
+          participants: {
+            where: { id: input.participantId },
+            select: { id: true, userId: true }
+          }
+        }
+      }
+    }
+  });
+
+  if (!item) {
+    throw notFound("Gradebook item");
+  }
+
+  const participant = item.group.participants[0];
+  if (!participant) {
+    throw notFound("Participant");
+  }
+
+  const maxScore = input.maxScore ?? item.pointsPossible;
+  if (maxScore <= 0) {
+    throw new AppError(400, "GRADE_NORMALIZED_MAX_INVALID", "Max score must be greater than zero.");
+  }
+  if (input.score < 0 || input.score > maxScore) {
+    throw new AppError(400, "GRADE_SCORE_OUT_OF_RANGE", "Score must be between zero and the max score.");
+  }
+
+  const isPass = computePassStatus({
+    explicit: input.isPass,
+    gradebookItem: item,
+    normalizedScore: input.score,
+    normalizedMaxScore: maxScore
+  });
+  const nextSnapshot = {
+    attemptId: null,
+    rawScore: input.score,
+    rawMaxScore: maxScore,
+    normalizedScore: input.score,
+    normalizedMaxScore: maxScore,
+    isPass,
+    latePenaltyApplied: false,
+    latePenaltyPercent: null,
+    source: "override"
+  };
+
+  return prisma.$transaction(async (tx) => {
+    const previousGrade = await tx.grade.findUnique({
+      where: {
+        gradebookItemId_participantId: {
+          gradebookItemId: item.id,
+          participantId: participant.id
+        }
+      }
+    });
+
+    const grade = await tx.grade.upsert({
+      where: {
+        gradebookItemId_participantId: {
+          gradebookItemId: item.id,
+          participantId: participant.id
+        }
+      },
+      update: {
+        selectedAttemptId: null,
+        rawScore: input.score,
+        rawMaxScore: maxScore,
+        normalizedScore: input.score,
+        normalizedMaxScore: maxScore,
+        isPass,
+        latePenaltyApplied: false,
+        latePenaltyPercent: null,
+        gradedByUserId: user.id,
+        gradedAt: now,
+        source: "override",
+        rawResult: nextSnapshot as JsonInput,
+        normalizedResult: nextSnapshot as JsonInput,
+        metadata: (input.metadata ?? {}) as JsonInput
+      },
+      create: {
+        gradebookItemId: item.id,
+        participantId: participant.id,
+        userId: participant.userId,
+        selectedAttemptId: null,
+        rawScore: input.score,
+        rawMaxScore: maxScore,
+        normalizedScore: input.score,
+        normalizedMaxScore: maxScore,
+        isPass,
+        latePenaltyApplied: false,
+        latePenaltyPercent: null,
+        gradedByUserId: user.id,
+        gradedAt: now,
+        source: "override",
+        rawResult: nextSnapshot as JsonInput,
+        normalizedResult: nextSnapshot as JsonInput,
+        metadata: (input.metadata ?? {}) as JsonInput
+      }
+    });
+
+    await tx.gradeEvent.create({
+      data: {
+        gradeId: grade.id,
+        gradebookItemId: item.id,
+        participantId: participant.id,
+        actorUserId: user.id,
+        eventType: "overridden",
+        previousValue: previousGrade ? (gradeSnapshot(previousGrade) as JsonInput) : undefined,
+        nextValue: nextSnapshot as JsonInput,
+        reason: input.reason ?? null,
+        metadata: (input.metadata ?? {}) as JsonInput,
+        createdAt: now
+      }
+    });
+
+    return grade;
+  });
+}
+
+export async function getActivityAttemptRegradeContext(
+  user: CurrentUser,
+  courseId: string,
+  attemptId: string
+): Promise<ActivityAttemptRegradeContext> {
+  await canManageCourseOrThrow(user, courseId);
+  const attempt = await prisma.activityAttempt.findFirst({
+    where: { id: attemptId, courseId },
+    include: {
+      activity: {
+        include: {
+          activityType: true
+        }
+      },
+      groupActivity: true
+    }
+  });
+
+  if (!attempt) {
+    throw notFound("Activity attempt");
+  }
+
+  const activity = attempt.activity;
+  return {
+    attemptId: attempt.id,
+    courseId: attempt.courseId,
+    groupId: attempt.groupId,
+    activityId: attempt.activityId,
+    pluginAttemptRef: attempt.pluginAttemptRef,
+    activityTypeKey: activity.activityType.key,
+    activity: {
+      id: activity.id,
+      bankActivityId: activity.bankActivityId,
+      activityVersionId: activity.activityVersionId,
+      title: activity.title,
+      description: activity.description,
+      lifecycle: activity.lifecycle,
+      config: (activity.config as Record<string, unknown> | null) ?? undefined,
+      metadata: (activity.metadata as Record<string, unknown> | null) ?? undefined,
+      assignment: {
+        id: attempt.groupActivity.id,
+        availableFrom: attempt.groupActivity.availableFrom,
+        availableUntil: attempt.groupActivity.availableUntil,
+        config: (attempt.groupActivity.config as Record<string, unknown> | null) ?? undefined,
+        metadata: (attempt.groupActivity.metadata as Record<string, unknown> | null) ?? undefined,
+        position: attempt.groupActivity.position
+      },
+      activityType: {
+        key: activity.activityType.key,
+        name: activity.activityType.name,
+        description: activity.activityType.description
+      }
+    }
+  };
 }
 
 export type CourseGradebookStatusFilter = "all" | "missing" | "late" | "needs_grading" | "graded";
