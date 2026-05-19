@@ -6,12 +6,12 @@ type SubjectContext = {
   description: string;
 };
 
-type GenerationLocale = "en" | "fr" | "zh";
+type GenerationLocale = "en" | "fr" | "zh" | "ar";
 
 export const parsonsGenerationInputSchema = z.object({
   description: z.string().min(10).max(4000),
   language: z.string().min(1).max(40),
-  locale: z.enum(["en", "fr", "zh"]).default("en")
+  locale: z.enum(["en", "fr", "zh", "ar"]).default("en")
 });
 
 const generatedParsonsSchema = z
@@ -236,6 +236,9 @@ function localeName(locale: GenerationLocale) {
   }
   if (locale === "zh") {
     return "Chinese";
+  }
+  if (locale === "ar") {
+    return "Arabic";
   }
   return "English";
 }

@@ -115,6 +115,11 @@ export const mcqPlugin: ActivityPlugin = {
           name: "选择题",
           description: "使用文本优先、类 Markdown 格式编写的单选题和多选题活动。",
           defaultTitle: "选择题"
+        },
+        ar: {
+          name: "أسئلة اختيار من متعدد",
+          description: "أنشطة اختيار مفرد ومتعدد تؤلف بصيغة نصية شبيهة بماركداون.",
+          defaultTitle: "أسئلة اختيار من متعدد"
         }
       },
       defaultConfig: {

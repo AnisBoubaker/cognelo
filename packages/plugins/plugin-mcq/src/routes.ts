@@ -7,7 +7,7 @@ import { parseMcqSource, type McqParseError } from "./mcq";
 const mcqGenerateInputSchema = z.object({
   description: z.string().min(10).max(4000),
   defaultCodeLanguage: z.string().min(1).max(40).default("python"),
-  locale: z.enum(["en", "fr", "zh"]).default("en")
+  locale: z.enum(["en", "fr", "zh", "ar"]).default("en")
 });
 
 type SubjectContext = {
@@ -80,7 +80,7 @@ async function generateValidMcqSource(input: {
   user: Parameters<typeof generateQuestionAuthoringText>[0];
   description: string;
   defaultCodeLanguage: string;
-  locale: "en" | "fr" | "zh";
+  locale: "en" | "fr" | "zh" | "ar";
   subject: SubjectContext;
 }) {
   const systemPrompt = buildSystemPrompt(input);
@@ -115,7 +115,7 @@ async function generateValidMcqSource(input: {
 
 function buildSystemPrompt(input: {
   defaultCodeLanguage: string;
-  locale: "en" | "fr" | "zh";
+  locale: "en" | "fr" | "zh" | "ar";
   subject: SubjectContext;
 }) {
   return [
@@ -181,12 +181,15 @@ function normalizeGeneratedSource(value: string) {
   return (fenceMatch?.[1] ?? trimmed).trim();
 }
 
-function localeName(locale: "en" | "fr" | "zh") {
+function localeName(locale: "en" | "fr" | "zh" | "ar") {
   if (locale === "fr") {
     return "French";
   }
   if (locale === "zh") {
     return "Chinese";
+  }
+  if (locale === "ar") {
+    return "Arabic";
   }
   return "English";
 }

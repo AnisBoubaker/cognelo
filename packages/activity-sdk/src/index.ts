@@ -6,7 +6,7 @@ import { placeholderPlugin } from "@cognelo/plugin-placeholder";
 import { mcqPlugin } from "@cognelo/plugin-mcq";
 import { webDesignCodingExercisesPlugin } from "@cognelo/plugin-web-design-coding-exercises";
 
-export type PluginLocale = "en" | "fr" | "zh";
+export type PluginLocale = "en" | "fr" | "zh" | "ar";
 
 export type ActivityMessages = {
   name: string;

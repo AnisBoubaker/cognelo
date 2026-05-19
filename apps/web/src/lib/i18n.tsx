@@ -3,7 +3,7 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import { parsonsMessages } from "@cognelo/plugin-parsons";
 
-export const locales = ["en", "fr", "zh"] as const;
+export const locales = ["en", "fr", "zh", "ar"] as const;
 export type Locale = (typeof locales)[number];
 
 type MessageTree = {
@@ -16,7 +16,8 @@ const messages: Record<Locale, MessageTree> = {
       label: "Language",
       en: "English",
       fr: "Français",
-      zh: "中文"
+      zh: "中文",
+      ar: "العربية"
     },
     common: {
       add: "Add",
@@ -610,7 +611,8 @@ const messages: Record<Locale, MessageTree> = {
       label: "Langue",
       en: "English",
       fr: "Français",
-      zh: "中文"
+      zh: "中文",
+      ar: "العربية"
     },
     common: {
       add: "Ajouter",
@@ -1204,7 +1206,8 @@ const messages: Record<Locale, MessageTree> = {
       label: "语言",
       en: "English",
       fr: "Français",
-      zh: "中文"
+      zh: "中文",
+      ar: "العربية"
     },
     common: {
       add: "添加",
@@ -1792,6 +1795,460 @@ const messages: Record<Locale, MessageTree> = {
       courseMaterialVisibilityError: "无法更新继承资料的可见性。"
     },
     parsons: parsonsMessages.zh
+  },
+  ar: {
+    locale: {
+      label: "اللغة",
+      en: "English",
+      fr: "Français",
+      zh: "中文",
+      ar: "العربية"
+    },
+    common: {
+      add: "إضافة",
+      cancel: "إلغاء",
+      close: "إغلاق",
+      create: "إنشاء",
+      date: "التاريخ",
+      download: "تنزيل",
+      edit: "تعديل",
+      back: "رجوع",
+      loading: "جار التحميل...",
+      logout: "تسجيل الخروج",
+      noDescription: "لا يوجد وصف بعد.",
+      open: "فتح",
+      remove: "إزالة",
+      redirecting: "جار التحويل...",
+      save: "حفظ",
+      saving: "جار الحفظ...",
+      time: "الوقت"
+    },
+    unsavedChanges: {
+      eyebrow: "تغييرات غير محفوظة",
+      title: "مغادرة هذه الصفحة؟",
+      message: "هناك تغييرات لم تحفظ بعد. اختر ما تريد فعله قبل المغادرة.",
+      continueEditing: "متابعة التحرير",
+      saveAndLeave: "حفظ والمغادرة",
+      discardAndLeave: "تجاهل والمغادرة"
+    },
+    nav: {
+      dashboard: "لوحة التحكم",
+      subjects: "المواد",
+      activityBanks: "بنوك الأنشطة",
+      courses: "المقررات",
+      newCourse: "مقرر جديد",
+      settings: "الإعدادات",
+      account: "الحساب",
+      accountMenu: "فتح قائمة الحساب"
+    },
+    status: {
+      draft: "مسودة",
+      published: "منشور",
+      archived: "مؤرشف"
+    },
+    roles: {
+      admin: "مدير",
+      course_manager: "مدير مقرر",
+      teacher: "معلم",
+      student: "طالب"
+    },
+    activityLifecycle: {
+      draft: "مسودة",
+      published: "منشور",
+      paused: "متوقف مؤقتا",
+      archived: "مؤرشف"
+    },
+    login: {
+      title: "تسجيل الدخول",
+      subtitle: "استخدم حساب المعلم التجريبي لإنشاء المقررات والأنشطة.",
+      activateTitle: "تفعيل حسابك",
+      activateSubtitle: "إذا أضافك معلم إلى مجموعة، اختر كلمة مرورك هنا قبل أول تسجيل دخول.",
+      email: "البريد الإلكتروني",
+      password: "كلمة المرور",
+      confirmPassword: "تأكيد كلمة المرور",
+      modeLabel: "خيارات المصادقة",
+      activateCta: "وصول لأول مرة",
+      activateSubmit: "تفعيل الحساب",
+      submit: "تسجيل الدخول",
+      submitting: "جار تسجيل الدخول...",
+      error: "فشل تسجيل الدخول.",
+      activationError: "تعذر تفعيل الحساب."
+    },
+    dashboard: {
+      eyebrow: "لوحة التحكم",
+      welcome: "مرحبا بعودتك",
+      roles: "الأدوار: {roles}",
+      coursesEyebrow: "المقررات",
+      coursesTitle: "إدارة مساحات التعلم",
+      coursesText: "أنشئ مساحة المقرر وانشرها وأرشفها وافتحها.",
+      activitiesEyebrow: "الأنشطة",
+      activitiesTitle: "أساس جاهز للإضافات",
+      activitiesText: "أضف أنشطة الآن، ثم وسعها بالمصححات والاختبارات والوحدات التعليمية لاحقا.",
+      researchEyebrow: "بحث",
+      researchTitle: "البيانات الوصفية أولا",
+      researchText: "تحمل الأنشطة بيانات وصفية قابلة للضبط منذ البداية."
+    },
+    courses: {
+      eyebrow: "المقررات",
+      title: "مساحة المقرر",
+      create: "إنشاء مقرر",
+      emptyDescription: "لا يوجد وصف بعد.",
+      activityCount: "{count} أنشطة",
+      loadError: "تعذر تحميل المقررات."
+    },
+    subjects: {
+      eyebrow: "المنهج",
+      subtitle: "تحتوي المواد على موارد مشتركة وتنظم بنوك الأنشطة.",
+      createTitle: "إنشاء مادة",
+      listEyebrow: "المواد",
+      listTitle: "المواد المتاحة",
+      titleLabel: "العنوان",
+      descriptionLabel: "الوصف",
+      cardEyebrow: "مادة",
+      summary: "{banks} بنوك أنشطة · {courses} مقررات",
+      empty: "لا توجد مواد بعد.",
+      loadError: "تعذر تحميل المواد.",
+      createError: "تعذر إنشاء المادة."
+    },
+    subjectDetail: {
+      eyebrow: "مادة",
+      fallbackTitle: "جار تحميل المادة...",
+      activityBanksEyebrow: "أنشطة قابلة لإعادة الاستخدام",
+      activityBanksTitle: "بنوك الأنشطة",
+      emptyActivityBanks: "لا توجد بنوك أنشطة مرتبطة بهذه المادة بعد.",
+      coursesEyebrow: "المقررات",
+      coursesTitle: "المقررات",
+      emptyCourses: "لا توجد مقررات مرتبطة بهذه المادة بعد.",
+      loadError: "تعذر تحميل المادة."
+    },
+    editSubject: {
+      eyebrow: "تعديل المادة",
+      fallbackTitle: "جار تحميل المادة...",
+      loadError: "تعذر تحميل المادة.",
+      saveError: "تعذر حفظ المادة."
+    },
+    activityBanks: {
+      eyebrow: "أنشطة قابلة لإعادة الاستخدام",
+      subtitle: "اختر بنك أنشطة لإدارة أنشطته، أو أضف بنكا جديدا.",
+      listEyebrow: "البنوك",
+      listTitle: "بنوك الأنشطة",
+      noSubject: "لا توجد مادة",
+      activityCount: "{count} أنشطة",
+      empty: "لا توجد بنوك أنشطة بعد.",
+      addTitle: "إضافة بنك أنشطة",
+      subjectLabel: "المادة",
+      titleLabel: "العنوان",
+      descriptionLabel: "الوصف",
+      loadError: "تعذر تحميل بنوك الأنشطة.",
+      createError: "تعذر إنشاء بنك الأنشطة."
+    },
+    activityBankDetail: {
+      backToBanks: "العودة إلى بنوك الأنشطة",
+      addActivityTitle: "إضافة نشاط",
+      activityTitleLabel: "عنوان النشاط",
+      activityTypeLabel: "نوع النشاط",
+      descriptionLabel: "الوصف",
+      chooseActivityEyebrow: "نوع النشاط",
+      chooseActivityTitle: "اختر نشاطا",
+      categoryTabsLabel: "فئات الأنشطة",
+      categoryProgramming: "برمجة",
+      categoryMiscellaneous: "متفرقات",
+      activitiesEyebrow: "الأنشطة الموجودة",
+      activitiesTitle: "الأنشطة",
+      titleHeader: "العنوان",
+      typeHeader: "النوع",
+      statusHeader: "الحالة",
+      versionHeader: "الإصدار",
+      noActivities: "لا توجد أنشطة في هذا البنك بعد.",
+      editActivityTitle: "تعديل النشاط",
+      deleteActivity: "إزالة {title}",
+      deleteActivityConfirm: "إزالة \"{title}\" من بنك الأنشطة هذا؟",
+      deleteActivityInUseConfirm:
+        "\"{title}\" مستخدم في {count} مقررات. ستؤدي الإزالة إلى فصل رابط البنك وتحويل هذه الأنشطة إلى أنشطة محلية في المقرر. هل تريد المتابعة؟",
+      loadError: "تعذر تحميل بنك الأنشطة.",
+      createActivityError: "تعذر إنشاء نشاط في البنك.",
+      updateActivityError: "تعذر تحديث نشاط البنك.",
+      deleteActivityError: "تعذر إزالة نشاط البنك."
+    },
+    bankActivityPage: {
+      notFound: "لم يتم العثور على النشاط في هذا البنك.",
+      loadError: "تعذر تحميل نشاط البنك.",
+      activityNotLoaded: "لم يتم تحميل النشاط.",
+      runUnavailable: "التشغيل غير متاح أثناء تأليف عناصر بنك الأنشطة.",
+      submitUnavailable: "التسليم غير متاح أثناء تأليف عناصر بنك الأنشطة.",
+      unsupportedTitle: "نوع نشاط غير مدعوم",
+      unsupportedText: "لا يملك هذا النوع من النشاط واجهة تأليف في البنك بعد.",
+      backToBank: "العودة إلى البنك",
+      statusLabel: "حالة النشر",
+      statusSaved: "تم تحديث حالة النشر.",
+      statusSaveError: "تعذر تحديث حالة النشر.",
+      versionNote: "تحدّث التغييرات المحفوظة هنا نشاط البنك وتنشئ إصدارا جديدا للتعيينات المستقبلية في المقررات."
+    },
+    courseForm: {
+      subject: "المادة",
+      title: "العنوان",
+      description: "الوصف",
+      status: "حالة النشر",
+      create: "إنشاء مقرر",
+      save: "حفظ المقرر",
+      saveError: "تعذر حفظ المقرر."
+    },
+    newCourse: {
+      eyebrow: "مقرر جديد",
+      title: "إنشاء مقرر"
+    },
+    editCourse: {
+      eyebrow: "تعديل المقرر",
+      fallbackTitle: "المقرر",
+      loadError: "تعذر تحميل المقرر."
+    },
+    settings: {
+      eyebrow: "الإعدادات",
+      title: "الإعدادات العامة",
+      subtitle: "إدارة تفضيلات الحساب العامة غير المرتبطة بمقرر محدد.",
+      navLabel: "الإعدادات",
+      profileNav: "الملف الشخصي",
+      profileNavText: "الاسم والبريد الإلكتروني والأدوار",
+      aiAgentsNav: "وكلاء الذكاء الاصطناعي",
+      aiAgentsNavText: "اتصالات النماذج",
+      pluginsNav: "الإضافات",
+      pluginsNavText: "إتاحة أنواع الأنشطة",
+      profileEyebrow: "الملف الشخصي",
+      profileTitle: "ملفك الشخصي",
+      firstName: "الاسم الأول",
+      lastName: "اسم العائلة",
+      email: "البريد الإلكتروني",
+      emailLocked: "يجب أن يتولى المدير تغيير البريد الإلكتروني.",
+      roles: "الأدوار",
+      saveProfile: "حفظ الملف الشخصي",
+      profileSaved: "تم حفظ الملف الشخصي.",
+      profileSaveError: "تعذر حفظ ملفك الشخصي.",
+      aiAgentsEyebrow: "وكلاء الذكاء الاصطناعي",
+      aiAgentsTitle: "اتصالات النماذج",
+      questionAuthoringAgent: "وكيل الذكاء الاصطناعي لتأليف الأسئلة",
+      questionAuthoringAgentHelp: "يستخدم كمساعد افتراضي لصياغة الأسئلة والتعليمات والأمثلة والاختبارات.",
+      noAiAgentSelected: "لم يتم اختيار وكيل",
+      saveAiAgentPreferences: "حفظ تفضيلات الذكاء الاصطناعي",
+      aiAgentPreferencesSaved: "تم حفظ تفضيلات الذكاء الاصطناعي.",
+      aiAgentPreferencesSaveError: "تعذر حفظ تفضيلات الذكاء الاصطناعي.",
+      pluginsEyebrow: "الإضافات",
+      pluginsTitle: "إضافات الأنشطة",
+      pluginsHelp: "فعّل الإضافات المكتشفة أولا، ثم أتحها عندما يجب أن تكون متاحة للأنشطة.",
+      pluginsLoadError: "تعذر تحميل إضافات الأنشطة.",
+      pluginSaveError: "تعذر تحديث الإضافة.",
+      pluginUpdated: "تم تحديث الإضافة.",
+      pluginActivated: "تم تفعيل الإضافة.",
+      pluginDeactivated: "تم إلغاء تفعيل الإضافة.",
+      pluginActivate: "تفعيل",
+      pluginDeactivate: "إلغاء التفعيل",
+      pluginActivatedBadge: "مفعلة",
+      pluginInactiveBadge: "غير مفعلة",
+      pluginEnabled: "متاحة",
+      pluginDisabled: "معطلة",
+      pluginsAdminOnly: "إعدادات الإضافات متاحة للمديرين."
+    },
+    courseDetail: {
+      defaultActivityTitle: "نشاط مؤقت",
+      defaultFolderTitle: "مجلد جديد",
+      defaultRepoTitle: "مستودع GitHub",
+      edit: "تعديل",
+      loadError: "تعذر تحميل المقرر.",
+      groupsEyebrow: "المجموعات",
+      groupsTitle: "مجموعات المقرر",
+      noGroups: "لا توجد مجموعات بعد.",
+      groupCardEyebrow: "مجموعة",
+      groupShellEyebrow: "هيكل المجموعة",
+      groupShellTitle: "إنشاء مجموعة",
+      backToCourses: "العودة إلى المقررات",
+      fallbackTitle: "جار تحميل المقرر...",
+      workspaceTabs: "مساحة المقرر",
+      materialsTab: "مواد المقرر",
+      activitiesTab: "الأنشطة",
+      groupsTab: "المجموعات",
+      gradebookTab: "دفتر الدرجات",
+      settingsTab: "الإعدادات",
+      gradebookEyebrow: "دفتر الدرجات",
+      gradebookTitle: "دفتر درجات المقرر",
+      exportCsv: "تصدير CSV",
+      groupFilter: "المجموعة",
+      activityFilter: "النشاط",
+      statusFilter: "الحالة",
+      allGroups: "كل المجموعات",
+      allActivities: "كل الأنشطة",
+      gradebookGroupAll: "كل المجموعات",
+      gradebookActivityAll: "كل الأنشطة",
+      gradebookStatusAll: "كل الحالات",
+      gradebookStatusMissing: "مفقود",
+      gradebookStatusLate: "متأخر",
+      gradebookStatusNeedsGrading: "يحتاج إلى تصحيح",
+      gradebookStatusGraded: "مصَحح",
+      activityHeader: "النشاط",
+      groupHeader: "المجموعة",
+      studentHeader: "الطالب",
+      submissionsHeader: "التسليمات",
+      gradedHeader: "المصححة",
+      meanGradeHeader: "متوسط الدرجة",
+      releaseHeader: "النشر",
+      actionsHeader: "إجراءات",
+      gradeHeader: "الدرجة",
+      statusHeader: "الحالة",
+      releaseGrades: "نشر",
+      hideGrades: "إخفاء",
+      releaseGradesConfirm: "نشر درجات \"{title}\" للطلاب؟",
+      hideGradesConfirm: "إخفاء درجات \"{title}\" عن الطلاب؟",
+      gradeReleaseError: "تعذر تحديث حالة نشر الدرجات.",
+      detailedResults: "النتائج التفصيلية",
+      detailedResultsEyebrow: "دفتر الدرجات",
+      detailedResultsTitle: "النتائج التفصيلية",
+      backToCourseGradebook: "العودة إلى دفتر درجات المقرر",
+      backToGroupGradebook: "العودة إلى دفتر درجات المجموعة",
+      seeAnswer: "عرض الإجابة",
+      answerOverlayTitle: "إجابة الطالب",
+      previousAttempt: "السابق",
+      nextAttempt: "التالي",
+      includeAttempts: "تضمين المحاولات",
+      attemptLabel: "محاولة {number}",
+      submissionLabel: "تسليم {number}",
+      noAnswerAvailable: "لا توجد إجابة متاحة.",
+      noGradebookRows: "لا توجد نتائج تطابق المرشحات الحالية.",
+      noReleasedGrades: "لم تنشر أي درجات بعد.",
+      notGradedYet: "لم تصحح بعد",
+      studentCount: "{count} طلاب",
+      expandActivity: "توسيع {title}",
+      attemptSummary: "{count} محاولات · المحددة {selected}",
+      attemptHistoryItem: "#{number} {status}",
+      studentResultsTitle: "نتائج الطلاب",
+      answerUnavailable: "غير متاح",
+      studentAnswerTitle: "إجابة الطالب",
+      answerLoadError: "تعذر تحميل إجابة الطالب.",
+      previousSubmission: "السابق",
+      nextSubmission: "التالي",
+      submissionPosition: "{current} من {total}",
+      attemptEventsTitle: "أحداث المحاولة",
+      noAnswers: "لم يتم العثور على تسليمات.",
+      groupTitle: "عنوان المجموعة",
+      groupTitlePlaceholder: "الشعبة أ",
+      createGroup: "إنشاء مجموعة",
+      createGroupError: "تعذر إنشاء المجموعة.",
+      openGroup: "فتح المجموعة",
+      activitiesEyebrow: "الأنشطة",
+      activitiesTitle: "الأنشطة المرفقة",
+      noActivities: "لا توجد أنشطة بعد.",
+      activityShellEyebrow: "هيكل النشاط",
+      activityShellTitle: "إضافة نشاط",
+      chooseActivityEyebrow: "نشاط المقرر",
+      chooseActivityTitle: "اختر نشاطا",
+      activityBanksPickerTab: "بنوك الأنشطة",
+      activityBankPickerLabel: "بنك الأنشطة",
+      noAvailableBankActivities: "لا توجد عناصر من بنك الأنشطة متاحة لهذا المقرر.",
+      activityTitle: "العنوان",
+      activityType: "النوع",
+      attachActivity: "إرفاق النشاط",
+      createActivityError: "تعذر إنشاء النشاط.",
+      materialsEyebrow: "المواد",
+      materialsTitle: "مواد المقرر",
+      addMaterial: "إضافة مادة",
+      noMaterials: "لا توجد مواد بعد.",
+      source: "المصدر",
+      location: "الموقع",
+      topLevel: "المستوى الأعلى",
+      githubUrl: "رابط مستودع GitHub",
+      file: "ملف",
+      maxFileSize: "الحجم الأقصى للملف: 25 ميغابايت.",
+      addMaterialSubmit: "إضافة مادة",
+      addMaterialError: "تعذر إضافة المادة.",
+      chooseFile: "اختر ملفا لرفعه.",
+      folderTitlePlaceholder: "عنوان المجلد",
+      fileTitlePlaceholder: "يستخدم اسم الملف إذا ترك فارغا",
+      repoTitlePlaceholder: "عنوان المستودع",
+      metadataOnly: "بيانات وصفية فقط",
+      removeConfirm: "إزالة \"{title}\" من هذا المقرر؟",
+      removeError: "تعذر إزالة المادة.",
+      updateError: "تعذر تحديث المادة.",
+      moveError: "تعذر نقل المادة.",
+      invalidFolderMove: "لا يمكن نقل مجلد إلى أحد أبنائه.",
+      titleHeader: "العنوان",
+      typeHeader: "النوع",
+      availabilityHeader: "الإتاحة",
+      sourceHeader: "المصدر",
+      saveMaterial: "حفظ المادة",
+      githubEditLabel: "رابط مستودع GitHub",
+      openMaterial: "فتح {title}",
+      downloadMaterial: "تنزيل {title}",
+      editMaterial: "تعديل {title}",
+      removeMaterial: "إزالة {title}",
+      dragMaterial: "سحب {title}",
+      dragToMove: "اسحب للنقل",
+      expandFolder: "توسيع {title}",
+      collapseFolder: "طي {title}",
+      expandFolderTitle: "توسيع المجلد",
+      collapseFolderTitle: "طي المجلد",
+      moveToTopLevel: "أفلت هنا للنقل إلى المستوى الأعلى",
+      openActivity: "فتح النشاط",
+      assignAllGroups: "إسناد إلى كل المجموعات",
+      assignAllGroupsEyebrow: "كل المجموعات",
+      assignAllGroupsTitle: "إسناد إلى كل مجموعة",
+      assignAllGroupsText: "ينشئ صفوف إسناد حقيقية للمجموعات التي لا تملك هذا النشاط بعد. عند تعطيل إعدادات كل مجموعة، تستبدل هذه التواريخ تواريخ المجموعات الموجودة أيضا.",
+      assignAllGroupsSave: "إسناد إلى كل المجموعات",
+      assignedToAllGroups: "مسند إلى كل المجموعات",
+      assignAllGroupsError: "تعذر إسناد هذا النشاط إلى كل المجموعات.",
+      enablePerGroupSettings: "تفعيل إعدادات كل مجموعة",
+      removeAllGroupsPolicy: "إزالة قاعدة كل المجموعات",
+      removeAllGroupsPolicyConfirm: "إزالة قاعدة كل المجموعات لـ \"{title}\"؟ ستبقى إسنادات المجموعات الحالية وتصبح مدارة على مستوى المجموعة.",
+      removeAllGroupsPolicyError: "تعذر إزالة قاعدة كل المجموعات.",
+      removeActivity: "إزالة النشاط",
+      removeActivityConfirm: "إزالة النشاط \"{title}\" من هذا المقرر؟",
+      removeActivityError: "تعذر إزالة النشاط.",
+      settingsEyebrow: "الإعدادات",
+      settingsTitle: "إعدادات المقرر",
+      studentSupportAgent: "وكيل ذكاء اصطناعي لدعم الطلاب",
+      studentSupportAgentHelp: "سيستخدم لاحقا لمساعدة الطلاب داخل هذا المقرر.",
+      noAiAgentSelected: "لم يتم اختيار وكيل ذكاء اصطناعي",
+      noAiAgentsAvailable: "لا توجد وكلاء ذكاء اصطناعي شخصية أو عامة بعد. أضف واحدا من الإعدادات العامة أولا.",
+      saveSettings: "حفظ الإعدادات",
+      settingsSaveError: "تعذر حفظ إعدادات المقرر.",
+      aiAgentScopePersonal: "شخصي",
+      aiAgentScopeGlobal: "عام",
+      gradebookStatus: {
+        missing: "مفقود",
+        late: "متأخر",
+        needs_grading: "يحتاج إلى تصحيح",
+        graded: "مصَحح"
+      },
+      attemptLifecycle: {
+        attempt: "محاولة",
+        submission: "تسليم"
+      }
+    },
+    groupPage: {
+      workspaceTabs: "مساحة المجموعة",
+      activitiesTab: "الأنشطة",
+      materialsTab: "المواد",
+      participantsTab: "المشاركون",
+      gradebookTab: "دفتر الدرجات",
+      gradesTab: "درجاتي",
+      settingsTab: "الإعدادات",
+      gradebookEyebrow: "دفتر الدرجات",
+      gradebookTitle: "دفتر درجات المجموعة",
+      gradesEyebrow: "الدرجات",
+      gradesTitle: "الدرجات المنشورة",
+      noReleasedGrades: "لم تنشر أي درجات بعد.",
+      notGradedYet: "لم تصحح بعد",
+      settingsEyebrow: "الإعدادات",
+      settingsTitle: "إعدادات المجموعة",
+      settingsReadOnly: "إعدادات المجموعة متاحة للمعلمين والمديرين.",
+      participantsEyebrow: "المشاركون",
+      participantsTitle: "المشاركون",
+      addParticipant: "إضافة مشارك",
+      participantRoleStudent: "طالب",
+      participantRoleTa: "مساعد تدريس",
+      participantRoleTeacher: "معلم",
+      assignedActivitiesEyebrow: "الأنشطة المسندة",
+      assignedActivitiesTitle: "الأنشطة المسندة",
+      materialsEyebrow: "مواد المجموعة",
+      materialsTitle: "مواد خاصة بالمجموعة"
+    },
+    parsons: parsonsMessages.ar
   }
 };
 
@@ -1804,12 +2261,23 @@ type I18nContextValue = {
 const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function getMessage(locale: Locale, key: string) {
-  return key.split(".").reduce<string | MessageTree | undefined>((current, part) => {
+  const message = key.split(".").reduce<string | MessageTree | undefined>((current, part) => {
     if (!current || typeof current === "string") {
       return current;
     }
     return current[part];
   }, messages[locale]);
+
+  if (message !== undefined || locale === "en") {
+    return message;
+  }
+
+  return key.split(".").reduce<string | MessageTree | undefined>((current, part) => {
+    if (!current || typeof current === "string") {
+      return current;
+    }
+    return current[part];
+  }, messages.en);
 }
 
 export function interpolate(message: string, vars?: Record<string, string | number>) {
@@ -1837,6 +2305,9 @@ export function detectInitialLocale() {
   if (browser.startsWith("zh")) {
     return "zh";
   }
+  if (browser.startsWith("ar")) {
+    return "ar";
+  }
   return "en";
 }
 
@@ -1854,6 +2325,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = locale;
+    document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
     window.localStorage.setItem("cognelo-locale", locale);
   }, [locale]);
 

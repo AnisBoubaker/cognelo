@@ -29,6 +29,11 @@ export const codingExercisesPlugin: ActivityPlugin = {
           name: "编程练习",
           description: "学生在教师定义的脚手架中编写代码，并通过受沙箱保护的远程执行服务运行或提交。",
           defaultTitle: "编程练习"
+        },
+        ar: {
+          name: "تمرين برمجة",
+          description: "يكتب الطلاب التعليمات البرمجية داخل قالب يحدده المعلم، ثم يشغلونها أو يسلمونها عبر خدمة تنفيذ بعيدة ومعزولة.",
+          defaultTitle: "تمرين برمجة"
         }
       },
       defaultConfig: {

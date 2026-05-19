@@ -95,6 +95,11 @@ export const parsonsPlugin: ActivityPlugin = {
           name: "Parsons 题",
           description: "重新排列被打乱的代码块，并在需要时恢复缩进，以重建正确程序。",
           defaultTitle: "Parsons 题"
+        },
+        ar: {
+          name: "مسألة بارسونز",
+          description: "أعد ترتيب كتل التعليمات البرمجية المبعثرة، واستعد المسافات البادئة عند الحاجة لإعادة بناء برنامج عامل.",
+          defaultTitle: "مسألة بارسونز"
         }
       },
       defaultConfig: {

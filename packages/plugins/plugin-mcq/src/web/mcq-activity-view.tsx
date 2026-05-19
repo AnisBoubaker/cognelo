@@ -25,9 +25,9 @@ type McqActivityViewProps = {
   activity: ActivityLike;
   canManage: boolean;
   onSave: (input: { title: string; description: string; config: Record<string, unknown> }) => Promise<ActivityLike>;
-  locale?: "en" | "fr" | "zh";
+  locale?: "en" | "fr" | "zh" | "ar";
   aiGenerationClient?: {
-    generate: (input: { description: string; defaultCodeLanguage: string; locale: "en" | "fr" | "zh" }) => Promise<{ source: string; attempts: number }>;
+    generate: (input: { description: string; defaultCodeLanguage: string; locale: "en" | "fr" | "zh" | "ar" }) => Promise<{ source: string; attempts: number }>;
   };
 };
 
@@ -150,7 +150,8 @@ const copyByLocale = {
 } as const;
 
 export function McqActivityView({ activity, canManage, onSave, locale = "en", aiGenerationClient }: McqActivityViewProps) {
-  const copy = copyByLocale[locale] ?? copyByLocale.en;
+  const copyLocale = locale === "ar" ? "en" : locale;
+  const copy = copyByLocale[copyLocale] ?? copyByLocale.en;
   const notifications = useNotifications();
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);

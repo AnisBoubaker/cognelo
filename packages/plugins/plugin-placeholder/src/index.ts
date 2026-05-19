@@ -28,6 +28,11 @@ export const placeholderPlugin: ActivityPlugin = {
           name: "占位活动",
           description: "用于设计教学活动时的通用占位结构。",
           defaultTitle: "占位活动"
+        },
+        ar: {
+          name: "نشاط مؤقت",
+          description: "هيكل عام يستخدم أثناء تصميم نشاط تعليمي.",
+          defaultTitle: "نشاط مؤقت"
         }
       },
       defaultConfig: {}

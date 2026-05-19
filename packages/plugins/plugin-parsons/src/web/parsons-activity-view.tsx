@@ -66,9 +66,9 @@ type ParsonsActivityViewProps = {
   onSave: (input: { title: string; description: string; config: Record<string, unknown> }) => Promise<ActivityLike>;
   attemptsClient?: ParsonsAttemptsClient;
   t: (key: string, vars?: Record<string, string | number>) => string;
-  locale?: "en" | "fr" | "zh";
+  locale?: "en" | "fr" | "zh" | "ar";
   aiGenerationClient?: {
-    generate: (input: { description: string; language: string; locale: "en" | "fr" | "zh" }) => Promise<
+    generate: (input: { description: string; language: string; locale: "en" | "fr" | "zh" | "ar" }) => Promise<
       | {
           status?: "ok" | "warning";
           warningMessage?: string;
