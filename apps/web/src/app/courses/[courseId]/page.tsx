@@ -34,6 +34,7 @@ export default function CourseDetailPage() {
   const [gradebookGroupId, setGradebookGroupId] = useState("");
   const [gradebookActivityId, setGradebookActivityId] = useState("");
   const [gradebookStatus, setGradebookStatus] = useState<GradebookStatus>("all");
+  const [savingReleaseItemId, setSavingReleaseItemId] = useState<string | null>(null);
   const [studentSupportAgentId, setStudentSupportAgentId] = useState("");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [showActivityPicker, setShowActivityPicker] = useState(false);
@@ -105,6 +106,26 @@ export default function CourseDetailPage() {
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("courseDetail.loadError")));
   }, [courseId, t, user, gradebookGroupId, gradebookActivityId, gradebookStatus]);
+
+  async function setGradebookRelease(gradebookItemId: string, released: boolean, activityTitle: string) {
+    const confirmed = window.confirm(
+      t(released ? "courseDetail.releaseGradesConfirm" : "courseDetail.hideGradesConfirm", { title: activityTitle })
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setSavingReleaseItemId(gradebookItemId);
+    setError("");
+    try {
+      await api.setGradebookItemRelease(courseId, gradebookItemId, { released });
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.gradeReleaseError"));
+    } finally {
+      setSavingReleaseItemId(null);
+    }
+  }
 
   const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
   const canManage = user?.roles.includes("admin") || membershipRole === "owner" || membershipRole === "teacher";
@@ -1329,6 +1350,7 @@ export default function CourseDetailPage() {
                             <span>{t("courseDetail.activityHeader")}</span>
                             <span>{t("courseDetail.gradeHeader")}</span>
                             <span>{t("courseDetail.statusHeader")}</span>
+                            <span>{t("courseDetail.releaseHeader")}</span>
                           </div>
                           {gradebook.rows.map((row) => (
                             <div className="table-row table-row-gradebook" key={`${row.gradebookItemId}-${row.participantId}`}>
@@ -1367,6 +1389,16 @@ export default function CourseDetailPage() {
                                 {t(`courseDetail.gradebookStatus.${row.status}`)}
                                 {row.latePenaltyApplied && row.latePenaltyPercent !== null ? ` -${row.latePenaltyPercent}%` : ""}
                               </span>
+                              <div className="table-actions">
+                                <button
+                                  className="button secondary"
+                                  disabled={savingReleaseItemId === row.gradebookItemId}
+                                  type="button"
+                                  onClick={() => setGradebookRelease(row.gradebookItemId, !row.gradesReleased, row.activityTitle)}
+                                >
+                                  {row.gradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>

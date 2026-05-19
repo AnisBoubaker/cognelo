@@ -117,6 +117,7 @@ GET    /api/courses/:courseId/groups/:groupId/participants
 POST   /api/courses/:courseId/groups/:groupId/participants
 GET    /api/courses/:courseId/groups/:groupId/activities
 POST   /api/courses/:courseId/groups/:groupId/activities
+GET    /api/courses/:courseId/groups/:groupId/grades
 GET    /api/courses/:courseId/materials
 POST   /api/courses/:courseId/materials
 POST   /api/courses/:courseId/materials/upload
@@ -133,6 +134,8 @@ PATCH  /api/courses/:courseId/activities/:activityId
 DELETE /api/courses/:courseId/activities/:activityId
 POST   /api/courses/:courseId/activities/:activityId/assign-all-groups
 DELETE /api/courses/:courseId/activities/:activityId/assign-all-groups
+GET    /api/courses/:courseId/gradebook
+PATCH  /api/courses/:courseId/gradebook/items/:gradebookItemId/release
 ```
 
 Plugin-specific subroutes are dispatched through:
@@ -216,6 +219,8 @@ Each `CourseGroupActivity` assignment has one corresponding `GradebookItem`, cre
 Core gradebook services create numbered `ActivityAttempt` records for assigned group activities, enforce attempt limits, compute lateness at submission time, normalize raw plugin scores to the gradebook item scale, apply pass/fail thresholds and late penalties, select the current grade across attempts, and record grading results with `GradeEvent` audit entries. Plugins keep their private attempt/submission artifacts in plugin tables and call the core services to keep gradebook records consistent.
 
 Teachers can view gradebook rows from the course page or a group page. The gradebook API returns one row per student participant and assigned group activity, including missing work, and supports group, activity, status, and CSV export filters.
+
+Teachers can release or hide grades per gradebook item from the course or group gradebook. Release/hide changes are audited with participant-scoped `GradeEvent` rows. Students see released grades in their section workspace through normalized grade summaries only; unreleased gradebook items, raw plugin grading payloads, hidden test details, and attempt history are not exposed in the first student view.
 
 Activity plugins can declare grading capabilities, manual grading renderer hints, and core-compatible grading results. Parsons is the first plugin wired into this contract; it advertises attempt, automatic grading, manual grading, and analytics support. Formative Parsons checks stay analytics-only, while summative Parsons submissions create a core attempt and automatic grade from the Parsons evaluation.
 

@@ -470,13 +470,14 @@ First plugin integration target:
 - Completed: make completed summative Parsons attempts read-only when the attempt limit is reached, so students can review the attempt without starting or submitting another one.
 - Completed: suppress correct/incorrect validation messages in summative Parsons mode.
 
-### Phase 7: Student Grade Visibility
+### Phase 7: Student Grade Visibility - Completed
 
-- Add student grade view for released grades.
-- Hide unreleased grades.
-- Hide hidden test details.
-- Do not expose attempt history initially.
-- Add release controls for teachers.
+- Completed: add student grade view for released grades in the section/group workspace.
+- Completed: hide unreleased gradebook items from students.
+- Completed: keep student grade responses limited to normalized grade summaries, without raw plugin grading payloads, hidden test details, or attempt history.
+- Completed: do not expose attempt history in the first student grade view.
+- Completed: add teacher release/hide controls for each gradebook item in course and group gradebook views.
+- Completed: record release/hide audit events per student participant on the gradebook item.
 
 ### Phase 8: Manual Grading And Regrading
 

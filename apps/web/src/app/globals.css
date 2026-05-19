@@ -959,11 +959,15 @@ a.card:hover,
 }
 
 .table-row-gradebook {
-  grid-template-columns: minmax(180px, 1fr) minmax(140px, 0.7fr) minmax(220px, 1fr) minmax(180px, 0.9fr) max-content;
+  grid-template-columns: minmax(180px, 1fr) minmax(140px, 0.7fr) minmax(220px, 1fr) minmax(180px, 0.9fr) max-content max-content;
 }
 
 .table-row-gradebook-group {
-  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1fr) minmax(180px, 0.9fr) max-content;
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1fr) minmax(180px, 0.9fr) max-content max-content;
+}
+
+.table-row-student-grades {
+  grid-template-columns: minmax(220px, 1.2fr) minmax(160px, 0.8fr) max-content;
 }
 
 .table-row:first-child {
