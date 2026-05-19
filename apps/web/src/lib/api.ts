@@ -597,6 +597,28 @@ export type CourseGradebookRow = {
   }>;
 };
 
+export type GradebookMutationGrade = {
+  id: string;
+  selectedAttemptId: string | null;
+  normalizedScore: number;
+  normalizedMaxScore: number;
+  isPass: boolean | null;
+  latePenaltyApplied: boolean;
+  latePenaltyPercent: number | null;
+  source: "override" | "regrade";
+};
+
+export type GradebookMutationAttempt = {
+  id: string;
+  attemptNumber: number;
+  lifecycle: "started" | "submitted" | "graded";
+  submittedAt: string | null;
+  gradedAt: string | null;
+  isLate: boolean;
+  lateBySeconds: number | null;
+  durationSeconds: number | null;
+};
+
 export type StudentReleasedGrades = {
   rows: StudentReleasedGradeRow[];
 };
@@ -787,6 +809,27 @@ export const api = {
       {
         method: "PATCH",
         body: JSON.stringify(input)
+      }
+    ),
+  overrideGradebookGrade: (
+    courseId: string,
+    gradebookItemId: string,
+    participantId: string,
+    input: { score: number; maxScore?: number; isPass?: boolean | null; reason?: string | null }
+  ) =>
+    request<{ grade: GradebookMutationGrade }>(
+      `/courses/${courseId}/gradebook/items/${gradebookItemId}/participants/${participantId}/override`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(input)
+      }
+    ),
+  regradeActivityAttempt: (courseId: string, attemptId: string, input?: { reason?: string | null }) =>
+    request<{ result: { attempt: GradebookMutationAttempt; grade: GradebookMutationGrade } }>(
+      `/courses/${courseId}/gradebook/attempts/${attemptId}/regrade`,
+      {
+        method: "POST",
+        body: JSON.stringify(input ?? {})
       }
     ),
   studentGroupGrades: (courseId: string, groupId: string) =>

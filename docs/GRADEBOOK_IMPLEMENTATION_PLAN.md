@@ -485,11 +485,12 @@ First plugin integration target:
 
 ### Phase 8: Manual Grading And Regrading
 
-- Add plugin-provided manual grading UI mount point.
-- Add override workflow.
-- Add automatic regrading workflow for plugins that support it.
-- Preserve old grade records/events.
-- Add tests for manual overrides and regrade audit trails.
+- Completed: add plugin-provided grading handler resolution for automatic regrading.
+- Completed: add a teacher override workflow that updates the current grade and writes an `overridden` grade event with previous/next snapshots and reason metadata.
+- Completed: add automatic regrading API for plugins that support `gradeAttempt`; the first Parsons implementation evaluates the stored submission state against the current course activity config and records a `regraded` grade event through the core grade service.
+- Completed: add teacher actions on the detailed activity results page for overriding a grade and regrading the selected/latest submitted attempt.
+- Completed: add tests for manual override audit events, plugin grading handler resolution, and regrade context assembly.
+- Remaining: replace the browser-prompt override UI with plugin-specific manual grading panels as richer plugin renderers become available.
 
 ### Phase 9: Analytics And Research Exports
 

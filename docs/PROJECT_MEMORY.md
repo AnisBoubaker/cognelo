@@ -148,6 +148,8 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - The course detail page resolves plugin-localized activity labels from registry definitions instead of relying only on database display names.
 - Activity bank lists and authoring pages also resolve plugin-localized activity labels from registry definitions instead of relying only on database display names.
 - MCQ choices can include fenced code blocks, and MCQ activities can opt into randomized choice display without changing stable choice IDs used for scoring.
+- Arabic (`ar`) is supported as a frontend locale. Selecting Arabic sets the document direction to RTL, and plugin activity metadata can provide Arabic `name`, `description`, and `defaultTitle` values.
+- Gradebook manual adjustment starts with a core teacher override workflow and a plugin-backed regrade workflow. Overrides update the current grade and write `overridden` grade events; automatic regrades resolve the plugin grading handler and record through the core grade service as `regraded` events. Parsons regrade evaluates the stored submitted attempt state against the current course-local activity config, so teacher corrections to an assigned course activity affect regrade results.
 
 ## Known MVP Constraints
 

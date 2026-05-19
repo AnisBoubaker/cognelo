@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   getAssignedGroupActivityAttemptSource,
   listPluginRoutes,
+  resolvePluginGradingHandler,
   resolvePluginRoute,
   runBankActivityDeletedHooks,
   runBankActivityDeletedHooksForPlugins,
@@ -76,6 +77,11 @@ describe("server activity SDK", () => {
         })
       ])
     );
+  });
+
+  it("resolves plugin grading handlers by activity type", () => {
+    expect(resolvePluginGradingHandler("parsons-problem")).toBeTypeOf("function");
+    expect(resolvePluginGradingHandler("placeholder")).toBeNull();
   });
 
   it("runs bank deletion hooks without requiring every plugin to implement one", async () => {

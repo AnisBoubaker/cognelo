@@ -4,7 +4,15 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { api, Course, CourseGradebook, CourseGradebookRow, ParsonsGradebookAttempt } from "@/lib/api";
+import {
+  api,
+  Course,
+  CourseGradebook,
+  CourseGradebookRow,
+  GradebookMutationAttempt,
+  GradebookMutationGrade,
+  ParsonsGradebookAttempt
+} from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 export default function GradebookActivityResultsPage() {
@@ -16,6 +24,7 @@ export default function GradebookActivityResultsPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
   const [error, setError] = useState("");
+  const [savingGradeKey, setSavingGradeKey] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<{
     row: CourseGradebookRow;
     includeAttempts: boolean;
@@ -25,16 +34,16 @@ export default function GradebookActivityResultsPage() {
     error: string;
   } | null>(null);
 
-  useEffect(() => {
-    async function refresh() {
-      const [courseResult, gradebookResult] = await Promise.all([
-        api.course(courseId),
-        api.courseGradebook(courseId, { activityId, groupId })
-      ]);
-      setCourse(courseResult.course);
-      setGradebook(gradebookResult.gradebook);
-    }
+  async function refresh() {
+    const [courseResult, gradebookResult] = await Promise.all([
+      api.course(courseId),
+      api.courseGradebook(courseId, { activityId, groupId })
+    ]);
+    setCourse(courseResult.course);
+    setGradebook(gradebookResult.gradebook);
+  }
 
+  useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("courseDetail.loadError")));
   }, [activityId, courseId, groupId, t]);
 
@@ -58,13 +67,14 @@ export default function GradebookActivityResultsPage() {
         participantId: row.participantId,
         includeAttempts
       });
+      const attempts = sortAttemptsByDisplayedTimestamp(result.attempts);
       setOverlay((current) =>
         current
           ? {
               ...current,
               includeAttempts,
-              attempts: result.attempts,
-              selectedIndex: Math.min(current.selectedIndex, Math.max(0, result.attempts.length - 1)),
+              attempts,
+              selectedIndex: Math.min(current.selectedIndex, Math.max(0, attempts.length - 1)),
               loading: false,
               error: ""
             }
@@ -81,6 +91,108 @@ export default function GradebookActivityResultsPage() {
             }
           : current
       );
+    }
+  }
+
+  function applyUpdatedGrade(row: CourseGradebookRow, grade: GradebookMutationGrade, attempt?: GradebookMutationAttempt) {
+    setGradebook((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        rows: current.rows.map((candidate) => {
+          if (candidate.gradebookItemId !== row.gradebookItemId || candidate.participantId !== row.participantId) {
+            return candidate;
+          }
+
+          const attempts = attempt
+            ? candidate.attempts.map((candidateAttempt) =>
+                candidateAttempt.id === attempt.id
+                  ? {
+                      ...candidateAttempt,
+                      lifecycle: attempt.lifecycle,
+                      submittedAt: attempt.submittedAt,
+                      gradedAt: attempt.gradedAt,
+                      isLate: attempt.isLate,
+                      lateBySeconds: attempt.lateBySeconds,
+                      durationSeconds: attempt.durationSeconds
+                    }
+                  : candidateAttempt
+              )
+            : candidate.attempts;
+          const selectedAttempt = grade.selectedAttemptId
+            ? attempts.find((candidateAttempt) => candidateAttempt.id === grade.selectedAttemptId)
+            : null;
+
+          return {
+            ...candidate,
+            score: grade.normalizedScore,
+            maxScore: grade.normalizedMaxScore,
+            isPass: grade.isPass,
+            latePenaltyApplied: grade.latePenaltyApplied,
+            latePenaltyPercent: grade.latePenaltyPercent,
+            selectedAttemptNumber: selectedAttempt?.attemptNumber ?? null,
+            status: grade.latePenaltyApplied || selectedAttempt?.isLate ? "late" : "graded",
+            needsGradingCount: attempt?.lifecycle === "graded" ? Math.max(0, candidate.needsGradingCount - 1) : candidate.needsGradingCount,
+            attempts
+          };
+        })
+      };
+    });
+  }
+
+  async function overrideGrade(row: CourseGradebookRow) {
+    const value = window.prompt(t("courseDetail.overrideGradePrompt", { max: formatGradeNumber(row.maxScore) }), row.score === null ? "" : String(row.score));
+    if (value === null) {
+      return;
+    }
+    const score = Number(value);
+    if (!Number.isFinite(score)) {
+      setError(t("courseDetail.overrideGradeInvalid"));
+      return;
+    }
+    const reason = window.prompt(t("courseDetail.overrideReasonPrompt")) ?? "";
+    setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:override`);
+    setError("");
+    try {
+      const result = await api.overrideGradebookGrade(courseId, row.gradebookItemId, row.participantId, {
+        score,
+        maxScore: row.maxScore,
+        reason: reason || null
+      });
+      await refresh();
+      applyUpdatedGrade(row, result.grade);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.overrideGradeError"));
+    } finally {
+      setSavingGradeKey(null);
+    }
+  }
+
+  async function regradeRow(row: CourseGradebookRow) {
+    const attempt =
+      row.attempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber) ??
+      [...row.attempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted");
+    if (!attempt) {
+      setError(t("courseDetail.regradeUnavailable"));
+      return;
+    }
+    if (!window.confirm(t("courseDetail.regradeConfirm", { name: row.participantName }))) {
+      return;
+    }
+
+    setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:regrade`);
+    setError("");
+    try {
+      const result = await api.regradeActivityAttempt(courseId, attempt.id, { reason: t("courseDetail.regradeReason") });
+      await refresh();
+      applyUpdatedGrade(row, result.result.grade, result.result.attempt);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.regradeError"));
+    } finally {
+      setSavingGradeKey(null);
     }
   }
 
@@ -146,6 +258,22 @@ export default function GradebookActivityResultsPage() {
                     ) : (
                       <span className="muted">{t("courseDetail.answerUnavailable")}</span>
                     )}
+                    <button
+                      className="button secondary"
+                      disabled={savingGradeKey === `${row.gradebookItemId}:${row.participantId}:regrade`}
+                      type="button"
+                      onClick={() => regradeRow(row)}
+                    >
+                      {t("courseDetail.regrade")}
+                    </button>
+                    <button
+                      className="button secondary"
+                      disabled={savingGradeKey === `${row.gradebookItemId}:${row.participantId}:override`}
+                      type="button"
+                      onClick={() => overrideGrade(row)}
+                    >
+                      {t("courseDetail.overrideGrade")}
+                    </button>
                   </div>
                 </div>
               ))}
@@ -208,7 +336,7 @@ export default function GradebookActivityResultsPage() {
                   </div>
 
                   <div className="answer-meta">
-                    <strong>{attemptLabel(selectedAttempt)}</strong>
+                    <strong>{attemptLabel(selectedAttempt, t)}</strong>
                     <span className="muted">{formatDateTime(selectedAttempt.completedAt ?? selectedAttempt.lastInteractionAt)}</span>
                   </div>
 
@@ -270,6 +398,15 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-function attemptLabel(attempt: ParsonsGradebookAttempt) {
-  return `${attempt.status === "completed" ? "Submission" : "Attempt"} ${attempt.id.slice(-6)}`;
+function attemptLabel(attempt: ParsonsGradebookAttempt, t: ReturnType<typeof useI18n>["t"]) {
+  const key = attempt.status === "completed" ? "courseDetail.submissionAnswerLabel" : "courseDetail.attemptAnswerLabel";
+  return t(key, { id: attempt.id.slice(-6) });
+}
+
+function sortAttemptsByDisplayedTimestamp(attempts: ParsonsGradebookAttempt[]) {
+  return [...attempts].sort((left, right) => attemptDisplayTime(right) - attemptDisplayTime(left));
+}
+
+function attemptDisplayTime(attempt: ParsonsGradebookAttempt) {
+  return new Date(attempt.completedAt ?? attempt.lastInteractionAt).getTime();
 }
