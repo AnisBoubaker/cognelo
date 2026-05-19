@@ -19,7 +19,8 @@ import {
   CourseMaterial,
   GradebookStatus,
   GroupParticipant,
-  GroupParticipantCandidate
+  GroupParticipantCandidate,
+  StudentReleasedGrades
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
@@ -34,8 +35,10 @@ export default function CourseGroupPage() {
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
+  const [studentGrades, setStudentGrades] = useState<StudentReleasedGrades | null>(null);
   const [gradebookActivityId, setGradebookActivityId] = useState("");
   const [gradebookStatus, setGradebookStatus] = useState<GradebookStatus>("all");
+  const [savingReleaseItemId, setSavingReleaseItemId] = useState<string | null>(null);
   const [groupTitle, setGroupTitle] = useState("");
   const [groupStatus, setGroupStatus] = useState<"draft" | "published">("draft");
   const [groupAvailableFrom, setGroupAvailableFrom] = useState("");
@@ -115,14 +118,37 @@ export default function CourseGroupPage() {
         status: gradebookStatus
       });
       setGradebook(gradebookResult.gradebook);
+      setStudentGrades(null);
     } else {
       setGradebook(null);
+      const gradesResult = await api.studentGroupGrades(courseId, groupId);
+      setStudentGrades(gradesResult.grades);
     }
   }
 
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("groupPage.loadError")));
   }, [courseId, groupId, t, user, gradebookActivityId, gradebookStatus]);
+
+  async function setGradebookRelease(gradebookItemId: string, released: boolean, activityTitle: string) {
+    const confirmed = window.confirm(
+      t(released ? "courseDetail.releaseGradesConfirm" : "courseDetail.hideGradesConfirm", { title: activityTitle })
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setSavingReleaseItemId(gradebookItemId);
+    setError("");
+    try {
+      await api.setGradebookItemRelease(courseId, gradebookItemId, { released });
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.gradeReleaseError"));
+    } finally {
+      setSavingReleaseItemId(null);
+    }
+  }
 
   const materials = group?.materials ?? [];
   const folders = materials.filter((material) => material.kind === "folder").sort(compareMaterials);
@@ -279,6 +305,48 @@ export default function CourseGroupPage() {
                       </div>
                     ) : (
                       <p className="muted">{t("groupPage.noCourseMaterials")}</p>
+                    )}
+                  </section>
+                )
+              },
+              {
+                id: "grades",
+                label: t("groupPage.gradesTab"),
+                render: () => (
+                  <section className="section stack">
+                    <div>
+                      <p className="eyebrow">{t("groupPage.gradesEyebrow")}</p>
+                      <h2>{t("groupPage.gradesTitle")}</h2>
+                    </div>
+
+                    {studentGrades?.rows.length ? (
+                      <div className="table-list">
+                        <div className="table-row table-row-student-grades table-head" aria-hidden="true">
+                          <span>{t("courseDetail.activityHeader")}</span>
+                          <span>{t("courseDetail.gradeHeader")}</span>
+                          <span>{t("courseDetail.statusHeader")}</span>
+                        </div>
+                        {studentGrades.rows.map((row) => (
+                          <div className="table-row table-row-student-grades" key={row.gradebookItemId}>
+                            <div className="table-main table-main-stack">
+                              <strong>{row.activityTitle}</strong>
+                              <span className="table-meta-note muted">{row.activityTypeName}</span>
+                            </div>
+                            <div className="table-main table-main-stack">
+                              <strong>{formatGradebookScore(row.score, row.maxScore)}</strong>
+                              <span className="table-meta-note muted">
+                                {row.gradedAt ? formatAvailabilityValue(row.gradedAt) : t("groupPage.notGradedYet")}
+                              </span>
+                            </div>
+                            <span className={`participant-status is-${row.status.replace("_", "-")}`}>
+                              {t(`courseDetail.gradebookStatus.${row.status}`)}
+                              {row.latePenaltyApplied && row.latePenaltyPercent !== null ? ` -${row.latePenaltyPercent}%` : ""}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="muted">{t("groupPage.noReleasedGrades")}</p>
                     )}
                   </section>
                 )
@@ -1583,6 +1651,7 @@ export default function CourseGroupPage() {
                             <span>{t("courseDetail.activityHeader")}</span>
                             <span>{t("courseDetail.gradeHeader")}</span>
                             <span>{t("courseDetail.statusHeader")}</span>
+                            <span>{t("courseDetail.releaseHeader")}</span>
                           </div>
                           {gradebook.rows.map((row) => (
                             <div className="table-row table-row-gradebook-group" key={`${row.gradebookItemId}-${row.participantId}`}>
@@ -1606,6 +1675,16 @@ export default function CourseGroupPage() {
                               <span className={`participant-status is-${row.status.replace("_", "-")}`}>
                                 {t(`courseDetail.gradebookStatus.${row.status}`)}
                               </span>
+                              <div className="table-actions">
+                                <button
+                                  className="button secondary"
+                                  disabled={savingReleaseItemId === row.gradebookItemId}
+                                  type="button"
+                                  onClick={() => setGradebookRelease(row.gradebookItemId, !row.gradesReleased, row.activityTitle)}
+                                >
+                                  {row.gradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>

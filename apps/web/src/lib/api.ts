@@ -544,6 +544,7 @@ export type CourseGradebookRow = {
   activityId: string;
   activityTitle: string;
   activityTypeName: string;
+  gradesReleased: boolean;
   participantId: string;
   participantName: string;
   participantEmail: string;
@@ -570,6 +571,29 @@ export type CourseGradebookRow = {
     lateBySeconds: number | null;
     durationSeconds: number | null;
   }>;
+};
+
+export type StudentReleasedGrades = {
+  rows: StudentReleasedGradeRow[];
+};
+
+export type StudentReleasedGradeRow = {
+  gradebookItemId: string;
+  activityId: string;
+  activityTitle: string;
+  activityTypeName: string;
+  status: Exclude<GradebookStatus, "all">;
+  score: number | null;
+  maxScore: number;
+  isPass: boolean | null;
+  latePenaltyApplied: boolean;
+  latePenaltyPercent: number | null;
+  selectedAttemptNumber: number | null;
+  attemptCount: number;
+  submittedAttemptCount: number;
+  availableFrom: string | null;
+  availableUntil: string | null;
+  gradedAt: string | null;
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -733,6 +757,16 @@ export const api = {
     }
     return `${API_URL}/api/courses/${courseId}/gradebook?${params.toString()}`;
   },
+  setGradebookItemRelease: (courseId: string, gradebookItemId: string, input: { released: boolean }) =>
+    request<{ gradebookItem: { id: string; gradesReleased: boolean } }>(
+      `/courses/${courseId}/gradebook/items/${gradebookItemId}/release`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(input)
+      }
+    ),
+  studentGroupGrades: (courseId: string, groupId: string) =>
+    request<{ grades: StudentReleasedGrades }>(`/courses/${courseId}/groups/${groupId}/grades`),
   createCourse: (input: CourseInput) =>
     request<{ course: Course }>("/courses", {
       method: "POST",

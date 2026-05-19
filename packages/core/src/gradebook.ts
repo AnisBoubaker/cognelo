@@ -1,6 +1,6 @@
 import { prisma, type Prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
-import { canManageCourse } from "./authorization";
+import { assertCanViewCourse, canManageCourse, isAdmin } from "./authorization";
 import { AppError, forbidden, notFound } from "./errors";
 
 type JsonInput = Prisma.InputJsonValue;
@@ -267,6 +267,11 @@ export type CourseGradebookFilters = {
   status?: CourseGradebookStatusFilter | null;
 };
 
+export type SetGradebookItemReleaseInput = {
+  released: boolean;
+  now?: Date;
+};
+
 export async function getCourseGradebook(user: CurrentUser, courseId: string, filters: CourseGradebookFilters = {}) {
   await canManageCourseOrThrow(user, courseId);
   await ensureCourseGradebookItems(courseId);
@@ -339,6 +344,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         activityId: item.activity.id,
         activityTitle: item.titleSnapshot || item.activity.title,
         activityTypeName: item.activity.activityType.name,
+        gradesReleased: item.gradesReleased,
         participantId: participant.id,
         participantName: formatParticipantName(participant),
         participantEmail: participant.email,
@@ -450,6 +456,143 @@ export async function getCourseGradebookCsv(user: CurrentUser, courseId: string,
   return lines.map((line) => line.map(csvCell).join(",")).join("\n");
 }
 
+export async function setGradebookItemRelease(
+  user: CurrentUser,
+  courseId: string,
+  gradebookItemId: string,
+  input: SetGradebookItemReleaseInput
+) {
+  await canManageCourseOrThrow(user, courseId);
+  const now = input.now ?? new Date();
+  const item = await prisma.gradebookItem.findFirst({
+    where: { id: gradebookItemId, courseId },
+    select: {
+      id: true,
+      gradesReleased: true,
+      courseId: true,
+      groupId: true,
+      activityId: true,
+      titleSnapshot: true,
+      group: {
+        select: {
+          participants: {
+            where: { role: "student" },
+            select: { id: true }
+          }
+        }
+      }
+    }
+  });
+
+  if (!item) {
+    throw notFound("Gradebook item");
+  }
+
+  if (item.gradesReleased === input.released) {
+    return item;
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.gradebookItem.update({
+      where: { id: gradebookItemId },
+      data: { gradesReleased: input.released }
+    });
+
+    await Promise.all(
+      item.group.participants.map((participant) =>
+        tx.gradeEvent.create({
+          data: {
+            gradebookItemId: item.id,
+            participantId: participant.id,
+            actorUserId: user.id,
+            eventType: input.released ? "released" : "hidden",
+            previousValue: { gradesReleased: item.gradesReleased } as JsonInput,
+            nextValue: { gradesReleased: input.released } as JsonInput,
+            metadata: {
+              courseId: item.courseId,
+              groupId: item.groupId,
+              activityId: item.activityId,
+              titleSnapshot: item.titleSnapshot
+            } as JsonInput,
+            createdAt: now
+          }
+        })
+      )
+    );
+
+    return updated;
+  });
+}
+
+export async function getStudentReleasedGrades(user: CurrentUser, courseId: string, groupId: string) {
+  await assertCanViewGroupForGradebook(user, courseId, groupId);
+  const participant = await prisma.courseGroupParticipant.findFirst({
+    where: { groupId, userId: user.id, role: "student" }
+  });
+
+  if (!participant) {
+    throw forbidden();
+  }
+
+  const items = await prisma.gradebookItem.findMany({
+    where: {
+      courseId,
+      groupId,
+      gradesReleased: true
+    },
+    include: {
+      activity: {
+        select: {
+          id: true,
+          title: true,
+          activityType: { select: { key: true, name: true } }
+        }
+      },
+      groupActivity: {
+        select: {
+          availableFrom: true,
+          availableUntil: true
+        }
+      },
+      grades: {
+        where: { participantId: participant.id },
+        include: { selectedAttempt: true }
+      },
+      attempts: {
+        where: { participantId: participant.id },
+        orderBy: [{ attemptNumber: "asc" }]
+      }
+    },
+    orderBy: [{ titleSnapshot: "asc" }]
+  });
+
+  return {
+    rows: items.map((item) => {
+      const grade = item.grades[0] ?? null;
+      const status = getGradebookRowStatus(grade, item.attempts);
+
+      return {
+        gradebookItemId: item.id,
+        activityId: item.activity.id,
+        activityTitle: item.titleSnapshot || item.activity.title,
+        activityTypeName: item.activity.activityType.name,
+        status,
+        score: grade?.normalizedScore ?? null,
+        maxScore: grade?.normalizedMaxScore ?? item.pointsPossible,
+        isPass: grade?.isPass ?? null,
+        latePenaltyApplied: grade?.latePenaltyApplied ?? false,
+        latePenaltyPercent: grade?.latePenaltyPercent ?? null,
+        selectedAttemptNumber: grade?.selectedAttempt?.attemptNumber ?? null,
+        attemptCount: item.attempts.length,
+        submittedAttemptCount: item.attempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded").length,
+        availableFrom: item.groupActivity.availableFrom?.toISOString() ?? null,
+        availableUntil: item.groupActivity.availableUntil?.toISOString() ?? null,
+        gradedAt: grade?.gradedAt.toISOString() ?? null
+      };
+    })
+  };
+}
+
 async function resolveAssignedActivityAttemptContext(user: CurrentUser, input: StartActivityAttemptInput) {
   const groupActivity = await prisma.courseGroupActivity.findFirst({
     where: {
@@ -547,6 +690,37 @@ async function canManageCourseOrThrow(user: CurrentUser, courseId: string) {
     return;
   }
   throw forbidden();
+}
+
+async function assertCanViewGroupForGradebook(user: CurrentUser, courseId: string, groupId: string) {
+  await assertCanViewCourse(user, courseId);
+  const group = await prisma.courseGroup.findFirst({ where: { id: groupId, courseId } });
+  if (!group) {
+    throw notFound("Course group");
+  }
+
+  if (isAdmin(user) || (await canManageCourse(user, courseId))) {
+    return group;
+  }
+
+  const participant = await prisma.courseGroupParticipant.findFirst({
+    where: { groupId, userId: user.id }
+  });
+
+  if (!participant) {
+    throw forbidden();
+  }
+
+  const now = new Date();
+  if (
+    group.status !== "published" ||
+    (group.availableFrom && group.availableFrom > now) ||
+    (group.availableUntil && group.availableUntil < now)
+  ) {
+    throw new AppError(403, "GROUP_NOT_AVAILABLE", "This group is not currently available.");
+  }
+
+  return group;
 }
 
 function getGradebookRowStatus(

@@ -14,6 +14,9 @@ const tx = vi.hoisted(() => ({
   gradeEvent: {
     create: vi.fn(),
     findMany: vi.fn()
+  },
+  gradebookItem: {
+    update: vi.fn()
   }
 }));
 
@@ -31,14 +34,20 @@ const mockPrisma = vi.hoisted(() => ({
   courseGroupParticipant: {
     findFirst: vi.fn()
   },
+  courseGroup: {
+    findFirst: vi.fn()
+  },
   gradebookItem: {
+    findFirst: vi.fn(),
     findMany: vi.fn(),
     upsert: vi.fn()
   }
 }));
 
 const authMocks = vi.hoisted(() => ({
-  canManageCourse: vi.fn()
+  assertCanViewCourse: vi.fn(),
+  canManageCourse: vi.fn(),
+  isAdmin: vi.fn()
 }));
 
 vi.mock("@cognelo/db", () => ({
@@ -47,7 +56,14 @@ vi.mock("@cognelo/db", () => ({
 
 vi.mock("./authorization", () => authMocks);
 
-const { getCourseGradebook, recordActivityAttemptGradingResult, startActivityAttempt, submitActivityAttempt } = await import("./gradebook");
+const {
+  getCourseGradebook,
+  getStudentReleasedGrades,
+  recordActivityAttemptGradingResult,
+  setGradebookItemRelease,
+  startActivityAttempt,
+  submitActivityAttempt
+} = await import("./gradebook");
 
 const studentUser: CurrentUser = {
   id: "student-1",
@@ -118,7 +134,10 @@ describe("gradebook attempt services", () => {
     tx.grade.upsert.mockImplementation(async ({ create, update }) => ({ id: "grade-1", ...create, ...update }));
     tx.gradeEvent.create.mockResolvedValue({ id: "event-1" });
     tx.gradeEvent.findMany.mockResolvedValue([]);
+    tx.gradebookItem.update.mockImplementation(async ({ data }) => ({ id: "gradebook-item-1", ...data }));
     authMocks.canManageCourse.mockResolvedValue(false);
+    authMocks.assertCanViewCourse.mockResolvedValue(undefined);
+    authMocks.isAdmin.mockReturnValue(false);
   });
 
   it("starts a numbered core attempt for the current group participant", async () => {
@@ -578,5 +597,130 @@ describe("gradebook attempt services", () => {
         titleSnapshot: "Existing activity"
       }
     });
+  });
+
+  it("releases a gradebook item and writes a visibility audit event", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    mockPrisma.gradebookItem.findFirst.mockResolvedValue({
+      id: "gradebook-item-1",
+      gradesReleased: false,
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      titleSnapshot: "Loops",
+      group: {
+        participants: [{ id: "participant-1" }]
+      }
+    });
+    const now = new Date("2026-05-19T12:00:00.000Z");
+
+    await expect(
+      setGradebookItemRelease(teacherUser, "course-1", "gradebook-item-1", {
+        released: true,
+        now
+      })
+    ).resolves.toMatchObject({ gradesReleased: true });
+
+    expect(tx.gradebookItem.update).toHaveBeenCalledWith({
+      where: { id: "gradebook-item-1" },
+      data: { gradesReleased: true }
+    });
+    expect(tx.gradeEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        gradebookItemId: "gradebook-item-1",
+        participantId: "participant-1",
+        actorUserId: "teacher-1",
+        eventType: "released",
+        previousValue: { gradesReleased: false },
+        nextValue: { gradesReleased: true },
+        createdAt: now
+      })
+    });
+  });
+
+  it("returns only released student grade summaries without attempt history details", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({
+      id: "group-1",
+      courseId: "course-1",
+      status: "published",
+      availableFrom: null,
+      availableUntil: null
+    });
+    mockPrisma.courseGroupParticipant.findFirst
+      .mockResolvedValueOnce({ id: "participant-1", userId: "student-1", role: "student" })
+      .mockResolvedValueOnce({ id: "participant-1", userId: "student-1", role: "student" });
+    mockPrisma.gradebookItem.findMany.mockResolvedValue([
+      {
+        id: "gradebook-item-1",
+        titleSnapshot: "Loops",
+        pointsPossible: 100,
+        activity: {
+          id: "activity-1",
+          title: "Loops",
+          activityType: { key: "parsons-problem", name: "Parsons problem" }
+        },
+        groupActivity: {
+          availableFrom: null,
+          availableUntil: null
+        },
+        grades: [
+          {
+            normalizedScore: 88,
+            normalizedMaxScore: 100,
+            isPass: null,
+            latePenaltyApplied: false,
+            latePenaltyPercent: null,
+            gradedAt: testNow,
+            selectedAttempt: { attemptNumber: 2, isLate: false }
+          }
+        ],
+        attempts: [
+          {
+            participantId: "participant-1",
+            attemptNumber: 1,
+            lifecycle: "graded",
+            isLate: false
+          },
+          {
+            participantId: "participant-1",
+            attemptNumber: 2,
+            lifecycle: "graded",
+            isLate: false
+          }
+        ]
+      }
+    ]);
+
+    await expect(getStudentReleasedGrades(studentUser, "course-1", "group-1")).resolves.toEqual({
+      rows: [
+        {
+          gradebookItemId: "gradebook-item-1",
+          activityId: "activity-1",
+          activityTitle: "Loops",
+          activityTypeName: "Parsons problem",
+          status: "graded",
+          score: 88,
+          maxScore: 100,
+          isPass: null,
+          latePenaltyApplied: false,
+          latePenaltyPercent: null,
+          selectedAttemptNumber: 2,
+          attemptCount: 2,
+          submittedAttemptCount: 2,
+          availableFrom: null,
+          availableUntil: null,
+          gradedAt: testNow.toISOString()
+        }
+      ]
+    });
+    expect(mockPrisma.gradebookItem.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          courseId: "course-1",
+          groupId: "group-1",
+          gradesReleased: true
+        }
+      })
+    );
   });
 });
