@@ -117,7 +117,7 @@ type WebDesignCodingExerciseActivityViewProps = {
   canManage: boolean;
   course?: CourseLike | null;
   onSave: (input: { title: string; description: string; config: Record<string, unknown> }) => Promise<ActivityLike>;
-  locale?: "en" | "fr" | "zh";
+  locale?: "en" | "fr" | "zh" | "ar";
   webDesignClient?: WebDesignExerciseClient;
 };
 
@@ -401,7 +401,8 @@ export function WebDesignCodingExerciseActivityView({
   locale = "en",
   webDesignClient
 }: WebDesignCodingExerciseActivityViewProps) {
-  const copy = copyByLocale[locale] ?? copyByLocale.en;
+  const copyLocale = locale === "ar" ? "en" : locale;
+  const copy = copyByLocale[copyLocale] ?? copyByLocale.en;
   const notifications = useNotifications();
   const initialConfig = useMemo(() => parseWebDesignExerciseConfig(activity.config), [activity.config]);
   const [title, setTitle] = useState(activity.title);

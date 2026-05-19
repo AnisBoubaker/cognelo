@@ -32,6 +32,11 @@ export const homeworkGraderPlugin: ActivityPlugin = {
           name: "作业评分器",
           description: "未来用于编程作业提交与评分的流程。",
           defaultTitle: "作业评分器"
+        },
+        ar: {
+          name: "مصَحح الواجبات",
+          description: "سير عمل مستقبلي لتسليم واجبات البرمجة وتصحيحها.",
+          defaultTitle: "مصَحح الواجبات"
         }
       },
       defaultConfig: {

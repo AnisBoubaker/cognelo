@@ -29,6 +29,11 @@ export const webDesignCodingExercisesPlugin: ActivityPlugin = {
           name: "网页设计编程练习",
           description: "学生编辑 HTML、CSS 和 JavaScript 文件，并在受沙箱保护的浏览器预览中即时查看结果。",
           defaultTitle: "网页设计编程练习"
+        },
+        ar: {
+          name: "تمرين برمجة تصميم ويب",
+          description: "يعدل الطلاب ملفات HTML وCSS وJavaScript مع معاينة مباشرة في متصفح معزول.",
+          defaultTitle: "تمرين برمجة تصميم ويب"
         }
       },
       defaultConfig: defaultWebDesignExerciseConfig,

@@ -33,6 +33,12 @@ describe("i18n helpers", () => {
       navigator: { language: "fr-CA" }
     });
     expect(detectInitialLocale()).toBe("fr");
+
+    vi.stubGlobal("window", {
+      localStorage: { getItem: vi.fn(() => null) },
+      navigator: { language: "ar-MA" }
+    });
+    expect(detectInitialLocale()).toBe("ar");
   });
 
   it("interpolates messages and preserves unknown variables", () => {
@@ -44,5 +50,13 @@ describe("i18n helpers", () => {
     expect(translateMessage("en", "missing.key")).toBe("missing.key");
     expect(getMessage("fr", "subjects.listTitle")).toBe("Matières disponibles");
     expect(getMessage("zh", "subjects.listTitle")).toBe("可用学科");
+  });
+
+  it("returns Arabic messages and falls back to English for missing Arabic keys", () => {
+    expect(getMessage("ar", "locale.label")).toBe("اللغة");
+    expect(getMessage("ar", "subjectDetail.activityBanksTitle")).toBe("بنوك الأنشطة");
+    expect(getMessage("ar", "courseDetail.activitiesTitle")).toBe("الأنشطة المرفقة");
+    expect(getMessage("ar", "courseDetail.gradebookTitle")).toBe("دفتر درجات المقرر");
+    expect(getMessage("ar", "materialKinds.github_repo")).toBe("GitHub repo");
   });
 });

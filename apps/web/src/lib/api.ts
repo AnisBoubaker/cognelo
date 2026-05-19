@@ -83,7 +83,7 @@ export type ActivityPluginTableBackup = {
 export type McqGenerationInput = {
   description: string;
   defaultCodeLanguage: string;
-  locale: "en" | "fr" | "zh";
+  locale: "en" | "fr" | "zh" | "ar";
 };
 
 export type McqGenerationResult = {
@@ -94,7 +94,7 @@ export type McqGenerationResult = {
 export type ParsonsGenerationInput = {
   description: string;
   language: string;
-  locale: "en" | "fr" | "zh";
+  locale: "en" | "fr" | "zh" | "ar";
 };
 
 export type ParsonsGenerationResult =
@@ -114,7 +114,7 @@ export type ParsonsGenerationResult =
 export type CodingExercisePromptGenerationInput = {
   description: string;
   language: string;
-  locale: "en" | "fr" | "zh";
+  locale: "en" | "fr" | "zh" | "ar";
 };
 
 export type CodingExercisePromptGenerationResult = {
@@ -126,7 +126,7 @@ export type CodingExerciseGenerationBaseInput = {
   description: string;
   prompt: string;
   language: string;
-  locale: "en" | "fr" | "zh";
+  locale: "en" | "fr" | "zh" | "ar";
 };
 
 export type CodingExerciseSolutionGenerationInput = CodingExerciseGenerationBaseInput;
@@ -328,7 +328,7 @@ export type ActivityDefinition = {
   defaultConfig?: Record<string, unknown>;
   i18n?: Partial<
     Record<
-      "en" | "fr" | "zh",
+      "en" | "fr" | "zh" | "ar",
       {
         name: string;
         description: string;

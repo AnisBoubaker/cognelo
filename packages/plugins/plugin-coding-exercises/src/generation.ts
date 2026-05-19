@@ -14,26 +14,26 @@ type SubjectContext = {
   description: string;
 };
 
-type GenerationLocale = "en" | "fr" | "zh";
+type GenerationLocale = "en" | "fr" | "zh" | "ar";
 
 export const codingExercisePromptGenerationInputSchema = z.object({
   description: z.string().min(10).max(4000),
   language: z.string().min(1).max(40),
-  locale: z.enum(["en", "fr", "zh"]).default("en")
+  locale: z.enum(["en", "fr", "zh", "ar"]).default("en")
 });
 
 export const codingExerciseSolutionGenerationInputSchema = z.object({
   description: z.string().max(4000).default(""),
   prompt: z.string().min(10).max(12000),
   language: z.string().min(1).max(40),
-  locale: z.enum(["en", "fr", "zh"]).default("en")
+  locale: z.enum(["en", "fr", "zh", "ar"]).default("en")
 });
 
 export const codingExerciseTestsGenerationInputSchema = z.object({
   description: z.string().max(4000).default(""),
   prompt: z.string().min(10).max(12000),
   language: z.string().min(1).max(40),
-  locale: z.enum(["en", "fr", "zh"]).default("en"),
+  locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
   referenceSolution: z.string().min(1).max(60000),
   templateSource: z.string().min(1).max(120000),
   templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([])
@@ -774,6 +774,9 @@ function localeName(locale: GenerationLocale) {
   }
   if (locale === "zh") {
     return "Chinese";
+  }
+  if (locale === "ar") {
+    return "Arabic";
   }
   return "English";
 }

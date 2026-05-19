@@ -48,7 +48,7 @@ type BankActivityRendererContext = {
   bankActivityId: string;
   bankTitle: string;
   hasQuestionAuthoringAgent: boolean;
-  locale: "en" | "fr" | "zh";
+  locale: "en" | "fr" | "zh" | "ar";
   onSave: SaveActivity;
   t: (key: string, params?: Record<string, string | number>) => string;
 };

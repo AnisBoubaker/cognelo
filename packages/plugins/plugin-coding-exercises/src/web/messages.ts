@@ -1,4 +1,5 @@
-export type CodingExercisesLocale = "en" | "fr" | "zh";
+export type CodingExercisesLocale = "en" | "fr" | "zh" | "ar";
+type CodingExercisesMessageLocale = Exclude<CodingExercisesLocale, "ar">;
 
 type MessageKey =
   | "authoringTitle"
@@ -105,7 +106,7 @@ type MessageKey =
 
 type MessageCatalog = Record<MessageKey, string>;
 
-const messages: Record<CodingExercisesLocale, MessageCatalog> = {
+const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
   en: {
     authoringTitle: "Coding exercise authoring",
     title: "Title",
@@ -418,7 +419,7 @@ const messages: Record<CodingExercisesLocale, MessageCatalog> = {
 };
 
 export function normalizeCodingExercisesLocale(value?: string): CodingExercisesLocale {
-  if (value === "fr" || value === "zh") {
+  if (value === "fr" || value === "zh" || value === "ar") {
     return value;
   }
   return "en";
@@ -429,7 +430,7 @@ export function formatCodingExercisesMessage(
   key: MessageKey,
   values?: Record<string, string | number>
 ) {
-  let template = messages[locale][key];
+  let template = messages[locale === "ar" ? "en" : locale][key];
   if (!values) {
     return template;
   }
