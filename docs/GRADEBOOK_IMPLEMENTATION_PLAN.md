@@ -449,6 +449,10 @@ First plugin integration target:
 - Completed: add group/section gradebook view.
 - Completed: add activity submissions view through the gradebook activity/status filters and per-activity rows.
 - Completed: add participant history view through per-row attempt history summaries.
+- Completed: course-wide teacher gradebook now defaults to activity-level summaries with submission count, graded count, mean grade, all-groups release/hide, detailed-results navigation, and expandable group-specific summaries with group release/hide controls. Group gradebook uses the same activity-summary layout scoped to the current group.
+- Completed: detailed results navigation supports course-wide activity results and group-scoped activity results through `?groupId=:groupId`.
+- Completed: detailed results back links return to the originating course/group gradebook tab through `?tab=gradebook`.
+- Completed: detailed activity results page lists per-student results and supports a Parsons "See answer" overlay with previous/next submission navigation and an "Include attempts" option for non-submission attempts/events.
 - Completed: add filters:
   - group
   - activity

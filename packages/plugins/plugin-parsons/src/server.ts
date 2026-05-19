@@ -4,12 +4,12 @@ import { AppError } from "@cognelo/core";
 
 import { prisma } from "./db-client";
 import { buildParsonsGradingResult } from "./grading";
-import { parsonsAttemptRoute, parsonsGenerateRoute } from "./routes";
+import { parsonsAttemptRoute, parsonsGenerateRoute, parsonsGradebookAttemptsRoute } from "./routes";
 import { parsonsAttemptEvaluationSchema } from "./attempt-types";
 
 export const parsonsServerPlugin: ServerActivityPlugin = {
   key: "parsons",
-  routes: [parsonsAttemptRoute, parsonsGenerateRoute],
+  routes: [parsonsAttemptRoute, parsonsGenerateRoute, parsonsGradebookAttemptsRoute],
   grading: {
     gradeAttempt: async ({ activityId, pluginAttemptRef }) => {
       if (!pluginAttemptRef) {

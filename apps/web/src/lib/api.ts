@@ -413,6 +413,15 @@ export type ParsonsAttempt = {
   resultSummary: Record<string, unknown>;
 };
 
+export type ParsonsGradebookAttempt = ParsonsAttempt & {
+  events: Array<{
+    id: string;
+    type: string;
+    createdAt: string;
+    payload: Record<string, unknown>;
+  }>;
+};
+
 export type CodingExerciseHiddenTest = {
   id: string;
   name: string;
@@ -534,7 +543,21 @@ export type CourseGradebook = {
   };
   groups: Array<{ id: string; title: string }>;
   activities: Array<{ id: string; title: string }>;
+  items: CourseGradebookItemSummary[];
   rows: CourseGradebookRow[];
+};
+
+export type CourseGradebookItemSummary = {
+  gradebookItemId: string;
+  groupId: string;
+  groupTitle: string;
+  activityId: string;
+  activityTitle: string;
+  activityTypeKey: string;
+  activityTypeName: string;
+  gradesReleased: boolean;
+  pointsPossible: number;
+  studentCount: number;
 };
 
 export type CourseGradebookRow = {
@@ -543,6 +566,7 @@ export type CourseGradebookRow = {
   groupTitle: string;
   activityId: string;
   activityTitle: string;
+  activityTypeKey: string;
   activityTypeName: string;
   gradesReleased: boolean;
   participantId: string;
@@ -1201,6 +1225,27 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(input)
     }),
+  groupParsonsGradebookAttempts: (
+    courseId: string,
+    groupId: string,
+    activityId: string,
+    input: { participantId: string; includeAttempts?: boolean }
+  ) => {
+    const params = new URLSearchParams({ participantId: input.participantId });
+    if (input.includeAttempts) {
+      params.set("includeAttempts", "true");
+    }
+    return request<{
+      participant: {
+        id: string;
+        userId?: string | null;
+        firstName: string;
+        lastName: string;
+        email: string;
+      };
+      attempts: ParsonsGradebookAttempt[];
+    }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/parsons/gradebook-attempts?${params.toString()}`);
+  },
   groupCodingExerciseHiddenTests: (courseId: string, groupId: string, activityId: string) =>
     request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/hidden-tests`
