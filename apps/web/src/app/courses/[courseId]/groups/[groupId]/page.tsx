@@ -2,7 +2,7 @@
 
 import { MarkdownRenderer } from "@cognelo/activity-ui";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ChangeEvent, FocusEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
@@ -14,6 +14,8 @@ import {
   ActivityType,
   Course,
   CourseGradebook,
+  CourseGradebookItemSummary,
+  CourseGradebookRow,
   CourseGroup,
   CourseGroupMaterial,
   CourseMaterial,
@@ -28,6 +30,7 @@ export default function CourseGroupPage() {
   const params = useParams<{ courseId: string; groupId: string }>();
   const { courseId, groupId } = params;
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const { locale, t } = useI18n();
   const [course, setCourse] = useState<Course | null>(null);
@@ -164,6 +167,8 @@ export default function CourseGroupPage() {
   const assignableActivities = (course?.activities ?? []).filter(
     (activity) => !assignedActivities.some((assignment) => assignment.activityId === activity.id)
   );
+  const gradebookActivities = buildGroupGradebookActivitySummaries(gradebook?.items ?? [], gradebook?.rows ?? []);
+  const gradebookOverview = buildGroupGradebookOverview(gradebookActivities);
 
   useEffect(() => {
     if (!assignActivityId && assignableActivities[0]?.id) {
@@ -997,7 +1002,7 @@ export default function CourseGroupPage() {
 
             <WorkspaceTabs
               ariaLabel={t("groupPage.workspaceTabs")}
-              initialTab="activities"
+              initialTab={searchParams.get("tab") === "gradebook" ? "gradebook" : "activities"}
               tabs={[
                 {
                   id: "activities",
@@ -1644,46 +1649,63 @@ export default function CourseGroupPage() {
                           </select>
                         </div>
                       </div>
-                      {gradebook?.rows.length ? (
-                        <div className="table-list">
-                          <div className="table-row table-row-gradebook table-head" aria-hidden="true">
-                            <span>{t("courseDetail.studentHeader")}</span>
+                      <div className="gradebook-summary-bar">
+                        <div className="gradebook-summary-card">
+                          <span className="table-meta-note muted">{t("courseDetail.activitiesHeader")}</span>
+                          <strong>{gradebookOverview.activityCount}</strong>
+                        </div>
+                        <div className="gradebook-summary-card">
+                          <span className="table-meta-note muted">{t("courseDetail.submissionsHeader")}</span>
+                          <strong>{gradebookOverview.submissionCount}</strong>
+                        </div>
+                        <div className="gradebook-summary-card">
+                          <span className="table-meta-note muted">{t("courseDetail.gradedHeader")}</span>
+                          <strong>{gradebookOverview.gradedCount}</strong>
+                        </div>
+                        <div className="gradebook-summary-card">
+                          <span className="table-meta-note muted">{t("courseDetail.meanGradeHeader")}</span>
+                          <strong>{formatMeanGrade(gradebookOverview.meanScore, gradebookOverview.meanMaxScore)}</strong>
+                        </div>
+                      </div>
+
+                      {gradebookActivities.length ? (
+                        <div className="table-list gradebook-table">
+                          <div className="table-row table-row-gradebook-activity table-head" aria-hidden="true">
                             <span>{t("courseDetail.activityHeader")}</span>
-                            <span>{t("courseDetail.gradeHeader")}</span>
-                            <span>{t("courseDetail.statusHeader")}</span>
+                            <span>{t("courseDetail.submissionsHeader")}</span>
+                            <span>{t("courseDetail.gradedHeader")}</span>
+                            <span>{t("courseDetail.meanGradeHeader")}</span>
                             <span>{t("courseDetail.releaseHeader")}</span>
+                            <span>{t("courseDetail.actionsHeader")}</span>
                           </div>
-                          {gradebook.rows.map((row) => (
-                            <div className="table-row table-row-gradebook-group" key={`${row.gradebookItemId}-${row.participantId}`}>
-                              <div className="table-main table-main-stack">
-                                <strong>{row.participantName}</strong>
-                                <span className="table-meta-note muted">{row.participantEmail}</span>
+                          {gradebookActivities.map((activity) => (
+                            <div className="table-row table-row-gradebook-activity" key={activity.activityId}>
+                              <div className="gradebook-activity-cell is-static">
+                                <div className="table-main table-main-stack">
+                                  <strong>{activity.activityTitle}</strong>
+                                  <span className="table-meta-note muted">{activity.activityTypeName}</span>
+                                </div>
                               </div>
-                              <div className="table-main table-main-stack">
-                                <strong>{row.activityTitle}</strong>
-                                <span className="table-meta-note muted">{row.activityTypeName}</span>
-                              </div>
-                              <div className="table-main table-main-stack">
-                                <strong>{formatGradebookScore(row.score, row.maxScore)}</strong>
-                                <span className="table-meta-note muted">
-                                  {t("courseDetail.attemptSummary", {
-                                    count: row.attemptCount,
-                                    selected: row.selectedAttemptNumber ?? "-"
-                                  })}
-                                </span>
-                              </div>
-                              <span className={`participant-status is-${row.status.replace("_", "-")}`}>
-                                {t(`courseDetail.gradebookStatus.${row.status}`)}
-                              </span>
+                              <span className="gradebook-number">{activity.submissionCount}</span>
+                              <span className="gradebook-number">{activity.gradedCount}</span>
+                              <strong className="gradebook-number">{formatMeanGrade(activity.meanScore, activity.meanMaxScore)}</strong>
                               <div className="table-actions">
                                 <button
                                   className="button secondary"
-                                  disabled={savingReleaseItemId === row.gradebookItemId}
+                                  disabled={savingReleaseItemId === activity.gradebookItemId}
                                   type="button"
-                                  onClick={() => setGradebookRelease(row.gradebookItemId, !row.gradesReleased, row.activityTitle)}
+                                  onClick={() => setGradebookRelease(activity.gradebookItemId, !activity.gradesReleased, activity.activityTitle)}
                                 >
-                                  {row.gradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
+                                  {activity.gradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
                                 </button>
+                              </div>
+                              <div className="table-actions">
+                                <Link
+                                  className="button secondary"
+                                  href={`/courses/${courseId}/gradebook/activities/${activity.activityId}?groupId=${groupId}`}
+                                >
+                                  {t("courseDetail.detailedResults")}
+                                </Link>
                               </div>
                             </div>
                           ))}
@@ -2144,6 +2166,89 @@ function formatGradebookScore(score: number | null, maxScore: number) {
 
 function formatGradeNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatMeanGrade(score: number | null, maxScore: number | null) {
+  if (score === null || maxScore === null) {
+    return "-";
+  }
+  return `${formatGradeNumber(score)} / ${formatGradeNumber(maxScore)}`;
+}
+
+type GroupGradebookActivitySummary = {
+  activityId: string;
+  activityTitle: string;
+  activityTypeName: string;
+  gradebookItemId: string;
+  gradesReleased: boolean;
+  submissionCount: number;
+  gradedCount: number;
+  meanScore: number | null;
+  meanMaxScore: number | null;
+};
+
+function buildGroupGradebookActivitySummaries(
+  items: CourseGradebookItemSummary[],
+  rows: CourseGradebookRow[]
+): GroupGradebookActivitySummary[] {
+  const rowsByItem = new Map<string, CourseGradebookRow[]>();
+  for (const row of rows) {
+    const existing = rowsByItem.get(row.gradebookItemId) ?? [];
+    existing.push(row);
+    rowsByItem.set(row.gradebookItemId, existing);
+  }
+
+  return items
+    .map((item) => {
+      const itemRows = rowsByItem.get(item.gradebookItemId) ?? [];
+      return {
+        activityId: item.activityId,
+        activityTitle: item.activityTitle,
+        activityTypeName: item.activityTypeName,
+        gradebookItemId: item.gradebookItemId,
+        gradesReleased: item.gradesReleased,
+        submissionCount: sum(itemRows.map((row) => row.submittedAttemptCount)),
+        gradedCount: itemRows.filter((row) => row.score !== null).length,
+        ...meanGradeForRows(itemRows)
+      };
+    })
+    .sort((left, right) => left.activityTitle.localeCompare(right.activityTitle));
+}
+
+function buildGroupGradebookOverview(activities: GroupGradebookActivitySummary[]) {
+  const rowsForMean = activities.flatMap((activity) =>
+    activity.meanScore === null || activity.meanMaxScore === null
+      ? []
+      : [{ score: activity.meanScore, maxScore: activity.meanMaxScore }]
+  );
+
+  return {
+    activityCount: activities.length,
+    submissionCount: sum(activities.map((activity) => activity.submissionCount)),
+    gradedCount: sum(activities.map((activity) => activity.gradedCount)),
+    meanScore: rowsForMean.length ? roundGrade(rowsForMean.reduce((total, row) => total + row.score, 0) / rowsForMean.length) : null,
+    meanMaxScore: rowsForMean.length ? roundGrade(rowsForMean.reduce((total, row) => total + row.maxScore, 0) / rowsForMean.length) : null
+  };
+}
+
+function meanGradeForRows(rows: CourseGradebookRow[]) {
+  const gradedRows = rows.filter((row) => row.score !== null);
+  if (!gradedRows.length) {
+    return { meanScore: null, meanMaxScore: null };
+  }
+
+  return {
+    meanScore: roundGrade(gradedRows.reduce((total, row) => total + (row.score ?? 0), 0) / gradedRows.length),
+    meanMaxScore: roundGrade(gradedRows.reduce((total, row) => total + row.maxScore, 0) / gradedRows.length)
+  };
+}
+
+function sum(values: number[]) {
+  return values.reduce((total, value) => total + value, 0);
+}
+
+function roundGrade(value: number) {
+  return Math.round(value * 100) / 100;
 }
 
 type MaterialTreeNode = {

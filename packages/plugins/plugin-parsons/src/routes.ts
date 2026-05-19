@@ -10,7 +10,7 @@ import {
   submitActivityAttempt
 } from "@cognelo/core";
 import { prisma } from "@cognelo/db";
-import { ensureParsonsAttempt, findLatestParsonsAttempt, updateParsonsAttempt } from "./attempts";
+import { ensureParsonsAttempt, findLatestParsonsAttempt, listParsonsGradebookAttempts, updateParsonsAttempt } from "./attempts";
 import { parsonsAttemptEnsureInputSchema, parsonsAttemptUpdateInputSchema } from "./attempt-types";
 import { generateParsonsProblem, parsonsGenerationInputSchema } from "./generation";
 import { buildParsonsGradingResult } from "./grading";
@@ -168,6 +168,62 @@ export const parsonsGenerateRoute: PluginRouteDefinition = {
         locale: input.locale,
         subject
       });
+    }
+  }
+};
+
+export const parsonsGradebookAttemptsRoute: PluginRouteDefinition = {
+  path: "parsons/gradebook-attempts",
+  activityTypeKeys: ["parsons-problem"],
+  methods: {
+    GET: async ({ context, request }) => {
+      if (!context.courseId || !context.groupId) {
+        throw new AppError(400, "GROUP_CONTEXT_REQUIRED", "Gradebook attempts require a group activity context.");
+      }
+      await assertCanManageCourse(context.user, context.courseId);
+
+      const searchParams = new URL(request.url).searchParams;
+      const participantId = searchParams.get("participantId");
+      if (!participantId) {
+        throw new AppError(400, "PARTICIPANT_REQUIRED", "A participant is required.");
+      }
+
+      const participant = await prisma.courseGroupParticipant.findFirst({
+        where: {
+          id: participantId,
+          groupId: context.groupId,
+          role: "student"
+        },
+        select: {
+          id: true,
+          userId: true,
+          firstName: true,
+          lastName: true,
+          email: true
+        }
+      });
+
+      if (!participant) {
+        throw new AppError(404, "PARTICIPANT_NOT_FOUND", "The participant was not found.");
+      }
+      if (!participant.userId) {
+        return {
+          participant,
+          attempts: []
+        };
+      }
+
+      const attempts = await listParsonsGradebookAttempts({
+        activityId: context.activity.id,
+        userId: participant.userId,
+        config: parseParsonsConfig(context.activity.config),
+        includeAttempts: searchParams.get("includeAttempts") === "true"
+      });
+
+      return {
+        participant,
+        attempts
+      };
     }
   }
 };

@@ -27,6 +27,15 @@ export type ParsonsAttemptRecord = {
   resultSummary: Record<string, unknown>;
 };
 
+export type ParsonsGradebookAttemptRecord = ParsonsAttemptRecord & {
+  events: Array<{
+    id: string;
+    type: string;
+    createdAt: string;
+    payload: Record<string, unknown>;
+  }>;
+};
+
 export async function ensureParsonsAttempt(params: {
   activityId: string;
   userId: string;
@@ -201,6 +210,32 @@ export async function listRecentParsonsAttemptSignals(params: { activityId: stri
   return attempts.map((attempt) => ({
     ...toParsonsAttemptRecord(attempt, normalizeAttemptState(attempt.latestState, defaultParsonsConfig())),
     recentEvents: attempt.events.map((event) => toParsonsAttemptEventRecord(event))
+  }));
+}
+
+export async function listParsonsGradebookAttempts(params: {
+  activityId: string;
+  userId: string;
+  config: ParsonsConfig;
+  includeAttempts?: boolean;
+}) {
+  const attempts = await prisma.pluginParsonsAttempt.findMany({
+    where: {
+      activityId: params.activityId,
+      userId: params.userId,
+      ...(params.includeAttempts ? {} : { status: "completed" })
+    },
+    orderBy: [{ startedAt: "asc" }],
+    include: {
+      events: {
+        orderBy: [{ createdAt: "asc" }]
+      }
+    }
+  });
+
+  return attempts.map((attempt) => ({
+    ...toParsonsAttemptRecord(attempt, normalizeAttemptState(attempt.latestState, params.config)),
+    events: attempt.events.map((event) => toParsonsAttemptEventRecord(event))
   }));
 }
 

@@ -2,13 +2,25 @@
 
 import { MarkdownRenderer } from "@cognelo/activity-ui";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ChangeEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
-import { api, ActivityBank, ActivityDefinition, ActivityType, AiAgentConnection, Course, CourseGradebook, CourseMaterial, GradebookStatus } from "@/lib/api";
+import {
+  api,
+  ActivityBank,
+  ActivityDefinition,
+  ActivityType,
+  AiAgentConnection,
+  Course,
+  CourseGradebook,
+  CourseGradebookItemSummary,
+  CourseGradebookRow,
+  CourseMaterial,
+  GradebookStatus
+} from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 type ActivityCategoryId = "programming" | "miscellaneous";
@@ -23,6 +35,7 @@ export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();
   const courseId = params.courseId;
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const { locale, t } = useI18n();
   const [course, setCourse] = useState<Course | null>(null);
@@ -35,6 +48,7 @@ export default function CourseDetailPage() {
   const [gradebookActivityId, setGradebookActivityId] = useState("");
   const [gradebookStatus, setGradebookStatus] = useState<GradebookStatus>("all");
   const [savingReleaseItemId, setSavingReleaseItemId] = useState<string | null>(null);
+  const [expandedGradebookActivityIds, setExpandedGradebookActivityIds] = useState<Set<string>>(new Set());
   const [studentSupportAgentId, setStudentSupportAgentId] = useState("");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [showActivityPicker, setShowActivityPicker] = useState(false);
@@ -127,8 +141,47 @@ export default function CourseDetailPage() {
     }
   }
 
+  async function setGradebookItemsRelease(gradebookItemIds: string[], released: boolean, activityTitle: string) {
+    const uniqueItemIds = [...new Set(gradebookItemIds)];
+    if (!uniqueItemIds.length) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      t(released ? "courseDetail.releaseGradesConfirm" : "courseDetail.hideGradesConfirm", { title: activityTitle })
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setSavingReleaseItemId(uniqueItemIds.join(":"));
+    setError("");
+    try {
+      await Promise.all(uniqueItemIds.map((itemId) => api.setGradebookItemRelease(courseId, itemId, { released })));
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.gradeReleaseError"));
+    } finally {
+      setSavingReleaseItemId(null);
+    }
+  }
+
+  function toggleGradebookActivity(activityId: string) {
+    setExpandedGradebookActivityIds((current) => {
+      const next = new Set(current);
+      if (next.has(activityId)) {
+        next.delete(activityId);
+      } else {
+        next.add(activityId);
+      }
+      return next;
+    });
+  }
+
   const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
   const canManage = user?.roles.includes("admin") || membershipRole === "owner" || membershipRole === "teacher";
+  const gradebookActivities = buildGradebookActivitySummaries(gradebook?.items ?? [], gradebook?.rows ?? []);
+  const gradebookOverview = buildGradebookOverview(gradebookActivities);
 
   useEffect(() => {
     if (course && !canManage && course.groups?.[0]?.id) {
@@ -697,7 +750,7 @@ export default function CourseDetailPage() {
             {error ? <p className="error">{error}</p> : null}
             <WorkspaceTabs
               ariaLabel={t("courseDetail.workspaceTabs")}
-              initialTab="materials"
+              initialTab={searchParams.get("tab") === "gradebook" ? "gradebook" : "materials"}
               tabs={[
                 {
                   id: "materials",
@@ -1342,63 +1395,107 @@ export default function CourseDetailPage() {
                         </div>
                       </div>
 
-                      {gradebook?.rows.length ? (
-                        <div className="table-list">
-                          <div className="table-row table-row-gradebook table-head" aria-hidden="true">
-                            <span>{t("courseDetail.studentHeader")}</span>
-                            <span>{t("courseDetail.groupHeader")}</span>
+                      <div className="gradebook-summary-bar">
+                        <div className="gradebook-summary-card">
+                          <span className="table-meta-note muted">{t("courseDetail.activitiesHeader")}</span>
+                          <strong>{gradebookOverview.activityCount}</strong>
+                        </div>
+                        <div className="gradebook-summary-card">
+                          <span className="table-meta-note muted">{t("courseDetail.submissionsHeader")}</span>
+                          <strong>{gradebookOverview.submissionCount}</strong>
+                        </div>
+                        <div className="gradebook-summary-card">
+                          <span className="table-meta-note muted">{t("courseDetail.gradedHeader")}</span>
+                          <strong>{gradebookOverview.gradedCount}</strong>
+                        </div>
+                        <div className="gradebook-summary-card">
+                          <span className="table-meta-note muted">{t("courseDetail.meanGradeHeader")}</span>
+                          <strong>{formatMeanGrade(gradebookOverview.meanScore, gradebookOverview.meanMaxScore)}</strong>
+                        </div>
+                      </div>
+
+                      {gradebookActivities.length ? (
+                        <div className="table-list gradebook-table">
+                          <div className="table-row table-row-gradebook-activity table-head" aria-hidden="true">
                             <span>{t("courseDetail.activityHeader")}</span>
-                            <span>{t("courseDetail.gradeHeader")}</span>
-                            <span>{t("courseDetail.statusHeader")}</span>
+                            <span>{t("courseDetail.submissionsHeader")}</span>
+                            <span>{t("courseDetail.gradedHeader")}</span>
+                            <span>{t("courseDetail.meanGradeHeader")}</span>
                             <span>{t("courseDetail.releaseHeader")}</span>
+                            <span>{t("courseDetail.actionsHeader")}</span>
                           </div>
-                          {gradebook.rows.map((row) => (
-                            <div className="table-row table-row-gradebook" key={`${row.gradebookItemId}-${row.participantId}`}>
-                              <div className="table-main table-main-stack">
-                                <strong>{row.participantName}</strong>
-                                <span className="table-meta-note muted">{row.participantEmail}</span>
-                                {row.externalId ? <span className="metadata-badge">{row.externalId}</span> : null}
+                          {gradebookActivities.map((activity) => (
+                            <div className="table-group" key={activity.activityId}>
+                              <div className="table-row table-row-gradebook-activity">
+                                <div className="gradebook-activity-cell">
+                                  <button
+                                    aria-expanded={expandedGradebookActivityIds.has(activity.activityId)}
+                                    aria-label={t("courseDetail.expandActivity", { title: activity.activityTitle })}
+                                    className="gradebook-expander"
+                                    type="button"
+                                    onClick={() => toggleGradebookActivity(activity.activityId)}
+                                  >
+                                    {expandedGradebookActivityIds.has(activity.activityId) ? "▾" : "▸"}
+                                  </button>
+                                  <div className="table-main table-main-stack">
+                                    <strong>{activity.activityTitle}</strong>
+                                    <span className="table-meta-note muted">{activity.activityTypeName}</span>
+                                  </div>
+                                </div>
+                                <span className="gradebook-number">{activity.submissionCount}</span>
+                                <span className="gradebook-number">{activity.gradedCount}</span>
+                                <strong className="gradebook-number">{formatMeanGrade(activity.meanScore, activity.meanMaxScore)}</strong>
+                                <div className="table-actions">
+                                  <button
+                                    className="button secondary"
+                                    disabled={savingReleaseItemId === activity.gradebookItemIds.join(":")}
+                                    type="button"
+                                    onClick={() =>
+                                      setGradebookItemsRelease(activity.gradebookItemIds, !activity.allGradesReleased, activity.activityTitle)
+                                    }
+                                  >
+                                    {activity.allGradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
+                                  </button>
+                                </div>
+                                <div className="table-actions">
+                                  <Link className="button secondary" href={`/courses/${courseId}/gradebook/activities/${activity.activityId}`}>
+                                    {t("courseDetail.detailedResults")}
+                                  </Link>
+                                </div>
                               </div>
-                              <span className="table-meta muted">{row.groupTitle}</span>
-                              <div className="table-main table-main-stack">
-                                <strong>{row.activityTitle}</strong>
-                                <span className="table-meta-note muted">{row.activityTypeName}</span>
-                              </div>
-                              <div className="table-main table-main-stack">
-                                <strong>{formatGradebookScore(row.score, row.maxScore)}</strong>
-                                <span className="table-meta-note muted">
-                                  {t("courseDetail.attemptSummary", {
-                                    count: row.attemptCount,
-                                    selected: row.selectedAttemptNumber ?? "-"
-                                  })}
-                                </span>
-                                {row.attempts.length ? (
-                                  <span className="table-meta-note muted">
-                                    {row.attempts
-                                      .map((attempt) =>
-                                        t("courseDetail.attemptHistoryItem", {
-                                          number: attempt.attemptNumber,
-                                          status: t(`courseDetail.attemptLifecycle.${attempt.lifecycle}`)
-                                        })
-                                      )
-                                      .join(" · ")}
-                                  </span>
-                                ) : null}
-                              </div>
-                              <span className={`participant-status is-${row.status.replace("_", "-")}`}>
-                                {t(`courseDetail.gradebookStatus.${row.status}`)}
-                                {row.latePenaltyApplied && row.latePenaltyPercent !== null ? ` -${row.latePenaltyPercent}%` : ""}
-                              </span>
-                              <div className="table-actions">
-                                <button
-                                  className="button secondary"
-                                  disabled={savingReleaseItemId === row.gradebookItemId}
-                                  type="button"
-                                  onClick={() => setGradebookRelease(row.gradebookItemId, !row.gradesReleased, row.activityTitle)}
-                                >
-                                  {row.gradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
-                                </button>
-                              </div>
+                              {expandedGradebookActivityIds.has(activity.activityId) ? (
+                                <div className="gradebook-subtable">
+                                  {activity.groups.map((group) => (
+                                    <div className="table-row table-row-gradebook-group-summary" key={`${activity.activityId}-${group.groupId}`}>
+                                      <div className="table-main table-main-stack">
+                                        <strong>{group.groupTitle}</strong>
+                                        <span className="table-meta-note muted">{t("courseDetail.studentCount", { count: group.studentCount })}</span>
+                                      </div>
+                                      <span className="gradebook-number">{group.submissionCount}</span>
+                                      <span className="gradebook-number">{group.gradedCount}</span>
+                                      <strong className="gradebook-number">{formatMeanGrade(group.meanScore, group.meanMaxScore)}</strong>
+                                      <div className="table-actions">
+                                        <button
+                                          className="button secondary"
+                                          disabled={savingReleaseItemId === group.gradebookItemId}
+                                          type="button"
+                                          onClick={() => setGradebookRelease(group.gradebookItemId, !group.gradesReleased, `${activity.activityTitle} - ${group.groupTitle}`)}
+                                        >
+                                          {group.gradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
+                                        </button>
+                                      </div>
+                                      <div className="table-actions">
+                                        <Link
+                                          className="button secondary"
+                                          href={`/courses/${courseId}/gradebook/activities/${activity.activityId}?groupId=${group.groupId}`}
+                                        >
+                                          {t("courseDetail.detailedResults")}
+                                        </Link>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
                             </div>
                           ))}
                         </div>
@@ -1704,6 +1801,125 @@ function formatGradebookScore(score: number | null, maxScore: number) {
 
 function formatGradeNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatMeanGrade(score: number | null, maxScore: number | null) {
+  if (score === null || maxScore === null) {
+    return "-";
+  }
+  return `${formatGradeNumber(score)} / ${formatGradeNumber(maxScore)}`;
+}
+
+type GradebookGroupSummary = {
+  groupId: string;
+  groupTitle: string;
+  gradebookItemId: string;
+  gradesReleased: boolean;
+  studentCount: number;
+  submissionCount: number;
+  gradedCount: number;
+  meanScore: number | null;
+  meanMaxScore: number | null;
+};
+
+type GradebookActivitySummary = {
+  activityId: string;
+  activityTitle: string;
+  activityTypeName: string;
+  gradebookItemIds: string[];
+  allGradesReleased: boolean;
+  submissionCount: number;
+  gradedCount: number;
+  meanScore: number | null;
+  meanMaxScore: number | null;
+  groups: GradebookGroupSummary[];
+};
+
+function buildGradebookActivitySummaries(items: CourseGradebookItemSummary[], rows: CourseGradebookRow[]): GradebookActivitySummary[] {
+  const rowsByItem = new Map<string, CourseGradebookRow[]>();
+  for (const row of rows) {
+    const existing = rowsByItem.get(row.gradebookItemId) ?? [];
+    existing.push(row);
+    rowsByItem.set(row.gradebookItemId, existing);
+  }
+
+  const itemsByActivity = new Map<string, CourseGradebookItemSummary[]>();
+  for (const item of items) {
+    const existing = itemsByActivity.get(item.activityId) ?? [];
+    existing.push(item);
+    itemsByActivity.set(item.activityId, existing);
+  }
+
+  return [...itemsByActivity.values()]
+    .map((activityItems) => {
+      const first = activityItems[0];
+      const activityRows = activityItems.flatMap((item) => rowsByItem.get(item.gradebookItemId) ?? []);
+      const groups = activityItems
+        .map((item) => summarizeGradebookGroup(item, rowsByItem.get(item.gradebookItemId) ?? []))
+        .sort((left, right) => left.groupTitle.localeCompare(right.groupTitle));
+
+      return {
+        activityId: first.activityId,
+        activityTitle: first.activityTitle,
+        activityTypeName: first.activityTypeName,
+        gradebookItemIds: activityItems.map((item) => item.gradebookItemId),
+        allGradesReleased: groups.length > 0 && groups.every((group) => group.gradesReleased),
+        submissionCount: sum(groups.map((group) => group.submissionCount)),
+        gradedCount: sum(groups.map((group) => group.gradedCount)),
+        ...meanGradeForRows(activityRows),
+        groups
+      };
+    })
+    .sort((left, right) => left.activityTitle.localeCompare(right.activityTitle));
+}
+
+function summarizeGradebookGroup(item: CourseGradebookItemSummary, rows: CourseGradebookRow[]): GradebookGroupSummary {
+  return {
+    groupId: item.groupId,
+    groupTitle: item.groupTitle,
+    gradebookItemId: item.gradebookItemId,
+    gradesReleased: item.gradesReleased,
+    studentCount: item.studentCount,
+    submissionCount: sum(rows.map((row) => row.submittedAttemptCount)),
+    gradedCount: rows.filter((row) => row.score !== null).length,
+    ...meanGradeForRows(rows)
+  };
+}
+
+function buildGradebookOverview(activities: GradebookActivitySummary[]) {
+  const rowsForMean = activities.flatMap((activity) =>
+    activity.meanScore === null || activity.meanMaxScore === null
+      ? []
+      : [{ score: activity.meanScore, maxScore: activity.meanMaxScore }]
+  );
+
+  return {
+    activityCount: activities.length,
+    submissionCount: sum(activities.map((activity) => activity.submissionCount)),
+    gradedCount: sum(activities.map((activity) => activity.gradedCount)),
+    meanScore: rowsForMean.length ? roundGrade(rowsForMean.reduce((total, row) => total + row.score, 0) / rowsForMean.length) : null,
+    meanMaxScore: rowsForMean.length ? roundGrade(rowsForMean.reduce((total, row) => total + row.maxScore, 0) / rowsForMean.length) : null
+  };
+}
+
+function meanGradeForRows(rows: CourseGradebookRow[]) {
+  const gradedRows = rows.filter((row) => row.score !== null);
+  if (!gradedRows.length) {
+    return { meanScore: null, meanMaxScore: null };
+  }
+
+  return {
+    meanScore: roundGrade(gradedRows.reduce((total, row) => total + (row.score ?? 0), 0) / gradedRows.length),
+    meanMaxScore: roundGrade(gradedRows.reduce((total, row) => total + row.maxScore, 0) / gradedRows.length)
+  };
+}
+
+function sum(values: number[]) {
+  return values.reduce((total, value) => total + value, 0);
+}
+
+function roundGrade(value: number) {
+  return Math.round(value * 100) / 100;
 }
 
 function compareMaterials(left: CourseMaterial, right: CourseMaterial) {

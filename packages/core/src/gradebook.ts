@@ -343,6 +343,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         groupTitle: item.group.title,
         activityId: item.activity.id,
         activityTitle: item.titleSnapshot || item.activity.title,
+        activityTypeKey: item.activity.activityType.key,
         activityTypeName: item.activity.activityType.name,
         gradesReleased: item.gradesReleased,
         participantId: participant.id,
@@ -383,6 +384,18 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
     },
     groups: [...groups.values()].sort((left, right) => left.title.localeCompare(right.title)),
     activities: [...activities.values()].sort((left, right) => left.title.localeCompare(right.title)),
+    items: items.map((item) => ({
+      gradebookItemId: item.id,
+      groupId: item.group.id,
+      groupTitle: item.group.title,
+      activityId: item.activity.id,
+      activityTitle: item.titleSnapshot || item.activity.title,
+      activityTypeKey: item.activity.activityType.key,
+      activityTypeName: item.activity.activityType.name,
+      gradesReleased: item.gradesReleased,
+      pointsPossible: item.pointsPossible,
+      studentCount: item.group.participants.length
+    })),
     rows
   };
 }
