@@ -111,9 +111,11 @@ export default function CourseDetailPage() {
       .aiAgentConnections()
       .then((aiAgentResult) => setAiAgentConnections(aiAgentResult.connections.filter((connection) => connection.isEnabled)))
       .catch(() => setAiAgentConnections([]));
-    if (courseResult.course.subjectId) {
+    if (userCanManage && courseResult.course.subjectId) {
       const banksResult = await api.activityBanks(courseResult.course.subjectId);
       setActivityBanks(banksResult.activityBanks);
+    } else {
+      setActivityBanks([]);
     }
   }
 

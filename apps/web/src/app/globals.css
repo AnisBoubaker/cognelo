@@ -1127,6 +1127,17 @@ a.card:hover,
   white-space: pre-wrap;
 }
 
+.code-block {
+  background: #101827;
+  border-radius: 8px;
+  color: #e8eef8;
+  font-family: var(--font-mono);
+  margin: 0;
+  overflow: auto;
+  padding: 16px;
+  white-space: pre-wrap;
+}
+
 .table-row:first-child {
   border-top: 0;
 }

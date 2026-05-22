@@ -564,7 +564,29 @@ export async function removeGroupParticipant(user: CurrentUser, courseId: string
   if (participant.userId === user.id) {
     throw new AppError(400, "GROUP_PARTICIPANT_SELF_REMOVE_FORBIDDEN", "You cannot remove yourself from this group.");
   }
-  await prisma.courseGroupParticipant.delete({ where: { id: participantId } });
+  await prisma.$transaction(async (tx) => {
+    await tx.courseGroupParticipant.delete({ where: { id: participantId } });
+    if (participant.role === "student" && participant.userId) {
+      const otherStudentGroups = await tx.courseGroupParticipant.findMany({
+        where: {
+          userId: participant.userId,
+          role: "student",
+          group: { courseId }
+        },
+        select: { id: true },
+        take: 1
+      });
+      if (!otherStudentGroups.length) {
+        await tx.courseMembership.deleteMany({
+          where: {
+            courseId,
+            userId: participant.userId,
+            role: "student"
+          }
+        });
+      }
+    }
+  });
   return { ok: true };
 }
 

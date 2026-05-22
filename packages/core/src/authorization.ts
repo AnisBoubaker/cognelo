@@ -55,7 +55,17 @@ export async function assertCanViewCourse(user: CurrentUser, courseId: string) {
     }
   }
   const memberships = await getCourseMembership(user.id, courseId);
-  if (memberships.length > 0) {
+  if (memberships.some((membership) => membership.role !== "student")) {
+    return;
+  }
+  const participant = await prisma.courseGroupParticipant.findFirst({
+    where: {
+      userId: user.id,
+      group: { courseId }
+    },
+    select: { id: true }
+  });
+  if (participant) {
     return;
   }
   throw forbidden();

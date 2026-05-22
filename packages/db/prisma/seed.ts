@@ -829,6 +829,31 @@ async function main() {
     }
   });
 
+  await prisma.courseGroupParticipant.upsert({
+    where: {
+      groupId_email: {
+        groupId: group.id,
+        email: student.email
+      }
+    },
+    update: {
+      userId: student.id,
+      role: "student",
+      firstName: student.firstName ?? "Sam",
+      lastName: student.lastName ?? "Student",
+      externalId: "S1001"
+    },
+    create: {
+      groupId: group.id,
+      userId: student.id,
+      role: "student",
+      firstName: student.firstName ?? "Sam",
+      lastName: student.lastName ?? "Student",
+      email: student.email,
+      externalId: "S1001"
+    }
+  });
+
   await prisma.courseGroupMaterial.upsert({
     where: { id: "seed-group-material-checklist" },
     update: {

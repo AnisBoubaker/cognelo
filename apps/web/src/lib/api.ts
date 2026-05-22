@@ -588,7 +588,8 @@ export type CourseGradebookRow = {
   attempts: Array<{
     id: string;
     attemptNumber: number;
-    lifecycle: "started" | "submitted" | "graded";
+    lifecycle: "started" | "submitted" | "graded" | "deleted";
+    pluginAttemptRef: string | null;
     startedAt: string;
     submittedAt: string | null;
     gradedAt: string | null;
@@ -596,6 +597,7 @@ export type CourseGradebookRow = {
     lateBySeconds: number | null;
     durationSeconds: number | null;
   }>;
+  deletedSubmissions: DeletedSubmissionAudit[];
 };
 
 export type GradebookMutationGrade = {
@@ -612,7 +614,7 @@ export type GradebookMutationGrade = {
 export type GradebookMutationAttempt = {
   id: string;
   attemptNumber: number;
-  lifecycle: "started" | "submitted" | "graded";
+  lifecycle: "started" | "submitted" | "graded" | "deleted";
   submittedAt: string | null;
   gradedAt: string | null;
   isLate: boolean;
@@ -639,9 +641,30 @@ export type StudentReleasedGradeRow = {
   selectedAttemptNumber: number | null;
   attemptCount: number;
   submittedAttemptCount: number;
+  deletedSubmissions: DeletedSubmissionAudit[];
   availableFrom: string | null;
   availableUntil: string | null;
   gradedAt: string | null;
+};
+
+export type DeletedSubmissionAudit = {
+  eventId: string;
+  attemptId: string | null;
+  attemptNumber: number | null;
+  lifecycle: string | null;
+  submittedAt: string | null;
+  gradedAt: string | null;
+  deletedAt: string;
+  reason: string | null;
+  actor: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
+  pluginKey: string | null;
+  pluginAttemptRef: string | null;
+  metadata: Record<string, unknown>;
+  gradeSnapshot: Record<string, unknown> | null;
 };
 
 export type StudentGradeFeedback = {
@@ -841,8 +864,20 @@ export const api = {
         body: JSON.stringify(input ?? {})
       }
     ),
+  deleteActivitySubmission: (courseId: string, attemptId: string, input: { reason: string }) =>
+    request<{ result: { attempt: GradebookMutationAttempt; grade: GradebookMutationGrade | null } }>(
+      `/courses/${courseId}/gradebook/attempts/${attemptId}`,
+      {
+        method: "DELETE",
+        body: JSON.stringify(input)
+      }
+    ),
   studentGroupGrades: (courseId: string, groupId: string) =>
     request<{ grades: StudentReleasedGrades }>(`/courses/${courseId}/groups/${groupId}/grades`),
+  studentActivitySubmissions: (courseId: string, groupId: string, activityId: string) =>
+    request<{ audit: { deletedSubmissions: DeletedSubmissionAudit[] } }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/submissions`
+    ),
   createCourse: (input: CourseInput) =>
     request<{ course: Course }>("/courses", {
       method: "POST",

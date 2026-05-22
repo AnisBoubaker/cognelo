@@ -71,6 +71,12 @@ export type RecordActivityAttemptGradingResultInput = {
   now?: Date;
 };
 
+export type DeleteActivitySubmissionInput = {
+  attemptId: string;
+  reason: string;
+  now?: Date;
+};
+
 export type OverrideGradebookGradeInput = {
   gradebookItemId: string;
   participantId: string;
@@ -91,6 +97,26 @@ export type ActivityAttemptRegradeContext = {
   pluginAttemptRef: string | null;
   activityTypeKey: string;
   activity: GradebookPluginActivityRecord;
+};
+
+export type DeletedSubmissionAudit = {
+  eventId: string;
+  attemptId: string | null;
+  attemptNumber: number | null;
+  lifecycle: string | null;
+  submittedAt: string | null;
+  gradedAt: string | null;
+  deletedAt: string;
+  reason: string | null;
+  actor: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
+  pluginKey: string | null;
+  pluginAttemptRef: string | null;
+  metadata: Record<string, unknown>;
+  gradeSnapshot: Record<string, unknown> | null;
 };
 
 export async function startActivityAttempt(user: CurrentUser, input: StartActivityAttemptInput) {
@@ -302,6 +328,130 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
     });
 
     return { attempt: gradedAttempt, grade };
+  });
+}
+
+export async function deleteActivitySubmission(user: CurrentUser, courseId: string, input: DeleteActivitySubmissionInput) {
+  await canManageCourseOrThrow(user, courseId);
+  const reason = input.reason.trim();
+  if (!reason) {
+    throw new AppError(400, "SUBMISSION_DELETE_REASON_REQUIRED", "A deletion reason is required.");
+  }
+
+  const now = input.now ?? new Date();
+  const attempt = await prisma.activityAttempt.findFirst({
+    where: { id: input.attemptId, courseId },
+    include: {
+      participant: true,
+      gradebookItem: true
+    }
+  });
+
+  if (!attempt) {
+    throw notFound("Activity attempt");
+  }
+  if (attempt.lifecycle === "deleted") {
+    throw new AppError(400, "SUBMISSION_ALREADY_DELETED", "This submission has already been deleted.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const previousGrade = await tx.grade.findUnique({
+      where: {
+        gradebookItemId_participantId: {
+          gradebookItemId: attempt.gradebookItemId,
+          participantId: attempt.participantId
+        }
+      }
+    });
+    const previousEvents = await tx.gradeEvent.findMany({
+      where: {
+        gradebookItemId: attempt.gradebookItemId,
+        participantId: attempt.participantId,
+        attemptId: { not: null },
+        eventType: { not: "submission_deleted" }
+      },
+      orderBy: [{ createdAt: "asc" }]
+    });
+    const remainingCandidates = gradeCandidatesFromEvents(previousEvents.filter((event) => event.attemptId !== attempt.id));
+    const selectedGrade = remainingCandidates.length
+      ? selectGradebookGrade({
+          gradebookItem: attempt.gradebookItem,
+          candidates: remainingCandidates
+        })
+      : null;
+    const gradeSnapshotBeforeDelete = previousGrade ? gradeSnapshot(previousGrade) : null;
+    const attemptSnapshot = activityAttemptSnapshot(attempt);
+
+    const deletedAttempt = await tx.activityAttempt.update({
+      where: { id: attempt.id },
+      data: {
+        lifecycle: "deleted",
+        metadata: {
+          ...(asJsonObject(attempt.metadata) ?? {}),
+          deletion: {
+            deletedAt: now.toISOString(),
+            deletedByUserId: user.id,
+            reason
+          }
+        } as JsonInput
+      }
+    });
+
+    let grade = previousGrade;
+    if (previousGrade && previousGrade.selectedAttemptId === attempt.id) {
+      if (selectedGrade) {
+        grade = await tx.grade.update({
+          where: { id: previousGrade.id },
+          data: {
+            selectedAttemptId: selectedGrade.attemptId,
+            rawScore: selectedGrade.rawScore,
+            rawMaxScore: selectedGrade.rawMaxScore,
+            normalizedScore: selectedGrade.normalizedScore,
+            normalizedMaxScore: selectedGrade.normalizedMaxScore,
+            isPass: selectedGrade.isPass,
+            latePenaltyApplied: selectedGrade.latePenaltyApplied,
+            latePenaltyPercent: selectedGrade.latePenaltyPercent,
+            gradedByUserId: user.id,
+            gradedAt: now,
+            source: "manual",
+            normalizedResult: selectedGrade.normalizedResult as JsonInput,
+            metadata: {
+              ...(asJsonObject(previousGrade.metadata) ?? {}),
+              selectedAfterSubmissionDeletion: true
+            } as JsonInput
+          }
+        });
+      } else {
+        await tx.grade.delete({ where: { id: previousGrade.id } });
+        grade = null;
+      }
+    }
+
+    await tx.gradeEvent.create({
+      data: {
+        gradeId: grade?.id ?? null,
+        gradebookItemId: attempt.gradebookItemId,
+        participantId: attempt.participantId,
+        attemptId: attempt.id,
+        actorUserId: user.id,
+        eventType: "submission_deleted",
+        previousValue: {
+          attempt: attemptSnapshot,
+          grade: gradeSnapshotBeforeDelete
+        } as JsonInput,
+        nextValue: {
+          attempt: activityAttemptSnapshot(deletedAttempt),
+          restoredGrade: grade ? gradeSnapshot(grade) : null
+        } as JsonInput,
+        reason,
+        metadata: {
+          deletedSubmission: attemptSnapshot
+        } as JsonInput,
+        createdAt: now
+      }
+    });
+
+    return { attempt: deletedAttempt, grade };
   });
 }
 
@@ -556,6 +706,13 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
       },
       attempts: {
         orderBy: [{ attemptNumber: "asc" }]
+      },
+      events: {
+        where: { eventType: "submission_deleted" },
+        include: {
+          actor: { select: { id: true, name: true, email: true } }
+        },
+        orderBy: [{ createdAt: "desc" }]
       }
     },
     orderBy: [{ group: { title: "asc" } }, { titleSnapshot: "asc" }]
@@ -571,7 +728,8 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
     return item.group.participants.flatMap((participant) => {
       const grade = item.grades.find((candidate) => candidate.participantId === participant.id) ?? null;
       const attempts = item.attempts.filter((attempt) => attempt.participantId === participant.id);
-      const status = getGradebookRowStatus(grade, attempts);
+      const activeAttempts = attempts.filter((attempt) => attempt.lifecycle !== "deleted");
+      const status = getGradebookRowStatus(grade, activeAttempts);
       if (statusFilter !== "all" && status !== statusFilter) {
         return [];
       }
@@ -597,14 +755,16 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         latePenaltyPercent: grade?.latePenaltyPercent ?? null,
         feedback: sanitizeStudentGradeFeedback(grade?.normalizedResult),
         selectedAttemptNumber: grade?.selectedAttempt?.attemptNumber ?? null,
-        attemptCount: attempts.length,
-        lateAttemptCount: attempts.filter((attempt) => attempt.isLate).length,
-        submittedAttemptCount: attempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded").length,
-        needsGradingCount: attempts.filter((attempt) => attempt.lifecycle === "submitted").length,
-        attempts: attempts.map((attempt) => ({
+        attemptCount: activeAttempts.length,
+        lateAttemptCount: activeAttempts.filter((attempt) => attempt.isLate).length,
+        submittedAttemptCount: activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded").length,
+        needsGradingCount: activeAttempts.filter((attempt) => attempt.lifecycle === "submitted").length,
+        deletedSubmissions: deletedSubmissionAuditsForParticipant(item.events, participant.id),
+        attempts: activeAttempts.map((attempt) => ({
           id: attempt.id,
           attemptNumber: attempt.attemptNumber,
           lifecycle: attempt.lifecycle,
+          pluginAttemptRef: attempt.pluginAttemptRef,
           startedAt: attempt.startedAt.toISOString(),
           submittedAt: attempt.submittedAt?.toISOString() ?? null,
           gradedAt: attempt.gradedAt?.toISOString() ?? null,
@@ -809,6 +969,16 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
       attempts: {
         where: { participantId: participant.id },
         orderBy: [{ attemptNumber: "asc" }]
+      },
+      events: {
+        where: {
+          participantId: participant.id,
+          eventType: "submission_deleted"
+        },
+        include: {
+          actor: { select: { id: true, name: true, email: true } }
+        },
+        orderBy: [{ createdAt: "desc" }]
       }
     },
     orderBy: [{ titleSnapshot: "asc" }]
@@ -817,7 +987,8 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
   return {
     rows: items.map((item) => {
       const grade = item.grades[0] ?? null;
-      const status = getGradebookRowStatus(grade, item.attempts);
+      const activeAttempts = item.attempts.filter((attempt) => attempt.lifecycle !== "deleted");
+      const status = getGradebookRowStatus(grade, activeAttempts);
 
       return {
         gradebookItemId: item.id,
@@ -832,13 +1003,49 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
         latePenaltyPercent: grade?.latePenaltyPercent ?? null,
         feedback: sanitizeStudentGradeFeedback(grade?.normalizedResult),
         selectedAttemptNumber: grade?.selectedAttempt?.attemptNumber ?? null,
-        attemptCount: item.attempts.length,
-        submittedAttemptCount: item.attempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded").length,
+        attemptCount: activeAttempts.length,
+        submittedAttemptCount: activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded").length,
+        deletedSubmissions: deletedSubmissionAuditsForParticipant(item.events, participant.id),
         availableFrom: item.groupActivity.availableFrom?.toISOString() ?? null,
         availableUntil: item.groupActivity.availableUntil?.toISOString() ?? null,
         gradedAt: grade?.gradedAt.toISOString() ?? null
       };
     })
+  };
+}
+
+export async function getStudentActivitySubmissionAudit(user: CurrentUser, courseId: string, groupId: string, activityId: string) {
+  await assertCanViewGroupForGradebook(user, courseId, groupId);
+  const participant = await prisma.courseGroupParticipant.findFirst({
+    where: { groupId, userId: user.id, role: "student" }
+  });
+
+  if (!participant) {
+    throw forbidden();
+  }
+
+  const item = await prisma.gradebookItem.findFirst({
+    where: {
+      courseId,
+      groupId,
+      activityId
+    },
+    include: {
+      events: {
+        where: {
+          participantId: participant.id,
+          eventType: "submission_deleted"
+        },
+        include: {
+          actor: { select: { id: true, name: true, email: true } }
+        },
+        orderBy: [{ createdAt: "desc" }]
+      }
+    }
+  });
+
+  return {
+    deletedSubmissions: item ? deletedSubmissionAuditsForParticipant(item.events, participant.id) : []
   };
 }
 
@@ -911,7 +1118,8 @@ async function assertAttemptCanStart(
   const usedAttempts = await prisma.activityAttempt.count({
     where: {
       gradebookItemId: item.id,
-      participantId: context.participant.id
+      participantId: context.participant.id,
+      lifecycle: { not: "deleted" }
     }
   });
 
@@ -1033,7 +1241,7 @@ function buildManualStudentFeedbackResult(feedbackText: string | null | undefine
 
 function getGradebookRowStatus(
   grade: { normalizedScore: number; selectedAttempt?: { isLate: boolean } | null } | null,
-  attempts: Array<{ lifecycle: "started" | "submitted" | "graded"; isLate: boolean }>
+  attempts: Array<{ lifecycle: "started" | "submitted" | "graded" | "deleted"; isLate: boolean }>
 ): CourseGradebookStatusFilter {
   if (attempts.some((attempt) => attempt.lifecycle === "submitted")) {
     return "needs_grading";
@@ -1045,6 +1253,80 @@ function getGradebookRowStatus(
     return "late";
   }
   return "graded";
+}
+
+function activityAttemptSnapshot(attempt: {
+  id: string;
+  attemptNumber: number;
+  lifecycle: string;
+  startedAt: Date;
+  submittedAt: Date | null;
+  gradedAt: Date | null;
+  durationSeconds: number | null;
+  isLate: boolean;
+  lateBySeconds: number | null;
+  pluginKey: string;
+  pluginVersion: string;
+  pluginAttemptRef: string | null;
+  metadata: unknown;
+}) {
+  return {
+    id: attempt.id,
+    attemptNumber: attempt.attemptNumber,
+    lifecycle: attempt.lifecycle,
+    startedAt: attempt.startedAt.toISOString(),
+    submittedAt: attempt.submittedAt?.toISOString() ?? null,
+    gradedAt: attempt.gradedAt?.toISOString() ?? null,
+    durationSeconds: attempt.durationSeconds,
+    isLate: attempt.isLate,
+    lateBySeconds: attempt.lateBySeconds,
+    pluginKey: attempt.pluginKey,
+    pluginVersion: attempt.pluginVersion,
+    pluginAttemptRef: attempt.pluginAttemptRef,
+    metadata: asJsonObject(attempt.metadata) ?? {}
+  };
+}
+
+function deletedSubmissionAuditsForParticipant(
+  events: Array<{
+    id: string;
+    participantId: string;
+    attemptId: string | null;
+    nextValue: unknown;
+    previousValue: unknown;
+    reason: string | null;
+    createdAt: Date;
+    actor?: { id: string; name: string | null; email: string } | null;
+  }> = [],
+  participantId: string
+): DeletedSubmissionAudit[] {
+  return events
+    .filter((event) => event.participantId === participantId)
+    .map((event) => {
+      const nextValue = asJsonObject(event.nextValue);
+      const previousValue = asJsonObject(event.previousValue);
+      const attempt =
+        asJsonObject(nextValue?.attempt) ??
+        asJsonObject(previousValue?.attempt) ??
+        asJsonObject(asJsonObject(event.nextValue)?.deletedSubmission) ??
+        {};
+      const grade = asJsonObject(previousValue?.grade);
+      return {
+        eventId: event.id,
+        attemptId: event.attemptId,
+        attemptNumber: asNumber(attempt.attemptNumber),
+        lifecycle: typeof attempt.lifecycle === "string" ? attempt.lifecycle : null,
+        submittedAt: typeof attempt.submittedAt === "string" ? attempt.submittedAt : null,
+        gradedAt: typeof attempt.gradedAt === "string" ? attempt.gradedAt : null,
+        deletedAt: event.createdAt.toISOString(),
+        reason: event.reason,
+        actor: event.actor ? { id: event.actor.id, name: event.actor.name, email: event.actor.email } : null,
+        pluginKey: typeof attempt.pluginKey === "string" ? attempt.pluginKey : null,
+        pluginAttemptRef: typeof attempt.pluginAttemptRef === "string" ? attempt.pluginAttemptRef : null,
+        metadata: asJsonObject(attempt.metadata) ?? {},
+        gradeSnapshot: grade
+      };
+    });
 }
 
 function formatParticipantName(participant: { firstName: string; lastName: string; email: string }) {

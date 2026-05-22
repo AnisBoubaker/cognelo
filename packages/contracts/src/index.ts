@@ -294,7 +294,8 @@ export type CourseGroupParticipantInput = z.infer<typeof CourseGroupParticipantI
 
 export const EnrollmentInputSchema = z.object({
   userId: RecordIdSchema,
-  role: CourseMembershipRoleSchema
+  role: CourseMembershipRoleSchema,
+  groupId: RecordIdSchema.optional()
 });
 export type EnrollmentInput = z.infer<typeof EnrollmentInputSchema>;
 

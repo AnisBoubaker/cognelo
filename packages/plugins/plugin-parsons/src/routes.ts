@@ -125,12 +125,17 @@ export const parsonsAttemptRoute: PluginRouteDefinition = {
           pluginAttemptRef: attempt.id,
           activityConfigFingerprint: attempt.latestState.configFingerprint,
           metadata: {
-            mode: "summative"
+            mode: "summative",
+            submittedState: attempt.latestState
           }
         });
         const submittedAttempt = await submitActivityAttempt(context.user, {
           attemptId: coreAttempt.id,
-          pluginAttemptRef: attempt.id
+          pluginAttemptRef: attempt.id,
+          metadata: {
+            mode: "summative",
+            submittedState: attempt.latestState
+          }
         });
         const gradingResult = buildParsonsGradingResult(input.result);
         await recordActivityAttemptGradingResult(context.user, {

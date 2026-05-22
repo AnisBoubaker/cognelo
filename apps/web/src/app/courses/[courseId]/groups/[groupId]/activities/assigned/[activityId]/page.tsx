@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
-import { api, Activity, ActivityDefinition, Course, CourseGroup, StudentGradeFeedback, StudentReleasedGradeRow } from "@/lib/api";
+import { api, Activity, ActivityDefinition, Course, CourseGroup, DeletedSubmissionAudit, StudentGradeFeedback, StudentReleasedGradeRow } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { activityRenderers } from "@/lib/activity-renderers";
 
@@ -19,6 +19,7 @@ export default function GroupActivityPage() {
   const [activity, setActivity] = useState<Activity | null>(null);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [releasedGrade, setReleasedGrade] = useState<StudentReleasedGradeRow | null>(null);
+  const [deletedSubmissions, setDeletedSubmissions] = useState<DeletedSubmissionAudit[]>([]);
   const [hasQuestionAuthoringAgent, setHasQuestionAuthoringAgent] = useState(false);
   const [error, setError] = useState("");
 
@@ -50,10 +51,15 @@ export default function GroupActivityPage() {
       const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher";
       if (userCanManage) {
         setReleasedGrade(null);
+        setDeletedSubmissions([]);
       } else {
-        const gradesResult = await api.studentGroupGrades(courseId, groupId);
+        const [gradesResult, submissionsResult] = await Promise.all([
+          api.studentGroupGrades(courseId, groupId),
+          api.studentActivitySubmissions(courseId, groupId, activityId)
+        ]);
         const gradeRow = gradesResult.grades.rows.find((row) => row.activityId === activityId && row.score !== null) ?? null;
         setReleasedGrade(gradeRow);
+        setDeletedSubmissions(submissionsResult.audit.deletedSubmissions);
       }
     }
 
@@ -130,8 +136,64 @@ export default function GroupActivityPage() {
         ) : (
           <p>{t("common.loading")}</p>
         )}
+
+        {deletedSubmissions.length ? (
+          <section className="section stack">
+            <div>
+              <p className="eyebrow">{t("courseDetail.deletedSubmissionsTitle")}</p>
+              <h2>{t("courseDetail.deletedSubmissionsTitle")}</h2>
+            </div>
+            <DeletedSubmissionList deletedSubmissions={deletedSubmissions} t={t} />
+          </section>
+        ) : null}
       </main>
     </AppShell>
+  );
+}
+
+function DeletedSubmissionList({
+  deletedSubmissions,
+  t
+}: {
+  deletedSubmissions: DeletedSubmissionAudit[];
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  return (
+    <div className="stack stack-tight">
+      {deletedSubmissions.map((deletion) => (
+        <div className="inline-panel stack stack-tight" key={deletion.eventId}>
+          <strong>
+            {t("courseDetail.deletedSubmissionSummary", {
+              number: deletion.attemptNumber ?? "-",
+              date: formatDateTime(deletion.deletedAt)
+            })}
+          </strong>
+          {deletion.actor ? <p className="muted">{t("courseDetail.deletedSubmissionActor", { name: deletion.actor.name ?? deletion.actor.email })}</p> : null}
+          {deletion.reason ? <p className="muted">{t("courseDetail.deletedSubmissionReason", { reason: deletion.reason })}</p> : null}
+          <p className="muted">
+            {t("courseDetail.deletedSubmissionWhat")}: {formatDeletedSubmissionRecord(deletion)}
+          </p>
+          <DeletedSubmissionSolution deletion={deletion} t={t} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DeletedSubmissionSolution({
+  deletion,
+  t
+}: {
+  deletion: DeletedSubmissionAudit;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const code = formatDeletedParsonsCode(deletion);
+
+  return (
+    <div className="stack stack-tight">
+      <strong>{t("courseDetail.deletedSubmissionSolution")}</strong>
+      {code ? <pre className="code-block">{code}</pre> : <p className="muted">{t("courseDetail.deletedSubmissionSolutionUnavailable")}</p>}
+    </div>
   );
 }
 
@@ -204,4 +266,58 @@ function formatGradebookScore(score: number | null, maxScore: number) {
 
 function formatGradeNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString();
+}
+
+function formatDeletedSubmissionRecord(deletion: DeletedSubmissionAudit) {
+  const parts = [
+    deletion.submittedAt ? `submitted ${formatDateTime(deletion.submittedAt)}` : null,
+    deletion.gradedAt ? `graded ${formatDateTime(deletion.gradedAt)}` : null,
+    deletion.pluginKey,
+    deletion.pluginAttemptRef ? `ref ${deletion.pluginAttemptRef}` : null
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : JSON.stringify(deletion.metadata);
+}
+
+type DeletedParsonsBlock = {
+  id: string;
+  displayText: string;
+  physicalLineIndex: number;
+  currentIndent: number;
+};
+
+function formatDeletedParsonsCode(deletion: DeletedSubmissionAudit) {
+  const blocks = getDeletedParsonsBlocks(deletion);
+  if (!blocks.length) {
+    return "";
+  }
+  return blocks.map((block) => `${"  ".repeat(Math.max(0, block.currentIndent))}${block.displayText}`).join("\n");
+}
+
+function getDeletedParsonsBlocks(deletion: DeletedSubmissionAudit): DeletedParsonsBlock[] {
+  const submittedState = asRecord(deletion.metadata.submittedState);
+  const blocks = Array.isArray(submittedState?.blocks) ? submittedState.blocks : [];
+  return blocks
+    .flatMap((block, index) => {
+      const record = asRecord(block);
+      if (!record || typeof record.displayText !== "string") {
+        return [];
+      }
+      return [
+        {
+          id: typeof record.id === "string" ? record.id : `block-${index}`,
+          displayText: record.displayText,
+          physicalLineIndex: typeof record.physicalLineIndex === "number" ? record.physicalLineIndex : index,
+          currentIndent: typeof record.currentIndent === "number" ? record.currentIndent : 0
+        }
+      ];
+    })
+    .sort((left, right) => left.physicalLineIndex - right.physicalLineIndex);
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }

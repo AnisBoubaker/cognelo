@@ -66,11 +66,13 @@ type ManualGradingRendererContext = {
   error: string;
   isSavingOverride: boolean;
   isSavingRegrade: boolean;
+  isSavingDelete: boolean;
   onClose: () => void;
   onIncludeAttemptsChange: (includeAttempts: boolean) => void;
   onSelectAttemptIndex: (index: number) => void;
   onOverrideGrade: (input: { score: number; maxScore: number; reason: string | null; feedbackText?: string | null }) => Promise<void>;
   onRegradeAttempt: () => Promise<void>;
+  onDeleteSubmission: () => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 

@@ -161,7 +161,11 @@ describe("Parsons plugin routes", () => {
     );
     expect(mocks.submitActivityAttempt).toHaveBeenCalledWith(context.user, {
       attemptId: "core-attempt-1",
-      pluginAttemptRef: "attempt-1"
+      pluginAttemptRef: "attempt-1",
+      metadata: {
+        mode: "summative",
+        submittedState: { configFingerprint: "fingerprint-1" }
+      }
     });
     expect(mocks.recordActivityAttemptGradingResult).toHaveBeenCalledWith(
       context.user,
