@@ -45,12 +45,37 @@ function psql(args, options = {}) {
     process.exit(1);
   }
 
-  const result = spawnSync("psql", [databaseUrl, ...args], {
+  let result = spawnSync("psql", [databaseUrl, ...args], {
     cwd: root,
     env: process.env,
     encoding: "utf8",
     stdio: options.capture ? "pipe" : "inherit"
   });
+
+  if (result.error?.code === "ENOENT") {
+    console.warn("Host psql was not found; falling back to the Docker Compose db service.");
+    let dockerArgs = args;
+    let input;
+    const fileArgIndex = args.indexOf("-f");
+    if (fileArgIndex >= 0 && args[fileArgIndex + 1]) {
+      input = readFileSync(args[fileArgIndex + 1], "utf8");
+      dockerArgs = args.toSpliced(fileArgIndex, 2);
+    }
+
+    result = spawnSync("docker", ["compose", "exec", "-T", "db", "psql", databaseUrl, ...dockerArgs], {
+      cwd: root,
+      env: process.env,
+      input,
+      encoding: "utf8",
+      stdio: options.capture ? "pipe" : ["pipe", "inherit", "inherit"]
+    });
+  }
+
+  if (result.error) {
+    console.error(`Unable to run psql: ${result.error.message}`);
+    process.exit(1);
+  }
+
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
   }

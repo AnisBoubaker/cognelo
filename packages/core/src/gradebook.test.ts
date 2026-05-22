@@ -39,6 +39,7 @@ const mockPrisma = vi.hoisted(() => ({
     findFirst: vi.fn()
   },
   gradebookItem: {
+    createMany: vi.fn(),
     findFirst: vi.fn(),
     findMany: vi.fn(),
     upsert: vi.fn()
@@ -589,7 +590,61 @@ describe("gradebook attempt services", () => {
         activity: { select: { id: true, title: true } }
       }
     });
-    expect(mockPrisma.gradebookItem.upsert).toHaveBeenCalledWith({
+    expect(mockPrisma.gradebookItem.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          courseId: "course-1",
+          groupId: "group-1",
+          groupActivityId: "assignment-1",
+          activityId: "activity-1",
+          titleSnapshot: "Existing activity"
+        }
+      ],
+      skipDuplicates: true
+    });
+  });
+
+  it("backfills gradebook items with duplicate skipping to tolerate concurrent listing requests", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    mockPrisma.courseGroupActivity.findMany.mockResolvedValue([
+      {
+        id: "assignment-1",
+        groupId: "group-1",
+        activityId: "activity-1",
+        group: { courseId: "course-1" },
+        activity: { id: "activity-1", title: "Existing activity" }
+      },
+      {
+        id: "assignment-2",
+        groupId: "group-1",
+        activityId: "activity-2",
+        group: { courseId: "course-1" },
+        activity: { id: "activity-2", title: "Second activity" }
+      }
+    ]);
+
+    await getCourseGradebook(teacherUser, "course-1");
+
+    expect(mockPrisma.gradebookItem.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          courseId: "course-1",
+          groupId: "group-1",
+          groupActivityId: "assignment-1",
+          activityId: "activity-1",
+          titleSnapshot: "Existing activity"
+        },
+        {
+          courseId: "course-1",
+          groupId: "group-1",
+          groupActivityId: "assignment-2",
+          activityId: "activity-2",
+          titleSnapshot: "Second activity"
+        }
+      ],
+      skipDuplicates: true
+    });
+    expect(mockPrisma.gradebookItem.upsert).not.toHaveBeenCalledWith({
       where: { groupActivityId: "assignment-1" },
       update: {},
       create: {
