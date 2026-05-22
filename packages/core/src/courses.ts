@@ -2,7 +2,7 @@ import { CourseInputSchema, CourseSettingsInputSchema, CourseUpdateSchema, Enrol
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 import { assertCanCreateCourse, assertCanManageCourse, assertCanViewCourse, isAdmin, isCourseManager, isTeacher } from "./authorization";
-import { notFound } from "./errors";
+import { AppError, notFound } from "./errors";
 
 const courseInclude = {
   subject: {
@@ -65,7 +65,10 @@ export async function listCourses(user: CurrentUser) {
   }
 
   return prisma.course.findMany({
-    where: { memberships: { some: { userId: user.id } } },
+    where: {
+      memberships: { some: { userId: user.id, role: "student" } },
+      groups: { some: { participants: { some: { userId: user.id } } } }
+    },
     include: buildCourseIncludeForStudent(user.id),
     orderBy: { updatedAt: "desc" }
   });
@@ -150,6 +153,69 @@ export async function archiveCourse(user: CurrentUser, courseId: string) {
 export async function addCourseMembership(user: CurrentUser, courseId: string, input: unknown) {
   await assertCanManageCourse(user, courseId);
   const data = EnrollmentInputSchema.parse(input);
+  if (data.role === "student") {
+    if (!data.groupId) {
+      throw new AppError(400, "STUDENT_GROUP_REQUIRED", "Student enrollment requires a course group.");
+    }
+    const groupId = data.groupId;
+
+    const [group, student] = await Promise.all([
+      prisma.courseGroup.findFirst({ where: { id: groupId, courseId }, select: { id: true } }),
+      prisma.user.findUnique({
+        where: { id: data.userId },
+        select: { id: true, email: true, name: true, firstName: true, lastName: true }
+      })
+    ]);
+    if (!group) {
+      throw notFound("Course group");
+    }
+    if (!student) {
+      throw notFound("User");
+    }
+
+    return prisma.$transaction(async (tx) => {
+      const membership = await tx.courseMembership.upsert({
+        where: {
+          courseId_userId_role: {
+            courseId,
+            userId: data.userId,
+            role: "student"
+          }
+        },
+        update: {},
+        create: {
+          courseId,
+          userId: data.userId,
+          role: "student"
+        },
+        include: { user: { select: { id: true, email: true, name: true } } }
+      });
+
+      await tx.courseGroupParticipant.upsert({
+        where: {
+          groupId_email: {
+            groupId,
+            email: student.email.toLowerCase()
+          }
+        },
+        update: {
+          userId: student.id,
+          role: "student"
+        },
+        create: {
+          groupId,
+          userId: student.id,
+          role: "student",
+          firstName: student.firstName?.trim() || firstNameFromName(student.name) || student.email,
+          lastName: student.lastName?.trim() || lastNameFromName(student.name),
+          email: student.email.toLowerCase()
+        }
+      });
+
+      return membership;
+    });
+  }
+
   return prisma.courseMembership.create({
     data: {
       courseId,
@@ -158,6 +224,15 @@ export async function addCourseMembership(user: CurrentUser, courseId: string, i
     },
     include: { user: { select: { id: true, email: true, name: true } } }
   });
+}
+
+function firstNameFromName(name: string | null) {
+  return name?.trim().split(/\s+/)[0] ?? "";
+}
+
+function lastNameFromName(name: string | null) {
+  const parts = name?.trim().split(/\s+/) ?? [];
+  return parts.length > 1 ? parts.slice(1).join(" ") : "";
 }
 
 async function assertAiAgentConnectionCanBeSelected(user: CurrentUser, connectionId: string | null | undefined) {

@@ -219,9 +219,10 @@ export default function ManualActivityGradingPage() {
           {pageRows.length ? (
             <div className="stack">
               {pageRows.map((row) => {
-                const attempts = attemptsByRowKey[rowKey(row)] ?? [];
+                const key = rowKey(row);
+                const attempts = attemptsByRowKey[key] ?? [];
                 const selectedAttempt = attempts[0] ?? null;
-                const draft = draftsByRowKey[rowKey(row)] ?? { score: "", feedback: "" };
+                const draft = draftsByRowKey[key] ?? { score: "", feedback: "" };
 
                 return (
                   <article className="inline-panel stack" key={rowKey(row)}>

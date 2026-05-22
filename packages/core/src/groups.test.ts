@@ -22,9 +22,12 @@ const tx = vi.hoisted(() => ({
     upsert: vi.fn()
   },
   courseGroupParticipant: {
-    create: vi.fn()
+    create: vi.fn(),
+    delete: vi.fn(),
+    findMany: vi.fn()
   },
   courseMembership: {
+    deleteMany: vi.fn(),
     upsert: vi.fn()
   },
   role: {

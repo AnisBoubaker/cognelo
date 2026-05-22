@@ -38,11 +38,13 @@ export type ParsonsManualGradingPanelProps = {
   error: string;
   isSavingOverride: boolean;
   isSavingRegrade: boolean;
+  isSavingDelete: boolean;
   onClose: () => void;
   onIncludeAttemptsChange: (includeAttempts: boolean) => void;
   onSelectAttemptIndex: (index: number) => void;
   onOverrideGrade: (input: { score: number; maxScore: number; reason: string | null; feedbackText?: string | null }) => Promise<void>;
   onRegradeAttempt: () => Promise<void>;
+  onDeleteSubmission: () => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
@@ -56,11 +58,13 @@ export function ParsonsManualGradingPanel({
   error,
   isSavingOverride,
   isSavingRegrade,
+  isSavingDelete,
   onClose,
   onIncludeAttemptsChange,
   onSelectAttemptIndex,
   onOverrideGrade,
   onRegradeAttempt,
+  onDeleteSubmission,
   t
 }: ParsonsManualGradingPanelProps) {
   const [score, setScore] = useState(row.score === null ? "" : formatGradeNumber(row.score));
@@ -178,6 +182,9 @@ export function ParsonsManualGradingPanel({
           </div>
           <button className="button secondary" disabled={isSavingRegrade || !selectedAttempt} type="button" onClick={() => void onRegradeAttempt()}>
             {isSavingRegrade ? t("common.saving") : t("courseDetail.regrade")}
+          </button>
+          <button className="button secondary" disabled={isSavingDelete || !selectedAttempt} type="button" onClick={() => void onDeleteSubmission()}>
+            {isSavingDelete ? t("common.saving") : t("courseDetail.deleteSubmission")}
           </button>
         </div>
         <div className="field">

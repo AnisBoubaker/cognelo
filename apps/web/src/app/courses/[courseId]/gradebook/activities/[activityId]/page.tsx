@@ -55,6 +55,7 @@ export default function GradebookActivityResultsPage() {
   const backLabel = groupId ? t("courseDetail.backToGroupGradebook") : t("courseDetail.backToCourseGradebook");
   const manualGradingRenderer = rows[0]?.activityTypeKey ? getManualGradingRenderer(rows[0].activityTypeKey) : null;
   const selectedAttempt = overlay?.attempts[overlay.selectedIndex] ?? null;
+  const hasRowsWithSubmittedAttempts = rows.some((row) => hasSubmittedAttempt(row));
 
   async function openManualGrading(row: CourseGradebookRow) {
     setOverlay({ row, includeAttempts: false, attempts: [], selectedIndex: 0, loading: true, error: "" });
@@ -188,6 +189,48 @@ export default function GradebookActivityResultsPage() {
     }
   }
 
+  async function deleteSelectedSubmission(row: CourseGradebookRow, selectedAttempt: ParsonsGradebookAttempt | null) {
+    if (!selectedAttempt) {
+      setError(t("courseDetail.deleteSubmissionUnavailable"));
+      return;
+    }
+
+    const coreAttempt = row.attempts.find((attempt) => attempt.pluginAttemptRef === selectedAttempt.id);
+    if (!coreAttempt) {
+      setError(t("courseDetail.deleteSubmissionUnavailable"));
+      return;
+    }
+
+    const reason = window.prompt(t("courseDetail.deleteSubmissionPrompt"));
+    if (reason === null) {
+      return;
+    }
+    const normalizedReason = reason.trim() || t("courseDetail.deleteSubmissionReasonFallback");
+    if (!window.confirm(t("courseDetail.deleteSubmissionConfirm", { name: row.participantName, number: coreAttempt.attemptNumber }))) {
+      return;
+    }
+
+    setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:delete`);
+    setError("");
+    try {
+      await api.deleteActivitySubmission(courseId, coreAttempt.id, { reason: normalizedReason });
+      await refresh();
+      setOverlay((current) =>
+        current
+          ? {
+              ...current,
+              attempts: current.attempts.filter((attempt) => attempt.id !== selectedAttempt.id),
+              selectedIndex: Math.max(0, current.selectedIndex - 1)
+            }
+          : current
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.deleteSubmissionError"));
+    } finally {
+      setSavingGradeKey(null);
+    }
+  }
+
   async function regradeAllRows() {
     const rowsWithAttempts = groupedRows.filter((row) =>
       row.attempts.some((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted")
@@ -257,12 +300,18 @@ export default function GradebookActivityResultsPage() {
               <button className="button secondary" disabled={savingGradeKey === "__all:regrade"} type="button" onClick={() => void regradeAllRows()}>
                 {savingGradeKey === "__all:regrade" ? t("common.saving") : t("courseDetail.regradeAll")}
               </button>
-              <Link
-                className="button secondary"
-                href={`/courses/${courseId}/gradebook/activities/${activityId}/manual${groupId ? `?groupId=${groupId}` : ""}`}
-              >
-                {t("courseDetail.gradeAllManually")}
-              </Link>
+              {hasRowsWithSubmittedAttempts ? (
+                <Link
+                  className="button secondary"
+                  href={`/courses/${courseId}/gradebook/activities/${activityId}/manual${groupId ? `?groupId=${groupId}` : ""}`}
+                >
+                  {t("courseDetail.gradeAllManually")}
+                </Link>
+              ) : (
+                <button className="button secondary" disabled type="button">
+                  {t("courseDetail.gradeAllManually")}
+                </button>
+              )}
             </div>
           </div>
 
@@ -276,40 +325,15 @@ export default function GradebookActivityResultsPage() {
                 <span>{t("courseDetail.actionsHeader")}</span>
               </div>
               {groupedRows.map((row) => (
-                <div className="table-row table-row-gradebook-detail" key={`${row.gradebookItemId}-${row.participantId}`}>
-                  <div className="table-main table-main-stack">
-                    <strong>{row.participantName}</strong>
-                    <span className="table-meta-note muted">{row.participantEmail}</span>
-                  </div>
-                  <span className="table-meta muted">{row.groupTitle}</span>
-                  <strong>{formatGradebookScore(row.score, row.maxScore)}</strong>
-                  <span className="table-meta muted">{row.submittedAttemptCount}</span>
-                  <div className="table-actions">
-                    {manualGradingRenderer ? (
-                      <button className="button secondary" type="button" onClick={() => openManualGrading(row)}>
-                        {t("courseDetail.reviewGrade")}
-                      </button>
-                    ) : (
-                      <span className="muted">{t("courseDetail.answerUnavailable")}</span>
-                    )}
-                    <button
-                      className="button secondary"
-                      disabled={savingGradeKey === `${row.gradebookItemId}:${row.participantId}:regrade`}
-                      type="button"
-                      onClick={() => regradeRow(row)}
-                    >
-                      {t("courseDetail.regrade")}
-                    </button>
-                    <button
-                      className="button secondary"
-                      disabled={!manualGradingRenderer || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:override`}
-                      type="button"
-                      onClick={() => openManualGrading(row)}
-                    >
-                      {t("courseDetail.overrideGrade")}
-                    </button>
-                  </div>
-                </div>
+                <GradebookStudentRow
+                  key={`${row.gradebookItemId}-${row.participantId}`}
+                  manualGradingAvailable={Boolean(manualGradingRenderer)}
+                  row={row}
+                  savingGradeKey={savingGradeKey}
+                  onOpenManualGrading={openManualGrading}
+                  onRegrade={regradeRow}
+                  t={t}
+                />
               ))}
             </div>
           ) : (
@@ -330,11 +354,13 @@ export default function GradebookActivityResultsPage() {
                   error: overlay.error,
                   isSavingOverride: savingGradeKey === `${overlay.row.gradebookItemId}:${overlay.row.participantId}:override`,
                   isSavingRegrade: savingGradeKey === `${overlay.row.gradebookItemId}:${overlay.row.participantId}:regrade`,
+                  isSavingDelete: savingGradeKey === `${overlay.row.gradebookItemId}:${overlay.row.participantId}:delete`,
                   onClose: () => setOverlay(null),
                   onIncludeAttemptsChange: (includeAttempts) => loadAttempts(overlay.row, includeAttempts),
                   onSelectAttemptIndex: (selectedIndex) => setOverlay((current) => (current ? { ...current, selectedIndex } : current)),
                   onOverrideGrade: (input) => overrideGrade(overlay.row, input),
                   onRegradeAttempt: () => regradeRow(overlay.row),
+                  onDeleteSubmission: () => deleteSelectedSubmission(overlay.row, selectedAttempt),
                   t
                 })
               : null}
@@ -343,6 +369,65 @@ export default function GradebookActivityResultsPage() {
       </main>
     </AppShell>
   );
+}
+
+function GradebookStudentRow({
+  manualGradingAvailable,
+  row,
+  savingGradeKey,
+  onOpenManualGrading,
+  onRegrade,
+  t
+}: {
+  manualGradingAvailable: boolean;
+  row: CourseGradebookRow;
+  savingGradeKey: string | null;
+  onOpenManualGrading: (row: CourseGradebookRow) => Promise<void>;
+  onRegrade: (row: CourseGradebookRow) => Promise<void>;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const rowHasSubmittedAttempt = hasSubmittedAttempt(row);
+
+  return (
+    <div className="table-row table-row-gradebook-detail">
+      <div className="table-main table-main-stack">
+        <strong>{row.participantName}</strong>
+        <span className="table-meta-note muted">{row.participantEmail}</span>
+      </div>
+      <span className="table-meta muted">{row.groupTitle}</span>
+      <strong>{rowHasSubmittedAttempt || row.score !== null ? formatGradebookScore(row.score, row.maxScore) : t("courseDetail.didNotSubmit")}</strong>
+      <span className="table-meta muted">{row.submittedAttemptCount}</span>
+      <div className="table-actions">
+        {manualGradingAvailable ? (
+          <button className="button secondary" disabled={!rowHasSubmittedAttempt} type="button" onClick={() => onOpenManualGrading(row)}>
+            {t("courseDetail.reviewGrade")}
+          </button>
+        ) : (
+          <span className="muted">{t("courseDetail.answerUnavailable")}</span>
+        )}
+        <button
+          className="button secondary"
+          disabled={!rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:regrade`}
+          type="button"
+          onClick={() => onRegrade(row)}
+        >
+          {t("courseDetail.regrade")}
+        </button>
+        <button
+          className="button secondary"
+          disabled={!manualGradingAvailable || !rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:override`}
+          type="button"
+          onClick={() => onOpenManualGrading(row)}
+        >
+          {t("courseDetail.overrideGrade")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function hasSubmittedAttempt(row: CourseGradebookRow) {
+  return row.attempts.some((attempt) => attempt.lifecycle === "graded" || attempt.lifecycle === "submitted");
 }
 
 function formatGradebookScore(score: number | null, maxScore: number) {

@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
 const mockPrisma = vi.hoisted(() => ({
+  courseGroupParticipant: {
+    findFirst: vi.fn()
+  },
   courseMembership: {
     findMany: vi.fn()
   }
@@ -25,6 +28,7 @@ const user = (roles: CurrentUser["roles"], id = "user-1"): CurrentUser => ({
 describe("authorization helpers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue(null);
     mockPrisma.courseMembership.findMany.mockResolvedValue([]);
   });
 
@@ -61,8 +65,9 @@ describe("authorization helpers", () => {
     });
   });
 
-  it("lets any course member view the course and rejects outsiders", async () => {
+  it("requires student course viewers to participate in at least one group", async () => {
     mockPrisma.courseMembership.findMany.mockResolvedValueOnce([{ role: "student" }]);
+    mockPrisma.courseGroupParticipant.findFirst.mockResolvedValueOnce({ id: "participant-1" });
     await expect(assertCanViewCourse(user(["student"]), "course-1")).resolves.toBeUndefined();
 
     mockPrisma.courseMembership.findMany.mockResolvedValueOnce([]);

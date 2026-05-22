@@ -1,7 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const tx = vi.hoisted(() => ({
+  courseGroupParticipant: {
+    upsert: vi.fn()
+  },
+  courseMembership: {
+    upsert: vi.fn()
+  }
+}));
+
 const mockPrisma = vi.hoisted(() => ({
+  $transaction: vi.fn(async (handler: (transaction: typeof tx) => unknown) => handler(tx)),
   aiAgentConnection: {
+    findFirst: vi.fn()
+  },
+  courseGroup: {
     findFirst: vi.fn()
   },
   course: {
@@ -12,6 +25,9 @@ const mockPrisma = vi.hoisted(() => ({
   },
   courseMembership: {
     create: vi.fn()
+  },
+  user: {
+    findUnique: vi.fn()
   }
 }));
 
@@ -43,6 +59,7 @@ const teacherUser = {
 describe("course services", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof tx) => unknown) => handler(tx));
   });
 
   it("creates a course with an owner membership for the creator", async () => {
@@ -97,7 +114,10 @@ describe("course services", () => {
     await listCourses({ ...teacherUser, id: "student-1", roles: ["student"] });
     expect(mockPrisma.course.findMany).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        where: { memberships: { some: { userId: "student-1" } } },
+        where: {
+          memberships: { some: { userId: "student-1", role: "student" } },
+          groups: { some: { participants: { some: { userId: "student-1" } } } }
+        },
         include: expect.objectContaining({
           groups: expect.objectContaining({
             where: expect.objectContaining({
@@ -129,21 +149,67 @@ describe("course services", () => {
     );
   });
 
-  it("adds course memberships with the selected enrollment role", async () => {
+  it("adds non-student course memberships with the selected enrollment role", async () => {
     mockPrisma.courseMembership.create.mockResolvedValue({ id: "membership-1" });
 
     await addCourseMembership(teacherUser, "course-1", {
-      userId: "student-1",
-      role: "student"
+      userId: "teacher-2",
+      role: "teacher"
     });
 
     expect(mockPrisma.courseMembership.create).toHaveBeenCalledWith({
       data: {
         courseId: "course-1",
-        userId: "student-1",
-        role: "student"
+        userId: "teacher-2",
+        role: "teacher"
       },
       include: { user: { select: { id: true, email: true, name: true } } }
+    });
+  });
+
+  it("requires student enrollments to be attached to a course group", async () => {
+    await expect(
+      addCourseMembership(teacherUser, "course-1", {
+        userId: "student-1",
+        role: "student"
+      })
+    ).rejects.toMatchObject({
+      status: 400,
+      code: "STUDENT_GROUP_REQUIRED"
+    });
+
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1" });
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: "student-1",
+      email: "Student@Example.test",
+      name: "Student One",
+      firstName: "Student",
+      lastName: "One"
+    });
+    tx.courseMembership.upsert.mockResolvedValue({ id: "membership-1" });
+
+    await addCourseMembership(teacherUser, "course-1", {
+      userId: "student-1",
+      role: "student",
+      groupId: "group-1"
+    });
+
+    expect(tx.courseMembership.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { courseId_userId_role: { courseId: "course-1", userId: "student-1", role: "student" } }
+      })
+    );
+    expect(tx.courseGroupParticipant.upsert).toHaveBeenCalledWith({
+      where: { groupId_email: { groupId: "group-1", email: "student@example.test" } },
+      update: { userId: "student-1", role: "student" },
+      create: {
+        groupId: "group-1",
+        userId: "student-1",
+        role: "student",
+        firstName: "Student",
+        lastName: "One",
+        email: "student@example.test"
+      }
     });
   });
 
