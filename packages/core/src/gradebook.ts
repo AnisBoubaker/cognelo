@@ -656,21 +656,16 @@ async function ensureCourseGradebookItems(courseId: string) {
     return;
   }
 
-  await Promise.all(
-    assignments.map((assignment) =>
-      prisma.gradebookItem.upsert({
-        where: { groupActivityId: assignment.id },
-        update: {},
-        create: {
-          courseId: assignment.group.courseId,
-          groupId: assignment.groupId,
-          groupActivityId: assignment.id,
-          activityId: assignment.activityId,
-          titleSnapshot: assignment.activity.title
-        }
-      })
-    )
-  );
+  await prisma.gradebookItem.createMany({
+    data: assignments.map((assignment) => ({
+      courseId: assignment.group.courseId,
+      groupId: assignment.groupId,
+      groupActivityId: assignment.id,
+      activityId: assignment.activityId,
+      titleSnapshot: assignment.activity.title
+    })),
+    skipDuplicates: true
+  });
 }
 
 export async function getCourseGradebookCsv(user: CurrentUser, courseId: string, filters: CourseGradebookFilters = {}) {
