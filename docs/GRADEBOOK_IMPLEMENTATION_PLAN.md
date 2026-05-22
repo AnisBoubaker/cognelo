@@ -477,8 +477,10 @@ First plugin integration target:
 ### Phase 7: Student Grade Visibility - Completed
 
 - Completed: add student grade view for released grades in the section/group workspace.
+- Completed: show released graded scores in the student assigned-activity list and on the assigned activity page itself.
 - Completed: hide unreleased gradebook items from students.
 - Completed: keep student grade responses limited to normalized grade summaries, without raw plugin grading payloads, hidden test details, or attempt history.
+- Completed: released Parsons grades include sanitized deterministic feedback and a grading breakdown, using the same order/indentation messages that formative checks show, without exposing raw plugin payloads or grading timestamps.
 - Completed: do not expose attempt history in the first student grade view.
 - Completed: add teacher release/hide controls for each gradebook item in course and group gradebook views.
 - Completed: record release/hide audit events per student participant on the gradebook item.
@@ -490,7 +492,8 @@ First plugin integration target:
 - Completed: add automatic regrading API for plugins that support `gradeAttempt`; the first Parsons implementation evaluates the stored submission state against the current course activity config and records a `regraded` grade event through the core grade service.
 - Completed: add teacher actions on the detailed activity results page for overriding a grade and regrading the selected/latest submitted attempt.
 - Completed: add tests for manual override audit events, plugin grading handler resolution, and regrade context assembly.
-- Remaining: replace the browser-prompt override UI with plugin-specific manual grading panels as richer plugin renderers become available.
+- Completed: replace the browser-prompt override UI with plugin-specific manual grading panels. Parsons now exposes a manual grading renderer that shows the submitted answer/attempt history beside score and reason fields, and the web gradebook resolves it through the activity definition `manualGrading.rendererKey`.
+- Completed: add bulk teacher workflows on the detailed activity results page. Teachers can trigger Regrade All for submitted/graded attempts, or open Grade All Manually to page through student attempts 10 at a time. Manual grading page navigation and Save persist all grades on the current page, including editable student-facing feedback text seeded from deterministic Parsons feedback when available.
 
 ### Phase 9: Analytics And Research Exports
 

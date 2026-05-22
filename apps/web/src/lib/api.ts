@@ -579,6 +579,7 @@ export type CourseGradebookRow = {
   isPass: boolean | null;
   latePenaltyApplied: boolean;
   latePenaltyPercent: number | null;
+  feedback: StudentGradeFeedback | null;
   selectedAttemptNumber: number | null;
   attemptCount: number;
   lateAttemptCount: number;
@@ -634,12 +635,20 @@ export type StudentReleasedGradeRow = {
   isPass: boolean | null;
   latePenaltyApplied: boolean;
   latePenaltyPercent: number | null;
+  feedback: StudentGradeFeedback | null;
   selectedAttemptNumber: number | null;
   attemptCount: number;
   submittedAttemptCount: number;
   availableFrom: string | null;
   availableUntil: string | null;
   gradedAt: string | null;
+};
+
+export type StudentGradeFeedback = {
+  kind: "parsons";
+  feedbackText?: string | null;
+  messages: Array<{ type: "order" | "indentation"; count: number }>;
+  grading: Array<{ type: "order" | "indentation"; awardedRaw: number; possibleRaw: number }>;
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -815,7 +824,7 @@ export const api = {
     courseId: string,
     gradebookItemId: string,
     participantId: string,
-    input: { score: number; maxScore?: number; isPass?: boolean | null; reason?: string | null }
+    input: { score: number; maxScore?: number; isPass?: boolean | null; reason?: string | null; feedbackText?: string | null }
   ) =>
     request<{ grade: GradebookMutationGrade }>(
       `/courses/${courseId}/gradebook/items/${gradebookItemId}/participants/${participantId}/override`,

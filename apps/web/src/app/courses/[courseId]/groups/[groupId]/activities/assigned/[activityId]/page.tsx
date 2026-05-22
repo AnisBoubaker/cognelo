@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
-import { api, Activity, ActivityDefinition, Course, CourseGroup } from "@/lib/api";
+import { api, Activity, ActivityDefinition, Course, CourseGroup, StudentGradeFeedback, StudentReleasedGradeRow } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { activityRenderers } from "@/lib/activity-renderers";
 
@@ -18,6 +18,7 @@ export default function GroupActivityPage() {
   const [group, setGroup] = useState<CourseGroup | null>(null);
   const [activity, setActivity] = useState<Activity | null>(null);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
+  const [releasedGrade, setReleasedGrade] = useState<StudentReleasedGradeRow | null>(null);
   const [hasQuestionAuthoringAgent, setHasQuestionAuthoringAgent] = useState(false);
   const [error, setError] = useState("");
 
@@ -44,10 +45,20 @@ export default function GroupActivityPage() {
       setHasQuestionAuthoringAgent(
         aiAgentResult.connections.some((connection) => connection.id === aiAgentResult.preferences.questionAuthoringAiAgentConnectionId && connection.isEnabled)
       );
+
+      const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
+      const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher";
+      if (userCanManage) {
+        setReleasedGrade(null);
+      } else {
+        const gradesResult = await api.studentGroupGrades(courseId, groupId);
+        const gradeRow = gradesResult.grades.rows.find((row) => row.activityId === activityId && row.score !== null) ?? null;
+        setReleasedGrade(gradeRow);
+      }
     }
 
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("activityPage.loadError")));
-  }, [activityId, courseId, groupId, t]);
+  }, [activityId, courseId, groupId, t, user]);
 
   async function saveActivity(input: { title: string; description: string; config: Record<string, unknown> }) {
     const result = await api.updateActivity(courseId, activityId, input);
@@ -86,6 +97,19 @@ export default function GroupActivityPage() {
 
         {error ? <p className="error">{error}</p> : null}
 
+        {releasedGrade ? (
+          <section className="section stack">
+            <div>
+              <p className="eyebrow">{t("groupPage.releasedGradeEyebrow")}</p>
+              <h2>{formatGradebookScore(releasedGrade.score, releasedGrade.maxScore)}</h2>
+              {releasedGrade.latePenaltyApplied && releasedGrade.latePenaltyPercent !== null ? (
+                <p className="muted">-{releasedGrade.latePenaltyPercent}%</p>
+              ) : null}
+              <StudentFeedback feedback={releasedGrade.feedback} maxScore={releasedGrade.maxScore} t={t} />
+            </div>
+          </section>
+        ) : null}
+
         {activity && ActivityRenderer ? (
           <ActivityRenderer
             activity={activity}
@@ -109,4 +133,75 @@ export default function GroupActivityPage() {
       </main>
     </AppShell>
   );
+}
+
+function StudentFeedback({
+  feedback,
+  maxScore,
+  t
+}: {
+  feedback: StudentGradeFeedback | null;
+  maxScore: number;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  if (!feedback) {
+    return null;
+  }
+
+  return (
+    <div className="stack stack-tight">
+      {feedback.feedbackText ? (
+        <div className="stack stack-tight">
+          <strong>{t("groupPage.feedbackTitle")}</strong>
+          <p className="muted">{feedback.feedbackText}</p>
+        </div>
+      ) : null}
+      {feedback.messages.length ? (
+        <div className="stack stack-tight">
+          <strong>{t("groupPage.feedbackTitle")}</strong>
+          {feedback.messages.map((message) => (
+            <p className="muted" key={message.type}>
+              {message.type === "order"
+                ? t("parsons.orderFeedback", { count: message.count })
+                : t("parsons.indentFeedback", { count: message.count })}
+            </p>
+          ))}
+        </div>
+      ) : null}
+      {feedback.grading.length ? (
+        <div className="stack stack-tight">
+          <strong>{t("groupPage.gradingBreakdownTitle")}</strong>
+          {scaleFeedbackGrading(feedback, maxScore).map((component) => (
+            <p className="muted" key={component.type}>
+              {t(component.type === "order" ? "groupPage.parsonsOrderScore" : "groupPage.parsonsIndentationScore", {
+                score: formatGradeNumber(component.awarded),
+                max: formatGradeNumber(component.possible)
+              })}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function scaleFeedbackGrading(feedback: StudentGradeFeedback, maxScore: number) {
+  const rawTotal = feedback.grading.reduce((sum, component) => sum + component.possibleRaw, 0);
+  const scale = rawTotal > 0 ? maxScore / rawTotal : 1;
+  return feedback.grading.map((component) => ({
+    type: component.type,
+    awarded: component.awardedRaw * scale,
+    possible: component.possibleRaw * scale
+  }));
+}
+
+function formatGradebookScore(score: number | null, maxScore: number) {
+  if (score === null) {
+    return "-";
+  }
+  return `${formatGradeNumber(score)} / ${formatGradeNumber(maxScore)}`;
+}
+
+function formatGradeNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }

@@ -678,6 +678,7 @@ describe("gradebook attempt services", () => {
         participantId: "participant-1",
         score: 93,
         reason: "Manual review",
+        feedbackText: "Good recovery after the ordering issue.",
         now
       })
     ).resolves.toMatchObject({
@@ -692,7 +693,12 @@ describe("gradebook attempt services", () => {
         update: expect.objectContaining({
           selectedAttemptId: null,
           normalizedScore: 93,
-          source: "override"
+          source: "override",
+          normalizedResult: expect.objectContaining({
+            studentFeedback: expect.objectContaining({
+              feedbackText: "Good recovery after the ordering issue."
+            })
+          })
         })
       })
     );
@@ -787,6 +793,17 @@ describe("gradebook attempt services", () => {
             latePenaltyApplied: false,
             latePenaltyPercent: null,
             gradedAt: testNow,
+            normalizedResult: {
+              studentFeedback: {
+                kind: "parsons",
+                messages: [{ type: "order", count: 2 }],
+                grading: [
+                  { type: "order", awardedRaw: 0, possibleRaw: 0.7 },
+                  { type: "indentation", awardedRaw: 0.3, possibleRaw: 0.3 }
+                ],
+                rawPayloadIgnored: true
+              }
+            },
             selectedAttempt: { attemptNumber: 2, isLate: false }
           }
         ],
@@ -820,6 +837,15 @@ describe("gradebook attempt services", () => {
           isPass: null,
           latePenaltyApplied: false,
           latePenaltyPercent: null,
+          feedback: {
+            kind: "parsons",
+            feedbackText: null,
+            messages: [{ type: "order", count: 2 }],
+            grading: [
+              { type: "order", awardedRaw: 0, possibleRaw: 0.7 },
+              { type: "indentation", awardedRaw: 0.3, possibleRaw: 0.3 }
+            ]
+          },
           selectedAttemptNumber: 2,
           attemptCount: 2,
           submittedAttemptCount: 2,

@@ -5,3 +5,4 @@ export * from "./messages";
 export * from "./parsons";
 export * from "./plugin";
 export * from "./web/parsons-activity-view";
+export * from "./web/parsons-manual-grading-panel";

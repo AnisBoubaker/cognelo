@@ -37,6 +37,7 @@ This file is for Parsons-specific memory only.
 - Teacher/admin previews remain ephemeral on purpose so they do not pollute analytics or research data.
 - Parsons exposes a teacher-only gradebook attempts route at `parsons/gradebook-attempts` through assigned group activity dispatch. It returns completed submissions by default and includes in-progress/abandoned attempts plus event history when `includeAttempts=true`, supporting the course gradebook "See answer" overlay.
 - Parsons registers a server `gradeAttempt` handler and is the first plugin used by the gradebook automatic regrade API. Regrading uses the stored plugin attempt reference, evaluates the submitted attempt state against the current course-local activity config, and lets core write the normalized grade plus `regraded` audit event.
+- Summative Parsons submissions suppress correctness feedback during the activity, but released grades include sanitized deterministic feedback in the normalized grade result. The student-facing feedback reuses the formative order/indentation messages and includes order/indentation raw-score components so students can see why points were lost without seeing raw plugin payloads or attempt history.
 
 ## Research/Product Intent
 

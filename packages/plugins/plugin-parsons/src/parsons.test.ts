@@ -121,7 +121,15 @@ describe("Parsons problem helpers", () => {
         incorrectIndents: 0
       },
       metadata: {
-        gradingModel: "parsons-correctness-v1"
+        gradingModel: "parsons-correctness-v1",
+        studentFeedback: {
+          kind: "parsons",
+          messages: [],
+          grading: [
+            { type: "order", awardedRaw: 0.7, possibleRaw: 0.7 },
+            { type: "indentation", awardedRaw: 0.3, possibleRaw: 0.3 }
+          ]
+        }
       }
     });
 
@@ -136,7 +144,13 @@ describe("Parsons problem helpers", () => {
     ).toMatchObject({
       rawScore: 0.7,
       rawMaxScore: 1,
-      isPass: false
+      isPass: false,
+      metadata: {
+        studentFeedback: {
+          messages: [{ type: "indentation", count: 2 }],
+          grading: expect.arrayContaining([{ type: "indentation", awardedRaw: 0, possibleRaw: 0.3 }])
+        }
+      }
     });
   });
 });

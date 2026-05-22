@@ -51,6 +51,11 @@ describe("activity SDK registry", () => {
         supportsAnalyticsPayloads: true
       })
     );
+    expect(getActivityDefinition("parsons-problem")?.manualGrading).toEqual(
+      expect.objectContaining({
+        rendererKey: "parsons-manual-grading"
+      })
+    );
   });
 
   it("exposes plugin database manifests for lifecycle management", () => {
