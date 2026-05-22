@@ -13,6 +13,7 @@ import {
   GradebookMutationGrade,
   ParsonsGradebookAttempt
 } from "@/lib/api";
+import { getManualGradingRenderer } from "@/lib/activity-renderers";
 import { useI18n } from "@/lib/i18n";
 
 export default function GradebookActivityResultsPage() {
@@ -52,10 +53,10 @@ export default function GradebookActivityResultsPage() {
   const groupTitle = groupId ? gradebook?.items.find((item) => item.groupId === groupId)?.groupTitle : null;
   const backHref = groupId ? `/courses/${courseId}/groups/${groupId}?tab=gradebook` : `/courses/${courseId}?tab=gradebook`;
   const backLabel = groupId ? t("courseDetail.backToGroupGradebook") : t("courseDetail.backToCourseGradebook");
-  const canShowAnswers = rows[0]?.activityTypeKey === "parsons-problem";
+  const manualGradingRenderer = rows[0]?.activityTypeKey ? getManualGradingRenderer(rows[0].activityTypeKey) : null;
   const selectedAttempt = overlay?.attempts[overlay.selectedIndex] ?? null;
 
-  async function openAnswer(row: CourseGradebookRow) {
+  async function openManualGrading(row: CourseGradebookRow) {
     setOverlay({ row, includeAttempts: false, attempts: [], selectedIndex: 0, loading: true, error: "" });
     await loadAttempts(row, false);
   }
@@ -143,24 +144,15 @@ export default function GradebookActivityResultsPage() {
     });
   }
 
-  async function overrideGrade(row: CourseGradebookRow) {
-    const value = window.prompt(t("courseDetail.overrideGradePrompt", { max: formatGradeNumber(row.maxScore) }), row.score === null ? "" : String(row.score));
-    if (value === null) {
-      return;
-    }
-    const score = Number(value);
-    if (!Number.isFinite(score)) {
-      setError(t("courseDetail.overrideGradeInvalid"));
-      return;
-    }
-    const reason = window.prompt(t("courseDetail.overrideReasonPrompt")) ?? "";
+  async function overrideGrade(row: CourseGradebookRow, input: { score: number; maxScore: number; reason: string | null; feedbackText?: string | null }) {
     setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:override`);
     setError("");
     try {
       const result = await api.overrideGradebookGrade(courseId, row.gradebookItemId, row.participantId, {
-        score,
-        maxScore: row.maxScore,
-        reason: reason || null
+        score: input.score,
+        maxScore: input.maxScore,
+        reason: input.reason,
+        feedbackText: input.feedbackText ?? input.reason
       });
       await refresh();
       applyUpdatedGrade(row, result.grade);
@@ -189,6 +181,37 @@ export default function GradebookActivityResultsPage() {
       const result = await api.regradeActivityAttempt(courseId, attempt.id, { reason: t("courseDetail.regradeReason") });
       await refresh();
       applyUpdatedGrade(row, result.result.grade, result.result.attempt);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.regradeError"));
+    } finally {
+      setSavingGradeKey(null);
+    }
+  }
+
+  async function regradeAllRows() {
+    const rowsWithAttempts = groupedRows.filter((row) =>
+      row.attempts.some((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted")
+    );
+    if (!rowsWithAttempts.length) {
+      setError(t("courseDetail.regradeUnavailable"));
+      return;
+    }
+    if (!window.confirm(t("courseDetail.regradeAllConfirm", { count: rowsWithAttempts.length }))) {
+      return;
+    }
+
+    setSavingGradeKey("__all:regrade");
+    setError("");
+    try {
+      for (const row of rowsWithAttempts) {
+        const attempt =
+          row.attempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber) ??
+          [...row.attempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted");
+        if (attempt) {
+          await api.regradeActivityAttempt(courseId, attempt.id, { reason: t("courseDetail.regradeReason") });
+        }
+      }
+      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("courseDetail.regradeError"));
     } finally {
@@ -230,6 +253,17 @@ export default function GradebookActivityResultsPage() {
               <p className="eyebrow">{t("courseDetail.detailedResults")}</p>
               <h2>{t("courseDetail.studentResultsTitle")}</h2>
             </div>
+            <div className="row wrap">
+              <button className="button secondary" disabled={savingGradeKey === "__all:regrade"} type="button" onClick={() => void regradeAllRows()}>
+                {savingGradeKey === "__all:regrade" ? t("common.saving") : t("courseDetail.regradeAll")}
+              </button>
+              <Link
+                className="button secondary"
+                href={`/courses/${courseId}/gradebook/activities/${activityId}/manual${groupId ? `?groupId=${groupId}` : ""}`}
+              >
+                {t("courseDetail.gradeAllManually")}
+              </Link>
+            </div>
           </div>
 
           {groupedRows.length ? (
@@ -251,9 +285,9 @@ export default function GradebookActivityResultsPage() {
                   <strong>{formatGradebookScore(row.score, row.maxScore)}</strong>
                   <span className="table-meta muted">{row.submittedAttemptCount}</span>
                   <div className="table-actions">
-                    {canShowAnswers ? (
-                      <button className="button secondary" type="button" onClick={() => openAnswer(row)}>
-                        {t("courseDetail.seeAnswer")}
+                    {manualGradingRenderer ? (
+                      <button className="button secondary" type="button" onClick={() => openManualGrading(row)}>
+                        {t("courseDetail.reviewGrade")}
                       </button>
                     ) : (
                       <span className="muted">{t("courseDetail.answerUnavailable")}</span>
@@ -268,9 +302,9 @@ export default function GradebookActivityResultsPage() {
                     </button>
                     <button
                       className="button secondary"
-                      disabled={savingGradeKey === `${row.gradebookItemId}:${row.participantId}:override`}
+                      disabled={!manualGradingRenderer || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:override`}
                       type="button"
-                      onClick={() => overrideGrade(row)}
+                      onClick={() => openManualGrading(row)}
                     >
                       {t("courseDetail.overrideGrade")}
                     </button>
@@ -285,89 +319,25 @@ export default function GradebookActivityResultsPage() {
 
         {overlay ? (
           <div className="dialog-backdrop" role="presentation" onMouseDown={() => setOverlay(null)}>
-            <section className="dialog-panel answer-overlay" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
-              <div className="section-heading">
-                <div>
-                  <p className="eyebrow">{overlay.row.participantName}</p>
-                  <h2>{t("courseDetail.studentAnswerTitle")}</h2>
-                </div>
-                <button className="button secondary" type="button" onClick={() => setOverlay(null)}>
-                  {t("common.close")}
-                </button>
-              </div>
-
-              <label className="checkbox-row">
-                <input
-                  checked={overlay.includeAttempts}
-                  type="checkbox"
-                  onChange={(event) => loadAttempts(overlay.row, event.target.checked)}
-                />
-                {t("courseDetail.includeAttempts")}
-              </label>
-
-              {overlay.error ? <p className="error">{overlay.error}</p> : null}
-              {overlay.loading ? <p className="muted">{t("common.loading")}</p> : null}
-
-              {!overlay.loading && selectedAttempt ? (
-                <div className="stack">
-                  <div className="row">
-                    <button
-                      className="button secondary"
-                      disabled={overlay.selectedIndex === 0}
-                      type="button"
-                      onClick={() => setOverlay((current) => (current ? { ...current, selectedIndex: current.selectedIndex - 1 } : current))}
-                    >
-                      {t("courseDetail.previousSubmission")}
-                    </button>
-                    <span className="muted">
-                      {t("courseDetail.submissionPosition", {
-                        current: overlay.selectedIndex + 1,
-                        total: overlay.attempts.length
-                      })}
-                    </span>
-                    <button
-                      className="button secondary"
-                      disabled={overlay.selectedIndex >= overlay.attempts.length - 1}
-                      type="button"
-                      onClick={() => setOverlay((current) => (current ? { ...current, selectedIndex: current.selectedIndex + 1 } : current))}
-                    >
-                      {t("courseDetail.nextSubmission")}
-                    </button>
-                  </div>
-
-                  <div className="answer-meta">
-                    <strong>{attemptLabel(selectedAttempt, t)}</strong>
-                    <span className="muted">{formatDateTime(selectedAttempt.completedAt ?? selectedAttempt.lastInteractionAt)}</span>
-                  </div>
-
-                  <div className="parsons-answer-lines">
-                    {[...selectedAttempt.latestState.blocks]
-                      .sort((left, right) => left.physicalLineIndex - right.physicalLineIndex)
-                      .map((block) => (
-                        <pre key={block.id} style={{ marginLeft: `${block.currentIndent * 18}px` }}>
-                          {block.displayText}
-                        </pre>
-                      ))}
-                  </div>
-
-                  {overlay.includeAttempts && selectedAttempt.events.length ? (
-                    <div className="stack">
-                      <h3>{t("courseDetail.attemptEventsTitle")}</h3>
-                      <div className="table-list">
-                        {selectedAttempt.events.map((event) => (
-                          <div className="table-row table-row-simple" key={event.id}>
-                            <strong>{event.type}</strong>
-                            <span className="table-meta muted">{formatDateTime(event.createdAt)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {!overlay.loading && !selectedAttempt ? <p className="muted">{t("courseDetail.noAnswers")}</p> : null}
-            </section>
+            {manualGradingRenderer
+              ? manualGradingRenderer({
+                  row: overlay.row,
+                  attempts: overlay.attempts,
+                  selectedAttempt,
+                  selectedIndex: overlay.selectedIndex,
+                  includeAttempts: overlay.includeAttempts,
+                  loading: overlay.loading,
+                  error: overlay.error,
+                  isSavingOverride: savingGradeKey === `${overlay.row.gradebookItemId}:${overlay.row.participantId}:override`,
+                  isSavingRegrade: savingGradeKey === `${overlay.row.gradebookItemId}:${overlay.row.participantId}:regrade`,
+                  onClose: () => setOverlay(null),
+                  onIncludeAttemptsChange: (includeAttempts) => loadAttempts(overlay.row, includeAttempts),
+                  onSelectAttemptIndex: (selectedIndex) => setOverlay((current) => (current ? { ...current, selectedIndex } : current)),
+                  onOverrideGrade: (input) => overrideGrade(overlay.row, input),
+                  onRegradeAttempt: () => regradeRow(overlay.row),
+                  t
+                })
+              : null}
           </div>
         ) : null}
       </main>
@@ -384,23 +354,6 @@ function formatGradebookScore(score: number | null, maxScore: number) {
 
 function formatGradeNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: false,
-    hourCycle: "h23"
-  }).format(new Date(value));
-}
-
-function attemptLabel(attempt: ParsonsGradebookAttempt, t: ReturnType<typeof useI18n>["t"]) {
-  const key = attempt.status === "completed" ? "courseDetail.submissionAnswerLabel" : "courseDetail.attemptAnswerLabel";
-  return t(key, { id: attempt.id.slice(-6) });
 }
 
 function sortAttemptsByDisplayedTimestamp(attempts: ParsonsGradebookAttempt[]) {

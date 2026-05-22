@@ -22,6 +22,7 @@ import {
   GradebookStatus,
   GroupParticipant,
   GroupParticipantCandidate,
+  StudentGradeFeedback,
   StudentReleasedGrades
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -163,6 +164,11 @@ export default function CourseGroupPage() {
     ? visibleCourseMaterials
     : visibleCourseMaterials.filter(({ material }) => !getHiddenMaterialState(courseMaterials, hiddenCourseMaterialIds, material.id).effectivelyHidden);
   const assignedActivities = group?.activities ?? [];
+  const releasedGradeByActivityId = new Map(
+    (studentGrades?.rows ?? [])
+      .filter((row) => row.score !== null)
+      .map((row) => [row.activityId, row])
+  );
   const participants = group?.participants ?? [];
   const assignableActivities = (course?.activities ?? []).filter(
     (activity) => !assignedActivities.some((assignment) => assignment.activityId === activity.id)
@@ -213,31 +219,42 @@ export default function CourseGroupPage() {
 
                     {assignedActivities.length ? (
                       <div className="stack" style={{ gap: 10 }}>
-                        {assignedActivities.map((assignment) => (
-                          <button
-                            key={assignment.id}
-                            type="button"
-                            style={{
-                              background: "rgba(255, 255, 255, 0.92)",
-                              border: "1px solid rgba(13, 27, 71, 0.08)",
-                              borderRadius: 12,
-                              color: "inherit",
-                              cursor: "pointer",
-                              display: "block",
-                              padding: "10px 12px",
-                              textAlign: "left",
-                              width: "100%"
-                            }}
-                            onClick={() => router.push(`/courses/${courseId}/groups/${groupId}/activities/assigned/${assignment.activity.id}`)}
-                          >
-                            <div style={{ textAlign: "left", width: "100%" }}>
-                              <strong style={{ display: "block" }}>{assignment.activity.title}</strong>
-                              <span className="table-meta-note muted">
-                                {formatAvailabilityWindow(assignment.availableFrom, assignment.availableUntil, t)}
-                              </span>
-                            </div>
-                          </button>
-                        ))}
+                        {assignedActivities.map((assignment) => {
+                          const releasedGrade = releasedGradeByActivityId.get(assignment.activity.id);
+
+                          return (
+                            <button
+                              key={assignment.id}
+                              type="button"
+                              style={{
+                                background: "rgba(255, 255, 255, 0.92)",
+                                border: "1px solid rgba(13, 27, 71, 0.08)",
+                                borderRadius: 12,
+                                color: "inherit",
+                                cursor: "pointer",
+                                display: "block",
+                                padding: "10px 12px",
+                                textAlign: "left",
+                                width: "100%"
+                              }}
+                              onClick={() => router.push(`/courses/${courseId}/groups/${groupId}/activities/assigned/${assignment.activity.id}`)}
+                            >
+                              <div style={{ alignItems: "center", display: "flex", gap: 12, justifyContent: "space-between", width: "100%" }}>
+                                <div style={{ minWidth: 0, textAlign: "left" }}>
+                                  <strong style={{ display: "block" }}>{assignment.activity.title}</strong>
+                                  <span className="table-meta-note muted">
+                                    {formatAvailabilityWindow(assignment.availableFrom, assignment.availableUntil, t)}
+                                  </span>
+                                </div>
+                                {releasedGrade ? (
+                                  <span className={`participant-status is-${releasedGrade.status.replace("_", "-")}`}>
+                                    {t("courseDetail.gradeHeader")}: {formatGradebookScore(releasedGrade.score, releasedGrade.maxScore)}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="muted">{t("groupPage.noAssignedActivities")}</p>
@@ -339,9 +356,10 @@ export default function CourseGroupPage() {
                             </div>
                             <div className="table-main table-main-stack">
                               <strong>{formatGradebookScore(row.score, row.maxScore)}</strong>
-                              <span className="table-meta-note muted">
-                                {row.gradedAt ? formatAvailabilityValue(row.gradedAt) : t("groupPage.notGradedYet")}
-                              </span>
+                              {row.latePenaltyApplied && row.latePenaltyPercent !== null ? (
+                                <span className="table-meta-note muted">-{row.latePenaltyPercent}%</span>
+                              ) : null}
+                              <StudentFeedback feedback={row.feedback} maxScore={row.maxScore} t={t} />
                             </div>
                             <span className={`participant-status is-${row.status.replace("_", "-")}`}>
                               {t(`courseDetail.gradebookStatus.${row.status}`)}
@@ -2155,6 +2173,66 @@ function formatAvailabilityValue(value: string) {
     hour12: false,
     hourCycle: "h23"
   }).format(date);
+}
+
+function StudentFeedback({
+  feedback,
+  maxScore,
+  t
+}: {
+  feedback: StudentGradeFeedback | null;
+  maxScore: number;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  if (!feedback) {
+    return null;
+  }
+
+  return (
+    <div className="stack stack-tight">
+      {feedback.feedbackText ? (
+        <div className="stack stack-tight">
+          <strong>{t("groupPage.feedbackTitle")}</strong>
+          <p className="muted">{feedback.feedbackText}</p>
+        </div>
+      ) : null}
+      {feedback.messages.length ? (
+        <div className="stack stack-tight">
+          <strong>{t("groupPage.feedbackTitle")}</strong>
+          {feedback.messages.map((message) => (
+            <p className="muted" key={message.type}>
+              {message.type === "order"
+                ? t("parsons.orderFeedback", { count: message.count })
+                : t("parsons.indentFeedback", { count: message.count })}
+            </p>
+          ))}
+        </div>
+      ) : null}
+      {feedback.grading.length ? (
+        <div className="stack stack-tight">
+          <strong>{t("groupPage.gradingBreakdownTitle")}</strong>
+          {scaleFeedbackGrading(feedback, maxScore).map((component) => (
+            <p className="muted" key={component.type}>
+              {t(component.type === "order" ? "groupPage.parsonsOrderScore" : "groupPage.parsonsIndentationScore", {
+                score: formatGradeNumber(component.awarded),
+                max: formatGradeNumber(component.possible)
+              })}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function scaleFeedbackGrading(feedback: StudentGradeFeedback, maxScore: number) {
+  const rawTotal = feedback.grading.reduce((sum, component) => sum + component.possibleRaw, 0);
+  const scale = rawTotal > 0 ? maxScore / rawTotal : 1;
+  return feedback.grading.map((component) => ({
+    type: component.type,
+    awarded: component.awardedRaw * scale,
+    possible: component.possibleRaw * scale
+  }));
 }
 
 function formatGradebookScore(score: number | null, maxScore: number) {

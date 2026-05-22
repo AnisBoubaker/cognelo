@@ -1,15 +1,18 @@
 import type { ComponentProps, JSXElementConstructor, ReactNode } from "react";
+import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { CodingExerciseActivityView } from "@cognelo/plugin-coding-exercises";
-import { ParsonsActivityView } from "@cognelo/plugin-parsons";
+import { ParsonsActivityView, ParsonsManualGradingPanel } from "@cognelo/plugin-parsons";
 import { McqActivityView } from "@cognelo/plugin-mcq";
 import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
 import {
   api,
   type CodingExerciseExecution,
   type CodingExerciseHiddenTest,
+  type CourseGradebookRow,
   type ParsonsAttempt,
   type ParsonsAttemptEvaluation,
   type ParsonsAttemptState,
+  type ParsonsGradebookAttempt,
   type WebDesignExerciseReferenceBundle,
   type WebDesignExerciseSubmission,
   type WebDesignExerciseTest
@@ -50,6 +53,24 @@ type BankActivityRendererContext = {
   hasQuestionAuthoringAgent: boolean;
   locale: "en" | "fr" | "zh" | "ar";
   onSave: SaveActivity;
+  t: (key: string, params?: Record<string, string | number>) => string;
+};
+
+type ManualGradingRendererContext = {
+  row: CourseGradebookRow;
+  attempts: ParsonsGradebookAttempt[];
+  selectedAttempt: ParsonsGradebookAttempt | null;
+  selectedIndex: number;
+  includeAttempts: boolean;
+  loading: boolean;
+  error: string;
+  isSavingOverride: boolean;
+  isSavingRegrade: boolean;
+  onClose: () => void;
+  onIncludeAttemptsChange: (includeAttempts: boolean) => void;
+  onSelectAttemptIndex: (index: number) => void;
+  onOverrideGrade: (input: { score: number; maxScore: number; reason: string | null; feedbackText?: string | null }) => Promise<void>;
+  onRegradeAttempt: () => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
@@ -354,3 +375,12 @@ export const bankActivityRenderers: Record<string, (context: BankActivityRendere
   mcq: McqBankActivityRenderer,
   "web-design-coding-exercise": WebDesignCodingExerciseBankActivityRenderer
 };
+
+export const manualGradingRenderers: Record<string, (context: ManualGradingRendererContext) => ReactNode> = {
+  "parsons-manual-grading": (context) => <ParsonsManualGradingPanel {...context} />
+};
+
+export function getManualGradingRenderer(activityTypeKey: string) {
+  const rendererKey = getActivityDefinition(activityTypeKey)?.manualGrading?.rendererKey;
+  return rendererKey ? manualGradingRenderers[rendererKey] ?? null : null;
+}

@@ -78,6 +78,7 @@ export type OverrideGradebookGradeInput = {
   maxScore?: number;
   isPass?: boolean | null;
   reason?: string | null;
+  feedbackText?: string | null;
   metadata?: JsonInput;
   now?: Date;
 };
@@ -364,7 +365,8 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
     isPass,
     latePenaltyApplied: false,
     latePenaltyPercent: null,
-    source: "override"
+    source: "override",
+    ...buildManualStudentFeedbackResult(input.feedbackText)
   };
 
   return prisma.$transaction(async (tx) => {
@@ -593,6 +595,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         isPass: grade?.isPass ?? null,
         latePenaltyApplied: grade?.latePenaltyApplied ?? false,
         latePenaltyPercent: grade?.latePenaltyPercent ?? null,
+        feedback: sanitizeStudentGradeFeedback(grade?.normalizedResult),
         selectedAttemptNumber: grade?.selectedAttempt?.attemptNumber ?? null,
         attemptCount: attempts.length,
         lateAttemptCount: attempts.filter((attempt) => attempt.isLate).length,
@@ -832,6 +835,7 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
         isPass: grade?.isPass ?? null,
         latePenaltyApplied: grade?.latePenaltyApplied ?? false,
         latePenaltyPercent: grade?.latePenaltyPercent ?? null,
+        feedback: sanitizeStudentGradeFeedback(grade?.normalizedResult),
         selectedAttemptNumber: grade?.selectedAttempt?.attemptNumber ?? null,
         attemptCount: item.attempts.length,
         submittedAttemptCount: item.attempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded").length,
@@ -971,6 +975,65 @@ async function assertCanViewGroupForGradebook(user: CurrentUser, courseId: strin
   }
 
   return group;
+}
+
+function sanitizeStudentGradeFeedback(value: unknown) {
+  const result = asJsonObject(value);
+  const feedback = asJsonObject(result?.studentFeedback);
+  if (!feedback || feedback.kind !== "parsons") {
+    return null;
+  }
+
+  const feedbackText = typeof feedback.feedbackText === "string" ? feedback.feedbackText : null;
+
+  const messages = Array.isArray(feedback.messages)
+    ? feedback.messages
+        .map((message) => {
+          const item = asJsonObject(message);
+          const type = item?.type;
+          const count = asNumber(item?.count);
+          if ((type === "order" || type === "indentation") && count !== null) {
+            return { type, count };
+          }
+          return null;
+        })
+        .filter((message): message is { type: "order" | "indentation"; count: number } => message !== null)
+    : [];
+
+  const grading = Array.isArray(feedback.grading)
+    ? feedback.grading
+        .map((component) => {
+          const item = asJsonObject(component);
+          const type = item?.type;
+          const awardedRaw = asNumber(item?.awardedRaw);
+          const possibleRaw = asNumber(item?.possibleRaw);
+          if ((type === "order" || type === "indentation") && awardedRaw !== null && possibleRaw !== null) {
+            return { type, awardedRaw, possibleRaw };
+          }
+          return null;
+        })
+        .filter(
+          (component): component is { type: "order" | "indentation"; awardedRaw: number; possibleRaw: number } => component !== null
+        )
+    : [];
+
+  return { kind: "parsons" as const, feedbackText, messages, grading };
+}
+
+function buildManualStudentFeedbackResult(feedbackText: string | null | undefined) {
+  const text = typeof feedbackText === "string" ? feedbackText.trim() : "";
+  if (!text) {
+    return {};
+  }
+
+  return {
+    studentFeedback: {
+      kind: "parsons",
+      feedbackText: text,
+      messages: [],
+      grading: []
+    }
+  };
 }
 
 function getGradebookRowStatus(
