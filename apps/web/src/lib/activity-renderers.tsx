@@ -1,18 +1,21 @@
 import type { ComponentProps, JSXElementConstructor, ReactNode } from "react";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { CodingExerciseActivityView } from "@cognelo/plugin-coding-exercises";
-import { ParsonsActivityView, ParsonsManualGradingPanel } from "@cognelo/plugin-parsons";
-import { McqActivityView } from "@cognelo/plugin-mcq";
+import {
+  createParsonsClient,
+  ParsonsActivityView,
+  ParsonsManualGradingPanel,
+  type ParsonsAttemptRecord,
+  type ParsonsGradebookAttemptRecord
+} from "@cognelo/plugin-parsons";
+import { createMcqClient, McqActivityView, McqManualGradingPanel, type McqSubmission } from "@cognelo/plugin-mcq";
 import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
 import {
   api,
+  apiRequest,
   type CodingExerciseExecution,
   type CodingExerciseHiddenTest,
   type CourseGradebookRow,
-  type ParsonsAttempt,
-  type ParsonsAttemptEvaluation,
-  type ParsonsAttemptState,
-  type ParsonsGradebookAttempt,
   type WebDesignExerciseReferenceBundle,
   type WebDesignExerciseSubmission,
   type WebDesignExerciseTest
@@ -58,8 +61,10 @@ type BankActivityRendererContext = {
 
 type ManualGradingRendererContext = {
   row: CourseGradebookRow;
-  attempts: ParsonsGradebookAttempt[];
-  selectedAttempt: ParsonsGradebookAttempt | null;
+  activityConfig?: Record<string, unknown>;
+  locale: "en" | "fr" | "zh" | "ar";
+  attempts: Array<ParsonsGradebookAttemptRecord | McqSubmission>;
+  selectedAttempt: ParsonsGradebookAttemptRecord | McqSubmission | null;
   selectedIndex: number;
   includeAttempts: boolean;
   loading: boolean;
@@ -79,28 +84,29 @@ type ManualGradingRendererContext = {
 function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActivityView>) {
   const { activityRouteCourseId, groupId, hasQuestionAuthoringAgent, ...activityProps } = props;
   const courseId = activityRouteCourseId ?? activityProps.course?.id;
+  const parsonsClient = createParsonsClient(apiRequest);
   return (
     <ParsonsActivityView
       {...activityProps}
       aiGenerationClient={
         activityProps.canManage && hasQuestionAuthoringAgent && courseId
           ? {
-              generate: (input) => api.generateParsonsProblem(courseId, activityProps.activity.id, input)
+              generate: (input) => parsonsClient.generate(courseId, activityProps.activity.id, input)
             }
           : undefined
       }
       attemptsClient={{
         ensureAttempt: async (activityId, courseId, input) => {
           const result = groupId
-            ? await api.ensureGroupParsonsAttempt(courseId, groupId, activityId, input)
-            : await api.ensureParsonsAttempt(courseId, activityId, input);
-          return { attempt: result.attempt as ParsonsAttemptClientShape };
+            ? await parsonsClient.ensureGroupAttempt(courseId, groupId, activityId, input)
+            : await parsonsClient.ensureAttempt(courseId, activityId, input);
+          return { attempt: result.attempt };
         },
         updateAttempt: async (activityId, courseId, input) => {
           const result = groupId
-            ? await api.updateGroupParsonsAttempt(courseId, groupId, activityId, input)
-            : await api.updateParsonsAttempt(courseId, activityId, input);
-          return { attempt: result.attempt as ParsonsAttemptClientShape };
+            ? await parsonsClient.updateGroupAttempt(courseId, groupId, activityId, input)
+            : await parsonsClient.updateAttempt(courseId, activityId, input);
+          return { attempt: result.attempt };
         }
       }}
     />
@@ -229,15 +235,26 @@ function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<ty
 }
 
 function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView>) {
-  const { activityRouteCourseId, groupId: _groupId, hasQuestionAuthoringAgent, ...activityProps } = props;
+  const { activityRouteCourseId, groupId, hasQuestionAuthoringAgent, ...activityProps } = props;
   const courseId = activityRouteCourseId;
+  const mcqClient = createMcqClient(apiRequest);
   return (
     <McqActivityView
       {...activityProps}
+      submissionClient={
+        courseId && groupId
+          ? {
+              submit: async (activityId, answers) => {
+                const result = await mcqClient.submitGroup(courseId, groupId, activityId, { answers });
+                return { submission: result.submission };
+              }
+            }
+          : undefined
+      }
       aiGenerationClient={
         activityProps.canManage && hasQuestionAuthoringAgent && courseId
           ? {
-              generate: (input) => api.generateMcqSource(courseId, activityProps.activity.id, input)
+              generate: (input) => mcqClient.generate(courseId, activityProps.activity.id, input)
             }
           : undefined
       }
@@ -246,6 +263,7 @@ function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView
 }
 
 function ParsonsBankActivityRenderer(context: BankActivityRendererContext) {
+  const parsonsClient = createParsonsClient(apiRequest);
   return (
     <ParsonsActivityView
       activity={context.activity}
@@ -258,7 +276,7 @@ function ParsonsBankActivityRenderer(context: BankActivityRendererContext) {
       aiGenerationClient={
         context.hasQuestionAuthoringAgent
           ? {
-              generate: (input) => api.generateBankParsonsProblem(context.activityBankId, context.bankActivityId, input)
+              generate: (input) => parsonsClient.generateBank(context.activityBankId, context.bankActivityId, input)
             }
           : undefined
       }
@@ -300,6 +318,7 @@ function CodingExerciseBankActivityRenderer(context: BankActivityRendererContext
 }
 
 function McqBankActivityRenderer(context: BankActivityRendererContext) {
+  const mcqClient = createMcqClient(apiRequest);
   return (
     <McqActivityView
       activity={context.activity}
@@ -307,7 +326,7 @@ function McqBankActivityRenderer(context: BankActivityRendererContext) {
       aiGenerationClient={
         context.hasQuestionAuthoringAgent
           ? {
-              generate: (input) => api.generateBankMcqSource(context.activityBankId, context.bankActivityId, input)
+              generate: (input) => mcqClient.generateBank(context.activityBankId, context.bankActivityId, input)
             }
           : undefined
       }
@@ -342,28 +361,6 @@ function WebDesignCodingExerciseBankActivityRenderer(context: BankActivityRender
   );
 }
 
-type ParsonsAttemptClientShape = ParsonsAttempt & {
-  latestState: ParsonsAttemptState;
-  resultSummary: Record<string, unknown>;
-};
-
-export type ParsonsAttemptsClient = {
-  ensureAttempt: (activityId: string, courseId: string, input?: { forceNew?: boolean }) => Promise<{ attempt: ParsonsAttemptClientShape }>;
-  updateAttempt: (
-    activityId: string,
-    courseId: string,
-    input: {
-      attemptId: string;
-      state?: ParsonsAttemptState;
-      event?: { type: "move" | "indent" | "reset" | "check" | "submit"; payload?: Record<string, unknown> };
-      result?: ParsonsAttemptEvaluation;
-      submit?: boolean;
-      complete?: boolean;
-      abandon?: boolean;
-    }
-  ) => Promise<{ attempt: ParsonsAttemptClientShape }>;
-};
-
 export const activityRenderers = {
   "coding-exercise": CodingExerciseActivityRenderer,
   "parsons-problem": ParsonsActivityRenderer,
@@ -379,7 +376,16 @@ export const bankActivityRenderers: Record<string, (context: BankActivityRendere
 };
 
 export const manualGradingRenderers: Record<string, (context: ManualGradingRendererContext) => ReactNode> = {
-  "parsons-manual-grading": (context) => <ParsonsManualGradingPanel {...context} />
+  "parsons-manual-grading": (context) => (
+    <ParsonsManualGradingPanel
+      {...context}
+      attempts={context.attempts as ParsonsGradebookAttemptRecord[]}
+      selectedAttempt={context.selectedAttempt as ParsonsGradebookAttemptRecord | null}
+    />
+  ),
+  "mcq-manual-grading": (context) => (
+    <McqManualGradingPanel {...context} attempts={context.attempts as McqSubmission[]} selectedAttempt={context.selectedAttempt as McqSubmission | null} />
+  )
 };
 
 export function getManualGradingRenderer(activityTypeKey: string) {

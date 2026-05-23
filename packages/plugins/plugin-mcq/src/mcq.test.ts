@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseMcqSource, renderInlineMarkdown } from "./mcq";
+import { gradeMcqAnswers, parseMcqSource, renderInlineMarkdown } from "./mcq";
 
 describe("MCQ source parser", () => {
   it("parses single and multiple answer questions from markdown", () => {
@@ -75,5 +75,27 @@ print("hello")
     );
     expect(parsed.questions[0].choices).toHaveLength(1);
     expect(parsed.questions[0].choices[0]).toMatchObject({ isCorrect: true });
+  });
+
+  it("awards partial credit for incomplete multiple-answer selections", () => {
+    const parsed = parseMcqSource(
+      `## Choose the collection types
+Which of these are Python collection types?
+
+- [x] \`list\`
+- [x] \`dict\`
+- [ ] \`switch\``,
+      "python"
+    );
+
+    const result = gradeMcqAnswers(parsed, {
+      "question-1": ["question-1-choice-2"]
+    });
+
+    expect(result.rawScore).toBe(0.5);
+    expect(result.questions[0]).toMatchObject({
+      isCorrect: false,
+      rawScore: 0.5
+    });
   });
 });

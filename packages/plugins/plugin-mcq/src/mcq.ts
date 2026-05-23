@@ -32,6 +32,24 @@ export type ParsedMcq = {
   errors: McqParseError[];
 };
 
+export type McqAnswerState = Record<string, string[]>;
+
+export type McqQuestionGrade = {
+  questionId: string;
+  selectedChoiceIds: string[];
+  correctChoiceIds: string[];
+  rawScore: number;
+  rawMaxScore: number;
+  isCorrect: boolean;
+};
+
+export type McqGradingResult = {
+  rawScore: number;
+  rawMaxScore: number;
+  isPass: boolean;
+  questions: McqQuestionGrade[];
+};
+
 type Section = {
   heading: string | null;
   headingLine: number;
@@ -62,6 +80,43 @@ export function parseMcqSource(source: string, defaultCodeLanguage: string): Par
     .filter((question): question is McqQuestion => question !== null);
 
   return { introBlocks, questions, errors };
+}
+
+export function gradeMcqAnswers(parsed: ParsedMcq, answers: McqAnswerState): McqGradingResult {
+  const questions = parsed.questions.map((question) => {
+    const selectedChoiceIds = normalizeChoiceIds(answers[question.id] ?? []);
+    const correctChoiceIds = normalizeChoiceIds(question.choices.filter((choice) => choice.isCorrect).map((choice) => choice.id));
+    const isCorrect = selectedChoiceIds.length === correctChoiceIds.length && selectedChoiceIds.every((choiceId, index) => choiceId === correctChoiceIds[index]);
+    const rawScore = scoreSelectedChoices(selectedChoiceIds, correctChoiceIds);
+    return {
+      questionId: question.id,
+      selectedChoiceIds,
+      correctChoiceIds,
+      rawScore,
+      rawMaxScore: 1,
+      isCorrect
+    };
+  });
+  const rawScore = questions.reduce((sum, question) => sum + question.rawScore, 0);
+  return {
+    rawScore,
+    rawMaxScore: parsed.questions.length,
+    isPass: rawScore === parsed.questions.length,
+    questions
+  };
+}
+
+function normalizeChoiceIds(choiceIds: string[]) {
+  return [...new Set(choiceIds.filter((choiceId) => typeof choiceId === "string"))].sort();
+}
+
+export function scoreSelectedChoices(selectedChoiceIds: string[], correctChoiceIds: string[]) {
+  if (!correctChoiceIds.length) {
+    return 0;
+  }
+  const correctSelectedCount = selectedChoiceIds.filter((choiceId) => correctChoiceIds.includes(choiceId)).length;
+  const incorrectSelectedCount = selectedChoiceIds.filter((choiceId) => !correctChoiceIds.includes(choiceId)).length;
+  return Math.max(0, Math.min(1, (correctSelectedCount - incorrectSelectedCount) / correctChoiceIds.length));
 }
 
 const languageAliases: Record<string, string> = {

@@ -1,4 +1,6 @@
 export * from "./attempt-types";
+export * from "./client";
+export type { ParsonsAttemptRecord, ParsonsGradebookAttemptRecord } from "./attempts";
 export * from "./db";
 export * from "./grading";
 export * from "./messages";

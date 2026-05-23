@@ -4,34 +4,41 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useNotifications } from "@cognelo/activity-ui";
+import { createMcqClient, type McqSubmission } from "@cognelo/plugin-mcq";
+import { createParsonsClient, type ParsonsGradebookAttemptRecord } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
 import {
   api,
+  apiRequest,
   Course,
   CourseGradebook,
   CourseGradebookRow,
   GradebookMutationAttempt,
-  GradebookMutationGrade,
-  ParsonsGradebookAttempt
+  GradebookMutationGrade
 } from "@/lib/api";
 import { getManualGradingRenderer } from "@/lib/activity-renderers";
 import { useI18n } from "@/lib/i18n";
+
+type GradebookReviewAttempt = ParsonsGradebookAttemptRecord | McqSubmission;
 
 export default function GradebookActivityResultsPage() {
   const params = useParams<{ courseId: string; activityId: string }>();
   const searchParams = useSearchParams();
   const { courseId, activityId } = params;
   const groupId = searchParams.get("groupId") || undefined;
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const notifications = useNotifications();
+  const mcqClient = useMemo(() => createMcqClient(apiRequest), []);
+  const parsonsClient = useMemo(() => createParsonsClient(apiRequest), []);
   const [course, setCourse] = useState<Course | null>(null);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
   const [error, setError] = useState("");
   const [savingGradeKey, setSavingGradeKey] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<{
     row: CourseGradebookRow;
+    activityConfig?: Record<string, unknown>;
     includeAttempts: boolean;
-    attempts: ParsonsGradebookAttempt[];
+    attempts: GradebookReviewAttempt[];
     selectedIndex: number;
     loading: boolean;
     error: string;
@@ -67,15 +74,23 @@ export default function GradebookActivityResultsPage() {
   async function loadAttempts(row: CourseGradebookRow, includeAttempts: boolean) {
     setOverlay((current) => (current ? { ...current, includeAttempts, loading: true, error: "" } : current));
     try {
-      const result = await api.groupParsonsGradebookAttempts(courseId, row.groupId, row.activityId, {
-        participantId: row.participantId,
-        includeAttempts
-      });
-      const attempts = sortAttemptsByDisplayedTimestamp(result.attempts);
+      const [attemptsResult, activityResult] = await Promise.all([
+        row.activityTypeKey === "mcq"
+          ? mcqClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
+              participantId: row.participantId
+            })
+          : parsonsClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
+              participantId: row.participantId,
+              includeAttempts
+            }),
+        api.groupActivity(courseId, row.groupId, row.activityId)
+      ]);
+      const attempts = sortAttemptsByDisplayedTimestamp(attemptsResult.attempts);
       setOverlay((current) =>
         current
           ? {
               ...current,
+              activityConfig: activityResult.activity.config ?? {},
               includeAttempts,
               attempts,
               selectedIndex: Math.min(current.selectedIndex, Math.max(0, attempts.length - 1)),
@@ -191,7 +206,7 @@ export default function GradebookActivityResultsPage() {
     }
   }
 
-  async function deleteSelectedSubmission(row: CourseGradebookRow, selectedAttempt: ParsonsGradebookAttempt | null) {
+  async function deleteSelectedSubmission(row: CourseGradebookRow, selectedAttempt: GradebookReviewAttempt | null) {
     if (!selectedAttempt) {
       notifications.error(t("courseDetail.deleteSubmissionUnavailable"));
       return;
@@ -344,10 +359,20 @@ export default function GradebookActivityResultsPage() {
         </section>
 
         {overlay ? (
-          <div className="dialog-backdrop" role="presentation" onMouseDown={() => setOverlay(null)}>
+          <div
+            className="dialog-backdrop"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                setOverlay(null);
+              }
+            }}
+          >
             {manualGradingRenderer
               ? manualGradingRenderer({
                   row: overlay.row,
+                  activityConfig: overlay.activityConfig,
+                  locale,
                   attempts: overlay.attempts,
                   selectedAttempt,
                   selectedIndex: overlay.selectedIndex,
@@ -443,10 +468,14 @@ function formatGradeNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-function sortAttemptsByDisplayedTimestamp(attempts: ParsonsGradebookAttempt[]) {
+function sortAttemptsByDisplayedTimestamp(attempts: GradebookReviewAttempt[]) {
   return [...attempts].sort((left, right) => attemptDisplayTime(right) - attemptDisplayTime(left));
 }
 
-function attemptDisplayTime(attempt: ParsonsGradebookAttempt) {
-  return new Date(attempt.completedAt ?? attempt.lastInteractionAt).getTime();
+function attemptDisplayTime(attempt: GradebookReviewAttempt) {
+  const value =
+    "completedAt" in attempt
+      ? attempt.completedAt ?? attempt.lastInteractionAt
+      : attempt.submittedAt ?? attempt.gradedAt;
+  return value ? new Date(value).getTime() : 0;
 }

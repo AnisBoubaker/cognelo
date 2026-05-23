@@ -154,20 +154,6 @@ export function ParsonsManualGradingPanel({
               </pre>
             ))}
           </div>
-
-          {includeAttempts && selectedAttempt.events.length ? (
-            <div className="stack">
-              <h3>{t("courseDetail.attemptEventsTitle")}</h3>
-              <div className="table-list">
-                {selectedAttempt.events.map((event) => (
-                  <div className="table-row table-row-simple" key={event.id}>
-                    <strong>{event.type}</strong>
-                    <span className="table-meta muted">{formatDateTime(event.createdAt)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
         </div>
       ) : null}
 
@@ -212,6 +198,20 @@ export function ParsonsManualGradingPanel({
           </button>
         </div>
       </form>
+
+      {!loading && selectedAttempt && includeAttempts && selectedAttempt.events.length ? (
+        <div className="stack">
+          <h3>{t("courseDetail.attemptEventsTitle")}</h3>
+          <div className="table-list">
+            {selectedAttempt.events.map((event) => (
+              <div className="table-row table-row-simple" key={event.id}>
+                <strong>{event.type}</strong>
+                <span className="table-meta muted">{formatDateTime(event.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

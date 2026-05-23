@@ -127,7 +127,17 @@ export const mcqPlugin: ActivityPlugin = {
         defaultCodeLanguage: "python",
         randomizeChoices: false
       },
-      configSchema: mcqConfigSchema
+      configSchema: mcqConfigSchema,
+      grading: {
+        supportsAttempts: true,
+        supportsAutoGrading: true,
+        supportsManualGrading: true,
+        supportsFeedbackRenderer: true,
+        supportsAnalyticsPayloads: true
+      },
+      manualGrading: {
+        rendererKey: "mcq-manual-grading"
+      }
     }
   ]
 };

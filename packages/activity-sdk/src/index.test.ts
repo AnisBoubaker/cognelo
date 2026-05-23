@@ -56,6 +56,18 @@ describe("activity SDK registry", () => {
         rendererKey: "parsons-manual-grading"
       })
     );
+    expect(getActivityDefinition("mcq")?.grading).toEqual(
+      expect.objectContaining({
+        supportsAttempts: true,
+        supportsAutoGrading: true,
+        supportsManualGrading: true
+      })
+    );
+    expect(getActivityDefinition("mcq")?.manualGrading).toEqual(
+      expect.objectContaining({
+        rendererKey: "mcq-manual-grading"
+      })
+    );
   });
 
   it("exposes plugin database manifests for lifecycle management", () => {
