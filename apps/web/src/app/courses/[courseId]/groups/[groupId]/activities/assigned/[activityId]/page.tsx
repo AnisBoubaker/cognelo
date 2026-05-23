@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
@@ -12,6 +12,7 @@ import { activityRenderers } from "@/lib/activity-renderers";
 export default function GroupActivityPage() {
   const params = useParams<{ courseId: string; groupId: string; activityId: string }>();
   const { courseId, groupId, activityId } = params;
+  const router = useRouter();
   const { user } = useAuth();
   const { locale, t } = useI18n();
   const [course, setCourse] = useState<Course | null>(null);
@@ -124,7 +125,10 @@ export default function GroupActivityPage() {
             course={course ? { id: course.id, title: course.title } : null}
             groupId={groupId}
             hasQuestionAuthoringAgent={hasQuestionAuthoringAgent}
+            onSubmitted={() => router.push(`/courses/${courseId}/groups/${groupId}`)}
             onSave={saveActivity}
+            showReleasedAnswers={Boolean(releasedGrade)}
+            releasedMaxScore={releasedGrade?.maxScore ?? undefined}
             t={t}
             locale={locale}
           />

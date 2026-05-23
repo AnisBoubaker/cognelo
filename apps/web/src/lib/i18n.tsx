@@ -348,6 +348,7 @@ const messages: Record<Locale, MessageTree> = {
       gradebookStatusGraded: "Graded",
       gradebookStatus: {
         missing: "Missing",
+        submitted: "Submitted",
         late: "Late",
         needs_grading: "Needs grading",
         graded: "Graded"
@@ -981,6 +982,7 @@ const messages: Record<Locale, MessageTree> = {
       gradebookStatusGraded: "Note",
       gradebookStatus: {
         missing: "Manquant",
+        submitted: "Soumis",
         late: "En retard",
         needs_grading: "A corriger",
         graded: "Note"
@@ -1614,6 +1616,7 @@ const messages: Record<Locale, MessageTree> = {
       gradebookStatusGraded: "已评分",
       gradebookStatus: {
         missing: "缺交",
+        submitted: "已提交",
         late: "迟交",
         needs_grading: "待评分",
         graded: "已评分"
@@ -2343,6 +2346,7 @@ const messages: Record<Locale, MessageTree> = {
       aiAgentScopeGlobal: "عام",
       gradebookStatus: {
         missing: "مفقود",
+        submitted: "مسلّم",
         late: "متأخر",
         needs_grading: "يحتاج إلى تصحيح",
         graded: "مصَحح"

@@ -25,6 +25,9 @@ type ActivityRendererProps<T extends JSXElementConstructor<any>> = ComponentProp
   activityRouteCourseId?: string;
   groupId?: string;
   hasQuestionAuthoringAgent?: boolean;
+  onSubmitted?: () => void;
+  showReleasedAnswers?: boolean;
+  releasedMaxScore?: number;
 };
 
 type RenderableActivity = {
@@ -82,7 +85,15 @@ type ManualGradingRendererContext = {
 };
 
 function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActivityView>) {
-  const { activityRouteCourseId, groupId, hasQuestionAuthoringAgent, ...activityProps } = props;
+  const {
+    activityRouteCourseId,
+    groupId,
+    hasQuestionAuthoringAgent,
+    onSubmitted: _onSubmitted,
+    showReleasedAnswers: _showReleasedAnswers,
+    releasedMaxScore: _releasedMaxScore,
+    ...activityProps
+  } = props;
   const courseId = activityRouteCourseId ?? activityProps.course?.id;
   const parsonsClient = createParsonsClient(apiRequest);
   return (
@@ -114,7 +125,15 @@ function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActi
 }
 
 function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof CodingExerciseActivityView>) {
-  const { activityRouteCourseId, groupId, hasQuestionAuthoringAgent, ...activityProps } = props;
+  const {
+    activityRouteCourseId,
+    groupId,
+    hasQuestionAuthoringAgent,
+    onSubmitted: _onSubmitted,
+    showReleasedAnswers: _showReleasedAnswers,
+    releasedMaxScore: _releasedMaxScore,
+    ...activityProps
+  } = props;
   const courseId = activityRouteCourseId ?? activityProps.course?.id;
   return (
     <CodingExerciseActivityView
@@ -177,7 +196,15 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
 }
 
 function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<typeof WebDesignCodingExerciseActivityView>) {
-  const { activityRouteCourseId: _activityRouteCourseId, groupId, hasQuestionAuthoringAgent: _hasQuestionAuthoringAgent, ...activityProps } = props;
+  const {
+    activityRouteCourseId: _activityRouteCourseId,
+    groupId,
+    hasQuestionAuthoringAgent: _hasQuestionAuthoringAgent,
+    onSubmitted: _onSubmitted,
+    showReleasedAnswers: _showReleasedAnswers,
+    releasedMaxScore: _releasedMaxScore,
+    ...activityProps
+  } = props;
   return (
     <WebDesignCodingExerciseActivityView
       {...activityProps}
@@ -235,7 +262,7 @@ function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<ty
 }
 
 function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView>) {
-  const { activityRouteCourseId, groupId, hasQuestionAuthoringAgent, ...activityProps } = props;
+  const { activityRouteCourseId, groupId, hasQuestionAuthoringAgent, onSubmitted, showReleasedAnswers, releasedMaxScore, ...activityProps } = props;
   const courseId = activityRouteCourseId;
   const mcqClient = createMcqClient(apiRequest);
   return (
@@ -244,6 +271,7 @@ function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView
       submissionClient={
         courseId && groupId
           ? {
+              getStatus: async (activityId) => mcqClient.groupSubmissionStatus(courseId, groupId, activityId),
               submit: async (activityId, answers) => {
                 const result = await mcqClient.submitGroup(courseId, groupId, activityId, { answers });
                 return { submission: result.submission };
@@ -251,6 +279,9 @@ function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView
             }
           : undefined
       }
+      onSubmitted={onSubmitted}
+      showCorrectAnswers={Boolean(showReleasedAnswers)}
+      releasedMaxScore={releasedMaxScore}
       aiGenerationClient={
         activityProps.canManage && hasQuestionAuthoringAgent && courseId
           ? {

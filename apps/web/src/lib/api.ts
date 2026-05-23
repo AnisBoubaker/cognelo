@@ -341,6 +341,11 @@ export type CourseGroupActivityAssignment = {
   activity: Activity;
 };
 
+export type StudentActivitySubmissionAudit = {
+  submittedAttemptCount: number;
+  deletedSubmissions: DeletedSubmissionAudit[];
+};
+
 export type CodingExerciseHiddenTest = {
   id: string;
   name: string;
@@ -797,7 +802,7 @@ export const api = {
   studentGroupGrades: (courseId: string, groupId: string) =>
     request<{ grades: StudentReleasedGrades }>(`/courses/${courseId}/groups/${groupId}/grades`),
   studentActivitySubmissions: (courseId: string, groupId: string, activityId: string) =>
-    request<{ audit: { deletedSubmissions: DeletedSubmissionAudit[] } }>(
+    request<{ audit: StudentActivitySubmissionAudit }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/submissions`
     ),
   createCourse: (input: CourseInput) =>

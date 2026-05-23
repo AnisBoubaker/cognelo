@@ -163,16 +163,44 @@ export async function getActivityAttemptAvailability(user: CurrentUser, input: A
     pluginKey: "availability-check",
     pluginVersion: "0"
   });
+  const details = await activityAttemptAvailabilityDetails(context);
 
   try {
     await assertAttemptCanStart(context, input.now ?? new Date());
-    return { canStart: true as const, reason: null };
+    return { ...details, canStart: true as const, reason: null };
   } catch (error) {
     if (error instanceof AppError && (error.code === "ATTEMPT_LIMIT_REACHED" || error.code === "ATTEMPT_DUE_DATE_PASSED")) {
-      return { canStart: false as const, reason: error.code };
+      return { ...details, canStart: false as const, reason: error.code };
     }
     throw error;
   }
+}
+
+async function activityAttemptAvailabilityDetails(context: Awaited<ReturnType<typeof resolveAssignedActivityAttemptContext>>) {
+  const item = context.gradebookItem;
+  if (item.attemptLimitMode !== "max_attempts" || item.maxAttempts === null) {
+    return {
+      attemptLimitMode: item.attemptLimitMode,
+      maxAttempts: item.maxAttempts,
+      usedAttempts: null,
+      attemptsRemaining: null
+    };
+  }
+
+  const usedAttempts = await prisma.activityAttempt.count({
+    where: {
+      gradebookItemId: item.id,
+      participantId: context.participant.id,
+      lifecycle: { not: "deleted" }
+    }
+  });
+
+  return {
+    attemptLimitMode: item.attemptLimitMode,
+    maxAttempts: item.maxAttempts,
+    usedAttempts,
+    attemptsRemaining: Math.max(0, item.maxAttempts - usedAttempts)
+  };
 }
 
 export async function submitActivityAttempt(user: CurrentUser, input: SubmitActivityAttemptInput) {
@@ -1037,6 +1065,10 @@ export async function getStudentActivitySubmissionAudit(user: CurrentUser, cours
       activityId
     },
     include: {
+      attempts: {
+        where: { participantId: participant.id },
+        orderBy: [{ attemptNumber: "asc" }]
+      },
       events: {
         where: {
           participantId: participant.id,
@@ -1050,7 +1082,10 @@ export async function getStudentActivitySubmissionAudit(user: CurrentUser, cours
     }
   });
 
+  const activeAttempts = item?.attempts.filter((attempt) => attempt.lifecycle !== "deleted") ?? [];
+
   return {
+    submittedAttemptCount: activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded").length,
     deletedSubmissions: item ? deletedSubmissionAuditsForParticipant(item.events, participant.id) : []
   };
 }

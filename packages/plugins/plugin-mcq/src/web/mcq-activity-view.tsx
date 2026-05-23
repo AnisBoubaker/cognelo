@@ -26,8 +26,15 @@ type McqActivityViewProps = {
   onSave: (input: { title: string; description: string; config: Record<string, unknown> }) => Promise<ActivityLike>;
   locale?: "en" | "fr" | "zh" | "ar";
   submissionClient?: {
+    getStatus?: (activityId: string) => Promise<{
+      submission: { answers: StudentAnswerState } | null;
+      availability: { attemptsRemaining: number | null; canStart: boolean; reason: string | null };
+    }>;
     submit: (activityId: string, answers: StudentAnswerState) => Promise<{ submission: { answers: StudentAnswerState } }>;
   };
+  onSubmitted?: () => void;
+  showCorrectAnswers?: boolean;
+  releasedMaxScore?: number;
   aiGenerationClient?: {
     generate: (input: { description: string; defaultCodeLanguage: string; locale: "en" | "fr" | "zh" | "ar" }) => Promise<{ source: string; attempts: number }>;
   };
@@ -79,12 +86,20 @@ const copyByLocale = {
     question: "Question",
     checkAnswers: "Check answers",
     submitAnswers: "Submit",
+    submitConfirmTitle: "Submit answers?",
+    submitConfirmMessage: "This will submit your answers for grading.",
+    submitConfirmRemaining: "You have {remaining} submission(s) left. After this submission, you will have {after} left.",
+    submitConfirmUnlimited: "This activity allows unlimited submissions.",
+    keepWorking: "Keep working",
+    confirmSubmit: "Submit answers",
     submitted: "Submitted.",
     submitError: "Unable to submit answers.",
     reset: "Reset",
     score: "Score",
+    points: "Points",
     correct: "Correct.",
-    incorrect: "Not quite. Review your choices and try again."
+    incorrect: "Not quite. Review your choices and try again.",
+    missedCorrectAnswer: "Missed correct answer."
   },
   fr: {
     authoringTitle: "Edition des questions a choix multiples",
@@ -115,12 +130,20 @@ const copyByLocale = {
     question: "Question",
     checkAnswers: "Verifier les reponses",
     submitAnswers: "Soumettre",
+    submitConfirmTitle: "Soumettre les reponses ?",
+    submitConfirmMessage: "Vos reponses seront envoyees pour correction.",
+    submitConfirmRemaining: "Il vous reste {remaining} soumission(s). Apres cette soumission, il vous en restera {after}.",
+    submitConfirmUnlimited: "Cette activite autorise un nombre illimite de soumissions.",
+    keepWorking: "Continuer",
+    confirmSubmit: "Soumettre",
     submitted: "Soumis.",
     submitError: "Impossible de soumettre les reponses.",
     reset: "Reinitialiser",
     score: "Score",
+    points: "Points",
     correct: "Correct.",
-    incorrect: "Pas tout a fait. Revoyez vos choix et reessayez."
+    incorrect: "Pas tout a fait. Revoyez vos choix et reessayez.",
+    missedCorrectAnswer: "Reponse correcte manquee."
   },
   zh: {
     authoringTitle: "选择题编辑",
@@ -151,16 +174,34 @@ const copyByLocale = {
     question: "问题",
     checkAnswers: "检查答案",
     submitAnswers: "提交",
+    submitConfirmTitle: "提交答案？",
+    submitConfirmMessage: "这会将你的答案提交评分。",
+    submitConfirmRemaining: "你还剩 {remaining} 次提交。本次提交后将剩 {after} 次。",
+    submitConfirmUnlimited: "此活动允许无限次提交。",
+    keepWorking: "继续作答",
+    confirmSubmit: "提交答案",
     submitted: "已提交。",
     submitError: "暂时无法提交答案。",
     reset: "重置",
     score: "得分",
+    points: "得分",
     correct: "正确。",
-    incorrect: "还不完全正确。请检查选项后再试。"
+    incorrect: "还不完全正确。请检查选项后再试。",
+    missedCorrectAnswer: "漏选的正确答案。"
   }
 } as const;
 
-export function McqActivityView({ activity, canManage, onSave, locale = "en", submissionClient, aiGenerationClient }: McqActivityViewProps) {
+export function McqActivityView({
+  activity,
+  canManage,
+  onSave,
+  locale = "en",
+  submissionClient,
+  onSubmitted,
+  showCorrectAnswers = false,
+  releasedMaxScore,
+  aiGenerationClient
+}: McqActivityViewProps) {
   const copyLocale = locale === "ar" ? "en" : locale;
   const copy = copyByLocale[copyLocale] ?? copyByLocale.en;
   const notifications = useNotifications();
@@ -173,6 +214,9 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", su
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showReplaceGenerationDialog, setShowReplaceGenerationDialog] = useState(false);
+  const [showSubmitConfirmDialog, setShowSubmitConfirmDialog] = useState(false);
+  const [submissionAvailability, setSubmissionAvailability] = useState<{ attemptsRemaining: number | null; canStart: boolean; reason: string | null } | null>(null);
+  const [loadingSubmissionStatus, setLoadingSubmissionStatus] = useState(false);
   const [error, setError] = useState("");
   const [studentAnswers, setStudentAnswers] = useState<StudentAnswerState>({});
   const [submitted, setSubmitted] = useState(false);
@@ -190,6 +234,9 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", su
     setSubmitted(false);
     setError("");
     setShowReplaceGenerationDialog(false);
+    setShowSubmitConfirmDialog(false);
+    setSubmissionAvailability(null);
+    setLoadingSubmissionStatus(false);
   }, [activity]);
 
   const parsedMcq = useMemo(() => parseMcqSource(source, defaultCodeLanguage), [defaultCodeLanguage, source]);
@@ -224,6 +271,40 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", su
     [defaultCodeLanguage, description, randomizeChoices, source, title]
   );
   const hasUnsavedChanges = canManage && !snapshotsEqual(currentSnapshot, savedSnapshot);
+
+  useEffect(() => {
+    if (!isSummativeStudentSession || !submissionClient?.getStatus) {
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingSubmissionStatus(true);
+    submissionClient.getStatus(activity.id)
+      .then((status) => {
+        if (cancelled) {
+          return;
+        }
+        setSubmissionAvailability(status.availability);
+        if (status.availability.canStart === false && status.submission) {
+          setStudentAnswers(status.submission.answers);
+          setSubmitted(true);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          notifications.error(err instanceof Error ? err.message : copy.submitError);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingSubmissionStatus(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activity.id, copy.submitError, isSummativeStudentSession, notifications, submissionClient]);
 
   const discardChanges = useCallback(() => {
     setTitle(savedSnapshot.title);
@@ -347,6 +428,24 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", su
     });
   }
 
+  async function requestSubmitMcqAnswers() {
+    if (!isSummativeStudentSession || !submissionClient) {
+      setSubmitted(true);
+      return;
+    }
+    try {
+      const status = await submissionClient.getStatus?.(activity.id);
+      setSubmissionAvailability(status?.availability ?? null);
+      if (status?.availability.canStart === false) {
+        notifications.error(status.availability.reason ?? copy.submitError);
+        return;
+      }
+      setShowSubmitConfirmDialog(true);
+    } catch (err) {
+      notifications.error(err instanceof Error ? err.message : copy.submitError);
+    }
+  }
+
   async function submitMcqAnswers() {
     if (!isSummativeStudentSession || !submissionClient) {
       setSubmitted(true);
@@ -357,7 +456,9 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", su
       const result = await submissionClient.submit(activity.id, studentAnswers);
       setStudentAnswers(result.submission.answers);
       setSubmitted(true);
+      setShowSubmitConfirmDialog(false);
       notifications.success(copy.submitted);
+      onSubmitted?.();
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : copy.submitError);
     } finally {
@@ -463,8 +564,10 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", su
               resetDisabled={false}
               resetLabel={copy.reset}
               scoreLabel={copy.score}
+              pointsLabel={copy.points}
               correctLabel={copy.correct}
               incorrectLabel={copy.incorrect}
+              missedCorrectAnswerLabel={copy.missedCorrectAnswer}
               randomizeChoices={randomizeChoices}
             />
           </section>
@@ -498,9 +601,9 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", su
         parsedMcq={parsedMcq}
         studentAnswers={studentAnswers}
         submitted={submitted}
-        showFeedback={!isSummativeStudentSession && submitted}
+        showFeedback={(!isSummativeStudentSession && submitted) || (isSummativeStudentSession && submitted && showCorrectAnswers)}
         score={score}
-        onSubmit={() => void submitMcqAnswers()}
+        onSubmit={() => void requestSubmitMcqAnswers()}
         onReset={() => {
           setStudentAnswers({});
           setSubmitted(false);
@@ -509,14 +612,37 @@ export function McqActivityView({ activity, canManage, onSave, locale = "en", su
         onMultipleChoice={updateMultipleChoice}
         questionLabel={copy.question}
         checkAnswersLabel={isSummativeStudentSession ? copy.submitAnswers : copy.checkAnswers}
-        disabled={submitting || submitted}
-        resetDisabled={isSummativeStudentSession && submitted}
+        disabled={loadingSubmissionStatus || submitting || submitted || (isSummativeStudentSession && submissionAvailability?.canStart === false)}
+        resetDisabled={loadingSubmissionStatus || (isSummativeStudentSession && (submitted || submissionAvailability?.canStart === false))}
         resetLabel={copy.reset}
         scoreLabel={copy.score}
+        pointsLabel={copy.points}
         correctLabel={copy.correct}
         incorrectLabel={copy.incorrect}
+        missedCorrectAnswerLabel={copy.missedCorrectAnswer}
+        releasedMaxScore={releasedMaxScore}
         randomizeChoices={randomizeChoices}
       />
+      {showSubmitConfirmDialog ? (
+        <div className="dialog-backdrop" role="presentation">
+          <div aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="mcq-submit-confirm-title">
+            <div className="stack" style={{ gap: 8 }}>
+              <p className="eyebrow">{copy.submitAnswers}</p>
+              <h2 id="mcq-submit-confirm-title">{copy.submitConfirmTitle}</h2>
+              <p className="muted">{copy.submitConfirmMessage}</p>
+              <p className="muted">{formatSubmissionAvailability(copy, submissionAvailability)}</p>
+            </div>
+            <div className="dialog-actions">
+              <button className="secondary" type="button" disabled={submitting} onClick={() => setShowSubmitConfirmDialog(false)}>
+                {copy.keepWorking}
+              </button>
+              <button type="button" disabled={submitting || submissionAvailability?.canStart === false} onClick={() => void submitMcqAnswers()}>
+                {submitting ? copy.saving : copy.confirmSubmit}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -537,8 +663,11 @@ function McqStudentView({
   resetDisabled,
   resetLabel,
   scoreLabel,
+  pointsLabel,
   correctLabel,
   incorrectLabel,
+  missedCorrectAnswerLabel,
+  releasedMaxScore,
   randomizeChoices
 }: {
   parsedMcq: ParsedMcq;
@@ -556,8 +685,11 @@ function McqStudentView({
   resetDisabled: boolean;
   resetLabel: string;
   scoreLabel: string;
+  pointsLabel: string;
   correctLabel: string;
   incorrectLabel: string;
+  missedCorrectAnswerLabel: string;
+  releasedMaxScore?: number;
   randomizeChoices: boolean;
 }) {
   const questions = useMemo(
@@ -575,6 +707,7 @@ function McqStudentView({
 
       {questions.map((question, index) => {
         const selected = studentAnswers[question.id] ?? [];
+        const questionMaxScore = releasedMaxScore && parsedMcq.questions.length ? releasedMaxScore / parsedMcq.questions.length : 1;
 
         return (
           <McqQuestionCard
@@ -587,8 +720,12 @@ function McqStudentView({
             questionLabel={questionLabel}
             correctLabel={correctLabel}
             incorrectLabel={incorrectLabel}
+            missedCorrectAnswerLabel={missedCorrectAnswerLabel}
+            pointsLabel={pointsLabel}
+            questionMaxScore={questionMaxScore}
             onSingleChoice={onSingleChoice}
             onMultipleChoice={onMultipleChoice}
+            disabled={disabled}
           />
         );
       })}
@@ -622,8 +759,12 @@ function McqQuestionCard({
   questionLabel,
   correctLabel,
   incorrectLabel,
+  missedCorrectAnswerLabel,
+  pointsLabel,
+  questionMaxScore,
   onSingleChoice,
-  onMultipleChoice
+  onMultipleChoice,
+  disabled
 }: {
   question: McqQuestion;
   index: number;
@@ -633,41 +774,103 @@ function McqQuestionCard({
   questionLabel: string;
   correctLabel: string;
   incorrectLabel: string;
+  missedCorrectAnswerLabel: string;
+  pointsLabel: string;
+  questionMaxScore: number;
   onSingleChoice: (question: McqQuestion, choiceId: string) => void;
   onMultipleChoice: (question: McqQuestion, choiceId: string, checked: boolean) => void;
+  disabled: boolean;
 }) {
   const expected = question.choices.filter((choice) => choice.isCorrect).map((choice) => choice.id).sort();
-  const actual = [...selected].sort();
-  const isCorrect = showFeedback && expected.length === actual.length && expected.every((choiceId, position) => choiceId === actual[position]);
+  const pointUnit = expected.length ? questionMaxScore / expected.length : 0;
+  const correctSelectedCount = selected.filter((choiceId) => expected.includes(choiceId)).length;
+  const incorrectSelectedCount = selected.filter((choiceId) => !expected.includes(choiceId)).length;
+  const questionScore = clampScore((correctSelectedCount - incorrectSelectedCount) * pointUnit, 0, questionMaxScore);
 
   return (
     <article className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 18 }}>
-      <div className="stack" style={{ gap: 6 }}>
-        <p className="eyebrow">{questionLabel} {index + 1}</p>
-        <h3 style={{ margin: 0 }}>{question.title}</h3>
+      <div style={{ alignItems: "flex-start", display: "flex", gap: 16, justifyContent: "space-between" }}>
+        <div className="stack" style={{ flex: "1 1 auto", gap: 6, minWidth: 0 }}>
+          <p className="eyebrow">{questionLabel} {index + 1}</p>
+          <h3 style={{ margin: 0 }}>{question.title}</h3>
+          <MarkdownBlocksView blocks={question.promptBlocks} />
+        </div>
+        {showFeedback ? (
+          <span
+            aria-label={`${pointsLabel}: ${formatPoints(questionScore)} / ${formatPoints(questionMaxScore)}`}
+            style={{
+              alignItems: "center",
+              background: "rgba(13, 27, 71, 0.06)",
+              border: "1px solid rgba(13, 27, 71, 0.12)",
+              borderRadius: 999,
+              color: "#0f1b46",
+              display: "inline-flex",
+              flex: "0 0 auto",
+              fontSize: 15,
+              fontVariantNumeric: "tabular-nums",
+              fontWeight: 800,
+              minHeight: 34,
+              padding: "6px 12px",
+              whiteSpace: "nowrap"
+            }}
+          >
+            {formatPoints(questionScore)} / {formatPoints(questionMaxScore)}
+          </span>
+        ) : null}
       </div>
-
-      <MarkdownBlocksView blocks={question.promptBlocks} />
 
       <div className="stack" style={{ gap: 12 }}>
         {question.choices.map((choice) => {
           const checked = selected.includes(choice.id);
+          const isCorrectChoice = choice.isCorrect;
+          const isMissedCorrectChoice = showFeedback && isCorrectChoice && !checked;
+          const isWrongSelectedChoice = showFeedback && checked && !isCorrectChoice;
+          const isRightSelectedChoice = showFeedback && checked && isCorrectChoice;
+          const pointImpact = showFeedback && (checked || isMissedCorrectChoice)
+            ? isRightSelectedChoice
+              ? pointUnit
+              : -pointUnit
+            : null;
           return (
             <label
               key={choice.id}
               style={{
                 alignItems: "flex-start",
-                border: "1px solid rgba(13, 27, 71, 0.12)",
+                background: isRightSelectedChoice
+                  ? "rgba(34, 197, 94, 0.08)"
+                  : isWrongSelectedChoice
+                    ? "rgba(220, 38, 38, 0.06)"
+                    : isMissedCorrectChoice
+                      ? "rgba(251, 146, 60, 0.08)"
+                      : undefined,
+                border: isRightSelectedChoice
+                  ? "1px solid rgba(22, 163, 74, 0.28)"
+                  : isWrongSelectedChoice
+                    ? "1px solid rgba(220, 38, 38, 0.24)"
+                    : isMissedCorrectChoice
+                      ? "1px solid rgba(251, 146, 60, 0.32)"
+                      : "1px solid rgba(13, 27, 71, 0.12)",
                 borderRadius: 10,
-                cursor: "pointer",
+                cursor: disabled ? "default" : "pointer",
                 display: "flex",
                 gap: 12,
                 justifyContent: "flex-start",
                 padding: 12
               }}
-            >
+              >
+              {showFeedback ? (
+                <AnswerStatusIcon
+                  isCorrectChoice={isCorrectChoice}
+                  isMissedCorrectChoice={isMissedCorrectChoice}
+                  isSelected={checked}
+                  correctLabel={correctLabel}
+                  incorrectLabel={incorrectLabel}
+                  missedCorrectAnswerLabel={missedCorrectAnswerLabel}
+                />
+              ) : null}
               <input
                 checked={checked}
+                disabled={disabled}
                 name={question.id}
                 type={question.mode === "single" ? "radio" : "checkbox"}
                 style={{
@@ -677,25 +880,119 @@ function McqQuestionCard({
                   padding: 0,
                   width: "auto"
                 }}
-                onChange={(event) =>
-                  question.mode === "single"
-                    ? onSingleChoice(question, choice.id)
-                    : onMultipleChoice(question, choice.id, event.target.checked)
-                }
+                onChange={(event) => {
+                  if (disabled) {
+                    return;
+                  }
+                  if (question.mode === "single") {
+                    onSingleChoice(question, choice.id);
+                  } else {
+                    onMultipleChoice(question, choice.id, event.target.checked);
+                  }
+                }}
               />
               <span style={{ flex: 1, minWidth: 0 }}>
                 <MarkdownBlocksView blocks={choice.blocks} compact />
               </span>
+              {pointImpact !== null ? (
+                <strong
+                  aria-label={`${pointsLabel}: ${formatSignedPoints(pointImpact)}`}
+                  style={{
+                    alignSelf: "center",
+                    color: pointImpact >= 0 ? "#15803d" : "#b91c1c",
+                    flex: "0 0 auto",
+                    fontVariantNumeric: "tabular-nums"
+                  }}
+                >
+                  {formatSignedPoints(pointImpact)}
+                </strong>
+              ) : null}
             </label>
           );
         })}
       </div>
 
-      {showFeedback ? (
-        <p className={isCorrect ? "muted" : "error"}>{isCorrect ? correctLabel : incorrectLabel}</p>
-      ) : null}
     </article>
   );
+}
+
+function AnswerStatusIcon({
+  isCorrectChoice,
+  isMissedCorrectChoice,
+  isSelected,
+  correctLabel,
+  incorrectLabel,
+  missedCorrectAnswerLabel
+}: {
+  isCorrectChoice: boolean;
+  isMissedCorrectChoice: boolean;
+  isSelected: boolean;
+  correctLabel: string;
+  incorrectLabel: string;
+  missedCorrectAnswerLabel: string;
+}) {
+  if (!isSelected && !isMissedCorrectChoice) {
+    return null;
+  }
+
+  const variant = isMissedCorrectChoice ? "missed" : isCorrectChoice ? "correct" : "incorrect";
+  const label = isMissedCorrectChoice ? missedCorrectAnswerLabel : isCorrectChoice ? correctLabel : incorrectLabel;
+  const styles =
+    variant === "correct"
+      ? {
+          background: "rgba(34, 197, 94, 0.12)",
+          border: "1px solid rgba(22, 163, 74, 0.35)",
+          color: "#15803d"
+        }
+      : variant === "missed"
+        ? {
+            background: "rgba(251, 146, 60, 0.12)",
+            border: "1px solid rgba(251, 146, 60, 0.4)",
+            color: "#c2410c"
+          }
+        : {
+            background: "rgba(220, 38, 38, 0.1)",
+            border: "1px solid rgba(220, 38, 38, 0.28)",
+            color: "#b91c1c"
+          };
+
+  return (
+    <span
+      aria-label={label}
+      title={label}
+      style={{
+        ...styles,
+        alignItems: "center",
+        borderRadius: 999,
+        display: "inline-flex",
+        flex: "0 0 auto",
+        fontSize: 18,
+        fontWeight: 800,
+        height: 28,
+        justifyContent: "center",
+        lineHeight: 1,
+        width: 28
+      }}
+    >
+      {variant === "correct" ? "✓" : variant === "missed" ? "!" : "×"}
+    </span>
+  );
+}
+
+function clampScore(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function formatSignedPoints(value: number) {
+  const formatted = formatPoints(Math.abs(value));
+  return `${value >= 0 ? "+" : "-"}${formatted}`;
+}
+
+function formatPoints(value: number) {
+  if (Number.isInteger(value)) {
+    return String(value);
+  }
+  return value.toFixed(2).replace(/\.?0+$/, "");
 }
 
 function shuffleChoices(choices: McqChoice[]) {
@@ -727,3 +1024,20 @@ function snapshotsEqual(left: McqFormSnapshot, right: McqFormSnapshot) {
   );
 }
 
+function formatSubmissionAvailability(
+  copy: (typeof copyByLocale)[keyof typeof copyByLocale],
+  availability: { attemptsRemaining: number | null } | null
+) {
+  if (!availability || availability.attemptsRemaining === null) {
+    return copy.submitConfirmUnlimited;
+  }
+  const remaining = availability.attemptsRemaining;
+  return formatCopy(copy.submitConfirmRemaining, {
+    remaining,
+    after: Math.max(0, remaining - 1)
+  });
+}
+
+function formatCopy(message: string, vars: Record<string, string | number>) {
+  return message.replace(/\{(\w+)\}/g, (_match, key) => String(vars[key] ?? `{${key}}`));
+}
