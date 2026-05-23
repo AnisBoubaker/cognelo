@@ -81,6 +81,7 @@ describe("server activity SDK", () => {
 
   it("resolves plugin grading handlers by activity type", () => {
     expect(resolvePluginGradingHandler("parsons-problem")).toBeTypeOf("function");
+    expect(resolvePluginGradingHandler("mcq")).toBeTypeOf("function");
     expect(resolvePluginGradingHandler("placeholder")).toBeNull();
   });
 

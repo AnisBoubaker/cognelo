@@ -1,13 +1,27 @@
 import { z } from "zod";
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
-import { AppError, assertCanManageActivityBank, assertCanManageCourse, generateQuestionAuthoringText } from "@cognelo/core";
-import { prisma } from "@cognelo/db";
-import { parseMcqSource, type McqParseError } from "./mcq";
+import {
+  AppError,
+  assertCanManageActivityBank,
+  assertCanManageCourse,
+  generateQuestionAuthoringText,
+  getActivityAttemptAvailability,
+  recordActivityAttemptGradingResult,
+  startActivityAttempt,
+  submitActivityAttempt
+} from "@cognelo/core";
+import { prisma, type Prisma } from "@cognelo/db";
+import { buildMcqGradingResultFromConfig } from "./grading";
+import { parseMcqSource, type McqAnswerState, type McqParseError } from "./mcq";
 
 const mcqGenerateInputSchema = z.object({
   description: z.string().min(10).max(4000),
   defaultCodeLanguage: z.string().min(1).max(40).default("python"),
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en")
+});
+
+const mcqSubmissionInputSchema = z.object({
+  answers: z.record(z.array(z.string().min(1).max(120)).default([]))
 });
 
 type SubjectContext = {
@@ -43,6 +57,191 @@ export const mcqGenerateRoute: PluginRouteDefinition = {
     }
   }
 };
+
+export const mcqSubmissionRoute: PluginRouteDefinition = {
+  path: "mcq/submission",
+  activityTypeKeys: ["mcq"],
+  methods: {
+    GET: async ({ context }) => {
+      if (!context.courseId || !context.groupId) {
+        throw new AppError(400, "GROUP_CONTEXT_REQUIRED", "MCQ submissions require a group activity context.");
+      }
+      const participant = await findStudentParticipant(context.groupId, context.user.id);
+      if (!participant) {
+        throw new AppError(403, "PARTICIPANT_REQUIRED", "Only enrolled students can submit this activity.");
+      }
+      return {
+        submission: await findLatestMcqSubmission({
+          courseId: context.courseId,
+          groupId: context.groupId,
+          activityId: context.activity.id,
+          participantId: participant.id
+        })
+      };
+    },
+    POST: async ({ context, readJson }) => {
+      if (!context.courseId || !context.groupId) {
+        throw new AppError(400, "GROUP_CONTEXT_REQUIRED", "MCQ submissions require a group activity context.");
+      }
+      if (context.activity.assignment?.metadata?.assessmentMode !== "summative") {
+        throw new AppError(400, "MCQ_SUMMATIVE_REQUIRED", "Only summative MCQ activities create gradebook submissions.");
+      }
+
+      const input = mcqSubmissionInputSchema.parse(await readJson());
+      const participant = await findStudentParticipant(context.groupId, context.user.id);
+      if (!participant) {
+        throw new AppError(403, "PARTICIPANT_REQUIRED", "Only enrolled students can submit this activity.");
+      }
+      const availability = await getActivityAttemptAvailability(context.user, {
+        courseId: context.courseId,
+        groupId: context.groupId,
+        activityId: context.activity.id
+      });
+      if (!availability.canStart) {
+        throw new AppError(409, availability.reason ?? "ATTEMPT_UNAVAILABLE", "No MCQ submission attempt is currently available.");
+      }
+
+      const gradingResult = buildMcqGradingResultFromConfig(context.activity.config, input.answers);
+      const coreAttempt = await startActivityAttempt(context.user, {
+        courseId: context.courseId,
+        groupId: context.groupId,
+        activityId: context.activity.id,
+        pluginKey: "mcq",
+        pluginVersion: "0.1.0",
+        metadata: {
+          mode: "summative",
+          submittedAnswers: input.answers
+        }
+      });
+      const submittedAttempt = await submitActivityAttempt(context.user, {
+        attemptId: coreAttempt.id,
+        pluginAttemptRef: coreAttempt.id,
+        metadata: {
+          mode: "summative",
+          submittedAnswers: input.answers
+        }
+      });
+      await recordActivityAttemptGradingResult(context.user, {
+        attemptId: submittedAttempt.id,
+        rawScore: gradingResult.rawScore,
+        rawMaxScore: gradingResult.rawMaxScore,
+        source: "auto",
+        isPass: gradingResult.isPass,
+        rawResult: {
+          answers: input.answers,
+          analyticsPayload: gradingResult.analyticsPayload ?? {}
+        } as Prisma.InputJsonValue,
+        normalizedResult: (gradingResult.metadata ?? {}) as Prisma.InputJsonValue
+      });
+
+      return {
+        submission: toMcqSubmissionRecord(submittedAttempt.metadata, {
+          id: submittedAttempt.id,
+          attemptNumber: submittedAttempt.attemptNumber,
+          lifecycle: submittedAttempt.lifecycle,
+          submittedAt: submittedAttempt.submittedAt,
+          gradedAt: submittedAttempt.gradedAt
+        }),
+        result: gradingResult
+      };
+    }
+  }
+};
+
+export const mcqGradebookAttemptsRoute: PluginRouteDefinition = {
+  path: "mcq/gradebook-attempts",
+  activityTypeKeys: ["mcq"],
+  methods: {
+    GET: async ({ context, request }) => {
+      if (!context.courseId || !context.groupId) {
+        throw new AppError(400, "GROUP_CONTEXT_REQUIRED", "Gradebook attempts require a group activity context.");
+      }
+      await assertCanManageCourse(context.user, context.courseId);
+      const participantId = new URL(request.url).searchParams.get("participantId");
+      if (!participantId) {
+        throw new AppError(400, "PARTICIPANT_REQUIRED", "A participant is required.");
+      }
+      const participant = await prisma.courseGroupParticipant.findFirst({
+        where: { id: participantId, groupId: context.groupId, role: "student" },
+        select: { id: true, userId: true, firstName: true, lastName: true, email: true }
+      });
+      if (!participant) {
+        throw new AppError(404, "PARTICIPANT_NOT_FOUND", "The participant was not found.");
+      }
+      const attempts = await prisma.activityAttempt.findMany({
+        where: {
+          courseId: context.courseId,
+          groupId: context.groupId,
+          activityId: context.activity.id,
+          participantId,
+          pluginKey: "mcq",
+          lifecycle: { in: ["submitted", "graded"] }
+        },
+        orderBy: [{ attemptNumber: "desc" }]
+      });
+      return {
+        participant,
+        attempts: attempts.map((attempt) => toMcqSubmissionRecord(attempt.metadata, attempt))
+      };
+    }
+  }
+};
+
+async function findStudentParticipant(groupId: string, userId: string) {
+  return prisma.courseGroupParticipant.findFirst({
+    where: { groupId, userId, role: "student" },
+    select: { id: true, userId: true, firstName: true, lastName: true, email: true }
+  });
+}
+
+async function findLatestMcqSubmission(input: { courseId: string; groupId: string; activityId: string; participantId: string }) {
+  const attempt = await prisma.activityAttempt.findFirst({
+    where: {
+      courseId: input.courseId,
+      groupId: input.groupId,
+      activityId: input.activityId,
+      participantId: input.participantId,
+      pluginKey: "mcq",
+      lifecycle: { in: ["submitted", "graded"] }
+    },
+    orderBy: [{ attemptNumber: "desc" }]
+  });
+  return attempt ? toMcqSubmissionRecord(attempt.metadata, attempt) : null;
+}
+
+export function submittedAnswersFromMetadata(metadata: unknown): McqAnswerState {
+  const record = metadata && typeof metadata === "object" && !Array.isArray(metadata) ? (metadata as Record<string, unknown>) : {};
+  const answers = record.submittedAnswers && typeof record.submittedAnswers === "object" && !Array.isArray(record.submittedAnswers)
+    ? (record.submittedAnswers as Record<string, unknown>)
+    : {};
+  return Object.fromEntries(
+    Object.entries(answers).map(([questionId, value]) => [
+      questionId,
+      Array.isArray(value) ? value.filter((choiceId): choiceId is string => typeof choiceId === "string") : []
+    ])
+  );
+}
+
+function toMcqSubmissionRecord(
+  metadata: unknown,
+  attempt: { id: string; attemptNumber: number; lifecycle: string; submittedAt: Date | string | null; gradedAt: Date | string | null }
+) {
+  return {
+    id: attempt.id,
+    attemptNumber: attempt.attemptNumber,
+    lifecycle: attempt.lifecycle,
+    submittedAt: toIsoString(attempt.submittedAt),
+    gradedAt: toIsoString(attempt.gradedAt),
+    answers: submittedAnswersFromMetadata(metadata)
+  };
+}
+
+function toIsoString(value: Date | string | null) {
+  if (!value) {
+    return null;
+  }
+  return typeof value === "string" ? value : value.toISOString();
+}
 
 async function resolveSubjectContext(activityBankId: string | undefined, courseId: string | undefined): Promise<SubjectContext> {
   if (activityBankId) {

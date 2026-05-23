@@ -80,37 +80,6 @@ export type ActivityPluginTableBackup = {
   createdAt: string;
 };
 
-export type McqGenerationInput = {
-  description: string;
-  defaultCodeLanguage: string;
-  locale: "en" | "fr" | "zh" | "ar";
-};
-
-export type McqGenerationResult = {
-  source: string;
-  attempts: number;
-};
-
-export type ParsonsGenerationInput = {
-  description: string;
-  language: string;
-  locale: "en" | "fr" | "zh" | "ar";
-};
-
-export type ParsonsGenerationResult =
-  | {
-      status?: "ok" | "warning";
-      warningMessage?: string;
-      prompt: string;
-      solution: string;
-      attempts: number;
-    }
-  | {
-      status: "error";
-      message: string;
-      attempts: number;
-    };
-
 export type CodingExercisePromptGenerationInput = {
   description: string;
   language: string;
@@ -370,56 +339,6 @@ export type CourseGroupActivityAssignment = {
   metadata?: Record<string, unknown>;
   position: number;
   activity: Activity;
-};
-
-export type ParsonsAttemptEvaluation = {
-  isCorrect: boolean;
-  orderCorrect: boolean;
-  indentationCorrect: boolean;
-  misplacedBlocks: number;
-  incorrectIndents: number;
-};
-
-export type ParsonsAttemptState = {
-  configFingerprint: string;
-  blocks: Array<{
-    id: string;
-    displayText: string;
-    originalText: string;
-    sourceIndex: number;
-    physicalLineIndex: number;
-    unitId: string;
-    groupId: string | null;
-    expectedIndent: number;
-    currentIndent: number;
-  }>;
-  selectedBlockId?: string | null;
-  lastEvaluation?: ParsonsAttemptEvaluation | null;
-};
-
-export type ParsonsAttempt = {
-  id: string;
-  activityId: string;
-  userId: string;
-  status: "in_progress" | "completed" | "abandoned";
-  startedAt: string;
-  lastInteractionAt: string;
-  completedAt: string | null;
-  checkCount: number;
-  resetCount: number;
-  moveCount: number;
-  indentCount: number;
-  latestState: ParsonsAttemptState;
-  resultSummary: Record<string, unknown>;
-};
-
-export type ParsonsGradebookAttempt = ParsonsAttempt & {
-  events: Array<{
-    id: string;
-    type: string;
-    createdAt: string;
-    payload: Record<string, unknown>;
-  }>;
 };
 
 export type CodingExerciseHiddenTest = {
@@ -719,6 +638,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+export function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  return request<T>(path, init);
+}
+
 export const api = {
   login: (email: string, password: string) =>
     request<{ user: CurrentUser }>("/auth/login", {
@@ -936,28 +859,6 @@ export const api = {
     request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}/assign-all-groups`, {
       method: "DELETE"
     }),
-  ensureParsonsAttempt: (courseId: string, activityId: string, input?: { forceNew?: boolean }) =>
-    request<{ attempt: ParsonsAttempt }>(`/courses/${courseId}/activities/${activityId}/parsons/attempt`, {
-      method: "POST",
-      body: JSON.stringify(input ?? {})
-    }),
-  updateParsonsAttempt: (
-    courseId: string,
-    activityId: string,
-    input: {
-      attemptId: string;
-      state?: ParsonsAttemptState;
-      event?: { type: "move" | "indent" | "reset" | "check" | "submit"; payload?: Record<string, unknown> };
-      result?: ParsonsAttemptEvaluation;
-      submit?: boolean;
-      complete?: boolean;
-      abandon?: boolean;
-    }
-  ) =>
-    request<{ attempt: ParsonsAttempt }>(`/courses/${courseId}/activities/${activityId}/parsons/attempt`, {
-      method: "PATCH",
-      body: JSON.stringify(input)
-    }),
   codingExerciseHiddenTests: (courseId: string, activityId: string) =>
     request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
       `/courses/${courseId}/activities/${activityId}/coding-exercises/hidden-tests`
@@ -1011,26 +912,6 @@ export const api = {
     }),
   generateCodingExerciseTests: (courseId: string, activityId: string, input: CodingExerciseTestsGenerationInput) =>
     request<CodingExerciseTestsGenerationResult>(`/courses/${courseId}/activities/${activityId}/coding-exercises/generate-tests`, {
-      method: "POST",
-      body: JSON.stringify(input)
-    }),
-  generateMcqSource: (courseId: string, activityId: string, input: McqGenerationInput) =>
-    request<McqGenerationResult>(`/courses/${courseId}/activities/${activityId}/mcq/generate`, {
-      method: "POST",
-      body: JSON.stringify(input)
-    }),
-  generateBankMcqSource: (activityBankId: string, bankActivityId: string, input: McqGenerationInput) =>
-    request<McqGenerationResult>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/mcq/generate`, {
-      method: "POST",
-      body: JSON.stringify(input)
-    }),
-  generateParsonsProblem: (courseId: string, activityId: string, input: ParsonsGenerationInput) =>
-    request<ParsonsGenerationResult>(`/courses/${courseId}/activities/${activityId}/parsons/generate`, {
-      method: "POST",
-      body: JSON.stringify(input)
-    }),
-  generateBankParsonsProblem: (activityBankId: string, bankActivityId: string, input: ParsonsGenerationInput) =>
-    request<ParsonsGenerationResult>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/parsons/generate`, {
       method: "POST",
       body: JSON.stringify(input)
     }),
@@ -1288,50 +1169,6 @@ export const api = {
     request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}/activities/${assignmentId}`, {
       method: "DELETE"
     }),
-  ensureGroupParsonsAttempt: (courseId: string, groupId: string, activityId: string, input?: { forceNew?: boolean }) =>
-    request<{ attempt: ParsonsAttempt }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/parsons/attempt`, {
-      method: "POST",
-      body: JSON.stringify(input ?? {})
-    }),
-  updateGroupParsonsAttempt: (
-    courseId: string,
-    groupId: string,
-    activityId: string,
-    input: {
-      attemptId: string;
-      state?: ParsonsAttemptState;
-      event?: { type: "move" | "indent" | "reset" | "check" | "submit"; payload?: Record<string, unknown> };
-      result?: ParsonsAttemptEvaluation;
-      submit?: boolean;
-      complete?: boolean;
-      abandon?: boolean;
-    }
-  ) =>
-    request<{ attempt: ParsonsAttempt }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/parsons/attempt`, {
-      method: "PATCH",
-      body: JSON.stringify(input)
-    }),
-  groupParsonsGradebookAttempts: (
-    courseId: string,
-    groupId: string,
-    activityId: string,
-    input: { participantId: string; includeAttempts?: boolean }
-  ) => {
-    const params = new URLSearchParams({ participantId: input.participantId });
-    if (input.includeAttempts) {
-      params.set("includeAttempts", "true");
-    }
-    return request<{
-      participant: {
-        id: string;
-        userId?: string | null;
-        firstName: string;
-        lastName: string;
-        email: string;
-      };
-      attempts: ParsonsGradebookAttempt[];
-    }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/parsons/gradebook-attempts?${params.toString()}`);
-  },
   groupCodingExerciseHiddenTests: (courseId: string, groupId: string, activityId: string) =>
     request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/hidden-tests`
