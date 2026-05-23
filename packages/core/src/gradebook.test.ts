@@ -1110,12 +1110,13 @@ describe("gradebook attempt services", () => {
             normalizedResult: {
               studentFeedback: {
                 kind: "parsons",
-                messages: [{ type: "order", count: 2 }],
-                grading: [
-                  { type: "order", awardedRaw: 0, possibleRaw: 0.7 },
-                  { type: "indentation", awardedRaw: 0.3, possibleRaw: 0.3 }
-                ],
-                rawPayloadIgnored: true
+                details: {
+                  messages: [{ type: "order", count: 2 }],
+                  grading: [
+                    { type: "order", awardedRaw: 0, possibleRaw: 0.7 },
+                    { type: "indentation", awardedRaw: 0.3, possibleRaw: 0.3 }
+                  ]
+                }
               }
             },
             selectedAttempt: { attemptNumber: 2, isLate: false }
@@ -1154,11 +1155,13 @@ describe("gradebook attempt services", () => {
           feedback: {
             kind: "parsons",
             feedbackText: null,
-            messages: [{ type: "order", count: 2 }],
-            grading: [
-              { type: "order", awardedRaw: 0, possibleRaw: 0.7 },
-              { type: "indentation", awardedRaw: 0.3, possibleRaw: 0.3 }
-            ]
+            details: {
+              messages: [{ type: "order", count: 2 }],
+              grading: [
+                { type: "order", awardedRaw: 0, possibleRaw: 0.7 },
+                { type: "indentation", awardedRaw: 0.3, possibleRaw: 0.3 }
+              ]
+            }
           },
           selectedAttemptNumber: 2,
           attemptCount: 2,

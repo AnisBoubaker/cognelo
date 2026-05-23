@@ -1189,44 +1189,23 @@ async function assertCanViewGroupForGradebook(user: CurrentUser, courseId: strin
 function sanitizeStudentGradeFeedback(value: unknown) {
   const result = asJsonObject(value);
   const feedback = asJsonObject(result?.studentFeedback);
-  if (!feedback || feedback.kind !== "parsons") {
+  const kind = typeof feedback?.kind === "string" ? feedback.kind : null;
+  if (!feedback || !kind) {
     return null;
   }
 
   const feedbackText = typeof feedback.feedbackText === "string" ? feedback.feedbackText : null;
+  const explicitDetails = asJsonObject(feedback.details);
+  const legacyDetails = Object.fromEntries(
+    Object.entries(feedback).filter(([key]) => key !== "kind" && key !== "feedbackText" && key !== "details")
+  );
+  const details = sanitizePublicJsonObject(explicitDetails ?? legacyDetails);
 
-  const messages = Array.isArray(feedback.messages)
-    ? feedback.messages
-        .map((message) => {
-          const item = asJsonObject(message);
-          const type = item?.type;
-          const count = asNumber(item?.count);
-          if ((type === "order" || type === "indentation") && count !== null) {
-            return { type, count };
-          }
-          return null;
-        })
-        .filter((message): message is { type: "order" | "indentation"; count: number } => message !== null)
-    : [];
-
-  const grading = Array.isArray(feedback.grading)
-    ? feedback.grading
-        .map((component) => {
-          const item = asJsonObject(component);
-          const type = item?.type;
-          const awardedRaw = asNumber(item?.awardedRaw);
-          const possibleRaw = asNumber(item?.possibleRaw);
-          if ((type === "order" || type === "indentation") && awardedRaw !== null && possibleRaw !== null) {
-            return { type, awardedRaw, possibleRaw };
-          }
-          return null;
-        })
-        .filter(
-          (component): component is { type: "order" | "indentation"; awardedRaw: number; possibleRaw: number } => component !== null
-        )
-    : [];
-
-  return { kind: "parsons" as const, feedbackText, messages, grading };
+  return {
+    kind,
+    feedbackText,
+    details: details ?? {}
+  };
 }
 
 function buildManualStudentFeedbackResult(feedbackText: string | null | undefined) {
@@ -1237,12 +1216,33 @@ function buildManualStudentFeedbackResult(feedbackText: string | null | undefine
 
   return {
     studentFeedback: {
-      kind: "parsons",
+      kind: "manual",
       feedbackText: text,
-      messages: [],
-      grading: []
+      details: {}
     }
   };
+}
+
+function sanitizePublicJsonObject(value: Record<string, unknown> | null): Record<string, unknown> | null {
+  const sanitized = sanitizePublicJson(value);
+  return sanitized && typeof sanitized === "object" && !Array.isArray(sanitized) ? (sanitized as Record<string, unknown>) : null;
+}
+
+function sanitizePublicJson(value: unknown): unknown {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(sanitizePublicJson).filter((item) => item !== undefined);
+  }
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .map(([key, item]) => [key, sanitizePublicJson(item)] as const)
+        .filter((entry): entry is readonly [string, unknown] => entry[1] !== undefined)
+    );
+  }
+  return undefined;
 }
 
 function getGradebookRowStatus(

@@ -11,7 +11,12 @@ import {
 } from "@cognelo/core";
 import { prisma } from "@cognelo/db";
 import { ensureParsonsAttempt, findLatestParsonsAttempt, listParsonsGradebookAttempts, updateParsonsAttempt } from "./attempts";
-import { parsonsAttemptEnsureInputSchema, parsonsAttemptUpdateInputSchema } from "./attempt-types";
+import {
+  parsonsAttemptEnsureInputSchema,
+  parsonsAttemptStateSchema,
+  parsonsAttemptUpdateInputSchema,
+  type ParsonsAttemptState
+} from "./attempt-types";
 import { generateParsonsProblem, parsonsGenerationInputSchema } from "./generation";
 import { buildParsonsGradingResult } from "./grading";
 import { parseParsonsConfig } from "./parsons";
@@ -224,11 +229,64 @@ export const parsonsGradebookAttemptsRoute: PluginRouteDefinition = {
         config: parseParsonsConfig(context.activity.config),
         includeAttempts: searchParams.get("includeAttempts") === "true"
       });
+      const submittedStatesByPluginAttempt = await listSubmittedStatesByPluginAttempt({
+        courseId: context.courseId,
+        groupId: context.groupId,
+        activityId: context.activity.id,
+        participantId
+      });
 
       return {
         participant,
-        attempts
+        attempts: attempts.map((attempt) => {
+          const submittedState = submittedStatesByPluginAttempt.get(attempt.id);
+          return submittedState
+            ? {
+                ...attempt,
+                latestState: submittedState,
+                submittedState
+              }
+            : attempt;
+        })
       };
     }
   }
 };
+
+async function listSubmittedStatesByPluginAttempt(input: {
+  courseId: string;
+  groupId: string;
+  activityId: string;
+  participantId: string;
+}) {
+  const coreAttempts = await prisma.activityAttempt.findMany({
+    where: {
+      courseId: input.courseId,
+      groupId: input.groupId,
+      activityId: input.activityId,
+      participantId: input.participantId,
+      pluginKey: "parsons",
+      pluginAttemptRef: { not: null },
+      lifecycle: { in: ["submitted", "graded"] }
+    },
+    select: {
+      pluginAttemptRef: true,
+      metadata: true
+    },
+    orderBy: [{ attemptNumber: "desc" }]
+  });
+
+  const statesByAttempt = new Map<string, ParsonsAttemptState>();
+  coreAttempts.forEach((attempt) => {
+    if (!attempt.pluginAttemptRef || statesByAttempt.has(attempt.pluginAttemptRef)) {
+      return;
+    }
+    const metadata = attempt.metadata && typeof attempt.metadata === "object" && !Array.isArray(attempt.metadata) ? attempt.metadata : {};
+    const submittedState = parsonsAttemptStateSchema.safeParse((metadata as Record<string, unknown>).submittedState);
+    if (submittedState.success) {
+      statesByAttempt.set(attempt.pluginAttemptRef, submittedState.data);
+    }
+  });
+
+  return statesByAttempt;
+}

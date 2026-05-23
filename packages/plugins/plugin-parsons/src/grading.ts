@@ -22,14 +22,16 @@ export function buildParsonsGradingResult(evaluation: ParsonsAttemptEvaluation):
       gradingModel: "parsons-correctness-v1",
       studentFeedback: {
         kind: "parsons",
-        messages: [
-          ...(evaluation.orderCorrect ? [] : [{ type: "order", count: evaluation.misplacedBlocks }]),
-          ...(evaluation.indentationCorrect ? [] : [{ type: "indentation", count: evaluation.incorrectIndents }])
-        ],
-        grading: [
-          { type: "order", awardedRaw: orderScore, possibleRaw: orderPossible },
-          { type: "indentation", awardedRaw: indentationScore, possibleRaw: indentationPossible }
-        ]
+        details: {
+          messages: [
+            ...(evaluation.orderCorrect ? [] : [{ type: "order", count: evaluation.misplacedBlocks }]),
+            ...(evaluation.indentationCorrect ? [] : [{ type: "indentation", count: evaluation.incorrectIndents }])
+          ],
+          grading: [
+            { type: "order", awardedRaw: orderScore, possibleRaw: orderPossible },
+            { type: "indentation", awardedRaw: indentationScore, possibleRaw: indentationPossible }
+          ]
+        }
       }
     }
   };
