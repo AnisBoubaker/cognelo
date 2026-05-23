@@ -398,7 +398,11 @@ export async function deleteActivitySubmission(user: CurrentUser, courseId: stri
     });
 
     let grade = previousGrade;
-    if (previousGrade && previousGrade.selectedAttemptId === attempt.id) {
+    const shouldReplacePreviousGrade =
+      previousGrade &&
+      previousGrade.source !== "override" &&
+      (previousGrade.selectedAttemptId === attempt.id || previousGrade.selectedAttemptId === null || !remainingCandidates.length);
+    if (shouldReplacePreviousGrade) {
       if (selectedGrade) {
         grade = await tx.grade.update({
           where: { id: previousGrade.id },
@@ -729,7 +733,8 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
       const grade = item.grades.find((candidate) => candidate.participantId === participant.id) ?? null;
       const attempts = item.attempts.filter((attempt) => attempt.participantId === participant.id);
       const activeAttempts = attempts.filter((attempt) => attempt.lifecycle !== "deleted");
-      const status = getGradebookRowStatus(grade, activeAttempts);
+      const effectiveGrade = activeAttempts.length || grade?.source === "override" ? grade : null;
+      const status = getGradebookRowStatus(effectiveGrade, activeAttempts);
       if (statusFilter !== "all" && status !== statusFilter) {
         return [];
       }
@@ -748,13 +753,13 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         participantEmail: participant.email,
         externalId: participant.externalId,
         status,
-        score: grade?.normalizedScore ?? null,
-        maxScore: grade?.normalizedMaxScore ?? item.pointsPossible,
-        isPass: grade?.isPass ?? null,
-        latePenaltyApplied: grade?.latePenaltyApplied ?? false,
-        latePenaltyPercent: grade?.latePenaltyPercent ?? null,
-        feedback: sanitizeStudentGradeFeedback(grade?.normalizedResult),
-        selectedAttemptNumber: grade?.selectedAttempt?.attemptNumber ?? null,
+        score: effectiveGrade?.normalizedScore ?? null,
+        maxScore: effectiveGrade?.normalizedMaxScore ?? item.pointsPossible,
+        isPass: effectiveGrade?.isPass ?? null,
+        latePenaltyApplied: effectiveGrade?.latePenaltyApplied ?? false,
+        latePenaltyPercent: effectiveGrade?.latePenaltyPercent ?? null,
+        feedback: sanitizeStudentGradeFeedback(effectiveGrade?.normalizedResult),
+        selectedAttemptNumber: effectiveGrade?.selectedAttempt?.attemptNumber ?? null,
         attemptCount: activeAttempts.length,
         lateAttemptCount: activeAttempts.filter((attempt) => attempt.isLate).length,
         submittedAttemptCount: activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded").length,
@@ -988,7 +993,8 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
     rows: items.map((item) => {
       const grade = item.grades[0] ?? null;
       const activeAttempts = item.attempts.filter((attempt) => attempt.lifecycle !== "deleted");
-      const status = getGradebookRowStatus(grade, activeAttempts);
+      const effectiveGrade = activeAttempts.length || grade?.source === "override" ? grade : null;
+      const status = getGradebookRowStatus(effectiveGrade, activeAttempts);
 
       return {
         gradebookItemId: item.id,
@@ -996,19 +1002,19 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
         activityTitle: item.titleSnapshot || item.activity.title,
         activityTypeName: item.activity.activityType.name,
         status,
-        score: grade?.normalizedScore ?? null,
-        maxScore: grade?.normalizedMaxScore ?? item.pointsPossible,
-        isPass: grade?.isPass ?? null,
-        latePenaltyApplied: grade?.latePenaltyApplied ?? false,
-        latePenaltyPercent: grade?.latePenaltyPercent ?? null,
-        feedback: sanitizeStudentGradeFeedback(grade?.normalizedResult),
-        selectedAttemptNumber: grade?.selectedAttempt?.attemptNumber ?? null,
+        score: effectiveGrade?.normalizedScore ?? null,
+        maxScore: effectiveGrade?.normalizedMaxScore ?? item.pointsPossible,
+        isPass: effectiveGrade?.isPass ?? null,
+        latePenaltyApplied: effectiveGrade?.latePenaltyApplied ?? false,
+        latePenaltyPercent: effectiveGrade?.latePenaltyPercent ?? null,
+        feedback: sanitizeStudentGradeFeedback(effectiveGrade?.normalizedResult),
+        selectedAttemptNumber: effectiveGrade?.selectedAttempt?.attemptNumber ?? null,
         attemptCount: activeAttempts.length,
         submittedAttemptCount: activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded").length,
         deletedSubmissions: deletedSubmissionAuditsForParticipant(item.events, participant.id),
         availableFrom: item.groupActivity.availableFrom?.toISOString() ?? null,
         availableUntil: item.groupActivity.availableUntil?.toISOString() ?? null,
-        gradedAt: grade?.gradedAt.toISOString() ?? null
+        gradedAt: effectiveGrade?.gradedAt.toISOString() ?? null
       };
     })
   };

@@ -571,6 +571,82 @@ describe("gradebook attempt services", () => {
     });
   });
 
+  it("treats stale attempt-derived grades as missing when every submission was deleted", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    mockPrisma.gradebookItem.findMany.mockResolvedValue([
+      {
+        id: "gradebook-item-1",
+        titleSnapshot: "Loops",
+        pointsPossible: 100,
+        group: {
+          id: "group-1",
+          title: "Section A",
+          participants: [
+            {
+              id: "participant-1",
+              firstName: "Student",
+              lastName: "One",
+              email: "student@example.test",
+              externalId: "S001",
+              user: null
+            }
+          ]
+        },
+        activity: {
+          id: "activity-1",
+          title: "Loops",
+          activityType: { key: "parsons-problem", name: "Parsons problem" }
+        },
+        groupActivity: {
+          id: "assignment-1",
+          availableFrom: null,
+          availableUntil: null
+        },
+        grades: [
+          {
+            participantId: "participant-1",
+            normalizedScore: 100,
+            normalizedMaxScore: 100,
+            isPass: null,
+            latePenaltyApplied: false,
+            latePenaltyPercent: null,
+            source: "auto",
+            normalizedResult: {},
+            selectedAttempt: null
+          }
+        ],
+        attempts: [
+          {
+            id: "attempt-1",
+            participantId: "participant-1",
+            attemptNumber: 1,
+            lifecycle: "deleted",
+            startedAt: testNow,
+            submittedAt: testNow,
+            gradedAt: testNow,
+            isLate: false,
+            lateBySeconds: null,
+            durationSeconds: 60,
+            pluginAttemptRef: "plugin-attempt-1"
+          }
+        ],
+        events: []
+      }
+    ]);
+
+    await expect(getCourseGradebook(teacherUser, "course-1")).resolves.toMatchObject({
+      rows: [
+        {
+          gradebookItemId: "gradebook-item-1",
+          status: "missing",
+          score: null,
+          submittedAttemptCount: 0,
+          attempts: []
+        }
+      ]
+    });
+  });
+
   it("backfills missing gradebook items from existing group activity assignments before listing", async () => {
     authMocks.canManageCourse.mockResolvedValueOnce(true);
     mockPrisma.courseGroupActivity.findMany.mockResolvedValue([
@@ -753,6 +829,91 @@ describe("gradebook attempt services", () => {
         })
       })
     );
+  });
+
+  it("replaces a stale attempt-derived grade with the next remaining submission when selected attempt is missing", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    const submittedAttempt = {
+      id: "attempt-1",
+      courseId: "course-1",
+      groupId: "group-1",
+      groupActivityId: "assignment-1",
+      activityId: "activity-1",
+      gradebookItemId: "gradebook-item-1",
+      participantId: "participant-1",
+      userId: "student-1",
+      attemptNumber: 1,
+      lifecycle: "graded",
+      startedAt: testNow,
+      submittedAt: testNow,
+      gradedAt: testNow,
+      durationSeconds: 60,
+      isLate: false,
+      lateBySeconds: null,
+      pluginKey: "parsons",
+      pluginVersion: "0.1.0",
+      pluginAttemptRef: "plugin-attempt-1",
+      metadata: {},
+      participant,
+      gradebookItem: groupActivity.gradebookItem
+    };
+    mockPrisma.activityAttempt.findFirst.mockResolvedValueOnce(submittedAttempt);
+    tx.grade.findUnique.mockResolvedValueOnce({
+      id: "grade-1",
+      selectedAttemptId: null,
+      rawScore: 100,
+      rawMaxScore: 100,
+      normalizedScore: 100,
+      normalizedMaxScore: 100,
+      isPass: true,
+      latePenaltyApplied: false,
+      latePenaltyPercent: null,
+      source: "auto",
+      metadata: {}
+    });
+    tx.gradeEvent.findMany.mockResolvedValueOnce([
+      {
+        attemptId: "attempt-1",
+        nextValue: {
+          attemptId: "attempt-1",
+          attemptNumber: 1,
+          rawScore: 100,
+          rawMaxScore: 100,
+          normalizedScore: 100,
+          normalizedMaxScore: 100
+        }
+      },
+      {
+        attemptId: "attempt-2",
+        nextValue: {
+          attemptId: "attempt-2",
+          attemptNumber: 2,
+          rawScore: 90,
+          rawMaxScore: 100,
+          normalizedScore: 90,
+          normalizedMaxScore: 100
+        }
+      }
+    ]);
+    tx.activityAttempt.update.mockResolvedValueOnce({ ...submittedAttempt, lifecycle: "deleted" });
+
+    await deleteActivitySubmission(teacherUser, "course-1", {
+      attemptId: "attempt-1",
+      reason: "Submitted wrong file",
+      now: testNow
+    });
+
+    expect(tx.grade.update).toHaveBeenCalledWith({
+      where: { id: "grade-1" },
+      data: expect.objectContaining({
+        selectedAttemptId: "attempt-2",
+        normalizedScore: 90,
+        normalizedMaxScore: 100,
+        source: "manual",
+        metadata: { selectedAfterSubmissionDeletion: true }
+      })
+    });
+    expect(tx.grade.delete).not.toHaveBeenCalled();
   });
 
   it("releases a gradebook item and writes a visibility audit event", async () => {
