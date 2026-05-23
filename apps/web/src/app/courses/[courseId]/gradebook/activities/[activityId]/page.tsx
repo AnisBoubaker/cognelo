@@ -32,7 +32,6 @@ export default function GradebookActivityResultsPage() {
   const parsonsClient = useMemo(() => createParsonsClient(apiRequest), []);
   const [course, setCourse] = useState<Course | null>(null);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
-  const [error, setError] = useState("");
   const [savingGradeKey, setSavingGradeKey] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<{
     row: CourseGradebookRow;
@@ -54,8 +53,8 @@ export default function GradebookActivityResultsPage() {
   }
 
   useEffect(() => {
-    refresh().catch((err) => setError(err instanceof Error ? err.message : t("courseDetail.loadError")));
-  }, [activityId, courseId, groupId, t]);
+    refresh().catch((err) => notifications.error(err instanceof Error ? err.message : t("courseDetail.loadError")));
+  }, [activityId, courseId, groupId, notifications, t]);
 
   const rows = gradebook?.rows ?? [];
   const activityTitle = rows[0]?.activityTitle ?? gradebook?.items[0]?.activityTitle ?? t("common.loading");
@@ -100,13 +99,14 @@ export default function GradebookActivityResultsPage() {
           : current
       );
     } catch (err) {
+      notifications.error(err instanceof Error ? err.message : t("courseDetail.answerLoadError"));
       setOverlay((current) =>
         current
           ? {
               ...current,
               includeAttempts,
               loading: false,
-              error: err instanceof Error ? err.message : t("courseDetail.answerLoadError")
+              error: ""
             }
           : current
       );
@@ -164,7 +164,6 @@ export default function GradebookActivityResultsPage() {
 
   async function overrideGrade(row: CourseGradebookRow, input: { score: number; maxScore: number; reason: string | null; feedbackText?: string | null }) {
     setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:override`);
-    setError("");
     try {
       const result = await api.overrideGradebookGrade(courseId, row.gradebookItemId, row.participantId, {
         score: input.score,
@@ -175,7 +174,7 @@ export default function GradebookActivityResultsPage() {
       await refresh();
       applyUpdatedGrade(row, result.grade);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("courseDetail.overrideGradeError"));
+      notifications.error(err instanceof Error ? err.message : t("courseDetail.overrideGradeError"));
     } finally {
       setSavingGradeKey(null);
     }
@@ -194,7 +193,6 @@ export default function GradebookActivityResultsPage() {
     }
 
     setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:regrade`);
-    setError("");
     try {
       const result = await api.regradeActivityAttempt(courseId, attempt.id, { reason: t("courseDetail.regradeReason") });
       await refresh();
@@ -228,7 +226,6 @@ export default function GradebookActivityResultsPage() {
     }
 
     setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:delete`);
-    setError("");
     try {
       await api.deleteActivitySubmission(courseId, coreAttempt.id, { reason: normalizedReason });
       await refresh();
@@ -261,7 +258,6 @@ export default function GradebookActivityResultsPage() {
     }
 
     setSavingGradeKey("__all:regrade");
-    setError("");
     try {
       for (const row of rowsWithAttempts) {
         const attempt =
@@ -304,8 +300,6 @@ export default function GradebookActivityResultsPage() {
             </Link>
           </div>
         </section>
-
-        {error ? <p className="error">{error}</p> : null}
 
         <section className="section stack">
           <div className="section-heading">

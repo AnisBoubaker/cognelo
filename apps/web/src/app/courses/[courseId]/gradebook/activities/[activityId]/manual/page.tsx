@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useNotifications } from "@cognelo/activity-ui";
 import {
   createMcqClient,
   getMcqManualGradingCopy,
@@ -33,6 +34,7 @@ export default function ManualActivityGradingPage() {
   const { courseId, activityId } = params;
   const groupId = searchParams.get("groupId") || undefined;
   const { locale, t } = useI18n();
+  const notifications = useNotifications();
   const mcqCopy = getMcqManualGradingCopy(locale);
   const mcqClient = useMemo(() => createMcqClient(apiRequest), []);
   const parsonsClient = useMemo(() => createParsonsClient(apiRequest), []);
@@ -44,7 +46,6 @@ export default function ManualActivityGradingPage() {
   const [draftsByRowKey, setDraftsByRowKey] = useState<Record<string, DraftGrade>>({});
   const [loadingAttempts, setLoadingAttempts] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
 
   async function refresh() {
     const [courseResult, gradebookResult] = await Promise.all([
@@ -56,8 +57,8 @@ export default function ManualActivityGradingPage() {
   }
 
   useEffect(() => {
-    refresh().catch((err) => setError(err instanceof Error ? err.message : t("courseDetail.loadError")));
-  }, [activityId, courseId, groupId, t]);
+    refresh().catch((err) => notifications.error(err instanceof Error ? err.message : t("courseDetail.loadError")));
+  }, [activityId, courseId, groupId, notifications, t]);
 
   const rows = useMemo(
     () =>
@@ -82,7 +83,6 @@ export default function ManualActivityGradingPage() {
 
     let cancelled = false;
     setLoadingAttempts(true);
-    setError("");
 
     Promise.all(
       pageRows.map(async (row) => {
@@ -151,7 +151,7 @@ export default function ManualActivityGradingPage() {
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : t("courseDetail.answerLoadError"));
+          notifications.error(err instanceof Error ? err.message : t("courseDetail.answerLoadError"));
         }
       })
       .finally(() => {
@@ -163,11 +163,10 @@ export default function ManualActivityGradingPage() {
     return () => {
       cancelled = true;
     };
-  }, [courseId, mcqClient, pageRows, parsonsClient, t]);
+  }, [courseId, mcqClient, notifications, pageRows, parsonsClient, t]);
 
   async function saveCurrentPage() {
     setSaving(true);
-    setError("");
     try {
       for (const row of pageRows) {
         const draft = draftsByRowKey[rowKey(row)];
@@ -183,7 +182,7 @@ export default function ManualActivityGradingPage() {
         if (draft.questionScores) {
           const invalidAnswer = mcqAnswers.find((answer) => {
             const score = Number(draft.questionScores?.[answer.questionId] ?? "");
-            return !Number.isFinite(score) || score < 0 || score > answer.maxScore;
+            return !Number.isFinite(score) || score > answer.maxScore;
           });
           if (invalidAnswer) {
             throw new Error(mcqCopy.invalidQuestionScore);
@@ -201,9 +200,11 @@ export default function ManualActivityGradingPage() {
         });
       }
       await refresh();
+      notifications.success(t("courseDetail.manualGradingSaved"));
+      return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("courseDetail.overrideGradeError"));
-      throw err;
+      notifications.error(err instanceof Error ? err.message : t("courseDetail.overrideGradeError"));
+      return false;
     } finally {
       setSaving(false);
     }
@@ -213,11 +214,9 @@ export default function ManualActivityGradingPage() {
     if (nextPageIndex < 0 || nextPageIndex >= pageCount || nextPageIndex === pageIndex) {
       return;
     }
-    try {
-      await saveCurrentPage();
+    const saved = await saveCurrentPage();
+    if (saved) {
       setPageIndex(nextPageIndex);
-    } catch {
-      // Keep the teacher on the current page so they can fix the invalid row.
     }
   }
 
@@ -233,13 +232,13 @@ export default function ManualActivityGradingPage() {
     }));
   }
 
-  function updateQuestionScore(row: CourseGradebookRow, questionId: string, score: string) {
+  function updateQuestionScore(row: CourseGradebookRow, questionId: string, score: string, maxScore: number) {
     const key = rowKey(row);
     setDraftsByRowKey((current) => {
       const currentDraft = current[key] ?? { score: "", feedback: "", questionScores: {} };
       const questionScores = {
         ...(currentDraft.questionScores ?? {}),
-        [questionId]: score
+        [questionId]: clampQuestionScoreInput(score, maxScore)
       };
       return {
         ...current,
@@ -270,8 +269,6 @@ export default function ManualActivityGradingPage() {
             </Link>
           </div>
         </section>
-
-        {error ? <p className="error">{error}</p> : null}
 
         <section className="section stack">
           <div className="section-heading">
@@ -390,12 +387,11 @@ export default function ManualActivityGradingPage() {
                                 <input
                                   id={`score-${rowKey(row)}-${answer.questionId}`}
                                   inputMode="decimal"
-                                  min={0}
                                   max={answer.maxScore}
                                   step="any"
                                   type="number"
                                   value={draft.questionScores?.[answer.questionId] ?? ""}
-                                  onChange={(event) => updateQuestionScore(row, answer.questionId, event.target.value)}
+                                  onChange={(event) => updateQuestionScore(row, answer.questionId, event.target.value, answer.maxScore)}
                                 />
                               </div>
                             </div>
@@ -423,7 +419,6 @@ export default function ManualActivityGradingPage() {
                           <input
                             id={`score-${rowKey(row)}`}
                             inputMode="decimal"
-                            min={0}
                             step="any"
                             type="number"
                             value={draft.score}
@@ -543,6 +538,14 @@ function sumQuestionScores(questionScores: Record<string, string>) {
 
 function roundGrade(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function clampQuestionScoreInput(value: string, maxScore: number) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return value;
+  }
+  return numericValue > maxScore ? formatGradeNumber(maxScore) : value;
 }
 
 function feedbackFromEvaluation(evaluation: ParsonsAttemptEvaluation | null, t: (key: string, params?: Record<string, string | number>) => string) {

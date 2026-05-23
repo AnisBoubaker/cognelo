@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { useNotifications } from "@cognelo/activity-ui";
 import { parseMcqSource, scoreSelectedChoices } from "../mcq";
 import { getMcqManualGradingCopy, type McqLocale } from "../messages";
 import { MarkdownBlocksView } from "./markdown-blocks-view";
@@ -59,9 +60,9 @@ export function McqManualGradingPanel({
   onDeleteSubmission,
   t
 }: McqManualGradingPanelProps) {
+  const notifications = useNotifications();
   const [questionScores, setQuestionScores] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
-  const [formError, setFormError] = useState("");
   const answers = useMemo(() => buildReviewAnswers(activityConfig, selectedAttempt, row.maxScore), [activityConfig, row.maxScore, selectedAttempt]);
   const totalScore = useMemo(() => sumQuestionScores(questionScores), [questionScores]);
   const copy = getMcqManualGradingCopy(locale);
@@ -69,7 +70,6 @@ export function McqManualGradingPanel({
   useEffect(() => {
     setQuestionScores(Object.fromEntries(answers.map((answer) => [answer.questionId, formatGradeNumber(answer.awardedScore)])));
     setReason("");
-    setFormError("");
   }, [answers, row.participantEmail]);
 
   async function submitOverride(event: FormEvent) {
@@ -79,18 +79,17 @@ export function McqManualGradingPanel({
       awardedScore: Number(questionScores[answer.questionId] ?? "")
     }));
     const invalidScore = normalizedScores.find(
-      (answer) => !Number.isFinite(answer.awardedScore) || answer.awardedScore < 0 || answer.awardedScore > answer.maxScore
+      (answer) => !Number.isFinite(answer.awardedScore) || answer.awardedScore > answer.maxScore
     );
     if (invalidScore) {
-      setFormError(copy.invalidQuestionScore);
+      notifications.error(copy.invalidQuestionScore);
       return;
     }
     const numericScore = roundGrade(normalizedScores.reduce((sum, answer) => sum + answer.awardedScore, 0));
-    if (!Number.isFinite(numericScore) || numericScore < 0 || numericScore > row.maxScore) {
-      setFormError(t("courseDetail.overrideGradeRangeError", { max: formatGradeNumber(row.maxScore) }));
+    if (!Number.isFinite(numericScore) || numericScore > row.maxScore) {
+      notifications.error(t("courseDetail.overrideGradeRangeError", { max: formatGradeNumber(row.maxScore) }));
       return;
     }
-    setFormError("");
     await onOverrideGrade({
       score: numericScore,
       maxScore: row.maxScore,
@@ -213,7 +212,6 @@ export function McqManualGradingPanel({
                     <input
                       id={`mcq-question-score-${answer.questionId}`}
                       inputMode="decimal"
-                      min={0}
                       max={answer.maxScore}
                       step="any"
                       type="number"
@@ -221,7 +219,7 @@ export function McqManualGradingPanel({
                       onChange={(event) =>
                         setQuestionScores((current) => ({
                           ...current,
-                          [answer.questionId]: event.target.value
+                          [answer.questionId]: clampQuestionScoreInput(event.target.value, answer.maxScore)
                         }))
                       }
                     />
@@ -252,7 +250,6 @@ export function McqManualGradingPanel({
           <label htmlFor="mcq-manual-reason">{t("courseDetail.overrideReasonPrompt")}</label>
           <textarea id="mcq-manual-reason" value={reason} onChange={(event) => setReason(event.target.value)} />
         </div>
-        {formError ? <p className="error">{formError}</p> : null}
         <div className="dialog-actions">
           <button className="button secondary" type="button" onClick={onClose}>
             {t("common.cancel")}
@@ -353,6 +350,14 @@ function sumQuestionScores(questionScores: Record<string, string>) {
 
 function roundGrade(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function clampQuestionScoreInput(value: string, maxScore: number) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return value;
+  }
+  return numericValue > maxScore ? formatGradeNumber(maxScore) : value;
 }
 
 function CorrectnessIcon({ correct, copy }: { correct: boolean; copy: ReturnType<typeof getMcqManualGradingCopy> }) {
