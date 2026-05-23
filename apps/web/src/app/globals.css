@@ -1555,7 +1555,8 @@ a.card:hover,
   color: color-mix(in srgb, var(--brand-ink), black 10%);
 }
 
-.participant-status.is-graded {
+.participant-status.is-graded,
+.participant-status.is-submitted {
   background: color-mix(in srgb, var(--brand-teal), white 84%);
   color: var(--accent-strong);
 }

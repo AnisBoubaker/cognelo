@@ -18,6 +18,15 @@ export type McqSubmission = {
   answers: Record<string, string[]>;
 };
 
+export type McqSubmissionAvailability = {
+  canStart: boolean;
+  reason: string | null;
+  attemptLimitMode: string;
+  maxAttempts: number | null;
+  usedAttempts: number | null;
+  attemptsRemaining: number | null;
+};
+
 export type McqPluginRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 
 export function createMcqClient(request: McqPluginRequest) {
@@ -39,6 +48,10 @@ export function createMcqClient(request: McqPluginRequest) {
           method: "POST",
           body: JSON.stringify(input)
         }
+      ),
+    groupSubmissionStatus: (courseId: string, groupId: string, activityId: string) =>
+      request<{ submission: McqSubmission | null; availability: McqSubmissionAvailability }>(
+        `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/mcq/submission`
       ),
     groupGradebookAttempts: (courseId: string, groupId: string, activityId: string, input: { participantId: string }) => {
       const params = new URLSearchParams({ participantId: input.participantId });

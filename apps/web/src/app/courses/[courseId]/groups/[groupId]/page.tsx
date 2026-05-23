@@ -40,6 +40,7 @@ export default function CourseGroupPage() {
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
   const [studentGrades, setStudentGrades] = useState<StudentReleasedGrades | null>(null);
+  const [submittedActivityIds, setSubmittedActivityIds] = useState<Set<string>>(new Set());
   const [gradebookActivityId, setGradebookActivityId] = useState("");
   const [gradebookStatus, setGradebookStatus] = useState<GradebookStatus>("all");
   const [savingReleaseItemId, setSavingReleaseItemId] = useState<string | null>(null);
@@ -125,8 +126,23 @@ export default function CourseGroupPage() {
       setStudentGrades(null);
     } else {
       setGradebook(null);
-      const gradesResult = await api.studentGroupGrades(courseId, groupId);
+      const [gradesResult, submissionAudits] = await Promise.all([
+        api.studentGroupGrades(courseId, groupId),
+        Promise.all(
+          (groupResult.group.activities ?? []).map(async (assignment) => ({
+            activityId: assignment.activity.id,
+            audit: await api.studentActivitySubmissions(courseId, groupId, assignment.activity.id)
+          }))
+        )
+      ]);
       setStudentGrades(gradesResult.grades);
+      setSubmittedActivityIds(
+        new Set(
+          submissionAudits
+            .filter((entry) => entry.audit.audit.submittedAttemptCount > 0)
+            .map((entry) => entry.activityId)
+        )
+      );
     }
   }
 
@@ -221,6 +237,7 @@ export default function CourseGroupPage() {
                       <div className="stack" style={{ gap: 10 }}>
                         {assignedActivities.map((assignment) => {
                           const releasedGrade = releasedGradeByActivityId.get(assignment.activity.id);
+                          const isSubmitted = submittedActivityIds.has(assignment.activity.id);
 
                           return (
                             <button
@@ -246,11 +263,18 @@ export default function CourseGroupPage() {
                                     {formatAvailabilityWindow(assignment.availableFrom, assignment.availableUntil, t)}
                                   </span>
                                 </div>
-                                {releasedGrade ? (
-                                  <span className={`participant-status is-${releasedGrade.status.replace("_", "-")}`}>
-                                    {t("courseDetail.gradeHeader")}: {formatGradebookScore(releasedGrade.score, releasedGrade.maxScore)}
-                                  </span>
-                                ) : null}
+                                <div className="row wrap" style={{ justifyContent: "flex-end" }}>
+                                  {isSubmitted ? (
+                                    <span className="participant-status is-submitted">
+                                      {t("courseDetail.gradebookStatus.submitted")}
+                                    </span>
+                                  ) : null}
+                                  {releasedGrade ? (
+                                    <span className={`participant-status is-${releasedGrade.status.replace("_", "-")}`}>
+                                      {t("courseDetail.gradeHeader")}: {formatGradebookScore(releasedGrade.score, releasedGrade.maxScore)}
+                                    </span>
+                                  ) : null}
+                                </div>
                               </div>
                             </button>
                           );

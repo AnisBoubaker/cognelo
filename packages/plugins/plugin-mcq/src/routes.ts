@@ -76,6 +76,11 @@ export const mcqSubmissionRoute: PluginRouteDefinition = {
           groupId: context.groupId,
           activityId: context.activity.id,
           participantId: participant.id
+        }),
+        availability: await getActivityAttemptAvailability(context.user, {
+          courseId: context.courseId,
+          groupId: context.groupId,
+          activityId: context.activity.id
         })
       };
     },
