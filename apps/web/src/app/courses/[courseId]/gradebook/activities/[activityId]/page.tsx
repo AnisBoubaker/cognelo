@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useNotifications } from "@cognelo/activity-ui";
 import { AppShell } from "@/components/app-shell";
 import {
   api,
@@ -22,6 +23,7 @@ export default function GradebookActivityResultsPage() {
   const { courseId, activityId } = params;
   const groupId = searchParams.get("groupId") || undefined;
   const { t } = useI18n();
+  const notifications = useNotifications();
   const [course, setCourse] = useState<Course | null>(null);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
   const [error, setError] = useState("");
@@ -169,7 +171,7 @@ export default function GradebookActivityResultsPage() {
       row.attempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber) ??
       [...row.attempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted");
     if (!attempt) {
-      setError(t("courseDetail.regradeUnavailable"));
+      notifications.error(t("courseDetail.regradeUnavailable"));
       return;
     }
     if (!window.confirm(t("courseDetail.regradeConfirm", { name: row.participantName }))) {
@@ -183,7 +185,7 @@ export default function GradebookActivityResultsPage() {
       await refresh();
       applyUpdatedGrade(row, result.result.grade, result.result.attempt);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("courseDetail.regradeError"));
+      notifications.error(err instanceof Error ? err.message : t("courseDetail.regradeError"));
     } finally {
       setSavingGradeKey(null);
     }
@@ -191,13 +193,13 @@ export default function GradebookActivityResultsPage() {
 
   async function deleteSelectedSubmission(row: CourseGradebookRow, selectedAttempt: ParsonsGradebookAttempt | null) {
     if (!selectedAttempt) {
-      setError(t("courseDetail.deleteSubmissionUnavailable"));
+      notifications.error(t("courseDetail.deleteSubmissionUnavailable"));
       return;
     }
 
     const coreAttempt = row.attempts.find((attempt) => attempt.pluginAttemptRef === selectedAttempt.id);
     if (!coreAttempt) {
-      setError(t("courseDetail.deleteSubmissionUnavailable"));
+      notifications.error(t("courseDetail.deleteSubmissionUnavailable"));
       return;
     }
 
@@ -225,7 +227,7 @@ export default function GradebookActivityResultsPage() {
           : current
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("courseDetail.deleteSubmissionError"));
+      notifications.error(err instanceof Error ? err.message : t("courseDetail.deleteSubmissionError"));
     } finally {
       setSavingGradeKey(null);
     }
@@ -236,7 +238,7 @@ export default function GradebookActivityResultsPage() {
       row.attempts.some((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted")
     );
     if (!rowsWithAttempts.length) {
-      setError(t("courseDetail.regradeUnavailable"));
+      notifications.error(t("courseDetail.regradeUnavailable"));
       return;
     }
     if (!window.confirm(t("courseDetail.regradeAllConfirm", { count: rowsWithAttempts.length }))) {
@@ -256,7 +258,7 @@ export default function GradebookActivityResultsPage() {
       }
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("courseDetail.regradeError"));
+      notifications.error(err instanceof Error ? err.message : t("courseDetail.regradeError"));
     } finally {
       setSavingGradeKey(null);
     }
