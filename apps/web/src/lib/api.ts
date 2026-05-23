@@ -668,10 +668,9 @@ export type DeletedSubmissionAudit = {
 };
 
 export type StudentGradeFeedback = {
-  kind: "parsons";
+  kind: string;
   feedbackText?: string | null;
-  messages: Array<{ type: "order" | "indentation"; count: number }>;
-  grading: Array<{ type: "order" | "indentation"; awardedRaw: number; possibleRaw: number }>;
+  details?: Record<string, unknown>;
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";

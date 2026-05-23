@@ -2187,6 +2187,7 @@ function StudentFeedback({
   if (!feedback) {
     return null;
   }
+  const parsonsDetails = getParsonsFeedbackDetails(feedback);
 
   return (
     <div className="stack stack-tight">
@@ -2196,10 +2197,10 @@ function StudentFeedback({
           <p className="muted">{feedback.feedbackText}</p>
         </div>
       ) : null}
-      {feedback.messages.length ? (
+      {parsonsDetails.messages.length ? (
         <div className="stack stack-tight">
           <strong>{t("groupPage.feedbackTitle")}</strong>
-          {feedback.messages.map((message) => (
+          {parsonsDetails.messages.map((message) => (
             <p className="muted" key={message.type}>
               {message.type === "order"
                 ? t("parsons.orderFeedback", { count: message.count })
@@ -2208,10 +2209,10 @@ function StudentFeedback({
           ))}
         </div>
       ) : null}
-      {feedback.grading.length ? (
+      {parsonsDetails.grading.length ? (
         <div className="stack stack-tight">
           <strong>{t("groupPage.gradingBreakdownTitle")}</strong>
-          {scaleFeedbackGrading(feedback, maxScore).map((component) => (
+          {scaleFeedbackGrading(parsonsDetails.grading, maxScore).map((component) => (
             <p className="muted" key={component.type}>
               {t(component.type === "order" ? "groupPage.parsonsOrderScore" : "groupPage.parsonsIndentationScore", {
                 score: formatGradeNumber(component.awarded),
@@ -2225,10 +2226,41 @@ function StudentFeedback({
   );
 }
 
-function scaleFeedbackGrading(feedback: StudentGradeFeedback, maxScore: number) {
-  const rawTotal = feedback.grading.reduce((sum, component) => sum + component.possibleRaw, 0);
+type ParsonsFeedbackMessage = { type: "order" | "indentation"; count: number };
+type ParsonsFeedbackGrading = { type: "order" | "indentation"; awardedRaw: number; possibleRaw: number };
+
+function getParsonsFeedbackDetails(feedback: StudentGradeFeedback) {
+  const details = feedback.kind === "parsons" && feedback.details && typeof feedback.details === "object" ? feedback.details : {};
+  const messages = Array.isArray(details.messages)
+    ? details.messages
+        .map((message) => {
+          const item = message && typeof message === "object" ? (message as Record<string, unknown>) : null;
+          const type = item?.type;
+          const count = typeof item?.count === "number" ? item.count : null;
+          return (type === "order" || type === "indentation") && count !== null ? { type, count } : null;
+        })
+        .filter((message): message is ParsonsFeedbackMessage => message !== null)
+    : [];
+  const grading = Array.isArray(details.grading)
+    ? details.grading
+        .map((component) => {
+          const item = component && typeof component === "object" ? (component as Record<string, unknown>) : null;
+          const type = item?.type;
+          const awardedRaw = typeof item?.awardedRaw === "number" ? item.awardedRaw : null;
+          const possibleRaw = typeof item?.possibleRaw === "number" ? item.possibleRaw : null;
+          return (type === "order" || type === "indentation") && awardedRaw !== null && possibleRaw !== null
+            ? { type, awardedRaw, possibleRaw }
+            : null;
+        })
+        .filter((component): component is ParsonsFeedbackGrading => component !== null)
+    : [];
+  return { messages, grading };
+}
+
+function scaleFeedbackGrading(grading: ParsonsFeedbackGrading[], maxScore: number) {
+  const rawTotal = grading.reduce((sum, component) => sum + component.possibleRaw, 0);
   const scale = rawTotal > 0 ? maxScore / rawTotal : 1;
-  return feedback.grading.map((component) => ({
+  return grading.map((component) => ({
     type: component.type,
     awarded: component.awardedRaw * scale,
     possible: component.possibleRaw * scale

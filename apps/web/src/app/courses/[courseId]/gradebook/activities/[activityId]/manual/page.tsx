@@ -237,13 +237,11 @@ export default function ManualActivityGradingPage() {
 
                     {selectedAttempt ? (
                       <div className="parsons-answer-lines">
-                        {[...selectedAttempt.latestState.blocks]
-                          .sort((left, right) => left.physicalLineIndex - right.physicalLineIndex)
-                          .map((block) => (
-                            <pre key={block.id} style={{ marginLeft: `${block.currentIndent * 18}px` }}>
-                              {block.displayText}
-                            </pre>
-                          ))}
+                        {selectedAttempt.latestState.blocks.map((block) => (
+                          <pre key={block.id} style={{ marginLeft: `${block.currentIndent * 18}px` }}>
+                            {block.displayText}
+                          </pre>
+                        ))}
                       </div>
                     ) : (
                       <p className="muted">{t("courseDetail.noAnswers")}</p>
@@ -316,9 +314,10 @@ function feedbackFromGrade(row: CourseGradebookRow, t: (key: string, params?: Re
   if (!feedback) {
     return "";
   }
+  const messages = getParsonsFeedbackMessages(feedback);
   return [
     feedback.feedbackText ?? "",
-    ...feedback.messages.map((message) =>
+    ...messages.map((message) =>
       message.type === "order"
         ? t("parsons.orderFeedback", { count: message.count })
         : t("parsons.indentFeedback", { count: message.count })
@@ -326,6 +325,20 @@ function feedbackFromGrade(row: CourseGradebookRow, t: (key: string, params?: Re
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function getParsonsFeedbackMessages(feedback: CourseGradebookRow["feedback"]) {
+  const details = feedback?.kind === "parsons" && feedback.details && typeof feedback.details === "object" ? feedback.details : {};
+  return Array.isArray(details.messages)
+    ? details.messages
+        .map((message) => {
+          const item = message && typeof message === "object" ? (message as Record<string, unknown>) : null;
+          const type = item?.type;
+          const count = typeof item?.count === "number" ? item.count : null;
+          return (type === "order" || type === "indentation") && count !== null ? { type, count } : null;
+        })
+        .filter((message): message is { type: "order" | "indentation"; count: number } => message !== null)
+    : [];
 }
 
 function formatGradebookScore(score: number | null, maxScore: number) {

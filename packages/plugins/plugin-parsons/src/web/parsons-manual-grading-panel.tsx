@@ -23,8 +23,9 @@ type ParsonsManualGradingRow = {
   maxScore: number;
   submittedAttemptCount: number;
   feedback?: {
+    kind?: string;
     feedbackText?: string | null;
-    messages?: Array<{ type: "order" | "indentation"; count: number }>;
+    details?: Record<string, unknown>;
   } | null;
 };
 
@@ -147,13 +148,11 @@ export function ParsonsManualGradingPanel({
           </div>
 
           <div className="parsons-answer-lines">
-            {[...selectedAttempt.latestState.blocks]
-              .sort((left, right) => left.physicalLineIndex - right.physicalLineIndex)
-              .map((block) => (
-                <pre key={block.id} style={{ marginLeft: `${block.currentIndent * 18}px` }}>
-                  {block.displayText}
-                </pre>
-              ))}
+            {selectedAttempt.latestState.blocks.map((block) => (
+              <pre key={block.id} style={{ marginLeft: `${block.currentIndent * 18}px` }}>
+                {block.displayText}
+              </pre>
+            ))}
           </div>
 
           {includeAttempts && selectedAttempt.events.length ? (
@@ -252,12 +251,26 @@ function feedbackFromGrade(row: ParsonsManualGradingRow, t: ParsonsManualGrading
   }
   return [
     feedback.feedbackText ?? "",
-    ...(feedback.messages ?? []).map((message) =>
+    ...getParsonsFeedbackMessages(feedback).map((message) =>
       message.type === "order" ? t("parsons.orderFeedback", { count: message.count }) : t("parsons.indentFeedback", { count: message.count })
     )
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function getParsonsFeedbackMessages(feedback: NonNullable<ParsonsManualGradingRow["feedback"]>) {
+  const details = feedback.kind === "parsons" && feedback.details && typeof feedback.details === "object" ? feedback.details : {};
+  return Array.isArray(details.messages)
+    ? details.messages
+        .map((message) => {
+          const item = message && typeof message === "object" ? (message as Record<string, unknown>) : null;
+          const type = item?.type;
+          const count = typeof item?.count === "number" ? item.count : null;
+          return (type === "order" || type === "indentation") && count !== null ? { type, count } : null;
+        })
+        .filter((message): message is { type: "order" | "indentation"; count: number } => message !== null)
+    : [];
 }
 
 function feedbackFromEvaluation(

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   submitActivityAttempt: vi.fn(),
   updateParsonsAttempt: vi.fn(),
   prisma: {
+    activityAttempt: { findMany: vi.fn() },
     course: { findUnique: vi.fn() },
     courseGroupParticipant: { findFirst: vi.fn() }
   }
@@ -82,6 +83,7 @@ describe("Parsons plugin routes", () => {
       email: "student@example.test"
     });
     mocks.listParsonsGradebookAttempts.mockResolvedValue([{ id: "attempt-1", status: "completed" }]);
+    mocks.prisma.activityAttempt.findMany.mockResolvedValue([]);
     mocks.startActivityAttempt.mockResolvedValue({ id: "core-attempt-1" });
     mocks.submitActivityAttempt.mockResolvedValue({ id: "core-attempt-1" });
     mocks.recordActivityAttemptGradingResult.mockResolvedValue({ id: "grade-1" });
@@ -208,6 +210,49 @@ describe("Parsons plugin routes", () => {
 
   it("lists Parsons gradebook attempts for a managed participant", async () => {
     const teacher = { ...context.user, id: "teacher-1", roles: ["teacher" as const] };
+    const latestState = {
+      configFingerprint: "fingerprint-1",
+      blocks: [
+        {
+          id: "latest-block",
+          displayText: "latest",
+          originalText: "latest",
+          sourceIndex: 0,
+          physicalLineIndex: 0,
+          unitId: "latest",
+          groupId: null,
+          expectedIndent: 0,
+          currentIndent: 0
+        }
+      ],
+      selectedBlockId: null,
+      lastEvaluation: null
+    };
+    const submittedState = {
+      ...latestState,
+      blocks: [
+        {
+          id: "submitted-block",
+          displayText: "submitted",
+          originalText: "submitted",
+          sourceIndex: 0,
+          physicalLineIndex: 0,
+          unitId: "submitted",
+          groupId: null,
+          expectedIndent: 0,
+          currentIndent: 0
+        }
+      ]
+    };
+    mocks.listParsonsGradebookAttempts.mockResolvedValueOnce([{ id: "attempt-1", status: "completed", latestState }]);
+    mocks.prisma.activityAttempt.findMany.mockResolvedValueOnce([
+      {
+        pluginAttemptRef: "attempt-1",
+        metadata: {
+          submittedState
+        }
+      }
+    ]);
 
     await expect(
       parsonsGradebookAttemptsRoute.methods.GET?.({
@@ -221,7 +266,7 @@ describe("Parsons plugin routes", () => {
       })
     ).resolves.toMatchObject({
       participant: { id: "participant-1", userId: "student-1" },
-      attempts: [{ id: "attempt-1", status: "completed" }]
+      attempts: [{ id: "attempt-1", status: "completed", latestState: submittedState, submittedState }]
     });
 
     expect(mocks.assertCanManageCourse).toHaveBeenCalledWith(teacher, "course-1");
@@ -230,6 +275,17 @@ describe("Parsons plugin routes", () => {
         activityId: "activity-1",
         userId: "student-1",
         includeAttempts: true
+      })
+    );
+    expect(mocks.prisma.activityAttempt.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          courseId: "course-1",
+          groupId: "group-1",
+          activityId: "activity-1",
+          participantId: "participant-1",
+          pluginKey: "parsons"
+        })
       })
     );
   });
