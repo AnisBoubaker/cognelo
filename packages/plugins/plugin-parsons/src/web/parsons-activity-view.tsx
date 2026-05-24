@@ -39,11 +39,34 @@ type ParsonsAttemptStateLike = ReturnType<typeof createInitialParsonsAttemptStat
 type ParsonsAttemptLike = {
   id: string;
   status: "in_progress" | "completed" | "abandoned";
+  startedAt: string;
+  lastInteractionAt: string;
+  completedAt: string | null;
   latestState: ParsonsAttemptStateLike;
 };
 
+type ParsonsAttemptAvailability = {
+  canStart: boolean;
+  reason: string | null;
+};
+
+type ParsonsSubmissionReview = {
+  attempt: ParsonsAttemptLike;
+  grade: {
+    rawScore: number;
+    rawMaxScore: number;
+    normalizedScore: number;
+    normalizedMaxScore: number;
+  } | null;
+};
+
 type ParsonsAttemptsClient = {
-  ensureAttempt: (activityId: string, courseId: string, input?: { forceNew?: boolean }) => Promise<{ attempt: ParsonsAttemptLike }>;
+  ensureAttempt: (
+    activityId: string,
+    courseId: string,
+    input?: { forceNew?: boolean }
+  ) => Promise<{ attempt: ParsonsAttemptLike; attemptAvailability?: ParsonsAttemptAvailability }>;
+  listSubmissions?: (activityId: string, courseId: string) => Promise<{ submissions: ParsonsSubmissionReview[] }>;
   updateAttempt: (
     activityId: string,
     courseId: string,
@@ -65,6 +88,9 @@ type ParsonsActivityViewProps = {
   canManage: boolean;
   onSave: (input: { title: string; description: string; config: Record<string, unknown> }) => Promise<ActivityLike>;
   attemptsClient?: ParsonsAttemptsClient;
+  studentViewMode?: "attempt" | "previous";
+  onNewAttemptAvailabilityChange?: (canStartNewAttempt: boolean) => void;
+  onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
   t: (key: string, vars?: Record<string, string | number>) => string;
   locale?: "en" | "fr" | "zh" | "ar";
   aiGenerationClient?: {
@@ -96,7 +122,19 @@ type ParsonsAuthoringSnapshot = {
   precedenceRules: ParsonsPrecedenceRule[];
 };
 
-export function ParsonsActivityView({ activity, course, canManage, onSave, attemptsClient, t, locale = "en", aiGenerationClient }: ParsonsActivityViewProps) {
+export function ParsonsActivityView({
+  activity,
+  course,
+  canManage,
+  onSave,
+  attemptsClient,
+  studentViewMode = "attempt",
+  onNewAttemptAvailabilityChange,
+  onPreviousSubmissionsAvailabilityChange,
+  t,
+  locale = "en",
+  aiGenerationClient
+}: ParsonsActivityViewProps) {
   const notifications = useNotifications();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -118,6 +156,7 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
   const [generating, setGenerating] = useState(false);
   const [showReplaceGenerationDialog, setShowReplaceGenerationDialog] = useState(false);
   const [attempt, setAttempt] = useState<ParsonsAttemptLike | null>(null);
+  const [previousSubmissions, setPreviousSubmissions] = useState<ParsonsSubmissionReview[]>([]);
   const attemptRef = useRef<ParsonsAttemptLike | null>(null);
   const blocksRef = useRef<ParsonsBlock[]>([]);
   const selectedBlockIdRef = useRef<string | null>(null);
@@ -127,6 +166,7 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
   const assessmentMode = activity.assignment?.metadata?.assessmentMode === "summative" ? "summative" : "formative";
   const isSummativeStudentSession = isInstrumentedStudentSession && assessmentMode === "summative";
   const isReadOnlyStudentAttempt = isSummativeStudentSession && attempt?.status === "completed";
+  const activityConfigKey = useMemo(() => JSON.stringify(activity.config ?? {}), [activity.config]);
 
   useEffect(() => {
     const config = parseParsonsConfig(activity.config);
@@ -146,10 +186,11 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
     setSelectedBlockId(null);
     setFeedback("");
     setAttempt(null);
+    setPreviousSubmissions([]);
     setError("");
     setGenerating(false);
     setShowReplaceGenerationDialog(false);
-  }, [activity]);
+  }, [activity.id, activity.title, activity.description, activityConfigKey]);
 
   useEffect(() => {
     if (selectedGroupId && !groups.some((group) => group.id === selectedGroupId)) {
@@ -178,13 +219,19 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
     let cancelled = false;
     setError("");
 
-    attemptsClient
-      .ensureAttempt(activity.id, course.id)
-      .then(({ attempt }) => {
+    Promise.all([
+      attemptsClient.ensureAttempt(activity.id, course.id),
+      isSummativeStudentSession && attemptsClient.listSubmissions ? attemptsClient.listSubmissions(activity.id, course.id) : Promise.resolve({ submissions: [] })
+    ])
+      .then(([attemptResult, submissionsResult]) => {
         if (cancelled) {
           return;
         }
+        const { attempt } = attemptResult;
         setAttempt(attempt);
+        onNewAttemptAvailabilityChange?.(attemptResult.attemptAvailability?.canStart ?? attempt.status !== "completed");
+        onPreviousSubmissionsAvailabilityChange?.(submissionsResult.submissions.length > 0);
+        setPreviousSubmissions(submissionsResult.submissions);
         setBlocks(attempt.latestState.blocks);
         setSelectedBlockId(attempt.latestState.selectedBlockId ?? null);
         setFeedback(isSummativeStudentSession ? "" : attempt.latestState.lastEvaluation ? formatFeedback(attempt.latestState.lastEvaluation) : "");
@@ -860,7 +907,50 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
         </section>
       ) : null}
 
+      {!canManage && previousSubmissions.length && studentViewMode === "previous" ? (
         <section className="section stack">
+          <div>
+            <p className="eyebrow">{t("parsons.previousSubmissionsTitle")}</p>
+            <h2>{t("parsons.previousSubmissionsTitle")}</h2>
+          </div>
+          <div className="stack">
+            {previousSubmissions.map((submission) => (
+              <article className="inline-panel stack" key={submission.attempt.id}>
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <strong>{t("parsons.submissionDateLabel", { date: formatSubmissionDate(submission.attempt.completedAt ?? submission.attempt.lastInteractionAt) })}</strong>
+                  {submission.grade ? (
+                    <span className="participant-status is-graded">
+                      {t("parsons.submissionGrade")}: {formatPoints(submission.grade.normalizedScore)} / {formatPoints(submission.grade.normalizedMaxScore)}
+                    </span>
+                  ) : null}
+                </div>
+                {submission.attempt.latestState.lastEvaluation ? (
+                  <p className="muted">{formatFeedback(submission.attempt.latestState.lastEvaluation)}</p>
+                ) : null}
+                <div className="parsons-board">
+                  {submission.attempt.latestState.blocks.map((block, index) => (
+                    <article className="parsons-block parsons-block-row" key={block.id}>
+                      <div className="parsons-code-line parsons-code-line-compact">
+                        <CodeRenderer
+                          className="parsons-inline-code"
+                          code={block.displayText}
+                          contentOffset={block.currentIndent * 18}
+                          language={language}
+                          showLineNumbers
+                          startingLineNumber={index + 1}
+                        />
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {canManage || studentViewMode === "attempt" ? (
+      <section className="section stack">
           <div>
             <p className="eyebrow">{t("parsons.studentEyebrow")}</p>
             <h2>{t("parsons.studentTitle")}</h2>
@@ -982,6 +1072,7 @@ export function ParsonsActivityView({ activity, course, canManage, onSave, attem
           ))}
         </div>
       </section>
+      ) : null}
     </>
   );
 }
@@ -1021,6 +1112,20 @@ function buildParsonsSnapshot(snapshot: ParsonsAuthoringSnapshot): ParsonsAuthor
 
 function parsonsSnapshotsEqual(left: ParsonsAuthoringSnapshot, right: ParsonsAuthoringSnapshot) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function formatPoints(value: number) {
+  if (Number.isInteger(value)) {
+    return String(value);
+  }
+  return value.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function formatSubmissionDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
 }
 
 function renderSelectionRail(

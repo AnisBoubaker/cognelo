@@ -18,10 +18,18 @@ export type McqSubmission = {
   answers: Record<string, string[]>;
 };
 
+export type McqSubmissionGrade = {
+  rawScore: number;
+  rawMaxScore: number;
+  normalizedScore?: number;
+  normalizedMaxScore?: number;
+};
+
 export type McqSubmissionAvailability = {
   canStart: boolean;
   reason: string | null;
   attemptLimitMode: string;
+  gradesReleased?: boolean;
   maxAttempts: number | null;
   usedAttempts: number | null;
   attemptsRemaining: number | null;
@@ -50,7 +58,7 @@ export function createMcqClient(request: McqPluginRequest) {
         }
       ),
     groupSubmissionStatus: (courseId: string, groupId: string, activityId: string) =>
-      request<{ submission: McqSubmission | null; availability: McqSubmissionAvailability }>(
+      request<{ submission: McqSubmission | null; grade: McqSubmissionGrade | null; availability: McqSubmissionAvailability }>(
         `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/mcq/submission`
       ),
     groupGradebookAttempts: (courseId: string, groupId: string, activityId: string, input: { participantId: string }) => {

@@ -182,6 +182,68 @@ export const parsonsGenerateRoute: PluginRouteDefinition = {
   }
 };
 
+export const parsonsStudentSubmissionsRoute: PluginRouteDefinition = {
+  path: "parsons/submissions",
+  activityTypeKeys: ["parsons-problem"],
+  methods: {
+    GET: async ({ context }) => {
+      if (!context.courseId || !context.groupId) {
+        throw new AppError(400, "GROUP_CONTEXT_REQUIRED", "Parsons submissions require a group activity context.");
+      }
+      const participant = await prisma.courseGroupParticipant.findFirst({
+        where: {
+          groupId: context.groupId,
+          userId: context.user.id,
+          role: "student"
+        },
+        select: { id: true, userId: true }
+      });
+      if (!participant?.userId) {
+        throw new AppError(403, "PARTICIPANT_REQUIRED", "Only enrolled students can view submissions for this activity.");
+      }
+
+      const config = parseParsonsConfig(context.activity.config);
+      const attempts = await listParsonsGradebookAttempts({
+        activityId: context.activity.id,
+        userId: participant.userId,
+        config
+      });
+      const submittedStatesByPluginAttempt = await listSubmittedStatesByPluginAttempt({
+        courseId: context.courseId,
+        groupId: context.groupId,
+        activityId: context.activity.id,
+        participantId: participant.id
+      });
+
+      return {
+        submissions: attempts.flatMap((attempt) => {
+          const submittedState = submittedStatesByPluginAttempt.get(attempt.id);
+          if (!submittedState) {
+            return [];
+          }
+          const evaluation = submittedState.lastEvaluation ?? null;
+          const grade = evaluation ? buildParsonsGradingResult(evaluation) : null;
+          return [{
+            attempt: {
+              ...attempt,
+              latestState: submittedState,
+              submittedState
+            },
+            grade: grade
+              ? {
+                  rawScore: grade.rawScore,
+                  rawMaxScore: grade.rawMaxScore,
+                  normalizedScore: grade.rawScore * 100,
+                  normalizedMaxScore: 100
+                }
+              : null
+          }];
+        })
+      };
+    }
+  }
+};
+
 export const parsonsGradebookAttemptsRoute: PluginRouteDefinition = {
   path: "parsons/gradebook-attempts",
   activityTypeKeys: ["parsons-problem"],

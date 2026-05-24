@@ -169,7 +169,10 @@ export async function getActivityAttemptAvailability(user: CurrentUser, input: A
     await assertAttemptCanStart(context, input.now ?? new Date());
     return { ...details, canStart: true as const, reason: null };
   } catch (error) {
-    if (error instanceof AppError && (error.code === "ATTEMPT_LIMIT_REACHED" || error.code === "ATTEMPT_DUE_DATE_PASSED")) {
+    if (
+      error instanceof AppError &&
+      (error.code === "ATTEMPT_LIMIT_REACHED" || error.code === "ATTEMPT_DUE_DATE_PASSED" || error.code === "GRADES_RELEASED")
+    ) {
       return { ...details, canStart: false as const, reason: error.code };
     }
     throw error;
@@ -181,6 +184,7 @@ async function activityAttemptAvailabilityDetails(context: Awaited<ReturnType<ty
   if (item.attemptLimitMode !== "max_attempts" || item.maxAttempts === null) {
     return {
       attemptLimitMode: item.attemptLimitMode,
+      gradesReleased: item.gradesReleased,
       maxAttempts: item.maxAttempts,
       usedAttempts: null,
       attemptsRemaining: null
@@ -197,6 +201,7 @@ async function activityAttemptAvailabilityDetails(context: Awaited<ReturnType<ty
 
   return {
     attemptLimitMode: item.attemptLimitMode,
+    gradesReleased: item.gradesReleased,
     maxAttempts: item.maxAttempts,
     usedAttempts,
     attemptsRemaining: Math.max(0, item.maxAttempts - usedAttempts)
@@ -218,6 +223,10 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
     throw notFound("Activity attempt");
   }
   await assertCanUseAttempt(user, attempt.courseId, attempt.participant);
+
+  if (attempt.gradebookItem.gradesReleased) {
+    throw new AppError(400, "GRADES_RELEASED", "No more submissions are allowed after grades have been released.");
+  }
 
   if (attempt.lifecycle === "graded") {
     throw new AppError(400, "ACTIVITY_ATTEMPT_ALREADY_GRADED", "This attempt has already been graded.");
@@ -761,7 +770,8 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
       const grade = item.grades.find((candidate) => candidate.participantId === participant.id) ?? null;
       const attempts = item.attempts.filter((attempt) => attempt.participantId === participant.id);
       const activeAttempts = attempts.filter((attempt) => attempt.lifecycle !== "deleted");
-      const effectiveGrade = activeAttempts.length || grade?.source === "override" ? grade : null;
+      const submittedAttempts = activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
+      const effectiveGrade = submittedAttempts.length || grade?.source === "override" ? grade : null;
       const status = getGradebookRowStatus(effectiveGrade, activeAttempts);
       if (statusFilter !== "all" && status !== statusFilter) {
         return [];
@@ -790,7 +800,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         selectedAttemptNumber: effectiveGrade?.selectedAttempt?.attemptNumber ?? null,
         attemptCount: activeAttempts.length,
         lateAttemptCount: activeAttempts.filter((attempt) => attempt.isLate).length,
-        submittedAttemptCount: activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded").length,
+        submittedAttemptCount: submittedAttempts.length,
         needsGradingCount: activeAttempts.filter((attempt) => attempt.lifecycle === "submitted").length,
         deletedSubmissions: deletedSubmissionAuditsForParticipant(item.events, participant.id),
         attempts: activeAttempts.map((attempt) => ({
@@ -979,7 +989,11 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
     where: {
       courseId,
       groupId,
-      gradesReleased: true
+      OR: [
+        { gradesReleased: true },
+        { attemptLimitMode: { not: "max_attempts" } },
+        { maxAttempts: { gt: 1 } }
+      ]
     },
     include: {
       activity: {
@@ -1005,8 +1019,7 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
       },
       events: {
         where: {
-          participantId: participant.id,
-          eventType: "submission_deleted"
+          participantId: participant.id
         },
         include: {
           actor: { select: { id: true, name: true, email: true } }
@@ -1018,32 +1031,47 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
   });
 
   return {
-    rows: items.map((item) => {
+    rows: items.flatMap((item) => {
       const grade = item.grades[0] ?? null;
       const activeAttempts = item.attempts.filter((attempt) => attempt.lifecycle !== "deleted");
-      const effectiveGrade = activeAttempts.length || grade?.source === "override" ? grade : null;
+      const submittedAttempts = activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
+      const effectiveGrade = submittedAttempts.length || grade?.source === "override" ? grade : null;
+      const submittedAttemptIds = new Set(submittedAttempts.map((attempt) => attempt.id));
+      const latestGrade = selectLatestGradeCandidate(
+        gradeCandidatesFromEvents(item.events ?? []).filter((candidate) => submittedAttemptIds.has(candidate.attemptId))
+      );
+      const latestGradeVisible = !item.gradesReleased && isRepeatableGradebookItem(item) && latestGrade !== null;
+      if (!item.gradesReleased && !latestGradeVisible) {
+        return [];
+      }
+      const displayedScore = item.gradesReleased ? effectiveGrade?.normalizedScore ?? null : latestGrade?.normalizedScore ?? null;
+      if (displayedScore === null) {
+        return [];
+      }
+      const displayedMaxScore = item.gradesReleased ? effectiveGrade?.normalizedMaxScore ?? item.pointsPossible : latestGrade?.normalizedMaxScore ?? item.pointsPossible;
       const status = getGradebookRowStatus(effectiveGrade, activeAttempts);
 
-      return {
+      return [{
         gradebookItemId: item.id,
         activityId: item.activity.id,
         activityTitle: item.titleSnapshot || item.activity.title,
         activityTypeName: item.activity.activityType.name,
+        gradeKind: item.gradesReleased ? "final" : "latest",
         status,
-        score: effectiveGrade?.normalizedScore ?? null,
-        maxScore: effectiveGrade?.normalizedMaxScore ?? item.pointsPossible,
-        isPass: effectiveGrade?.isPass ?? null,
-        latePenaltyApplied: effectiveGrade?.latePenaltyApplied ?? false,
-        latePenaltyPercent: effectiveGrade?.latePenaltyPercent ?? null,
-        feedback: sanitizeStudentGradeFeedback(effectiveGrade?.normalizedResult),
-        selectedAttemptNumber: effectiveGrade?.selectedAttempt?.attemptNumber ?? null,
+        score: displayedScore,
+        maxScore: displayedMaxScore,
+        isPass: item.gradesReleased ? effectiveGrade?.isPass ?? null : latestGrade?.isPass ?? null,
+        latePenaltyApplied: item.gradesReleased ? effectiveGrade?.latePenaltyApplied ?? false : latestGrade?.latePenaltyApplied ?? false,
+        latePenaltyPercent: item.gradesReleased ? effectiveGrade?.latePenaltyPercent ?? null : latestGrade?.latePenaltyPercent ?? null,
+        feedback: item.gradesReleased ? sanitizeStudentGradeFeedback(effectiveGrade?.normalizedResult) : sanitizeStudentGradeFeedback(latestGrade?.normalizedResult),
+        selectedAttemptNumber: item.gradesReleased ? effectiveGrade?.selectedAttempt?.attemptNumber ?? null : latestGrade?.attemptNumber ?? null,
         attemptCount: activeAttempts.length,
-        submittedAttemptCount: activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded").length,
-        deletedSubmissions: deletedSubmissionAuditsForParticipant(item.events, participant.id),
+        submittedAttemptCount: submittedAttempts.length,
+        deletedSubmissions: deletedSubmissionAuditsForParticipant(item.events ?? [], participant.id),
         availableFrom: item.groupActivity.availableFrom?.toISOString() ?? null,
         availableUntil: item.groupActivity.availableUntil?.toISOString() ?? null,
-        gradedAt: effectiveGrade?.gradedAt.toISOString() ?? null
-      };
+        gradedAt: item.gradesReleased ? effectiveGrade?.gradedAt.toISOString() ?? null : null
+      }];
     })
   };
 }
@@ -1147,6 +1175,10 @@ async function assertAttemptCanStart(
 ) {
   const availableUntil = context.groupActivity.availableUntil;
   const item = context.gradebookItem;
+
+  if (item.gradesReleased) {
+    throw new AppError(400, "GRADES_RELEASED", "No more attempts are allowed after grades have been released.");
+  }
 
   if (item.attemptLimitMode === "until_due" && availableUntil && now > availableUntil && !item.lateSubmissionsAllowed) {
     throw new AppError(400, "ATTEMPT_DUE_DATE_PASSED", "No more attempts are allowed after the due date.");
@@ -1331,6 +1363,7 @@ function activityAttemptSnapshot(attempt: {
 function deletedSubmissionAuditsForParticipant(
   events: Array<{
     id: string;
+    eventType?: string;
     participantId: string;
     attemptId: string | null;
     nextValue: unknown;
@@ -1342,7 +1375,7 @@ function deletedSubmissionAuditsForParticipant(
   participantId: string
 ): DeletedSubmissionAudit[] {
   return events
-    .filter((event) => event.participantId === participantId)
+    .filter((event) => event.participantId === participantId && (event.eventType === undefined || event.eventType === "submission_deleted"))
     .map((event) => {
       const nextValue = asJsonObject(event.nextValue);
       const previousValue = asJsonObject(event.previousValue);
@@ -1534,6 +1567,14 @@ function selectGradebookGrade(input: {
   }
 
   return [...candidates].sort((left, right) => right.attemptNumber - left.attemptNumber)[0];
+}
+
+function selectLatestGradeCandidate(candidates: GradedAttemptCandidate[]) {
+  return [...candidates].sort((left, right) => right.attemptNumber - left.attemptNumber)[0] ?? null;
+}
+
+function isRepeatableGradebookItem(item: { attemptLimitMode: string; maxAttempts: number | null }) {
+  return item.attemptLimitMode !== "max_attempts" || item.maxAttempts === null || item.maxAttempts > 1;
 }
 
 function buildWeightedAverageGrade(gradebookItem: GradebookItemPolicy, candidates: GradedAttemptCandidate[]): GradedAttemptCandidate {

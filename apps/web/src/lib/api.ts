@@ -555,6 +555,7 @@ export type StudentReleasedGradeRow = {
   activityId: string;
   activityTitle: string;
   activityTypeName: string;
+  gradeKind: "final" | "latest";
   status: Exclude<GradebookStatus, "all">;
   score: number | null;
   maxScore: number;

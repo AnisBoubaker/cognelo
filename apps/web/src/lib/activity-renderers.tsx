@@ -1,4 +1,5 @@
 import type { ComponentProps, JSXElementConstructor, ReactNode } from "react";
+import { useMemo } from "react";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { CodingExerciseActivityView } from "@cognelo/plugin-coding-exercises";
 import {
@@ -28,6 +29,9 @@ type ActivityRendererProps<T extends JSXElementConstructor<any>> = ComponentProp
   onSubmitted?: () => void;
   showReleasedAnswers?: boolean;
   releasedMaxScore?: number;
+  studentViewMode?: "attempt" | "previous";
+  onNewAttemptAvailabilityChange?: (canStartNewAttempt: boolean) => void;
+  onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
 };
 
 type RenderableActivity = {
@@ -84,6 +88,10 @@ type ManualGradingRendererContext = {
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
+function isAttemptAvailability(value: unknown): value is { canStart: boolean; reason: string | null } {
+  return Boolean(value && typeof value === "object" && "canStart" in value && typeof (value as { canStart?: unknown }).canStart === "boolean");
+}
+
 function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActivityView>) {
   const {
     activityRouteCourseId,
@@ -92,34 +100,63 @@ function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActi
     onSubmitted: _onSubmitted,
     showReleasedAnswers: _showReleasedAnswers,
     releasedMaxScore: _releasedMaxScore,
+    studentViewMode,
+    onNewAttemptAvailabilityChange,
+    onPreviousSubmissionsAvailabilityChange,
     ...activityProps
   } = props;
   const courseId = activityRouteCourseId ?? activityProps.course?.id;
-  const parsonsClient = createParsonsClient(apiRequest);
+  const parsonsClient = useMemo(() => createParsonsClient(apiRequest), []);
+  const aiGenerationClient = useMemo(
+    () =>
+      activityProps.canManage && hasQuestionAuthoringAgent && courseId
+        ? {
+            generate: (input: { description: string; language: string; locale: "en" | "fr" | "zh" | "ar" }) =>
+              parsonsClient.generate(courseId, activityProps.activity.id, input)
+          }
+        : undefined,
+    [activityProps.activity.id, activityProps.canManage, courseId, hasQuestionAuthoringAgent, parsonsClient]
+  );
+  const attemptsClient = useMemo(
+    () => ({
+      ensureAttempt: async (activityId: string, courseId: string, input?: { forceNew?: boolean }) => {
+        const result = groupId
+          ? await parsonsClient.ensureGroupAttempt(courseId, groupId, activityId, input)
+          : await parsonsClient.ensureAttempt(courseId, activityId, input);
+        const attemptAvailability =
+          "attemptAvailability" in result && isAttemptAvailability(result.attemptAvailability) ? result.attemptAvailability : undefined;
+        return { attempt: result.attempt, attemptAvailability };
+      },
+      listSubmissions: groupId ? async (activityId: string, courseId: string) => parsonsClient.groupSubmissions(courseId, groupId, activityId) : undefined,
+      updateAttempt: async (
+        activityId: string,
+        courseId: string,
+        input: {
+          attemptId: string;
+          state?: Parameters<typeof parsonsClient.updateAttempt>[2]["state"];
+          event?: Parameters<typeof parsonsClient.updateAttempt>[2]["event"];
+          result?: Parameters<typeof parsonsClient.updateAttempt>[2]["result"];
+          submit?: boolean;
+          complete?: boolean;
+          abandon?: boolean;
+        }
+      ) => {
+        const result = groupId
+          ? await parsonsClient.updateGroupAttempt(courseId, groupId, activityId, input)
+          : await parsonsClient.updateAttempt(courseId, activityId, input);
+        return { attempt: result.attempt };
+      }
+    }),
+    [groupId, parsonsClient]
+  );
   return (
     <ParsonsActivityView
       {...activityProps}
-      aiGenerationClient={
-        activityProps.canManage && hasQuestionAuthoringAgent && courseId
-          ? {
-              generate: (input) => parsonsClient.generate(courseId, activityProps.activity.id, input)
-            }
-          : undefined
-      }
-      attemptsClient={{
-        ensureAttempt: async (activityId, courseId, input) => {
-          const result = groupId
-            ? await parsonsClient.ensureGroupAttempt(courseId, groupId, activityId, input)
-            : await parsonsClient.ensureAttempt(courseId, activityId, input);
-          return { attempt: result.attempt };
-        },
-        updateAttempt: async (activityId, courseId, input) => {
-          const result = groupId
-            ? await parsonsClient.updateGroupAttempt(courseId, groupId, activityId, input)
-            : await parsonsClient.updateAttempt(courseId, activityId, input);
-          return { attempt: result.attempt };
-        }
-      }}
+      aiGenerationClient={aiGenerationClient}
+      attemptsClient={attemptsClient}
+      onNewAttemptAvailabilityChange={onNewAttemptAvailabilityChange}
+      onPreviousSubmissionsAvailabilityChange={onPreviousSubmissionsAvailabilityChange}
+      studentViewMode={studentViewMode}
     />
   );
 }
@@ -132,6 +169,9 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
     onSubmitted: _onSubmitted,
     showReleasedAnswers: _showReleasedAnswers,
     releasedMaxScore: _releasedMaxScore,
+    studentViewMode: _studentViewMode,
+    onNewAttemptAvailabilityChange: _onNewAttemptAvailabilityChange,
+    onPreviousSubmissionsAvailabilityChange: _onPreviousSubmissionsAvailabilityChange,
     ...activityProps
   } = props;
   const courseId = activityRouteCourseId ?? activityProps.course?.id;
@@ -203,6 +243,9 @@ function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<ty
     onSubmitted: _onSubmitted,
     showReleasedAnswers: _showReleasedAnswers,
     releasedMaxScore: _releasedMaxScore,
+    studentViewMode: _studentViewMode,
+    onNewAttemptAvailabilityChange: _onNewAttemptAvailabilityChange,
+    onPreviousSubmissionsAvailabilityChange: _onPreviousSubmissionsAvailabilityChange,
     ...activityProps
   } = props;
   return (
@@ -262,7 +305,18 @@ function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<ty
 }
 
 function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView>) {
-  const { activityRouteCourseId, groupId, hasQuestionAuthoringAgent, onSubmitted, showReleasedAnswers, releasedMaxScore, ...activityProps } = props;
+  const {
+    activityRouteCourseId,
+    groupId,
+    hasQuestionAuthoringAgent,
+    onSubmitted,
+    showReleasedAnswers,
+    releasedMaxScore,
+    studentViewMode,
+    onNewAttemptAvailabilityChange,
+    onPreviousSubmissionsAvailabilityChange,
+    ...activityProps
+  } = props;
   const courseId = activityRouteCourseId;
   const mcqClient = createMcqClient(apiRequest);
   return (
@@ -282,6 +336,9 @@ function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView
       onSubmitted={onSubmitted}
       showCorrectAnswers={Boolean(showReleasedAnswers)}
       releasedMaxScore={releasedMaxScore}
+      studentViewMode={studentViewMode}
+      onNewAttemptAvailabilityChange={onNewAttemptAvailabilityChange}
+      onPreviousSubmissionsAvailabilityChange={onPreviousSubmissionsAvailabilityChange}
       aiGenerationClient={
         activityProps.canManage && hasQuestionAuthoringAgent && courseId
           ? {
