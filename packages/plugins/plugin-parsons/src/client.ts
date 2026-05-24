@@ -21,6 +21,11 @@ export type ParsonsGenerationResult =
       attempts: number;
     };
 
+type ParsonsAttemptAvailability = {
+  canStart: boolean;
+  reason: string | null;
+};
+
 export type ParsonsPluginRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 
 export function createParsonsClient(request: ParsonsPluginRequest) {
@@ -58,7 +63,7 @@ export function createParsonsClient(request: ParsonsPluginRequest) {
         body: JSON.stringify(input)
       }),
     ensureGroupAttempt: (courseId: string, groupId: string, activityId: string, input?: { forceNew?: boolean }) =>
-      request<{ attempt: ParsonsAttemptRecord }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/parsons/attempt`, {
+      request<{ attempt: ParsonsAttemptRecord; attemptAvailability?: ParsonsAttemptAvailability }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/parsons/attempt`, {
         method: "POST",
         body: JSON.stringify(input ?? {})
       }),
@@ -80,6 +85,18 @@ export function createParsonsClient(request: ParsonsPluginRequest) {
         method: "PATCH",
         body: JSON.stringify(input)
       }),
+    groupSubmissions: (courseId: string, groupId: string, activityId: string) =>
+      request<{
+        submissions: Array<{
+          attempt: ParsonsGradebookAttemptRecord;
+          grade: {
+            rawScore: number;
+            rawMaxScore: number;
+            normalizedScore: number;
+            normalizedMaxScore: number;
+          } | null;
+        }>;
+      }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/parsons/submissions`),
     groupGradebookAttempts: (
       courseId: string,
       groupId: string,

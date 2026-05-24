@@ -28,11 +28,15 @@ type McqActivityViewProps = {
   submissionClient?: {
     getStatus?: (activityId: string) => Promise<{
       submission: { answers: StudentAnswerState } | null;
-      availability: { attemptsRemaining: number | null; canStart: boolean; reason: string | null };
+      grade?: { rawScore: number; rawMaxScore: number; normalizedScore?: number; normalizedMaxScore?: number } | null;
+      availability: { attemptsRemaining: number | null; canStart: boolean; reason: string | null; gradesReleased?: boolean };
     }>;
     submit: (activityId: string, answers: StudentAnswerState) => Promise<{ submission: { answers: StudentAnswerState } }>;
   };
   onSubmitted?: () => void;
+  studentViewMode?: "attempt" | "previous";
+  onNewAttemptAvailabilityChange?: (canStartNewAttempt: boolean) => void;
+  onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
   showCorrectAnswers?: boolean;
   releasedMaxScore?: number;
   aiGenerationClient?: {
@@ -92,6 +96,8 @@ const copyByLocale = {
     submitConfirmUnlimited: "This activity allows unlimited submissions.",
     keepWorking: "Keep working",
     confirmSubmit: "Submit answers",
+    latestSubmission: "Latest submission",
+    latestGrade: "Latest grade",
     submitted: "Submitted.",
     submitError: "Unable to submit answers.",
     reset: "Reset",
@@ -136,6 +142,8 @@ const copyByLocale = {
     submitConfirmUnlimited: "Cette activite autorise un nombre illimite de soumissions.",
     keepWorking: "Continuer",
     confirmSubmit: "Soumettre",
+    latestSubmission: "Derniere soumission",
+    latestGrade: "Derniere note",
     submitted: "Soumis.",
     submitError: "Impossible de soumettre les reponses.",
     reset: "Reinitialiser",
@@ -180,6 +188,8 @@ const copyByLocale = {
     submitConfirmUnlimited: "此活动允许无限次提交。",
     keepWorking: "继续作答",
     confirmSubmit: "提交答案",
+    latestSubmission: "最新提交",
+    latestGrade: "最新成绩",
     submitted: "已提交。",
     submitError: "暂时无法提交答案。",
     reset: "重置",
@@ -198,6 +208,9 @@ export function McqActivityView({
   locale = "en",
   submissionClient,
   onSubmitted,
+  studentViewMode = "attempt",
+  onNewAttemptAvailabilityChange,
+  onPreviousSubmissionsAvailabilityChange,
   showCorrectAnswers = false,
   releasedMaxScore,
   aiGenerationClient
@@ -215,13 +228,18 @@ export function McqActivityView({
   const [generating, setGenerating] = useState(false);
   const [showReplaceGenerationDialog, setShowReplaceGenerationDialog] = useState(false);
   const [showSubmitConfirmDialog, setShowSubmitConfirmDialog] = useState(false);
-  const [submissionAvailability, setSubmissionAvailability] = useState<{ attemptsRemaining: number | null; canStart: boolean; reason: string | null } | null>(null);
+  const [submissionAvailability, setSubmissionAvailability] = useState<{ attemptsRemaining: number | null; canStart: boolean; reason: string | null; gradesReleased?: boolean } | null>(null);
+  const [latestSubmissionReview, setLatestSubmissionReview] = useState<{
+    answers: StudentAnswerState;
+    grade: { rawScore: number; rawMaxScore: number; normalizedScore?: number; normalizedMaxScore?: number } | null;
+  } | null>(null);
   const [loadingSubmissionStatus, setLoadingSubmissionStatus] = useState(false);
   const [error, setError] = useState("");
   const [studentAnswers, setStudentAnswers] = useState<StudentAnswerState>({});
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const isSummativeStudentSession = !canManage && activity.assignment?.metadata?.assessmentMode === "summative" && Boolean(submissionClient);
+  const activityConfigKey = useMemo(() => JSON.stringify(activity.config ?? {}), [activity.config]);
 
   useEffect(() => {
     setTitle(activity.title);
@@ -236,8 +254,9 @@ export function McqActivityView({
     setShowReplaceGenerationDialog(false);
     setShowSubmitConfirmDialog(false);
     setSubmissionAvailability(null);
+    setLatestSubmissionReview(null);
     setLoadingSubmissionStatus(false);
-  }, [activity]);
+  }, [activity.id, activity.title, activity.description, activityConfigKey]);
 
   const parsedMcq = useMemo(() => parseMcqSource(source, defaultCodeLanguage), [defaultCodeLanguage, source]);
   const score = useMemo(() => {
@@ -285,9 +304,19 @@ export function McqActivityView({
           return;
         }
         setSubmissionAvailability(status.availability);
-        if (status.availability.canStart === false && status.submission) {
-          setStudentAnswers(status.submission.answers);
-          setSubmitted(true);
+        onNewAttemptAvailabilityChange?.(status.availability.canStart);
+        onPreviousSubmissionsAvailabilityChange?.(Boolean(status.submission));
+        if (status.submission) {
+          setLatestSubmissionReview({
+            answers: status.submission.answers,
+            grade: status.grade ?? null
+          });
+          if (status.availability.canStart === false) {
+            setStudentAnswers(status.submission.answers);
+            setSubmitted(true);
+          }
+        } else {
+          setLatestSubmissionReview(null);
         }
       })
       .catch((err) => {
@@ -304,7 +333,15 @@ export function McqActivityView({
     return () => {
       cancelled = true;
     };
-  }, [activity.id, copy.submitError, isSummativeStudentSession, notifications, submissionClient]);
+  }, [
+    activity.id,
+    copy.submitError,
+    isSummativeStudentSession,
+    notifications,
+    onNewAttemptAvailabilityChange,
+    onPreviousSubmissionsAvailabilityChange,
+    submissionClient
+  ]);
 
   const discardChanges = useCallback(() => {
     setTitle(savedSnapshot.title);
@@ -597,32 +634,72 @@ export function McqActivityView({
 
   return (
     <section className="section stack">
-      <McqStudentView
-        parsedMcq={parsedMcq}
-        studentAnswers={studentAnswers}
-        submitted={submitted}
-        showFeedback={(!isSummativeStudentSession && submitted) || (isSummativeStudentSession && submitted && showCorrectAnswers)}
-        score={score}
-        onSubmit={() => void requestSubmitMcqAnswers()}
-        onReset={() => {
-          setStudentAnswers({});
-          setSubmitted(false);
-        }}
-        onSingleChoice={updateSingleChoice}
-        onMultipleChoice={updateMultipleChoice}
-        questionLabel={copy.question}
-        checkAnswersLabel={isSummativeStudentSession ? copy.submitAnswers : copy.checkAnswers}
-        disabled={loadingSubmissionStatus || submitting || submitted || (isSummativeStudentSession && submissionAvailability?.canStart === false)}
-        resetDisabled={loadingSubmissionStatus || (isSummativeStudentSession && (submitted || submissionAvailability?.canStart === false))}
-        resetLabel={copy.reset}
-        scoreLabel={copy.score}
-        pointsLabel={copy.points}
-        correctLabel={copy.correct}
-        incorrectLabel={copy.incorrect}
-        missedCorrectAnswerLabel={copy.missedCorrectAnswer}
-        releasedMaxScore={releasedMaxScore}
-        randomizeChoices={randomizeChoices}
-      />
+      {latestSubmissionReview && studentViewMode === "previous" ? (
+        <section className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 18 }}>
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <h2 style={{ margin: 0 }}>{copy.latestSubmission}</h2>
+            {latestSubmissionReview.grade ? (
+              <span className="participant-status is-graded">
+                {copy.latestGrade}:{" "}
+                {formatPoints(formatDisplayGradeScore(latestSubmissionReview.grade, releasedMaxScore))} /{" "}
+                {formatPoints(releasedMaxScore ?? latestSubmissionReview.grade.normalizedMaxScore ?? latestSubmissionReview.grade.rawMaxScore)}
+              </span>
+            ) : null}
+          </div>
+          <McqStudentView
+            parsedMcq={parsedMcq}
+            studentAnswers={latestSubmissionReview.answers}
+            submitted
+            showFeedback
+            score={null}
+            onSubmit={() => undefined}
+            onReset={() => undefined}
+            onSingleChoice={() => undefined}
+            onMultipleChoice={() => undefined}
+            questionLabel={copy.question}
+            checkAnswersLabel={copy.checkAnswers}
+            disabled
+            resetDisabled
+            hideActions
+            resetLabel={copy.reset}
+            scoreLabel={copy.score}
+            pointsLabel={copy.points}
+            correctLabel={copy.correct}
+            incorrectLabel={copy.incorrect}
+            missedCorrectAnswerLabel={copy.missedCorrectAnswer}
+            releasedMaxScore={releasedMaxScore ?? latestSubmissionReview.grade?.normalizedMaxScore}
+            randomizeChoices={false}
+          />
+        </section>
+      ) : null}
+      {studentViewMode === "attempt" ? (
+        <McqStudentView
+          parsedMcq={parsedMcq}
+          studentAnswers={studentAnswers}
+          submitted={submitted}
+          showFeedback={(!isSummativeStudentSession && submitted) || (isSummativeStudentSession && submitted && showCorrectAnswers)}
+          score={score}
+          onSubmit={() => void requestSubmitMcqAnswers()}
+          onReset={() => {
+            setStudentAnswers({});
+            setSubmitted(false);
+          }}
+          onSingleChoice={updateSingleChoice}
+          onMultipleChoice={updateMultipleChoice}
+          questionLabel={copy.question}
+          checkAnswersLabel={isSummativeStudentSession ? copy.submitAnswers : copy.checkAnswers}
+          disabled={loadingSubmissionStatus || submitting || submitted || (isSummativeStudentSession && submissionAvailability?.canStart === false)}
+          resetDisabled={loadingSubmissionStatus || (isSummativeStudentSession && (submitted || submissionAvailability?.canStart === false))}
+          resetLabel={copy.reset}
+          scoreLabel={copy.score}
+          pointsLabel={copy.points}
+          correctLabel={copy.correct}
+          incorrectLabel={copy.incorrect}
+          missedCorrectAnswerLabel={copy.missedCorrectAnswer}
+          releasedMaxScore={releasedMaxScore}
+          randomizeChoices={randomizeChoices}
+        />
+      ) : null}
       {showSubmitConfirmDialog ? (
         <div className="dialog-backdrop" role="presentation">
           <div aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="mcq-submit-confirm-title">
@@ -661,6 +738,7 @@ function McqStudentView({
   checkAnswersLabel,
   disabled,
   resetDisabled,
+  hideActions = false,
   resetLabel,
   scoreLabel,
   pointsLabel,
@@ -683,6 +761,7 @@ function McqStudentView({
   checkAnswersLabel: string;
   disabled: boolean;
   resetDisabled: boolean;
+  hideActions?: boolean;
   resetLabel: string;
   scoreLabel: string;
   pointsLabel: string;
@@ -730,7 +809,7 @@ function McqStudentView({
         );
       })}
 
-      {parsedMcq.questions.length ? (
+      {parsedMcq.questions.length && !hideActions ? (
         <div className="row">
           <button type="button" disabled={disabled} onClick={onSubmit}>
             {checkAnswersLabel}
@@ -993,6 +1072,16 @@ function formatPoints(value: number) {
     return String(value);
   }
   return value.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function formatDisplayGradeScore(
+  grade: { rawScore: number; rawMaxScore: number; normalizedScore?: number; normalizedMaxScore?: number },
+  displayMaxScore?: number
+) {
+  if (displayMaxScore !== undefined && grade.rawMaxScore > 0) {
+    return (grade.rawScore / grade.rawMaxScore) * displayMaxScore;
+  }
+  return grade.normalizedScore ?? grade.rawScore;
 }
 
 function shuffleChoices(choices: McqChoice[]) {

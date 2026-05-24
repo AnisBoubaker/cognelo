@@ -70,13 +70,23 @@ export const mcqSubmissionRoute: PluginRouteDefinition = {
       if (!participant) {
         throw new AppError(403, "PARTICIPANT_REQUIRED", "Only enrolled students can submit this activity.");
       }
+      const submission = await findLatestMcqSubmission({
+        courseId: context.courseId,
+        groupId: context.groupId,
+        activityId: context.activity.id,
+        participantId: participant.id
+      });
+      const gradingResult = submission ? buildMcqGradingResultFromConfig(context.activity.config, submission.answers) : null;
       return {
-        submission: await findLatestMcqSubmission({
-          courseId: context.courseId,
-          groupId: context.groupId,
-          activityId: context.activity.id,
-          participantId: participant.id
-        }),
+        submission,
+        grade: gradingResult
+          ? {
+              rawScore: gradingResult.rawScore,
+              rawMaxScore: gradingResult.rawMaxScore,
+              normalizedScore: gradingResult.rawScore,
+              normalizedMaxScore: gradingResult.rawMaxScore
+            }
+          : null,
         availability: await getActivityAttemptAvailability(context.user, {
           courseId: context.courseId,
           groupId: context.groupId,

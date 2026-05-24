@@ -62,6 +62,7 @@ vi.mock("./authorization", () => authMocks);
 
 const {
   getActivityAttemptRegradeContext,
+  getActivityAttemptAvailability,
   getCourseGradebook,
   getStudentReleasedGrades,
   deleteActivitySubmission,
@@ -106,6 +107,7 @@ const groupActivity = {
     gradingMode: "points",
     passThresholdPoints: null,
     passThresholdOutOf: null,
+    gradesReleased: false,
     attemptLimitMode: "unlimited",
     maxAttempts: null,
     gradeStrategy: "latest",
@@ -213,6 +215,49 @@ describe("gradebook attempt services", () => {
     expect(tx.activityAttempt.create).not.toHaveBeenCalled();
   });
 
+  it("rejects a new attempt when grades have been released", async () => {
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({
+      ...groupActivity,
+      gradebookItem: {
+        ...groupActivity.gradebookItem,
+        gradesReleased: true
+      }
+    });
+
+    await expect(
+      startActivityAttempt(studentUser, {
+        courseId: "course-1",
+        groupId: "group-1",
+        activityId: "activity-1",
+        pluginKey: "mcq",
+        pluginVersion: "0.1.0"
+      })
+    ).rejects.toMatchObject({ code: "GRADES_RELEASED" });
+    expect(tx.activityAttempt.create).not.toHaveBeenCalled();
+  });
+
+  it("reports attempts unavailable when grades have been released", async () => {
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({
+      ...groupActivity,
+      gradebookItem: {
+        ...groupActivity.gradebookItem,
+        gradesReleased: true
+      }
+    });
+
+    await expect(
+      getActivityAttemptAvailability(studentUser, {
+        courseId: "course-1",
+        groupId: "group-1",
+        activityId: "activity-1"
+      })
+    ).resolves.toMatchObject({
+      canStart: false,
+      reason: "GRADES_RELEASED",
+      gradesReleased: true
+    });
+  });
+
   it("computes lateness when submitting an attempt after available until and grace", async () => {
     mockPrisma.activityAttempt.findUnique.mockResolvedValue({
       id: "attempt-1",
@@ -243,6 +288,33 @@ describe("gradebook attempt services", () => {
       isLate: true,
       lateBySeconds: 330
     });
+  });
+
+  it("rejects submitting an already-started attempt when grades have been released", async () => {
+    mockPrisma.activityAttempt.findUnique.mockResolvedValue({
+      id: "attempt-1",
+      courseId: "course-1",
+      participant,
+      participantId: "participant-1",
+      userId: "student-1",
+      lifecycle: "started",
+      startedAt: new Date("2026-05-18T14:00:00.000Z"),
+      pluginAttemptRef: null,
+      groupActivity: {
+        availableUntil: null
+      },
+      gradebookItem: {
+        ...groupActivity.gradebookItem,
+        gradesReleased: true
+      }
+    });
+
+    await expect(
+      submitActivityAttempt(studentUser, {
+        attemptId: "attempt-1"
+      })
+    ).rejects.toMatchObject({ code: "GRADES_RELEASED" });
+    expect(mockPrisma.activityAttempt.update).not.toHaveBeenCalled();
   });
 
   it("records a grading result, grades the attempt, and writes an audit event", async () => {
@@ -628,6 +700,19 @@ describe("gradebook attempt services", () => {
             lateBySeconds: null,
             durationSeconds: 60,
             pluginAttemptRef: "plugin-attempt-1"
+          },
+          {
+            id: "attempt-2",
+            participantId: "participant-1",
+            attemptNumber: 2,
+            lifecycle: "started",
+            startedAt: testNow,
+            submittedAt: null,
+            gradedAt: null,
+            isLate: false,
+            lateBySeconds: null,
+            durationSeconds: null,
+            pluginAttemptRef: "plugin-attempt-2"
           }
         ],
         events: []
@@ -641,7 +726,12 @@ describe("gradebook attempt services", () => {
           status: "missing",
           score: null,
           submittedAttemptCount: 0,
-          attempts: []
+          attempts: [
+            {
+              id: "attempt-2",
+              lifecycle: "started"
+            }
+          ]
         }
       ]
     });
@@ -1090,6 +1180,9 @@ describe("gradebook attempt services", () => {
         id: "gradebook-item-1",
         titleSnapshot: "Loops",
         pointsPossible: 100,
+        gradesReleased: true,
+        attemptLimitMode: "max_attempts",
+        maxAttempts: 1,
         activity: {
           id: "activity-1",
           title: "Loops",
@@ -1122,6 +1215,29 @@ describe("gradebook attempt services", () => {
             selectedAttempt: { attemptNumber: 2, isLate: false }
           }
         ],
+        events: [
+          {
+            id: "event-1",
+            participantId: "participant-1",
+            attemptId: "attempt-1",
+            eventType: "auto_graded",
+            nextValue: {
+              attemptId: "attempt-1",
+              attemptNumber: 1,
+              rawScore: 1,
+              rawMaxScore: 1,
+              normalizedScore: 100,
+              normalizedMaxScore: 100,
+              isPass: true,
+              latePenaltyApplied: false,
+              latePenaltyPercent: null,
+              normalizedResult: {}
+            },
+            previousValue: null,
+            reason: null,
+            createdAt: testNow
+          }
+        ],
         attempts: [
           {
             participantId: "participant-1",
@@ -1146,6 +1262,7 @@ describe("gradebook attempt services", () => {
           activityId: "activity-1",
           activityTitle: "Loops",
           activityTypeName: "Parsons problem",
+          gradeKind: "final",
           status: "graded",
           score: 88,
           maxScore: 100,
@@ -1178,9 +1295,77 @@ describe("gradebook attempt services", () => {
         where: {
           courseId: "course-1",
           groupId: "group-1",
-          gradesReleased: true
+          OR: [
+            { gradesReleased: true },
+            { attemptLimitMode: { not: "max_attempts" } },
+            { maxAttempts: { gt: 1 } }
+          ]
         }
       })
     );
+  });
+
+  it("does not return a released automatic grade when all submitted attempts were deleted", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({
+      id: "group-1",
+      courseId: "course-1",
+      status: "published",
+      availableFrom: null,
+      availableUntil: null
+    });
+    mockPrisma.courseGroupParticipant.findFirst
+      .mockResolvedValueOnce({ id: "participant-1", userId: "student-1", role: "student" })
+      .mockResolvedValueOnce({ id: "participant-1", userId: "student-1", role: "student" });
+    mockPrisma.gradebookItem.findMany.mockResolvedValue([
+      {
+        id: "gradebook-item-1",
+        titleSnapshot: "Loops",
+        pointsPossible: 100,
+        gradesReleased: true,
+        attemptLimitMode: "max_attempts",
+        maxAttempts: 3,
+        activity: {
+          id: "activity-1",
+          title: "Loops",
+          activityType: { key: "parsons-problem", name: "Parsons problem" }
+        },
+        groupActivity: {
+          availableFrom: null,
+          availableUntil: null
+        },
+        grades: [
+          {
+            normalizedScore: 100,
+            normalizedMaxScore: 100,
+            isPass: null,
+            latePenaltyApplied: false,
+            latePenaltyPercent: null,
+            gradedAt: testNow,
+            source: "auto",
+            normalizedResult: {},
+            selectedAttempt: { attemptNumber: 1, isLate: false }
+          }
+        ],
+        events: [],
+        attempts: [
+          {
+            participantId: "participant-1",
+            attemptNumber: 1,
+            lifecycle: "deleted",
+            isLate: false
+          },
+          {
+            participantId: "participant-1",
+            attemptNumber: 2,
+            lifecycle: "started",
+            isLate: false
+          }
+        ]
+      }
+    ]);
+
+    await expect(getStudentReleasedGrades(studentUser, "course-1", "group-1")).resolves.toEqual({
+      rows: []
+    });
   });
 });

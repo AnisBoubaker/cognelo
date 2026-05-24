@@ -21,6 +21,9 @@ export default function GroupActivityPage() {
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [releasedGrade, setReleasedGrade] = useState<StudentReleasedGradeRow | null>(null);
   const [deletedSubmissions, setDeletedSubmissions] = useState<DeletedSubmissionAudit[]>([]);
+  const [canStartNewAttempt, setCanStartNewAttempt] = useState<boolean | null>(null);
+  const [hasPreviousSubmissions, setHasPreviousSubmissions] = useState<boolean | null>(null);
+  const [selectedTab, setSelectedTab] = useState<"attempt" | "previous" | "deleted">("attempt");
   const [hasQuestionAuthoringAgent, setHasQuestionAuthoringAgent] = useState(false);
   const [error, setError] = useState("");
 
@@ -30,6 +33,12 @@ export default function GroupActivityPage() {
     activity && activityDefinitions.some((definition) => definition.key === activity.activityType.key)
       ? activityRenderers[activity.activityType.key as keyof typeof activityRenderers]
       : null;
+
+  useEffect(() => {
+    setCanStartNewAttempt(null);
+    setHasPreviousSubmissions(null);
+    setSelectedTab("attempt");
+  }, [activityId, courseId, groupId]);
 
   useEffect(() => {
     async function refresh() {
@@ -66,6 +75,29 @@ export default function GroupActivityPage() {
 
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("activityPage.loadError")));
   }, [activityId, courseId, groupId, t, user]);
+
+  useEffect(() => {
+    const newAttemptAvailable = canStartNewAttempt !== false;
+    const previousAvailable = hasPreviousSubmissions === true;
+    const previousKnownUnavailable = hasPreviousSubmissions === false;
+    const deletedAvailable = deletedSubmissions.length > 0;
+
+    if (selectedTab === "attempt" && !newAttemptAvailable) {
+      if (previousAvailable) {
+        setSelectedTab("previous");
+      } else if (previousKnownUnavailable && deletedAvailable) {
+        setSelectedTab("deleted");
+      }
+      return;
+    }
+    if (selectedTab === "previous" && previousKnownUnavailable) {
+      setSelectedTab(newAttemptAvailable ? "attempt" : deletedAvailable ? "deleted" : "attempt");
+      return;
+    }
+    if (selectedTab === "deleted" && !deletedAvailable) {
+      setSelectedTab(newAttemptAvailable ? "attempt" : previousAvailable ? "previous" : "attempt");
+    }
+  }, [canStartNewAttempt, deletedSubmissions.length, hasPreviousSubmissions, selectedTab]);
 
   async function saveActivity(input: { title: string; description: string; config: Record<string, unknown> }) {
     const result = await api.updateActivity(courseId, activityId, input);
@@ -104,10 +136,10 @@ export default function GroupActivityPage() {
 
         {error ? <p className="error">{error}</p> : null}
 
-        {releasedGrade ? (
+        {releasedGrade?.gradeKind === "final" ? (
           <section className="section stack">
             <div>
-              <p className="eyebrow">{t("groupPage.releasedGradeEyebrow")}</p>
+              <p className="eyebrow">{t("groupPage.finalGradeLabel")}</p>
               <h2>{formatGradebookScore(releasedGrade.score, releasedGrade.maxScore)}</h2>
               {releasedGrade.latePenaltyApplied && releasedGrade.latePenaltyPercent !== null ? (
                 <p className="muted">-{releasedGrade.latePenaltyPercent}%</p>
@@ -117,31 +149,74 @@ export default function GroupActivityPage() {
           </section>
         ) : null}
 
-        {activity && ActivityRenderer ? (
-          <ActivityRenderer
-            activity={activity}
-            activityRouteCourseId={courseId}
-            canManage={Boolean(canManage)}
-            course={course ? { id: course.id, title: course.title } : null}
-            groupId={groupId}
-            hasQuestionAuthoringAgent={hasQuestionAuthoringAgent}
-            onSubmitted={() => router.push(`/courses/${courseId}/groups/${groupId}`)}
-            onSave={saveActivity}
-            showReleasedAnswers={Boolean(releasedGrade)}
-            releasedMaxScore={releasedGrade?.maxScore ?? undefined}
-            t={t}
-            locale={locale}
-          />
-        ) : activity ? (
-          <section className="section stack">
-            <h2>{t("parsons.unsupportedTitle")}</h2>
-            <p className="muted">{t("parsons.unsupportedText")}</p>
-          </section>
-        ) : (
-          <p>{t("common.loading")}</p>
-        )}
+        {hasPreviousSubmissions === true || deletedSubmissions.length || canStartNewAttempt === false ? (
+          <div className="tab-strip" role="tablist" aria-label={activity?.title ?? t("common.loading")}>
+            {canStartNewAttempt !== false ? (
+              <button
+                aria-selected={selectedTab === "attempt"}
+                className="tab-button"
+                role="tab"
+                type="button"
+                onClick={() => setSelectedTab("attempt")}
+              >
+                {t("courseDetail.newAttemptTab")}
+              </button>
+            ) : null}
+            {hasPreviousSubmissions === true ? (
+              <button
+                aria-selected={selectedTab === "previous"}
+                className="tab-button"
+                role="tab"
+                type="button"
+                onClick={() => setSelectedTab("previous")}
+              >
+                {t("courseDetail.previousSubmissionsTitle")}
+              </button>
+            ) : null}
+            {deletedSubmissions.length ? (
+              <button
+                aria-selected={selectedTab === "deleted"}
+                className="tab-button"
+                role="tab"
+                type="button"
+                onClick={() => setSelectedTab("deleted")}
+              >
+                {t("courseDetail.deletedSubmissionsTitle")}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
-        {deletedSubmissions.length ? (
+        {(selectedTab === "attempt" && canStartNewAttempt !== false) || selectedTab === "previous" ? (
+          activity && ActivityRenderer ? (
+            <ActivityRenderer
+              activity={activity}
+              activityRouteCourseId={courseId}
+              canManage={Boolean(canManage)}
+              course={course ? { id: course.id, title: course.title } : null}
+              groupId={groupId}
+              hasQuestionAuthoringAgent={hasQuestionAuthoringAgent}
+              onSubmitted={() => router.push(`/courses/${courseId}/groups/${groupId}`)}
+              onSave={saveActivity}
+              showReleasedAnswers={releasedGrade?.gradeKind === "final"}
+              releasedMaxScore={releasedGrade?.maxScore ?? undefined}
+              studentViewMode={selectedTab === "previous" ? "previous" : "attempt"}
+              onNewAttemptAvailabilityChange={setCanStartNewAttempt}
+              onPreviousSubmissionsAvailabilityChange={setHasPreviousSubmissions}
+              t={t}
+              locale={locale}
+            />
+          ) : activity ? (
+            <section className="section stack">
+              <h2>{t("parsons.unsupportedTitle")}</h2>
+              <p className="muted">{t("parsons.unsupportedText")}</p>
+            </section>
+          ) : (
+            <p>{t("common.loading")}</p>
+          )
+        ) : null}
+
+        {deletedSubmissions.length && selectedTab === "deleted" ? (
           <section className="section stack">
             <div>
               <p className="eyebrow">{t("courseDetail.deletedSubmissionsTitle")}</p>

@@ -271,7 +271,8 @@ export default function CourseGroupPage() {
                                   ) : null}
                                   {releasedGrade ? (
                                     <span className={`participant-status is-${releasedGrade.status.replace("_", "-")}`}>
-                                      {t("courseDetail.gradeHeader")}: {formatGradebookScore(releasedGrade.score, releasedGrade.maxScore)}
+                                      {t(releasedGrade.gradeKind === "final" ? "groupPage.finalGradeLabel" : "groupPage.latestGradeLabel")}:{" "}
+                                      {formatGradebookScore(releasedGrade.score, releasedGrade.maxScore)}
                                     </span>
                                   ) : null}
                                 </div>
