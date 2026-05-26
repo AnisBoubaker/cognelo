@@ -432,6 +432,7 @@ This preserves the documented student-first, section-first navigation model.
 - Phase 6 is implemented.
 - Phase 7 is implemented.
 - Phase 8 is implemented for the student group workspace.
+- Phase 9 is implemented as a lightweight web material type registry.
 - The schema foundation lives in `packages/db/prisma/schema.prisma`.
 - The migration lives in `packages/db/prisma/migrations/202605260001_course_content_tree/migration.sql`.
 - The schema foundation test lives in `packages/db/prisma/course-content-schema.test.ts`.
@@ -445,6 +446,7 @@ This preserves the documented student-first, section-first navigation model.
   - `apps/api/src/app/api/courses/[courseId]/groups/[groupId]/content/route.test.ts`
 - The seed content tree lives in `packages/db/prisma/seed.ts`.
 - Activity creation and assignment now accept optional `contentPlacement` in shared contracts.
+- Student accordion state for first-level folders is stored in browser `localStorage`, keyed per course/group, and pruned defensively after content loads.
 - Verification completed after Phase 1:
   - `npx prisma validate --schema packages/db/prisma/schema.prisma`
   - `npm run db:migrate:all`
@@ -545,24 +547,47 @@ Verification completed after Phase 7:
   - `/courses/seed-course-programming-101/groups/seed-group-programming-101-section-a`
 - `npm test`
 
-### Phase 8: Student Content Tree
+### Phase 8: Student Content Tree - Complete
 
 - Render the unified tree in the student section workspace.
 - Use effective visibility and activity availability to determine display and openability.
 - Keep student grade visibility and feedback behavior backed by the gradebook APIs.
 
-Implemented scope: learner group workspaces now open on a unified Content tab instead of separate Activities and Materials tabs. The student content tree uses the group content endpoint with effective visibility filtering, renders first-level folders as persisted accordion sections, keeps nested folder expand/collapse inside each accordion section, opens visible materials according to type, hides unassigned course-level activity shells, locks upcoming assigned activities, and carries over submission/released-grade badges from the former student activities list. Student grades remain in the separate Grades tab backed by gradebook release APIs.
+Implemented scope: learner group workspaces now open on a unified Content tab instead of separate Activities and Materials tabs. The student content tree uses the group content endpoint with effective visibility filtering, renders first-level folders as theme-colored accordion sections, keeps nested folder expand/collapse inside each accordion section, opens visible materials according to type, hides unassigned course-level activity shells, locks upcoming assigned activities, and carries over submission/released-grade badges from the former student activities list. Student grades remain in the separate Grades tab backed by gradebook release APIs.
+
+Student accordion behavior:
+
+- first-level folders are collapsed the first time a learner opens the group workspace
+- multiple first-level folders may be open at once
+- open/closed state is persisted in browser `localStorage` with a course/group-specific key
+- saved folder IDs are parsed defensively and pruned only after the current content tree has loaded, so removed or moved folders cannot break the page
+- first-level accordion headers intentionally show only the folder title and chevron; nested folders retain the normal folder-row treatment
+- the student content heading is intentionally reduced to a single localized "Course content" label
+- content labels are localized across the supported locale bundles
 
 Verification completed after Phase 8:
 
 - `npm run typecheck`
 - `npm test -- apps/web/src/lib/i18n.test.ts apps/web/src/lib/api.test.ts`
 
-### Phase 9: Material Type Registry
+### Phase 9: Material Type Registry - Complete
 
 - Introduce lightweight material type definitions.
 - Register existing material types.
 - Update the Material picker category to render from the registry.
+
+Implemented scope: material type definitions now live in `apps/web/src/lib/material-types.ts` and drive the course element picker's Material category plus material icon resolution in course/group content trees. The registry is intentionally lightweight and separate from activity plugins. It records each material type's label key, description key, default title key, icon, create mode, and future-facing `embeddingSource` so later course-material embedding/indexing work can identify whether semantic content should come from an uploaded file, typed text body, or external URL without changing the activity plugin lifecycle.
+
+Registered material types:
+
+- GitHub repo: shell creation, external URL embedding source
+- File: upload-oriented material type, file upload embedding source
+- Text: shell creation, text body embedding source
+
+Verification completed after Phase 9:
+
+- `npm run typecheck`
+- `npm test -- apps/web/src/lib/material-types.test.ts`
 
 ### Phase 10: Documentation And Cleanup
 
