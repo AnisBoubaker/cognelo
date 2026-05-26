@@ -1399,7 +1399,7 @@ export default function CourseGroupPage() {
 
             <WorkspaceTabs
               ariaLabel={t("groupPage.workspaceTabs")}
-              initialTab={searchParams.get("tab") === "gradebook" ? "gradebook" : "activities"}
+              initialTab={searchParams.get("tab") === "gradebook" ? "gradebook" : "content"}
               tabs={[
                 {
                   id: "activities",
@@ -1688,6 +1688,32 @@ export default function CourseGroupPage() {
                             const courseActivity = item.activityId ? courseActivityById.get(item.activityId) : null;
                             const activityTypeKey = assignment?.activity.activityType.key ?? courseActivity?.activityType.key ?? null;
                             const activityLabel = activityTypeKey ? activityCopy(activityTypeKey).name : null;
+                            const isCourseWideAssignment = assignment?.metadata?.assignmentScope === "course_all_groups";
+                            const isCourseWideSettingsLocked = assignment?.metadata?.enablePerGroupSettings === false;
+                            const assessmentMode =
+                              assignment?.metadata?.assessmentMode === "summative"
+                                ? t("groupPage.assessmentModeSummative")
+                                : assignment
+                                  ? t("groupPage.assessmentModeFormative")
+                                  : null;
+                            const availabilityLabel = assignment
+                              ? formatAvailabilityWindow(assignment.availableFrom, assignment.availableUntil, t)
+                              : null;
+                            const metadataBadges = [
+                              activityLabel ? <span className="metadata-badge is-activity-type" key="activity-type">{activityLabel}</span> : null,
+                              isCourseWideAssignment ? (
+                                <span className="metadata-badge is-course-wide" key="course-wide">
+                                  {t("groupPage.courseWideAssignment")}
+                                </span>
+                              ) : null,
+                              isCourseWideSettingsLocked ? (
+                                <span className="metadata-badge" key="course-wide-locked">
+                                  {t("groupPage.courseWideSettingsLocked")}
+                                </span>
+                              ) : null,
+                              assessmentMode ? <span className="metadata-badge" key="assessment-mode">{assessmentMode}</span> : null,
+                              availabilityLabel ? <span className="metadata-badge" key="availability">{availabilityLabel}</span> : null
+                            ].filter(Boolean);
                             const isHidden = item.effectiveVisibility ? item.effectiveVisibility !== "visible" : !item.isVisible;
 
                             return (
@@ -1738,11 +1764,7 @@ export default function CourseGroupPage() {
                                     </span>
                                   )}
                                   <strong>{href ? <Link href={href}>{title}</Link> : title}</strong>
-                                  {activityLabel ? (
-                                    <span className="metadata-badges">
-                                      <span className="metadata-badge is-activity-type">{activityLabel}</span>
-                                    </span>
-                                  ) : null}
+                                  {metadataBadges.length ? <span className="metadata-badges">{metadataBadges}</span> : null}
                                 </div>
                                 <div className="table-actions content-row-actions">
                                   {href ? (
@@ -2486,7 +2508,7 @@ export default function CourseGroupPage() {
                       </section>
                     )
                 }
-              ]}
+              ].filter((tab) => tab.id !== "activities" && tab.id !== "materials")}
             />
             {dragPreview ? (
               <div className="drag-preview" style={{ left: dragPreview.x + 14, top: dragPreview.y + 14 }}>
