@@ -452,8 +452,7 @@ export async function getGroupAssignedActivity(user: CurrentUser, courseId: stri
     const now = new Date();
     if (
       group.status !== "published" ||
-      (assignment.availableFrom && assignment.availableFrom > now) ||
-      (assignment.availableUntil && assignment.availableUntil < now)
+      (assignment.availableFrom && assignment.availableFrom > now)
     ) {
       throw new AppError(403, "GROUP_ACTIVITY_NOT_AVAILABLE", "This activity is not currently available in the group.");
     }

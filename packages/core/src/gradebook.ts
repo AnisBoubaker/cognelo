@@ -1180,7 +1180,7 @@ async function assertAttemptCanStart(
     throw new AppError(400, "GRADES_RELEASED", "No more attempts are allowed after grades have been released.");
   }
 
-  if (item.attemptLimitMode === "until_due" && availableUntil && now > availableUntil && !item.lateSubmissionsAllowed) {
+  if (availableUntil && now > availableUntil) {
     throw new AppError(400, "ATTEMPT_DUE_DATE_PASSED", "No more attempts are allowed after the due date.");
   }
 
