@@ -27,8 +27,8 @@ import {
   StudentReleasedGrades
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { materialIconName, type MaterialTypeIconName } from "@/lib/material-types";
 
-type PickerMaterialIcon = "github" | "file" | "text";
 type ContentDropPlacement = "after" | "before" | "inside";
 type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
 
@@ -406,9 +406,7 @@ export default function CourseGroupPage() {
                 render: () => (
                   <section className="section stack">
                     <div>
-                      <p className="eyebrow">{t("courseDetail.contentEyebrow")}</p>
-                      <h2>{t("courseDetail.contentTitle")}</h2>
-                      <p className="muted">{t("courseDetail.contentText")}</p>
+                      <h2>{t("courseDetail.contentEyebrow")}</h2>
                     </div>
 
                     {studentRootContentItems.length ? (
@@ -934,7 +932,7 @@ export default function CourseGroupPage() {
     return item.titleSnapshot ?? t("courseDetail.untitledFolder");
   }
 
-  function contentItemMaterialIconName(item: CourseContentItem): PickerMaterialIcon {
+  function contentItemMaterialIconName(item: CourseContentItem): MaterialTypeIconName {
     const material = item.materialId ? courseMaterialById.get(item.materialId) ?? groupMaterialById.get(item.materialId) : null;
     return materialIconName(material?.kind);
   }
@@ -3133,7 +3131,7 @@ function FolderContentIcon({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-function MaterialTypeIcon({ iconName }: { iconName: PickerMaterialIcon }) {
+function MaterialTypeIcon({ iconName }: { iconName: MaterialTypeIconName }) {
   const paths = {
     github: (
       <>
@@ -3169,16 +3167,6 @@ function MaterialTypeIcon({ iconName }: { iconName: PickerMaterialIcon }) {
       </svg>
     </span>
   );
-}
-
-function materialIconName(kind: string | null | undefined): PickerMaterialIcon {
-  if (kind === "github_repo") {
-    return "github";
-  }
-  if (kind === "text") {
-    return "text";
-  }
-  return "file";
 }
 
 function getHiddenMaterialState<T extends MaterialTreeNode>(materials: T[], hiddenMaterialIds: Set<string>, materialId: string) {

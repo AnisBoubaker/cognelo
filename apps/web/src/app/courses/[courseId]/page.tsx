@@ -20,46 +20,22 @@ import {
   CourseGradebookItemSummary,
   CourseGradebookRow,
   CourseMaterial,
-  GradebookStatus,
-  MaterialKind
+  GradebookStatus
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { materialIconName, materialTypeDefinitions, type MaterialTypeIconName, type PickerMaterialKind } from "@/lib/material-types";
 
 type ActivityCategoryId = "programming" | "miscellaneous";
 type ActivityPickerTabId = "activity-banks" | ActivityCategoryId | "material";
 type ContentDropPlacement = "after" | "before" | "inside";
 type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
-type PickerMaterialKind = Extract<MaterialKind, "github_repo" | "file" | "text">;
-type PickerMaterialIcon = "github" | "file" | "text";
 
 const activityCategories: Array<{ id: ActivityCategoryId; labelKey: string }> = [
   { id: "programming", labelKey: "activityBankDetail.categoryProgramming" },
   { id: "miscellaneous", labelKey: "activityBankDetail.categoryMiscellaneous" }
 ];
 
-const pickerMaterialTypes: Array<{ kind: PickerMaterialKind; labelKey: string; descriptionKey: string; defaultTitleKey: string; icon: PickerMaterialIcon }> = [
-  {
-    kind: "github_repo",
-    labelKey: "materialKinds.github_repo",
-    descriptionKey: "courseDetail.materialTypeGithubDescription",
-    defaultTitleKey: "courseDetail.defaultRepoTitle",
-    icon: "github"
-  },
-  {
-    kind: "file",
-    labelKey: "materialKinds.file",
-    descriptionKey: "courseDetail.materialTypeFileDescription",
-    defaultTitleKey: "courseDetail.defaultFileTitle",
-    icon: "file"
-  },
-  {
-    kind: "text",
-    labelKey: "materialKinds.text",
-    descriptionKey: "courseDetail.materialTypeTextDescription",
-    defaultTitleKey: "courseDetail.defaultTextTitle",
-    icon: "text"
-  }
-];
+const pickerMaterialTypes = materialTypeDefinitions;
 
 export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();
@@ -900,7 +876,7 @@ export default function CourseDetailPage() {
     return null;
   }
 
-  function contentItemMaterialIconName(item: CourseContentItem): PickerMaterialIcon {
+  function contentItemMaterialIconName(item: CourseContentItem): MaterialTypeIconName {
     const material = item.materialId ? courseMaterialById.get(item.materialId) : null;
     return materialIconName(material?.kind);
   }
@@ -2302,7 +2278,7 @@ function FolderContentIcon({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-function MaterialTypeIcon({ iconName }: { iconName: PickerMaterialIcon }) {
+function MaterialTypeIcon({ iconName }: { iconName: MaterialTypeIconName }) {
   const paths = {
     github: (
       <>
@@ -2338,16 +2314,6 @@ function MaterialTypeIcon({ iconName }: { iconName: PickerMaterialIcon }) {
       </svg>
     </span>
   );
-}
-
-function materialIconName(kind: string | null | undefined): PickerMaterialIcon {
-  if (kind === "github_repo") {
-    return "github";
-  }
-  if (kind === "text") {
-    return "text";
-  }
-  return "file";
 }
 
 function MaterialActionIcon({ name }: { name: "assign" | "download" | "down" | "drag" | "edit" | "hidden" | "open" | "remove" | "up" | "visible" }) {
