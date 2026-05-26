@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
-import { api, Activity, ActivityDefinition, Course, CourseGroup, DeletedSubmissionAudit, StudentGradeFeedback, StudentReleasedGradeRow } from "@/lib/api";
+import { api, ApiError, Activity, ActivityDefinition, Course, CourseGroup, DeletedSubmissionAudit, StudentGradeFeedback, StudentReleasedGradeRow } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { activityRenderers } from "@/lib/activity-renderers";
 
@@ -24,6 +24,7 @@ export default function GroupActivityPage() {
   const [canStartNewAttempt, setCanStartNewAttempt] = useState<boolean | null>(null);
   const [hasPreviousSubmissions, setHasPreviousSubmissions] = useState<boolean | null>(null);
   const [selectedTab, setSelectedTab] = useState<"attempt" | "previous" | "deleted">("attempt");
+  const [isActivityUnavailable, setIsActivityUnavailable] = useState(false);
   const [hasQuestionAuthoringAgent, setHasQuestionAuthoringAgent] = useState(false);
   const [error, setError] = useState("");
 
@@ -37,21 +38,20 @@ export default function GroupActivityPage() {
   useEffect(() => {
     setCanStartNewAttempt(null);
     setHasPreviousSubmissions(null);
+    setIsActivityUnavailable(false);
     setSelectedTab("attempt");
   }, [activityId, courseId, groupId]);
 
   useEffect(() => {
     async function refresh() {
-      const [courseResult, groupResult, activityResult, typeResult, aiAgentResult] = await Promise.all([
+      const [courseResult, groupResult, typeResult, aiAgentResult] = await Promise.all([
         api.course(courseId),
         api.group(courseId, groupId),
-        api.groupActivity(courseId, groupId, activityId),
         api.activityTypes(),
         api.aiAgentConnections()
       ]);
       setCourse(courseResult.course);
       setGroup(groupResult.group);
-      setActivity(activityResult.activity);
       setActivityDefinitions(typeResult.registeredDefinitions);
       setHasQuestionAuthoringAgent(
         aiAgentResult.connections.some((connection) => connection.id === aiAgentResult.preferences.questionAuthoringAiAgentConnectionId && connection.isEnabled)
@@ -59,6 +59,23 @@ export default function GroupActivityPage() {
 
       const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
       const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher";
+      let activityResult: Awaited<ReturnType<typeof api.groupActivity>>;
+      try {
+        activityResult = await api.groupActivity(courseId, groupId, activityId);
+        setActivity(activityResult.activity);
+        setIsActivityUnavailable(false);
+      } catch (err) {
+        if (!userCanManage && err instanceof ApiError && err.code === "GROUP_ACTIVITY_NOT_AVAILABLE") {
+          setActivity(null);
+          setReleasedGrade(null);
+          setDeletedSubmissions([]);
+          setIsActivityUnavailable(true);
+          setError("");
+          return;
+        }
+        throw err;
+      }
+
       if (userCanManage) {
         setReleasedGrade(null);
         setDeletedSubmissions([]);
@@ -136,6 +153,16 @@ export default function GroupActivityPage() {
 
         {error ? <p className="error">{error}</p> : null}
 
+        {isActivityUnavailable ? (
+          <section className="section stack">
+            <div>
+              <p className="eyebrow">{t("groupPage.activityUnavailableEyebrow")}</p>
+              <h2>{t("groupPage.activityUnavailableTitle")}</h2>
+              <p className="muted">{t("groupPage.activityUnavailableText")}</p>
+            </div>
+          </section>
+        ) : null}
+
         {releasedGrade?.gradeKind === "final" ? (
           <section className="section stack">
             <div>
@@ -149,7 +176,7 @@ export default function GroupActivityPage() {
           </section>
         ) : null}
 
-        {hasPreviousSubmissions === true || deletedSubmissions.length || canStartNewAttempt === false ? (
+        {!isActivityUnavailable && (hasPreviousSubmissions === true || deletedSubmissions.length || canStartNewAttempt === false) ? (
           <div className="tab-strip" role="tablist" aria-label={activity?.title ?? t("common.loading")}>
             {canStartNewAttempt !== false ? (
               <button
@@ -187,7 +214,7 @@ export default function GroupActivityPage() {
           </div>
         ) : null}
 
-        {(selectedTab === "attempt" && canStartNewAttempt !== false) || selectedTab === "previous" ? (
+        {!isActivityUnavailable && ((selectedTab === "attempt" && canStartNewAttempt !== false) || selectedTab === "previous") ? (
           activity && ActivityRenderer ? (
             <ActivityRenderer
               activity={activity}
@@ -216,7 +243,7 @@ export default function GroupActivityPage() {
           )
         ) : null}
 
-        {deletedSubmissions.length && selectedTab === "deleted" ? (
+        {!isActivityUnavailable && deletedSubmissions.length && selectedTab === "deleted" ? (
           <section className="section stack">
             <div>
               <p className="eyebrow">{t("courseDetail.deletedSubmissionsTitle")}</p>

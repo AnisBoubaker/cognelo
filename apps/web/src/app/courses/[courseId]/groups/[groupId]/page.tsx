@@ -191,6 +191,7 @@ export default function CourseGroupPage() {
   );
   const gradebookActivities = buildGroupGradebookActivitySummaries(gradebook?.items ?? [], gradebook?.rows ?? []);
   const gradebookOverview = buildGroupGradebookOverview(gradebookActivities);
+  const now = Date.now();
 
   useEffect(() => {
     if (!assignActivityId && assignableActivities[0]?.id) {
@@ -238,23 +239,31 @@ export default function CourseGroupPage() {
                         {assignedActivities.map((assignment) => {
                           const releasedGrade = releasedGradeByActivityId.get(assignment.activity.id);
                           const isSubmitted = submittedActivityIds.has(assignment.activity.id);
+                          const availability = getAvailabilityStatus(assignment.availableFrom, assignment.availableUntil, now);
+                          const isOpenable = availability !== "upcoming";
 
                           return (
                             <button
                               key={assignment.id}
+                              disabled={!isOpenable}
                               type="button"
                               style={{
                                 background: "rgba(255, 255, 255, 0.92)",
                                 border: "1px solid rgba(13, 27, 71, 0.08)",
                                 borderRadius: 12,
                                 color: "inherit",
-                                cursor: "pointer",
+                                cursor: isOpenable ? "pointer" : "default",
                                 display: "block",
+                                opacity: isOpenable ? 1 : 0.72,
                                 padding: "10px 12px",
                                 textAlign: "left",
                                 width: "100%"
                               }}
-                              onClick={() => router.push(`/courses/${courseId}/groups/${groupId}/activities/assigned/${assignment.activity.id}`)}
+                              onClick={() => {
+                                if (isOpenable) {
+                                  router.push(`/courses/${courseId}/groups/${groupId}/activities/assigned/${assignment.activity.id}`);
+                                }
+                              }}
                             >
                               <div style={{ alignItems: "center", display: "flex", gap: 12, justifyContent: "space-between", width: "100%" }}>
                                 <div style={{ minWidth: 0, textAlign: "left" }}>
@@ -264,6 +273,12 @@ export default function CourseGroupPage() {
                                   </span>
                                 </div>
                                 <div className="row wrap" style={{ justifyContent: "flex-end" }}>
+                                  {availability === "upcoming" ? (
+                                    <span className="participant-status is-missing">{t("groupPage.activityUpcoming")}</span>
+                                  ) : null}
+                                  {availability === "expired" ? (
+                                    <span className="participant-status is-late">{t("groupPage.activityExpired")}</span>
+                                  ) : null}
                                   {isSubmitted ? (
                                     <span className="participant-status is-submitted">
                                       {t("courseDetail.gradebookStatus.submitted")}
@@ -2171,6 +2186,20 @@ function formatAvailabilityWindow(
   }
 
   return t("groupPage.availableBefore", { until: formatAvailabilityValue(availableUntil as string) });
+}
+
+function getAvailabilityStatus(
+  availableFrom: string | null | undefined,
+  availableUntil: string | null | undefined,
+  now: number
+): "available" | "upcoming" | "expired" {
+  if (availableFrom && new Date(availableFrom).getTime() > now) {
+    return "upcoming";
+  }
+  if (availableUntil && new Date(availableUntil).getTime() < now) {
+    return "expired";
+  }
+  return "available";
 }
 
 function formatAvailabilityValue(value: string) {
