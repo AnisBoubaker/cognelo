@@ -2,7 +2,7 @@
 
 import { MarkdownRenderer } from "@cognelo/activity-ui";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { ChangeEvent, FocusEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
@@ -35,7 +35,6 @@ type ContentDropTarget = { id: string; type: "root" } | { id: string; placement:
 export default function CourseGroupPage() {
   const params = useParams<{ courseId: string; groupId: string }>();
   const { courseId, groupId } = params;
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const { locale, t } = useI18n();
@@ -44,6 +43,7 @@ export default function CourseGroupPage() {
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [contentItems, setContentItems] = useState<CourseContentItem[]>([]);
+  const [contentLoaded, setContentLoaded] = useState(false);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
   const [studentGrades, setStudentGrades] = useState<StudentReleasedGrades | null>(null);
   const [submittedActivityIds, setSubmittedActivityIds] = useState<Set<string>>(new Set());
@@ -72,6 +72,8 @@ export default function CourseGroupPage() {
   const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(new Set());
   const [collapsedCourseFolderIds, setCollapsedCourseFolderIds] = useState<Set<string>>(new Set());
   const [collapsedContentFolderIds, setCollapsedContentFolderIds] = useState<Set<string>>(new Set());
+  const [openStudentRootFolderIds, setOpenStudentRootFolderIds] = useState<Set<string>>(new Set());
+  const [studentAccordionStateLoaded, setStudentAccordionStateLoaded] = useState(false);
   const [assignActivityId, setAssignActivityId] = useState("");
   const [assignParentId, setAssignParentId] = useState("");
   const [assignIsVisible, setAssignIsVisible] = useState(true);
@@ -113,6 +115,7 @@ export default function CourseGroupPage() {
   const canManage = user?.roles.includes("admin") || membershipRole === "owner" || membershipRole === "teacher";
 
   async function refresh() {
+    setContentLoaded(false);
     const [courseResult, groupResult, typeResult] = await Promise.all([
       api.course(courseId),
       api.group(courseId, groupId),
@@ -130,6 +133,7 @@ export default function CourseGroupPage() {
     const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher";
     const contentResult = await api.groupContent(courseId, groupId, { visibleOnly: !userCanManage });
     setContentItems(contentResult.contentItems);
+    setContentLoaded(true);
     if (userCanManage) {
       const gradebookResult = await api.courseGradebook(courseId, {
         groupId,
@@ -196,6 +200,12 @@ export default function CourseGroupPage() {
   const assignedActivities = group?.activities ?? [];
   const contentFolders = contentItems.filter((item) => item.kind === "folder").sort(compareContentItems);
   const visibleContentItems = flattenContentItems(contentItems, collapsedContentFolderIds);
+  const studentContentItems = contentItems.filter((item) => item.kind !== "activity" || Boolean(item.courseGroupActivityId));
+  const studentRootContentItems = studentContentItems.filter((item) => !item.parentId).sort(compareContentItems);
+  const studentRootFolderIds = studentRootContentItems.filter((item) => item.kind === "folder").map((item) => item.id);
+  const studentRootFolderIdSignature = studentRootFolderIds.join("|");
+  const studentAccordionStorageKey = `cognelo:course:${courseId}:group:${groupId}:student-content-accordion`;
+  const studentContentReady = Boolean(course && group && contentLoaded);
   const courseMaterialById = new Map(courseMaterials.map((material) => [material.id, material]));
   const groupMaterialById = new Map(materials.map((material) => [material.id, material]));
   const courseActivityById = new Map((course?.activities ?? []).map((activity) => [activity.id, activity]));
@@ -219,6 +229,153 @@ export default function CourseGroupPage() {
     }
   }, [assignActivityId, assignableActivities]);
 
+  useEffect(() => {
+    setStudentAccordionStateLoaded(false);
+    try {
+      const storedValue = window.localStorage.getItem(studentAccordionStorageKey);
+      const parsedValue = storedValue ? JSON.parse(storedValue) : [];
+      setOpenStudentRootFolderIds(new Set(Array.isArray(parsedValue) ? parsedValue.filter((value): value is string => typeof value === "string") : []));
+    } catch {
+      setOpenStudentRootFolderIds(new Set());
+    } finally {
+      setStudentAccordionStateLoaded(true);
+    }
+  }, [studentAccordionStorageKey]);
+
+  useEffect(() => {
+    if (!studentAccordionStateLoaded || !studentContentReady) {
+      return;
+    }
+    const validFolderIds = new Set(studentRootFolderIds);
+    setOpenStudentRootFolderIds((current) => {
+      const next = new Set([...current].filter((folderId) => validFolderIds.has(folderId)));
+      return setsAreEqual(current, next) ? current : next;
+    });
+  }, [studentAccordionStateLoaded, studentContentReady, studentRootFolderIdSignature]);
+
+  useEffect(() => {
+    if (!studentAccordionStateLoaded || !studentContentReady) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(studentAccordionStorageKey, JSON.stringify([...openStudentRootFolderIds]));
+    } catch {
+      // Ignore localStorage failures; the accordion still works for the current session.
+    }
+  }, [openStudentRootFolderIds, studentAccordionStateLoaded, studentAccordionStorageKey, studentContentReady]);
+
+  function renderStudentContentRow(item: CourseContentItem, depth: number, options: { isRootAccordionFolder?: boolean } = {}) {
+    const title = contentItemTitle(item);
+    const href = contentItemHref(item);
+    const isRootAccordionFolder = Boolean(options.isRootAccordionFolder);
+    const isCollapsed = isRootAccordionFolder ? !openStudentRootFolderIds.has(item.id) : collapsedContentFolderIds.has(item.id);
+    const material = item.materialId ? courseMaterialById.get(item.materialId) ?? groupMaterialById.get(item.materialId) : null;
+    const assignment = item.courseGroupActivityId ? assignmentById.get(item.courseGroupActivityId) : null;
+    const courseActivity = item.activityId ? courseActivityById.get(item.activityId) : null;
+    const activityTypeKey = assignment?.activity.activityType.key ?? courseActivity?.activityType.key ?? null;
+    const activityLabel = activityTypeKey ? activityCopy(activityTypeKey).name : null;
+    const releasedGrade = assignment ? releasedGradeByActivityId.get(assignment.activity.id) : null;
+    const isSubmitted = assignment ? submittedActivityIds.has(assignment.activity.id) : false;
+    const availability = assignment ? getAvailabilityStatus(assignment.availableFrom, assignment.availableUntil, now) : "available";
+    const isOpenable = availability !== "upcoming";
+    const hasBadges = Boolean(activityLabel || assignment || availability !== "available" || isSubmitted || releasedGrade);
+
+    return (
+      <div
+        className={`table-row table-row-content-tree is-student-content ${item.kind === "folder" ? "is-folder-row" : ""} ${
+          isRootAccordionFolder ? `is-student-accordion-root ${isCollapsed ? "" : "is-open"}` : ""
+        } ${isOpenable ? "" : "is-content-locked"}`}
+        key={item.id}
+        style={isRootAccordionFolder ? undefined : { paddingLeft: 14 + depth * 20 }}
+      >
+        <div className="table-main table-main-stack">
+          {isRootAccordionFolder ? null : <span className="content-tree-student-spacer" aria-hidden="true" />}
+          {item.kind === "folder" && !isRootAccordionFolder ? (
+            <button
+              aria-expanded={!isCollapsed}
+              aria-label={isCollapsed ? t("courseDetail.expandFolder", { title }) : t("courseDetail.collapseFolder", { title })}
+              className="content-item-icon-button"
+              title={isCollapsed ? t("courseDetail.expandFolderTitle") : t("courseDetail.collapseFolderTitle")}
+              type="button"
+              onClick={() => {
+                if (isRootAccordionFolder) {
+                  setOpenStudentRootFolderIds((current) => toggleSetValue(current, item.id));
+                  return;
+                }
+                toggleContentFolder(item.id);
+              }}
+            >
+              <FolderContentIcon collapsed={isCollapsed} />
+            </button>
+          ) : item.kind !== "folder" ? (
+            <span className="content-item-icon">
+              {item.kind === "activity" ? <ActivityContentIcon /> : <MaterialTypeIcon iconName={contentItemMaterialIconName(item)} />}
+            </span>
+          ) : null}
+          <strong>
+            {isRootAccordionFolder ? (
+              <button
+                aria-expanded={!isCollapsed}
+                className="student-accordion-title-button"
+                type="button"
+                onClick={() => setOpenStudentRootFolderIds((current) => toggleSetValue(current, item.id))}
+              >
+                {title}
+              </button>
+            ) : href && isOpenable && material ? (
+              <a
+                href={href}
+                rel={material.kind !== "file" ? "noreferrer" : undefined}
+                target={material.kind !== "file" ? "_blank" : undefined}
+              >
+                {title}
+              </a>
+            ) : href && isOpenable ? (
+              <Link href={href}>{title}</Link>
+            ) : (
+              title
+            )}
+          </strong>
+          {hasBadges ? (
+            <span className="metadata-badges">
+              {activityLabel ? <span className="metadata-badge is-activity-type">{activityLabel}</span> : null}
+              {assignment ? <span className="metadata-badge">{formatAvailabilityWindow(assignment.availableFrom, assignment.availableUntil, t)}</span> : null}
+              {availability === "upcoming" ? <span className="participant-status is-missing">{t("groupPage.activityUpcoming")}</span> : null}
+              {availability === "expired" ? <span className="participant-status is-late">{t("groupPage.activityExpired")}</span> : null}
+              {isSubmitted ? <span className="participant-status is-submitted">{t("courseDetail.gradebookStatus.submitted")}</span> : null}
+              {releasedGrade ? (
+                <span className={`participant-status is-${releasedGrade.status.replace("_", "-")}`}>
+                  {t(releasedGrade.gradeKind === "final" ? "groupPage.finalGradeLabel" : "groupPage.latestGradeLabel")}:{" "}
+                  {formatGradebookScore(releasedGrade.score, releasedGrade.maxScore)}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
+        </div>
+        {isRootAccordionFolder ? null : <div className="table-actions">
+          {href && isOpenable ? (
+            material ? (
+              <a
+                aria-label={t(material.kind === "file" ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial", { title })}
+                className="button secondary icon-button"
+                href={href}
+                rel={material.kind === "file" ? undefined : "noreferrer"}
+                target={material.kind === "file" ? undefined : "_blank"}
+                title={t(material.kind === "file" ? "common.download" : "common.open")}
+              >
+                <MaterialActionIcon name={material.kind === "file" ? "download" : "open"} />
+              </a>
+            ) : (
+              <Link aria-label={t("courseDetail.openContentItem", { title })} className="button secondary icon-button" href={href} title={t("common.open")}>
+                <MaterialActionIcon name="open" />
+              </Link>
+            )
+          ) : null}
+        </div>}
+      </div>
+    );
+  }
+
   if (group && course && !canManage) {
     return (
       <AppShell>
@@ -241,152 +398,45 @@ export default function CourseGroupPage() {
 
           <WorkspaceTabs
             ariaLabel={t("groupPage.workspaceTabs")}
-            initialTab="activities"
+            initialTab={searchParams.get("tab") === "grades" ? "grades" : "content"}
             tabs={[
               {
-                id: "activities",
-                label: t("groupPage.activitiesTab"),
+                id: "content",
+                label: t("courseDetail.contentTab"),
                 render: () => (
                   <section className="section stack">
                     <div>
-                      <p className="eyebrow">{t("groupPage.assignedActivitiesEyebrow")}</p>
-                      <h2>{t("groupPage.assignedActivitiesTitle")}</h2>
-                      <p className="muted">{t("groupPage.assignedActivitiesText")}</p>
+                      <p className="eyebrow">{t("courseDetail.contentEyebrow")}</p>
+                      <h2>{t("courseDetail.contentTitle")}</h2>
+                      <p className="muted">{t("courseDetail.contentText")}</p>
                     </div>
 
-                    {assignedActivities.length ? (
-                      <div className="stack" style={{ gap: 10 }}>
-                        {assignedActivities.map((assignment) => {
-                          const releasedGrade = releasedGradeByActivityId.get(assignment.activity.id);
-                          const isSubmitted = submittedActivityIds.has(assignment.activity.id);
-                          const availability = getAvailabilityStatus(assignment.availableFrom, assignment.availableUntil, now);
-                          const isOpenable = availability !== "upcoming";
-
-                          return (
-                            <button
-                              key={assignment.id}
-                              disabled={!isOpenable}
-                              type="button"
-                              style={{
-                                background: "rgba(255, 255, 255, 0.92)",
-                                border: "1px solid rgba(13, 27, 71, 0.08)",
-                                borderRadius: 12,
-                                color: "inherit",
-                                cursor: isOpenable ? "pointer" : "default",
-                                display: "block",
-                                opacity: isOpenable ? 1 : 0.72,
-                                padding: "10px 12px",
-                                textAlign: "left",
-                                width: "100%"
-                              }}
-                              onClick={() => {
-                                if (isOpenable) {
-                                  router.push(`/courses/${courseId}/groups/${groupId}/activities/assigned/${assignment.activity.id}`);
-                                }
-                              }}
-                            >
-                              <div style={{ alignItems: "center", display: "flex", gap: 12, justifyContent: "space-between", width: "100%" }}>
-                                <div style={{ minWidth: 0, textAlign: "left" }}>
-                                  <strong style={{ display: "block" }}>{assignment.activity.title}</strong>
-                                  <span className="table-meta-note muted">
-                                    {formatAvailabilityWindow(assignment.availableFrom, assignment.availableUntil, t)}
-                                  </span>
-                                </div>
-                                <div className="row wrap" style={{ justifyContent: "flex-end" }}>
-                                  {availability === "upcoming" ? (
-                                    <span className="participant-status is-missing">{t("groupPage.activityUpcoming")}</span>
-                                  ) : null}
-                                  {availability === "expired" ? (
-                                    <span className="participant-status is-late">{t("groupPage.activityExpired")}</span>
-                                  ) : null}
-                                  {isSubmitted ? (
-                                    <span className="participant-status is-submitted">
-                                      {t("courseDetail.gradebookStatus.submitted")}
-                                    </span>
-                                  ) : null}
-                                  {releasedGrade ? (
-                                    <span className={`participant-status is-${releasedGrade.status.replace("_", "-")}`}>
-                                      {t(releasedGrade.gradeKind === "final" ? "groupPage.finalGradeLabel" : "groupPage.latestGradeLabel")}:{" "}
-                                      {formatGradebookScore(releasedGrade.score, releasedGrade.maxScore)}
-                                    </span>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="muted">{t("groupPage.noAssignedActivities")}</p>
-                    )}
-                  </section>
-                )
-              },
-              {
-                id: "materials",
-                label: t("groupPage.materialsTab"),
-                render: () => (
-                  <section className="section stack">
-                    <div>
-                      <p className="eyebrow">{t("groupPage.inheritedMaterialsEyebrow")}</p>
-                      <h2>{t("groupPage.inheritedMaterialsTitle")}</h2>
-                      <p className="muted">{t("groupPage.inheritedMaterialsText")}</p>
-                    </div>
-
-                    {displayedCourseMaterials.length ? (
+                    {studentRootContentItems.length ? (
                       <div className="table-list">
-                        {displayedCourseMaterials.map(({ material, depth }) => {
-                          const href = courseMaterialHref(material);
-                          const isCollapsed = collapsedCourseFolderIds.has(material.id);
+                        {studentRootContentItems.map((item) => {
+                          if (item.kind !== "folder") {
+                            return renderStudentContentRow(item, 0);
+                          }
+
+                          const childRows =
+                            openStudentRootFolderIds.has(item.id)
+                              ? flattenContentItemsFromParent(studentContentItems, item.id, collapsedContentFolderIds, 1)
+                              : [];
 
                           return (
-                            <div key={material.id} className="table-row">
-                              <div className="table-main material-title" style={{ paddingLeft: `${depth * 22}px` }}>
-                                {material.kind === "folder" ? (
-                                  <button
-                                    aria-expanded={!isCollapsed}
-                                    aria-label={t(isCollapsed ? "courseDetail.expandFolder" : "courseDetail.collapseFolder", {
-                                      title: material.title
-                                    })}
-                                    className="material-glyph"
-                                    title={t(isCollapsed ? "courseDetail.expandFolderTitle" : "courseDetail.collapseFolderTitle")}
-                                    type="button"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      toggleCourseFolder(material.id);
-                                    }}
-                                  >
-                                    {isCollapsed ? "[+]" : "[-]"}
-                                  </button>
-                                ) : (
-                                  <span className="material-glyph material-glyph-static">-</span>
-                                )}
-                                <strong>{material.title}</strong>
-                              </div>
-                              <span className="table-meta muted">{courseMaterialDetail(material)}</span>
-                              <div className="table-actions">
-                                {href ? (
-                                  <a
-                                    aria-label={t(
-                                      material.kind === "file" ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial",
-                                      { title: material.title }
-                                    )}
-                                    className="button secondary icon-button"
-                                    href={href}
-                                    rel={material.kind === "file" ? undefined : "noreferrer"}
-                                    target={material.kind === "file" ? undefined : "_blank"}
-                                    title={t(material.kind === "file" ? "common.download" : "common.open")}
-                                  >
-                                    <MaterialActionIcon name={material.kind === "file" ? "download" : "open"} />
-                                  </a>
-                                ) : null}
-                              </div>
+                            <div className={`student-accordion-section ${openStudentRootFolderIds.has(item.id) ? "is-open" : ""}`} key={item.id}>
+                              {renderStudentContentRow(item, 0, { isRootAccordionFolder: true })}
+                              {childRows.length ? (
+                                <div className="student-accordion-panel">
+                                  {childRows.map(({ item: child, depth }) => renderStudentContentRow(child, depth))}
+                                </div>
+                              ) : null}
                             </div>
                           );
                         })}
                       </div>
                     ) : (
-                      <p className="muted">{t("groupPage.noCourseMaterials")}</p>
+                      <p className="muted">{t("courseDetail.noContentItems")}</p>
                     )}
                   </section>
                 )
@@ -2891,6 +2941,28 @@ function compareContentItems(left: CourseContentItem, right: CourseContentItem) 
   return left.position - right.position || leftTitle.localeCompare(rightTitle);
 }
 
+function setsAreEqual(left: Set<string>, right: Set<string>) {
+  if (left.size !== right.size) {
+    return false;
+  }
+  for (const value of left) {
+    if (!right.has(value)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function toggleSetValue(current: Set<string>, value: string) {
+  const next = new Set(current);
+  if (next.has(value)) {
+    next.delete(value);
+  } else {
+    next.add(value);
+  }
+  return next;
+}
+
 function flattenContentItems(contentItems: CourseContentItem[], collapsedFolderIds: Set<string>) {
   const itemIds = new Set(contentItems.map((item) => item.id));
   const byParent = new Map<string, CourseContentItem[]>();
@@ -2928,6 +3000,42 @@ function flattenContentItems(contentItems: CourseContentItem[], collapsedFolderI
     }
   }
 
+  return rows;
+}
+
+function flattenContentItemsFromParent(
+  contentItems: CourseContentItem[],
+  parentId: string,
+  collapsedFolderIds: Set<string>,
+  startingDepth: number
+) {
+  const byParent = new Map<string, CourseContentItem[]>();
+  for (const item of contentItems) {
+    const itemParentId = item.parentId ?? "root";
+    byParent.set(itemParentId, [...(byParent.get(itemParentId) ?? []), item]);
+  }
+
+  for (const [itemParentId, children] of byParent) {
+    byParent.set(itemParentId, children.sort(compareContentItems));
+  }
+
+  const rows: { item: CourseContentItem; depth: number }[] = [];
+  const visited = new Set<string>();
+
+  function walk(currentParentId: string, depth: number) {
+    for (const item of byParent.get(currentParentId) ?? []) {
+      if (visited.has(item.id)) {
+        continue;
+      }
+      visited.add(item.id);
+      rows.push({ item, depth });
+      if (item.kind === "folder" && !collapsedFolderIds.has(item.id)) {
+        walk(item.id, depth + 1);
+      }
+    }
+  }
+
+  walk(parentId, startingDepth);
   return rows;
 }
 
