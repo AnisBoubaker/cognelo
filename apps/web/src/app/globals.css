@@ -960,6 +960,11 @@ a.card:hover,
   grid-row: 1 / span 2;
 }
 
+.table-row-content-tree .content-tree-student-spacer {
+  grid-row: 1 / span 2;
+  width: 28px;
+}
+
 .table-row-content-tree .content-item-icon,
 .table-row-content-tree .content-item-icon-button {
   align-items: center;
@@ -1016,6 +1021,86 @@ a.card:hover,
   );
 }
 
+.student-accordion-section + .student-accordion-section {
+  margin-top: 10px;
+}
+
+.table-row-content-tree.is-student-accordion-root {
+  background: linear-gradient(90deg, var(--brand-violet), color-mix(in srgb, var(--brand-blue), var(--brand-violet) 45%));
+  border: 0;
+  color: #fff;
+  min-height: 48px;
+  padding: 0;
+}
+
+.table-row-content-tree.is-student-accordion-root .table-main-stack {
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+}
+
+.table-row-content-tree.is-student-accordion-root strong,
+.table-row-content-tree.is-student-accordion-root .metadata-badges {
+  grid-column: 1;
+}
+
+.student-accordion-section.is-open {
+  border: 1px solid color-mix(in srgb, var(--brand-violet), white 48%);
+}
+
+.student-accordion-section.is-open .table-row-content-tree.is-student-accordion-root {
+  border-radius: 0;
+}
+
+.student-accordion-panel {
+  background: color-mix(in srgb, var(--brand-violet), white 94%);
+  display: grid;
+  gap: 8px;
+  padding: 14px 18px 18px;
+}
+
+.student-accordion-panel .table-row-content-tree {
+  border: 1px solid color-mix(in srgb, var(--brand-blue), white 74%);
+}
+
+.student-accordion-title-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-weight: inherit;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 20px 0 24px;
+  text-align: left;
+  width: 100%;
+}
+
+.student-accordion-title-button::after {
+  content: "›";
+  flex: 0 0 auto;
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.student-accordion-title-button[aria-expanded="true"]::after {
+  content: "⌄";
+  font-size: 24px;
+  transform: translateY(-4px);
+}
+
+.student-accordion-title-button:hover {
+  box-shadow: none;
+  text-decoration: none;
+  transform: none;
+}
+
 .table-row-content-tree.is-folder-row strong {
   font-weight: 900;
 }
@@ -1023,6 +1108,10 @@ a.card:hover,
 .table-row-content-tree.is-hidden-content {
   background: color-mix(in srgb, var(--surface-2), white 18%);
   color: color-mix(in srgb, var(--ink), white 42%);
+}
+
+.table-row-content-tree.is-content-locked {
+  background: color-mix(in srgb, var(--surface-2), white 14%);
 }
 
 .table-row-content-tree.is-hidden-content a,

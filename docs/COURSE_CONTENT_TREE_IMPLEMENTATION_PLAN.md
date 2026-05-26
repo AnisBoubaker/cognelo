@@ -431,6 +431,7 @@ This preserves the documented student-first, section-first navigation model.
 - Phase 5 is implemented at the service/contract layer.
 - Phase 6 is implemented.
 - Phase 7 is implemented.
+- Phase 8 is implemented for the student group workspace.
 - The schema foundation lives in `packages/db/prisma/schema.prisma`.
 - The migration lives in `packages/db/prisma/migrations/202605260001_course_content_tree/migration.sql`.
 - The schema foundation test lives in `packages/db/prisma/course-content-schema.test.ts`.
@@ -549,6 +550,13 @@ Verification completed after Phase 7:
 - Render the unified tree in the student section workspace.
 - Use effective visibility and activity availability to determine display and openability.
 - Keep student grade visibility and feedback behavior backed by the gradebook APIs.
+
+Implemented scope: learner group workspaces now open on a unified Content tab instead of separate Activities and Materials tabs. The student content tree uses the group content endpoint with effective visibility filtering, renders first-level folders as persisted accordion sections, keeps nested folder expand/collapse inside each accordion section, opens visible materials according to type, hides unassigned course-level activity shells, locks upcoming assigned activities, and carries over submission/released-grade badges from the former student activities list. Student grades remain in the separate Grades tab backed by gradebook release APIs.
+
+Verification completed after Phase 8:
+
+- `npm run typecheck`
+- `npm test -- apps/web/src/lib/i18n.test.ts apps/web/src/lib/api.test.ts`
 
 ### Phase 9: Material Type Registry
 
