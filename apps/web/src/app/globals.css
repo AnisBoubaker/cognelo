@@ -946,6 +946,100 @@ a.card:hover,
   grid-template-columns: minmax(260px, 1.5fr) minmax(180px, 0.7fr) 110px max-content;
 }
 
+.table-row-content-tree {
+  grid-template-columns: minmax(0, 1fr) max-content;
+}
+
+.table-row-content-tree .table-main-stack {
+  align-items: center;
+  column-gap: 8px;
+  grid-template-columns: 28px 58px minmax(0, 1fr);
+}
+
+.table-row-content-tree .drag-handle {
+  grid-row: 1 / span 2;
+}
+
+.table-row-content-tree .content-item-icon,
+.table-row-content-tree .content-item-icon-button {
+  align-items: center;
+  display: inline-flex;
+  grid-row: 1 / span 2;
+  justify-content: center;
+}
+
+.table-row-content-tree .content-item-icon .activity-type-icon,
+.table-row-content-tree .content-item-icon-button .activity-type-icon {
+  height: 44px;
+  width: 44px;
+}
+
+.table-row-content-tree .content-item-icon-button {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.table-row-content-tree .content-item-icon-button:hover {
+  background: color-mix(in srgb, var(--brand-teal), transparent 86%);
+}
+
+.table-row-content-tree strong,
+.table-row-content-tree .metadata-badges {
+  grid-column: 3;
+}
+
+.table-row-content-tree .metadata-badges {
+  grid-row: 2;
+}
+
+.folder-content-icon {
+  background: color-mix(in srgb, #f5b84b, white 58%);
+  border-color: color-mix(in srgb, #f5b84b, var(--accent) 28%);
+  color: color-mix(in srgb, #b56a00, var(--ink) 35%);
+}
+
+.activity-content-icon {
+  background: color-mix(in srgb, var(--brand-teal), white 84%);
+  border-color: color-mix(in srgb, var(--brand-blue), white 58%);
+  color: color-mix(in srgb, var(--brand-blue), var(--ink) 26%);
+}
+
+.table-row-content-tree.is-folder-row {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, #f5b84b, white 91%),
+    color-mix(in srgb, var(--surface), white 2%) 42%
+  );
+}
+
+.table-row-content-tree.is-folder-row strong {
+  font-weight: 900;
+}
+
+.table-row-content-tree.is-hidden-content {
+  background: color-mix(in srgb, var(--surface-2), white 18%);
+  color: color-mix(in srgb, var(--ink), white 42%);
+}
+
+.table-row-content-tree.is-hidden-content a,
+.table-row-content-tree.is-hidden-content strong,
+.table-row-content-tree.is-hidden-content .activity-type-icon,
+.table-row-content-tree.is-hidden-content .drag-handle,
+.table-row-content-tree.is-hidden-content .icon-button,
+.table-row-content-tree.is-hidden-content .metadata-badge {
+  color: color-mix(in srgb, var(--ink), white 42%);
+}
+
+.table-row-content-tree.is-hidden-content .activity-type-icon,
+.table-row-content-tree.is-hidden-content .metadata-badge,
+.table-row-content-tree.is-hidden-content .drag-handle {
+  opacity: 0.62;
+}
+
 .table-row-activities .table-inline-form {
   grid-column: 1 / -1;
 }
@@ -1151,6 +1245,36 @@ a.card:hover,
   box-shadow: inset 4px 0 0 var(--accent);
 }
 
+.table-row-content-tree.is-drop-before,
+.table-row-content-tree.is-drop-after {
+  position: relative;
+}
+
+.table-row-content-tree.is-drop-before::before,
+.table-row-content-tree.is-drop-after::after {
+  background: var(--accent);
+  border-radius: 999px;
+  content: "";
+  height: 3px;
+  left: 12px;
+  pointer-events: none;
+  position: absolute;
+  right: 12px;
+}
+
+.table-row-content-tree.is-drop-before::before {
+  top: -2px;
+}
+
+.table-row-content-tree.is-drop-after::after {
+  bottom: -2px;
+}
+
+.table-row-content-tree.is-drop-inside {
+  background: color-mix(in srgb, var(--brand-teal), transparent 88%);
+  box-shadow: inset 4px 0 0 var(--brand-teal);
+}
+
 .table-row.is-hidden-material {
   background: color-mix(in srgb, var(--surface-2), white 22%);
   color: color-mix(in srgb, var(--ink), white 26%);
@@ -1281,6 +1405,12 @@ a.card:hover,
   background: color-mix(in srgb, var(--brand-teal), white 84%);
   border-color: color-mix(in srgb, var(--brand-teal), white 54%);
   color: var(--accent-strong);
+}
+
+.metadata-badge.is-activity-type {
+  background: color-mix(in srgb, var(--brand-blue), white 84%);
+  border-color: color-mix(in srgb, var(--brand-blue), white 48%);
+  color: color-mix(in srgb, var(--brand-blue), var(--ink) 30%);
 }
 
 .material-glyph {
@@ -1496,6 +1626,18 @@ a.card:hover,
   flex-wrap: nowrap;
   gap: 6px;
   justify-content: flex-end;
+}
+
+.content-row-actions {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(4, 36px);
+  justify-content: end;
+}
+
+.content-row-actions .action-slot {
+  height: 36px;
+  width: 36px;
 }
 
 .icon-button {

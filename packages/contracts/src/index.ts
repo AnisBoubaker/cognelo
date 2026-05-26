@@ -200,14 +200,6 @@ function validateCourseMaterialUrl(value: { kind?: MaterialKind; url?: string },
 }
 
 function validateCourseMaterialCreate(value: { kind?: MaterialKind; url?: string }, context: z.RefinementCtx) {
-  if (value.kind && ["link", "github_repo", "pdf"].includes(value.kind) && !value.url) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["url"],
-      message: "A URL is required for this material type."
-    });
-  }
-
   validateCourseMaterialUrl(value, context);
 }
 
@@ -223,6 +215,15 @@ export type CourseGroupMaterialInput = z.infer<typeof CourseGroupMaterialInputSc
 export const CourseGroupMaterialUpdateSchema = CourseMaterialBaseSchema.partial().superRefine(validateCourseMaterialUrl);
 export type CourseGroupMaterialUpdate = z.infer<typeof CourseGroupMaterialUpdateSchema>;
 
+export const CourseContentPlacementInputSchema = z.object({
+  parentId: RecordIdSchema.nullable().optional(),
+  titleSnapshot: z.string().trim().min(1).max(180).nullable().optional(),
+  isVisible: z.boolean().optional().default(true),
+  position: z.number().int().min(0).optional(),
+  metadata: z.record(z.unknown()).optional().default({})
+});
+export type CourseContentPlacementInput = z.infer<typeof CourseContentPlacementInputSchema>;
+
 export const ActivityInputSchema = z.object({
   bankActivityId: RecordIdSchema.optional(),
   activityVersionId: RecordIdSchema.optional(),
@@ -232,7 +233,8 @@ export const ActivityInputSchema = z.object({
   lifecycle: ActivityLifecycleSchema.optional().default("draft"),
   config: z.record(z.unknown()).optional().default({}),
   metadata: z.record(z.unknown()).optional().default({}),
-  position: z.number().int().min(0).optional().default(0)
+  position: z.number().int().min(0).optional().default(0),
+  contentPlacement: CourseContentPlacementInputSchema.optional()
 });
 export type ActivityInput = z.infer<typeof ActivityInputSchema>;
 
@@ -258,7 +260,8 @@ export const CourseGroupActivityInputSchema = z.object({
   config: z.record(z.unknown()).optional().default({}),
   metadata: z.record(z.unknown()).optional().default({}),
   gradebookSettings: GradebookItemSettingsInputSchema.optional(),
-  position: z.number().int().min(0).optional().default(0)
+  position: z.number().int().min(0).optional().default(0),
+  contentPlacement: CourseContentPlacementInputSchema.optional()
 });
 export type CourseGroupActivityInput = z.infer<typeof CourseGroupActivityInputSchema>;
 
@@ -270,7 +273,8 @@ export const CourseAllGroupsActivityAssignmentInputSchema = z.object({
   availableUntil: z.string().datetime().nullable().optional(),
   enablePerGroupSettings: z.boolean().optional().default(true),
   assessmentMode: AssignedActivityAssessmentModeSchema.optional().default("formative"),
-  gradebookSettings: GradebookItemSettingsInputSchema.optional()
+  gradebookSettings: GradebookItemSettingsInputSchema.optional(),
+  contentPlacement: CourseContentPlacementInputSchema.optional()
 });
 export type CourseAllGroupsActivityAssignmentInput = z.infer<typeof CourseAllGroupsActivityAssignmentInputSchema>;
 

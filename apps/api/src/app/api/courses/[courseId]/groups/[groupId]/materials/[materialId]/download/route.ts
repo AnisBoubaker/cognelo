@@ -27,9 +27,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
     return new Response(buffer, {
       status: 200,
       headers: {
+        "Cache-Control": "no-store, max-age=0",
         "Content-Type": typeof metadata.mimeType === "string" ? metadata.mimeType : "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${typeof metadata.originalName === "string" ? metadata.originalName : material.title}"`,
-        "Cache-Control": "no-store"
+        "Content-Disposition": `attachment; filename="${typeof metadata.originalName === "string" ? metadata.originalName : material.title}"`
       }
     });
   });

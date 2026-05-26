@@ -33,6 +33,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
     return new NextResponse(stream, {
       headers: {
+        "Cache-Control": "no-store, max-age=0",
         "Content-Type": metadata.mimeType ?? "application/octet-stream",
         "Content-Length": String(fileStat.size),
         "Content-Disposition": `attachment; filename="${encodeURIComponent(metadata.originalName ?? material.title)}"`

@@ -31,6 +31,8 @@ import type {
   UserProfileUpdate
 } from "@cognelo/contracts";
 
+export type { MaterialKind };
+
 export type AiAgentConnection = {
   id: string;
   scope: "personal" | "global";
@@ -229,6 +231,22 @@ export type CourseMaterial = {
   url?: string | null;
   metadata?: Record<string, unknown>;
   position: number;
+};
+
+export type CourseContentItem = {
+  id: string;
+  courseId: string;
+  groupId?: string | null;
+  parentId?: string | null;
+  kind: "folder" | "material" | "activity";
+  titleSnapshot?: string | null;
+  position: number;
+  isVisible: boolean;
+  materialId?: string | null;
+  activityId?: string | null;
+  courseGroupActivityId?: string | null;
+  effectiveVisibility?: "visible" | "hidden" | "hidden_by_parent";
+  metadata?: Record<string, unknown>;
 };
 
 export type CourseGroup = {
@@ -1045,6 +1063,43 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input)
     }),
+  courseContent: (courseId: string, options?: { includeGroupItems?: boolean; visibleOnly?: boolean }) => {
+    const params = new URLSearchParams();
+    if (options?.includeGroupItems) {
+      params.set("includeGroupItems", "true");
+    }
+    if (options?.visibleOnly) {
+      params.set("visibleOnly", "true");
+    }
+    const query = params.toString();
+    return request<{ contentItems: CourseContentItem[] }>(`/courses/${courseId}/content${query ? `?${query}` : ""}`);
+  },
+  createContentFolder: (courseId: string, input: { title: string; parentId?: string | null; isVisible?: boolean; position?: number }) =>
+    request<{ contentItem: CourseContentItem }>(`/courses/${courseId}/content/folders`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  createMaterialContentItem: (
+    courseId: string,
+    input: { materialId: string; parentId?: string | null; titleSnapshot?: string | null; isVisible?: boolean; position?: number }
+  ) =>
+    request<{ contentItem: CourseContentItem }>(`/courses/${courseId}/content/materials`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  updateContentItem: (
+    courseId: string,
+    contentItemId: string,
+    input: { titleSnapshot?: string | null; parentId?: string | null; isVisible?: boolean; position?: number; metadata?: Record<string, unknown> }
+  ) =>
+    request<{ contentItem: CourseContentItem }>(`/courses/${courseId}/content/${contentItemId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  deleteContentItem: (courseId: string, contentItemId: string) =>
+    request<{ ok: true }>(`/courses/${courseId}/content/${contentItemId}`, {
+      method: "DELETE"
+    }),
   updateActivity: (courseId: string, activityId: string, input: ActivityUpdate) =>
     request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}`, {
       method: "PATCH",
@@ -1082,6 +1137,26 @@ export const api = {
     const response = await fetch(`${API_URL}/api/courses/${courseId}/materials/upload`, {
       cache: "no-store",
       method: "POST",
+      credentials: "include",
+      body: formData
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 401 || body?.error?.code === "UNAUTHORIZED") {
+        notifyUnauthorized();
+      }
+      throw new Error(body?.error?.message ?? "Upload failed.");
+    }
+    return body as { material: CourseMaterial };
+  },
+  uploadExistingMaterialFile: async (courseId: string, materialId: string, input: { title: string; file: File }) => {
+    const formData = new FormData();
+    formData.append("title", input.title);
+    formData.append("file", input.file);
+
+    const response = await fetch(`${API_URL}/api/courses/${courseId}/materials/${materialId}/upload`, {
+      cache: "no-store",
+      method: "PUT",
       credentials: "include",
       body: formData
     });
@@ -1156,6 +1231,42 @@ export const api = {
     }),
   groupActivityAssignments: (courseId: string, groupId: string) =>
     request<{ assignments: CourseGroupActivityAssignment[] }>(`/courses/${courseId}/groups/${groupId}/activities`),
+  groupContent: (courseId: string, groupId: string, options?: { visibleOnly?: boolean }) => {
+    const query = options?.visibleOnly ? "?visibleOnly=true" : "";
+    return request<{ contentItems: CourseContentItem[] }>(`/courses/${courseId}/groups/${groupId}/content${query}`);
+  },
+  createGroupMaterialContentItem: (
+    courseId: string,
+    groupId: string,
+    input: { materialId: string; parentId?: string | null; titleSnapshot?: string | null; isVisible?: boolean; position?: number }
+  ) =>
+    request<{ contentItem: CourseContentItem }>(`/courses/${courseId}/groups/${groupId}/content/materials`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  createGroupActivityContentItem: (
+    courseId: string,
+    groupId: string,
+    input: { activityId: string; parentId?: string | null; titleSnapshot?: string | null; isVisible?: boolean; position?: number }
+  ) =>
+    request<{ contentItem: CourseContentItem }>(`/courses/${courseId}/groups/${groupId}/content/activities`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  updateGroupContentItem: (
+    courseId: string,
+    groupId: string,
+    contentItemId: string,
+    input: { titleSnapshot?: string | null; parentId?: string | null; isVisible?: boolean; position?: number; metadata?: Record<string, unknown> }
+  ) =>
+    request<{ contentItem: CourseContentItem }>(`/courses/${courseId}/groups/${groupId}/content/${contentItemId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  deleteGroupContentItem: (courseId: string, groupId: string, contentItemId: string) =>
+    request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}/content/${contentItemId}`, {
+      method: "DELETE"
+    }),
   assignGroupActivity: (courseId: string, groupId: string, input: CourseGroupActivityInput) =>
     request<{ assignment: CourseGroupActivityAssignment }>(`/courses/${courseId}/groups/${groupId}/activities`, {
       method: "POST",

@@ -2,6 +2,7 @@ export * from "./activities";
 export * from "./ai-agents";
 export * from "./auth";
 export * from "./authorization";
+export * from "./course-content";
 export * from "./courses";
 export * from "./errors";
 export * from "./gradebook";

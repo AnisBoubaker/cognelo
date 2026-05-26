@@ -18,6 +18,7 @@ import {
   CourseGradebookRow,
   CourseGroup,
   CourseGroupMaterial,
+  CourseContentItem,
   CourseMaterial,
   GradebookStatus,
   GroupParticipant,
@@ -26,6 +27,10 @@ import {
   StudentReleasedGrades
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+
+type PickerMaterialIcon = "github" | "file" | "text";
+type ContentDropPlacement = "after" | "before" | "inside";
+type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
 
 export default function CourseGroupPage() {
   const params = useParams<{ courseId: string; groupId: string }>();
@@ -38,6 +43,7 @@ export default function CourseGroupPage() {
   const [group, setGroup] = useState<CourseGroup | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
+  const [contentItems, setContentItems] = useState<CourseContentItem[]>([]);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
   const [studentGrades, setStudentGrades] = useState<StudentReleasedGrades | null>(null);
   const [submittedActivityIds, setSubmittedActivityIds] = useState<Set<string>>(new Set());
@@ -59,11 +65,16 @@ export default function CourseGroupPage() {
   const [editMaterialTitle, setEditMaterialTitle] = useState("");
   const [editMaterialUrl, setEditMaterialUrl] = useState("");
   const [draggingMaterialId, setDraggingMaterialId] = useState<string | null>(null);
+  const [draggingContentItemId, setDraggingContentItemId] = useState<string | null>(null);
   const [dragPreview, setDragPreview] = useState<{ title: string; x: number; y: number } | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; type: "material" | "root" } | null>(null);
+  const [contentDropTarget, setContentDropTarget] = useState<ContentDropTarget | null>(null);
   const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(new Set());
   const [collapsedCourseFolderIds, setCollapsedCourseFolderIds] = useState<Set<string>>(new Set());
+  const [collapsedContentFolderIds, setCollapsedContentFolderIds] = useState<Set<string>>(new Set());
   const [assignActivityId, setAssignActivityId] = useState("");
+  const [assignParentId, setAssignParentId] = useState("");
+  const [assignIsVisible, setAssignIsVisible] = useState(true);
   const [assignAvailableFrom, setAssignAvailableFrom] = useState("");
   const [assignAvailableUntil, setAssignAvailableUntil] = useState("");
   const [assignAssessmentMode, setAssignAssessmentMode] = useState<"formative" | "summative">("formative");
@@ -96,6 +107,7 @@ export default function CourseGroupPage() {
   const [materialActionError, setMaterialActionError] = useState("");
   const [courseMaterialVisibilityError, setCourseMaterialVisibilityError] = useState("");
   const [assignmentError, setAssignmentError] = useState("");
+  const [contentActionError, setContentActionError] = useState("");
 
   const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
   const canManage = user?.roles.includes("admin") || membershipRole === "owner" || membershipRole === "teacher";
@@ -116,6 +128,8 @@ export default function CourseGroupPage() {
     setActivityDefinitions(typeResult.registeredDefinitions);
     const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
     const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher";
+    const contentResult = await api.groupContent(courseId, groupId, { visibleOnly: !userCanManage });
+    setContentItems(contentResult.contentItems);
     if (userCanManage) {
       const gradebookResult = await api.courseGradebook(courseId, {
         groupId,
@@ -180,6 +194,12 @@ export default function CourseGroupPage() {
     ? visibleCourseMaterials
     : visibleCourseMaterials.filter(({ material }) => !getHiddenMaterialState(courseMaterials, hiddenCourseMaterialIds, material.id).effectivelyHidden);
   const assignedActivities = group?.activities ?? [];
+  const contentFolders = contentItems.filter((item) => item.kind === "folder").sort(compareContentItems);
+  const visibleContentItems = flattenContentItems(contentItems, collapsedContentFolderIds);
+  const courseMaterialById = new Map(courseMaterials.map((material) => [material.id, material]));
+  const groupMaterialById = new Map(materials.map((material) => [material.id, material]));
+  const courseActivityById = new Map((course?.activities ?? []).map((activity) => [activity.id, activity]));
+  const assignmentById = new Map(assignedActivities.map((assignment) => [assignment.id, assignment]));
   const releasedGradeByActivityId = new Map(
     (studentGrades?.rows ?? [])
       .filter((row) => row.score !== null)
@@ -441,7 +461,7 @@ export default function CourseGroupPage() {
 
   function groupMaterialHref(material: CourseGroupMaterial) {
     if (material.kind === "file") {
-      return api.groupMaterialDownloadUrl(courseId, groupId, material.id);
+      return withDownloadVersion(api.groupMaterialDownloadUrl(courseId, groupId, material.id), material);
     }
     return material.url ?? undefined;
   }
@@ -457,7 +477,7 @@ export default function CourseGroupPage() {
 
   function courseMaterialHref(material: CourseMaterial) {
     if (material.kind === "file") {
-      return api.groupCourseMaterialDownloadUrl(courseId, groupId, material.id);
+      return withDownloadVersion(api.groupCourseMaterialDownloadUrl(courseId, groupId, material.id), material);
     }
     return material.url ?? undefined;
   }
@@ -807,6 +827,7 @@ export default function CourseGroupPage() {
     event.preventDefault();
     setAssignmentError("");
 
+    const selectedActivity = assignableActivities.find((activity) => activity.id === assignActivityId);
     try {
       await api.assignGroupActivity(courseId, groupId, {
         activityId: assignActivityId,
@@ -815,7 +836,13 @@ export default function CourseGroupPage() {
         config: {},
         metadata: { assessmentMode: assignAssessmentMode },
         ...(assignAssessmentMode === "summative" ? { gradebookSettings: buildAssignGradebookSettings() } : {}),
-        position: assignedActivities.length
+        position: assignedActivities.length,
+        contentPlacement: {
+          parentId: assignParentId || null,
+          isVisible: assignIsVisible,
+          metadata: {},
+          titleSnapshot: selectedActivity?.title ?? null
+        }
       });
       await refresh();
       setAssignAvailableFrom("");
@@ -829,12 +856,276 @@ export default function CourseGroupPage() {
       setAssignMaxAttempts("1");
       setAssignGradeStrategy("latest");
       setAssignDropLowestAttempt(false);
+      setAssignParentId("");
+      setAssignIsVisible(true);
       const remaining = assignableActivities.filter((activity) => activity.id !== assignActivityId);
       setAssignActivityId(remaining[0]?.id ?? "");
       setIsAssigningActivity(false);
     } catch (err) {
       setAssignmentError(err instanceof Error ? err.message : t("groupPage.assignmentCreateError"));
     }
+  }
+
+  function contentItemTitle(item: CourseContentItem) {
+    if (item.materialId) {
+      return (
+        courseMaterialById.get(item.materialId)?.title ??
+        groupMaterialById.get(item.materialId)?.title ??
+        item.titleSnapshot ??
+        t("courseDetail.untitledMaterial")
+      );
+    }
+    if (item.courseGroupActivityId) {
+      return assignmentById.get(item.courseGroupActivityId)?.activity.title ?? item.titleSnapshot ?? t("courseDetail.defaultActivityTitle");
+    }
+    if (item.activityId) {
+      return courseActivityById.get(item.activityId)?.title ?? item.titleSnapshot ?? t("courseDetail.defaultActivityTitle");
+    }
+    return item.titleSnapshot ?? t("courseDetail.untitledFolder");
+  }
+
+  function contentItemMaterialIconName(item: CourseContentItem): PickerMaterialIcon {
+    const material = item.materialId ? courseMaterialById.get(item.materialId) ?? groupMaterialById.get(item.materialId) : null;
+    return materialIconName(material?.kind);
+  }
+
+  function toggleContentFolder(folderId: string) {
+    setCollapsedContentFolderIds((current) => {
+      const next = new Set(current);
+      if (next.has(folderId)) {
+        next.delete(folderId);
+      } else {
+        next.add(folderId);
+      }
+      return next;
+    });
+  }
+
+  function contentItemHref(item: CourseContentItem) {
+    if (item.courseGroupActivityId) {
+      const assignment = assignmentById.get(item.courseGroupActivityId);
+      return assignment ? `/courses/${courseId}/groups/${groupId}/activities/assigned/${assignment.activity.id}` : null;
+    }
+    if (item.activityId && courseActivityById.has(item.activityId)) {
+      return `/courses/${courseId}/activities/${item.activityId}`;
+    }
+    if (item.materialId && courseMaterialById.has(item.materialId)) {
+      return courseMaterialHref(courseMaterialById.get(item.materialId) as CourseMaterial) ?? null;
+    }
+    if (item.materialId && groupMaterialById.has(item.materialId)) {
+      return groupMaterialHref(groupMaterialById.get(item.materialId) as CourseGroupMaterial) ?? null;
+    }
+    return null;
+  }
+
+  async function updateContentInScope(item: CourseContentItem, input: { parentId?: string | null; isVisible?: boolean; position?: number }) {
+    if (item.groupId) {
+      await api.updateGroupContentItem(courseId, groupId, item.id, input);
+    } else {
+      await api.updateContentItem(courseId, item.id, input);
+    }
+  }
+
+  async function deleteContentInScope(item: CourseContentItem) {
+    if (item.groupId) {
+      await api.deleteGroupContentItem(courseId, groupId, item.id);
+    } else {
+      await api.deleteContentItem(courseId, item.id);
+    }
+  }
+
+  async function toggleContentVisibility(item: CourseContentItem) {
+    setContentActionError("");
+    try {
+      await updateContentInScope(item, { isVisible: !item.isVisible });
+      await refresh();
+    } catch (err) {
+      setContentActionError(err instanceof Error ? err.message : t("courseDetail.contentUpdateError"));
+    }
+  }
+
+  async function removeContentItem(item: CourseContentItem) {
+    const title = contentItemTitle(item);
+    const confirmed = window.confirm(t("courseDetail.removeContentItemConfirm", { title }));
+    if (!confirmed) {
+      return;
+    }
+
+    setContentActionError("");
+    try {
+      if (item.courseGroupActivityId) {
+        await api.deleteGroupActivityAssignment(courseId, item.groupId ?? groupId, item.courseGroupActivityId);
+      } else if (item.activityId) {
+        await api.deleteActivity(courseId, item.activityId);
+      } else if (item.materialId && item.groupId && groupMaterialById.has(item.materialId)) {
+        await api.deleteGroupMaterial(courseId, item.groupId, item.materialId);
+      } else if (item.materialId) {
+        await api.deleteMaterial(courseId, item.materialId);
+      } else {
+        await deleteContentInScope(item);
+      }
+      await refresh();
+    } catch (err) {
+      setContentActionError(err instanceof Error ? err.message : t("courseDetail.contentUpdateError"));
+    }
+  }
+
+  async function moveContentItemBesideTarget(dragged: CourseContentItem, target: CourseContentItem, placement: "before" | "after") {
+    if ((dragged.groupId ?? null) !== (target.groupId ?? null)) {
+      return;
+    }
+
+    const nextParentId = target.parentId ?? null;
+    const nextGroupId = dragged.groupId ?? null;
+    const siblings = contentItems
+      .filter(
+        (item) =>
+          item.id !== dragged.id &&
+          (item.parentId ?? null) === nextParentId &&
+          (item.groupId ?? null) === nextGroupId
+      )
+      .sort(compareContentItems);
+    const targetIndex = siblings.findIndex((item) => item.id === target.id);
+    if (targetIndex === -1) {
+      return;
+    }
+
+    siblings.splice(placement === "before" ? targetIndex : targetIndex + 1, 0, {
+      ...dragged,
+      parentId: nextParentId,
+      groupId: nextGroupId
+    });
+
+    await Promise.all(
+      siblings.map((item, index) =>
+        updateContentInScope(item, {
+          parentId: nextParentId,
+          position: index
+        })
+      )
+    );
+  }
+
+  async function moveContentItemIntoFolder(dragged: CourseContentItem, folder: CourseContentItem) {
+    await updateContentInScope(dragged, {
+      parentId: folder.id,
+      position: nextContentPosition(folder.id, dragged.groupId ?? null)
+    });
+  }
+
+  async function moveContentItemToRoot(dragged: CourseContentItem) {
+    await updateContentInScope(dragged, {
+      parentId: null,
+      position: nextContentPosition(null, dragged.groupId ?? null)
+    });
+  }
+
+  async function moveContentItemSafely(action: () => Promise<void>) {
+    setContentActionError("");
+    try {
+      await action();
+      await refresh();
+    } catch (err) {
+      setContentActionError(err instanceof Error ? err.message : t("courseDetail.contentUpdateError"));
+    }
+  }
+
+  function nextContentPosition(parentId: string | null, groupId: string | null) {
+    return contentItems.filter((item) => (item.parentId ?? null) === parentId && (item.groupId ?? null) === groupId).length;
+  }
+
+  function handleContentPointerDown(item: CourseContentItem, event: PointerEvent) {
+    if (event.button !== 0 || !canManage) {
+      return;
+    }
+    event.preventDefault();
+    const title = contentItemTitle(item);
+    setDraggingContentItemId(item.id);
+    setDragPreview({ title, x: event.clientX, y: event.clientY });
+
+    const movePreview = (moveEvent: globalThis.PointerEvent) => {
+      setDragPreview((current) => (current ? { ...current, x: moveEvent.clientX, y: moveEvent.clientY } : current));
+      setContentDropTarget(findContentDropTarget(moveEvent.clientX, moveEvent.clientY, item.id));
+    };
+
+    const finishDrag = async (upEvent: globalThis.PointerEvent) => {
+      window.removeEventListener("pointercancel", cancelDrag);
+      window.removeEventListener("pointermove", movePreview);
+      const targetDescriptor = findContentDropTarget(upEvent.clientX, upEvent.clientY, item.id);
+      setDraggingContentItemId(null);
+      setDragPreview(null);
+      setContentDropTarget(null);
+
+      if (targetDescriptor?.type === "root") {
+        if (!item.parentId) {
+          return;
+        }
+        await moveContentItemSafely(() => moveContentItemToRoot(item));
+        return;
+      }
+
+      if (!targetDescriptor || targetDescriptor.type !== "content") {
+        return;
+      }
+
+      const target = contentItems.find((candidate) => candidate.id === targetDescriptor.id);
+      if (!target || target.id === item.id) {
+        return;
+      }
+
+      await moveContentItemSafely(async () => {
+        if (targetDescriptor.placement === "inside" && target.kind === "folder") {
+          if (isContentDescendant(contentItems, target.id, item.id)) {
+            setContentActionError(t("courseDetail.invalidFolderMove"));
+            return;
+          }
+          await moveContentItemIntoFolder(item, target);
+        } else {
+          await moveContentItemBesideTarget(item, target, targetDescriptor.placement === "before" ? "before" : "after");
+        }
+      });
+    };
+
+    const cancelDrag = () => {
+      setDraggingContentItemId(null);
+      setDragPreview(null);
+      setContentDropTarget(null);
+      window.removeEventListener("pointerup", finishDrag);
+      window.removeEventListener("pointermove", movePreview);
+    };
+
+    window.addEventListener("pointermove", movePreview);
+    window.addEventListener("pointerup", finishDrag, { once: true });
+    window.addEventListener("pointercancel", cancelDrag, { once: true });
+  }
+
+  function findContentDropTarget(x: number, y: number, draggedId: string) {
+    const element = document.elementFromPoint(x, y);
+    if (element?.closest("[data-content-root-drop='true']")) {
+      return { id: "root", type: "root" as const };
+    }
+
+    const itemElement = element?.closest("[data-content-item-id]");
+    if (!(itemElement instanceof HTMLElement)) {
+      return null;
+    }
+
+    const targetId = itemElement.dataset.contentItemId;
+    if (!targetId || targetId === draggedId) {
+      return null;
+    }
+
+    const target = contentItems.find((candidate) => candidate.id === targetId);
+    const rect = itemElement.getBoundingClientRect();
+    const relativeY = rect.height > 0 ? (y - rect.top) / rect.height : 0.5;
+    let placement: ContentDropPlacement;
+    if (target?.kind === "folder" && relativeY >= 0.25 && relativeY <= 0.75) {
+      placement = "inside";
+    } else {
+      placement = relativeY < 0.5 ? "before" : "after";
+    }
+
+    return { id: targetId, placement, type: "content" as const };
   }
 
   async function saveAssignmentAvailability(assignmentId: string, availableFrom: string, availableUntil: string) {
@@ -1107,6 +1398,32 @@ export default function CourseGroupPage() {
                               </select>
                             </div>
                             <div className="field">
+                              <label htmlFor="assignContentFolder">{t("courseDetail.contentFolderLabel")}</label>
+                              <select
+                                id="assignContentFolder"
+                                value={assignParentId}
+                                onChange={(event) => setAssignParentId(event.target.value)}
+                                disabled={!canManage}
+                              >
+                                <option value="">{t("courseDetail.contentFolderRoot")}</option>
+                                {contentFolders.map((folder) => (
+                                  <option key={folder.id} value={folder.id}>
+                                    {folder.titleSnapshot ?? t("courseDetail.untitledFolder")}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <label className="checkbox-row" htmlFor="assignContentVisible">
+                              <input
+                                id="assignContentVisible"
+                                type="checkbox"
+                                checked={assignIsVisible}
+                                disabled={!canManage}
+                                onChange={(event) => setAssignIsVisible(event.target.checked)}
+                              />
+                              <span>{t("courseDetail.contentVisibleLabel")}</span>
+                            </label>
+                            <div className="field">
                               <label htmlFor="assignAvailableFrom">{t("groupPage.availableFrom")}</label>
                               <DateTimeMinuteInput
                                 id="assignAvailableFrom"
@@ -1289,6 +1606,137 @@ export default function CourseGroupPage() {
                         <p className="muted">{t("groupPage.noAssignedActivities")}</p>
                       )}
                       {assignmentError ? <p className="error">{assignmentError}</p> : null}
+                    </section>
+                  )
+                },
+                {
+                  id: "content",
+                  label: t("courseDetail.contentTab"),
+                  render: () => (
+                    <section className="section stack">
+                      <div className="section-heading">
+                        <div>
+                          <p className="eyebrow">{t("courseDetail.contentEyebrow")}</p>
+                          <h2>{t("courseDetail.contentTitle")}</h2>
+                          <p className="muted">{t("courseDetail.contentText")}</p>
+                        </div>
+                      </div>
+
+                      {visibleContentItems.length ? (
+                        <div className="table-list">
+                          <div
+                            className={`root-drop-zone ${draggingContentItemId ? "is-active" : ""} ${
+                              contentDropTarget?.type === "root" ? "is-drop-target" : ""
+                            }`}
+                            data-content-root-drop="true"
+                          >
+                            {t("courseDetail.moveToTopLevel")}
+                          </div>
+                          {visibleContentItems.map(({ item, depth }) => {
+                            const title = contentItemTitle(item);
+                            const href = contentItemHref(item);
+                            const isCollapsed = collapsedContentFolderIds.has(item.id);
+                            const assignment = item.courseGroupActivityId ? assignmentById.get(item.courseGroupActivityId) : null;
+                            const courseActivity = item.activityId ? courseActivityById.get(item.activityId) : null;
+                            const activityTypeKey = assignment?.activity.activityType.key ?? courseActivity?.activityType.key ?? null;
+                            const activityLabel = activityTypeKey ? activityCopy(activityTypeKey).name : null;
+                            const isHidden = item.effectiveVisibility ? item.effectiveVisibility !== "visible" : !item.isVisible;
+
+                            return (
+                              <div
+                                className={`table-row table-row-content-tree ${draggingContentItemId === item.id ? "is-dragging" : ""} ${
+                                  contentDropTarget?.type === "content" && contentDropTarget.id === item.id ? "is-drop-target" : ""
+                                } ${item.kind === "folder" ? "is-folder-row" : ""} ${isHidden ? "is-hidden-content" : ""} ${
+                                  contentDropTarget?.type === "content" && contentDropTarget.id === item.id
+                                    ? `is-drop-${contentDropTarget.placement}`
+                                    : ""
+                                }`}
+                                data-content-item-id={item.id}
+                                key={item.id}
+                                style={{ paddingLeft: 14 + depth * 20 }}
+                              >
+                                <div className="table-main table-main-stack">
+                                  <span
+                                    aria-label={t("courseDetail.dragContentItem", { title })}
+                                    className="drag-handle"
+                                    role="button"
+                                    tabIndex={0}
+                                    title={t("courseDetail.dragToMove")}
+                                    onPointerDown={(event) => handleContentPointerDown(item, event)}
+                                  >
+                                    <MaterialActionIcon name="drag" />
+                                  </span>
+                                  {item.kind === "folder" ? (
+                                    <button
+                                      aria-label={
+                                        isCollapsed
+                                          ? t("courseDetail.expandFolder", { title })
+                                          : t("courseDetail.collapseFolder", { title })
+                                      }
+                                      className="content-item-icon-button"
+                                      title={isCollapsed ? t("courseDetail.expandFolderTitle") : t("courseDetail.collapseFolderTitle")}
+                                      type="button"
+                                      onClick={() => toggleContentFolder(item.id)}
+                                    >
+                                      <FolderContentIcon collapsed={isCollapsed} />
+                                    </button>
+                                  ) : (
+                                    <span className="content-item-icon">
+                                      {item.kind === "activity" ? (
+                                        <ActivityContentIcon />
+                                      ) : (
+                                        <MaterialTypeIcon iconName={contentItemMaterialIconName(item)} />
+                                      )}
+                                    </span>
+                                  )}
+                                  <strong>{href ? <Link href={href}>{title}</Link> : title}</strong>
+                                  {activityLabel ? (
+                                    <span className="metadata-badges">
+                                      <span className="metadata-badge is-activity-type">{activityLabel}</span>
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="table-actions content-row-actions">
+                                  {href ? (
+                                    <Link
+                                      aria-label={t("courseDetail.openContentItem", { title })}
+                                      className="button secondary icon-button"
+                                      href={href}
+                                      title={t("common.open")}
+                                    >
+                                      <MaterialActionIcon name="open" />
+                                    </Link>
+                                  ) : (
+                                    <span className="action-slot" aria-hidden="true" />
+                                  )}
+                                  <span className="action-slot" aria-hidden="true" />
+                                  <button
+                                    aria-label={item.isVisible ? t("courseDetail.hideContentItem", { title }) : t("courseDetail.showContentItem", { title })}
+                                    className="secondary icon-button"
+                                    title={item.isVisible ? t("courseDetail.contentHidden") : t("courseDetail.contentVisible")}
+                                    type="button"
+                                    onClick={() => toggleContentVisibility(item)}
+                                  >
+                                    <MaterialActionIcon name={item.isVisible ? "hidden" : "visible"} />
+                                  </button>
+                                  <button
+                                    aria-label={t("courseDetail.removeContentItem", { title })}
+                                    className="danger icon-button"
+                                    title={t("common.remove")}
+                                    type="button"
+                                    onClick={() => removeContentItem(item)}
+                                  >
+                                    <MaterialActionIcon name="remove" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="muted">{t("courseDetail.noContentItems")}</p>
+                      )}
+                      {contentActionError ? <p className="error">{contentActionError}</p> : null}
                     </section>
                   )
                 },
@@ -2145,6 +2593,16 @@ function toIsoOrNull(value: string) {
   return value ? new Date(value).toISOString() : null;
 }
 
+function withDownloadVersion(url: string, material: CourseMaterial | CourseGroupMaterial) {
+  const version =
+    typeof material.metadata?.storedName === "string"
+      ? material.metadata.storedName
+      : typeof material.metadata?.originalName === "string"
+        ? material.metadata.originalName
+        : null;
+  return version ? `${url}?v=${encodeURIComponent(version)}` : url;
+}
+
 function toDateTimeLocalValue(value?: string | null) {
   if (!value) {
     return "";
@@ -2427,6 +2885,66 @@ function compareMaterials<T extends MaterialTreeNode>(left: T, right: T) {
   return left.position - right.position || left.title.localeCompare(right.title);
 }
 
+function compareContentItems(left: CourseContentItem, right: CourseContentItem) {
+  const leftTitle = left.titleSnapshot ?? "";
+  const rightTitle = right.titleSnapshot ?? "";
+  return left.position - right.position || leftTitle.localeCompare(rightTitle);
+}
+
+function flattenContentItems(contentItems: CourseContentItem[], collapsedFolderIds: Set<string>) {
+  const itemIds = new Set(contentItems.map((item) => item.id));
+  const byParent = new Map<string, CourseContentItem[]>();
+  for (const item of contentItems) {
+    const parentId = item.parentId ?? "root";
+    byParent.set(parentId, [...(byParent.get(parentId) ?? []), item]);
+  }
+
+  for (const [parentId, children] of byParent) {
+    byParent.set(parentId, children.sort(compareContentItems));
+  }
+
+  const rows: { item: CourseContentItem; depth: number }[] = [];
+  const visited = new Set<string>();
+
+  function walk(parentId: string, depth: number) {
+    for (const item of byParent.get(parentId) ?? []) {
+      if (visited.has(item.id)) {
+        continue;
+      }
+      visited.add(item.id);
+      rows.push({ item, depth });
+      if (item.kind === "folder" && !collapsedFolderIds.has(item.id)) {
+        walk(item.id, depth + 1);
+      }
+    }
+  }
+
+  walk("root", 0);
+
+  for (const item of contentItems.sort(compareContentItems)) {
+    const parentIsMissing = item.parentId && !itemIds.has(item.parentId);
+    if (!visited.has(item.id) && parentIsMissing) {
+      rows.push({ item, depth: 0 });
+    }
+  }
+
+  return rows;
+}
+
+function isContentDescendant(contentItems: CourseContentItem[], possibleChildId: string, possibleAncestorId: string) {
+  const byId = new Map(contentItems.map((item) => [item.id, item]));
+  let current = byId.get(possibleChildId);
+
+  while (current?.parentId) {
+    if (current.parentId === possibleAncestorId) {
+      return true;
+    }
+    current = byId.get(current.parentId);
+  }
+
+  return false;
+}
+
 function flattenMaterials<T extends MaterialTreeNode>(materials: T[], collapsedFolderIds: Set<string>) {
   const materialIds = new Set(materials.map((material) => material.id));
   const byParent = new Map<string, T[]>();
@@ -2481,6 +2999,80 @@ function isMaterialDescendant<T extends MaterialTreeNode>(materials: T[], possib
   return false;
 }
 
+function ActivityContentIcon() {
+  return (
+    <span className="activity-type-icon activity-content-icon" aria-hidden="true">
+      <svg fill="none" height="28" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 32 32" width="28">
+        <path d="M9 6h14l3 3v17H6V6h3z" />
+        <path d="M22 6v5h5" />
+        <path d="M11 15h10" />
+        <path d="M11 20h7" />
+        <path d="M11 25h5" />
+      </svg>
+    </span>
+  );
+}
+
+function FolderContentIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <span className="activity-type-icon folder-content-icon" aria-hidden="true">
+      <svg fill="none" height="28" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 32 32" width="28">
+        <path d="M4 9h9l3 4h12v13H4z" />
+        <path d="M4 9v17" />
+        <path d={collapsed ? "m18 17 4 3-4 3" : "m18 18 3 4 3-4"} />
+      </svg>
+    </span>
+  );
+}
+
+function MaterialTypeIcon({ iconName }: { iconName: PickerMaterialIcon }) {
+  const paths = {
+    github: (
+      <>
+        <path d="M16 25c-6 0-11-4.8-11-10.8 0-2.4.8-4.7 2.3-6.5-.2-.9-.4-2.9.5-5 0 0 1.9-.6 5 1.9A16.8 16.8 0 0 1 16 4.3c1.1 0 2.2.1 3.2.3 3.1-2.5 5-1.9 5-1.9.9 2.1.7 4.1.5 5A10 10 0 0 1 27 14.2C27 20.2 22 25 16 25Z" />
+        <path d="M12.5 24.2c-.5.9-.7 1.9-.7 3.1" />
+        <path d="M19.5 24.2c.5.9.7 1.9.7 3.1" />
+        <path d="M13 17.5h.01" />
+        <path d="M19 17.5h.01" />
+      </>
+    ),
+    file: (
+      <>
+        <path d="M10 4h8l5 5v19H10z" />
+        <path d="M18 4v6h5" />
+        <path d="M13 16h7" />
+        <path d="M13 21h7" />
+      </>
+    ),
+    text: (
+      <>
+        <path d="M7 6h18" />
+        <path d="M16 6v20" />
+        <path d="M11 26h10" />
+        <path d="M9 12h14" />
+      </>
+    )
+  } as const;
+
+  return (
+    <span className="activity-type-icon" aria-hidden="true">
+      <svg fill="none" height="28" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 32 32" width="28">
+        {paths[iconName]}
+      </svg>
+    </span>
+  );
+}
+
+function materialIconName(kind: string | null | undefined): PickerMaterialIcon {
+  if (kind === "github_repo") {
+    return "github";
+  }
+  if (kind === "text") {
+    return "text";
+  }
+  return "file";
+}
+
 function getHiddenMaterialState<T extends MaterialTreeNode>(materials: T[], hiddenMaterialIds: Set<string>, materialId: string) {
   const byId = new Map(materials.map((material) => [material.id, material]));
   let current = byId.get(materialId);
@@ -2506,13 +3098,19 @@ function getHiddenMaterialState<T extends MaterialTreeNode>(materials: T[], hidd
   };
 }
 
-function MaterialActionIcon({ name }: { name: "download" | "drag" | "edit" | "hidden" | "open" | "remove" | "save" | "visible" }) {
+function MaterialActionIcon({ name }: { name: "download" | "down" | "drag" | "edit" | "hidden" | "open" | "remove" | "save" | "up" | "visible" }) {
   const paths = {
     download: (
       <>
         <path d="M12 3v10" />
         <path d="m8 9 4 4 4-4" />
         <path d="M5 19h14" />
+      </>
+    ),
+    down: (
+      <>
+        <path d="M12 5v14" />
+        <path d="m17 14-5 5-5-5" />
       </>
     ),
     drag: (
@@ -2559,6 +3157,12 @@ function MaterialActionIcon({ name }: { name: "download" | "drag" | "edit" | "hi
         <path d="M5 3h11l3 3v15H5z" />
         <path d="M8 3v6h8" />
         <path d="M9 21v-7h6v7" />
+      </>
+    ),
+    up: (
+      <>
+        <path d="M12 19V5" />
+        <path d="m7 10 5-5 5 5" />
       </>
     ),
     visible: (
