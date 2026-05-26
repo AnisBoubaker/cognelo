@@ -37,13 +37,50 @@ describe("shared contract schemas", () => {
     });
   });
 
-  it("requires URLs for URL-backed course materials on create", () => {
-    expect(() =>
+  it("accepts optional course content placement for activities and assignments", () => {
+    expect(
+      ActivityInputSchema.parse({
+        activityTypeKey: "mcq",
+        title: "Question set",
+        contentPlacement: {
+          parentId: "folder-1",
+          isVisible: false
+        }
+      })
+    ).toMatchObject({
+      contentPlacement: {
+        parentId: "folder-1",
+        isVisible: false,
+        metadata: {}
+      }
+    });
+
+    expect(
+      CourseGroupActivityInputSchema.parse({
+        activityId: "activity-1",
+        contentPlacement: {
+          parentId: "folder-1"
+        }
+      })
+    ).toMatchObject({
+      contentPlacement: {
+        parentId: "folder-1",
+        isVisible: true,
+        metadata: {}
+      }
+    });
+  });
+
+  it("allows URL-backed course materials to be created before they are configured", () => {
+    expect(
       CourseMaterialInputSchema.parse({
         title: "Repository",
         kind: "github_repo"
       })
-    ).toThrow();
+    ).toMatchObject({
+      title: "Repository",
+      kind: "github_repo"
+    });
   });
 
   it("restricts github repository materials to github.com URLs", () => {

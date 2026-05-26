@@ -68,19 +68,32 @@ export async function createActivity(user: CurrentUser, courseId: string, input:
     definition.metadataSchema.parse(data.metadata);
   }
 
-  return prisma.activity.create({
-    data: {
-      courseId,
-      activityTypeId: activityType.id,
-      title: data.title,
-      description: data.description,
-      lifecycle: data.lifecycle,
-      config: mergedConfig as Prisma.InputJsonValue,
-      metadata: data.metadata as Prisma.InputJsonValue,
-      position: data.position,
-      createdById: user.id
-    },
-    include: { activityType: true, bankActivity: true, activityVersion: true }
+  return prisma.$transaction(async (tx) => {
+    const activity = await tx.activity.create({
+      data: {
+        courseId,
+        activityTypeId: activityType.id,
+        title: data.title,
+        description: data.description,
+        lifecycle: data.lifecycle,
+        config: mergedConfig as Prisma.InputJsonValue,
+        metadata: data.metadata as Prisma.InputJsonValue,
+        position: data.position,
+        createdById: user.id
+      },
+      include: { activityType: true, bankActivity: true, activityVersion: true }
+    });
+
+    if (data.contentPlacement) {
+      await createCourseActivityContentItem(tx, {
+        courseId,
+        activityId: activity.id,
+        title: activity.title,
+        placement: data.contentPlacement
+      });
+    }
+
+    return activity;
   });
 }
 
@@ -123,25 +136,38 @@ async function createCourseActivityFromBankVersion(
     throw new AppError(400, "ACTIVITY_BANK_SUBJECT_MISMATCH", "This activity bank does not belong to the course subject.");
   }
 
-  return prisma.activity.create({
-    data: {
-      courseId,
-      bankActivityId: version.bankActivityId,
-      activityVersionId: version.id,
-      activityTypeId: version.activityTypeId,
-      title: data.title || version.title,
-      description: data.description || version.description,
-      lifecycle: data.lifecycle,
-      config: version.config as Prisma.InputJsonValue,
-      metadata: {
-        ...((version.metadata as Record<string, unknown> | null) ?? {}),
-        ...(data.metadata ?? {}),
-        activityVersionNumber: version.versionNumber
-      } as Prisma.InputJsonValue,
-      position: data.position,
-      createdById: user.id
-    },
-    include: { activityType: true, bankActivity: true, activityVersion: true }
+  return prisma.$transaction(async (tx) => {
+    const activity = await tx.activity.create({
+      data: {
+        courseId,
+        bankActivityId: version.bankActivityId,
+        activityVersionId: version.id,
+        activityTypeId: version.activityTypeId,
+        title: data.title || version.title,
+        description: data.description || version.description,
+        lifecycle: data.lifecycle,
+        config: version.config as Prisma.InputJsonValue,
+        metadata: {
+          ...((version.metadata as Record<string, unknown> | null) ?? {}),
+          ...(data.metadata ?? {}),
+          activityVersionNumber: version.versionNumber
+        } as Prisma.InputJsonValue,
+        position: data.position,
+        createdById: user.id
+      },
+      include: { activityType: true, bankActivity: true, activityVersion: true }
+    });
+
+    if (data.contentPlacement) {
+      await createCourseActivityContentItem(tx, {
+        courseId,
+        activityId: activity.id,
+        title: activity.title,
+        placement: data.contentPlacement
+      });
+    }
+
+    return activity;
   });
 }
 
@@ -204,4 +230,43 @@ export async function deleteActivity(user: CurrentUser, courseId: string, activi
   }
   await prisma.activity.delete({ where: { id: activityId } });
   return { ok: true };
+}
+
+async function createCourseActivityContentItem(
+  tx: Pick<typeof prisma, "courseContentItem">,
+  input: {
+    courseId: string;
+    activityId: string;
+    title: string;
+    placement: NonNullable<ReturnType<typeof ActivityInputSchema.parse>["contentPlacement"]>;
+  }
+) {
+  if (input.placement.parentId) {
+    const parent = await tx.courseContentItem.findFirst({
+      where: { id: input.placement.parentId, courseId: input.courseId, groupId: null, kind: "folder" },
+      select: { id: true }
+    });
+    if (!parent) {
+      throw notFound("Parent folder");
+    }
+  }
+
+  const position =
+    input.placement.position ??
+    (await tx.courseContentItem.count({
+      where: { courseId: input.courseId, groupId: null, parentId: input.placement.parentId ?? null }
+    }));
+
+  await tx.courseContentItem.create({
+    data: {
+      courseId: input.courseId,
+      parentId: input.placement.parentId ?? null,
+      kind: "activity",
+      titleSnapshot: input.placement.titleSnapshot ?? input.title,
+      position,
+      isVisible: input.placement.isVisible,
+      activityId: input.activityId,
+      metadata: input.placement.metadata as Prisma.InputJsonValue
+    }
+  });
 }

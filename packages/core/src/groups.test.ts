@@ -18,6 +18,12 @@ const tx = vi.hoisted(() => ({
     update: vi.fn(),
     upsert: vi.fn()
   },
+  courseContentItem: {
+    count: vi.fn(),
+    create: vi.fn(),
+    findFirst: vi.fn(),
+    update: vi.fn()
+  },
   gradebookItem: {
     upsert: vi.fn()
   },
@@ -153,6 +159,8 @@ describe("group services", () => {
         activityId: input.where.groupId_activityId.activityId
       })
     );
+    tx.courseContentItem.count.mockResolvedValue(0);
+    tx.courseContentItem.findFirst.mockResolvedValue(null);
     tx.gradebookItem.upsert.mockResolvedValue({ id: "gradebook-item-1" });
     authMocks.canManageCourse.mockResolvedValue(true);
     authMocks.isAdmin.mockReturnValue(false);
@@ -344,6 +352,86 @@ describe("group services", () => {
     );
   });
 
+  it("materializes root content items for course-wide all-groups placement", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      courseId: "course-1",
+      title: "Loop practice",
+      metadata: {}
+    });
+    tx.courseGroup.findMany.mockResolvedValue([{ id: "group-1", activities: [] }]);
+    tx.activity.update.mockResolvedValue({ id: "activity-1" });
+    tx.activity.findFirst.mockResolvedValue({ id: "activity-1" });
+
+    await assignActivityToAllCourseGroups(teacherUser, "course-1", "activity-1", {
+      contentPlacement: {
+        titleSnapshot: "Week activity",
+        isVisible: false
+      }
+    });
+
+    expect(tx.activity.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          metadata: {
+            allGroupsAssignment: expect.objectContaining({
+              contentPlacement: expect.objectContaining({
+                titleSnapshot: "Week activity",
+                isVisible: false
+              })
+            })
+          }
+        }
+      })
+    );
+    expect(tx.courseContentItem.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        courseId: "course-1",
+        groupId: "group-1",
+        parentId: null,
+        kind: "activity",
+        titleSnapshot: "Week activity",
+        isVisible: false,
+        activityId: "activity-1",
+        courseGroupActivityId: "assignment-group-1"
+      })
+    });
+  });
+
+  it("creates course-wide content placement when a future group inherits assignments", async () => {
+    tx.courseGroup.create.mockResolvedValue({ id: "group-1" });
+    tx.activity.findMany.mockResolvedValue([
+      {
+        id: "activity-1",
+        title: "Parsons warmup",
+        metadata: {
+          allGroupsAssignment: {
+            enabled: true,
+            assessmentMode: "formative",
+            contentPlacement: {
+              titleSnapshot: "Inherited warmup",
+              isVisible: true,
+              metadata: {}
+            }
+          }
+        }
+      }
+    ]);
+
+    await createCourseGroup(teacherUser, "course-1", { title: "Team A" });
+
+    expect(tx.courseContentItem.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        courseId: "course-1",
+        groupId: "group-1",
+        kind: "activity",
+        titleSnapshot: "Inherited warmup",
+        activityId: "activity-1",
+        courseGroupActivityId: "assignment-group-1"
+      })
+    });
+  });
+
   it("removes the course-wide policy while leaving group assignments group-managed", async () => {
     mockPrisma.activity.findFirst.mockResolvedValue({
       id: "activity-1",
@@ -498,6 +586,34 @@ describe("group services", () => {
         activityId: "activity-1",
         titleSnapshot: "Trace loops"
       }
+    });
+  });
+
+  it("creates group content placement when assigning an activity to a group", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
+    mockPrisma.activity.findFirst.mockResolvedValue({ id: "activity-1", courseId: "course-1", title: "Trace loops" });
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue(null);
+    tx.courseContentItem.findFirst.mockResolvedValueOnce({ id: "folder-1" }).mockResolvedValueOnce(null);
+
+    await assignActivityToGroup(teacherUser, "course-1", "group-1", {
+      activityId: "activity-1",
+      contentPlacement: {
+        parentId: "folder-1",
+        isVisible: false
+      }
+    });
+
+    expect(tx.courseContentItem.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        courseId: "course-1",
+        groupId: "group-1",
+        parentId: "folder-1",
+        kind: "activity",
+        titleSnapshot: "Trace loops",
+        isVisible: false,
+        activityId: "activity-1",
+        courseGroupActivityId: "assignment-created"
+      })
     });
   });
 

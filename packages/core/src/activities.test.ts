@@ -1,7 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
+const tx = vi.hoisted(() => ({
+  activity: {
+    create: vi.fn()
+  },
+  courseContentItem: {
+    count: vi.fn(),
+    create: vi.fn(),
+    findFirst: vi.fn()
+  }
+}));
+
 const mockPrisma = vi.hoisted(() => ({
+  $transaction: vi.fn(async (handler: (transaction: typeof tx) => unknown) => handler(tx)),
   activity: {
     create: vi.fn(),
     findFirst: vi.fn()
@@ -58,6 +70,9 @@ const teacherUser: CurrentUser = {
 describe("activity services", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof tx) => unknown) => handler(tx));
+    tx.activity.create.mockImplementation((...args) => mockPrisma.activity.create(...args));
+    tx.courseContentItem.count.mockResolvedValue(0);
   });
 
   it("creates a local course activity only for enabled activity types", async () => {
@@ -82,6 +97,32 @@ describe("activity services", () => {
         })
       })
     );
+  });
+
+  it("creates a course content item when activity creation includes placement", async () => {
+    mockPrisma.activityType.findUnique.mockResolvedValue({ id: "type-1", key: "placeholder", isEnabled: true });
+    tx.activity.create.mockResolvedValue({ id: "activity-1", title: "Local activity" });
+    tx.courseContentItem.findFirst.mockResolvedValue({ id: "folder-1" });
+
+    await createActivity(teacherUser, "course-1", {
+      activityTypeKey: "placeholder",
+      title: "Local activity",
+      contentPlacement: {
+        parentId: "folder-1",
+        isVisible: false
+      }
+    });
+
+    expect(tx.courseContentItem.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        courseId: "course-1",
+        parentId: "folder-1",
+        kind: "activity",
+        titleSnapshot: "Local activity",
+        isVisible: false,
+        activityId: "activity-1"
+      })
+    });
   });
 
   it("rejects local creation when the activity type is not available", async () => {

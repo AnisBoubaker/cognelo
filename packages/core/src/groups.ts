@@ -19,6 +19,8 @@ import { AppError, notFound } from "./errors";
 type StudentAccessDb = Pick<typeof prisma, "role" | "userRole" | "courseMembership">;
 type GradebookItemDb = Pick<typeof prisma, "gradebookItem">;
 type GradebookItemSettingsInput = ReturnType<typeof normalizeGradebookItemSettings>;
+type GroupActivityInput = ReturnType<typeof CourseGroupActivityInputSchema.parse>;
+type CourseWideContentPlacement = NonNullable<ReturnType<typeof CourseAllGroupsActivityAssignmentInputSchema.parse>["contentPlacement"]>;
 type CourseWideAssignmentMetadata = {
   enabled?: boolean;
   availableFrom?: string | null;
@@ -26,6 +28,7 @@ type CourseWideAssignmentMetadata = {
   enablePerGroupSettings?: boolean;
   assessmentMode?: "formative" | "summative";
   gradebookSettings?: GradebookItemSettingsInput;
+  contentPlacement?: CourseWideContentPlacement;
 };
 
 const COURSE_WIDE_ASSIGNMENT_METADATA_KEY = "allGroupsAssignment";
@@ -144,9 +147,10 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
             availableUntil: data.availableUntil ?? null,
             enablePerGroupSettings: data.enablePerGroupSettings,
             assessmentMode: data.assessmentMode,
-            ...(gradebookSettings ? { gradebookSettings } : {})
+            ...(gradebookSettings ? { gradebookSettings } : {}),
+            ...(data.contentPlacement ? { contentPlacement: data.contentPlacement } : {})
           }
-        }
+        } as Prisma.InputJsonValue
       }
     });
 
@@ -199,7 +203,18 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
               activityId,
               titleSnapshot: activity.title,
               gradebookSettings
-            })
+            }).then(() =>
+              data.contentPlacement
+                ? ensureAssignmentContentItem(tx, {
+                    courseId,
+                    groupId: group.id,
+                    groupActivityId: assignment.id,
+                    activityId,
+                    title: activity.title,
+                    placement: data.contentPlacement
+                  })
+                : undefined
+            )
           );
       })
     );
@@ -630,6 +645,17 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
       gradebookSettings: data.gradebookSettings ? normalizeGradebookItemSettings(data.gradebookSettings) : undefined
     });
 
+    if (data.contentPlacement) {
+      await ensureAssignmentContentItem(tx, {
+        courseId,
+        groupId,
+        groupActivityId: assignment.id,
+        activityId: assignment.activityId,
+        title: activity.title,
+        placement: data.contentPlacement
+      });
+    }
+
     return assignment;
   });
 }
@@ -695,7 +721,7 @@ export async function deleteGroupActivityAssignment(
 }
 
 async function createCourseWideAssignmentsForGroup(
-  tx: Pick<typeof prisma, "activity" | "courseGroupActivity" | "gradebookItem">,
+  tx: Pick<typeof prisma, "activity" | "courseContentItem" | "courseGroupActivity" | "gradebookItem">,
   courseId: string,
   groupId: string
 ) {
@@ -746,6 +772,18 @@ async function createCourseWideAssignmentsForGroup(
             gradebookSettings: getCourseWideAssignmentMetadata(activity?.metadata)?.gradebookSettings
               ? normalizeGradebookItemSettings(getCourseWideAssignmentMetadata(activity?.metadata)?.gradebookSettings)
               : undefined
+          }).then(() => {
+            const placement = getCourseWideAssignmentMetadata(activity?.metadata)?.contentPlacement;
+            return placement
+              ? ensureAssignmentContentItem(tx, {
+                  courseId,
+                  groupId,
+                  groupActivityId: createdAssignment.id,
+                  activityId: createdAssignment.activityId,
+                  title: activity?.title ?? "Activity",
+                  placement
+                })
+              : undefined;
           });
         })
     )
@@ -776,6 +814,69 @@ async function ensureGradebookItemForAssignment(
       ...(settings ? buildGradebookItemSettingsData(settings) : {})
     }
   });
+}
+
+async function ensureAssignmentContentItem(
+  tx: Pick<typeof prisma, "courseContentItem">,
+  input: {
+    courseId: string;
+    groupId: string;
+    groupActivityId: string;
+    activityId: string;
+    title: string;
+    placement: GroupActivityInput["contentPlacement"] | CourseWideContentPlacement;
+  }
+) {
+  if (!input.placement) {
+    return;
+  }
+
+  const parentId = "parentId" in input.placement ? (input.placement.parentId ?? null) : null;
+  if (parentId) {
+    const parent = await tx.courseContentItem.findFirst({
+      where: { id: parentId, courseId: input.courseId, groupId: null, kind: "folder" },
+      select: { id: true }
+    });
+    if (!parent) {
+      throw notFound("Parent folder");
+    }
+  }
+
+  const position =
+    input.placement.position ??
+    (await tx.courseContentItem.count({
+      where: {
+        courseId: input.courseId,
+        parentId,
+        OR: [{ groupId: null }, { groupId: input.groupId }]
+      }
+    }));
+  const data = {
+    courseId: input.courseId,
+    groupId: input.groupId,
+    parentId,
+    kind: "activity" as const,
+    titleSnapshot: input.placement.titleSnapshot ?? input.title,
+    position,
+    isVisible: input.placement.isVisible,
+    activityId: input.activityId,
+    courseGroupActivityId: input.groupActivityId,
+    metadata: input.placement.metadata as Prisma.InputJsonValue
+  };
+
+  const existing = await tx.courseContentItem.findFirst({
+    where: { courseGroupActivityId: input.groupActivityId, kind: "activity" },
+    select: { id: true }
+  });
+  if (existing) {
+    await tx.courseContentItem.update({
+      where: { id: existing.id },
+      data
+    });
+    return;
+  }
+
+  await tx.courseContentItem.create({ data });
 }
 
 async function assertGroupBelongsToCourse(courseId: string, groupId: string) {

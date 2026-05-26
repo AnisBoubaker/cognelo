@@ -117,6 +117,12 @@ GET    /api/courses/:courseId/groups/:groupId/participants
 POST   /api/courses/:courseId/groups/:groupId/participants
 GET    /api/courses/:courseId/groups/:groupId/activities
 POST   /api/courses/:courseId/groups/:groupId/activities
+GET    /api/courses/:courseId/groups/:groupId/content
+POST   /api/courses/:courseId/groups/:groupId/content/folders
+POST   /api/courses/:courseId/groups/:groupId/content/materials
+POST   /api/courses/:courseId/groups/:groupId/content/activities
+PATCH  /api/courses/:courseId/groups/:groupId/content/:contentItemId
+DELETE /api/courses/:courseId/groups/:groupId/content/:contentItemId
 GET    /api/courses/:courseId/groups/:groupId/grades
 GET    /api/courses/:courseId/materials
 POST   /api/courses/:courseId/materials
@@ -124,6 +130,12 @@ POST   /api/courses/:courseId/materials/upload
 PATCH  /api/courses/:courseId/materials/:materialId
 DELETE /api/courses/:courseId/materials/:materialId
 GET    /api/courses/:courseId/materials/:materialId/download
+GET    /api/courses/:courseId/content
+POST   /api/courses/:courseId/content/folders
+POST   /api/courses/:courseId/content/materials
+POST   /api/courses/:courseId/content/activities
+PATCH  /api/courses/:courseId/content/:contentItemId
+DELETE /api/courses/:courseId/content/:contentItemId
 GET    /api/activity-types
 GET    /api/plugins
 PATCH  /api/plugins/:pluginKey
@@ -216,6 +228,8 @@ Course activities can be assigned to every group from the course page. This stor
 
 Each `CourseGroupActivity` assignment has one corresponding `GradebookItem`, created when the assignment is materialized directly, through an all-groups course policy, or by future-group inheritance.
 
+Course content tree foundations are present in core. `CourseContentItem` provides a shared placement, ordering, nesting, and visibility layer for folders, materials, and activities without merging their domain behavior. Folders are course-level structure and are preserved across groups; group-specific materials and activities can be placed inside those shared folders. Materials remain non-assigned resources, while activities remain generic course or group assignment records with plugin-owned behavior isolated in plugin packages. Core course/group content APIs can create folders, place materials, place activities, move/update items, delete items, and list all or effectively visible content items. Activity creation and assignment contracts can optionally carry `contentPlacement` so activity rows and group assignments can create matching content-tree activity items.
+
 Core gradebook services create numbered `ActivityAttempt` records for assigned group activities, enforce attempt limits, compute lateness at submission time, normalize raw plugin scores to the gradebook item scale, apply pass/fail thresholds and late penalties, select the current grade across attempts, and record grading results with `GradeEvent` audit entries. Plugins keep their private attempt/submission artifacts in plugin tables and call the core services to keep gradebook records consistent.
 
 Teachers can view gradebook rows from the course page or a group page. The gradebook API returns one row per student participant and assigned group activity, including missing work, and supports group, activity, status, and CSV export filters.
@@ -242,7 +256,7 @@ teacher@cognelo.local
 student@cognelo.local
 ```
 
-The seed also creates a sample subject, an activity bank with coding/web-design/Parsons examples, a sample course, starter material, a section, and assigned activities for development.
+The seed also creates a sample subject, an activity bank with coding/web-design/Parsons examples, a sample course, starter materials, a section, assigned activities, and a mixed course content tree for development. The seeded content tree includes visible and hidden folders with materials and activities placed side by side.
 
 ## Run Locally
 

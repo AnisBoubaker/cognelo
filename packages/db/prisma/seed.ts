@@ -120,6 +120,52 @@ async function upsertBankActivityWithVersion(params: {
   return { bankActivity, version };
 }
 
+async function upsertCourseContentItem(params: {
+  id: string;
+  courseId: string;
+  groupId?: string | null;
+  parentId?: string | null;
+  kind: "folder" | "material" | "activity";
+  titleSnapshot: string;
+  position: number;
+  isVisible?: boolean;
+  materialId?: string | null;
+  activityId?: string | null;
+  courseGroupActivityId?: string | null;
+  metadata?: Record<string, unknown>;
+}) {
+  return prisma.courseContentItem.upsert({
+    where: { id: params.id },
+    update: {
+      courseId: params.courseId,
+      groupId: params.groupId ?? null,
+      parentId: params.parentId ?? null,
+      kind: params.kind,
+      titleSnapshot: params.titleSnapshot,
+      position: params.position,
+      isVisible: params.isVisible ?? true,
+      materialId: params.materialId ?? null,
+      activityId: params.activityId ?? null,
+      courseGroupActivityId: params.courseGroupActivityId ?? null,
+      metadata: (params.metadata ?? {}) as Prisma.InputJsonValue
+    },
+    create: {
+      id: params.id,
+      courseId: params.courseId,
+      groupId: params.groupId ?? null,
+      parentId: params.parentId ?? null,
+      kind: params.kind,
+      titleSnapshot: params.titleSnapshot,
+      position: params.position,
+      isVisible: params.isVisible ?? true,
+      materialId: params.materialId ?? null,
+      activityId: params.activityId ?? null,
+      courseGroupActivityId: params.courseGroupActivityId ?? null,
+      metadata: (params.metadata ?? {}) as Prisma.InputJsonValue
+    }
+  });
+}
+
 async function main() {
   await ensurePluginLocalTables();
 
@@ -409,11 +455,11 @@ async function main() {
     });
   }
 
-  await prisma.courseMaterial.upsert({
+  const welcomeMaterial = await prisma.courseMaterial.upsert({
     where: { id: "seed-material-welcome" },
     update: {
       title: "Welcome",
-      kind: "markdown",
+      kind: "text",
       body: "## Welcome\n\nStart here before attempting the first activity.",
       metadata: { module: "orientation" }
     },
@@ -421,9 +467,92 @@ async function main() {
       id: "seed-material-welcome",
       courseId: course.id,
       title: "Welcome",
-      kind: "markdown",
+      kind: "text",
       body: "## Welcome\n\nStart here before attempting the first activity.",
       metadata: { module: "orientation" },
+      createdById: teacher.id
+    }
+  });
+
+  const variablesIntroMaterial = await prisma.courseMaterial.upsert({
+    where: { id: "seed-material-variables-intro" },
+    update: {
+      title: "Introduction to variables",
+      kind: "file",
+      body: null,
+      url: null,
+      metadata: { module: "week-1", originalName: "introduction-to-variables.pdf", mimeType: "application/pdf" },
+      position: 1
+    },
+    create: {
+      id: "seed-material-variables-intro",
+      courseId: course.id,
+      title: "Introduction to variables",
+      kind: "file",
+      metadata: { module: "week-1", originalName: "introduction-to-variables.pdf", mimeType: "application/pdf" },
+      position: 1,
+      createdById: teacher.id
+    }
+  });
+
+  const examplesRepoMaterial = await prisma.courseMaterial.upsert({
+    where: { id: "seed-material-examples-repo" },
+    update: {
+      title: "Examples shown in class",
+      kind: "github_repo",
+      url: "https://github.com/cognelo/examples-programming-101",
+      metadata: { module: "week-1" },
+      position: 2
+    },
+    create: {
+      id: "seed-material-examples-repo",
+      courseId: course.id,
+      title: "Examples shown in class",
+      kind: "github_repo",
+      url: "https://github.com/cognelo/examples-programming-101",
+      metadata: { module: "week-1" },
+      position: 2,
+      createdById: teacher.id
+    }
+  });
+
+  const loopsSlidesMaterial = await prisma.courseMaterial.upsert({
+    where: { id: "seed-material-loops-slides" },
+    update: {
+      title: "What are loops?",
+      kind: "file",
+      metadata: { module: "week-2", originalName: "what-are-loops.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
+      position: 3
+    },
+    create: {
+      id: "seed-material-loops-slides",
+      courseId: course.id,
+      title: "What are loops?",
+      kind: "file",
+      metadata: { module: "week-2", originalName: "what-are-loops.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
+      position: 3,
+      createdById: teacher.id
+    }
+  });
+
+  const loopsResourceMaterial = await prisma.courseMaterial.upsert({
+    where: { id: "seed-material-loops-resource" },
+    update: {
+      title: "Codecademy: Learn loops",
+      kind: "text",
+      body: "Extra practice resource: https://www.codecademy.com/resources/docs/python/loops",
+      url: null,
+      metadata: { module: "week-2", audience: "extra-practice" },
+      position: 4
+    },
+    create: {
+      id: "seed-material-loops-resource",
+      courseId: course.id,
+      title: "Codecademy: Learn loops",
+      kind: "text",
+      body: "Extra practice resource: https://www.codecademy.com/resources/docs/python/loops",
+      metadata: { module: "week-2", audience: "extra-practice" },
+      position: 4,
       createdById: teacher.id
     }
   });
@@ -955,6 +1084,149 @@ async function main() {
       availableUntil: new Date("2026-05-22T03:59:00.000Z"),
       position: 3
     }
+  });
+
+  await prisma.courseContentItem.deleteMany({
+    where: {
+      courseId: course.id,
+      id: { startsWith: "seed-content-" }
+    }
+  });
+
+  const courseOverviewFolder = await upsertCourseContentItem({
+    id: "seed-content-course-overview-folder",
+    courseId: course.id,
+    kind: "folder",
+    titleSnapshot: "Course overview",
+    position: 0,
+    metadata: { seed: true }
+  });
+
+  await upsertCourseContentItem({
+    id: "seed-content-course-welcome",
+    courseId: course.id,
+    parentId: courseOverviewFolder.id,
+    kind: "material",
+    titleSnapshot: welcomeMaterial.title,
+    position: 0,
+    materialId: welcomeMaterial.id,
+    metadata: { seed: true }
+  });
+
+  const week1Folder = await upsertCourseContentItem({
+    id: "seed-content-course-week-1",
+    courseId: course.id,
+    kind: "folder",
+    titleSnapshot: "Week 1: Variables",
+    position: 1,
+    metadata: { seed: true, week: 1 }
+  });
+
+  await upsertCourseContentItem({
+    id: "seed-content-section-a-variables-pdf",
+    courseId: course.id,
+    parentId: week1Folder.id,
+    kind: "material",
+    titleSnapshot: variablesIntroMaterial.title,
+    position: 0,
+    materialId: variablesIntroMaterial.id,
+    metadata: { seed: true }
+  });
+
+  await upsertCourseContentItem({
+    id: "seed-content-section-a-mcq",
+    courseId: course.id,
+    parentId: week1Folder.id,
+    kind: "activity",
+    titleSnapshot: "Check your understanding: Python basics",
+    position: 1,
+    activityId: "seed-activity-mcq",
+    metadata: { seed: true }
+  });
+
+  await upsertCourseContentItem({
+    id: "seed-content-section-a-examples-repo",
+    courseId: course.id,
+    parentId: week1Folder.id,
+    kind: "material",
+    titleSnapshot: examplesRepoMaterial.title,
+    position: 2,
+    materialId: examplesRepoMaterial.id,
+    metadata: { seed: true }
+  });
+
+  await upsertCourseContentItem({
+    id: "seed-content-section-a-coding-template",
+    courseId: course.id,
+    parentId: week1Folder.id,
+    kind: "activity",
+    titleSnapshot: "Practice: Use the right variable",
+    position: 3,
+    activityId: "seed-activity-coding-template",
+    metadata: { seed: true }
+  });
+
+  const week2Folder = await upsertCourseContentItem({
+    id: "seed-content-course-week-2",
+    courseId: course.id,
+    kind: "folder",
+    titleSnapshot: "Week 2: Loops",
+    position: 2,
+    isVisible: false,
+    metadata: { seed: true, week: 2, note: "Hidden to demonstrate folder visibility inheritance." }
+  });
+
+  await upsertCourseContentItem({
+    id: "seed-content-section-a-loops-slides",
+    courseId: course.id,
+    parentId: week2Folder.id,
+    kind: "material",
+    titleSnapshot: loopsSlidesMaterial.title,
+    position: 0,
+    materialId: loopsSlidesMaterial.id,
+    metadata: { seed: true }
+  });
+
+  await upsertCourseContentItem({
+    id: "seed-content-section-a-parsons-loop",
+    courseId: course.id,
+    parentId: week2Folder.id,
+    kind: "activity",
+    titleSnapshot: "Parsons: Compute a loop",
+    position: 1,
+    activityId: "seed-activity-parsons",
+    metadata: { seed: true }
+  });
+
+  const resourcesFolder = await upsertCourseContentItem({
+    id: "seed-content-course-week-2-resources",
+    courseId: course.id,
+    parentId: week2Folder.id,
+    kind: "folder",
+    titleSnapshot: "Resources",
+    position: 2,
+    metadata: { seed: true }
+  });
+
+  await upsertCourseContentItem({
+    id: "seed-content-section-a-loops-resource",
+    courseId: course.id,
+    parentId: resourcesFolder.id,
+    kind: "material",
+    titleSnapshot: loopsResourceMaterial.title,
+    position: 0,
+    materialId: loopsResourceMaterial.id,
+    metadata: { seed: true }
+  });
+
+  await upsertCourseContentItem({
+    id: "seed-content-section-a-web-design",
+    courseId: course.id,
+    kind: "activity",
+    titleSnapshot: "Capstone practice: Responsive profile card",
+    position: 2,
+    activityId: "seed-activity-web-design-profile-card",
+    metadata: { seed: true, note: "Root-level item to test mixed folder/root layout." }
   });
 }
 
