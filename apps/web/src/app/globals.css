@@ -1016,8 +1016,9 @@ a.card:hover,
 .table-row-content-tree.is-folder-row {
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, #f5b84b, white 91%),
-    color-mix(in srgb, var(--surface), white 2%) 42%
+    transparent 0 var(--content-tree-indent, 0px),
+    color-mix(in srgb, #f5b84b, white 91%) var(--content-tree-indent, 0px),
+    color-mix(in srgb, var(--surface), white 2%) calc(var(--content-tree-indent, 0px) + 360px)
   );
 }
 
@@ -1060,6 +1061,7 @@ a.card:hover,
 
 .student-accordion-panel .table-row-content-tree {
   border: 1px solid color-mix(in srgb, var(--brand-blue), white 74%);
+  margin-left: var(--student-content-row-indent, 0);
 }
 
 .student-accordion-title-button {
