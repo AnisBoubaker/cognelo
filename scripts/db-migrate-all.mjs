@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 const root = process.cwd();
 const coreSchema = "packages/db/prisma/schema.prisma";
 const coreMigrationsDir = join(root, "packages/db/prisma/migrations");
-const pluginsDir = join(root, "packages/plugins");
+const pluginsDir = join(root, "packages/plugin-activities");
 
 export function run(label, command, args) {
   console.log(`\n> ${label}`);

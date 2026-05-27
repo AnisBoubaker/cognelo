@@ -116,7 +116,7 @@ The runner listens on port `3456`. The API reads `WEB_DESIGN_RUNNER_URL`, which 
 
 When changing this plugin, update:
 
-- `packages/plugins/plugin-web-design-coding-exercises/README.md`
-- `packages/plugins/plugin-web-design-coding-exercises/PROJECT_MEMORY.md`
+- `packages/plugin-activities/plugin-web-design-coding-exercises/README.md`
+- `packages/plugin-activities/plugin-web-design-coding-exercises/PROJECT_MEMORY.md`
 
 Only update the root `README.md` or `docs/PROJECT_MEMORY.md` if the change affects the whole platform or a cross-plugin convention.

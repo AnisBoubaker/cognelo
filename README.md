@@ -2,7 +2,7 @@
 
 Cognelo is a modular ITS foundation for programming education. This root README covers the platform itself: core architecture, shared services, setup, and conventions for adding plugins.
 
-Plugin-specific behavior, routes, persistence, and UX notes belong in each plugin package under `packages/plugins/*`.
+Plugin-specific behavior, routes, persistence, and UX notes belong in each plugin package under `packages/plugin-activities/*`.
 
 ## Architecture Rationale
 
@@ -27,8 +27,8 @@ packages/
   contracts/           Shared DTO schemas and types
   core/                Services and authorization
   db/                  Prisma schema, migration, seed, client
-  plugins/
-    plugin-*/          Plugin packages, each with its own README and PROJECT_MEMORY
+  plugin-activities/
+    plugin-*/          Activity plugin packages, each with its own README and PROJECT_MEMORY
 docs/
   ARCHITECTURE.md      Durable architecture notes
   PROJECT_MEMORY.md    Platform-level memory for future sessions
@@ -45,13 +45,14 @@ docs/
 - Courses: create, list, read, update, archive; courses belong to a subject and receive activity copies from banks
 - Course settings: course-level AI agent selection for student support
 - Memberships: basic course membership creation
-- Materials: generic typed course material records
+- Course content tree: shared placement, ordering, folder nesting, and visibility for folders, materials, and activities
+- Materials: generic typed course material records that remain non-assigned resources
 - Activities: typed course-local activity copies with JSON config and research metadata
 - Activity types: enabled type listing plus SDK definitions
 
 ## Plugin Boundary
 
-Each activity plugin lives in its own package under `packages/plugins/plugin-*`.
+Each activity plugin lives in its own package under `packages/plugin-activities/plugin-*`.
 
 The intended boundary is:
 
@@ -228,7 +229,11 @@ Course activities can be assigned to every group from the course page. This stor
 
 Each `CourseGroupActivity` assignment has one corresponding `GradebookItem`, created when the assignment is materialized directly, through an all-groups course policy, or by future-group inheritance.
 
-Course content tree foundations are present in core. `CourseContentItem` provides a shared placement, ordering, nesting, and visibility layer for folders, materials, and activities without merging their domain behavior. Folders are course-level structure and are preserved across groups; group-specific materials and activities can be placed inside those shared folders. Materials remain non-assigned resources, while activities remain generic course or group assignment records with plugin-owned behavior isolated in plugin packages. Core course/group content APIs can create folders, place materials, place activities, move/update items, delete items, and list all or effectively visible content items. Activity creation and assignment contracts can optionally carry `contentPlacement` so activity rows and group assignments can create matching content-tree activity items.
+`CourseContentItem` provides the canonical course content tree: shared placement, ordering, nesting, and visibility for folders, materials, and activities without merging their domain behavior. Folders are generic course content structure, live at the course level, and are preserved across groups; group-specific materials and activities can be placed inside those shared folders. Materials remain non-assigned resources, while activities remain generic course or group assignment records with plugin-owned behavior isolated in plugin packages. Core course/group content APIs can create folders, place materials, place activities, move/update items, delete items, and list all or effectively visible content items. Activity creation and assignment contracts can optionally carry `contentPlacement` so activity rows and group assignments can create matching content-tree activity items.
+
+Visibility is content-tree state and is separate from activity availability. A visible upcoming or expired activity can still be locked by assignment policy, while a hidden item or a descendant of a hidden folder is omitted from student content. Student group workspaces render a single Content tab with first-level folders as accordions; teachers manage the same unified content tree from course and group workspaces. The older material-only and activity-only workspace tabs are no longer the canonical content management surface.
+
+Material type definitions live in a lightweight web registry, separate from activity plugins. The current picker material types are GitHub repo, File, and Text. The registry records labels, descriptions, icons, create modes, and future-facing embedding source metadata so later course-material indexing can identify uploaded files, typed text, or external URLs without changing the activity plugin lifecycle.
 
 Core gradebook services create numbered `ActivityAttempt` records for assigned group activities, enforce attempt limits, compute lateness at submission time, normalize raw plugin scores to the gradebook item scale, apply pass/fail thresholds and late penalties, select the current grade across attempts, and record grading results with `GradeEvent` audit entries. Plugins keep their private attempt/submission artifacts in plugin tables and call the core services to keep gradebook records consistent.
 
@@ -354,7 +359,7 @@ WEB_DESIGN_RUNNER_URL=http://localhost:3456
 - Plugin authoring screens can use the selected question-authoring AI agent through server-side plugin routes; the MCQ plugin uses this to generate validated MCQ source from a teacher description.
 - All core and plugin authoring/settings forms should register unsaved-change state through `useUnsavedChangesGuard` from `@cognelo/activity-ui`. Registered forms show a shared confirmation dialog before internal navigation, with actions to continue editing, save and leave, or discard changes. Browser refresh/close uses the native browser warning.
 - The subjects area uses a list-first management flow: add subjects from the list header, open a subject detail page, and edit subject metadata from a dedicated edit page.
-- Course materials support links, uploads, folders, edit/remove, expand/collapse, and drag/drop ordering.
+- Course and group workspaces use a unified Content tab for folders, materials, and activities. Teachers can manage shared course folders, place course-wide or group-specific content inside them, toggle content visibility, drag/drop reorder content, and configure material/activity-specific settings from content rows.
 - Course workspaces include a Settings tab where teachers can choose the student-support AI agent from their personal connections or admin-managed global connections.
 - Activity banks are first-class authoring spaces. Course activities are copied from bank versions rather than edited live in the bank, and activity type labels are localized from plugin registry definitions.
 
@@ -362,8 +367,8 @@ WEB_DESIGN_RUNNER_URL=http://localhost:3456
 
 If you are working on a single plugin, start inside that plugin package:
 
-- `packages/plugins/plugin-your-plugin/README.md`
-- `packages/plugins/plugin-your-plugin/PROJECT_MEMORY.md`
+- `packages/plugin-activities/plugin-your-plugin/README.md`
+- `packages/plugin-activities/plugin-your-plugin/PROJECT_MEMORY.md`
 
 For the beginner-friendly plugin authoring handbook, including step-by-step setup, core services, API/web integration, research data patterns, and grading-oriented design guidance, use [docs/plugin-authoring/README.md](docs/plugin-authoring/README.md).
 

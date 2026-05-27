@@ -50,7 +50,7 @@ That means you can stay in one ecosystem:
 Plugins themselves live in:
 
 ```text
-packages/plugins/
+packages/plugin-activities/
 ```
 
 The plugin package is not a standalone app. Instead, it gets imported by the main platform.
@@ -169,7 +169,7 @@ If you are new to Next.js, think of Cognelo like this:
 - `apps/web` is your React app
 - `apps/api` is your server API
 - `packages/*` are shared libraries
-- `packages/plugins/*` are feature modules
+- `packages/plugin-activities/*` are feature modules
 
 You do not need to know every Next.js feature to work on a plugin. For most plugin work, you mainly need:
 
@@ -182,9 +182,9 @@ You do not need to know every Next.js feature to work on a plugin. For most plug
 
 Before starting your own plugin, open these three files and skim them:
 
-- [packages/plugins/plugin-placeholder/src/index.ts](../../packages/plugins/plugin-placeholder/src/index.ts)
-- [packages/plugins/plugin-homework-grader/src/index.ts](../../packages/plugins/plugin-homework-grader/src/index.ts)
-- [packages/plugins/plugin-parsons/src/plugin.ts](../../packages/plugins/plugin-parsons/src/plugin.ts)
+- [packages/plugin-activities/plugin-placeholder/src/index.ts](../../packages/plugin-activities/plugin-placeholder/src/index.ts)
+- [packages/plugin-activities/plugin-homework-grader/src/index.ts](../../packages/plugin-activities/plugin-homework-grader/src/index.ts)
+- [packages/plugin-activities/plugin-parsons/src/plugin.ts](../../packages/plugin-activities/plugin-parsons/src/plugin.ts)
 
 They show the progression from simple to advanced.
 

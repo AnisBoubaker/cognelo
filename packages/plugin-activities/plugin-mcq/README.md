@@ -35,5 +35,5 @@ The MCQ authoring UI must stay registered with `useUnsavedChangesGuard` from `@c
 
 When changing this plugin, update:
 
-- `packages/plugins/plugin-mcq/README.md`
-- `packages/plugins/plugin-mcq/PROJECT_MEMORY.md`
+- `packages/plugin-activities/plugin-mcq/README.md`
+- `packages/plugin-activities/plugin-mcq/PROJECT_MEMORY.md`

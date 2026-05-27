@@ -21,13 +21,13 @@ For a beginner, `plugin-placeholder` is usually the best starting point.
 From the repository root:
 
 ```bash
-cp -R packages/plugins/plugin-placeholder packages/plugins/plugin-my-activity
+cp -R packages/plugin-activities/plugin-placeholder packages/plugin-activities/plugin-my-activity
 ```
 
 Then search for the old names:
 
 ```bash
-rg -n "placeholder|Placeholder" packages/plugins/plugin-my-activity
+rg -n "placeholder|Placeholder" packages/plugin-activities/plugin-my-activity
 ```
 
 Update:
@@ -44,7 +44,7 @@ Update:
 A simple plugin can start with:
 
 ```text
-packages/plugins/plugin-my-activity/
+packages/plugin-activities/plugin-my-activity/
   README.md
   PROJECT_MEMORY.md
   package.json

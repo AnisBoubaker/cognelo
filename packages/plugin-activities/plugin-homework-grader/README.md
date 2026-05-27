@@ -35,5 +35,5 @@ When this plugin gains teacher authoring or settings UI, the first form implemen
 
 When changing this plugin, update:
 
-- `packages/plugins/plugin-homework-grader/README.md`
-- `packages/plugins/plugin-homework-grader/PROJECT_MEMORY.md`
+- `packages/plugin-activities/plugin-homework-grader/README.md`
+- `packages/plugin-activities/plugin-homework-grader/PROJECT_MEMORY.md`

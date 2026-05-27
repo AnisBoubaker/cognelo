@@ -28,5 +28,5 @@ If this placeholder ever grows custom authoring or settings UI, that form should
 
 When changing this plugin, update:
 
-- `packages/plugins/plugin-placeholder/README.md`
-- `packages/plugins/plugin-placeholder/PROJECT_MEMORY.md`
+- `packages/plugin-activities/plugin-placeholder/README.md`
+- `packages/plugin-activities/plugin-placeholder/PROJECT_MEMORY.md`

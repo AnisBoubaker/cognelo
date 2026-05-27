@@ -7,7 +7,7 @@ import { coreMigrations, pluginSchemas, runAll } from "./db-migrate-all.mjs";
 describe("db:migrate:all script helpers", () => {
   it("discovers only plugins that have Prisma schemas", () => {
     const root = mkdtempSync(join(tmpdir(), "cognelo-migrate-"));
-    const pluginsDir = join(root, "packages/plugins");
+    const pluginsDir = join(root, "packages/plugin-activities");
     mkdirSync(join(pluginsDir, "plugin-a/prisma"), { recursive: true });
     mkdirSync(join(pluginsDir, "plugin-b"), { recursive: true });
     mkdirSync(join(pluginsDir, "plugin-c/prisma"), { recursive: true });
@@ -15,8 +15,8 @@ describe("db:migrate:all script helpers", () => {
     writeFileSync(join(pluginsDir, "plugin-c/prisma/schema.prisma"), "datasource db { provider = \"postgresql\" url = env(\"DATABASE_URL\") }");
 
     expect(pluginSchemas({ root, pluginsDir })).toEqual([
-      "packages/plugins/plugin-a/prisma/schema.prisma",
-      "packages/plugins/plugin-c/prisma/schema.prisma"
+      "packages/plugin-activities/plugin-a/prisma/schema.prisma",
+      "packages/plugin-activities/plugin-c/prisma/schema.prisma"
     ]);
   });
 
@@ -43,7 +43,7 @@ describe("db:migrate:all script helpers", () => {
     runAll({
       applyCoreMigrationsFn: () => calls.push({ label: "apply core migrations" }),
       runCommand,
-      schemas: ["packages/plugins/plugin-a/prisma/schema.prisma", "packages/plugins/plugin-c/prisma/schema.prisma"]
+      schemas: ["packages/plugin-activities/plugin-a/prisma/schema.prisma", "packages/plugin-activities/plugin-c/prisma/schema.prisma"]
     });
 
     expect(calls).toEqual([
@@ -51,14 +51,14 @@ describe("db:migrate:all script helpers", () => {
       { label: "Core Prisma generate", command: "npx", args: ["prisma", "generate", "--schema", "packages/db/prisma/schema.prisma"] },
       { label: "Plugin migrations", command: "npx", args: ["tsx", "scripts/apply-plugin-migrations.ts"] },
       {
-        label: "Plugin Prisma generate: packages/plugins/plugin-a/prisma/schema.prisma",
+        label: "Plugin Prisma generate: packages/plugin-activities/plugin-a/prisma/schema.prisma",
         command: "npx",
-        args: ["prisma", "generate", "--schema", "packages/plugins/plugin-a/prisma/schema.prisma"]
+        args: ["prisma", "generate", "--schema", "packages/plugin-activities/plugin-a/prisma/schema.prisma"]
       },
       {
-        label: "Plugin Prisma generate: packages/plugins/plugin-c/prisma/schema.prisma",
+        label: "Plugin Prisma generate: packages/plugin-activities/plugin-c/prisma/schema.prisma",
         command: "npx",
-        args: ["prisma", "generate", "--schema", "packages/plugins/plugin-c/prisma/schema.prisma"]
+        args: ["prisma", "generate", "--schema", "packages/plugin-activities/plugin-c/prisma/schema.prisma"]
       }
     ]);
   });

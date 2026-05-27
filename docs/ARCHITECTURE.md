@@ -64,7 +64,7 @@ Plugin-owned private data follows the same rule through server hooks. A plugin c
 
 ## Activity Extensibility
 
-Activity types are registered in `packages/activity-sdk`. Core services store bank activities, activity versions, and course-local activity copies, validate common state, and keep `config` and `metadata` as JSON. Activity-specific validation/rendering/execution is added by registering plugin packages under `packages/plugins/*`.
+Activity types are registered in `packages/activity-sdk`. Core services store bank activities, activity versions, and course-local activity copies, validate common state, and keep `config` and `metadata` as JSON. Activity-specific validation/rendering/execution is added by registering plugin packages under `packages/plugin-activities/*`.
 
 To add a new activity type:
 

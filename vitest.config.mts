@@ -9,22 +9,22 @@ export default defineConfig({
       "@cognelo/contracts": new URL("./packages/contracts/src/index.ts", import.meta.url).pathname,
       "@cognelo/core": new URL("./packages/core/src/index.ts", import.meta.url).pathname,
       "@cognelo/db": new URL("./packages/db/src/index.ts", import.meta.url).pathname,
-      "@cognelo/plugin-coding-exercises/server": new URL("./packages/plugins/plugin-coding-exercises/src/server.ts", import.meta.url).pathname,
-      "@cognelo/plugin-coding-exercises": new URL("./packages/plugins/plugin-coding-exercises/src/index.ts", import.meta.url).pathname,
-      "@cognelo/plugin-homework-grader/server": new URL("./packages/plugins/plugin-homework-grader/src/server.ts", import.meta.url).pathname,
-      "@cognelo/plugin-homework-grader": new URL("./packages/plugins/plugin-homework-grader/src/index.ts", import.meta.url).pathname,
-      "@cognelo/plugin-mcq/server": new URL("./packages/plugins/plugin-mcq/src/server.ts", import.meta.url).pathname,
-      "@cognelo/plugin-mcq": new URL("./packages/plugins/plugin-mcq/src/index.ts", import.meta.url).pathname,
-      "@cognelo/plugin-parsons/server": new URL("./packages/plugins/plugin-parsons/src/server.ts", import.meta.url).pathname,
-      "@cognelo/plugin-parsons": new URL("./packages/plugins/plugin-parsons/src/index.ts", import.meta.url).pathname,
-      "@cognelo/plugin-placeholder/server": new URL("./packages/plugins/plugin-placeholder/src/server.ts", import.meta.url).pathname,
-      "@cognelo/plugin-placeholder": new URL("./packages/plugins/plugin-placeholder/src/index.ts", import.meta.url).pathname,
+      "@cognelo/plugin-coding-exercises/server": new URL("./packages/plugin-activities/plugin-coding-exercises/src/server.ts", import.meta.url).pathname,
+      "@cognelo/plugin-coding-exercises": new URL("./packages/plugin-activities/plugin-coding-exercises/src/index.ts", import.meta.url).pathname,
+      "@cognelo/plugin-homework-grader/server": new URL("./packages/plugin-activities/plugin-homework-grader/src/server.ts", import.meta.url).pathname,
+      "@cognelo/plugin-homework-grader": new URL("./packages/plugin-activities/plugin-homework-grader/src/index.ts", import.meta.url).pathname,
+      "@cognelo/plugin-mcq/server": new URL("./packages/plugin-activities/plugin-mcq/src/server.ts", import.meta.url).pathname,
+      "@cognelo/plugin-mcq": new URL("./packages/plugin-activities/plugin-mcq/src/index.ts", import.meta.url).pathname,
+      "@cognelo/plugin-parsons/server": new URL("./packages/plugin-activities/plugin-parsons/src/server.ts", import.meta.url).pathname,
+      "@cognelo/plugin-parsons": new URL("./packages/plugin-activities/plugin-parsons/src/index.ts", import.meta.url).pathname,
+      "@cognelo/plugin-placeholder/server": new URL("./packages/plugin-activities/plugin-placeholder/src/server.ts", import.meta.url).pathname,
+      "@cognelo/plugin-placeholder": new URL("./packages/plugin-activities/plugin-placeholder/src/index.ts", import.meta.url).pathname,
       "@cognelo/plugin-web-design-coding-exercises/server": new URL(
-        "./packages/plugins/plugin-web-design-coding-exercises/src/server.ts",
+        "./packages/plugin-activities/plugin-web-design-coding-exercises/src/server.ts",
         import.meta.url
       ).pathname,
       "@cognelo/plugin-web-design-coding-exercises": new URL(
-        "./packages/plugins/plugin-web-design-coding-exercises/src/index.ts",
+        "./packages/plugin-activities/plugin-web-design-coding-exercises/src/index.ts",
         import.meta.url
       ).pathname
     }

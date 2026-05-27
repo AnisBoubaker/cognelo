@@ -56,7 +56,8 @@ packages/
   core/           shared business logic
   contracts/      Zod schemas and shared types
   db/             Prisma schema, migrations, seed
-  plugins/        plugin packages
+  plugin-activities/
+                  activity plugin packages
 ```
 
 The main idea is simple:
@@ -68,7 +69,7 @@ The main idea is simple:
 
 If you just want the shortest possible summary:
 
-1. Copy a plugin under `packages/plugins/`
+1. Copy a plugin under `packages/plugin-activities/`
 2. Rename its keys and package metadata
 3. Register it in `packages/activity-sdk/src/index.ts`
 4. If it has API subroutes, register it in `packages/activity-sdk/src/server.ts`
