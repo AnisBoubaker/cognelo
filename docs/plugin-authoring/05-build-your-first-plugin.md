@@ -36,7 +36,7 @@ That makes it a good tutorial example because it is:
 For a first plugin, copy the placeholder plugin:
 
 ```bash
-cp -R packages/plugins/plugin-placeholder packages/plugins/plugin-tracing-quiz
+cp -R packages/plugin-activities/plugin-placeholder packages/plugin-activities/plugin-tracing-quiz
 ```
 
 Why the placeholder plugin?
@@ -50,7 +50,7 @@ Why the placeholder plugin?
 Search for the old placeholder name:
 
 ```bash
-rg -n "placeholder|Placeholder" packages/plugins/plugin-tracing-quiz
+rg -n "placeholder|Placeholder" packages/plugin-activities/plugin-tracing-quiz
 ```
 
 Update the package metadata in `package.json` so it becomes:
@@ -76,7 +76,7 @@ At this stage, do not worry about every detail. The important thing is that:
 
 ## Step 2: Replace The Minimal Plugin Definition
 
-In `packages/plugins/plugin-tracing-quiz/src/index.ts`, replace the placeholder example with a tracing quiz plugin.
+In `packages/plugin-activities/plugin-tracing-quiz/src/index.ts`, replace the placeholder example with a tracing quiz plugin.
 
 Example:
 
@@ -208,7 +208,7 @@ Now let’s make the activity actually render something useful in the browser.
 Create:
 
 ```text
-packages/plugins/plugin-tracing-quiz/src/web/tracing-quiz-view.tsx
+packages/plugin-activities/plugin-tracing-quiz/src/web/tracing-quiz-view.tsx
 ```
 
 Example:
@@ -365,7 +365,7 @@ Now let’s add one plugin-specific endpoint so the example feels truly end-to-e
 Create:
 
 ```text
-packages/plugins/plugin-tracing-quiz/src/routes.ts
+packages/plugin-activities/plugin-tracing-quiz/src/routes.ts
 ```
 
 Example:
@@ -404,7 +404,7 @@ This example is intentionally simple. It does not grade anything yet. It just pr
 Create:
 
 ```text
-packages/plugins/plugin-tracing-quiz/src/server.ts
+packages/plugin-activities/plugin-tracing-quiz/src/server.ts
 ```
 
 Example:

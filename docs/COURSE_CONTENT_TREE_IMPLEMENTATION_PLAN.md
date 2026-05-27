@@ -433,6 +433,7 @@ This preserves the documented student-first, section-first navigation model.
 - Phase 7 is implemented.
 - Phase 8 is implemented for the student group workspace.
 - Phase 9 is implemented as a lightweight web material type registry.
+- Phase 10 is implemented.
 - The schema foundation lives in `packages/db/prisma/schema.prisma`.
 - The migration lives in `packages/db/prisma/migrations/202605260001_course_content_tree/migration.sql`.
 - The schema foundation test lives in `packages/db/prisma/course-content-schema.test.ts`.
@@ -595,6 +596,12 @@ Verification completed after Phase 9:
 - Update `docs/PROJECT_MEMORY.md`.
 - Update plugin docs only if plugin behavior changes.
 - Remove or deprecate old material-only hierarchy UI once the content tree is canonical.
+
+Implemented scope: the root README and platform memory now document `CourseContentItem` as the canonical shared content tree, the separation between content visibility and activity availability, the unified teacher/student Content surfaces, strict plugin isolation, and the lightweight material type registry with future embedding-source hints. Plugin documentation was intentionally left unchanged because no plugin-owned persistence, route contract, renderer contract, or grading behavior changed. The old material-only and activity-only workspace tabs are no longer the canonical product surface; compatibility material fields and endpoints remain only to support existing records and transition code while content-tree APIs drive the current UI.
+
+Verification completed after Phase 10:
+
+- `npm run typecheck`
 
 ## Testing Plan
 

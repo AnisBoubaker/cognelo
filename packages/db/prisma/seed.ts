@@ -1,8 +1,8 @@
 import bcrypt from "bcryptjs";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { listActivityDefinitions, listActivityPlugins } from "@cognelo/activity-sdk";
-import { prisma as codingExercisesPrisma } from "../../plugins/plugin-coding-exercises/src/db-client";
-import { prisma as webDesignCodingExercisesPrisma } from "../../plugins/plugin-web-design-coding-exercises/src/db-client";
+import { prisma as codingExercisesPrisma } from "../../plugin-activities/plugin-coding-exercises/src/db-client";
+import { prisma as webDesignCodingExercisesPrisma } from "../../plugin-activities/plugin-web-design-coding-exercises/src/db-client";
 
 const prisma = new PrismaClient();
 

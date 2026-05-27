@@ -108,7 +108,7 @@ Summative submissions do not show correctness feedback during the activity. When
 
 When changing this plugin, update:
 
-- `packages/plugins/plugin-parsons/README.md`
-- `packages/plugins/plugin-parsons/PROJECT_MEMORY.md`
+- `packages/plugin-activities/plugin-parsons/README.md`
+- `packages/plugin-activities/plugin-parsons/PROJECT_MEMORY.md`
 
 Only update the root `README.md` or `docs/PROJECT_MEMORY.md` if the change affects the whole platform or a cross-plugin convention.

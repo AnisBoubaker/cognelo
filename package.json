@@ -7,7 +7,7 @@
   "workspaces": [
     "apps/*",
     "packages/*",
-    "packages/plugins/*"
+    "packages/plugin-activities/*"
   ],
   "scripts": {
     "dev": "set -a && . ./.env && set +a && node ./scripts/dev.mjs",

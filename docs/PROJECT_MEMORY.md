@@ -4,8 +4,8 @@ This file is for platform-level memory only.
 
 Plugin-specific behavior, persistence, routes, UX decisions, and implementation notes belong in the owning plugin package under:
 
-- `packages/plugins/plugin-*/README.md`
-- `packages/plugins/plugin-*/PROJECT_MEMORY.md`
+- `packages/plugin-activities/plugin-*/README.md`
+- `packages/plugin-activities/plugin-*/PROJECT_MEMORY.md`
 
 ## Long-Term Platform Decisions
 
@@ -21,7 +21,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 
 ## Plugin Architecture Rules
 
-- Activity plugins should be clearly packaged under `packages/plugins/plugin-*`.
+- Activity plugins should be clearly packaged under `packages/plugin-activities/plugin-*`.
 - Plugin-owned code should not be scattered through core modules or the main web app when it can live inside the plugin package.
 - Plugin-specific persistence should be modeled as plugin-owned tables/modules rather than by stretching core tables with plugin-specific columns.
 - Plugin-specific HTTP handlers should live in plugin packages. The API app should expose generic dispatcher routes, not one hardcoded Next route file per plugin capability.
@@ -65,10 +65,12 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Parsons exposes a teacher-only gradebook attempts route through the assigned group plugin dispatcher at `parsons/gradebook-attempts`. The detailed activity results page uses it for the "See answer" overlay, showing submission snapshots by default and optionally including non-submission attempts/events.
 - Gradebook Phase 8 manual grading/regrading is implemented. The detailed activity results page resolves plugin-specific manual grading renderers through the activity definition `manualGrading.rendererKey`; Parsons provides the first panel, combining submitted answer review, attempt/event navigation, teacher override score/reason fields, and the existing regrade action. The detailed activity results page also supports bulk Regrade All for submitted/graded attempts and a Grade All Manually page that pages through student attempts 10 at a time. Moving pages or pressing Save persists all visible manual grades and editable student-facing feedback.
 - Teachers can delete a specific submitted/graded attempt from the detailed activity "Grade manually" overlay. Core soft-deletes the `ActivityAttempt`, records a `submission_deleted` grade event with the deleted attempt snapshot and reason, and excludes deleted attempts from active submission counts, grading actions, and non-override grade display. If deletion leaves no active submitted attempts, the participant row is shown as missing/did-not-submit rather than retaining a stale attempt-derived score; explicit override grades may remain visible without an active attempt.
-- Course content tree Phase 1-3 foundations are implemented. Core Prisma now has `CourseContentItem` and `CourseContentItemKind` for a shared folder/material/activity placement tree. Folders are course-level structure (`groupId = null`) preserved across groups; group-specific materials and activities may be placed inside those shared folders. Core service logic in `packages/core/src/course-content.ts` creates folders, material items, and activity items; validates course-level parent folders, course/group scope, and folder cycles; computes effective visibility; and lists all or student-visible content. Group content listing returns the shared course structure plus the selected group's content items. API routes under `/api/courses/:courseId/content` and `/api/courses/:courseId/groups/:groupId/content` expose course/group content listing, folder creation, material placement, activity placement, update, and delete. The tree is a placement/order/visibility layer only: materials remain resources, and activity plugin behavior remains isolated behind generic `Activity` and `CourseGroupActivity` references.
-- Course content tree Phase 4 is dev-seed driven because there is no production content to preserve. `packages/db/prisma/seed.ts` creates a representative mixed content tree for Programming 101 / Section A: course-level Week 1 and Week 2 folders, Section A-specific PDF/MCQ/GitHub/coding items in Week 1, a hidden Week 2 folder with Section A-specific slides/Parsons/resources, plus a root-level web-design activity. Existing material/activity tables remain intact while the new tree is exercised through seeded `CourseContentItem` rows.
-- Course content tree Phase 5 is implemented at the service/contract layer. `ActivityInputSchema`, `CourseGroupActivityInputSchema`, and all-groups assignment input accept optional `contentPlacement`. Course activity creation can create a course-scoped activity content item. Direct group assignment can create a group-scoped content item in a selected shared course folder. Course-wide all-groups assignment stores placement metadata and materializes activity content items for current and future groups using the same shared course folder IDs.
-- Course content tree Phase 6 has an initial course picker slice. The course page picker is now a course-element picker with Activity banks, Material, Programming, and Miscellaneous tabs. It loads shared course folders, lets teachers choose destination folder and visibility, creates course-level folders, places existing materials into the content tree, and sends `contentPlacement` for local or bank-backed course activity creation. Group assignment picker updates and full unified tree rendering are still pending.
+- Course content tree Phases 1-10 are implemented. Core Prisma has `CourseContentItem` and `CourseContentItemKind` for the shared folder/material/activity placement tree. Folders are generic course-level structure (`groupId = null`) preserved across groups; group-specific materials and activities may be placed inside those shared folders. Core service logic in `packages/core/src/course-content.ts` creates folders, material items, and activity items; validates course-level parent folders, course/group scope, and folder cycles; computes effective visibility; and lists all or student-visible content. Group content listing returns the shared course structure plus the selected group's content items. API routes under `/api/courses/:courseId/content` and `/api/courses/:courseId/groups/:groupId/content` expose course/group content listing, folder creation, material placement, activity placement, update, and delete. The tree is a placement/order/visibility layer only: materials remain resources, activity availability remains assignment policy, and activity plugin behavior remains isolated behind generic `Activity` and `CourseGroupActivity` references.
+- Course content tree Phase 4 is dev-seed driven because there is no production content to preserve. `packages/db/prisma/seed.ts` creates a representative mixed content tree for Programming 101 / Section A with visible and hidden course folders plus materials and activities placed side by side. Existing material/activity tables remain intact while the new tree is exercised through seeded `CourseContentItem` rows.
+- Course content tree activity placement is implemented at the service/contract layer. `ActivityInputSchema`, `CourseGroupActivityInputSchema`, and all-groups assignment input accept optional `contentPlacement`. Course activity creation can create a course-scoped activity content item. Direct group assignment can create a group-scoped content item in a selected shared course folder. Course-wide all-groups assignment stores placement metadata and materializes activity content items for current and future groups using the same shared course folder IDs.
+- The teacher course page picker is a course-element picker with Activity banks, Material, Programming, and Miscellaneous tabs. It loads shared course folders, lets teachers choose destination folder and visibility, creates course-level folders, creates material shells from material type definitions, and sends `contentPlacement` for local or bank-backed course activity creation. The course page and group teacher page render unified Content tabs; old material-only and activity-only tabs are no longer canonical content management surfaces.
+- Student group workspaces render one Content tab backed by the group content endpoint. Effective visibility filters hidden items and descendants of hidden folders. First-level folders render as theme-colored accordions with localStorage persistence keyed per course/group; nested folders keep normal folder-row expand/collapse. Student activity rows carry availability, submission, and released-grade badges, while grade release remains controlled by gradebook APIs.
+- Material type definitions live in `apps/web/src/lib/material-types.ts` and are intentionally lightweight and separate from activity plugins. Current material picker types are GitHub repo, File, and Text. The registry records label keys, description keys, default title keys, icons, create modes, and an `embeddingSource` hint (`external_url`, `file_upload`, or `text_body`) for future course-material embedding/indexing work.
 
 ## Naming Model
 
@@ -99,9 +101,8 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Implemented material kinds currently include at least `folder`, `github_repo`, and `file`, with room for more later.
 - Uploaded files are stored locally for MVP/dev and represented as `file` materials with metadata such as original name, stored name, MIME type, and size.
 - GitHub repository materials are validated as `github.com` URLs.
-- Course materials support hierarchy through `parentId`, where only folders may be parents.
-- Material ordering is explicit via `position`, not implicit by timestamp.
-- Material tree operations must prevent moving a folder into one of its own descendants.
+- Course material records may still carry legacy `parentId` and `position` fields for compatibility, but `CourseContentItem` is the canonical student-facing hierarchy, ordering, and visibility layer.
+- Material tree operations and compatibility code must still prevent moving a legacy material folder into one of its own descendants while the legacy fields remain.
 
 ## Frontend Platform Decisions
 
@@ -117,12 +118,11 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Plugin deactivation disables the plugin and renames its plugin-owned tables into backup tables recorded as `ActivityPluginTableBackup` rows. Reactivation can restore an unrestored backup for the same plugin version.
 - Disabled or inactive plugins are removed from activity type listings, hidden from renderer selection for existing activities, and blocked at generic plugin route dispatch.
 - The current plugin installation model is manifest-backed and explicitly registered at build time. It is not filesystem autodiscovery yet, but it gives the platform a durable admin-managed enablement layer for later drop-in plugin installation work.
-- The course materials area uses a compact table/list layout rather than large cards.
+- The unified Content tree uses a compact table/list layout rather than large cards.
 - Course workspaces include a Settings tab for course-wide settings. Current settings let teachers choose the student-support AI agent from their personal or global enabled connections.
-- The add-material form is hidden by default and revealed from the course material section.
-- Materials can be edited and removed inline from the course detail page.
-- Folders support expand/collapse.
-- Material moving uses pointer-based drag and drop with a drag handle, floating preview, target highlighting, and a top-level drop zone.
+- Material and activity settings are edited from content-row controls in the unified tree.
+- Folders support expand/collapse; student first-level folders render as accordions.
+- Content moving uses pointer-based drag and drop with a drag handle, floating preview, target highlighting, a top-level drop zone, and an activation threshold so accidental handle clicks do not immediately move content.
 - Branding uses the project logo from `docs/brand`.
 - The app favicon uses the square Cognelo icon asset.
 - The top header separates primary app navigation from personal controls.

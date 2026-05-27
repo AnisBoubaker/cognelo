@@ -11,5 +11,5 @@ dist
 coverage
 TEST_COVERAGE_GAPS.tmp.txt
 packages/db/generated
-packages/plugins/*/src/generated
+packages/plugin-activities/*/src/generated
 storage

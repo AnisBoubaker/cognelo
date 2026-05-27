@@ -65,7 +65,7 @@ This is what makes the activity type visible to the platform.
 Create a React component in your plugin package, for example:
 
 ```text
-packages/plugins/plugin-tracing-quiz/src/web/tracing-quiz-view.tsx
+packages/plugin-activities/plugin-tracing-quiz/src/web/tracing-quiz-view.tsx
 ```
 
 Example:

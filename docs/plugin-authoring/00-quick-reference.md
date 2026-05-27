@@ -25,7 +25,7 @@ Cognelo has:
 - `packages/core`: shared business logic
 - `packages/contracts`: shared schemas/types
 - `packages/db`: Prisma schema, migrations, seed
-- `packages/plugins/*`: plugin packages
+- `packages/plugin-activities/*`: plugin packages
 
 Plugins own activity-specific behavior. The platform owns generic auth, subject/activity-bank/course/activity CRUD, route dispatch, activity copying, and shared UI primitives.
 
@@ -37,7 +37,7 @@ If a plugin adds AI-assisted generation that writes into authoring/configuration
 
 ## Minimal Plugin Flow
 
-1. Create `packages/plugins/plugin-your-plugin`
+1. Create `packages/plugin-activities/plugin-your-plugin`
 2. Export an `ActivityPlugin`
 3. Register it in `packages/activity-sdk/src/index.ts`
 4. If needed, export a `ServerActivityPlugin`
@@ -109,7 +109,7 @@ export const activityRenderers = {
 ## Recommended Package Shape
 
 ```text
-packages/plugins/plugin-your-plugin/
+packages/plugin-activities/plugin-your-plugin/
   README.md
   PROJECT_MEMORY.md
   package.json
@@ -363,11 +363,11 @@ Manual checks:
 - [packages/core/src/activities.ts](../../packages/core/src/activities.ts)
 - [apps/web/src/lib/activity-renderers.tsx](../../apps/web/src/lib/activity-renderers.tsx)
 - [apps/web/src/lib/api.ts](../../apps/web/src/lib/api.ts)
-- [packages/plugins/plugin-placeholder/src/index.ts](../../packages/plugins/plugin-placeholder/src/index.ts)
-- [packages/plugins/plugin-homework-grader/src/index.ts](../../packages/plugins/plugin-homework-grader/src/index.ts)
-- [packages/plugins/plugin-parsons/src/plugin.ts](../../packages/plugins/plugin-parsons/src/plugin.ts)
-- [packages/plugins/plugin-parsons/src/routes.ts](../../packages/plugins/plugin-parsons/src/routes.ts)
-- [packages/plugins/plugin-parsons/src/db.ts](../../packages/plugins/plugin-parsons/src/db.ts)
+- [packages/plugin-activities/plugin-placeholder/src/index.ts](../../packages/plugin-activities/plugin-placeholder/src/index.ts)
+- [packages/plugin-activities/plugin-homework-grader/src/index.ts](../../packages/plugin-activities/plugin-homework-grader/src/index.ts)
+- [packages/plugin-activities/plugin-parsons/src/plugin.ts](../../packages/plugin-activities/plugin-parsons/src/plugin.ts)
+- [packages/plugin-activities/plugin-parsons/src/routes.ts](../../packages/plugin-activities/plugin-parsons/src/routes.ts)
+- [packages/plugin-activities/plugin-parsons/src/db.ts](../../packages/plugin-activities/plugin-parsons/src/db.ts)
 
 ## Pick Your Path
 

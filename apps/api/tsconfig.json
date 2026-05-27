@@ -31,40 +31,40 @@
         "../../packages/activity-sdk/src/server.ts"
       ],
       "@cognelo/plugin-homework-grader": [
-        "../../packages/plugins/plugin-homework-grader/src/index.ts"
+        "../../packages/plugin-activities/plugin-homework-grader/src/index.ts"
       ],
       "@cognelo/plugin-homework-grader/server": [
-        "../../packages/plugins/plugin-homework-grader/src/server.ts"
+        "../../packages/plugin-activities/plugin-homework-grader/src/server.ts"
       ],
       "@cognelo/plugin-coding-exercises": [
-        "../../packages/plugins/plugin-coding-exercises/src/index.ts"
+        "../../packages/plugin-activities/plugin-coding-exercises/src/index.ts"
       ],
       "@cognelo/plugin-coding-exercises/server": [
-        "../../packages/plugins/plugin-coding-exercises/src/server.ts"
+        "../../packages/plugin-activities/plugin-coding-exercises/src/server.ts"
       ],
       "@cognelo/plugin-parsons": [
-        "../../packages/plugins/plugin-parsons/src/index.ts"
+        "../../packages/plugin-activities/plugin-parsons/src/index.ts"
       ],
       "@cognelo/plugin-parsons/server": [
-        "../../packages/plugins/plugin-parsons/src/server.ts"
+        "../../packages/plugin-activities/plugin-parsons/src/server.ts"
       ],
       "@cognelo/plugin-placeholder": [
-        "../../packages/plugins/plugin-placeholder/src/index.ts"
+        "../../packages/plugin-activities/plugin-placeholder/src/index.ts"
       ],
       "@cognelo/plugin-placeholder/server": [
-        "../../packages/plugins/plugin-placeholder/src/server.ts"
+        "../../packages/plugin-activities/plugin-placeholder/src/server.ts"
       ],
       "@cognelo/plugin-mcq": [
-        "../../packages/plugins/plugin-mcq/src/index.ts"
+        "../../packages/plugin-activities/plugin-mcq/src/index.ts"
       ],
       "@cognelo/plugin-mcq/server": [
-        "../../packages/plugins/plugin-mcq/src/server.ts"
+        "../../packages/plugin-activities/plugin-mcq/src/server.ts"
       ],
       "@cognelo/plugin-web-design-coding-exercises": [
-        "../../packages/plugins/plugin-web-design-coding-exercises/src/index.ts"
+        "../../packages/plugin-activities/plugin-web-design-coding-exercises/src/index.ts"
       ],
       "@cognelo/plugin-web-design-coding-exercises/server": [
-        "../../packages/plugins/plugin-web-design-coding-exercises/src/server.ts"
+        "../../packages/plugin-activities/plugin-web-design-coding-exercises/src/server.ts"
       ],
       "@cognelo/config": [
         "../../packages/config/src/index.ts"
