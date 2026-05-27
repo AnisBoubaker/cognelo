@@ -3,7 +3,7 @@
 import { MarkdownRenderer } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { ChangeEvent, FocusEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
+import { CSSProperties, ChangeEvent, FocusEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
@@ -31,6 +31,8 @@ import { materialIconName, type MaterialTypeIconName } from "@/lib/material-type
 
 type ContentDropPlacement = "after" | "before" | "inside";
 type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
+
+const contentDragActivationDistance = 8;
 
 export default function CourseGroupPage() {
   const params = useParams<{ courseId: string; groupId: string }>();
@@ -279,6 +281,7 @@ export default function CourseGroupPage() {
     const availability = assignment ? getAvailabilityStatus(assignment.availableFrom, assignment.availableUntil, now) : "available";
     const isOpenable = availability !== "upcoming";
     const hasBadges = Boolean(activityLabel || assignment || availability !== "available" || isSubmitted || releasedGrade);
+    const studentRowIndent = Math.max(0, depth - 1) * 28;
 
     return (
       <div
@@ -286,7 +289,15 @@ export default function CourseGroupPage() {
           isRootAccordionFolder ? `is-student-accordion-root ${isCollapsed ? "" : "is-open"}` : ""
         } ${isOpenable ? "" : "is-content-locked"}`}
         key={item.id}
-        style={isRootAccordionFolder ? undefined : { paddingLeft: 14 + depth * 20 }}
+        style={
+          isRootAccordionFolder
+            ? undefined
+            : ({
+                "--content-tree-indent": `${14 + Math.min(depth, 1) * 20}px`,
+                "--student-content-row-indent": `${studentRowIndent}px`,
+                paddingLeft: 14 + Math.min(depth, 1) * 20
+              } as CSSProperties)
+        }
       >
         <div className="table-main table-main-stack">
           {isRootAccordionFolder ? null : <span className="content-tree-student-spacer" aria-hidden="true" />}
@@ -1088,10 +1099,29 @@ export default function CourseGroupPage() {
     }
     event.preventDefault();
     const title = contentItemTitle(item);
-    setDraggingContentItemId(item.id);
-    setDragPreview({ title, x: event.clientX, y: event.clientY });
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let dragStarted = false;
+
+    const activateDrag = (x: number, y: number) => {
+      if (dragStarted) {
+        return true;
+      }
+      const deltaX = x - startX;
+      const deltaY = y - startY;
+      if (deltaX * deltaX + deltaY * deltaY < contentDragActivationDistance * contentDragActivationDistance) {
+        return false;
+      }
+      dragStarted = true;
+      setDraggingContentItemId(item.id);
+      setDragPreview({ title, x, y });
+      return true;
+    };
 
     const movePreview = (moveEvent: globalThis.PointerEvent) => {
+      if (!activateDrag(moveEvent.clientX, moveEvent.clientY)) {
+        return;
+      }
       setDragPreview((current) => (current ? { ...current, x: moveEvent.clientX, y: moveEvent.clientY } : current));
       setContentDropTarget(findContentDropTarget(moveEvent.clientX, moveEvent.clientY, item.id));
     };
@@ -1103,6 +1133,10 @@ export default function CourseGroupPage() {
       setDraggingContentItemId(null);
       setDragPreview(null);
       setContentDropTarget(null);
+
+      if (!dragStarted) {
+        return;
+      }
 
       if (targetDescriptor?.type === "root") {
         if (!item.parentId) {
@@ -1727,7 +1761,7 @@ export default function CourseGroupPage() {
                                 }`}
                                 data-content-item-id={item.id}
                                 key={item.id}
-                                style={{ paddingLeft: 14 + depth * 20 }}
+                                style={{ "--content-tree-indent": `${14 + depth * 20}px`, paddingLeft: 14 + depth * 20 } as CSSProperties}
                               >
                                 <div className="table-main table-main-stack">
                                   <span
