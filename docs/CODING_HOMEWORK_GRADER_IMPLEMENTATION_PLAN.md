@@ -42,6 +42,9 @@ The implementation must be TypeScript/Node/Postgres-native. The Python prototype
 - Student ZIP upload.
 - Server-side ZIP validation and extraction.
 - C-first code analysis using a TypeScript/Node parser pipeline.
+- A parser adapter roadmap so additional languages can be added after the first C implementation.
+- Teacher-defined submission structure requirements for expected files, folders, and functions.
+- A temporary student preflight upload/check flow that validates structure without creating a final submission.
 - Course documentation snapshot from prior content resources.
 - AST serialization and embedding.
 - Retrieval of closest prior examples.
@@ -50,14 +53,14 @@ The implementation must be TypeScript/Node/Postgres-native. The Python prototype
 - Student answers to generated challenge questions.
 - Teacher review and manual grading.
 - Core gradebook integration for summative submissions.
+- Long-term production object storage for homework artifacts.
+- A global cross-course embeddings/indexing service for reusable course context retrieval.
 
 ### Out Of Scope For The First Complete Version
 
 - Fully automatic grading of challenge answers.
 - Full plagiarism adjudication.
 - Multi-language parser parity beyond the first C implementation.
-- Long-term production object storage.
-- A global cross-course embeddings service.
 - Real-time student code execution.
 - Direct reuse of the Python prototype in production.
 
@@ -68,6 +71,8 @@ The implementation must be TypeScript/Node/Postgres-native. The Python prototype
 - Do not add Coding Homework Grader columns to core course, activity, content, attempt, or grade tables.
 - Use core only for generic course/activity/assignment/content/gradebook orchestration.
 - Use content type plugin embedding descriptors through core services rather than importing concrete content type plugins.
+- Store uploaded and generated artifacts behind a storage abstraction so local development storage can evolve into production object storage without rewriting plugin workflows.
+- Design embeddings behind a shared indexing abstraction so the Coding Homework Grader can start with plugin-local JSONB vectors and later use a global cross-course embeddings service.
 - Store historical snapshots for assignment documentation and generated questions so later content edits do not mutate an existing submission record.
 - Use existing AI agent connection patterns for server-side generation; never expose provider keys to the browser.
 - Register every authoring/settings form with `useUnsavedChangesGuard`.
@@ -111,6 +116,7 @@ The exact Prisma names can evolve, but the plugin should start with these concep
 - `promptMarkdown`
 - `promptPdfAttachmentId`
 - `languageKey`
+- `submissionRequirements` JSON
 - `candidateLimit`
 - `retrievedExampleCount`
 - `questionCount`
@@ -124,6 +130,19 @@ The exact Prisma names can evolve, but the plugin should start with these concep
 - `bankActivityId` unique
 - same authoring fields as course assignment
 - timestamps
+
+`submissionRequirements` should support teacher-authored or uploaded requirements such as:
+
+- required files
+- required folders
+- allowed or ignored paths
+- required functions per file
+- optional functions per file
+- allowed extensions
+- maximum file count and archive size
+- language-specific parser expectations
+
+The first implementation can store this as JSON while exposing a structured editor/import flow in the plugin UI.
 
 `PluginCodingHomeworkAttachment`
 
@@ -181,7 +200,9 @@ For MVP scale, embeddings can be stored as JSON arrays and compared in Node. Kee
 - `coreAttemptId` optional
 - `documentationSnapshotId`
 - `zipAttachmentId`
-- `status`: uploaded, processing, challenge_ready, answered, ready_for_grading, graded, failed
+- `kind`: preflight or final
+- `status`: uploaded, validating, invalid_structure, structure_valid, processing, challenge_ready, answered, ready_for_grading, graded, failed
+- `structureValidationSummary` JSON
 - `processingError`
 - `metadata` JSON
 - timestamps
@@ -258,6 +279,12 @@ Open decision:
 
 The production implementation should preserve the research method but make each step inspectable.
 
+0. Validate submission structure.
+   - Compare extracted ZIP contents with teacher-defined submission requirements.
+   - Check required files, folders, allowed extensions, and required functions.
+   - Record missing, unexpected, unparseable, and valid elements.
+   - Allow the same validation service to run in preflight mode without creating a final attempt.
+
 1. Build a reference corpus from prior course content.
    - Resolve each prior content resource through core's content embedding source descriptor.
    - Extract text from Markdown/text resources directly.
@@ -270,6 +297,7 @@ The production implementation should preserve the research method but make each 
 
 2. Process a student submission.
    - Validate ZIP size, file count, path safety, and allowed extensions.
+   - Validate the archive structure against teacher requirements.
    - Extract supported source files.
    - Normalize source.
    - Parse functions.
@@ -306,6 +334,8 @@ Recommended approach:
 
 - Add a parser adapter interface in the plugin.
 - Implement a C adapter first.
+- Treat C as the first production implementation, not as a permanent language limit.
+- Model assignment requirements and extracted functions with language-neutral shapes so later parser adapters can validate other languages.
 - Use a TypeScript/Node-compatible parser such as Tree-sitter with a C grammar if it works cleanly in the app/build environment.
 - Keep AST serialization stable and deterministic.
 - Treat preprocessing as a best-effort normalization step, not a full compiler pipeline.
@@ -330,6 +360,8 @@ Suggested route paths:
 - `coding-homework-grader/submission`
   - `GET`: student submission/challenge status
   - `POST`: upload ZIP and start processing
+- `coding-homework-grader/submission-preflight`
+  - `POST`: temporarily upload ZIP and validate files, folders, and required functions without final submission or question generation
 - `coding-homework-grader/challenge-answers`
   - `PUT`: save draft answers
   - `POST`: submit final answers and mark ready for grading
@@ -350,6 +382,11 @@ Suggested route paths:
   - Markdown editor for prompt text.
   - PDF upload.
   - Preview of current student-facing statement.
+- Submission requirements tab:
+  - structured editor for required files, folders, and functions
+  - upload/import option for a requirements file
+  - validation preview using a sample ZIP
+  - language selector, with C implemented first and more languages planned through parser adapters
 - Challenge generation tab:
   - language selector, initially C only
   - candidate limit
@@ -364,7 +401,8 @@ Suggested route paths:
 State-driven UI:
 
 - Before available: use normal core assignment availability.
-- No submission: show homework statement and upload ZIP.
+- No submission: show homework statement, structure requirements, temporary conformance check, and final ZIP upload.
+- Preflight check: students may temporarily upload a ZIP to verify required files, folders, and functions before final submission; these checks do not create gradebook attempts or challenge questions.
 - Processing: show progress/status.
 - Challenge ready: show generated free-response questions.
 - Ready for grading: show submitted ZIP metadata and submitted answers, read-only.
@@ -440,7 +478,7 @@ Deliverables:
 
 - Add plugin Prisma schema and generated client.
 - Add plugin database module with activation migrations.
-- Add assignment, attachment, snapshot, reference function, submission, submission file, submission function, question, and review tables.
+- Add assignment, attachment, submission requirement, snapshot, reference function, submission, submission file, submission function, question, and review tables.
 - Add backup/deactivation coverage through existing plugin lifecycle.
 
 Acceptance:
@@ -456,6 +494,8 @@ Deliverables:
 - Teacher authoring renderer.
 - Markdown assignment text editing.
 - Assignment PDF upload route.
+- Submission requirements editor for required files, folders, allowed paths, and required functions.
+- Requirements upload/import flow.
 - Assignment preview.
 - Bank-to-course copy hook for authored prompt/PDF/settings.
 
@@ -463,6 +503,7 @@ Acceptance:
 
 - Teachers can author an activity in an activity bank.
 - Adding from a bank copies assignment settings into course-owned plugin rows.
+- Adding from a bank copies submission requirements into course-owned plugin rows.
 - Course-local edits do not mutate bank-owned rows.
 
 ### Phase 4: Prior Documentation Snapshot
@@ -501,16 +542,35 @@ Deliverables:
 
 - Parser adapter interface.
 - C adapter.
+- Language-neutral parser result contracts for files, folders, functions, diagnostics, and AST text.
 - Function extraction.
 - Stable AST text serialization.
 - Parse diagnostics and tests with real C fixtures.
+- Document how future language adapters will plug into the same submission requirement and question-generation pipeline.
 
 Acceptance:
 
 - Known C fixture functions produce deterministic AST strings.
 - Parse failures are explicit and recoverable.
+- The C adapter is the only implemented adapter, but the service interface does not hardcode C-only assumptions.
 
-### Phase 7: Reference Embedding Index
+### Phase 7: Submission Structure Validation And Preflight
+
+Deliverables:
+
+- Validation service for teacher-defined required files, folders, extensions, and functions.
+- Student preflight upload route and UI.
+- Validation summary that separates missing required items, unexpected items, parser errors, and valid items.
+- Temporary artifact handling so preflight uploads can be discarded or expire without becoming submissions.
+- Teacher-facing sample ZIP validation preview.
+
+Acceptance:
+
+- Students can test a ZIP before final submission without creating a gradebook attempt or challenge questions.
+- Final submissions reuse the same validation service.
+- Invalid final submissions return actionable structure feedback before challenge generation starts.
+
+### Phase 8: Reference Embedding Index
 
 Deliverables:
 
@@ -524,13 +584,14 @@ Acceptance:
 - Reference functions can be embedded and searched.
 - Distance ranking is deterministic in tests with fixture vectors.
 
-### Phase 8: Student ZIP Submission
+### Phase 9: Student ZIP Submission
 
 Deliverables:
 
 - Student upload UI.
 - ZIP upload route.
 - Size, file count, file extension, MIME, and path traversal validation.
+- Structure validation against teacher requirements.
 - Safe extraction to local storage.
 - Submission status records.
 
@@ -538,9 +599,10 @@ Acceptance:
 
 - Students can upload a ZIP.
 - Unsafe archives are rejected.
+- Archives that do not conform to required files, folders, or functions are rejected with a validation report.
 - Valid archives create plugin submission records and extracted file metadata.
 
-### Phase 9: Submission Analysis And Candidate Selection
+### Phase 10: Submission Analysis And Candidate Selection
 
 Deliverables:
 
@@ -555,7 +617,7 @@ Acceptance:
 - Given fixtures, the service selects structurally divergent functions.
 - Candidate selection is inspectable by teachers.
 
-### Phase 10: Challenge Question Generation
+### Phase 11: Challenge Question Generation
 
 Deliverables:
 
@@ -570,7 +632,7 @@ Acceptance:
 - Students do not see prior examples used for generation.
 - Teachers can audit question provenance.
 
-### Phase 11: Student Challenge Answer Flow
+### Phase 12: Student Challenge Answer Flow
 
 Deliverables:
 
@@ -585,7 +647,7 @@ Acceptance:
 - Once finalized, ZIP and answers are read-only for that attempt.
 - Summative finalization creates/submits the core attempt.
 
-### Phase 12: Teacher Manual Grading And Gradebook Integration
+### Phase 13: Teacher Manual Grading And Gradebook Integration
 
 Deliverables:
 
@@ -601,7 +663,7 @@ Acceptance:
 - Teachers can assign scores and feedback.
 - Grades appear in course/group gradebook summaries.
 
-### Phase 13: Operational Hardening
+### Phase 14: Operational Hardening
 
 Deliverables:
 
@@ -616,7 +678,41 @@ Acceptance:
 - Failed processing can be retried without duplicate attempts/questions.
 - Long-running processing does not block normal page requests.
 
-### Phase 14: Quality, Research, And Analytics
+### Phase 15: Production Object Storage
+
+Deliverables:
+
+- Introduce a platform storage abstraction for plugin artifacts.
+- Move assignment PDFs, student ZIP files, extracted source files, generated artifacts, and review downloads from local disk to configurable object storage.
+- Store object keys, checksums, content type, size, and retention metadata in plugin-owned attachment rows.
+- Add signed, permission-checked download routes rather than exposing object URLs directly.
+- Add lifecycle/retention policies for submitted homework artifacts and extracted temporary files.
+- Keep local filesystem storage as the development adapter.
+
+Acceptance:
+
+- The plugin can run with local storage in development and object storage in production using the same service interface.
+- Student submissions and teacher downloads continue to pass through Cognelo authorization checks.
+- Reprocessing can retrieve historical artifacts from object storage by stable object key.
+
+### Phase 16: Global Cross-Course Embeddings Service
+
+Deliverables:
+
+- Introduce a shared indexing service that can ingest generic content embedding descriptors from content type plugins.
+- Store reusable content chunks, code snippets, AST representations, embeddings, metadata, and access scope outside a single activity submission.
+- Support course-, subject-, and activity-scoped retrieval, with strict authorization and visibility filters.
+- Migrate Coding Homework Grader reference retrieval from plugin-local JSONB vector search to the shared index.
+- Add invalidation/reindexing rules when content resources change.
+- Preserve per-submission documentation snapshots by storing the retrieved chunk IDs and exact chunk text used at generation time.
+
+Acceptance:
+
+- The plugin can retrieve relevant prior examples from a shared course/subject index without importing concrete content type plugins.
+- Retrieval respects course membership, group visibility, hidden content, and the assignment's prior-content cutoff.
+- Existing generated questions remain reproducible from stored snapshot data even after the global index changes.
+
+### Phase 17: Quality, Research, And Analytics
 
 Deliverables:
 
@@ -630,19 +726,22 @@ Acceptance:
 - The plugin can reproduce the paper's core evaluation fields.
 - Teachers can identify why a question was asked.
 
-### Phase 15: Documentation And Rollout
+### Phase 18: Documentation And Rollout
 
 Deliverables:
 
 - Plugin README.
-- Plugin memory.
+- Plugin `PROJECT_MEMORY.md`, following the same rule as every Cognelo plugin, kept up to date with plugin-specific behavior, implementation state, constraints, data ownership, route contracts, storage/indexing decisions, and design choices.
 - Plugin authoring handbook update.
-- Project memory update for platform-level integration points.
+- Root `README.md` update for setup, feature overview, and any new storage/indexing requirements.
+- `docs/PROJECT_MEMORY.md` update for platform-level integration points and long-term decisions.
 - Seed/demo activity if useful.
 
 Acceptance:
 
 - A new developer can understand how to author, assign, submit, and grade a Coding Homework Grader activity.
+- The root README and project memory accurately reflect the implemented behavior and operational requirements.
+- The plugin memory follows the existing plugin convention and captures all relevant plugin-local decisions without scattering plugin-specific notes into platform memory.
 - The plugin's current limitations are documented.
 
 ## Test Plan
@@ -651,20 +750,26 @@ Unit tests:
 
 - manifest and registry tests
 - config schema tests
+- submission requirement schema tests
 - assignment persistence tests
 - bank-to-course copy tests
 - content snapshot tests
 - parser/AST serializer tests
+- structure validation tests for required files, folders, and functions
 - embedding distance tests
 - candidate selection tests
 - prompt builder tests
 - ZIP validation tests
+- storage adapter tests
+- global index retrieval and authorization filter tests
 
 Route tests:
 
 - assignment save/load
 - PDF upload/delete
+- requirements import/save
 - documentation preview
+- preflight upload/check
 - ZIP submission
 - question generation retry
 - answer finalization
@@ -676,6 +781,8 @@ Integration tests:
 - create bank activity, assign to course, verify independent course-owned plugin data
 - summative student submission creates a core attempt only after final answers
 - manual grade records normalized grade
+- object storage-backed artifacts remain downloadable through authorized plugin routes
+- shared-index retrieval respects content visibility and assignment cutoff rules
 
 Frontend checks:
 
@@ -686,6 +793,8 @@ Frontend checks:
 ## Security And Privacy Notes
 
 - Reject ZIP path traversal, symlinks, excessive file counts, excessive uncompressed size, and unsupported file types.
+- Apply the same archive safety checks to temporary preflight uploads.
+- Expire and delete preflight artifacts because they are not submitted work.
 - Store original submissions for teacher review, but do not expose them to other students.
 - Do not show retrieved prior examples to students.
 - Do not expose AI prompts containing other course materials to students.
@@ -699,6 +808,8 @@ Frontend checks:
 - Whether a student may create a new attempt after seeing challenge questions. Recommended: yes only if the assignment attempt policy allows another attempt, and the next attempt gets a newly generated challenge set.
 - Whether group-specific content before the assignment should be included in the documentation snapshot. Recommended: defer to a later phase.
 - Whether PDF assignment statements should also be indexed as documentation. Recommended: no; the assignment statement describes the task, while prior content resources define the taught material.
-- Whether to introduce `pgvector` now. Recommended: no for MVP; hide JSONB vector storage behind an interface.
+- Which object storage backend should be the first production target. Recommended: design for S3-compatible APIs while keeping a local adapter for development.
+- Whether to introduce `pgvector` before the global indexing service. Recommended: no for MVP; hide JSONB vector storage behind an interface, then choose `pgvector` or another vector backend during the global service phase.
+- Whether the global embeddings service should be platform-wide or packaged as a separate indexing package/app. Recommended: start as a shared platform service with clear interfaces, then split operationally only if scale requires it.
 - Whether generated challenge answers should eventually be auto-graded. Recommended: treat answer assessment as advisory until validated.
-
+- Which submission requirement format teachers can upload first. Recommended: start with JSON plus a structured UI, then add CSV/YAML later if teachers need it.
