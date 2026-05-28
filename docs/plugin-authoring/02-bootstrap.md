@@ -11,7 +11,7 @@ There is no plugin generator yet. The easiest approach is to copy an existing pl
 Choose the closest starting point:
 
 - `plugin-placeholder` for the simplest possible plugin
-- `plugin-homework-grader` if you want a config schema example
+- `plugin-coding-homework-grader` if you want a config schema example
 - `plugin-parsons` if you need routes, persistence, and custom UI
 
 For a beginner, `plugin-placeholder` is usually the best starting point.
@@ -125,7 +125,7 @@ import { myActivityPlugin } from "@cognelo/plugin-my-activity";
 
 const plugins: ActivityPlugin[] = [
   placeholderPlugin,
-  homeworkGraderPlugin,
+  codingHomeworkGraderPlugin,
   parsonsPlugin,
   myActivityPlugin
 ];

@@ -106,7 +106,7 @@ Read these when you get stuck:
 - [apps/web/src/lib/content-type-renderers.tsx](../../apps/web/src/lib/content-type-renderers.tsx)
 - [apps/web/src/lib/api.ts](../../apps/web/src/lib/api.ts)
 - [packages/plugin-activities/plugin-placeholder/src/index.ts](../../packages/plugin-activities/plugin-placeholder/src/index.ts)
-- [packages/plugin-activities/plugin-homework-grader/src/index.ts](../../packages/plugin-activities/plugin-homework-grader/src/index.ts)
+- [packages/plugin-activities/plugin-coding-homework-grader/src/index.ts](../../packages/plugin-activities/plugin-coding-homework-grader/src/index.ts)
 - [packages/plugin-activities/plugin-parsons/src/plugin.ts](../../packages/plugin-activities/plugin-parsons/src/plugin.ts)
 - [packages/plugin-activities/plugin-parsons/src/routes.ts](../../packages/plugin-activities/plugin-parsons/src/routes.ts)
 - [packages/plugin-activities/plugin-parsons/src/db.ts](../../packages/plugin-activities/plugin-parsons/src/db.ts)
@@ -118,7 +118,7 @@ Read these when you get stuck:
 
 The easiest next expansions would be:
 
-- a dedicated “build a homework grader” tutorial
+- a dedicated “build a coding homework grader” tutorial
 - a dedicated “build a content sync provider” tutorial
 - a dedicated “research instrumentation patterns” page
 - a dedicated “shared grading roadmap” page

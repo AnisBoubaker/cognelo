@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/index.ts",
   "dependencies": {
-    "@cognelo/plugin-homework-grader": "0.1.0",
+    "@cognelo/plugin-coding-homework-grader": "0.1.0",
     "@cognelo/plugin-parsons": "0.1.0",
     "@cognelo/plugin-placeholder": "0.1.0",
     "@cognelo/plugin-mcq": "0.1.0",

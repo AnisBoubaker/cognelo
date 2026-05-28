@@ -1,12 +1,12 @@
-# Plugin: Homework Grader
+# Plugin: Coding Homework Grader
 
-This README is for the homework-grader plugin only.
+This README is for the coding-homework-grader plugin only.
 
-The package currently defines the activity shell, localized metadata, and config schema for a future homework grading workflow.
+The package currently defines the activity shell, localized metadata, initial algorithm contracts, and config schema for a future coding homework grading workflow.
 
 ## Purpose
 
-`@cognelo/plugin-homework-grader` is the planned home for programming-assignment submission and grading behavior.
+`@cognelo/plugin-coding-homework-grader` is the planned home for programming-assignment submission and grading behavior.
 
 Current scope:
 
@@ -17,7 +17,7 @@ Current scope:
 
 ## Activity Type
 
-- `homework-grader`
+- `coding-homework-grader`
 
 Current config shape:
 
@@ -27,17 +27,17 @@ Current config shape:
 
 ## Current State
 
-This plugin is still a scaffold. It does not yet own dedicated persistence tables, bank-to-course copy hooks, or activity-specific UX beyond registration metadata.
+This plugin is still a scaffold. It is registered as `coding-homework-grader`, uses the package `@cognelo/plugin-coding-homework-grader`, and does not yet own dedicated persistence tables, bank-to-course copy hooks, or activity-specific UX beyond registration metadata.
 
 When this plugin gains teacher authoring or settings UI, the first form implementation should register with `useUnsavedChangesGuard` from `@cognelo/activity-ui` so navigation uses the platform-wide unsaved-change dialog.
 
-## Phase 0 Direction
+## Implementation Direction
 
-The next product form of this plugin is **Coding Homework Grader**. The implementation plan lives in:
+The phased implementation plan lives in:
 
 - `docs/CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md`
 
-Phase 0 keeps the package as the existing scaffold but captures stable service contracts for the future implementation in `src/algorithm.ts`.
+Phase 0 captured stable service contracts for the future implementation in `src/algorithm.ts`. Phase 1 renamed the package, plugin key, activity key, and localized picker metadata to Coding Homework Grader.
 
 The prototype in `tmp/challenge-questions/scripts` is a research reference only. Production code must not import from `tmp`, execute the Python scripts, or depend on those files being present.
 
@@ -60,5 +60,5 @@ Prompt versioning starts with:
 
 When changing this plugin, update:
 
-- `packages/plugin-activities/plugin-homework-grader/README.md`
-- `packages/plugin-activities/plugin-homework-grader/PROJECT_MEMORY.md`
+- `packages/plugin-activities/plugin-coding-homework-grader/README.md`
+- `packages/plugin-activities/plugin-coding-homework-grader/PROJECT_MEMORY.md`

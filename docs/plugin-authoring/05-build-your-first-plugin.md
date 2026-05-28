@@ -167,7 +167,7 @@ import { tracingQuizPlugin } from "@cognelo/plugin-tracing-quiz";
 Then add it to the `plugins` array:
 
 ```ts
-const plugins: ActivityPlugin[] = [placeholderPlugin, homeworkGraderPlugin, parsonsPlugin, tracingQuizPlugin];
+const plugins: ActivityPlugin[] = [placeholderPlugin, codingHomeworkGraderPlugin, parsonsPlugin, tracingQuizPlugin];
 ```
 
 Why this matters:

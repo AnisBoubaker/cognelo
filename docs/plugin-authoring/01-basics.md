@@ -11,7 +11,7 @@ In Cognelo, a plugin is a package that adds one or more activity types.
 An activity type is something like:
 
 - a Parsons problem
-- a homework grader
+- a coding homework grader
 - a tracing quiz
 - a code-completion exercise
 
@@ -183,7 +183,7 @@ You do not need to know every Next.js feature to work on a plugin. For most plug
 Before starting your own plugin, open these three files and skim them:
 
 - [packages/plugin-activities/plugin-placeholder/src/index.ts](../../packages/plugin-activities/plugin-placeholder/src/index.ts)
-- [packages/plugin-activities/plugin-homework-grader/src/index.ts](../../packages/plugin-activities/plugin-homework-grader/src/index.ts)
+- [packages/plugin-activities/plugin-coding-homework-grader/src/index.ts](../../packages/plugin-activities/plugin-coding-homework-grader/src/index.ts)
 - [packages/plugin-activities/plugin-parsons/src/plugin.ts](../../packages/plugin-activities/plugin-parsons/src/plugin.ts)
 
 They show the progression from simple to advanced.

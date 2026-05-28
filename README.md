@@ -58,6 +58,8 @@ docs/
 
 Activity plugins live under `packages/plugin-activities/plugin-*`. Content type plugins live under `packages/plugin-content-types/plugin-*`.
 
+The Coding Homework Grader scaffold is registered as `coding-homework-grader` in `packages/plugin-activities/plugin-coding-homework-grader`; its phased design lives in `docs/CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md`.
+
 The intended boundary is:
 
 - **Core tables stay generic**: `Subject`, `ActivityBank`, `BankActivity`, `ActivityVersion`, `Activity`, `ActivityType`, `CourseContentResource`, `CourseContentItem`, `Course`, and related auth/course tables remain shared.

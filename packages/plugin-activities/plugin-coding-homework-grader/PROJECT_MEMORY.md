@@ -1,6 +1,6 @@
-# Homework Grader Plugin Memory
+# Coding Homework Grader Plugin Memory
 
-This file is for homework-grader-specific memory only.
+This file is for coding-homework-grader-specific memory only.
 
 ## Current Decisions
 
@@ -8,7 +8,8 @@ This file is for homework-grader-specific memory only.
 - It has no web authoring view yet, so there is currently no form surface to register with the shared unsaved-change guard.
 - When real teacher authoring or settings UI is added, register every form with `useUnsavedChangesGuard` before considering the UI complete.
 - It currently has no plugin-owned persistence or bank-to-course copy hook; add those only when real grading/reference data exists.
-- The planned product name is Coding Homework Grader. The package has not been renamed yet; that belongs to the next implementation phase.
+- Phase 1 renamed the scaffold package to `@cognelo/plugin-coding-homework-grader`, the plugin and activity keys to `coding-homework-grader`, and the plugin database namespace to `plugin_coding_homework_grader`.
+- The picker display name is Coding Homework Grader and the activity remains in the Programming category.
 - Phase 0 added `src/algorithm.ts` with stable TypeScript-facing contracts for source files, submission requirements, structure validation summaries, parser adapters, AST functions, embeddings, candidate selection, and challenge question generation.
 - The first parser implementation should target C, but the contracts are intentionally language-neutral so future parser adapters can support additional languages.
 - The research prototype in `tmp/challenge-questions/scripts` is reference material only. Production plugin code must not import, execute, or otherwise depend on files under `tmp`.
