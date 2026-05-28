@@ -1,6 +1,13 @@
 "use client";
 
 import { MarkdownRenderer } from "@cognelo/activity-ui";
+import {
+  activityDefinitionBelongsToCategory,
+  activityDefinitionCreatesCategory,
+  getActivityCategoryMessages,
+  listActivityCategories,
+  type ActivityCategoryId
+} from "@cognelo/activity-sdk/categories";
 import { resolveLocalizedText, type ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -27,18 +34,13 @@ import {
 import { ContentTypeIcon as MaterialTypeIcon, resolveContentTypeSettingsRenderer } from "@/lib/content-type-renderers";
 import { useI18n } from "@/lib/i18n";
 
-type ActivityCategoryId = "generic" | "programming" | "miscellaneous";
 type ActivityPickerTabId = "activity-banks" | ActivityCategoryId | "material";
 type ContentDropPlacement = "after" | "before" | "inside";
 type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
 
 const contentDragActivationDistance = 8;
 
-const activityCategories: Array<{ id: ActivityCategoryId; labelKey: string }> = [
-  { id: "generic", labelKey: "activityBankDetail.categoryGeneric" },
-  { id: "programming", labelKey: "activityBankDetail.categoryProgramming" },
-  { id: "miscellaneous", labelKey: "activityBankDetail.categoryMiscellaneous" }
-];
+const activityCategories = listActivityCategories();
 
 export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();
@@ -566,25 +568,13 @@ export default function CourseDetailPage() {
   }
 
   function activityTypeBelongsToCategory(activityTypeKey: string, categoryId: ActivityCategoryId) {
-    const defaultCategoryIds = activityDefinitions.find((candidate) => candidate.key === activityTypeKey)?.defaultCategoryIds;
-    if (defaultCategoryIds === "all") {
-      return true;
-    }
-    if (!defaultCategoryIds?.length) {
-      return categoryId === "miscellaneous";
-    }
-    return defaultCategoryIds.includes(categoryId);
+    const definition = activityDefinitions.find((candidate) => candidate.key === activityTypeKey);
+    return activityDefinitionBelongsToCategory(definition, categoryId);
   }
 
   function activityTypeCreatesCategory(activityTypeKey: string, categoryId: ActivityCategoryId) {
-    const defaultCategoryIds = activityDefinitions.find((candidate) => candidate.key === activityTypeKey)?.defaultCategoryIds;
-    if (defaultCategoryIds === "all") {
-      return categoryId === "generic";
-    }
-    if (!defaultCategoryIds?.length) {
-      return categoryId === "miscellaneous";
-    }
-    return defaultCategoryIds.includes(categoryId);
+    const definition = activityDefinitions.find((candidate) => candidate.key === activityTypeKey);
+    return activityDefinitionCreatesCategory(definition, categoryId);
   }
 
   function activityTypeIconName(activityTypeKey: string): NonNullable<ActivityDefinition["icon"]> {
@@ -1950,7 +1940,7 @@ export default function CourseDetailPage() {
                           role="tab"
                           type="button"
                         >
-                          {t(category.labelKey)}
+                          {getActivityCategoryMessages(category, locale)}
                         </button>
                       ))}
                     </div>

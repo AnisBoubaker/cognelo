@@ -343,7 +343,7 @@ export type ActivityDefinition = {
   key: string;
   name: string;
   description: string;
-  defaultCategoryIds?: string[] | "all";
+  defaultCategoryIds?: string[];
   icon?: "code" | "checklist" | "document-check" | "list-check" | "placeholder";
   defaultConfig?: Record<string, unknown>;
   i18n?: Partial<
