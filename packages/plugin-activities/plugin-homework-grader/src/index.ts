@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ActivityPlugin } from "@cognelo/activity-sdk";
+export * from "./algorithm";
 
 export const homeworkGraderPlugin: ActivityPlugin = {
   key: "homework-grader",
