@@ -29,7 +29,7 @@ export const zhMessages = {
       time: "时间"
     },
     activityCategories: {
-      generic: "通用",
+      generic: "通用活动",
       programming: "编程",
       miscellaneous: "其他"
     },
@@ -465,6 +465,18 @@ export const zhMessages = {
       addRootFolder: "新建文件夹",
       addSubfolder: "为 {title} 添加子文件夹",
       renameFolder: "重命名 {title}",
+      renameFolderAction: "重命名文件夹",
+      contentActions: "{title} 的操作",
+      contentActionsTitle: "更多操作",
+      contentSettingsAction: "设置",
+      newActivityInFolder: "新建活动",
+      newFolderInFolder: "新建文件夹",
+      contentTreeActions: "内容树操作",
+      contentTreeActionsTitle: "更多内容操作",
+      newRootFolderAction: "新建根文件夹",
+      newRootActivityAction: "新建活动",
+      expandAllFolders: "全部展开",
+      collapseAllFolders: "全部折叠",
       noMaterialsAvailable: "暂无课程资料。",
       activityBankPickerLabel: "活动库",
       noAvailableBankActivities: "此课程没有可用的活动库条目。",
