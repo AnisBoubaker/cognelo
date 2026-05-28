@@ -2,7 +2,7 @@
 
 This plan describes the phased implementation of the new Coding Homework Grader activity plugin.
 
-The existing `plugin-homework-grader` package is currently only a scaffold. The product direction is to rename it to Coding Homework Grader and turn it into a full programming-homework submission workflow:
+The existing `plugin-coding-homework-grader` package is currently a renamed scaffold. The product direction is to turn it into a full programming-homework submission workflow:
 
 - Teachers define the homework statement as editable text or an uploaded PDF.
 - Teachers add and assign the activity through the normal course content and gradebook workflow.
@@ -19,7 +19,7 @@ This plan is based on:
 - `tmp/K0094_paper.pdf`
 - `tmp/latex_source/icetm2024.tex`
 - the prototype under `tmp/challenge-questions/scripts`
-- the existing scaffold under `packages/plugin-activities/plugin-homework-grader`
+- the existing scaffold under `packages/plugin-activities/plugin-coding-homework-grader`
 - the current activity plugin, content type plugin, content tree, and gradebook architecture
 
 The Python prototype maps to these future TypeScript modules:
@@ -79,7 +79,7 @@ The implementation must be TypeScript/Node/Postgres-native. The Python prototype
 
 ## Naming And Rename Strategy
 
-Rename the user-facing activity from Homework grader to Coding Homework Grader.
+Phase 1 renamed the user-facing activity from Homework Grader to Coding Homework Grader.
 
 Recommended package/API rename:
 
@@ -89,7 +89,7 @@ Recommended package/API rename:
 - Activity type key: `coding-homework-grader`
 - Database namespace: `plugin_coding_homework_grader`
 
-Because the current homework grader is a scaffold with no plugin-owned production data, this can be treated as a clean rename during development. If local scaffold records exist, add a small migration/seed cleanup note rather than a full compatibility layer.
+Because the current coding homework grader is a scaffold with no plugin-owned production data, this can be treated as a clean rename during development. If local scaffold records exist, add a small migration/seed cleanup note rather than a full compatibility layer.
 
 Keep a short transition checklist:
 
@@ -464,7 +464,7 @@ Deliverables:
 
 - Rename package, plugin key, activity type key, display name, i18n metadata, and docs.
 - Update SDK registries, TypeScript aliases, API/web config, Vitest aliases, and lockfile.
-- Update tests that currently expect `homework-grader`.
+- Update tests that previously expected the old homework-grader scaffold.
 
 Acceptance:
 

@@ -54,11 +54,11 @@
       "@cognelo/plugin-text-content/server": [
         "../../packages/plugin-content-types/plugin-text/src/server.ts"
       ],
-      "@cognelo/plugin-homework-grader": [
-        "../../packages/plugin-activities/plugin-homework-grader/src/index.ts"
+      "@cognelo/plugin-coding-homework-grader": [
+        "../../packages/plugin-activities/plugin-coding-homework-grader/src/index.ts"
       ],
-      "@cognelo/plugin-homework-grader/server": [
-        "../../packages/plugin-activities/plugin-homework-grader/src/server.ts"
+      "@cognelo/plugin-coding-homework-grader/server": [
+        "../../packages/plugin-activities/plugin-coding-homework-grader/src/server.ts"
       ],
       "@cognelo/plugin-coding-exercises": [
         "../../packages/plugin-activities/plugin-coding-exercises/src/index.ts"

@@ -81,7 +81,7 @@ import { yourPlugin } from "@cognelo/plugin-your-plugin";
 
 const plugins: ActivityPlugin[] = [
   placeholderPlugin,
-  homeworkGraderPlugin,
+  codingHomeworkGraderPlugin,
   parsonsPlugin,
   yourPlugin
 ];
@@ -100,7 +100,7 @@ import { yourServerPlugin } from "@cognelo/plugin-your-plugin/server";
 
 const serverPlugins: readonly ServerActivityPlugin[] = [
   placeholderServerPlugin,
-  homeworkGraderServerPlugin,
+  codingHomeworkGraderServerPlugin,
   parsonsServerPlugin,
   yourServerPlugin
 ];
@@ -508,7 +508,7 @@ If your plugin needs grading today:
 - store grading data in plugin-owned tables
 - keep the schema easy to adapt later to a shared grade system
 
-The `plugin-homework-grader` package is currently a scaffold, not a finished shared grading subsystem.
+The `plugin-coding-homework-grader` package is currently a scaffold, not a finished shared grading subsystem.
 
 ## Verification
 
@@ -553,7 +553,7 @@ Manual checks:
 - [apps/web/src/lib/content-type-renderers.tsx](../../apps/web/src/lib/content-type-renderers.tsx)
 - [apps/web/src/lib/api.ts](../../apps/web/src/lib/api.ts)
 - [packages/plugin-activities/plugin-placeholder/src/index.ts](../../packages/plugin-activities/plugin-placeholder/src/index.ts)
-- [packages/plugin-activities/plugin-homework-grader/src/index.ts](../../packages/plugin-activities/plugin-homework-grader/src/index.ts)
+- [packages/plugin-activities/plugin-coding-homework-grader/src/index.ts](../../packages/plugin-activities/plugin-coding-homework-grader/src/index.ts)
 - [packages/plugin-activities/plugin-parsons/src/plugin.ts](../../packages/plugin-activities/plugin-parsons/src/plugin.ts)
 - [packages/plugin-activities/plugin-parsons/src/routes.ts](../../packages/plugin-activities/plugin-parsons/src/routes.ts)
 - [packages/plugin-activities/plugin-parsons/src/db.ts](../../packages/plugin-activities/plugin-parsons/src/db.ts)

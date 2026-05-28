@@ -50,7 +50,7 @@ describe("i18n helpers", () => {
     expect(translateMessage("en", "missing.key")).toBe("missing.key");
     expect(getMessage("fr", "subjects.listTitle")).toBe("Matières disponibles");
     expect(getMessage("zh", "subjects.listTitle")).toBe("可用学科");
-    expect(getMessage("en", "activityCategories.generic")).toBe("Generic");
+    expect(getMessage("en", "activityCategories.generic")).toBe("Generic Activity");
   });
 
   it("returns Arabic messages and falls back to English for missing Arabic keys", () => {

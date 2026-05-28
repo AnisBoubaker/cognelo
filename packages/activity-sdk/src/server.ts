@@ -1,6 +1,6 @@
 import type { CurrentUser } from "@cognelo/contracts";
 import { codingExercisesServerPlugin } from "@cognelo/plugin-coding-exercises/server";
-import { homeworkGraderServerPlugin } from "@cognelo/plugin-homework-grader/server";
+import { codingHomeworkGraderServerPlugin } from "@cognelo/plugin-coding-homework-grader/server";
 import { parsonsServerPlugin } from "@cognelo/plugin-parsons/server";
 import { placeholderServerPlugin } from "@cognelo/plugin-placeholder/server";
 import { mcqServerPlugin } from "@cognelo/plugin-mcq/server";
@@ -112,7 +112,7 @@ export function getAssignedGroupActivityAttemptSource(context: PluginRouteContex
 
 const serverPlugins: readonly ServerActivityPlugin[] = [
   placeholderServerPlugin,
-  homeworkGraderServerPlugin,
+  codingHomeworkGraderServerPlugin,
   parsonsServerPlugin,
   mcqServerPlugin,
   codingExercisesServerPlugin,

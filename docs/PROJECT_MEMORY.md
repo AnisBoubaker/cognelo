@@ -18,6 +18,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Favor shared contracts and service-layer logic over duplicating validation in each app.
 - Treat `docs/PROJECT_MEMORY.md` and `README.md` as living project artifacts that must be updated whenever platform architecture, setup, product behavior, or major cross-cutting capabilities change.
 - Treat plugin `README.md` and `PROJECT_MEMORY.md` files as living plugin artifacts that must be updated whenever plugin behavior or plugin-local architecture changes.
+- The Coding Homework Grader scaffold is registered as `coding-homework-grader` in `packages/plugin-activities/plugin-coding-homework-grader`; its phased implementation plan lives in `docs/CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md`, and plugin-local design choices belong in that package's `PROJECT_MEMORY.md`.
 
 ## Plugin Architecture Rules
 

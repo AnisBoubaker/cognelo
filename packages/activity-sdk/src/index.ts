@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { codingExercisesPlugin } from "@cognelo/plugin-coding-exercises";
-import { homeworkGraderPlugin } from "@cognelo/plugin-homework-grader";
+import { codingHomeworkGraderPlugin } from "@cognelo/plugin-coding-homework-grader";
 import { parsonsPlugin } from "@cognelo/plugin-parsons";
 import { placeholderPlugin } from "@cognelo/plugin-placeholder";
 import { mcqPlugin } from "@cognelo/plugin-mcq";
@@ -76,7 +76,7 @@ export type ActivityPlugin = {
 
 const plugins: ActivityPlugin[] = [
   placeholderPlugin,
-  homeworkGraderPlugin,
+  codingHomeworkGraderPlugin,
   parsonsPlugin,
   mcqPlugin,
   codingExercisesPlugin,

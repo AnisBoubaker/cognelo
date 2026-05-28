@@ -93,7 +93,7 @@ Example:
 
 There is not yet a platform-wide gradebook service in Cognelo.
 
-The `plugin-homework-grader` package currently acts more like a scaffold than a finished grading system.
+The `plugin-coding-homework-grader` package currently acts more like a scaffold than a finished grading system.
 
 Today, if a plugin needs grading behavior, the plugin should own it.
 
