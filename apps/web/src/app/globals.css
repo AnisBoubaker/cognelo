@@ -1504,6 +1504,12 @@ a.card:hover,
   color: color-mix(in srgb, var(--brand-blue), var(--ink) 30%);
 }
 
+.metadata-badge.is-warning {
+  background: color-mix(in srgb, #b7791f, white 82%);
+  border-color: color-mix(in srgb, #b7791f, white 42%);
+  color: color-mix(in srgb, #b7791f, var(--ink) 35%);
+}
+
 .material-glyph {
   background: transparent;
   border: 0;

@@ -305,6 +305,8 @@ Student content responses must not expose hidden gradebook data, raw plugin grad
 
 Add a lightweight material type registry separate from activity plugins.
 
+Superseded note: this was the Phase 9 bridge for the content tree work. The later content type plugin implementation moved GitHub repo, File, and Text behavior into `packages/plugin-content-types/*` and removed the old web material type registry.
+
 Initial material types:
 
 - GitHub repository
@@ -432,7 +434,7 @@ This preserves the documented student-first, section-first navigation model.
 - Phase 6 is implemented.
 - Phase 7 is implemented.
 - Phase 8 is implemented for the student group workspace.
-- Phase 9 is implemented as a lightweight web material type registry.
+- Phase 9 was implemented as a lightweight web material type registry and later superseded by content type plugins.
 - Phase 10 is implemented.
 - The schema foundation lives in `packages/db/prisma/schema.prisma`.
 - The migration lives in `packages/db/prisma/migrations/202605260001_course_content_tree/migration.sql`.
@@ -597,7 +599,7 @@ Verification completed after Phase 9:
 - Update plugin docs only if plugin behavior changes.
 - Remove or deprecate old material-only hierarchy UI once the content tree is canonical.
 
-Implemented scope: the root README and platform memory now document `CourseContentItem` as the canonical shared content tree, the separation between content visibility and activity availability, the unified teacher/student Content surfaces, strict plugin isolation, and the lightweight material type registry with future embedding-source hints. Plugin documentation was intentionally left unchanged because no plugin-owned persistence, route contract, renderer contract, or grading behavior changed. The old material-only and activity-only workspace tabs are no longer the canonical product surface; compatibility material fields and endpoints remain only to support existing records and transition code while content-tree APIs drive the current UI.
+Implemented scope: the root README and platform memory documented `CourseContentItem` as the canonical shared content tree, the separation between content visibility and activity availability, the unified teacher/student Content surfaces, strict plugin isolation, and the temporary lightweight material type registry with future embedding-source hints. That registry was later superseded by content type plugins. Plugin documentation was intentionally left unchanged during this phase because no plugin-owned persistence, route contract, renderer contract, or grading behavior changed. The old material-only and activity-only workspace tabs are no longer the canonical product surface; compatibility material fields and endpoints remain only to support existing records and transition code while content-tree APIs drive the current UI.
 
 Verification completed after Phase 10:
 
@@ -659,6 +661,6 @@ Document:
 - activity availability as separate from content visibility
 - materials remaining non-activity resources
 - activity plugin isolation remaining unchanged
-- material type registry being lightweight and separate from activity plugins
+- temporary material type registry being lightweight and separate from activity plugins; later content type plugin work superseded it
 
 Plugin package documentation only needs updates when a plugin's own behavior, persistence, or route contract changes.

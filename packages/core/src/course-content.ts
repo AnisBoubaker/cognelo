@@ -1,7 +1,10 @@
 import { Prisma, prisma } from "@cognelo/db";
+import { getContentTypePluginForType } from "@cognelo/content-type-sdk";
+import { getServerContentTypePlugin, type ContentEmbeddingSource } from "@cognelo/content-type-sdk/server";
 import type { CurrentUser } from "@cognelo/contracts";
-import { assertCanManageCourse, assertCanViewCourse } from "./authorization";
+import { assertCanManageCourse, assertCanViewCourse, canManageCourse } from "./authorization";
 import { AppError, notFound } from "./errors";
+import { assertContentResourcePluginActive, assertContentTypePluginEnabled } from "./plugins";
 
 type ContentScope = {
   groupId?: string | null;
@@ -22,6 +25,40 @@ type CreateMaterialContentItemInput = ContentScope & {
   position?: number;
   isVisible?: boolean;
   metadata?: unknown;
+};
+
+type CreateContentResourceInput = ContentScope & {
+  contentTypeKey: string;
+  pluginKey: string;
+  title: string;
+  metadata?: unknown;
+};
+
+type UpdateContentResourceInput = {
+  title?: string;
+  metadata?: unknown;
+};
+
+type CreateContentResourceContentItemInput = ContentScope & {
+  contentResourceId: string;
+  parentId?: string | null;
+  titleSnapshot?: string | null;
+  position?: number;
+  isVisible?: boolean;
+  metadata?: unknown;
+};
+
+type CreatePluginContentResourceInput = ContentScope & {
+  contentTypeKey: string;
+  payload?: unknown;
+  parentId?: string | null;
+  position?: number;
+  isVisible?: boolean;
+  itemMetadata?: unknown;
+};
+
+type UpdatePluginContentResourceInput = {
+  payload?: unknown;
 };
 
 type CreateActivityContentItemInput = ContentScope & {
@@ -49,7 +86,7 @@ type ListContentOptions = ContentScope & {
 
 type CourseContentDb = Pick<
   typeof prisma,
-  "activity" | "courseContentItem" | "courseGroup" | "courseGroupActivity" | "courseMaterial"
+  "activity" | "courseContentItem" | "courseContentResource" | "courseGroup" | "courseGroupActivity" | "courseMaterial"
 >;
 
 export type EffectiveContentVisibility = "visible" | "hidden" | "hidden_by_parent";
@@ -93,7 +130,7 @@ export async function createMaterialContentItem(user: CurrentUser, courseId: str
       courseId,
       groupId: scope.groupId,
       parentId: input.parentId ?? null,
-      kind: "material",
+      kind: "content",
       titleSnapshot: input.titleSnapshot ?? material.title,
       position: await resolvePosition(prisma, courseId, scope.groupId, input.parentId, input.position),
       isVisible: input.isVisible ?? true,
@@ -101,6 +138,236 @@ export async function createMaterialContentItem(user: CurrentUser, courseId: str
       metadata: toJson(input.metadata)
     }
   });
+}
+
+export async function createContentResource(user: CurrentUser, courseId: string, input: CreateContentResourceInput) {
+  await assertCanManageCourse(user, courseId);
+  const scope = normalizeScope(input);
+  await assertValidScope(prisma, courseId, scope.groupId);
+
+  return prisma.courseContentResource.create({
+    data: {
+      courseId,
+      groupId: scope.groupId,
+      contentTypeKey: assertPluginKey(input.contentTypeKey, "contentTypeKey"),
+      pluginKey: assertPluginKey(input.pluginKey, "pluginKey"),
+      title: assertTitle(input.title),
+      metadata: toJson(input.metadata)
+    }
+  });
+}
+
+export async function updateContentResource(
+  user: CurrentUser,
+  courseId: string,
+  contentResourceId: string,
+  input: UpdateContentResourceInput,
+  scope: ContentScope = {}
+) {
+  await assertCanManageCourse(user, courseId);
+  const resource = await prisma.courseContentResource.findFirst({ where: { id: contentResourceId, courseId, ...scopeWhere(scope) } });
+  if (!resource) {
+    throw notFound("Course content resource");
+  }
+
+  return prisma.courseContentResource.update({
+    where: { id: contentResourceId },
+    data: {
+      ...(input.title !== undefined ? { title: assertTitle(input.title) } : {}),
+      ...(input.metadata !== undefined ? { metadata: toJson(input.metadata) } : {})
+    }
+  });
+}
+
+export async function listContentResources(user: CurrentUser, courseId: string, options: ContentScope = {}) {
+  await assertCanViewCourse(user, courseId);
+  const scope = normalizeScope(options);
+  await assertValidScope(prisma, courseId, scope.groupId);
+
+  const resources = await prisma.courseContentResource.findMany({
+    where: {
+      courseId,
+      ...(scope.groupId ? { OR: [{ groupId: null }, { groupId: scope.groupId }] } : { groupId: null })
+    },
+    orderBy: [{ title: "asc" }, { createdAt: "asc" }]
+  });
+  if (await canManageCourse(user, courseId)) {
+    return resources;
+  }
+
+  const visibleResourceIds = await getVisibleContentResourceIds(courseId, scope.groupId);
+  return resources.filter((resource) => visibleResourceIds.has(resource.id));
+}
+
+export async function deleteContentResource(user: CurrentUser, courseId: string, contentResourceId: string, scope: ContentScope = {}) {
+  await assertCanManageCourse(user, courseId);
+  const resource = await prisma.courseContentResource.findFirst({ where: { id: contentResourceId, courseId, ...scopeWhere(scope) } });
+  if (!resource) {
+    throw notFound("Course content resource");
+  }
+  await prisma.courseContentResource.delete({ where: { id: contentResourceId } });
+  return { ok: true };
+}
+
+export async function createContentResourceContentItem(user: CurrentUser, courseId: string, input: CreateContentResourceContentItemInput) {
+  await assertCanManageCourse(user, courseId);
+  const scope = normalizeScope(input);
+  await assertValidScope(prisma, courseId, scope.groupId);
+  await assertValidParent(prisma, courseId, input.parentId);
+  const resource = await prisma.courseContentResource.findFirst({
+    where: { id: input.contentResourceId, courseId, groupId: scope.groupId },
+    select: { id: true, title: true }
+  });
+  if (!resource) {
+    throw notFound("Course content resource");
+  }
+
+  return prisma.courseContentItem.create({
+    data: {
+      courseId,
+      groupId: scope.groupId,
+      parentId: input.parentId ?? null,
+      kind: "content",
+      titleSnapshot: input.titleSnapshot ?? resource.title,
+      position: await resolvePosition(prisma, courseId, scope.groupId, input.parentId, input.position),
+      isVisible: input.isVisible ?? true,
+      contentResourceId: resource.id,
+      metadata: toJson(input.metadata)
+    }
+  });
+}
+
+export async function createPluginContentResource(user: CurrentUser, courseId: string, input: CreatePluginContentResourceInput) {
+  await assertCanManageCourse(user, courseId);
+  const scope = normalizeScope(input);
+  await assertValidScope(prisma, courseId, scope.groupId);
+  await assertValidParent(prisma, courseId, input.parentId);
+  await assertContentTypePluginEnabled(input.contentTypeKey);
+
+  const plugin = getContentTypePluginForType(input.contentTypeKey);
+  const serverPlugin = plugin ? getServerContentTypePlugin(plugin.key) : null;
+  const create = serverPlugin?.handlers?.create;
+  if (!plugin || !serverPlugin || !create) {
+    throw new AppError(400, "CONTENT_TYPE_CREATE_UNAVAILABLE", "This content type does not support generic creation yet.");
+  }
+
+  const result = await create({
+    user,
+    courseId,
+    groupId: scope.groupId,
+    contentTypeKey: input.contentTypeKey,
+    payload: input.payload ?? {}
+  });
+
+  return prisma.$transaction(async (transaction) => {
+    const resource = await transaction.courseContentResource.create({
+      data: {
+        courseId,
+        groupId: scope.groupId,
+        contentTypeKey: assertPluginKey(input.contentTypeKey, "contentTypeKey"),
+        pluginKey: plugin.key,
+        title: assertTitle(result.title),
+        metadata: toJson(result.metadata)
+      }
+    });
+    const contentItem = await transaction.courseContentItem.create({
+      data: {
+        courseId,
+        groupId: scope.groupId,
+        parentId: input.parentId ?? null,
+        kind: "content",
+        titleSnapshot: resource.title,
+        position: await resolvePosition(transaction, courseId, scope.groupId, input.parentId, input.position),
+        isVisible: input.isVisible ?? true,
+        contentResourceId: resource.id,
+        metadata: toJson(input.itemMetadata)
+      }
+    });
+    return { resource, contentItem };
+  });
+}
+
+export async function updatePluginContentResource(
+  user: CurrentUser,
+  courseId: string,
+  contentResourceId: string,
+  input: UpdatePluginContentResourceInput,
+  scope: ContentScope = {}
+) {
+  const resource = await getContentResourceForPluginRoute(user, courseId, contentResourceId, scope);
+  await assertCanManageCourse(user, courseId);
+  const serverPlugin = getServerContentTypePlugin(resource.pluginKey);
+  const update = serverPlugin?.handlers?.update;
+  if (!serverPlugin || !update) {
+    throw new AppError(400, "CONTENT_TYPE_UPDATE_UNAVAILABLE", "This content type does not support generic updates yet.");
+  }
+  const result = await update({ user, resource: toServerResourceRecord(resource), payload: input.payload ?? {} });
+  return updateContentResource(
+    user,
+    courseId,
+    contentResourceId,
+    {
+      ...(result.title !== undefined ? { title: result.title } : {}),
+      ...(result.metadata !== undefined ? { metadata: result.metadata } : {})
+    },
+    scope
+  );
+}
+
+export async function deletePluginContentResource(user: CurrentUser, courseId: string, contentResourceId: string, scope: ContentScope = {}) {
+  const resource = await getContentResourceForPluginRoute(user, courseId, contentResourceId, scope);
+  await assertCanManageCourse(user, courseId);
+  const serverPlugin = getServerContentTypePlugin(resource.pluginKey);
+  const remove = serverPlugin?.handlers?.delete;
+  if (remove) {
+    await remove({ user, resource: toServerResourceRecord(resource) });
+  }
+  return deleteContentResource(user, courseId, contentResourceId, scope);
+}
+
+export async function getContentResourceEmbeddingSource(
+  user: CurrentUser,
+  courseId: string,
+  contentResourceId: string,
+  options: ContentScope & { enforceVisibility?: boolean } = {}
+): Promise<ContentEmbeddingSource> {
+  const resource = await getContentResourceForPluginRoute(user, courseId, contentResourceId, options);
+  const serverPlugin = getServerContentTypePlugin(resource.pluginKey);
+  const getEmbeddingSource = serverPlugin?.handlers?.getEmbeddingSource;
+  if (!serverPlugin || !getEmbeddingSource) {
+    return { kind: "none", sourceId: resource.id };
+  }
+  return getEmbeddingSource({ resource: toServerResourceRecord(resource) });
+}
+
+export async function getContentResourceForPluginRoute(
+  user: CurrentUser,
+  courseId: string,
+  contentResourceId: string,
+  options: ContentScope & { enforceVisibility?: boolean } = {}
+) {
+  await assertCanViewCourse(user, courseId);
+  const scope = normalizeScope(options);
+  await assertValidScope(prisma, courseId, scope.groupId);
+
+  const resource = await prisma.courseContentResource.findFirst({
+    where: {
+      id: contentResourceId,
+      courseId,
+      ...(scope.groupId ? { OR: [{ groupId: null }, { groupId: scope.groupId }] } : { groupId: null })
+    }
+  });
+  if (!resource) {
+    throw notFound("Course content resource");
+  }
+  await assertContentResourcePluginActive(resource.pluginKey);
+
+  const mustEnforceVisibility = options.enforceVisibility ?? !(await canManageCourse(user, courseId));
+  if (mustEnforceVisibility) {
+    await assertContentResourceVisible(courseId, contentResourceId, scope.groupId);
+  }
+
+  return resource;
 }
 
 export async function createActivityContentItem(user: CurrentUser, courseId: string, input: CreateActivityContentItemInput) {
@@ -346,10 +613,61 @@ function addEffectiveVisibility<T extends { id: string; parentId: string | null;
   }));
 }
 
+async function assertContentResourceVisible(courseId: string, contentResourceId: string, groupId: string | null) {
+  const visibleResourceIds = await getVisibleContentResourceIds(courseId, groupId);
+  if (!visibleResourceIds.has(contentResourceId)) {
+    throw new AppError(404, "CONTENT_RESOURCE_NOT_AVAILABLE", "This content resource is not available.");
+  }
+}
+
+async function getVisibleContentResourceIds(courseId: string, groupId: string | null) {
+  const items = await prisma.courseContentItem.findMany({
+    where: {
+      courseId,
+      ...(groupId ? { OR: [{ groupId: null }, { groupId }] } : { groupId: null })
+    },
+    orderBy: [{ parentId: "asc" }, { position: "asc" }, { createdAt: "asc" }]
+  });
+  const visibleItems = addEffectiveVisibility(items);
+  return new Set(
+    visibleItems
+      .filter((item) => item.contentResourceId && item.effectiveVisibility === "visible")
+      .map((item) => item.contentResourceId as string)
+  );
+}
+
+function toServerResourceRecord(resource: {
+  id: string;
+  courseId: string;
+  groupId: string | null;
+  contentTypeKey: string;
+  pluginKey: string;
+  title: string;
+  metadata: unknown;
+}) {
+  return {
+    id: resource.id,
+    courseId: resource.courseId,
+    groupId: resource.groupId,
+    contentTypeKey: resource.contentTypeKey,
+    pluginKey: resource.pluginKey,
+    title: resource.title,
+    metadata: (resource.metadata as Record<string, unknown> | null) ?? undefined
+  };
+}
+
 function assertTitle(title: string) {
   const normalized = title.trim();
   if (!normalized) {
     throw new AppError(400, "CONTENT_TITLE_REQUIRED", "Content folders require a title.");
+  }
+  return normalized;
+}
+
+function assertPluginKey(value: string, field: string) {
+  const normalized = value.trim();
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(normalized)) {
+    throw new AppError(400, "INVALID_CONTENT_PLUGIN_KEY", `${field} must be a plugin key.`);
   }
   return normalized;
 }

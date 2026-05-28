@@ -96,6 +96,13 @@ export const ActivityPluginInstallationUpdateSchema = z.union([
 ]);
 export type ActivityPluginInstallationUpdate = z.infer<typeof ActivityPluginInstallationUpdateSchema>;
 
+export const ContentTypePluginInstallationUpdateSchema = z.union([
+  z.object({ action: z.literal("activate"), restoreBackupId: z.string().cuid().optional().nullable() }),
+  z.object({ action: z.literal("deactivate") }),
+  z.object({ isEnabled: z.boolean() })
+]);
+export type ContentTypePluginInstallationUpdate = z.infer<typeof ContentTypePluginInstallationUpdateSchema>;
+
 export const CourseInputSchema = z.object({
   subjectId: RecordIdSchema,
   title: z.string().min(2).max(160),

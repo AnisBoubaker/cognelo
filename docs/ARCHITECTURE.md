@@ -8,7 +8,7 @@ Cognelo is a modular intelligent tutoring system for programming education.
 - **PostgreSQL + Prisma** for relational integrity, explicit migrations, and future research-friendly querying.
 - **JWT in HttpOnly cookies** for secure browser auth in the MVP, with space for refresh tokens, SSO, invitations, and password reset flows later.
 - **Zod contracts** shared between frontend and backend for DTO validation and stable API expectations.
-- **Activity registry package** for plugin-style activity registration without coupling activity business logic to subjects, banks, or courses.
+- **Activity and content type registry packages** for plugin-style registration without coupling activity or non-activity content behavior to subjects, banks, courses, or the content tree.
 
 ## Monorepo Layout
 
@@ -18,10 +18,14 @@ apps/
   web/                 Next.js frontend application
 packages/
   activity-sdk/        Activity type contract and registry
+  content-type-sdk/    Content type plugin contracts and registry
   config/              Environment loading and validation
   contracts/           Shared DTO schemas and TypeScript types
   core/                Auth, authorization, subject, bank, course, material, activity services
   db/                  Prisma schema, migrations, seed, Prisma client
+  plugin-activities/   Activity plugin packages
+  plugin-content-types/
+                       Non-activity content type plugin packages
 docs/
   ARCHITECTURE.md      Architecture memory for future sessions
 ```
@@ -34,7 +38,8 @@ docs/
 - **Subjects** own reusable curriculum context and subject-level material.
 - **Activity banks** own reusable activity authoring and version history for a subject.
 - **Courses** own course lifecycle, course-local material, and course-local copies of bank activities.
-- **Course materials** are generic records with typed metadata and JSON payloads.
+- **Course content resources** are plugin-backed non-activity resources such as GitHub repos, files, and text notes.
+- **Course materials** are legacy generic records retained for compatibility while new non-activity content moves to content type plugins.
 - **Sections** are currently implemented by `CourseGroup` records and own participants plus activity availability windows. The product language should move toward "section"; the generic word "group" is reserved for future concepts.
 - **Activities** are typed course-local activity copies and delegate behavior to registered activity modules.
 
@@ -49,7 +54,9 @@ Subject
     BankActivity
       ActivityVersion
   Course
-    CourseMaterial
+    CourseContentItem folder tree
+    CourseContentResource
+    CourseMaterial (legacy compatibility)
     Activity
     Section/CourseGroup
       participants
@@ -75,3 +82,43 @@ To add a new activity type:
 5. If the plugin has private bank-owned data, add a server plugin hook to copy that data when a bank version becomes a course activity.
 
 No course table rewrite is required.
+
+## Content Type Extensibility
+
+Content type plugins are the sibling system for non-activity course content. They are registered through `packages/content-type-sdk` and implemented under `packages/plugin-content-types/*`.
+
+Core owns:
+
+- `CourseContentItem` for folder placement, ordering, nesting, and visibility
+- `CourseContentResource` for the generic resource row
+- `ContentTypePluginInstallation` and `ContentTypePluginTableBackup` for activation, enablement, and backup state
+- generic course/group content resource API routes and plugin dispatch
+
+Content type plugins own:
+
+- picker metadata, localized labels, icons, and default titles
+- create/update/delete validation
+- settings and viewer components registered by renderer key
+- plugin routes such as file upload/download
+- storage details and plugin-owned tables when generic metadata is not enough
+- `getEmbeddingSource` handlers for future indexing
+
+Enabled content type plugins can be selected for new content resources. Active but disabled plugins can still serve existing resources. Inactive or unavailable plugins are blocked at dispatch and existing content rows render as unavailable.
+
+The current content type plugins are:
+
+- `packages/plugin-content-types/plugin-github-repo`
+- `packages/plugin-content-types/plugin-file`
+- `packages/plugin-content-types/plugin-text`
+
+Embedding readiness is deliberately generic. Core exposes `getContentResourceEmbeddingSource`, which dispatches to the owning content type plugin and returns one of:
+
+```ts
+type ContentEmbeddingSource =
+  | { kind: "text"; text: string; sourceId: string }
+  | { kind: "file"; fileRef: string; mimeType?: string; sourceId: string }
+  | { kind: "external_url"; url: string; sourceId: string }
+  | { kind: "none"; sourceId: string };
+```
+
+There is no embeddings/index database yet. Future activity generation should ask a generic indexing service for relevant course context; it should not import concrete content type plugins directly.

@@ -1,9 +1,10 @@
 "use client";
 
 import { MarkdownRenderer } from "@cognelo/activity-ui";
+import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { CSSProperties, ChangeEvent, FocusEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
+import { CSSProperties, FocusEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
@@ -19,6 +20,7 @@ import {
   CourseGroup,
   CourseGroupMaterial,
   CourseContentItem,
+  CourseContentResource,
   CourseMaterial,
   GradebookStatus,
   GroupParticipant,
@@ -26,8 +28,8 @@ import {
   StudentGradeFeedback,
   StudentReleasedGrades
 } from "@/lib/api";
+import { ContentTypeIcon as MaterialTypeIcon } from "@/lib/content-type-renderers";
 import { useI18n } from "@/lib/i18n";
-import { materialIconName, type MaterialTypeIconName } from "@/lib/material-types";
 
 type ContentDropPlacement = "after" | "before" | "inside";
 type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
@@ -44,6 +46,9 @@ export default function CourseGroupPage() {
   const [group, setGroup] = useState<CourseGroup | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
+  const [contentTypeDefinitions, setContentTypeDefinitions] = useState<ContentTypeDefinition[]>([]);
+  const [activeContentTypeDefinitions, setActiveContentTypeDefinitions] = useState<ContentTypeDefinition[]>([]);
+  const [contentResources, setContentResources] = useState<CourseContentResource[]>([]);
   const [contentItems, setContentItems] = useState<CourseContentItem[]>([]);
   const [contentLoaded, setContentLoaded] = useState(false);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
@@ -57,22 +62,9 @@ export default function CourseGroupPage() {
   const [groupAvailableFrom, setGroupAvailableFrom] = useState("");
   const [groupAvailableUntil, setGroupAvailableUntil] = useState("");
   const [savingGroup, setSavingGroup] = useState(false);
-  const [isAddingGroupMaterial, setIsAddingGroupMaterial] = useState(false);
-  const [groupMaterialMode, setGroupMaterialMode] = useState<"folder" | "github_repo" | "file">("github_repo");
-  const [groupMaterialTitle, setGroupMaterialTitle] = useState("");
-  const [groupMaterialParentId, setGroupMaterialParentId] = useState("");
-  const [groupGithubUrl, setGroupGithubUrl] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
-  const [editMaterialTitle, setEditMaterialTitle] = useState("");
-  const [editMaterialUrl, setEditMaterialUrl] = useState("");
-  const [draggingMaterialId, setDraggingMaterialId] = useState<string | null>(null);
   const [draggingContentItemId, setDraggingContentItemId] = useState<string | null>(null);
   const [dragPreview, setDragPreview] = useState<{ title: string; x: number; y: number } | null>(null);
-  const [dropTarget, setDropTarget] = useState<{ id: string; type: "material" | "root" } | null>(null);
   const [contentDropTarget, setContentDropTarget] = useState<ContentDropTarget | null>(null);
-  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(new Set());
-  const [collapsedCourseFolderIds, setCollapsedCourseFolderIds] = useState<Set<string>>(new Set());
   const [collapsedContentFolderIds, setCollapsedContentFolderIds] = useState<Set<string>>(new Set());
   const [openStudentRootFolderIds, setOpenStudentRootFolderIds] = useState<Set<string>>(new Set());
   const [studentAccordionStateLoaded, setStudentAccordionStateLoaded] = useState(false);
@@ -105,11 +97,7 @@ export default function CourseGroupPage() {
   const [savingParticipant, setSavingParticipant] = useState(false);
   const [removingParticipantId, setRemovingParticipantId] = useState<string | null>(null);
   const [savingAssignmentId, setSavingAssignmentId] = useState<string | null>(null);
-  const [savingCourseMaterialVisibilityId, setSavingCourseMaterialVisibilityId] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [materialError, setMaterialError] = useState("");
-  const [materialActionError, setMaterialActionError] = useState("");
-  const [courseMaterialVisibilityError, setCourseMaterialVisibilityError] = useState("");
   const [assignmentError, setAssignmentError] = useState("");
   const [contentActionError, setContentActionError] = useState("");
 
@@ -133,8 +121,15 @@ export default function CourseGroupPage() {
     setActivityDefinitions(typeResult.registeredDefinitions);
     const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
     const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher";
-    const contentResult = await api.groupContent(courseId, groupId, { visibleOnly: !userCanManage });
+    const [contentResult, contentTypesResult, contentResourcesResult] = await Promise.all([
+      api.groupContent(courseId, groupId, { visibleOnly: !userCanManage }),
+      api.courseContentTypes(courseId),
+      api.groupContentResources(courseId, groupId)
+    ]);
     setContentItems(contentResult.contentItems);
+    setContentTypeDefinitions(contentTypesResult.contentTypes);
+    setActiveContentTypeDefinitions(contentTypesResult.activeContentTypes ?? contentTypesResult.contentTypes);
+    setContentResources(contentResourcesResult.resources);
     setContentLoaded(true);
     if (userCanManage) {
       const gradebookResult = await api.courseGradebook(courseId, {
@@ -191,14 +186,7 @@ export default function CourseGroupPage() {
   }
 
   const materials = group?.materials ?? [];
-  const folders = materials.filter((material) => material.kind === "folder").sort(compareMaterials);
-  const visibleMaterials = flattenMaterials(materials, collapsedFolderIds);
   const courseMaterials = course?.materials ?? [];
-  const hiddenCourseMaterialIds = new Set(group?.hiddenCourseMaterialIds ?? []);
-  const visibleCourseMaterials = flattenMaterials(courseMaterials, collapsedCourseFolderIds);
-  const displayedCourseMaterials = canManage
-    ? visibleCourseMaterials
-    : visibleCourseMaterials.filter(({ material }) => !getHiddenMaterialState(courseMaterials, hiddenCourseMaterialIds, material.id).effectivelyHidden);
   const assignedActivities = group?.activities ?? [];
   const contentFolders = contentItems.filter((item) => item.kind === "folder").sort(compareContentItems);
   const visibleContentItems = flattenContentItems(contentItems, collapsedContentFolderIds);
@@ -210,6 +198,8 @@ export default function CourseGroupPage() {
   const studentContentReady = Boolean(course && group && contentLoaded);
   const courseMaterialById = new Map(courseMaterials.map((material) => [material.id, material]));
   const groupMaterialById = new Map(materials.map((material) => [material.id, material]));
+  const contentResourceById = new Map(contentResources.map((resource) => [resource.id, resource]));
+  const contentTypeByKey = new Map(activeContentTypeDefinitions.map((definition) => [definition.key, definition]));
   const courseActivityById = new Map((course?.activities ?? []).map((activity) => [activity.id, activity]));
   const assignmentById = new Map(assignedActivities.map((assignment) => [assignment.id, assignment]));
   const releasedGradeByActivityId = new Map(
@@ -272,6 +262,11 @@ export default function CourseGroupPage() {
     const isRootAccordionFolder = Boolean(options.isRootAccordionFolder);
     const isCollapsed = isRootAccordionFolder ? !openStudentRootFolderIds.has(item.id) : collapsedContentFolderIds.has(item.id);
     const material = item.materialId ? courseMaterialById.get(item.materialId) ?? groupMaterialById.get(item.materialId) : null;
+    const materialIsDownloadable = material ? legacyMaterialHasStoredFile(material) : false;
+    const contentResource = item.contentResourceId ? contentResourceById.get(item.contentResourceId) : null;
+    const contentResourceIsFile = contentResource
+      ? contentTypeByKey.get(contentResource.contentTypeKey)?.embeddingSource === "file_upload"
+      : false;
     const assignment = item.courseGroupActivityId ? assignmentById.get(item.courseGroupActivityId) : null;
     const courseActivity = item.activityId ? courseActivityById.get(item.activityId) : null;
     const activityTypeKey = assignment?.activity.activityType.key ?? courseActivity?.activityType.key ?? null;
@@ -336,9 +331,13 @@ export default function CourseGroupPage() {
             ) : href && isOpenable && material ? (
               <a
                 href={href}
-                rel={material.kind !== "file" ? "noreferrer" : undefined}
-                target={material.kind !== "file" ? "_blank" : undefined}
+                rel={materialIsDownloadable ? undefined : "noreferrer"}
+                target={materialIsDownloadable ? undefined : "_blank"}
               >
+                {title}
+              </a>
+            ) : href && isOpenable && contentResource ? (
+              <a href={href} rel={contentResourceIsFile ? undefined : "noreferrer"} target={contentResourceIsFile ? undefined : "_blank"}>
                 {title}
               </a>
             ) : href && isOpenable ? (
@@ -367,14 +366,25 @@ export default function CourseGroupPage() {
           {href && isOpenable ? (
             material ? (
               <a
-                aria-label={t(material.kind === "file" ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial", { title })}
+                aria-label={t(materialIsDownloadable ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial", { title })}
                 className="button secondary icon-button"
                 href={href}
-                rel={material.kind === "file" ? undefined : "noreferrer"}
-                target={material.kind === "file" ? undefined : "_blank"}
-                title={t(material.kind === "file" ? "common.download" : "common.open")}
+                rel={materialIsDownloadable ? undefined : "noreferrer"}
+                target={materialIsDownloadable ? undefined : "_blank"}
+                title={t(materialIsDownloadable ? "common.download" : "common.open")}
               >
-                <MaterialActionIcon name={material.kind === "file" ? "download" : "open"} />
+                <MaterialActionIcon name={materialIsDownloadable ? "download" : "open"} />
+              </a>
+            ) : contentResource ? (
+              <a
+                aria-label={t(contentResourceIsFile ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial", { title })}
+                className="button secondary icon-button"
+                href={href}
+                rel={contentResourceIsFile ? undefined : "noreferrer"}
+                target={contentResourceIsFile ? undefined : "_blank"}
+                title={t(contentResourceIsFile ? "common.download" : "common.open")}
+              >
+                <MaterialActionIcon name={contentResourceIsFile ? "download" : "open"} />
               </a>
             ) : (
               <Link aria-label={t("courseDetail.openContentItem", { title })} className="button secondary icon-button" href={href} title={t("common.open")}>
@@ -514,55 +524,20 @@ export default function CourseGroupPage() {
     };
   }
 
-  function nextMaterialPosition(parentId: string | null) {
-    return materials.filter((material) => (material.parentId ?? null) === parentId).length;
-  }
-
   function groupMaterialHref(material: CourseGroupMaterial) {
-    if (material.kind === "file") {
+    if (legacyMaterialHasStoredFile(material)) {
       return withDownloadVersion(api.groupMaterialDownloadUrl(courseId, groupId, material.id), material);
     }
     return material.url ?? undefined;
   }
 
-  function materialDetail(material: CourseGroupMaterial) {
-    const originalName = typeof material.metadata?.originalName === "string" ? material.metadata.originalName : undefined;
-    const size = typeof material.metadata?.size === "number" ? formatBytes(material.metadata.size) : undefined;
-    if (originalName && size) {
-      return `${originalName} · ${size}`;
-    }
-    return originalName || material.url || material.body || t("courseDetail.metadataOnly");
-  }
-
   function courseMaterialHref(material: CourseMaterial) {
-    if (material.kind === "file") {
+    if (legacyMaterialHasStoredFile(material)) {
       return withDownloadVersion(api.groupCourseMaterialDownloadUrl(courseId, groupId, material.id), material);
     }
     return material.url ?? undefined;
   }
 
-  function courseMaterialDetail(material: CourseMaterial) {
-    const originalName = typeof material.metadata?.originalName === "string" ? material.metadata.originalName : undefined;
-    const size = typeof material.metadata?.size === "number" ? formatBytes(material.metadata.size) : undefined;
-    if (originalName && size) {
-      return `${originalName} · ${size}`;
-    }
-    return originalName || material.url || material.body || t("courseDetail.metadataOnly");
-  }
-
-  function resetGroupMaterialForm() {
-    setGroupMaterialMode("github_repo");
-    setGroupMaterialTitle("");
-    setGroupMaterialParentId("");
-    setGroupGithubUrl("");
-    setSelectedFile(null);
-    setMaterialError("");
-  }
-
-  function closeGroupMaterialForm() {
-    resetGroupMaterialForm();
-    setIsAddingGroupMaterial(false);
-  }
 
   function resetParticipantForm() {
     setParticipantRole("student");
@@ -578,51 +553,6 @@ export default function CourseGroupPage() {
   function closeParticipantForm() {
     resetParticipantForm();
     setIsAddingParticipant(false);
-  }
-
-  async function createGroupMaterial(event: FormEvent) {
-    event.preventDefault();
-    setMaterialError("");
-
-    try {
-      const parentId = groupMaterialParentId || null;
-      const position = nextMaterialPosition(parentId);
-
-      if (groupMaterialMode === "folder") {
-        await api.createGroupMaterial(courseId, groupId, {
-          title: groupMaterialTitle || t("courseDetail.defaultFolderTitle"),
-          kind: "folder",
-          parentId,
-          metadata: {},
-          position
-        });
-      } else if (groupMaterialMode === "github_repo") {
-        await api.createGroupMaterial(courseId, groupId, {
-          title: groupMaterialTitle || t("courseDetail.defaultRepoTitle"),
-          kind: "github_repo",
-          parentId,
-          url: groupGithubUrl,
-          metadata: { source: "github" },
-          position
-        });
-      } else {
-        if (!selectedFile) {
-          setMaterialError(t("courseDetail.chooseFile"));
-          return;
-        }
-        await api.uploadGroupMaterial(courseId, groupId, {
-          title: groupMaterialTitle || selectedFile.name,
-          file: selectedFile,
-          parentId,
-          position
-        });
-      }
-
-      await refresh();
-      closeGroupMaterialForm();
-    } catch (err) {
-      setMaterialError(err instanceof Error ? err.message : t("groupPage.materialCreateError"));
-    }
   }
 
   async function saveGroupSettings(event: FormEvent) {
@@ -641,225 +571,6 @@ export default function CourseGroupPage() {
       setError(err instanceof Error ? err.message : t("groupPage.groupSaveError"));
     } finally {
       setSavingGroup(false);
-    }
-  }
-
-  function chooseFile(event: ChangeEvent<HTMLInputElement>) {
-    setSelectedFile(event.target.files?.[0] ?? null);
-  }
-
-  function startEditingMaterial(material: CourseGroupMaterial) {
-    setMaterialActionError("");
-    setEditingMaterialId(material.id);
-    setEditMaterialTitle(material.title);
-    setEditMaterialUrl(material.url ?? "");
-  }
-
-  async function saveMaterialEdit(material: CourseGroupMaterial) {
-    setMaterialActionError("");
-    try {
-      await api.updateGroupMaterial(courseId, groupId, material.id, {
-        kind: material.kind,
-        title: editMaterialTitle,
-        url: material.kind === "github_repo" ? editMaterialUrl : undefined
-      });
-      setEditingMaterialId(null);
-      await refresh();
-    } catch (err) {
-      setMaterialActionError(err instanceof Error ? err.message : t("groupPage.materialUpdateError"));
-    }
-  }
-
-  async function removeMaterial(material: CourseGroupMaterial) {
-    const confirmed = window.confirm(t("groupPage.removeMaterialConfirm", { title: material.title }));
-    if (!confirmed) {
-      return;
-    }
-
-    setMaterialActionError("");
-    try {
-      await api.deleteGroupMaterial(courseId, groupId, material.id);
-      if (editingMaterialId === material.id) {
-        setEditingMaterialId(null);
-      }
-      await refresh();
-    } catch (err) {
-      setMaterialActionError(err instanceof Error ? err.message : t("groupPage.materialDeleteError"));
-    }
-  }
-
-  async function moveMaterialAfterTarget(dragged: CourseGroupMaterial, target: CourseGroupMaterial) {
-    const nextParentId = target.parentId ?? null;
-    const siblings = materials
-      .filter((material) => material.id !== dragged.id && (material.parentId ?? null) === nextParentId)
-      .sort(compareMaterials);
-    const targetIndex = siblings.findIndex((material) => material.id === target.id);
-    siblings.splice(targetIndex + 1, 0, { ...dragged, parentId: nextParentId });
-
-    await Promise.all(
-      siblings.map((material, index) =>
-        api.updateGroupMaterial(courseId, groupId, material.id, {
-          parentId: nextParentId,
-          position: index
-        })
-      )
-    );
-  }
-
-  async function moveMaterialIntoFolder(dragged: CourseGroupMaterial, folder: CourseGroupMaterial) {
-    await api.updateGroupMaterial(courseId, groupId, dragged.id, {
-      parentId: folder.id,
-      position: nextMaterialPosition(folder.id)
-    });
-  }
-
-  async function moveMaterialToRoot(dragged: CourseGroupMaterial) {
-    await api.updateGroupMaterial(courseId, groupId, dragged.id, {
-      parentId: null,
-      position: nextMaterialPosition(null)
-    });
-  }
-
-  async function moveMaterialSafely(action: () => Promise<void>) {
-    try {
-      await action();
-      await refresh();
-    } catch (err) {
-      setMaterialActionError(err instanceof Error ? err.message : t("courseDetail.moveError"));
-    }
-  }
-
-  function handleMaterialPointerDown(material: CourseGroupMaterial, event: PointerEvent) {
-    if (event.button !== 0) {
-      return;
-    }
-    event.preventDefault();
-    setDraggingMaterialId(material.id);
-    setDragPreview({ title: material.title, x: event.clientX, y: event.clientY });
-
-    const movePreview = (moveEvent: globalThis.PointerEvent) => {
-      setDragPreview((current) => (current ? { ...current, x: moveEvent.clientX, y: moveEvent.clientY } : current));
-      setDropTarget(findDropTarget(moveEvent.clientX, moveEvent.clientY, material.id));
-    };
-
-    const finishDrag = async (upEvent: globalThis.PointerEvent) => {
-      window.removeEventListener("pointercancel", cancelDrag);
-      window.removeEventListener("pointermove", movePreview);
-      const dropElement = document.elementFromPoint(upEvent.clientX, upEvent.clientY);
-      setDraggingMaterialId(null);
-      setDragPreview(null);
-      setDropTarget(null);
-
-      if (dropElement?.closest("[data-root-drop='true']")) {
-        if (!material.parentId) {
-          return;
-        }
-        await moveMaterialSafely(() => moveMaterialToRoot(material));
-        return;
-      }
-
-      const targetElement = dropElement?.closest("[data-material-id]");
-      if (!(targetElement instanceof HTMLElement)) {
-        return;
-      }
-
-      const target = materials.find((candidate) => candidate.id === targetElement.dataset.materialId);
-      if (!target || target.id === material.id) {
-        return;
-      }
-
-      await moveMaterialSafely(async () => {
-        if (target.kind === "folder") {
-          if (isMaterialDescendant(materials, target.id, material.id)) {
-            setMaterialActionError(t("courseDetail.invalidFolderMove"));
-            return;
-          }
-          await moveMaterialIntoFolder(material, target);
-        } else {
-          await moveMaterialAfterTarget(material, target);
-        }
-      });
-    };
-
-    const cancelDrag = () => {
-      setDraggingMaterialId(null);
-      setDragPreview(null);
-      setDropTarget(null);
-      window.removeEventListener("pointerup", finishDrag);
-      window.removeEventListener("pointermove", movePreview);
-    };
-
-    window.addEventListener("pointermove", movePreview);
-    window.addEventListener("pointerup", finishDrag, { once: true });
-    window.addEventListener("pointercancel", cancelDrag, { once: true });
-  }
-
-  function findDropTarget(x: number, y: number, draggedId: string) {
-    const element = document.elementFromPoint(x, y);
-    if (element?.closest("[data-root-drop='true']")) {
-      return { id: "root", type: "root" as const };
-    }
-
-    const materialElement = element?.closest("[data-material-id]");
-    if (!(materialElement instanceof HTMLElement)) {
-      return null;
-    }
-
-    const targetId = materialElement.dataset.materialId;
-    if (!targetId || targetId === draggedId) {
-      return null;
-    }
-
-    return { id: targetId, type: "material" as const };
-  }
-
-  function toggleFolder(folderId: string) {
-    setCollapsedFolderIds((current) => {
-      const next = new Set(current);
-      if (next.has(folderId)) {
-        next.delete(folderId);
-      } else {
-        next.add(folderId);
-      }
-      return next;
-    });
-  }
-
-  function toggleCourseFolder(folderId: string) {
-    setCollapsedCourseFolderIds((current) => {
-      const next = new Set(current);
-      if (next.has(folderId)) {
-        next.delete(folderId);
-      } else {
-        next.add(folderId);
-      }
-      return next;
-    });
-  }
-
-  async function toggleCourseMaterialVisibility(material: CourseMaterial) {
-    if (!canManage) {
-      return;
-    }
-
-    const hiddenState = getHiddenMaterialState(courseMaterials, hiddenCourseMaterialIds, material.id);
-    if (hiddenState.hiddenByAncestor && !hiddenState.directlyHidden) {
-      return;
-    }
-
-    setCourseMaterialVisibilityError("");
-    setSavingCourseMaterialVisibilityId(material.id);
-    try {
-      if (hiddenState.directlyHidden) {
-        await api.unhideCourseMaterialInGroup(courseId, groupId, material.id);
-      } else {
-        await api.hideCourseMaterialInGroup(courseId, groupId, material.id);
-      }
-      await refresh();
-    } catch (err) {
-      setCourseMaterialVisibilityError(err instanceof Error ? err.message : t("groupPage.courseMaterialVisibilityError"));
-    } finally {
-      setSavingCourseMaterialVisibilityId(null);
     }
   }
 
@@ -926,6 +637,9 @@ export default function CourseGroupPage() {
   }
 
   function contentItemTitle(item: CourseContentItem) {
+    if (item.contentResourceId) {
+      return contentResourceById.get(item.contentResourceId)?.title ?? item.titleSnapshot ?? t("courseDetail.untitledMaterial");
+    }
     if (item.materialId) {
       return (
         courseMaterialById.get(item.materialId)?.title ??
@@ -943,9 +657,12 @@ export default function CourseGroupPage() {
     return item.titleSnapshot ?? t("courseDetail.untitledFolder");
   }
 
-  function contentItemMaterialIconName(item: CourseContentItem): MaterialTypeIconName {
-    const material = item.materialId ? courseMaterialById.get(item.materialId) ?? groupMaterialById.get(item.materialId) : null;
-    return materialIconName(material?.kind);
+  function contentItemMaterialIconName(item: CourseContentItem) {
+    if (item.contentResourceId) {
+      const resource = contentResourceById.get(item.contentResourceId);
+      return (resource ? contentTypeByKey.get(resource.contentTypeKey)?.icon : null) ?? "file";
+    }
+    return "file" as const;
   }
 
   function toggleContentFolder(folderId: string) {
@@ -973,6 +690,17 @@ export default function CourseGroupPage() {
     }
     if (item.materialId && groupMaterialById.has(item.materialId)) {
       return groupMaterialHref(groupMaterialById.get(item.materialId) as CourseGroupMaterial) ?? null;
+    }
+    if (item.contentResourceId && contentResourceById.has(item.contentResourceId)) {
+      const resource = contentResourceById.get(item.contentResourceId) as CourseContentResource;
+      const definition = contentTypeByKey.get(resource.contentTypeKey);
+      if (!definition) {
+        return null;
+      }
+      if (definition.embeddingSource === "file_upload" && typeof resource.metadata?.storedName === "string") {
+        return withDownloadVersion(api.groupContentResourceDownloadUrl(courseId, groupId, resource.id), resource);
+      }
+      return typeof resource.metadata?.url === "string" ? resource.metadata.url : null;
     }
     return null;
   }
@@ -1020,6 +748,10 @@ export default function CourseGroupPage() {
         await api.deleteGroupMaterial(courseId, item.groupId, item.materialId);
       } else if (item.materialId) {
         await api.deleteMaterial(courseId, item.materialId);
+      } else if (item.contentResourceId && item.groupId) {
+        await api.deleteGroupContentResource(courseId, item.groupId, item.contentResourceId);
+      } else if (item.contentResourceId) {
+        await api.deleteCourseContentResource(courseId, item.contentResourceId);
       } else {
         await deleteContentInScope(item);
       }
@@ -1717,6 +1449,10 @@ export default function CourseGroupPage() {
                           {visibleContentItems.map(({ item, depth }) => {
                             const title = contentItemTitle(item);
                             const href = contentItemHref(item);
+                            const contentResource = item.contentResourceId ? contentResourceById.get(item.contentResourceId) : null;
+                            const contentResourceDefinition = contentResource ? contentTypeByKey.get(contentResource.contentTypeKey) ?? null : null;
+                            const contentResourceIsUnavailable = Boolean(contentResource && !contentResourceDefinition);
+                            const contentResourceIsFile = contentResourceDefinition?.embeddingSource === "file_upload";
                             const isCollapsed = collapsedContentFolderIds.has(item.id);
                             const assignment = item.courseGroupActivityId ? assignmentById.get(item.courseGroupActivityId) : null;
                             const courseActivity = item.activityId ? courseActivityById.get(item.activityId) : null;
@@ -1746,7 +1482,12 @@ export default function CourseGroupPage() {
                                 </span>
                               ) : null,
                               assessmentMode ? <span className="metadata-badge" key="assessment-mode">{assessmentMode}</span> : null,
-                              availabilityLabel ? <span className="metadata-badge" key="availability">{availabilityLabel}</span> : null
+                              availabilityLabel ? <span className="metadata-badge" key="availability">{availabilityLabel}</span> : null,
+                              contentResourceIsUnavailable ? (
+                                <span className="metadata-badge is-warning" key="content-plugin-unavailable">
+                                  {t("courseDetail.contentPluginUnavailable")}
+                                </span>
+                              ) : null
                             ].filter(Boolean);
                             const isHidden = item.effectiveVisibility ? item.effectiveVisibility !== "visible" : !item.isVisible;
 
@@ -1797,11 +1538,33 @@ export default function CourseGroupPage() {
                                       )}
                                     </span>
                                   )}
-                                  <strong>{href ? <Link href={href}>{title}</Link> : title}</strong>
+                                  <strong>
+                                    {href && contentResource ? (
+                                      <a href={href} rel={contentResourceIsFile ? undefined : "noreferrer"} target={contentResourceIsFile ? undefined : "_blank"}>
+                                        {title}
+                                      </a>
+                                    ) : href ? (
+                                      <Link href={href}>{title}</Link>
+                                    ) : (
+                                      title
+                                    )}
+                                  </strong>
                                   {metadataBadges.length ? <span className="metadata-badges">{metadataBadges}</span> : null}
                                 </div>
                                 <div className="table-actions content-row-actions">
                                   {href ? (
+                                    contentResource ? (
+                                      <a
+                                        aria-label={t(contentResourceIsFile ? "courseDetail.downloadMaterial" : "courseDetail.openContentItem", { title })}
+                                        className="button secondary icon-button"
+                                        href={href}
+                                        rel={contentResourceIsFile ? undefined : "noreferrer"}
+                                        target={contentResourceIsFile ? undefined : "_blank"}
+                                        title={t(contentResourceIsFile ? "common.download" : "common.open")}
+                                      >
+                                        <MaterialActionIcon name={contentResourceIsFile ? "download" : "open"} />
+                                      </a>
+                                    ) : (
                                     <Link
                                       aria-label={t("courseDetail.openContentItem", { title })}
                                       className="button secondary icon-button"
@@ -1810,6 +1573,7 @@ export default function CourseGroupPage() {
                                     >
                                       <MaterialActionIcon name="open" />
                                     </Link>
+                                    )
                                   ) : (
                                     <span className="action-slot" aria-hidden="true" />
                                   )}
@@ -1842,369 +1606,6 @@ export default function CourseGroupPage() {
                       )}
                       {contentActionError ? <p className="error">{contentActionError}</p> : null}
                     </section>
-                  )
-                },
-                {
-                  id: "materials",
-                  label: t("groupPage.materialsTab"),
-                  render: () => (
-                    <div className="stack">
-                  <div className="section-heading">
-                    <div>
-                      <p className="eyebrow">{t("groupPage.materialsEyebrow")}</p>
-                      <h2>{t("groupPage.materialsTitle")}</h2>
-                      <p className="muted">{t("groupPage.materialsText")}</p>
-                    </div>
-                    {canManage ? (
-                      <button
-                        type="button"
-                        className="button secondary"
-                        onClick={() => {
-                          if (isAddingGroupMaterial) {
-                            closeGroupMaterialForm();
-                            return;
-                          }
-                          setMaterialError("");
-                          setIsAddingGroupMaterial(true);
-                        }}
-                      >
-                        {isAddingGroupMaterial ? t("common.cancel") : t("courseDetail.addMaterial")}
-                      </button>
-                    ) : null}
-                  </div>
-
-                  {canManage && isAddingGroupMaterial ? (
-                    <form className="form inline-panel" onSubmit={createGroupMaterial}>
-                      <div className="field">
-                        <label htmlFor="groupMaterialMode">{t("courseDetail.source")}</label>
-                        <select
-                          id="groupMaterialMode"
-                          value={groupMaterialMode}
-                          onChange={(event) => setGroupMaterialMode(event.target.value as typeof groupMaterialMode)}
-                        >
-                          <option value="folder">{t("materialKinds.folder")}</option>
-                          <option value="github_repo">{t("materialKinds.github_repo")}</option>
-                          <option value="file">{t("materialKinds.file")}</option>
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label htmlFor="groupMaterialParent">{t("courseDetail.location")}</label>
-                        <select
-                          id="groupMaterialParent"
-                          value={groupMaterialParentId}
-                          onChange={(event) => setGroupMaterialParentId(event.target.value)}
-                        >
-                          <option value="">{t("courseDetail.topLevel")}</option>
-                          {folders.map((folder) => (
-                            <option key={folder.id} value={folder.id}>
-                              {folder.title}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label htmlFor="groupMaterialTitle">{t("courseDetail.activityTitle")}</label>
-                        <input
-                          id="groupMaterialTitle"
-                          value={groupMaterialTitle}
-                          onChange={(event) => setGroupMaterialTitle(event.target.value)}
-                          placeholder={
-                            groupMaterialMode === "file"
-                              ? t("courseDetail.fileTitlePlaceholder")
-                              : groupMaterialMode === "folder"
-                                ? t("courseDetail.folderTitlePlaceholder")
-                                : t("courseDetail.repoTitlePlaceholder")
-                          }
-                        />
-                      </div>
-                      {groupMaterialMode === "folder" ? null : groupMaterialMode === "github_repo" ? (
-                        <div className="field" key="group-github-repo-material">
-                          <label htmlFor="groupGithubUrl">{t("courseDetail.githubUrl")}</label>
-                          <input
-                            key="groupGithubUrl"
-                            id="groupGithubUrl"
-                            type="url"
-                            value={groupGithubUrl}
-                            onChange={(event) => setGroupGithubUrl(event.target.value)}
-                            placeholder="https://github.com/org/repo"
-                            required
-                          />
-                        </div>
-                      ) : (
-                        <div className="field" key="group-file-material">
-                          <label htmlFor="groupMaterialFile">{t("courseDetail.file")}</label>
-                          <input key="groupMaterialFile" id="groupMaterialFile" type="file" onChange={chooseFile} required />
-                          <p className="muted">{t("courseDetail.maxFileSize")}</p>
-                        </div>
-                      )}
-                      {materialError ? <p className="error">{materialError}</p> : null}
-                      <div className="row">
-                        <button type="submit">{t("groupPage.addMaterial")}</button>
-                        <button type="button" className="button secondary" onClick={closeGroupMaterialForm}>
-                          {t("common.cancel")}
-                        </button>
-                      </div>
-                    </form>
-                  ) : null}
-
-                  {visibleMaterials.length ? (
-                    <div className="table-list">
-                      <div className="table-row table-head" aria-hidden="true">
-                        <span>{t("courseDetail.titleHeader")}</span>
-                        <span>{t("courseDetail.typeHeader")}</span>
-                        <span>{t("courseDetail.sourceHeader")}</span>
-                        <span>{t("courseDetail.actionsHeader")}</span>
-                      </div>
-                      <div
-                        className={`root-drop-zone ${draggingMaterialId ? "is-active" : ""} ${
-                          dropTarget?.type === "root" ? "is-drop-target" : ""
-                        }`}
-                        data-root-drop="true"
-                      >
-                        {t("courseDetail.moveToTopLevel")}
-                      </div>
-                      {visibleMaterials.map(({ material, depth }) => {
-                        const href = groupMaterialHref(material);
-                        const isEditing = editingMaterialId === material.id;
-                        const isCollapsed = collapsedFolderIds.has(material.id);
-                        return (
-                          <div key={material.id}>
-                            <div
-                              className={`table-row ${draggingMaterialId === material.id ? "is-dragging" : ""} ${
-                                dropTarget?.type === "material" && dropTarget.id === material.id ? "is-drop-target" : ""
-                              }`}
-                              data-material-id={material.id}
-                            >
-                              <div className="table-main material-title" style={{ paddingLeft: `${depth * 22}px` }}>
-                                {canManage ? (
-                                  <span
-                                    aria-label={t("courseDetail.dragMaterial", { title: material.title })}
-                                    className="drag-handle"
-                                    role="button"
-                                    tabIndex={0}
-                                    title={t("courseDetail.dragToMove")}
-                                    onPointerDown={(event) => handleMaterialPointerDown(material, event)}
-                                  >
-                                    <MaterialActionIcon name="drag" />
-                                  </span>
-                                ) : null}
-                                {material.kind === "folder" ? (
-                                  <button
-                                    aria-expanded={!isCollapsed}
-                                    aria-label={t(isCollapsed ? "courseDetail.expandFolder" : "courseDetail.collapseFolder", {
-                                      title: material.title
-                                    })}
-                                    className="material-glyph"
-                                    title={t(isCollapsed ? "courseDetail.expandFolderTitle" : "courseDetail.collapseFolderTitle")}
-                                    type="button"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      toggleFolder(material.id);
-                                    }}
-                                  >
-                                    {isCollapsed ? "[+]" : "[-]"}
-                                  </button>
-                                ) : (
-                                  <span className="material-glyph material-glyph-static">-</span>
-                                )}
-                                <strong>{material.title}</strong>
-                              </div>
-                              <span className="eyebrow">{t(`materialKinds.${material.kind}`)}</span>
-                              <span className="table-meta muted">{materialDetail(material)}</span>
-                              <div className="table-actions">
-                                {href ? (
-                                  <a
-                                    aria-label={t(
-                                      material.kind === "file" ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial",
-                                      { title: material.title }
-                                    )}
-                                    className="button secondary icon-button"
-                                    href={href}
-                                    rel={material.kind === "file" ? undefined : "noreferrer"}
-                                    target={material.kind === "file" ? undefined : "_blank"}
-                                    title={t(material.kind === "file" ? "common.download" : "common.open")}
-                                  >
-                                    <MaterialActionIcon name={material.kind === "file" ? "download" : "open"} />
-                                  </a>
-                                ) : null}
-                                {canManage ? (
-                                  <>
-                                    <button
-                                      aria-label={t("courseDetail.editMaterial", { title: material.title })}
-                                      className="secondary icon-button"
-                                      title={t("common.edit")}
-                                      type="button"
-                                      onClick={() => startEditingMaterial(material)}
-                                    >
-                                      <MaterialActionIcon name="edit" />
-                                    </button>
-                                    <button
-                                      aria-label={t("courseDetail.removeMaterial", { title: material.title })}
-                                      className="danger icon-button"
-                                      title={t("common.remove")}
-                                      type="button"
-                                      onClick={() => removeMaterial(material)}
-                                    >
-                                      <MaterialActionIcon name="remove" />
-                                    </button>
-                                  </>
-                                ) : null}
-                              </div>
-                            </div>
-                            {isEditing ? (
-                              <form
-                                className="inline-edit"
-                                onSubmit={(event) => {
-                                  event.preventDefault();
-                                  void saveMaterialEdit(material);
-                                }}
-                              >
-                                <div className="field">
-                                  <label htmlFor={`group-edit-title-${material.id}`}>{t("courseDetail.activityTitle")}</label>
-                                  <input
-                                    id={`group-edit-title-${material.id}`}
-                                    value={editMaterialTitle}
-                                    onChange={(event) => setEditMaterialTitle(event.target.value)}
-                                    required
-                                    minLength={2}
-                                  />
-                                </div>
-                                {material.kind === "github_repo" ? (
-                                  <div className="field">
-                                    <label htmlFor={`group-edit-url-${material.id}`}>{t("courseDetail.githubEditLabel")}</label>
-                                    <input
-                                      id={`group-edit-url-${material.id}`}
-                                      type="url"
-                                      value={editMaterialUrl}
-                                      onChange={(event) => setEditMaterialUrl(event.target.value)}
-                                      required
-                                    />
-                                  </div>
-                                ) : null}
-                                <div className="row">
-                                  <button type="submit">{t("courseDetail.saveMaterial")}</button>
-                                  <button className="secondary" type="button" onClick={() => setEditingMaterialId(null)}>
-                                    {t("common.cancel")}
-                                  </button>
-                                </div>
-                              </form>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="muted">{t("groupPage.noMaterials")}</p>
-                  )}
-                  {materialActionError ? <p className="error">{materialActionError}</p> : null}
-
-                  <section className="section stack">
-                    <div>
-                      <p className="eyebrow">{t("groupPage.inheritedMaterialsEyebrow")}</p>
-                      <h2>{t("groupPage.inheritedMaterialsTitle")}</h2>
-                      <p className="muted">{t("groupPage.inheritedMaterialsText")}</p>
-                    </div>
-
-                    {displayedCourseMaterials.length ? (
-                      <div className="table-list">
-                        <div className="table-row table-head" aria-hidden="true">
-                          <span>{t("courseDetail.titleHeader")}</span>
-                          <span>{t("courseDetail.typeHeader")}</span>
-                          <span>{t("courseDetail.sourceHeader")}</span>
-                          <span>{t("courseDetail.actionsHeader")}</span>
-                        </div>
-                        {displayedCourseMaterials.map(({ material, depth }) => {
-                          const href = courseMaterialHref(material);
-                          const hiddenState = getHiddenMaterialState(courseMaterials, hiddenCourseMaterialIds, material.id);
-                          const isCollapsed = collapsedCourseFolderIds.has(material.id);
-
-                          return (
-                            <div
-                              key={material.id}
-                              className={`table-row ${hiddenState.effectivelyHidden ? "is-hidden-material" : ""}`}
-                            >
-                              <div className="table-main material-title" style={{ paddingLeft: `${depth * 22}px` }}>
-                                {material.kind === "folder" ? (
-                                  <button
-                                    aria-expanded={!isCollapsed}
-                                    aria-label={t(isCollapsed ? "courseDetail.expandFolder" : "courseDetail.collapseFolder", {
-                                      title: material.title
-                                    })}
-                                    className="material-glyph"
-                                    title={t(isCollapsed ? "courseDetail.expandFolderTitle" : "courseDetail.collapseFolderTitle")}
-                                    type="button"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      toggleCourseFolder(material.id);
-                                    }}
-                                  >
-                                    {isCollapsed ? "[+]" : "[-]"}
-                                  </button>
-                                ) : (
-                                  <span className="material-glyph material-glyph-static">-</span>
-                                )}
-                                <strong>{material.title}</strong>
-                              </div>
-                              <span className="eyebrow">{t(`materialKinds.${material.kind}`)}</span>
-                              <span className="table-meta muted">
-                                {courseMaterialDetail(material)}
-                                {hiddenState.effectivelyHidden ? (
-                                  <span className="table-meta-note">
-                                    {hiddenState.hiddenByAncestor && !hiddenState.directlyHidden
-                                      ? t("groupPage.hiddenByFolder")
-                                      : t("groupPage.hiddenInGroup")}
-                                  </span>
-                                ) : null}
-                              </span>
-                              <div className="table-actions">
-                                {href ? (
-                                  <a
-                                    aria-label={t(
-                                      material.kind === "file" ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial",
-                                      { title: material.title }
-                                    )}
-                                    className="button secondary icon-button"
-                                    href={href}
-                                    rel={material.kind === "file" ? undefined : "noreferrer"}
-                                    target={material.kind === "file" ? undefined : "_blank"}
-                                    title={t(material.kind === "file" ? "common.download" : "common.open")}
-                                  >
-                                    <MaterialActionIcon name={material.kind === "file" ? "download" : "open"} />
-                                  </a>
-                                ) : null}
-                                {canManage ? (
-                                  <button
-                                    aria-label={t(
-                                      hiddenState.directlyHidden ? "groupPage.unhideCourseMaterial" : "groupPage.hideCourseMaterial",
-                                      { title: material.title }
-                                    )}
-                                    className="secondary icon-button"
-                                    disabled={
-                                      savingCourseMaterialVisibilityId === material.id ||
-                                      (hiddenState.hiddenByAncestor && !hiddenState.directlyHidden)
-                                    }
-                                    title={
-                                      hiddenState.hiddenByAncestor && !hiddenState.directlyHidden
-                                        ? t("groupPage.hiddenByFolder")
-                                        : t(hiddenState.directlyHidden ? "groupPage.unhideAction" : "groupPage.hideAction")
-                                    }
-                                    type="button"
-                                    onClick={() => void toggleCourseMaterialVisibility(material)}
-                                  >
-                                    <MaterialActionIcon name={hiddenState.effectivelyHidden ? "hidden" : "visible"} />
-                                  </button>
-                                ) : null}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="muted">{t("groupPage.noCourseMaterials")}</p>
-                    )}
-                    {courseMaterialVisibilityError ? <p className="error">{courseMaterialVisibilityError}</p> : null}
-                  </section>
-                    </div>
                   )
                 },
                 {
@@ -2697,7 +2098,7 @@ function toIsoOrNull(value: string) {
   return value ? new Date(value).toISOString() : null;
 }
 
-function withDownloadVersion(url: string, material: CourseMaterial | CourseGroupMaterial) {
+function withDownloadVersion(url: string, material: CourseMaterial | CourseGroupMaterial | CourseContentResource) {
   const version =
     typeof material.metadata?.storedName === "string"
       ? material.metadata.storedName
@@ -2705,6 +2106,10 @@ function withDownloadVersion(url: string, material: CourseMaterial | CourseGroup
         ? material.metadata.originalName
         : null;
   return version ? `${url}?v=${encodeURIComponent(version)}` : url;
+}
+
+function legacyMaterialHasStoredFile(material: CourseMaterial | CourseGroupMaterial) {
+  return typeof material.metadata?.storedName === "string";
 }
 
 function toDateTimeLocalValue(value?: string | null) {
@@ -2977,18 +2382,6 @@ function roundGrade(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-type MaterialTreeNode = {
-  id: string;
-  title: string;
-  kind: string;
-  parentId?: string | null;
-  position: number;
-};
-
-function compareMaterials<T extends MaterialTreeNode>(left: T, right: T) {
-  return left.position - right.position || left.title.localeCompare(right.title);
-}
-
 function compareContentItems(left: CourseContentItem, right: CourseContentItem) {
   const leftTitle = left.titleSnapshot ?? "";
   const rightTitle = right.titleSnapshot ?? "";
@@ -3107,60 +2500,6 @@ function isContentDescendant(contentItems: CourseContentItem[], possibleChildId:
   return false;
 }
 
-function flattenMaterials<T extends MaterialTreeNode>(materials: T[], collapsedFolderIds: Set<string>) {
-  const materialIds = new Set(materials.map((material) => material.id));
-  const byParent = new Map<string, T[]>();
-  for (const material of materials) {
-    const parentId = material.parentId ?? "root";
-    byParent.set(parentId, [...(byParent.get(parentId) ?? []), material]);
-  }
-
-  for (const [parentId, children] of byParent) {
-    byParent.set(parentId, children.sort(compareMaterials));
-  }
-
-  const rows: { material: T; depth: number }[] = [];
-  const visited = new Set<string>();
-
-  function walk(parentId: string, depth: number) {
-    for (const material of byParent.get(parentId) ?? []) {
-      if (visited.has(material.id)) {
-        continue;
-      }
-      visited.add(material.id);
-      rows.push({ material, depth });
-      if (material.kind === "folder" && !collapsedFolderIds.has(material.id)) {
-        walk(material.id, depth + 1);
-      }
-    }
-  }
-
-  walk("root", 0);
-
-  for (const material of materials.sort(compareMaterials)) {
-    const parentIsMissing = material.parentId && !materialIds.has(material.parentId);
-    if (!visited.has(material.id) && parentIsMissing) {
-      rows.push({ material, depth: 0 });
-    }
-  }
-
-  return rows;
-}
-
-function isMaterialDescendant<T extends MaterialTreeNode>(materials: T[], possibleChildId: string, possibleAncestorId: string) {
-  const byId = new Map(materials.map((material) => [material.id, material]));
-  let current = byId.get(possibleChildId);
-
-  while (current?.parentId) {
-    if (current.parentId === possibleAncestorId) {
-      return true;
-    }
-    current = byId.get(current.parentId);
-  }
-
-  return false;
-}
-
 function ActivityContentIcon() {
   return (
     <span className="activity-type-icon activity-content-icon" aria-hidden="true">
@@ -3185,69 +2524,6 @@ function FolderContentIcon({ collapsed }: { collapsed: boolean }) {
       </svg>
     </span>
   );
-}
-
-function MaterialTypeIcon({ iconName }: { iconName: MaterialTypeIconName }) {
-  const paths = {
-    github: (
-      <>
-        <path d="M16 25c-6 0-11-4.8-11-10.8 0-2.4.8-4.7 2.3-6.5-.2-.9-.4-2.9.5-5 0 0 1.9-.6 5 1.9A16.8 16.8 0 0 1 16 4.3c1.1 0 2.2.1 3.2.3 3.1-2.5 5-1.9 5-1.9.9 2.1.7 4.1.5 5A10 10 0 0 1 27 14.2C27 20.2 22 25 16 25Z" />
-        <path d="M12.5 24.2c-.5.9-.7 1.9-.7 3.1" />
-        <path d="M19.5 24.2c.5.9.7 1.9.7 3.1" />
-        <path d="M13 17.5h.01" />
-        <path d="M19 17.5h.01" />
-      </>
-    ),
-    file: (
-      <>
-        <path d="M10 4h8l5 5v19H10z" />
-        <path d="M18 4v6h5" />
-        <path d="M13 16h7" />
-        <path d="M13 21h7" />
-      </>
-    ),
-    text: (
-      <>
-        <path d="M7 6h18" />
-        <path d="M16 6v20" />
-        <path d="M11 26h10" />
-        <path d="M9 12h14" />
-      </>
-    )
-  } as const;
-
-  return (
-    <span className="activity-type-icon" aria-hidden="true">
-      <svg fill="none" height="28" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 32 32" width="28">
-        {paths[iconName]}
-      </svg>
-    </span>
-  );
-}
-
-function getHiddenMaterialState<T extends MaterialTreeNode>(materials: T[], hiddenMaterialIds: Set<string>, materialId: string) {
-  const byId = new Map(materials.map((material) => [material.id, material]));
-  let current = byId.get(materialId);
-  let directlyHidden = false;
-  let hiddenByAncestor = false;
-
-  while (current) {
-    if (hiddenMaterialIds.has(current.id)) {
-      if (current.id === materialId) {
-        directlyHidden = true;
-      } else {
-        hiddenByAncestor = true;
-      }
-      break;
-    }
-    current = current.parentId ? byId.get(current.parentId) : undefined;
-  }
-
-  return {
-    directlyHidden,
-    hiddenByAncestor,
-    effectivelyHidden: directlyHidden || hiddenByAncestor
-  };
 }
 
 function MaterialActionIcon({ name }: { name: "download" | "down" | "drag" | "edit" | "hidden" | "open" | "remove" | "save" | "up" | "visible" }) {

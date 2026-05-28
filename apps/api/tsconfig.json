@@ -30,6 +30,30 @@
       "@cognelo/activity-sdk/server": [
         "../../packages/activity-sdk/src/server.ts"
       ],
+      "@cognelo/content-type-sdk": [
+        "../../packages/content-type-sdk/src/index.ts"
+      ],
+      "@cognelo/content-type-sdk/server": [
+        "../../packages/content-type-sdk/src/server.ts"
+      ],
+      "@cognelo/plugin-file-content": [
+        "../../packages/plugin-content-types/plugin-file/src/index.ts"
+      ],
+      "@cognelo/plugin-file-content/server": [
+        "../../packages/plugin-content-types/plugin-file/src/server.ts"
+      ],
+      "@cognelo/plugin-github-repo": [
+        "../../packages/plugin-content-types/plugin-github-repo/src/index.ts"
+      ],
+      "@cognelo/plugin-github-repo/server": [
+        "../../packages/plugin-content-types/plugin-github-repo/src/server.ts"
+      ],
+      "@cognelo/plugin-text-content": [
+        "../../packages/plugin-content-types/plugin-text/src/index.ts"
+      ],
+      "@cognelo/plugin-text-content/server": [
+        "../../packages/plugin-content-types/plugin-text/src/server.ts"
+      ],
       "@cognelo/plugin-homework-grader": [
         "../../packages/plugin-activities/plugin-homework-grader/src/index.ts"
       ],

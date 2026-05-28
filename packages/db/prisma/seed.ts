@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { listActivityDefinitions, listActivityPlugins } from "@cognelo/activity-sdk";
+import { listContentTypePlugins } from "@cognelo/content-type-sdk";
 import { prisma as codingExercisesPrisma } from "../../plugin-activities/plugin-coding-exercises/src/db-client";
 import { prisma as webDesignCodingExercisesPrisma } from "../../plugin-activities/plugin-web-design-coding-exercises/src/db-client";
 
@@ -8,6 +9,13 @@ const prisma = new PrismaClient();
 
 async function ensurePluginLocalTables() {
   for (const plugin of listActivityPlugins()) {
+    for (const migration of plugin.db.migrations ?? []) {
+      for (const statement of migration.statements) {
+        await prisma.$executeRawUnsafe(statement);
+      }
+    }
+  }
+  for (const plugin of listContentTypePlugins()) {
     for (const migration of plugin.db.migrations ?? []) {
       for (const statement of migration.statements) {
         await prisma.$executeRawUnsafe(statement);
@@ -125,11 +133,12 @@ async function upsertCourseContentItem(params: {
   courseId: string;
   groupId?: string | null;
   parentId?: string | null;
-  kind: "folder" | "material" | "activity";
+  kind: "folder" | "content" | "activity";
   titleSnapshot: string;
   position: number;
   isVisible?: boolean;
   materialId?: string | null;
+  contentResourceId?: string | null;
   activityId?: string | null;
   courseGroupActivityId?: string | null;
   metadata?: Record<string, unknown>;
@@ -145,6 +154,7 @@ async function upsertCourseContentItem(params: {
       position: params.position,
       isVisible: params.isVisible ?? true,
       materialId: params.materialId ?? null,
+      contentResourceId: params.contentResourceId ?? null,
       activityId: params.activityId ?? null,
       courseGroupActivityId: params.courseGroupActivityId ?? null,
       metadata: (params.metadata ?? {}) as Prisma.InputJsonValue
@@ -159,6 +169,7 @@ async function upsertCourseContentItem(params: {
       position: params.position,
       isVisible: params.isVisible ?? true,
       materialId: params.materialId ?? null,
+      contentResourceId: params.contentResourceId ?? null,
       activityId: params.activityId ?? null,
       courseGroupActivityId: params.courseGroupActivityId ?? null,
       metadata: (params.metadata ?? {}) as Prisma.InputJsonValue
@@ -230,6 +241,39 @@ async function main() {
       });
       activityTypesByKey.set(definition.key, activityType);
     }
+  }
+
+  for (const plugin of listContentTypePlugins()) {
+    await prisma.contentTypePluginInstallation.upsert({
+      where: { key: plugin.key },
+      update: {
+        packageName: plugin.packageName,
+        name: plugin.name,
+        version: plugin.version ?? "0.1.0",
+        metadata: {
+          contentTypeKeys: plugin.contentTypes.map((contentType) => contentType.key),
+          databaseNamespace: plugin.db.namespace,
+          databaseTables: plugin.db.tables,
+          databaseNotes: plugin.db.notes ?? []
+        },
+        isActivated: true,
+        isEnabled: true
+      },
+      create: {
+        key: plugin.key,
+        packageName: plugin.packageName,
+        name: plugin.name,
+        version: plugin.version ?? "0.1.0",
+        metadata: {
+          contentTypeKeys: plugin.contentTypes.map((contentType) => contentType.key),
+          databaseNamespace: plugin.db.namespace,
+          databaseTables: plugin.db.tables,
+          databaseNotes: plugin.db.notes ?? []
+        },
+        isActivated: true,
+        isEnabled: true
+      }
+    });
   }
 
   const placeholderType = activityTypesByKey.get("placeholder");
@@ -455,105 +499,160 @@ async function main() {
     });
   }
 
-  const welcomeMaterial = await prisma.courseMaterial.upsert({
-    where: { id: "seed-material-welcome" },
+  await prisma.courseMaterial.deleteMany({
+    where: {
+      id: {
+        in: [
+          "seed-material-welcome",
+          "seed-material-variables-intro",
+          "seed-material-examples-repo",
+          "seed-material-loops-slides",
+          "seed-material-loops-resource"
+        ]
+      }
+    }
+  });
+
+  const welcomeResource = await prisma.courseContentResource.upsert({
+    where: { id: "seed-content-resource-welcome" },
     update: {
+      courseId: course.id,
+      groupId: null,
+      contentTypeKey: "text",
+      pluginKey: "text-content",
       title: "Welcome",
-      kind: "text",
-      body: "## Welcome\n\nStart here before attempting the first activity.",
-      metadata: { module: "orientation" }
+      metadata: {
+        module: "orientation",
+        body: "## Welcome\n\nStart here before attempting the first activity.",
+        format: "markdown"
+      }
     },
     create: {
-      id: "seed-material-welcome",
+      id: "seed-content-resource-welcome",
       courseId: course.id,
+      groupId: null,
+      contentTypeKey: "text",
+      pluginKey: "text-content",
       title: "Welcome",
-      kind: "text",
-      body: "## Welcome\n\nStart here before attempting the first activity.",
-      metadata: { module: "orientation" },
-      createdById: teacher.id
+      metadata: {
+        module: "orientation",
+        body: "## Welcome\n\nStart here before attempting the first activity.",
+        format: "markdown"
+      }
     }
   });
 
-  const variablesIntroMaterial = await prisma.courseMaterial.upsert({
-    where: { id: "seed-material-variables-intro" },
+  const examplesRepoResource = await prisma.courseContentResource.upsert({
+    where: { id: "seed-content-resource-examples-repo" },
     update: {
-      title: "Introduction to variables",
-      kind: "file",
-      body: null,
-      url: null,
-      metadata: { module: "week-1", originalName: "introduction-to-variables.pdf", mimeType: "application/pdf" },
-      position: 1
-    },
-    create: {
-      id: "seed-material-variables-intro",
       courseId: course.id,
-      title: "Introduction to variables",
-      kind: "file",
-      metadata: { module: "week-1", originalName: "introduction-to-variables.pdf", mimeType: "application/pdf" },
-      position: 1,
-      createdById: teacher.id
-    }
-  });
-
-  const examplesRepoMaterial = await prisma.courseMaterial.upsert({
-    where: { id: "seed-material-examples-repo" },
-    update: {
+      groupId: null,
+      contentTypeKey: "github-repo",
+      pluginKey: "github-repo-content",
       title: "Examples shown in class",
-      kind: "github_repo",
-      url: "https://github.com/cognelo/examples-programming-101",
-      metadata: { module: "week-1" },
-      position: 2
+      metadata: { module: "week-1", url: "https://github.com/cognelo/examples-programming-101" }
     },
     create: {
-      id: "seed-material-examples-repo",
+      id: "seed-content-resource-examples-repo",
       courseId: course.id,
+      groupId: null,
+      contentTypeKey: "github-repo",
+      pluginKey: "github-repo-content",
       title: "Examples shown in class",
-      kind: "github_repo",
-      url: "https://github.com/cognelo/examples-programming-101",
-      metadata: { module: "week-1" },
-      position: 2,
-      createdById: teacher.id
+      metadata: { module: "week-1", url: "https://github.com/cognelo/examples-programming-101" }
     }
   });
 
-  const loopsSlidesMaterial = await prisma.courseMaterial.upsert({
-    where: { id: "seed-material-loops-slides" },
+  const variablesIntroResource = await prisma.courseContentResource.upsert({
+    where: { id: "seed-content-resource-variables-intro" },
     update: {
-      title: "What are loops?",
-      kind: "file",
-      metadata: { module: "week-2", originalName: "what-are-loops.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
-      position: 3
+      courseId: course.id,
+      groupId: null,
+      contentTypeKey: "file",
+      pluginKey: "file-content",
+      title: "Introduction to variables",
+      metadata: {
+        module: "week-1",
+        originalName: "introduction-to-variables.pdf",
+        mimeType: "application/pdf",
+        setupStatus: "draft"
+      }
     },
     create: {
-      id: "seed-material-loops-slides",
+      id: "seed-content-resource-variables-intro",
       courseId: course.id,
-      title: "What are loops?",
-      kind: "file",
-      metadata: { module: "week-2", originalName: "what-are-loops.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
-      position: 3,
-      createdById: teacher.id
+      groupId: null,
+      contentTypeKey: "file",
+      pluginKey: "file-content",
+      title: "Introduction to variables",
+      metadata: {
+        module: "week-1",
+        originalName: "introduction-to-variables.pdf",
+        mimeType: "application/pdf",
+        setupStatus: "draft"
+      }
     }
   });
 
-  const loopsResourceMaterial = await prisma.courseMaterial.upsert({
-    where: { id: "seed-material-loops-resource" },
+  const loopsSlidesResource = await prisma.courseContentResource.upsert({
+    where: { id: "seed-content-resource-loops-slides" },
     update: {
-      title: "Codecademy: Learn loops",
-      kind: "text",
-      body: "Extra practice resource: https://www.codecademy.com/resources/docs/python/loops",
-      url: null,
-      metadata: { module: "week-2", audience: "extra-practice" },
-      position: 4
+      courseId: course.id,
+      groupId: null,
+      contentTypeKey: "file",
+      pluginKey: "file-content",
+      title: "What are loops?",
+      metadata: {
+        module: "week-2",
+        originalName: "what-are-loops.pptx",
+        mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        setupStatus: "draft"
+      }
     },
     create: {
-      id: "seed-material-loops-resource",
+      id: "seed-content-resource-loops-slides",
       courseId: course.id,
+      groupId: null,
+      contentTypeKey: "file",
+      pluginKey: "file-content",
+      title: "What are loops?",
+      metadata: {
+        module: "week-2",
+        originalName: "what-are-loops.pptx",
+        mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        setupStatus: "draft"
+      }
+    }
+  });
+
+  const loopsResource = await prisma.courseContentResource.upsert({
+    where: { id: "seed-content-resource-loops-resource" },
+    update: {
+      courseId: course.id,
+      groupId: null,
+      contentTypeKey: "text",
+      pluginKey: "text-content",
       title: "Codecademy: Learn loops",
-      kind: "text",
-      body: "Extra practice resource: https://www.codecademy.com/resources/docs/python/loops",
-      metadata: { module: "week-2", audience: "extra-practice" },
-      position: 4,
-      createdById: teacher.id
+      metadata: {
+        module: "week-2",
+        audience: "extra-practice",
+        body: "Extra practice resource: https://www.codecademy.com/resources/docs/python/loops",
+        format: "markdown"
+      }
+    },
+    create: {
+      id: "seed-content-resource-loops-resource",
+      courseId: course.id,
+      groupId: null,
+      contentTypeKey: "text",
+      pluginKey: "text-content",
+      title: "Codecademy: Learn loops",
+      metadata: {
+        module: "week-2",
+        audience: "extra-practice",
+        body: "Extra practice resource: https://www.codecademy.com/resources/docs/python/loops",
+        format: "markdown"
+      }
     }
   });
 
@@ -1106,10 +1205,10 @@ async function main() {
     id: "seed-content-course-welcome",
     courseId: course.id,
     parentId: courseOverviewFolder.id,
-    kind: "material",
-    titleSnapshot: welcomeMaterial.title,
+    kind: "content",
+    titleSnapshot: welcomeResource.title,
     position: 0,
-    materialId: welcomeMaterial.id,
+    contentResourceId: welcomeResource.id,
     metadata: { seed: true }
   });
 
@@ -1126,10 +1225,10 @@ async function main() {
     id: "seed-content-section-a-variables-pdf",
     courseId: course.id,
     parentId: week1Folder.id,
-    kind: "material",
-    titleSnapshot: variablesIntroMaterial.title,
+    kind: "content",
+    titleSnapshot: variablesIntroResource.title,
     position: 0,
-    materialId: variablesIntroMaterial.id,
+    contentResourceId: variablesIntroResource.id,
     metadata: { seed: true }
   });
 
@@ -1148,10 +1247,10 @@ async function main() {
     id: "seed-content-section-a-examples-repo",
     courseId: course.id,
     parentId: week1Folder.id,
-    kind: "material",
-    titleSnapshot: examplesRepoMaterial.title,
+    kind: "content",
+    titleSnapshot: examplesRepoResource.title,
     position: 2,
-    materialId: examplesRepoMaterial.id,
+    contentResourceId: examplesRepoResource.id,
     metadata: { seed: true }
   });
 
@@ -1180,10 +1279,10 @@ async function main() {
     id: "seed-content-section-a-loops-slides",
     courseId: course.id,
     parentId: week2Folder.id,
-    kind: "material",
-    titleSnapshot: loopsSlidesMaterial.title,
+    kind: "content",
+    titleSnapshot: loopsSlidesResource.title,
     position: 0,
-    materialId: loopsSlidesMaterial.id,
+    contentResourceId: loopsSlidesResource.id,
     metadata: { seed: true }
   });
 
@@ -1212,10 +1311,10 @@ async function main() {
     id: "seed-content-section-a-loops-resource",
     courseId: course.id,
     parentId: resourcesFolder.id,
-    kind: "material",
-    titleSnapshot: loopsResourceMaterial.title,
+    kind: "content",
+    titleSnapshot: loopsResource.title,
     position: 0,
-    materialId: loopsResourceMaterial.id,
+    contentResourceId: loopsResource.id,
     metadata: { seed: true }
   });
 

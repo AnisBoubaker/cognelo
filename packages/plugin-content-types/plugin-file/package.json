@@ -1,0 +1,24 @@
+{
+  "name": "@cognelo/plugin-file-content",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts"
+  },
+  "dependencies": {
+    "@cognelo/content-type-sdk": "0.1.0",
+    "@cognelo/db": "0.1.0",
+    "react": "^19.2.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "typescript": "^5.4.5"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}
