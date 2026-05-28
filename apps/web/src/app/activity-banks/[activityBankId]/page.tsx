@@ -15,9 +15,10 @@ type EditingActivityState = {
   activityTypeKey: string;
 };
 
-type ActivityCategoryId = "programming" | "miscellaneous";
+type ActivityCategoryId = "generic" | "programming" | "miscellaneous";
 
 const activityCategories: Array<{ id: ActivityCategoryId; labelKey: string }> = [
+  { id: "generic", labelKey: "activityBankDetail.categoryGeneric" },
   { id: "programming", labelKey: "activityBankDetail.categoryProgramming" },
   { id: "miscellaneous", labelKey: "activityBankDetail.categoryMiscellaneous" }
 ];
@@ -195,11 +196,32 @@ export default function ActivityBankDetailPage() {
     return defaultCategoryIds.includes(categoryId);
   }
 
+  function activityTypeCreatesCategory(activityTypeKey: string, categoryId: ActivityCategoryId) {
+    const defaultCategoryIds = activityDefinitions.find((candidate) => candidate.key === activityTypeKey)?.defaultCategoryIds;
+    if (defaultCategoryIds === "all") {
+      return categoryId === "generic";
+    }
+    if (!defaultCategoryIds?.length) {
+      return categoryId === "miscellaneous";
+    }
+    return defaultCategoryIds.includes(categoryId);
+  }
+
   function activityTypeIconName(activityTypeKey: string) {
     return activityDefinitions.find((candidate) => candidate.key === activityTypeKey)?.icon ?? "placeholder";
   }
 
+  const visibleActivityCategories = activityCategories.filter((category) =>
+    activityTypes.some((type) => activityTypeCreatesCategory(type.key, category.id))
+  );
   const visibleActivityTypes = activityTypes.filter((type) => activityTypeBelongsToCategory(type.key, selectedCategoryId));
+
+  useEffect(() => {
+    if (visibleActivityCategories.some((category) => category.id === selectedCategoryId)) {
+      return;
+    }
+    setSelectedCategoryId(visibleActivityCategories[0]?.id ?? "programming");
+  }, [selectedCategoryId, visibleActivityCategories]);
 
   return (
     <AppShell>
@@ -286,7 +308,7 @@ export default function ActivityBankDetailPage() {
               </div>
               <div className="activity-picker-layout">
                 <div className="activity-category-tabs" role="tablist" aria-label={t("activityBankDetail.categoryTabsLabel")}>
-                  {activityCategories.map((category) => (
+                  {visibleActivityCategories.map((category) => (
                     <button
                       key={category.id}
                       className={selectedCategoryId === category.id ? "activity-category-tab is-active" : "activity-category-tab"}
