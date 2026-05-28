@@ -24,6 +24,9 @@
       "@cognelo/activity-sdk": [
         "../../packages/activity-sdk/src/index.ts"
       ],
+      "@cognelo/activity-sdk/categories": [
+        "../../packages/activity-sdk/src/categories.ts"
+      ],
       "@cognelo/content-type-sdk": [
         "../../packages/content-type-sdk/src/index.ts"
       ],

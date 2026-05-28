@@ -1,5 +1,12 @@
 "use client";
 
+import {
+  activityDefinitionBelongsToCategory,
+  activityDefinitionCreatesCategory,
+  getActivityCategoryMessages,
+  listActivityCategories,
+  type ActivityCategoryId
+} from "@cognelo/activity-sdk/categories";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
@@ -15,13 +22,7 @@ type EditingActivityState = {
   activityTypeKey: string;
 };
 
-type ActivityCategoryId = "generic" | "programming" | "miscellaneous";
-
-const activityCategories: Array<{ id: ActivityCategoryId; labelKey: string }> = [
-  { id: "generic", labelKey: "activityBankDetail.categoryGeneric" },
-  { id: "programming", labelKey: "activityBankDetail.categoryProgramming" },
-  { id: "miscellaneous", labelKey: "activityBankDetail.categoryMiscellaneous" }
-];
+const activityCategories = listActivityCategories();
 
 export default function ActivityBankDetailPage() {
   const params = useParams<{ activityBankId: string }>();
@@ -37,7 +38,7 @@ export default function ActivityBankDetailPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [deletingActivityId, setDeletingActivityId] = useState<string | null>(null);
   const [showActivityPicker, setShowActivityPicker] = useState(false);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<ActivityCategoryId>("programming");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<ActivityCategoryId>("generic");
 
   async function loadPage() {
     const [bankResult, typesResult] = await Promise.all([api.activityBank(activityBankId), api.activityTypes()]);
@@ -186,25 +187,13 @@ export default function ActivityBankDetailPage() {
   }
 
   function activityTypeBelongsToCategory(activityTypeKey: string, categoryId: ActivityCategoryId) {
-    const defaultCategoryIds = activityDefinitions.find((candidate) => candidate.key === activityTypeKey)?.defaultCategoryIds;
-    if (defaultCategoryIds === "all") {
-      return true;
-    }
-    if (!defaultCategoryIds?.length) {
-      return categoryId === "miscellaneous";
-    }
-    return defaultCategoryIds.includes(categoryId);
+    const definition = activityDefinitions.find((candidate) => candidate.key === activityTypeKey);
+    return activityDefinitionBelongsToCategory(definition, categoryId);
   }
 
   function activityTypeCreatesCategory(activityTypeKey: string, categoryId: ActivityCategoryId) {
-    const defaultCategoryIds = activityDefinitions.find((candidate) => candidate.key === activityTypeKey)?.defaultCategoryIds;
-    if (defaultCategoryIds === "all") {
-      return categoryId === "generic";
-    }
-    if (!defaultCategoryIds?.length) {
-      return categoryId === "miscellaneous";
-    }
-    return defaultCategoryIds.includes(categoryId);
+    const definition = activityDefinitions.find((candidate) => candidate.key === activityTypeKey);
+    return activityDefinitionCreatesCategory(definition, categoryId);
   }
 
   function activityTypeIconName(activityTypeKey: string) {
@@ -220,7 +209,7 @@ export default function ActivityBankDetailPage() {
     if (visibleActivityCategories.some((category) => category.id === selectedCategoryId)) {
       return;
     }
-    setSelectedCategoryId(visibleActivityCategories[0]?.id ?? "programming");
+    setSelectedCategoryId(visibleActivityCategories[0]?.id ?? "generic");
   }, [selectedCategoryId, visibleActivityCategories]);
 
   return (
@@ -317,7 +306,7 @@ export default function ActivityBankDetailPage() {
                       aria-selected={selectedCategoryId === category.id}
                       onClick={() => setSelectedCategoryId(category.id)}
                     >
-                      {t(category.labelKey)}
+                      {getActivityCategoryMessages(category, locale)}
                     </button>
                   ))}
                 </div>

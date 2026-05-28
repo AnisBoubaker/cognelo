@@ -19,6 +19,7 @@
       "@cognelo/core": ["packages/core/src/index.ts"],
       "@cognelo/db": ["packages/db/src/index.ts"],
       "@cognelo/activity-sdk": ["packages/activity-sdk/src/index.ts"],
+      "@cognelo/activity-sdk/categories": ["packages/activity-sdk/src/categories.ts"],
       "@cognelo/activity-sdk/server": ["packages/activity-sdk/src/server.ts"],
       "@cognelo/content-type-sdk": ["packages/content-type-sdk/src/index.ts"],
       "@cognelo/content-type-sdk/server": ["packages/content-type-sdk/src/server.ts"],

@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  activityDefinitionBelongsToCategory,
+  activityDefinitionCreatesCategory,
   getActivityDefinition,
+  getActivityHomeCategoryIds,
   getActivityMessages,
   getActivityPlugin,
   getActivityPluginForActivityType,
+  listActivityCategories,
   listActivityDefinitions,
   listActivityPlugins,
   listPluginDatabaseModules
@@ -37,9 +41,17 @@ describe("activity SDK registry", () => {
   });
 
   it("marks all-category activities and explicit category assignments", () => {
-    expect(getActivityDefinition("mcq")?.defaultCategoryIds).toBe("all");
+    expect(getActivityDefinition("mcq")?.defaultCategoryIds).toEqual(["generic", "all"]);
     expect(getActivityDefinition("coding-exercise")?.defaultCategoryIds).toContain("programming");
     expect(getActivityDefinition("placeholder")?.defaultCategoryIds).toContain("miscellaneous");
+  });
+
+  it("centralizes category definitions and falls unknown categories back to generic", () => {
+    expect(listActivityCategories().map((category) => category.id)).toEqual(["generic", "programming", "miscellaneous"]);
+    expect(getActivityHomeCategoryIds({ defaultCategoryIds: ["unknown-category"] })).toEqual(["generic"]);
+    expect(activityDefinitionCreatesCategory(getActivityDefinition("mcq"), "generic")).toBe(true);
+    expect(activityDefinitionCreatesCategory(getActivityDefinition("mcq"), "programming")).toBe(false);
+    expect(activityDefinitionBelongsToCategory(getActivityDefinition("mcq"), "programming")).toBe(true);
   });
 
   it("exposes grading capability metadata on gradable activity definitions", () => {

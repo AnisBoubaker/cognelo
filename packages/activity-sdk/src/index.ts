@@ -5,16 +5,14 @@ import { parsonsPlugin } from "@cognelo/plugin-parsons";
 import { placeholderPlugin } from "@cognelo/plugin-placeholder";
 import { mcqPlugin } from "@cognelo/plugin-mcq";
 import { webDesignCodingExercisesPlugin } from "@cognelo/plugin-web-design-coding-exercises";
-
-export type PluginLocale = "en" | "fr" | "zh" | "ar";
+export * from "./categories";
+import type { ActivityCategoryAssignment, PluginLocale } from "./categories";
 
 export type ActivityMessages = {
   name: string;
   description: string;
   defaultTitle?: string;
 };
-
-export type ActivityCategoryAssignment = readonly string[] | "all";
 
 export type ActivityIconName = "code" | "checklist" | "document-check" | "list-check" | "placeholder";
 
