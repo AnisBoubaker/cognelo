@@ -29,7 +29,7 @@ export const enMessages = {
       time: "Time"
     },
     activityCategories: {
-      generic: "Generic",
+      generic: "Generic Activity",
       programming: "Programming",
       miscellaneous: "Miscellaneous"
     },
@@ -497,6 +497,18 @@ export const enMessages = {
       addRootFolder: "New folder",
       addSubfolder: "Add subfolder to {title}",
       renameFolder: "Rename {title}",
+      renameFolderAction: "Rename folder",
+      contentActions: "Actions for {title}",
+      contentActionsTitle: "More actions",
+      contentSettingsAction: "Settings",
+      newActivityInFolder: "New activity",
+      newFolderInFolder: "New folder",
+      contentTreeActions: "Content tree actions",
+      contentTreeActionsTitle: "More content actions",
+      newRootFolderAction: "New root folder",
+      newRootActivityAction: "New activity",
+      expandAllFolders: "Expand all",
+      collapseAllFolders: "Collapse all",
       noMaterialsAvailable: "No course materials are available yet.",
       activityBankPickerLabel: "Activity bank",
       noAvailableBankActivities: "No activity bank items are available for this course.",

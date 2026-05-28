@@ -29,7 +29,7 @@ export const arMessages = {
       time: "الوقت"
     },
     activityCategories: {
-      generic: "عام",
+      generic: "نشاط عام",
       programming: "برمجة",
       miscellaneous: "متفرقات"
     },
@@ -412,6 +412,18 @@ export const arMessages = {
       addRootFolder: "مجلد جديد",
       addSubfolder: "إضافة مجلد فرعي إلى {title}",
       renameFolder: "إعادة تسمية {title}",
+      renameFolderAction: "إعادة تسمية المجلد",
+      contentActions: "إجراءات {title}",
+      contentActionsTitle: "إجراءات إضافية",
+      contentSettingsAction: "الإعدادات",
+      newActivityInFolder: "نشاط جديد",
+      newFolderInFolder: "مجلد جديد",
+      contentTreeActions: "إجراءات شجرة المحتوى",
+      contentTreeActionsTitle: "إجراءات محتوى إضافية",
+      newRootFolderAction: "مجلد جذري جديد",
+      newRootActivityAction: "نشاط جديد",
+      expandAllFolders: "توسيع الكل",
+      collapseAllFolders: "طي الكل",
       noMaterialsAvailable: "لا توجد مواد مقرر متاحة بعد.",
       activityBankPickerLabel: "بنك الأنشطة",
       noAvailableBankActivities: "لا توجد عناصر من بنك الأنشطة متاحة لهذا المقرر.",

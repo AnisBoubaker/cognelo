@@ -29,7 +29,7 @@ export const frMessages = {
       time: "Heure"
     },
     activityCategories: {
-      generic: "Générique",
+      generic: "Activité générique",
       programming: "Programmation",
       miscellaneous: "Divers"
     },
@@ -465,6 +465,18 @@ export const frMessages = {
       addRootFolder: "Nouveau dossier",
       addSubfolder: "Ajouter un sous-dossier à {title}",
       renameFolder: "Renommer {title}",
+      renameFolderAction: "Renommer le dossier",
+      contentActions: "Actions pour {title}",
+      contentActionsTitle: "Plus d'actions",
+      contentSettingsAction: "Paramètres",
+      newActivityInFolder: "Nouvelle activité",
+      newFolderInFolder: "Nouveau dossier",
+      contentTreeActions: "Actions de l'arborescence",
+      contentTreeActionsTitle: "Plus d'actions de contenu",
+      newRootFolderAction: "Nouveau dossier racine",
+      newRootActivityAction: "Nouvelle activité",
+      expandAllFolders: "Tout déplier",
+      collapseAllFolders: "Tout replier",
       noMaterialsAvailable: "Aucun matériel de cours n'est disponible.",
       activityBankPickerLabel: "Banque d'activités",
       noAvailableBankActivities: "Aucune activité de banque n'est disponible pour ce cours.",

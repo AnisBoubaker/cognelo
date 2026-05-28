@@ -553,6 +553,14 @@ a.card:hover,
   width: 22px;
 }
 
+.content-header-actions {
+  position: relative;
+}
+
+.content-header-menu {
+  min-width: 210px;
+}
+
 .hero-panel {
   background:
     linear-gradient(140deg, rgba(41, 213, 207, 0.12), rgba(46, 131, 216, 0.08) 45%, rgba(90, 42, 191, 0.08)),
@@ -632,7 +640,8 @@ a.card:hover,
   font-variant-numeric: tabular-nums;
 }
 
-.field label {
+.field label,
+.field-label {
   font-weight: 700;
 }
 
@@ -1692,6 +1701,131 @@ a.card:hover,
   margin-bottom: 16px;
 }
 
+.folder-picker {
+  position: relative;
+}
+
+.folder-picker-trigger {
+  align-items: center;
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--line), var(--brand-blue) 12%);
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 2px rgba(13, 27, 71, 0.04);
+  color: var(--ink);
+  display: flex;
+  font: inherit;
+  font-weight: 650;
+  justify-content: space-between;
+  min-height: 40px;
+  padding: 7px 11px;
+  width: 100%;
+}
+
+.folder-picker-trigger:hover,
+.folder-picker-trigger:focus-visible {
+  border-color: color-mix(in srgb, var(--brand-blue), white 54%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-blue), transparent 86%);
+  outline: none;
+}
+
+.folder-picker-current {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-picker-menu {
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--line), var(--brand-blue) 14%);
+  border-radius: 8px;
+  box-shadow: 0 18px 44px rgba(13, 27, 71, 0.14), 0 2px 8px rgba(13, 27, 71, 0.06);
+  display: grid;
+  gap: 0;
+  left: 0;
+  max-height: min(320px, 42dvh);
+  overflow: auto;
+  padding: 5px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 85;
+}
+
+.folder-picker-option {
+  --folder-picker-depth: 0;
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 650;
+  gap: 7px;
+  grid-template-columns: calc(var(--folder-picker-depth) * 16px) 18px minmax(0, 1fr);
+  min-height: 32px;
+  padding: 5px 8px;
+  position: relative;
+  text-align: start;
+}
+
+.folder-picker-option:hover,
+.folder-picker-option:focus-visible {
+  background: color-mix(in srgb, var(--brand-blue), white 94%);
+  outline: none;
+}
+
+.folder-picker-option.is-selected {
+  background: color-mix(in srgb, var(--brand-blue), white 92%);
+}
+
+.folder-picker-option.is-selected::after {
+  background: var(--brand-blue);
+  border-radius: 999px;
+  content: "";
+  height: 16px;
+  position: absolute;
+  right: 8px;
+  width: 3px;
+}
+
+.folder-picker-tree-rails {
+  align-self: stretch;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent 7px,
+    color-mix(in srgb, var(--line), var(--brand-blue) 20%) 7px,
+    color-mix(in srgb, var(--line), var(--brand-blue) 20%) 8px,
+    transparent 8px,
+    transparent 16px
+  );
+  opacity: 0.85;
+  width: calc(var(--folder-picker-depth) * 16px);
+}
+
+.folder-picker-folder-icon {
+  align-items: center;
+  color: color-mix(in srgb, var(--ink), white 18%);
+  display: inline-flex;
+  height: 18px;
+  justify-content: center;
+  width: 18px;
+}
+
+.folder-picker-folder-icon svg {
+  height: 17px;
+  width: 17px;
+}
+
+.folder-picker-option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .activity-bank-picker-panel {
   display: grid;
   gap: 12px;
@@ -1774,15 +1908,71 @@ a.card:hover,
 }
 
 .content-row-actions {
-  display: grid;
+  display: flex;
   gap: 6px;
-  grid-template-columns: repeat(4, 36px);
   justify-content: end;
 }
 
-.content-row-actions .action-slot {
-  height: 36px;
-  width: 36px;
+.content-context-menu {
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--line), var(--brand-blue) 12%);
+  border-radius: 8px;
+  box-shadow: 0 16px 38px rgba(13, 27, 71, 0.13), 0 2px 8px rgba(13, 27, 71, 0.05);
+  display: grid;
+  gap: 1px;
+  min-width: 180px;
+  padding: 5px;
+  position: fixed;
+  z-index: 80;
+}
+
+.content-header-actions .content-header-menu {
+  left: auto;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+}
+
+.content-context-menu-item {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 620;
+  gap: 8px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  min-height: 31px;
+  padding: 6px 8px;
+  text-align: start;
+  text-decoration: none;
+}
+
+.content-context-menu-item svg {
+  color: color-mix(in srgb, var(--ink), white 18%);
+  height: 16px;
+  justify-self: center;
+  width: 16px;
+}
+
+.content-context-menu-item:hover,
+.content-context-menu-item:focus-visible {
+  background: color-mix(in srgb, var(--brand-blue), white 94%);
+  outline: none;
+}
+
+.content-context-menu-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.content-context-menu-item.is-danger,
+.content-context-menu-item.is-danger svg {
+  color: #9f1239;
 }
 
 .icon-button {

@@ -10,7 +10,16 @@ import {
 import { resolveLocalizedText, type ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { CSSProperties, FormEvent, KeyboardEvent as ReactKeyboardEvent, PointerEvent, useEffect, useRef, useState } from "react";
+import {
+  CSSProperties,
+  FormEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent,
+  useEffect,
+  useRef,
+  useState
+} from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
@@ -40,6 +49,11 @@ type ActivityPickerTab = {
 };
 type ContentDropPlacement = "after" | "before" | "inside";
 type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
+type ContentContextMenu = {
+  itemId: string;
+  x: number;
+  y: number;
+};
 
 const contentDragActivationDistance = 8;
 
@@ -108,6 +122,9 @@ export default function CourseDetailPage() {
   const [collapsedContentFolderIds, setCollapsedContentFolderIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [materialActionError, setMaterialActionError] = useState("");
+  const [contentContextMenu, setContentContextMenu] = useState<ContentContextMenu | null>(null);
+  const [pickerFolderMenuOpen, setPickerFolderMenuOpen] = useState(false);
+  const [contentHeaderMenuOpen, setContentHeaderMenuOpen] = useState(false);
   const folderTitleInputRef = useRef<HTMLInputElement | null>(null);
   const cancelFolderEditRef = useRef(false);
   const skipFolderBlurRef = useRef(false);
@@ -268,6 +285,78 @@ export default function CourseDetailPage() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [showActivityPicker]);
+
+  useEffect(() => {
+    if (!contentContextMenu) {
+      return;
+    }
+
+    function closeMenu() {
+      setContentContextMenu(null);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setContentContextMenu(null);
+      }
+    }
+
+    window.addEventListener("click", closeMenu);
+    window.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("click", closeMenu);
+      window.removeEventListener("scroll", closeMenu, true);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [contentContextMenu]);
+
+  useEffect(() => {
+    if (!pickerFolderMenuOpen) {
+      return;
+    }
+
+    function closeMenu() {
+      setPickerFolderMenuOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setPickerFolderMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("click", closeMenu);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("click", closeMenu);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [pickerFolderMenuOpen]);
+
+  useEffect(() => {
+    if (!contentHeaderMenuOpen) {
+      return;
+    }
+
+    function closeMenu() {
+      setContentHeaderMenuOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setContentHeaderMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("click", closeMenu);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("click", closeMenu);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [contentHeaderMenuOpen]);
+
 
   useEffect(() => {
     if (!activityBanks.length) {
@@ -617,6 +706,7 @@ export default function CourseDetailPage() {
   const contentFolderOptions = flattenContentItems(contentItems, new Set())
     .filter(({ item }) => item.kind === "folder")
     .map(({ item, depth }) => ({ item, depth }));
+  const selectedPickerFolder = pickerParentId ? contentFolderOptions.find(({ item }) => item.id === pickerParentId) ?? null : null;
   const attachedBankActivityIds = new Set(
     (course?.activities ?? [])
       .map((activity) => activity.bankActivityId)
@@ -654,6 +744,51 @@ export default function CourseDetailPage() {
       metadata: {},
       ...(titleSnapshot ? { titleSnapshot } : {})
     };
+  }
+
+  function openActivityPicker(parentId: string | null = null) {
+    setPickerParentId(parentId ?? "");
+    setPickerIsVisible(true);
+    setSelectedActivityPickerTab((current) => (current === "material" ? "activity-banks" : current));
+    setShowActivityPicker(true);
+    setContentContextMenu(null);
+    setContentHeaderMenuOpen(false);
+    setPickerFolderMenuOpen(false);
+  }
+
+  function expandAllContentFolders() {
+    setCollapsedContentFolderIds(new Set());
+    setContentHeaderMenuOpen(false);
+  }
+
+  function collapseAllContentFolders() {
+    setCollapsedContentFolderIds(new Set(contentFolderOptions.map(({ item }) => item.id)));
+    setContentHeaderMenuOpen(false);
+  }
+
+  function openContentContextMenu(item: CourseContentItem, event: ReactMouseEvent<HTMLElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setContentContextMenu({
+      itemId: item.id,
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 240)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 280))
+    });
+  }
+
+  function openContentContextMenuFromButton(item: CourseContentItem, event: ReactMouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (contentContextMenu?.itemId === item.id) {
+      setContentContextMenu(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    setContentContextMenu({
+      itemId: item.id,
+      x: Math.max(8, Math.min(rect.right - 220, window.innerWidth - 240)),
+      y: Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - 280))
+    });
   }
 
   function startEditingFolder(item: CourseContentItem, selectAll: boolean) {
@@ -1122,26 +1257,67 @@ export default function CourseDetailPage() {
                           <h2>{t("courseDetail.contentTitle")}</h2>
                           <p className="muted">{t("courseDetail.contentText")}</p>
                         </div>
-                        <div className="section-actions">
+                        <div className="section-actions content-header-actions">
                           <button
-                            aria-label={t("courseDetail.addRootFolder")}
+                            aria-expanded={contentHeaderMenuOpen}
+                            aria-haspopup="menu"
+                            aria-label={t("courseDetail.contentTreeActions")}
                             className="secondary icon-button section-action-icon-button"
-                            disabled={isAddingActivity}
-                            title={t("courseDetail.addRootFolder")}
+                            title={t("courseDetail.contentTreeActionsTitle")}
                             type="button"
-                            onClick={() => void createInlineFolder(null)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setContentHeaderMenuOpen((current) => !current);
+                            }}
                           >
-                            <MaterialActionIcon name="folderAdd" />
+                            <MaterialActionIcon name="more" />
                           </button>
-                          <button
-                            aria-label={t("courseDetail.activityShellTitle")}
-                            className="secondary icon-button section-action-icon-button"
-                            title={t("courseDetail.activityShellTitle")}
-                            type="button"
-                            onClick={() => setShowActivityPicker(true)}
-                          >
-                            <MaterialActionIcon name="activityAdd" />
-                          </button>
+                          {contentHeaderMenuOpen ? (
+                            <div className="content-header-menu content-context-menu" role="menu" onClick={(event) => event.stopPropagation()}>
+                              <button
+                                className="content-context-menu-item"
+                                disabled={isAddingActivity}
+                                role="menuitem"
+                                type="button"
+                                onClick={() => {
+                                  setContentHeaderMenuOpen(false);
+                                  void createInlineFolder(null);
+                                }}
+                              >
+                                <MaterialActionIcon name="folderAdd" />
+                                <span>{t("courseDetail.newRootFolderAction")}</span>
+                              </button>
+                              <button
+                                className="content-context-menu-item"
+                                role="menuitem"
+                                type="button"
+                                onClick={() => openActivityPicker(null)}
+                              >
+                                <MaterialActionIcon name="activityAdd" />
+                                <span>{t("courseDetail.newRootActivityAction")}</span>
+                              </button>
+                              <button
+                                className="content-context-menu-item"
+                                disabled={!contentFolderOptions.length}
+                                role="menuitem"
+                                type="button"
+                                onClick={expandAllContentFolders}
+                              >
+                                <MaterialActionIcon name="down" />
+                                <span>{t("courseDetail.expandAllFolders")}</span>
+                              </button>
+                              <button
+                                className="content-context-menu-item"
+                                disabled={!contentFolderOptions.length}
+                                role="menuitem"
+                                type="button"
+                                onClick={collapseAllContentFolders}
+                              >
+                                <MaterialActionIcon name="up" />
+                                <span>{t("courseDetail.collapseAllFolders")}</span>
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
 
@@ -1182,6 +1358,7 @@ export default function CourseDetailPage() {
                                 data-content-item-id={item.id}
                                 key={item.id}
                                 style={{ "--content-tree-indent": `${14 + depth * 20}px`, paddingLeft: 14 + depth * 20 } as CSSProperties}
+                                onContextMenu={(event) => openContentContextMenu(item, event)}
                               >
                                 <div className="table-main table-main-stack">
                                   <span
@@ -1268,84 +1445,133 @@ export default function CourseDetailPage() {
                                   ) : null}
                                 </div>
                                 <div className="table-actions content-row-actions">
-                                  {item.kind === "folder" ? (
-                                    <button
-                                      aria-label={t("courseDetail.addSubfolder", { title })}
-                                      className="secondary icon-button"
-                                      disabled={isAddingActivity}
-                                      title={t("courseDetail.addSubfolder", { title })}
-                                      type="button"
-                                      onClick={() => void createInlineFolder(item.id)}
+                                  {item.kind === "activity" && href ? (
+                                    <Link
+                                      aria-label={t("courseDetail.openActivity")}
+                                      className="button secondary icon-button"
+                                      href={href}
+                                      title={t("courseDetail.openActivity")}
                                     >
-                                      <MaterialActionIcon name="add" />
-                                    </button>
-                                  ) : href ? (
-                                    material ? (
-                                      <a
-                                        aria-label={t(
-                                          materialIsDownloadable ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial",
-                                          { title }
-                                        )}
-                                        className="button secondary icon-button"
-                                        href={href}
-                                        rel={materialIsDownloadable ? undefined : "noreferrer"}
-                                        target={materialIsDownloadable ? undefined : "_blank"}
-                                        title={t(materialIsDownloadable ? "common.download" : "common.open")}
-                                      >
-                                        <MaterialActionIcon name={materialIsDownloadable ? "download" : "open"} />
-                                      </a>
-                                    ) : contentResource ? (
-                                      <a
-                                        aria-label={t(contentResourceIsFile ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial", { title })}
-                                        className="button secondary icon-button"
-                                        href={href}
-                                        rel={contentResourceIsFile ? undefined : "noreferrer"}
-                                        target={contentResourceIsFile ? undefined : "_blank"}
-                                        title={t(contentResourceIsFile ? "common.download" : "common.open")}
-                                      >
-                                        <MaterialActionIcon name={contentResourceIsFile ? "download" : "open"} />
-                                      </a>
-                                    ) : (
-                                      <Link
-                                        aria-label={t("courseDetail.openActivity")}
-                                        className="button secondary icon-button"
-                                        href={href}
-                                        title={t("courseDetail.openActivity")}
-                                      >
-                                        <MaterialActionIcon name="open" />
-                                      </Link>
-                                    )
-                                  ) : (
-                                    <span className="action-slot" aria-hidden="true" />
-                                  )}
+                                      <MaterialActionIcon name="open" />
+                                    </Link>
+                                  ) : null}
                                   <button
-                                    aria-label={t("courseDetail.contentSettings", { title })}
+                                    aria-label={t("courseDetail.contentActions", { title })}
                                     className="secondary icon-button"
-                                    title={t("courseDetail.settingsTitle")}
+                                    aria-expanded={contentContextMenu?.itemId === item.id}
+                                    aria-haspopup="menu"
+                                    title={t("courseDetail.contentActionsTitle")}
                                     type="button"
-                                    onClick={() => (item.kind === "folder" ? startEditingFolder(item, false) : openContentSettings(item))}
+                                    onClick={(event) => openContentContextMenuFromButton(item, event)}
                                   >
-                                    <MaterialActionIcon name="edit" />
-                                  </button>
-                                  <button
-                                    aria-label={item.isVisible ? t("courseDetail.hideContentItem", { title }) : t("courseDetail.showContentItem", { title })}
-                                    className="secondary icon-button"
-                                    title={item.isVisible ? t("courseDetail.contentHidden") : t("courseDetail.contentVisible")}
-                                    type="button"
-                                    onClick={() => toggleContentVisibility(item)}
-                                  >
-                                    <MaterialActionIcon name={item.isVisible ? "hidden" : "visible"} />
-                                  </button>
-                                  <button
-                                    aria-label={t("courseDetail.removeContentItem", { title })}
-                                    className="danger icon-button"
-                                    title={t("common.remove")}
-                                    type="button"
-                                    onClick={() => removeContentItem(item)}
-                                  >
-                                    <MaterialActionIcon name="remove" />
+                                    <MaterialActionIcon name="more" />
                                   </button>
                                 </div>
+                                {contentContextMenu?.itemId === item.id ? (
+                                  <div
+                                    className="content-context-menu"
+                                    role="menu"
+                                    style={{ left: contentContextMenu.x, top: contentContextMenu.y } as CSSProperties}
+                                    onClick={(event) => event.stopPropagation()}
+                                    onContextMenu={(event) => event.preventDefault()}
+                                  >
+                                    {href ? (
+                                      material ? (
+                                        <a
+                                          className="content-context-menu-item"
+                                          href={href}
+                                          rel={materialIsDownloadable ? undefined : "noreferrer"}
+                                          role="menuitem"
+                                          target={materialIsDownloadable ? undefined : "_blank"}
+                                          onClick={() => setContentContextMenu(null)}
+                                        >
+                                          <MaterialActionIcon name={materialIsDownloadable ? "download" : "open"} />
+                                          <span>{t(materialIsDownloadable ? "common.download" : "common.open")}</span>
+                                        </a>
+                                      ) : contentResource ? (
+                                        <a
+                                          className="content-context-menu-item"
+                                          href={href}
+                                          rel={contentResourceIsFile ? undefined : "noreferrer"}
+                                          role="menuitem"
+                                          target={contentResourceIsFile ? undefined : "_blank"}
+                                          onClick={() => setContentContextMenu(null)}
+                                        >
+                                          <MaterialActionIcon name={contentResourceIsFile ? "download" : "open"} />
+                                          <span>{t(contentResourceIsFile ? "common.download" : "common.open")}</span>
+                                        </a>
+                                      ) : (
+                                        <Link className="content-context-menu-item" href={href} role="menuitem" onClick={() => setContentContextMenu(null)}>
+                                          <MaterialActionIcon name="open" />
+                                          <span>{t("common.open")}</span>
+                                        </Link>
+                                      )
+                                    ) : null}
+                                    {item.kind === "folder" ? (
+                                      <>
+                                        <button
+                                          className="content-context-menu-item"
+                                          disabled={isAddingActivity}
+                                          role="menuitem"
+                                          type="button"
+                                          onClick={() => openActivityPicker(item.id)}
+                                        >
+                                          <MaterialActionIcon name="activityAdd" />
+                                          <span>{t("courseDetail.newActivityInFolder")}</span>
+                                        </button>
+                                        <button
+                                          className="content-context-menu-item"
+                                          disabled={isAddingActivity}
+                                          role="menuitem"
+                                          type="button"
+                                          onClick={() => {
+                                            setContentContextMenu(null);
+                                            void createInlineFolder(item.id);
+                                          }}
+                                        >
+                                          <MaterialActionIcon name="folderAdd" />
+                                          <span>{t("courseDetail.newFolderInFolder")}</span>
+                                        </button>
+                                      </>
+                                    ) : null}
+                                    <button
+                                      className="content-context-menu-item"
+                                      role="menuitem"
+                                      type="button"
+                                      onClick={() => {
+                                        setContentContextMenu(null);
+                                        item.kind === "folder" ? startEditingFolder(item, false) : openContentSettings(item);
+                                      }}
+                                    >
+                                      <MaterialActionIcon name="edit" />
+                                      <span>{t(item.kind === "folder" ? "courseDetail.renameFolderAction" : "courseDetail.contentSettingsAction")}</span>
+                                    </button>
+                                    <button
+                                      className="content-context-menu-item"
+                                      role="menuitem"
+                                      type="button"
+                                      onClick={() => {
+                                        setContentContextMenu(null);
+                                        void toggleContentVisibility(item);
+                                      }}
+                                    >
+                                      <MaterialActionIcon name={item.isVisible ? "hidden" : "visible"} />
+                                      <span>{item.isVisible ? t("courseDetail.contentHidden") : t("courseDetail.contentVisible")}</span>
+                                    </button>
+                                    <button
+                                      className="content-context-menu-item is-danger"
+                                      role="menuitem"
+                                      type="button"
+                                      onClick={() => {
+                                        setContentContextMenu(null);
+                                        void removeContentItem(item);
+                                      }}
+                                    >
+                                      <MaterialActionIcon name="remove" />
+                                      <span>{t("common.remove")}</span>
+                                    </button>
+                                  </div>
+                                ) : null}
                               </div>
                             );
                           })}
@@ -1937,15 +2163,76 @@ export default function CourseDetailPage() {
                     <div className="activity-type-options" role="tabpanel">
                       <div className="grid compact-form-grid activity-picker-placement">
                         <div className="field">
-                          <label htmlFor="courseContentFolder">{t("courseDetail.contentFolderLabel")}</label>
-                          <select id="courseContentFolder" value={pickerParentId} onChange={(event) => setPickerParentId(event.target.value)}>
-                            <option value="">{t("courseDetail.contentFolderRoot")}</option>
-                            {contentFolderOptions.map(({ item: folder, depth }) => (
-                              <option key={folder.id} value={folder.id}>
-                                {formatFolderOptionLabel(folder, depth, t("courseDetail.untitledFolder"))}
-                              </option>
-                            ))}
-                          </select>
+                          <span className="field-label" id="course-content-folder-label">
+                            {t("courseDetail.contentFolderLabel")}
+                          </span>
+                          <div className="folder-picker">
+                            <button
+                              aria-expanded={pickerFolderMenuOpen}
+                              aria-haspopup="listbox"
+                              aria-labelledby="course-content-folder-label course-content-folder-current"
+                              className="folder-picker-trigger"
+                              id="courseContentFolder"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setPickerFolderMenuOpen((current) => !current);
+                              }}
+                            >
+                              <span className="folder-picker-current" id="course-content-folder-current">
+                                {selectedPickerFolder
+                                  ? selectedPickerFolder.item.titleSnapshot ?? t("courseDetail.untitledFolder")
+                                  : t("courseDetail.contentFolderRoot")}
+                              </span>
+                              <MaterialActionIcon name="down" />
+                            </button>
+                            {pickerFolderMenuOpen ? (
+                              <div
+                                className="folder-picker-menu"
+                                role="listbox"
+                                aria-labelledby="course-content-folder-label"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <button
+                                  aria-selected={!pickerParentId}
+                                  className={!pickerParentId ? "folder-picker-option is-selected" : "folder-picker-option"}
+                                  role="option"
+                                  style={{ "--folder-picker-depth": 0 } as CSSProperties}
+                                  type="button"
+                                  onClick={() => {
+                                    setPickerParentId("");
+                                    setPickerFolderMenuOpen(false);
+                                  }}
+                                >
+                                  <span className="folder-picker-tree-rails" aria-hidden="true" />
+                                  <span className="folder-picker-folder-icon">
+                                    <MaterialActionIcon name="folder" />
+                                  </span>
+                                  <span className="folder-picker-option-label">{t("courseDetail.contentFolderRoot")}</span>
+                                </button>
+                                {contentFolderOptions.map(({ item: folder, depth }) => (
+                                  <button
+                                    key={folder.id}
+                                    aria-selected={pickerParentId === folder.id}
+                                    className={pickerParentId === folder.id ? "folder-picker-option is-selected" : "folder-picker-option"}
+                                    role="option"
+                                    style={{ "--folder-picker-depth": depth } as CSSProperties}
+                                    type="button"
+                                    onClick={() => {
+                                      setPickerParentId(folder.id);
+                                      setPickerFolderMenuOpen(false);
+                                    }}
+                                  >
+                                    <span className="folder-picker-tree-rails" aria-hidden="true" />
+                                    <span className="folder-picker-folder-icon">
+                                      <MaterialActionIcon name="folder" />
+                                    </span>
+                                    <span className="folder-picker-option-label">{folder.titleSnapshot ?? t("courseDetail.untitledFolder")}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
                         <label className="checkbox-row" htmlFor="courseContentVisible">
                           <input
@@ -2495,7 +2782,22 @@ function FolderContentIcon({ collapsed }: { collapsed: boolean }) {
 function MaterialActionIcon({
   name
 }: {
-  name: "activityAdd" | "add" | "assign" | "download" | "down" | "drag" | "edit" | "folderAdd" | "hidden" | "open" | "remove" | "up" | "visible";
+  name:
+    | "activityAdd"
+    | "add"
+    | "assign"
+    | "download"
+    | "down"
+    | "drag"
+    | "edit"
+    | "folder"
+    | "folderAdd"
+    | "hidden"
+    | "more"
+    | "open"
+    | "remove"
+    | "up"
+    | "visible";
 }) {
   const paths = {
     activityAdd: (
@@ -2549,6 +2851,12 @@ function MaterialActionIcon({
         <path d="m12 6 5 5" />
       </>
     ),
+    folder: (
+      <>
+        <path d="M3 7.5h6.7l2 2.5H21v7.5A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z" />
+        <path d="M3 10h18" />
+      </>
+    ),
     folderAdd: (
       <>
         <path d="M3 7h7l2 3h9v9H3z" />
@@ -2562,6 +2870,13 @@ function MaterialActionIcon({
         <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" />
         <path d="M9.9 5.2A10.4 10.4 0 0 1 12 5c5 0 9.3 3 10 7-.3 1.5-1.2 2.8-2.4 3.9" />
         <path d="M6.6 6.7C4.5 8 3.2 9.8 2 12c.8 1.6 1.9 3 3.3 4.1" />
+      </>
+    ),
+    more: (
+      <>
+        <circle cx="5" cy="12" r="1.5" />
+        <circle cx="12" cy="12" r="1.5" />
+        <circle cx="19" cy="12" r="1.5" />
       </>
     ),
     open: (
