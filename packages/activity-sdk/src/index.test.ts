@@ -48,6 +48,11 @@ describe("activity SDK registry", () => {
 
   it("centralizes category definitions and falls unknown categories back to generic", () => {
     expect(listActivityCategories().map((category) => category.id)).toEqual(["generic", "programming", "miscellaneous"]);
+    expect(listActivityCategories().map((category) => category.labelKey)).toEqual([
+      "activityCategories.generic",
+      "activityCategories.programming",
+      "activityCategories.miscellaneous"
+    ]);
     expect(getActivityHomeCategoryIds({ defaultCategoryIds: ["unknown-category"] })).toEqual(["generic"]);
     expect(activityDefinitionCreatesCategory(getActivityDefinition("mcq"), "generic")).toBe(true);
     expect(activityDefinitionCreatesCategory(getActivityDefinition("mcq"), "programming")).toBe(false);

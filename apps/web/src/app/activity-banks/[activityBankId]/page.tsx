@@ -3,7 +3,6 @@
 import {
   activityDefinitionBelongsToCategory,
   activityDefinitionCreatesCategory,
-  getActivityCategoryMessages,
   listActivityCategories,
   type ActivityCategoryId
 } from "@cognelo/activity-sdk/categories";
@@ -306,7 +305,7 @@ export default function ActivityBankDetailPage() {
                       aria-selected={selectedCategoryId === category.id}
                       onClick={() => setSelectedCategoryId(category.id)}
                     >
-                      {getActivityCategoryMessages(category, locale)}
+                      {t(category.labelKey)}
                     </button>
                   ))}
                 </div>

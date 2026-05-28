@@ -4,7 +4,6 @@ import { MarkdownRenderer } from "@cognelo/activity-ui";
 import {
   activityDefinitionBelongsToCategory,
   activityDefinitionCreatesCategory,
-  getActivityCategoryMessages,
   listActivityCategories,
   type ActivityCategoryId
 } from "@cognelo/activity-sdk/categories";
@@ -1940,7 +1939,7 @@ export default function CourseDetailPage() {
                           role="tab"
                           type="button"
                         >
-                          {getActivityCategoryMessages(category, locale)}
+                          {t(category.labelKey)}
                         </button>
                       ))}
                     </div>
