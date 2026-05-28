@@ -17,6 +17,12 @@ type NotificationRecord = NotificationInput & {
   variant: NotificationVariant;
 };
 
+export type NotificationLabels = Record<NotificationVariant, string> & {
+  dismiss: string;
+  history: string;
+  historyTitle: string;
+};
+
 type NotificationsContextValue = {
   notify: (input: NotificationInput) => void;
   success: (message: string, options?: Omit<NotificationInput, "message" | "variant">) => void;
@@ -164,41 +170,6 @@ function getAccentColor(variant: NotificationVariant) {
   return "#247fd6";
 }
 
-function getLocalizedLabels(locale: string) {
-  const language = locale.toLowerCase();
-  if (language.startsWith("fr")) {
-    return {
-      dismiss: "Fermer la notification",
-      history: "Messages",
-      historyTitle: "Messages récents",
-      success: "Validation",
-      error: "Erreur",
-      info: "Info",
-      warning: "Avertissement"
-    };
-  }
-  if (language.startsWith("zh")) {
-    return {
-      dismiss: "关闭通知",
-      history: "消息",
-      historyTitle: "最近消息",
-      success: "验证",
-      error: "错误",
-      info: "信息",
-      warning: "警告"
-    };
-  }
-  return {
-    dismiss: "Dismiss notification",
-    history: "Messages",
-    historyTitle: "Recent messages",
-    success: "Validation",
-    error: "Error",
-    info: "Info",
-    warning: "Warning"
-  };
-}
-
 function getCurrentDocumentLocale() {
   if (typeof document !== "undefined") {
     return document.documentElement.lang || "en";
@@ -217,7 +188,7 @@ function formatNotificationTime(value: Date, locale: string) {
   }).format(value);
 }
 
-export function NotificationProvider({ children }: { children: ReactNode }) {
+export function NotificationProvider({ children, labels }: { children: ReactNode; labels: NotificationLabels }) {
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [history, setHistory] = useState<NotificationRecord[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -349,8 +320,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }),
     [dismiss, notify]
   );
-  const labels = getLocalizedLabels(locale);
-
   return (
     <NotificationsContext.Provider value={value}>
       {children}
@@ -372,7 +341,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                   <p style={messageStyle}>{notification.message}</p>
                 </div>
                 <button aria-label={labels.dismiss} onClick={() => dismiss(notification.id)} style={closeButtonStyle} type="button">
-                  ×
+                  x
                 </button>
               </div>
             </section>
@@ -386,7 +355,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
               <div style={{ alignItems: "center", display: "flex", justifyContent: "space-between" }}>
                 <p style={titleStyle}>{labels.historyTitle}</p>
                 <button aria-label={labels.dismiss} onClick={() => setHistoryOpen(false)} style={closeButtonStyle} type="button">
-                  ×
+                  x
                 </button>
               </div>
               {history

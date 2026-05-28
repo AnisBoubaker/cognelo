@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { NotificationProvider } from "@cognelo/activity-ui";
 import { AuthProvider } from "@/components/auth-provider";
+import { AppNotificationProvider } from "@/components/notification-provider";
 import { UnsavedChangesProvider } from "@/components/unsaved-changes-provider";
 import { I18nProvider } from "@/lib/i18n";
 import "./globals.css";
@@ -22,9 +22,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <AuthProvider>
           <I18nProvider>
-            <NotificationProvider>
+            <AppNotificationProvider>
               <UnsavedChangesProvider>{children}</UnsavedChangesProvider>
-            </NotificationProvider>
+            </AppNotificationProvider>
           </I18nProvider>
         </AuthProvider>
       </body>

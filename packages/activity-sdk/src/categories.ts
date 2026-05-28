@@ -1,35 +1,18 @@
-export type PluginLocale = "en" | "fr" | "zh" | "ar";
-
 export const GENERIC_ACTIVITY_CATEGORY_ID = "generic";
 export const ALL_ACTIVITY_CATEGORY_ID = "all";
 
 export const ACTIVITY_CATEGORIES = [
   {
     id: GENERIC_ACTIVITY_CATEGORY_ID,
-    i18n: {
-      en: "Generic",
-      fr: "Générique",
-      zh: "通用",
-      ar: "عام"
-    }
+    labelKey: "activityCategories.generic"
   },
   {
     id: "programming",
-    i18n: {
-      en: "Programming",
-      fr: "Programmation",
-      zh: "编程",
-      ar: "برمجة"
-    }
+    labelKey: "activityCategories.programming"
   },
   {
     id: "miscellaneous",
-    i18n: {
-      en: "Miscellaneous",
-      fr: "Divers",
-      zh: "其他",
-      ar: "متفرقات"
-    }
+    labelKey: "activityCategories.miscellaneous"
   }
 ] as const;
 
@@ -42,10 +25,6 @@ type ActivityCategoryOwner = {
 
 export function listActivityCategories() {
   return [...ACTIVITY_CATEGORIES];
-}
-
-export function getActivityCategoryMessages(category: { i18n: Partial<Record<PluginLocale, string>> }, locale: PluginLocale) {
-  return category.i18n[locale] ?? category.i18n.en ?? "";
 }
 
 export function isKnownActivityCategoryId(categoryId: string): categoryId is ActivityCategoryId {
