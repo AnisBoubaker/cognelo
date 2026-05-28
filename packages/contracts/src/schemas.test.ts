@@ -6,6 +6,7 @@ import {
   ActivityPluginInstallationUpdateSchema,
   AiAgentConnectionInputSchema,
   AiAgentPreferencesInputSchema,
+  ContentTypePluginInstallationUpdateSchema,
   BankActivityInputSchema,
   CourseGroupActivityInputSchema,
   CourseGroupInputSchema,
@@ -150,6 +151,7 @@ describe("shared contract schemas", () => {
       action: "activate",
       restoreBackupId: null
     });
+    expect(ContentTypePluginInstallationUpdateSchema.parse({ isEnabled: false })).toEqual({ isEnabled: false });
   });
 
   it("validates course, subject, bank, group, activity, and enrollment defaults", () => {

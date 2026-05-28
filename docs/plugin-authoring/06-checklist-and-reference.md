@@ -6,7 +6,7 @@ This chapter is the practical final page: what to check, what to run, and what f
 
 ## Beginner-Friendly Build Checklist
 
-When creating a new plugin, a safe order is:
+When creating a new activity plugin, a safe order is:
 
 1. create the package
 2. define the plugin object
@@ -19,6 +19,21 @@ When creating a new plugin, a safe order is:
 9. add unsaved-change protection with `useUnsavedChangesGuard` for every authoring or settings form
 10. add a bank-to-course copy hook if the plugin owns private bank data. This is required, not optional.
 11. add a bank-activity delete cleanup hook if the plugin owns private bank data
+12. add docs
+
+When creating a new content type plugin, a safe order is:
+
+1. create the package under `packages/plugin-content-types`
+2. define the `ContentTypePlugin`
+3. register it in `packages/content-type-sdk/src/index.ts`
+4. define the `ServerContentTypePlugin`
+5. register it in `packages/content-type-sdk/src/server.ts`
+6. add settings/viewer renderers if needed
+7. register renderers in `apps/web/src/lib/content-type-renderers.tsx`
+8. add plugin routes if needed
+9. implement `getEmbeddingSource`
+10. add plugin-owned tables only when generic resource metadata is not enough
+11. activate and enable the plugin from `/settings/plugins`
 12. add docs
 
 ## Commands
@@ -67,6 +82,11 @@ Check that:
 - plugin routes respond correctly
 - unauthorized access is rejected
 - any plugin tables receive the expected records, including both bank-owned and copied course-owned rows where applicable
+- content type plugins appear under the Content type plugins settings tab
+- enabled content type plugins appear in the course picker
+- disabled active content type plugins still serve existing resources
+- inactive content type plugins show unavailable existing rows
+- content type plugins return the expected embedding source descriptor
 
 ## Best Reference Files
 
@@ -74,27 +94,36 @@ Read these when you get stuck:
 
 - [packages/activity-sdk/src/index.ts](../../packages/activity-sdk/src/index.ts)
 - [packages/activity-sdk/src/server.ts](../../packages/activity-sdk/src/server.ts)
+- [packages/content-type-sdk/src/index.ts](../../packages/content-type-sdk/src/index.ts)
+- [packages/content-type-sdk/src/server.ts](../../packages/content-type-sdk/src/server.ts)
 - [packages/core/src/activities.ts](../../packages/core/src/activities.ts)
+- [packages/core/src/course-content.ts](../../packages/core/src/course-content.ts)
 - [packages/core/src/subjects.ts](../../packages/core/src/subjects.ts)
 - [packages/contracts/src/index.ts](../../packages/contracts/src/index.ts)
 - [packages/activity-ui/src/code-editor.tsx](../../packages/activity-ui/src/code-editor.tsx)
 - [packages/activity-ui/src/code-renderer.tsx](../../packages/activity-ui/src/code-renderer.tsx)
 - [apps/web/src/lib/activity-renderers.tsx](../../apps/web/src/lib/activity-renderers.tsx)
+- [apps/web/src/lib/content-type-renderers.tsx](../../apps/web/src/lib/content-type-renderers.tsx)
 - [apps/web/src/lib/api.ts](../../apps/web/src/lib/api.ts)
 - [packages/plugin-activities/plugin-placeholder/src/index.ts](../../packages/plugin-activities/plugin-placeholder/src/index.ts)
 - [packages/plugin-activities/plugin-homework-grader/src/index.ts](../../packages/plugin-activities/plugin-homework-grader/src/index.ts)
 - [packages/plugin-activities/plugin-parsons/src/plugin.ts](../../packages/plugin-activities/plugin-parsons/src/plugin.ts)
 - [packages/plugin-activities/plugin-parsons/src/routes.ts](../../packages/plugin-activities/plugin-parsons/src/routes.ts)
 - [packages/plugin-activities/plugin-parsons/src/db.ts](../../packages/plugin-activities/plugin-parsons/src/db.ts)
+- [packages/plugin-content-types/plugin-github-repo](../../packages/plugin-content-types/plugin-github-repo)
+- [packages/plugin-content-types/plugin-file](../../packages/plugin-content-types/plugin-file)
+- [packages/plugin-content-types/plugin-text](../../packages/plugin-content-types/plugin-text)
 
 ## If You Want To Grow The Docs Later
 
 The easiest next expansions would be:
 
 - a dedicated “build a homework grader” tutorial
+- a dedicated “build a content sync provider” tutorial
 - a dedicated “research instrumentation patterns” page
 - a dedicated “shared grading roadmap” page
 
 For now, this handbook should be enough for a beginner to build a working plugin without first being an expert in Next.js.
 
 Previous: [Data, Research, And Grading](05-data-research-and-grading.md)
+Next: [Build Your First Content Type Plugin](07-build-your-first-content-type-plugin.md)

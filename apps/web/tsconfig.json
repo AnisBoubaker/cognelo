@@ -24,6 +24,21 @@
       "@cognelo/activity-sdk": [
         "../../packages/activity-sdk/src/index.ts"
       ],
+      "@cognelo/content-type-sdk": [
+        "../../packages/content-type-sdk/src/index.ts"
+      ],
+      "@cognelo/content-type-sdk/server": [
+        "../../packages/content-type-sdk/src/server.ts"
+      ],
+      "@cognelo/plugin-file-content": [
+        "../../packages/plugin-content-types/plugin-file/src/index.ts"
+      ],
+      "@cognelo/plugin-github-repo": [
+        "../../packages/plugin-content-types/plugin-github-repo/src/index.ts"
+      ],
+      "@cognelo/plugin-text-content": [
+        "../../packages/plugin-content-types/plugin-text/src/index.ts"
+      ],
       "@cognelo/activity-ui": [
         "../../packages/activity-ui/src/index.ts"
       ],

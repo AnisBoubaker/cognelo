@@ -2,14 +2,14 @@
 
 Cognelo is a modular ITS foundation for programming education. This root README covers the platform itself: core architecture, shared services, setup, and conventions for adding plugins.
 
-Plugin-specific behavior, routes, persistence, and UX notes belong in each plugin package under `packages/plugin-activities/*`.
+Plugin-specific behavior, routes, persistence, and UX notes belong in each plugin package under `packages/plugin-activities/*` for activities and `packages/plugin-content-types/*` for non-activity course content.
 
 ## Architecture Rationale
 
 - **Next.js + TypeScript** powers both the backend API and frontend app, keeping the MVP cohesive while preserving a clean app boundary.
 - **PostgreSQL + Prisma** gives the system relational integrity, migrations, and a schema that can grow into activity versioning, enrollment, sections, TAs, invitations, and research analytics.
 - **Shared contracts with Zod** keep API validation close to TypeScript types.
-- **Activity registry packages** keep plugin logic out of the subject, activity bank, and course models.
+- **Activity and content type registry packages** keep plugin logic out of subject, activity bank, course, and content tree models.
 - **Plugin-owned persistence and routes** keep plugin-specific concerns out of core tables and out of hardcoded API files.
 - **HttpOnly JWT cookie auth** gives a secure browser default for the MVP.
 - **Built-in i18n** gives the web app English, French, and Chinese UI copy, while plugins can provide their own localized labels.
@@ -23,12 +23,15 @@ apps/
 packages/
   activity-sdk/        Plugin registries and shared plugin contracts
   activity-ui/         Shared plugin-facing UI such as code editor/renderer/markdown/notifications
+  content-type-sdk/    Content type plugin registry and server contracts
   config/              Environment validation
   contracts/           Shared DTO schemas and types
   core/                Services and authorization
   db/                  Prisma schema, migration, seed, client
   plugin-activities/
     plugin-*/          Activity plugin packages, each with its own README and PROJECT_MEMORY
+  plugin-content-types/
+    plugin-*/          Course content type plugin packages
 docs/
   ARCHITECTURE.md      Durable architecture notes
   PROJECT_MEMORY.md    Platform-level memory for future sessions
@@ -45,22 +48,25 @@ docs/
 - Courses: create, list, read, update, archive; courses belong to a subject and receive activity copies from banks
 - Course settings: course-level AI agent selection for student support
 - Memberships: basic course membership creation
-- Course content tree: shared placement, ordering, folder nesting, and visibility for folders, materials, and activities
-- Materials: generic typed course material records that remain non-assigned resources
+- Course content tree: shared placement, ordering, folder nesting, and visibility for folders, legacy materials, plugin-backed content resources, and activities
+- Content resources: plugin-backed non-activity course content such as GitHub repos, uploaded files, and Markdown text
+- Materials: legacy generic typed course material records retained for compatibility while new content uses content type plugins
 - Activities: typed course-local activity copies with JSON config and research metadata
 - Activity types: enabled type listing plus SDK definitions
 
 ## Plugin Boundary
 
-Each activity plugin lives in its own package under `packages/plugin-activities/plugin-*`.
+Activity plugins live under `packages/plugin-activities/plugin-*`. Content type plugins live under `packages/plugin-content-types/plugin-*`.
 
 The intended boundary is:
 
-- **Core tables stay generic**: `Subject`, `ActivityBank`, `BankActivity`, `ActivityVersion`, `Activity`, `ActivityType`, `Course`, and related auth/course tables remain shared.
+- **Core tables stay generic**: `Subject`, `ActivityBank`, `BankActivity`, `ActivityVersion`, `Activity`, `ActivityType`, `CourseContentResource`, `CourseContentItem`, `Course`, and related auth/course tables remain shared.
 - **Plugin tables belong to the plugin**: plugin-specific persistence lives in plugin-local Prisma schemas, migrations, clients, and database modules rather than in the core Prisma schema.
 - **Plugin HTTP handlers belong to the plugin**: the API app provides a generic dispatcher route, while plugin-specific subroutes are declared in plugin packages.
+- **Content type behavior belongs to content type plugins**: validation, settings forms, plugin routes, storage behavior, open/download behavior, and embedding source extraction live in `packages/plugin-content-types/*`.
 - **Bank-to-course copies are explicit**: author in an activity bank, create a new bank version when saving there, and copy the selected version into a course when assigning it to that course. Course edits mutate only the course copy.
 - **Plugin activation and enablement are platform-managed**: installed activity plugins have `ActivityPluginInstallation` records. Newly discovered plugins start inactive and disabled; admins activate them first, then enable them when they should be available. Deactivation disables the plugin and renames plugin-owned tables into versioned backup tables that can be restored during reactivation. Plugin-local migrations provide the activation SQL for creating fresh empty plugin-owned tables when reactivated without restoring a backup.
+- **Content type activation mirrors activity plugins**: installed content type plugins have `ContentTypePluginInstallation` records. Enabled content type plugins can create new resources; active but disabled plugins may still serve existing resources; inactive/unavailable plugins render existing rows with an unavailable state.
 - **Shared services stay shared**: reusable pieces such as the syntax-colored code editor, code renderer, Markdown renderer, and shared notification system live in `@cognelo/activity-ui`.
 - **Remote execution stays outside the API app**: activities that run learner code should call an external sandbox service such as Judge0 from server-side plugin routes.
 
@@ -75,6 +81,15 @@ Plugin packages can export:
 - server route definitions
 - web components
 - plugin-local `README.md` and `PROJECT_MEMORY.md`
+
+Content type plugin packages can export:
+
+- content type definitions for picker metadata and localized labels
+- settings/rendering components registered by renderer key
+- server create/update/delete/open-action handlers
+- plugin routes for upload/download/viewer behavior
+- `getEmbeddingSource` handlers that return generic text, file, external URL, or none descriptors for future indexing
+- database manifests and plugin-owned migrations when generic resource metadata is not enough
 
 For the beginner-friendly plugin authoring handbook, including step-by-step setup, shared services, persistence patterns, and research/grading guidance, see [docs/plugin-authoring/README.md](docs/plugin-authoring/README.md).
 
@@ -137,9 +152,16 @@ POST   /api/courses/:courseId/content/materials
 POST   /api/courses/:courseId/content/activities
 PATCH  /api/courses/:courseId/content/:contentItemId
 DELETE /api/courses/:courseId/content/:contentItemId
+GET    /api/courses/:courseId/content-types
+GET    /api/courses/:courseId/content-resources
+POST   /api/courses/:courseId/content-resources
+PATCH  /api/courses/:courseId/content-resources/:resourceId
+DELETE /api/courses/:courseId/content-resources/:resourceId
 GET    /api/activity-types
 GET    /api/plugins
 PATCH  /api/plugins/:pluginKey
+GET    /api/content-type-plugins
+PATCH  /api/content-type-plugins/:pluginKey
 GET    /api/courses/:courseId/activities
 POST   /api/courses/:courseId/activities
 GET    /api/courses/:courseId/activities/:activityId
@@ -157,11 +179,13 @@ Plugin-specific subroutes are dispatched through:
 /api/courses/:courseId/activities/:activityId/[...pluginPath]
 /api/activity-banks/:activityBankId/activities/:bankActivityId/[...pluginPath]
 /api/courses/:courseId/groups/:groupId/activities/assigned/:activityId/[...pluginPath]
+/api/courses/:courseId/content-resources/:resourceId/[...pluginPath]
+/api/courses/:courseId/groups/:groupId/content-resources/:resourceId/[...pluginPath]
 ```
 
 Concrete plugin routes are documented in the owning plugin package.
 
-The web app keeps plugin-specific React wiring in the activity renderer registry. Route components should consume registered activity definitions and renderer entries instead of importing plugin packages or branching on concrete plugin keys.
+The web app keeps plugin-specific React wiring in registries: activity renderers in `apps/web/src/lib/activity-renderers.tsx`, and content type settings/rendering in `apps/web/src/lib/content-type-renderers.tsx`. Route components should consume registered definitions and renderer entries instead of importing plugin packages or branching on concrete plugin keys.
 
 ## Authorization Model
 
@@ -187,9 +211,13 @@ Core Prisma entities include:
 - `Course`
 - `CourseMembership`
 - `CourseMaterial`
+- `CourseContentResource`
+- `CourseContentItem`
 - `ActivityType`
 - `ActivityPluginInstallation`
 - `ActivityPluginTableBackup`
+- `ContentTypePluginInstallation`
+- `ContentTypePluginTableBackup`
 - `Activity`
 - `CourseGroupActivity`
 - `GradebookItem`
@@ -233,7 +261,9 @@ Each `CourseGroupActivity` assignment has one corresponding `GradebookItem`, cre
 
 Visibility is content-tree state and is separate from activity availability. A visible upcoming or expired activity can still be locked by assignment policy, while a hidden item or a descendant of a hidden folder is omitted from student content. Student group workspaces render a single Content tab with first-level folders as accordions; teachers manage the same unified content tree from course and group workspaces. The older material-only and activity-only workspace tabs are no longer the canonical content management surface.
 
-Material type definitions live in a lightweight web registry, separate from activity plugins. The current picker material types are GitHub repo, File, and Text. The registry records labels, descriptions, icons, create modes, and future-facing embedding source metadata so later course-material indexing can identify uploaded files, typed text, or external URLs without changing the activity plugin lifecycle.
+Course content resources are now plugin-backed through content type plugins. The current content type plugins are GitHub repo, File, and Text under `packages/plugin-content-types/*`. The course picker reads enabled content type definitions, while existing content rows can still render through active disabled plugins. Folders remain generic core content tree items rather than plugins.
+
+Each content type plugin can expose a `getEmbeddingSource` handler. Core exposes the generic `getContentResourceEmbeddingSource` service so future indexing or activity-generation code can ask for descriptors without importing concrete content plugins. The descriptor is intentionally generic: text, file reference, external URL, or none. Phase 11 does not create an embeddings database.
 
 Core gradebook services create numbered `ActivityAttempt` records for assigned group activities, enforce attempt limits, compute lateness at submission time, normalize raw plugin scores to the gradebook item scale, apply pass/fail thresholds and late penalties, select the current grade across attempts, and record grading results with `GradeEvent` audit entries. Plugins keep their private attempt/submission artifacts in plugin tables and call the core services to keep gradebook records consistent.
 
@@ -367,8 +397,9 @@ WEB_DESIGN_RUNNER_URL=http://localhost:3456
 
 If you are working on a single plugin, start inside that plugin package:
 
-- `packages/plugin-activities/plugin-your-plugin/README.md`
-- `packages/plugin-activities/plugin-your-plugin/PROJECT_MEMORY.md`
+- `packages/plugin-activities/plugin-your-plugin/README.md` for activity plugins
+- `packages/plugin-content-types/plugin-your-content-type/README.md` for content type plugins
+- the matching plugin-local `PROJECT_MEMORY.md`
 
 For the beginner-friendly plugin authoring handbook, including step-by-step setup, core services, API/web integration, research data patterns, and grading-oriented design guidance, use [docs/plugin-authoring/README.md](docs/plugin-authoring/README.md).
 

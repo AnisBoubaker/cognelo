@@ -13,13 +13,18 @@ describe("course content tree schema foundation", () => {
     expect(schema).toContain("enum CourseContentItemKind");
   });
 
-  it("supports folders, materials, and activities as content item kinds", () => {
+  it("supports folders, plugin-backed content, and activities as content item kinds", () => {
     expect(schema).toContain("folder");
-    expect(schema).toContain("material");
+    expect(schema).toContain("content");
     expect(schema).toContain("activity");
   });
 
-  it("ships a migration for the course content table and key relationships", () => {
+  it("ships migrations for the course content table, content resources, and key relationships", () => {
+    const contentTypeMigration = readFileSync(
+      new URL("./migrations/202605270001_content_type_plugins_foundation/migration.sql", import.meta.url),
+      "utf8"
+    );
+
     expect(migration).toContain('CREATE TYPE "CourseContentItemKind" AS ENUM');
     expect(migration).toContain('CREATE TABLE "CourseContentItem"');
     expect(migration).toContain('"isVisible" BOOLEAN NOT NULL DEFAULT true');
@@ -27,5 +32,11 @@ describe("course content tree schema foundation", () => {
     expect(migration).toContain('CONSTRAINT "CourseContentItem_materialId_fkey"');
     expect(migration).toContain('CONSTRAINT "CourseContentItem_activityId_fkey"');
     expect(migration).toContain('CONSTRAINT "CourseContentItem_courseGroupActivityId_fkey"');
+    expect(contentTypeMigration).toContain("CREATE TABLE \"ContentTypePluginInstallation\"");
+    expect(contentTypeMigration).toContain("CREATE TABLE \"ContentTypePluginTableBackup\"");
+    expect(contentTypeMigration).toContain("CREATE TABLE \"CourseContentResource\"");
+    expect(contentTypeMigration).toContain("\"contentResourceId\" TEXT");
+    expect(contentTypeMigration).toContain("ContentTypePluginTableBackup_pluginKey_fkey");
+    expect(contentTypeMigration).toContain("CourseContentItem_contentResourceId_fkey");
   });
 });

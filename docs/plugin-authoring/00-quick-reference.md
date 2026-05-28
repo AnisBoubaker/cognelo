@@ -22,12 +22,14 @@ Cognelo has:
 - `apps/api`: backend API app
 - `packages/activity-sdk`: plugin registration and plugin contracts
 - `packages/activity-ui`: shared code editor/renderer/markdown/notifications
+- `packages/content-type-sdk`: content type plugin registration and contracts
 - `packages/core`: shared business logic
 - `packages/contracts`: shared schemas/types
 - `packages/db`: Prisma schema, migrations, seed
 - `packages/plugin-activities/*`: plugin packages
+- `packages/plugin-content-types/*`: content type plugin packages
 
-Plugins own activity-specific behavior. The platform owns generic auth, subject/activity-bank/course/activity CRUD, route dispatch, activity copying, and shared UI primitives.
+Activity plugins own activity-specific behavior. Content type plugins own non-activity course content behavior. The platform owns generic auth, subject/activity-bank/course/activity CRUD, content tree placement, resource rows, route dispatch, activity copying, and shared UI primitives.
 
 For authored rich text display, use `MarkdownRenderer` from `@cognelo/activity-ui`. For transient confirmations and non-field-specific errors, use `useNotifications()` instead of adding a plugin-local inline “saved” banner.
 
@@ -35,7 +37,7 @@ For every plugin authoring or settings form, use `useUnsavedChangesGuard` from `
 
 If a plugin adds AI-assisted generation that writes into authoring/configuration fields, confirm before replacing any non-empty existing content. Treat generation as a destructive overwrite unless it appends into a clearly separate draft area.
 
-## Minimal Plugin Flow
+## Minimal Activity Plugin Flow
 
 1. Create `packages/plugin-activities/plugin-your-plugin`
 2. Export an `ActivityPlugin`
@@ -48,6 +50,21 @@ If a plugin adds AI-assisted generation that writes into authoring/configuration
 9. If the plugin exposes any authoring or settings form, register unsaved-change behavior with `useUnsavedChangesGuard`
 10. If the plugin stores private bank-owned data, add a server hook to copy it into course-owned plugin tables when a bank version is assigned to a course. This is mandatory; core does not know how to copy plugin-owned rows.
 11. If needed, add browser API helpers in `apps/web/src/lib/api.ts`
+
+## Minimal Content Type Plugin Flow
+
+1. Create `packages/plugin-content-types/plugin-your-content-type`
+2. Export a `ContentTypePlugin`
+3. Register it in `packages/content-type-sdk/src/index.ts`
+4. Export a `ServerContentTypePlugin`
+5. Register it in `packages/content-type-sdk/src/server.ts`
+6. Add settings/viewer components if needed
+7. Register settings/viewer renderers in `apps/web/src/lib/content-type-renderers.tsx`
+8. If needed, add plugin routes for upload/download/viewer behavior
+9. Implement `getEmbeddingSource`
+10. Add plugin-owned tables only when generic `CourseContentResource.metadata` is insufficient
+
+Content type plugins do not create `Activity`, `BankActivity`, attempts, or gradebook rows. They create and manage `CourseContentResource` behavior. Folders stay generic `CourseContentItem` rows owned by core.
 
 ## Required Registration Points
 
@@ -106,6 +123,60 @@ export const activityRenderers = {
 } as const;
 ```
 
+### Content type definition registry
+
+File:
+
+- [packages/content-type-sdk/src/index.ts](../../packages/content-type-sdk/src/index.ts)
+
+What you add:
+
+```ts
+import { yourContentPlugin } from "@cognelo/plugin-your-content-type";
+
+const plugins: ContentTypePlugin[] = [
+  githubRepoContentPlugin,
+  fileContentPlugin,
+  textContentPlugin,
+  yourContentPlugin
+];
+```
+
+### Content type server registry
+
+File:
+
+- [packages/content-type-sdk/src/server.ts](../../packages/content-type-sdk/src/server.ts)
+
+What you add:
+
+```ts
+import { yourContentServerPlugin } from "@cognelo/plugin-your-content-type/server";
+
+const serverPlugins: readonly ServerContentTypePlugin[] = [
+  githubRepoContentServerPlugin,
+  fileContentServerPlugin,
+  textContentServerPlugin,
+  yourContentServerPlugin
+];
+```
+
+### Content type renderer registry
+
+File:
+
+- [apps/web/src/lib/content-type-renderers.tsx](../../apps/web/src/lib/content-type-renderers.tsx)
+
+What you add:
+
+```ts
+import { YourContentSettings } from "@cognelo/plugin-your-content-type/settings";
+
+const contentTypeSettingsRenderers = {
+  "your-content-settings": YourContentSettings
+};
+```
+
 ## Recommended Package Shape
 
 ```text
@@ -122,6 +193,22 @@ packages/plugin-activities/plugin-your-plugin/
     db.ts
     web/
       your-activity-view.tsx
+```
+
+Content type plugin package:
+
+```text
+packages/plugin-content-types/plugin-your-content-type/
+  README.md
+  PROJECT_MEMORY.md
+  package.json
+  tsconfig.json
+  src/
+    index.ts
+    server.ts
+    settings.tsx
+    db.ts
+    your-content-type.test.ts
 ```
 
 ## Core Contracts You Plug Into
@@ -176,6 +263,74 @@ type ServerActivityPlugin = {
   };
 };
 ```
+
+### `ContentTypePlugin`
+
+Defined in:
+
+- [packages/content-type-sdk/src/index.ts](../../packages/content-type-sdk/src/index.ts)
+
+Typical shape:
+
+```ts
+type ContentTypePlugin = {
+  key: string;
+  packageName: string;
+  name: string;
+  version?: string;
+  db: {
+    namespace: string;
+    tables: readonly string[];
+    notes?: readonly string[];
+  };
+  contentTypes: ContentTypeDefinition[];
+};
+```
+
+Key `ContentTypeDefinition` fields:
+
+- `key`
+- `label`
+- `description`
+- `defaultTitle`
+- `icon`
+- `createMode`
+- `embeddingSource`
+- `settingsRendererKey`
+
+### `ServerContentTypePlugin`
+
+Defined in:
+
+- [packages/content-type-sdk/src/server.ts](../../packages/content-type-sdk/src/server.ts)
+
+Typical shape:
+
+```ts
+type ServerContentTypePlugin = {
+  key: string;
+  routes?: readonly ContentTypeRouteDefinition[];
+  handlers?: {
+    create?: ContentTypeCreateHandler;
+    update?: ContentTypeUpdateHandler;
+    delete?: ContentTypeDeleteHandler;
+    resolveOpenAction?: ContentTypeOpenActionHandler;
+    getEmbeddingSource?: ContentTypeEmbeddingSourceHandler;
+  };
+};
+```
+
+`getEmbeddingSource` must return a generic descriptor:
+
+```ts
+type ContentEmbeddingSource =
+  | { kind: "text"; text: string; sourceId: string }
+  | { kind: "file"; fileRef: string; mimeType?: string; sourceId: string }
+  | { kind: "external_url"; url: string; sourceId: string }
+  | { kind: "none"; sourceId: string };
+```
+
+Future indexing services should call core's generic `getContentResourceEmbeddingSource` instead of importing your plugin directly.
 
 ## Minimal Plugin Example
 
@@ -256,6 +411,30 @@ export const tracingQuizSubmissionRoute: PluginRouteDefinition = {
 };
 ```
 
+## Content Type Route Handler Example
+
+Content type routes are dispatched through:
+
+- [apps/api/src/app/api/courses/[courseId]/content-resources/[resourceId]/[...pluginPath]/route.ts](../../apps/api/src/app/api/courses/[courseId]/content-resources/[resourceId]/[...pluginPath]/route.ts)
+- [apps/api/src/app/api/courses/[courseId]/groups/[groupId]/content-resources/[resourceId]/[...pluginPath]/route.ts](../../apps/api/src/app/api/courses/[courseId]/groups/[groupId]/content-resources/[resourceId]/[...pluginPath]/route.ts)
+
+Example:
+
+```ts
+import type { ContentTypeRouteDefinition } from "@cognelo/content-type-sdk/server";
+
+export const previewRoute: ContentTypeRouteDefinition = {
+  path: "preview",
+  contentTypeKeys: ["your-content-type"],
+  methods: {
+    GET: async ({ context }) => ({
+      title: context.resource?.title,
+      metadata: context.resource?.metadata ?? {}
+    })
+  }
+};
+```
+
 ## Shared UI You Can Reuse
 
 Files:
@@ -298,6 +477,10 @@ Use plugin-owned tables for:
 - event streams
 - grade summaries
 - detailed telemetry
+
+For content type plugins, start with `CourseContentResource.metadata` for safe, student-visible resource metadata such as URLs, Markdown bodies, original file names, MIME types, and setup status. Move to plugin-owned tables when you need private data, extraction jobs, large metadata, provider-specific sync state, or records that should survive independently of a small JSON blob.
+
+Content type plugin activation and enablement uses `ContentTypePluginInstallation`. Admins activate a discovered plugin first, then enable it for new resource creation. Disabled active plugins can still serve existing resources. Deactivation backs up plugin-owned tables and makes existing resources unavailable until reactivated.
 
 Copy rule for plugin-owned data:
 
@@ -354,22 +537,34 @@ Manual checks:
 - renderer shows up
 - config save path works
 - plugin routes work
+- content type plugin routes work when building content plugins
 - plugin tables receive data when expected
+- content resources return the expected embedding source descriptor when building content plugins
 
 ## Best Files To Read
 
 - [packages/activity-sdk/src/index.ts](../../packages/activity-sdk/src/index.ts)
 - [packages/activity-sdk/src/server.ts](../../packages/activity-sdk/src/server.ts)
+- [packages/content-type-sdk/src/index.ts](../../packages/content-type-sdk/src/index.ts)
+- [packages/content-type-sdk/src/server.ts](../../packages/content-type-sdk/src/server.ts)
 - [packages/core/src/activities.ts](../../packages/core/src/activities.ts)
+- [packages/core/src/course-content.ts](../../packages/core/src/course-content.ts)
 - [apps/web/src/lib/activity-renderers.tsx](../../apps/web/src/lib/activity-renderers.tsx)
+- [apps/web/src/lib/content-type-renderers.tsx](../../apps/web/src/lib/content-type-renderers.tsx)
 - [apps/web/src/lib/api.ts](../../apps/web/src/lib/api.ts)
 - [packages/plugin-activities/plugin-placeholder/src/index.ts](../../packages/plugin-activities/plugin-placeholder/src/index.ts)
 - [packages/plugin-activities/plugin-homework-grader/src/index.ts](../../packages/plugin-activities/plugin-homework-grader/src/index.ts)
 - [packages/plugin-activities/plugin-parsons/src/plugin.ts](../../packages/plugin-activities/plugin-parsons/src/plugin.ts)
 - [packages/plugin-activities/plugin-parsons/src/routes.ts](../../packages/plugin-activities/plugin-parsons/src/routes.ts)
 - [packages/plugin-activities/plugin-parsons/src/db.ts](../../packages/plugin-activities/plugin-parsons/src/db.ts)
+- [packages/plugin-content-types/plugin-github-repo/src/index.ts](../../packages/plugin-content-types/plugin-github-repo/src/index.ts)
+- [packages/plugin-content-types/plugin-github-repo/src/server.ts](../../packages/plugin-content-types/plugin-github-repo/src/server.ts)
+- [packages/plugin-content-types/plugin-file/src/index.ts](../../packages/plugin-content-types/plugin-file/src/index.ts)
+- [packages/plugin-content-types/plugin-file/src/server.ts](../../packages/plugin-content-types/plugin-file/src/server.ts)
+- [packages/plugin-content-types/plugin-text/src/index.ts](../../packages/plugin-content-types/plugin-text/src/index.ts)
+- [packages/plugin-content-types/plugin-text/src/server.ts](../../packages/plugin-content-types/plugin-text/src/server.ts)
 
 ## Pick Your Path
 
 - Want the short version: you are already here.
-- Want the tutorial version: continue with [Cognelo And Next.js Basics](01-basics.md) or jump to [Build Your First Plugin](05-build-your-first-plugin.md).
+- Want the tutorial version: continue with [Cognelo And Next.js Basics](01-basics.md), jump to [Build Your First Plugin](05-build-your-first-plugin.md), or build a content type with [Build Your First Content Type Plugin](07-build-your-first-content-type-plugin.md).

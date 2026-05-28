@@ -35,7 +35,7 @@ enum MaterialKind {
 
 enum CourseContentItemKind {
   folder
-  material
+  content
   activity
 }
 
@@ -196,6 +196,7 @@ model Course {
   gradebookItems   GradebookItem[]
   activityAttempts ActivityAttempt[]
   contentItems     CourseContentItem[]
+  contentResources CourseContentResource[]
 
   @@index([subjectId])
   @@index([status])
@@ -319,6 +320,7 @@ model CourseGroup {
   gradebookItems        GradebookItem[]
   activityAttempts      ActivityAttempt[]
   contentItems          CourseContentItem[]
+  contentResources      CourseContentResource[]
 
   @@index([courseId, updatedAt])
   @@index([status, availableFrom, availableUntil])
@@ -452,6 +454,39 @@ model ActivityPluginTableBackup {
   @@index([restoredAt])
 }
 
+model ContentTypePluginInstallation {
+  id            String                         @id @default(cuid())
+  key           String                         @unique
+  packageName   String
+  name          String
+  version       String                         @default("0.1.0")
+  metadata      Json                           @default("{}")
+  isActivated   Boolean                        @default(false)
+  isEnabled     Boolean                        @default(true)
+  activatedAt   DateTime?
+  deactivatedAt DateTime?
+  createdAt     DateTime                       @default(now())
+  updatedAt     DateTime                       @updatedAt
+  tableBackups  ContentTypePluginTableBackup[]
+
+  @@index([isActivated])
+  @@index([isEnabled])
+}
+
+model ContentTypePluginTableBackup {
+  id            String                        @id @default(cuid())
+  pluginKey     String
+  pluginVersion String
+  sourceTables  Json                          @default("[]")
+  backupTables  Json                          @default("[]")
+  restoredAt    DateTime?
+  createdAt     DateTime                      @default(now())
+  installation  ContentTypePluginInstallation @relation(fields: [pluginKey], references: [key], onDelete: Cascade)
+
+  @@index([pluginKey, pluginVersion])
+  @@index([restoredAt])
+}
+
 model BankActivity {
   id               String            @id @default(cuid())
   bankId           String
@@ -534,6 +569,25 @@ model Activity {
   @@index([lifecycle])
 }
 
+model CourseContentResource {
+  id             String              @id @default(cuid())
+  courseId       String
+  groupId        String?
+  contentTypeKey String
+  pluginKey      String
+  title          String
+  metadata       Json                @default("{}")
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  course         Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  group          CourseGroup?        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  contentItems   CourseContentItem[]
+
+  @@index([courseId, groupId])
+  @@index([contentTypeKey])
+  @@index([pluginKey])
+}
+
 model CourseContentItem {
   id                    String                @id @default(cuid())
   courseId              String
@@ -547,12 +601,14 @@ model CourseContentItem {
   activityId            String?
   courseGroupActivityId String?
   metadata              Json                  @default("{}")
+  contentResourceId     String?
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
   course                Course                @relation(fields: [courseId], references: [id], onDelete: Cascade)
   group                 CourseGroup?          @relation(fields: [groupId], references: [id], onDelete: Cascade)
   parent                CourseContentItem?    @relation("CourseContentTree", fields: [parentId], references: [id], onDelete: Cascade)
   children              CourseContentItem[]   @relation("CourseContentTree")
+  contentResource       CourseContentResource? @relation(fields: [contentResourceId], references: [id], onDelete: Cascade)
   material              CourseMaterial?       @relation(fields: [materialId], references: [id], onDelete: Cascade)
   activity              Activity?             @relation(fields: [activityId], references: [id], onDelete: Cascade)
   groupActivity         CourseGroupActivity?  @relation(fields: [courseGroupActivityId], references: [id], onDelete: Cascade)
@@ -563,6 +619,7 @@ model CourseContentItem {
   @@index([parentId])
   @@index([kind])
   @@index([isVisible])
+  @@index([contentResourceId])
   @@index([materialId])
   @@index([activityId])
   @@index([courseGroupActivityId])

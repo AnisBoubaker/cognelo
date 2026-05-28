@@ -16,20 +16,18 @@ import type {
   CourseGroupParticipantInput,
   CourseGroupParticipantRole,
   CourseGroupStatus,
-  CourseGroupMaterialInput,
-  CourseGroupMaterialUpdate,
   CourseGroupUpdate,
   CourseInput,
-  CourseMaterialInput,
-  CourseMaterialUpdate,
   CourseSettingsInput,
   CourseUpdate,
   CurrentUser,
+  ContentTypePluginInstallationUpdate,
   MaterialKind,
   SubjectInput,
   SubjectUpdate,
   UserProfileUpdate
 } from "@cognelo/contracts";
+import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 
 export type { MaterialKind };
 
@@ -80,6 +78,40 @@ export type ActivityPluginTableBackup = {
   backupTables: Array<{ sourceTable: string; backupTable: string }>;
   restoredAt: string | null;
   createdAt: string;
+};
+
+export type ContentTypePluginInstallation = {
+  id: string;
+  key: string;
+  packageName: string;
+  name: string;
+  version: string;
+  metadata: {
+    contentTypeKeys?: string[];
+    databaseNamespace?: string;
+    databaseTables?: string[];
+    databaseNotes?: string[];
+    [key: string]: unknown;
+  };
+  isActivated: boolean;
+  isEnabled: boolean;
+  activatedAt: string | null;
+  deactivatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  tableBackups?: ActivityPluginTableBackup[];
+};
+
+export type CourseContentResource = {
+  id: string;
+  courseId: string;
+  groupId: string | null;
+  contentTypeKey: string;
+  pluginKey: string;
+  title: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type CodingExercisePromptGenerationInput = {
@@ -238,11 +270,12 @@ export type CourseContentItem = {
   courseId: string;
   groupId?: string | null;
   parentId?: string | null;
-  kind: "folder" | "material" | "activity";
+  kind: "folder" | "content" | "activity";
   titleSnapshot?: string | null;
   position: number;
   isVisible: boolean;
   materialId?: string | null;
+  contentResourceId?: string | null;
   activityId?: string | null;
   courseGroupActivityId?: string | null;
   effectiveVisibility?: "visible" | "hidden" | "hidden_by_parent";
@@ -710,6 +743,12 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(input)
     }),
+  contentTypePlugins: () => request<{ plugins: ContentTypePluginInstallation[] }>("/content-type-plugins"),
+  updateContentTypePlugin: (pluginKey: string, input: ContentTypePluginInstallationUpdate) =>
+    request<{ plugin: ContentTypePluginInstallation }>(`/content-type-plugins/${pluginKey}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
   subjects: () => request<{ subjects: Subject[] }>("/subjects"),
   subject: (subjectId: string) => request<{ subject: Subject }>(`/subjects/${subjectId}`),
   createSubject: (input: SubjectInput) =>
@@ -1074,16 +1113,63 @@ export const api = {
     const query = params.toString();
     return request<{ contentItems: CourseContentItem[] }>(`/courses/${courseId}/content${query ? `?${query}` : ""}`);
   },
-  createContentFolder: (courseId: string, input: { title: string; parentId?: string | null; isVisible?: boolean; position?: number }) =>
-    request<{ contentItem: CourseContentItem }>(`/courses/${courseId}/content/folders`, {
+  courseContentTypes: (courseId: string) =>
+    request<{ contentTypes: ContentTypeDefinition[]; activeContentTypes?: ContentTypeDefinition[] }>(`/courses/${courseId}/content-types`),
+  courseContentResources: (courseId: string) =>
+    request<{ resources: CourseContentResource[] }>(`/courses/${courseId}/content-resources`),
+  createCourseContentResource: (
+    courseId: string,
+    input: {
+      contentTypeKey: string;
+      payload?: unknown;
+      parentId?: string | null;
+      position?: number;
+      isVisible?: boolean;
+      itemMetadata?: Record<string, unknown>;
+    }
+  ) =>
+    request<{ resource: CourseContentResource; contentItem: CourseContentItem }>(`/courses/${courseId}/content-resources`, {
       method: "POST",
       body: JSON.stringify(input)
     }),
-  createMaterialContentItem: (
+  updateCourseContentResource: (
     courseId: string,
-    input: { materialId: string; parentId?: string | null; titleSnapshot?: string | null; isVisible?: boolean; position?: number }
+    resourceId: string,
+    input: {
+      payload?: unknown;
+    }
   ) =>
-    request<{ contentItem: CourseContentItem }>(`/courses/${courseId}/content/materials`, {
+    request<{ resource: CourseContentResource }>(`/courses/${courseId}/content-resources/${resourceId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  uploadCourseContentResourceFile: async (courseId: string, resourceId: string, input: { title: string; file: File }) => {
+    const formData = new FormData();
+    formData.append("title", input.title);
+    formData.append("file", input.file);
+    const response = await fetch(`${API_URL}/api/courses/${courseId}/content-resources/${resourceId}/upload`, {
+      cache: "no-store",
+      method: "PUT",
+      credentials: "include",
+      body: formData
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 401 || body?.error?.code === "UNAUTHORIZED") {
+        notifyUnauthorized();
+      }
+      throw new Error(body?.error?.message ?? "Upload failed.");
+    }
+    return body as { resource: CourseContentResource };
+  },
+  courseContentResourceDownloadUrl: (courseId: string, resourceId: string) =>
+    `${API_URL}/api/courses/${courseId}/content-resources/${resourceId}/download`,
+  deleteCourseContentResource: (courseId: string, resourceId: string) =>
+    request<{ ok: true }>(`/courses/${courseId}/content-resources/${resourceId}`, {
+      method: "DELETE"
+    }),
+  createContentFolder: (courseId: string, input: { title: string; parentId?: string | null; isVisible?: boolean; position?: number }) =>
+    request<{ contentItem: CourseContentItem }>(`/courses/${courseId}/content/folders`, {
       method: "POST",
       body: JSON.stringify(input)
     }),
@@ -1109,140 +1195,64 @@ export const api = {
     request<{ ok: true }>(`/courses/${courseId}/activities/${activityId}`, {
       method: "DELETE"
     }),
-  createMaterial: (courseId: string, input: CourseMaterialInput) =>
-    request<{ material: CourseMaterial }>(`/courses/${courseId}/materials`, {
-      method: "POST",
-      body: JSON.stringify(input)
-    }),
-  updateMaterial: (courseId: string, materialId: string, input: CourseMaterialUpdate) =>
-    request<{ material: CourseMaterial }>(`/courses/${courseId}/materials/${materialId}`, {
-      method: "PATCH",
-      body: JSON.stringify(input)
-    }),
   deleteMaterial: (courseId: string, materialId: string) =>
     request<{ ok: true }>(`/courses/${courseId}/materials/${materialId}`, {
       method: "DELETE"
     }),
-  uploadMaterial: async (courseId: string, input: { title: string; file: File; parentId?: string | null; position?: number }) => {
-    const formData = new FormData();
-    formData.append("title", input.title);
-    formData.append("file", input.file);
-    if (input.parentId) {
-      formData.append("parentId", input.parentId);
-    }
-    if (input.position !== undefined) {
-      formData.append("position", String(input.position));
-    }
-
-    const response = await fetch(`${API_URL}/api/courses/${courseId}/materials/upload`, {
-      cache: "no-store",
-      method: "POST",
-      credentials: "include",
-      body: formData
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      if (response.status === 401 || body?.error?.code === "UNAUTHORIZED") {
-        notifyUnauthorized();
-      }
-      throw new Error(body?.error?.message ?? "Upload failed.");
-    }
-    return body as { material: CourseMaterial };
-  },
-  uploadExistingMaterialFile: async (courseId: string, materialId: string, input: { title: string; file: File }) => {
-    const formData = new FormData();
-    formData.append("title", input.title);
-    formData.append("file", input.file);
-
-    const response = await fetch(`${API_URL}/api/courses/${courseId}/materials/${materialId}/upload`, {
-      cache: "no-store",
-      method: "PUT",
-      credentials: "include",
-      body: formData
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      if (response.status === 401 || body?.error?.code === "UNAUTHORIZED") {
-        notifyUnauthorized();
-      }
-      throw new Error(body?.error?.message ?? "Upload failed.");
-    }
-    return body as { material: CourseMaterial };
-  },
   materialDownloadUrl: (courseId: string, materialId: string) =>
     `${API_URL}/api/courses/${courseId}/materials/${materialId}/download`,
   groupCourseMaterialDownloadUrl: (courseId: string, groupId: string, materialId: string) =>
     `${API_URL}/api/courses/${courseId}/groups/${groupId}/course-materials/${materialId}/download`,
-  groupMaterials: (courseId: string, groupId: string) =>
-    request<{ materials: CourseGroupMaterial[] }>(`/courses/${courseId}/groups/${groupId}/materials`),
-  createGroupMaterial: (courseId: string, groupId: string, input: CourseGroupMaterialInput) =>
-    request<{ material: CourseGroupMaterial }>(`/courses/${courseId}/groups/${groupId}/materials`, {
-      method: "POST",
-      body: JSON.stringify(input)
-    }),
-  updateGroupMaterial: (courseId: string, groupId: string, materialId: string, input: CourseGroupMaterialUpdate) =>
-    request<{ material: CourseGroupMaterial }>(`/courses/${courseId}/groups/${groupId}/materials/${materialId}`, {
-      method: "PATCH",
-      body: JSON.stringify(input)
-    }),
   deleteGroupMaterial: (courseId: string, groupId: string, materialId: string) =>
     request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}/materials/${materialId}`, {
       method: "DELETE"
     }),
-  uploadGroupMaterial: async (
-    courseId: string,
-    groupId: string,
-    input: { title: string; file: File; parentId?: string | null; position?: number }
-  ) => {
-    const formData = new FormData();
-    formData.append("title", input.title);
-    formData.append("file", input.file);
-    if (input.parentId) {
-      formData.append("parentId", input.parentId);
-    }
-    if (input.position !== undefined) {
-      formData.append("position", String(input.position));
-    }
-
-    const response = await fetch(`${API_URL}/api/courses/${courseId}/groups/${groupId}/materials/upload`, {
-      cache: "no-store",
-      method: "POST",
-      credentials: "include",
-      body: formData
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      if (response.status === 401 || body?.error?.code === "UNAUTHORIZED") {
-        notifyUnauthorized();
-      }
-      throw new Error(body?.error?.message ?? "Upload failed.");
-    }
-    return body as { material: CourseGroupMaterial };
-  },
   groupMaterialDownloadUrl: (courseId: string, groupId: string, materialId: string) =>
     `${API_URL}/api/courses/${courseId}/groups/${groupId}/materials/${materialId}/download`,
-  hideCourseMaterialInGroup: (courseId: string, groupId: string, materialId: string) =>
-    request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}/course-materials/${materialId}/visibility`, {
-      method: "PUT"
-    }),
-  unhideCourseMaterialInGroup: (courseId: string, groupId: string, materialId: string) =>
-    request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}/course-materials/${materialId}/visibility`, {
-      method: "DELETE"
-    }),
   groupActivityAssignments: (courseId: string, groupId: string) =>
     request<{ assignments: CourseGroupActivityAssignment[] }>(`/courses/${courseId}/groups/${groupId}/activities`),
   groupContent: (courseId: string, groupId: string, options?: { visibleOnly?: boolean }) => {
     const query = options?.visibleOnly ? "?visibleOnly=true" : "";
     return request<{ contentItems: CourseContentItem[] }>(`/courses/${courseId}/groups/${groupId}/content${query}`);
   },
-  createGroupMaterialContentItem: (
+  groupContentResources: (courseId: string, groupId: string) =>
+    request<{ resources: CourseContentResource[] }>(`/courses/${courseId}/groups/${groupId}/content-resources`),
+  createGroupContentResource: (
     courseId: string,
     groupId: string,
-    input: { materialId: string; parentId?: string | null; titleSnapshot?: string | null; isVisible?: boolean; position?: number }
+    input: {
+      contentTypeKey: string;
+      payload?: unknown;
+      parentId?: string | null;
+      position?: number;
+      isVisible?: boolean;
+      itemMetadata?: Record<string, unknown>;
+    }
   ) =>
-    request<{ contentItem: CourseContentItem }>(`/courses/${courseId}/groups/${groupId}/content/materials`, {
-      method: "POST",
+    request<{ resource: CourseContentResource; contentItem: CourseContentItem }>(
+      `/courses/${courseId}/groups/${groupId}/content-resources`,
+      {
+        method: "POST",
+        body: JSON.stringify(input)
+      }
+    ),
+  updateGroupContentResource: (
+    courseId: string,
+    groupId: string,
+    resourceId: string,
+    input: {
+      payload?: unknown;
+    }
+  ) =>
+    request<{ resource: CourseContentResource }>(`/courses/${courseId}/groups/${groupId}/content-resources/${resourceId}`, {
+      method: "PATCH",
       body: JSON.stringify(input)
+    }),
+  groupContentResourceDownloadUrl: (courseId: string, groupId: string, resourceId: string) =>
+    `${API_URL}/api/courses/${courseId}/groups/${groupId}/content-resources/${resourceId}/download`,
+  deleteGroupContentResource: (courseId: string, groupId: string, resourceId: string) =>
+    request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}/content-resources/${resourceId}`, {
+      method: "DELETE"
     }),
   createGroupActivityContentItem: (
     courseId: string,

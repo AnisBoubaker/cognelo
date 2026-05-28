@@ -26,6 +26,35 @@ const fakePlugin = vi.hoisted(() => ({
   }
 }));
 
+const fakeContentTypePlugin = vi.hoisted(() => ({
+  key: "content-placeholder",
+  packageName: "@cognelo/plugin-content-placeholder",
+  name: "Content placeholder",
+  version: "2.0.0",
+  contentTypes: [
+    {
+      key: "content-document",
+      label: { default: "Document" },
+      description: { default: "Document content" },
+      defaultTitle: { default: "Untitled document" },
+      icon: "document",
+      createMode: "shell",
+      embeddingSource: "text_body"
+    }
+  ],
+  db: {
+    namespace: "content_placeholder",
+    tables: ["plugin_content_placeholder_dummy"],
+    notes: ["dummy content table"],
+    migrations: [
+      {
+        id: "init",
+        statements: ['CREATE TABLE "plugin_content_placeholder_dummy" ("id" TEXT PRIMARY KEY)']
+      }
+    ]
+  }
+}));
+
 const tx = vi.hoisted(() => ({
   $executeRawUnsafe: vi.fn(),
   $queryRaw: vi.fn(),
@@ -36,6 +65,18 @@ const tx = vi.hoisted(() => ({
     update: vi.fn()
   },
   activityPluginTableBackup: {
+    create: vi.fn(),
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    update: vi.fn()
+  },
+  contentTypePluginInstallation: {
+    findUnique: vi.fn(),
+    findMany: vi.fn(),
+    upsert: vi.fn(),
+    update: vi.fn()
+  },
+  contentTypePluginTableBackup: {
     create: vi.fn(),
     findMany: vi.fn(),
     findFirst: vi.fn(),
@@ -53,6 +94,11 @@ const mockPrisma = vi.hoisted(() => ({
     findMany: vi.fn(),
     findUnique: vi.fn(),
     upsert: vi.fn()
+  },
+  contentTypePluginInstallation: {
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
+    upsert: vi.fn()
   }
 }));
 
@@ -67,12 +113,27 @@ vi.mock("@cognelo/activity-sdk", () => ({
   listActivityPlugins: vi.fn(() => [fakePlugin])
 }));
 
+vi.mock("@cognelo/content-type-sdk", () => ({
+  getContentTypePlugin: vi.fn((key: string) => (key === fakeContentTypePlugin.key ? fakeContentTypePlugin : undefined)),
+  getContentTypePluginForType: vi.fn((key: string) => (key === "content-document" ? fakeContentTypePlugin : undefined)),
+  listContentTypeDefinitions: vi.fn(() => fakeContentTypePlugin.contentTypes),
+  listContentTypePlugins: vi.fn(() => [fakeContentTypePlugin])
+}));
+
 const {
   assertActivityTypePluginEnabled,
+  assertContentResourcePluginActive,
+  assertContentTypePluginEnabled,
   ensureActivityPluginInstallations,
+  ensureContentTypePluginInstallations,
   getEnabledActivityPluginKeys,
+  getEnabledContentTypePluginKeys,
+  listActiveContentTypeDefinitions,
+  listContentTypePluginInstallations,
+  listEnabledContentTypeDefinitions,
   listActivityPluginInstallations,
-  updateActivityPluginInstallation
+  updateActivityPluginInstallation,
+  updateContentTypePluginInstallation
 } = await import("./plugins");
 
 const adminUser: CurrentUser = {
@@ -97,6 +158,12 @@ describe("plugin lifecycle services", () => {
       {
         id: "init",
         statements: ['CREATE TABLE "plugin_placeholder_dummy" ("id" TEXT PRIMARY KEY)']
+      }
+    ];
+    fakeContentTypePlugin.db.migrations = [
+      {
+        id: "init",
+        statements: ['CREATE TABLE "plugin_content_placeholder_dummy" ("id" TEXT PRIMARY KEY)']
       }
     ];
     mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof tx) => unknown) => handler(tx));
@@ -266,5 +333,120 @@ describe("plugin lifecycle services", () => {
         backups: [{ id: "backup-1" }]
       }
     });
+  });
+
+  it("syncs newly discovered content type plugin manifests as inactive and disabled", async () => {
+    mockPrisma.contentTypePluginInstallation.upsert.mockResolvedValue({ key: "content-placeholder" });
+
+    await ensureContentTypePluginInstallations();
+
+    expect(mockPrisma.contentTypePluginInstallation.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { key: "content-placeholder" },
+        create: expect.objectContaining({
+          key: "content-placeholder",
+          isActivated: false,
+          isEnabled: false,
+          metadata: expect.objectContaining({
+            contentTypeKeys: ["content-document"],
+            databaseNamespace: "content_placeholder",
+            databaseTables: ["plugin_content_placeholder_dummy"]
+          })
+        }),
+        update: expect.objectContaining({
+          version: "2.0.0"
+        })
+      })
+    );
+  });
+
+  it("requires admin rights to list or update content type plugin installations", async () => {
+    await expect(listContentTypePluginInstallations(teacherUser)).rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
+    await expect(updateContentTypePluginInstallation(teacherUser, "content-placeholder", { isEnabled: true })).rejects.toMatchObject({
+      status: 403,
+      code: "FORBIDDEN"
+    });
+  });
+
+  it("activates and enables content type plugins independently from activity plugins", async () => {
+    tx.contentTypePluginInstallation.upsert.mockResolvedValue({ key: "content-placeholder", isActivated: false });
+    tx.$queryRaw.mockResolvedValueOnce([{ exists: false }]).mockResolvedValueOnce([{ exists: true }]);
+    tx.contentTypePluginInstallation.update.mockResolvedValueOnce({
+      key: "content-placeholder",
+      isActivated: true,
+      isEnabled: false
+    });
+
+    await expect(updateContentTypePluginInstallation(adminUser, "content-placeholder", { action: "activate" })).resolves.toMatchObject({
+      key: "content-placeholder",
+      isActivated: true,
+      isEnabled: false
+    });
+
+    expect(tx.$executeRawUnsafe).toHaveBeenCalledWith('CREATE TABLE "plugin_content_placeholder_dummy" ("id" TEXT PRIMARY KEY)');
+    expect(tx.activityType.upsert).not.toHaveBeenCalledWith(expect.objectContaining({ where: { key: "content-document" } }));
+
+    tx.contentTypePluginInstallation.findUnique.mockResolvedValue({ key: "content-placeholder", isActivated: true, isEnabled: false });
+    tx.contentTypePluginInstallation.update.mockResolvedValueOnce({
+      key: "content-placeholder",
+      isActivated: true,
+      isEnabled: true
+    });
+
+    await expect(updateContentTypePluginInstallation(adminUser, "content-placeholder", { isEnabled: true })).resolves.toMatchObject({
+      isEnabled: true
+    });
+
+    expect(tx.contentTypePluginInstallation.update).toHaveBeenCalledWith({
+      where: { key: "content-placeholder" },
+      data: { isEnabled: true }
+    });
+  });
+
+  it("reports enabled content type plugin keys and definitions", async () => {
+    mockPrisma.contentTypePluginInstallation.findMany.mockResolvedValue([{ key: "content-placeholder" }]);
+    mockPrisma.contentTypePluginInstallation.findUnique.mockResolvedValue({ isActivated: false, isEnabled: true });
+
+    await expect(getEnabledContentTypePluginKeys()).resolves.toEqual(new Set(["content-placeholder"]));
+    await expect(listEnabledContentTypeDefinitions()).resolves.toMatchObject([{ key: "content-document" }]);
+    await expect(assertContentTypePluginEnabled("content-document")).rejects.toMatchObject({
+      status: 400,
+      code: "PLUGIN_DISABLED"
+    });
+  });
+
+  it("allows active disabled content type plugins to serve existing resources", async () => {
+    mockPrisma.contentTypePluginInstallation.findUnique.mockResolvedValue({ isActivated: true, isEnabled: false });
+
+    await expect(assertContentResourcePluginActive("content-placeholder")).resolves.toBeUndefined();
+  });
+
+  it("lists active content type definitions even when creation is disabled", async () => {
+    mockPrisma.contentTypePluginInstallation.findMany.mockResolvedValue([{ key: "content-placeholder" }]);
+
+    await expect(listActiveContentTypeDefinitions()).resolves.toMatchObject([{ key: "content-document" }]);
+  });
+
+  it("deactivates disabled content type plugins by backing up owned tables", async () => {
+    tx.contentTypePluginInstallation.findUnique.mockResolvedValue({ key: "content-placeholder", isActivated: true, isEnabled: false });
+    tx.$queryRaw.mockResolvedValueOnce([{ exists: true }]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    tx.contentTypePluginTableBackup.create.mockResolvedValue({ id: "content-backup-1" });
+    tx.contentTypePluginInstallation.update.mockResolvedValue({ key: "content-placeholder", isActivated: false, isEnabled: false });
+
+    await expect(updateContentTypePluginInstallation(adminUser, "content-placeholder", { action: "deactivate" })).resolves.toMatchObject({
+      isActivated: false,
+      isEnabled: false
+    });
+
+    expect(tx.contentTypePluginTableBackup.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          pluginKey: "content-placeholder",
+          pluginVersion: "2.0.0",
+          sourceTables: ["plugin_content_placeholder_dummy"],
+          backupTables: [expect.objectContaining({ sourceTable: "plugin_content_placeholder_dummy", backupTable: expect.stringMatching(/^bak_/) })]
+        })
+      })
+    );
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { MarkdownRenderer } from "@cognelo/activity-ui";
+import { resolveLocalizedText, type ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { CSSProperties, FormEvent, PointerEvent, useEffect, useState } from "react";
@@ -16,14 +17,15 @@ import {
   AiAgentConnection,
   Course,
   CourseContentItem,
+  CourseContentResource,
   CourseGradebook,
   CourseGradebookItemSummary,
   CourseGradebookRow,
   CourseMaterial,
   GradebookStatus
 } from "@/lib/api";
+import { ContentTypeIcon as MaterialTypeIcon, resolveContentTypeSettingsRenderer } from "@/lib/content-type-renderers";
 import { useI18n } from "@/lib/i18n";
-import { materialIconName, materialTypeDefinitions, type MaterialTypeIconName, type PickerMaterialKind } from "@/lib/material-types";
 
 type ActivityCategoryId = "programming" | "miscellaneous";
 type ActivityPickerTabId = "activity-banks" | ActivityCategoryId | "material";
@@ -37,8 +39,6 @@ const activityCategories: Array<{ id: ActivityCategoryId; labelKey: string }> = 
   { id: "miscellaneous", labelKey: "activityBankDetail.categoryMiscellaneous" }
 ];
 
-const pickerMaterialTypes = materialTypeDefinitions;
-
 export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();
   const courseId = params.courseId;
@@ -49,6 +49,9 @@ export default function CourseDetailPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
+  const [contentTypeDefinitions, setContentTypeDefinitions] = useState<ContentTypeDefinition[]>([]);
+  const [activeContentTypeDefinitions, setActiveContentTypeDefinitions] = useState<ContentTypeDefinition[]>([]);
+  const [contentResources, setContentResources] = useState<CourseContentResource[]>([]);
   const [activityBanks, setActivityBanks] = useState<ActivityBank[]>([]);
   const [aiAgentConnections, setAiAgentConnections] = useState<AiAgentConnection[]>([]);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
@@ -106,19 +109,27 @@ export default function CourseDetailPage() {
     const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
     const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher";
     if (userCanManage) {
-      const [gradebookResult, contentResult] = await Promise.all([
+      const [gradebookResult, contentResult, contentTypesResult, contentResourcesResult] = await Promise.all([
         api.courseGradebook(courseId, {
           groupId: gradebookGroupId || undefined,
           activityId: gradebookActivityId || undefined,
           status: gradebookStatus
         }),
-        api.courseContent(courseId)
+        api.courseContent(courseId),
+        api.courseContentTypes(courseId),
+        api.courseContentResources(courseId)
       ]);
       setGradebook(gradebookResult.gradebook);
       setContentItems(contentResult.contentItems);
+      setContentTypeDefinitions(contentTypesResult.contentTypes);
+      setActiveContentTypeDefinitions(contentTypesResult.activeContentTypes ?? contentTypesResult.contentTypes);
+      setContentResources(contentResourcesResult.resources);
     } else {
       setGradebook(null);
       setContentItems([]);
+      setContentTypeDefinitions([]);
+      setActiveContentTypeDefinitions([]);
+      setContentResources([]);
     }
     const aiSettings = getCourseAiSettings(courseResult.course);
     setStudentSupportAgentId(aiSettings.studentSupportAiAgentConnectionId);
@@ -311,25 +322,22 @@ export default function CourseDetailPage() {
     }
   }
 
-  async function createPickerMaterial(kind: PickerMaterialKind) {
+  async function createPickerContentResource(definition: ContentTypeDefinition) {
     setError("");
     setIsAddingActivity(true);
     try {
-      const materialType = pickerMaterialTypes.find((candidate) => candidate.kind === kind);
-      const title = t(materialType?.defaultTitleKey ?? "courseDetail.defaultMaterialTitle");
-      const materialResult = await api.createMaterial(courseId, {
-        title,
-        kind,
-        parentId: null,
-        metadata: { setupStatus: "draft" },
-        position: nextMaterialPosition(null)
-      });
-      await api.createMaterialContentItem(courseId, {
-        materialId: materialResult.material.id,
+      const title = resolveLocalizedText(definition.defaultTitle, locale);
+      const result = await api.createCourseContentResource(courseId, {
+        contentTypeKey: definition.key,
+        payload: { title },
         parentId: pickerParentId || null,
-        titleSnapshot: title,
         isVisible: pickerIsVisible
       });
+      setSettingsContentItemId(result.contentItem.id);
+      setSettingsMaterialTitle(title);
+      setSettingsMaterialUrl("");
+      setSettingsMaterialBody("");
+      setSettingsMaterialFile(null);
       setShowActivityPicker(false);
       await refresh();
     } catch (err) {
@@ -492,23 +500,19 @@ export default function CourseDetailPage() {
   }
 
   function materialHref(material: CourseMaterial) {
-    if (material.kind === "file") {
+    if (legacyMaterialHasStoredFile(material)) {
       return withMaterialDownloadVersion(api.materialDownloadUrl(courseId, material.id), material);
     }
     return material.url ?? undefined;
   }
 
-  function nextMaterialPosition(parentId: string | null) {
-    return (course?.materials ?? []).filter((material) => (material.parentId ?? null) === parentId).length;
-  }
-
-  function materialDetail(material: CourseMaterial) {
-    const originalName = typeof material.metadata?.originalName === "string" ? material.metadata.originalName : undefined;
-    const size = typeof material.metadata?.size === "number" ? formatBytes(material.metadata.size) : undefined;
+  function contentResourceDetail(resource: CourseContentResource) {
+    const originalName = typeof resource.metadata?.originalName === "string" ? resource.metadata.originalName : undefined;
+    const size = typeof resource.metadata?.size === "number" ? formatBytes(resource.metadata.size) : undefined;
     if (originalName && size) {
       return `${originalName} · ${size}`;
     }
-    return originalName || material.url || material.body || t("courseDetail.metadataOnly");
+    return originalName || (typeof resource.metadata?.url === "string" ? resource.metadata.url : undefined) || t("courseDetail.metadataOnly");
   }
 
   function activityCopy(activityTypeKey: string) {
@@ -572,13 +576,18 @@ export default function CourseDetailPage() {
     selectedActivityPickerTab === "activity-banks" || selectedActivityPickerTab === "material"
       ? []
       : activityTypes.filter((type) => activityTypeBelongsToCategory(type.key, selectedActivityPickerTab));
+  const pickerContentTypes = contentTypeDefinitions;
   const visibleContentItems = flattenContentItems(contentItems, collapsedContentFolderIds);
   const courseMaterialById = new Map(materials.map((material) => [material.id, material]));
+  const contentResourceById = new Map(contentResources.map((resource) => [resource.id, resource]));
+  const contentTypeByKey = new Map(activeContentTypeDefinitions.map((definition) => [definition.key, definition]));
   const courseActivityById = new Map((course?.activities ?? []).map((activity) => [activity.id, activity]));
   const courseGroupById = new Map((course?.groups ?? []).map((group) => [group.id, group]));
   const settingsContentItem = settingsContentItemId ? contentItems.find((item) => item.id === settingsContentItemId) ?? null : null;
   const settingsActivity = settingsContentItem?.activityId ? courseActivityById.get(settingsContentItem.activityId) ?? null : null;
-  const settingsMaterial = settingsContentItem?.materialId ? courseMaterialById.get(settingsContentItem.materialId) ?? null : null;
+  const settingsContentResource = settingsContentItem?.contentResourceId ? contentResourceById.get(settingsContentItem.contentResourceId) ?? null : null;
+  const settingsContentType = settingsContentResource ? contentTypeByKey.get(settingsContentResource.contentTypeKey) ?? null : null;
+  const SettingsContentTypeRenderer = resolveContentTypeSettingsRenderer(settingsContentType?.settingsRendererKey);
 
   function buildPickerContentPlacement(titleSnapshot?: string) {
     return {
@@ -612,6 +621,8 @@ export default function CourseDetailPage() {
         await api.deleteActivity(courseId, item.activityId);
       } else if (item.materialId) {
         await api.deleteMaterial(courseId, item.materialId);
+      } else if (item.contentResourceId) {
+        await api.deleteCourseContentResource(courseId, item.contentResourceId);
       } else {
         await deleteContentInScope(item);
       }
@@ -632,10 +643,17 @@ export default function CourseDetailPage() {
       return;
     }
     if (item.materialId) {
-      const material = courseMaterialById.get(item.materialId);
-      setSettingsMaterialTitle(material?.title ?? item.titleSnapshot ?? "");
-      setSettingsMaterialUrl(material?.url ?? "");
-      setSettingsMaterialBody(material?.body ?? "");
+      setSettingsMaterialTitle(item.titleSnapshot ?? "");
+      setSettingsMaterialUrl("");
+      setSettingsMaterialBody("");
+      setSettingsMaterialFile(null);
+      return;
+    }
+    if (item.contentResourceId) {
+      const resource = contentResourceById.get(item.contentResourceId);
+      setSettingsMaterialTitle(resource?.title ?? item.titleSnapshot ?? "");
+      setSettingsMaterialUrl(typeof resource?.metadata?.url === "string" ? resource.metadata.url : "");
+      setSettingsMaterialBody(typeof resource?.metadata?.body === "string" ? resource.metadata.body : "");
       setSettingsMaterialFile(null);
     }
   }
@@ -646,37 +664,49 @@ export default function CourseDetailPage() {
     setSettingsMaterialFile(null);
   }
 
-  async function saveMaterialContentSettings(event: FormEvent) {
+  async function saveContentResourceSettings(event: FormEvent) {
     event.preventDefault();
     const item = settingsContentItemId ? contentItems.find((candidate) => candidate.id === settingsContentItemId) : null;
-    const material = item?.materialId ? courseMaterialById.get(item.materialId) : null;
-    if (!item || !material) {
+    const resource = item?.contentResourceId ? contentResourceById.get(item.contentResourceId) : null;
+    if (!item || !resource) {
       return;
     }
 
     setSettingsError("");
     try {
-      if (material.kind === "file") {
-        const hasUploadedFile = typeof material.metadata?.storedName === "string";
+      let nextTitle = settingsMaterialTitle;
+      const definition = contentTypeByKey.get(resource.contentTypeKey);
+      if (definition?.embeddingSource === "file_upload") {
         if (settingsMaterialFile) {
-          await api.uploadExistingMaterialFile(courseId, material.id, {
-            title: settingsMaterialTitle || settingsMaterialFile.name,
+          nextTitle = settingsMaterialTitle || settingsMaterialFile.name;
+          await api.uploadCourseContentResourceFile(courseId, resource.id, {
+            title: nextTitle,
             file: settingsMaterialFile
           });
-        } else if (hasUploadedFile) {
-          await api.updateMaterial(courseId, material.id, { title: settingsMaterialTitle });
+        } else if (typeof resource.metadata?.storedName === "string") {
+          await api.updateCourseContentResource(courseId, resource.id, {
+            payload: { title: settingsMaterialTitle }
+          });
         } else {
           setSettingsError(t("courseDetail.chooseFile"));
           return;
         }
+      } else if (definition?.embeddingSource === "text_body") {
+        await api.updateCourseContentResource(courseId, resource.id, {
+          payload: {
+            title: settingsMaterialTitle,
+            body: settingsMaterialBody
+          }
+        });
       } else {
-        await api.updateMaterial(courseId, material.id, {
-          title: settingsMaterialTitle,
-          ...(material.kind === "github_repo" ? { url: settingsMaterialUrl || undefined } : {}),
-          ...(material.kind === "text" ? { body: settingsMaterialBody } : {})
+        await api.updateCourseContentResource(courseId, resource.id, {
+          payload: {
+            title: settingsMaterialTitle,
+            url: settingsMaterialUrl || undefined
+          }
         });
       }
-      await api.updateContentItem(courseId, item.id, { titleSnapshot: settingsMaterialTitle });
+      await api.updateContentItem(courseId, item.id, { titleSnapshot: nextTitle });
       await refresh();
       closeContentSettings();
     } catch (err) {
@@ -882,6 +912,9 @@ export default function CourseDetailPage() {
   }
 
   function contentItemTitle(item: CourseContentItem) {
+    if (item.contentResourceId) {
+      return contentResourceById.get(item.contentResourceId)?.title ?? item.titleSnapshot ?? t("courseDetail.untitledMaterial");
+    }
     if (item.materialId) {
       return courseMaterialById.get(item.materialId)?.title ?? item.titleSnapshot ?? t("courseDetail.untitledMaterial");
     }
@@ -898,12 +931,26 @@ export default function CourseDetailPage() {
     if (item.materialId && courseMaterialById.has(item.materialId)) {
       return materialHref(courseMaterialById.get(item.materialId) as CourseMaterial) ?? null;
     }
+    if (item.contentResourceId && contentResourceById.has(item.contentResourceId)) {
+      const resource = contentResourceById.get(item.contentResourceId) as CourseContentResource;
+      const definition = contentTypeByKey.get(resource.contentTypeKey);
+      if (!definition) {
+        return null;
+      }
+      if (definition.embeddingSource === "file_upload" && typeof resource.metadata?.storedName === "string") {
+        return withContentResourceDownloadVersion(api.courseContentResourceDownloadUrl(courseId, resource.id), resource);
+      }
+      return typeof resource.metadata?.url === "string" ? resource.metadata.url : null;
+    }
     return null;
   }
 
-  function contentItemMaterialIconName(item: CourseContentItem): MaterialTypeIconName {
-    const material = item.materialId ? courseMaterialById.get(item.materialId) : null;
-    return materialIconName(material?.kind);
+  function contentItemMaterialIconName(item: CourseContentItem) {
+    if (item.contentResourceId) {
+      const resource = contentResourceById.get(item.contentResourceId);
+      return (resource ? contentTypeByKey.get(resource.contentTypeKey)?.icon : null) ?? "file";
+    }
+    return "file" as const;
   }
 
   function toggleContentFolder(folderId: string) {
@@ -975,6 +1022,11 @@ export default function CourseDetailPage() {
                             const isCollapsed = collapsedContentFolderIds.has(item.id);
                             const href = contentItemHref(item);
                             const material = item.materialId ? courseMaterialById.get(item.materialId) : null;
+                            const materialIsDownloadable = material ? legacyMaterialHasStoredFile(material) : false;
+                            const contentResource = item.contentResourceId ? contentResourceById.get(item.contentResourceId) : null;
+                            const contentResourceDefinition = contentResource ? contentTypeByKey.get(contentResource.contentTypeKey) ?? null : null;
+                            const contentResourceIsUnavailable = Boolean(contentResource && !contentResourceDefinition);
+                            const contentResourceIsFile = contentResourceDefinition?.embeddingSource === "file_upload";
                             const activity = item.activityId ? courseActivityById.get(item.activityId) : null;
                             const allGroupsRule = activity ? getAllGroupsAssignmentRule(activity) : null;
                             const activityLabel = activity ? activityCopy(activity.activityType.key).name : null;
@@ -1031,9 +1083,13 @@ export default function CourseDetailPage() {
                                     {href && material ? (
                                       <a
                                         href={href}
-                                        rel={material.kind !== "file" ? "noreferrer" : undefined}
-                                        target={material.kind !== "file" ? "_blank" : undefined}
+                                        rel={materialIsDownloadable ? undefined : "noreferrer"}
+                                        target={materialIsDownloadable ? undefined : "_blank"}
                                       >
+                                        {title}
+                                      </a>
+                                    ) : href && contentResource ? (
+                                      <a href={href} rel={contentResourceIsFile ? undefined : "noreferrer"} target={contentResourceIsFile ? undefined : "_blank"}>
                                         {title}
                                       </a>
                                     ) : href ? (
@@ -1042,11 +1098,14 @@ export default function CourseDetailPage() {
                                       title
                                     )}
                                   </strong>
-                                  {activity ? (
+                                  {activity || contentResourceIsUnavailable ? (
                                     <span className="metadata-badges">
                                       {activityLabel ? <span className="metadata-badge is-activity-type">{activityLabel}</span> : null}
-                                      {activity.activityVersion ? (
+                                      {activity?.activityVersion ? (
                                         <span className="metadata-badge">{`Bank version ${activity.activityVersion.versionNumber}`}</span>
+                                      ) : null}
+                                      {contentResourceIsUnavailable ? (
+                                        <span className="metadata-badge is-warning">{t("courseDetail.contentPluginUnavailable")}</span>
                                       ) : null}
                                       {allGroupsRule?.enabled ? (
                                         <span className="metadata-badge is-course-wide">
@@ -1062,16 +1121,27 @@ export default function CourseDetailPage() {
                                     material ? (
                                       <a
                                         aria-label={t(
-                                          material.kind === "file" ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial",
+                                          materialIsDownloadable ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial",
                                           { title }
                                         )}
                                         className="button secondary icon-button"
                                         href={href}
-                                        rel={material.kind === "file" ? undefined : "noreferrer"}
-                                        target={material.kind === "file" ? undefined : "_blank"}
-                                        title={t(material.kind === "file" ? "common.download" : "common.open")}
+                                        rel={materialIsDownloadable ? undefined : "noreferrer"}
+                                        target={materialIsDownloadable ? undefined : "_blank"}
+                                        title={t(materialIsDownloadable ? "common.download" : "common.open")}
                                       >
-                                        <MaterialActionIcon name={material.kind === "file" ? "download" : "open"} />
+                                        <MaterialActionIcon name={materialIsDownloadable ? "download" : "open"} />
+                                      </a>
+                                    ) : contentResource ? (
+                                      <a
+                                        aria-label={t(contentResourceIsFile ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial", { title })}
+                                        className="button secondary icon-button"
+                                        href={href}
+                                        rel={contentResourceIsFile ? undefined : "noreferrer"}
+                                        target={contentResourceIsFile ? undefined : "_blank"}
+                                        title={t(contentResourceIsFile ? "common.download" : "common.open")}
+                                      >
+                                        <MaterialActionIcon name={contentResourceIsFile ? "download" : "open"} />
                                       </a>
                                     ) : (
                                       <Link
@@ -1644,55 +1714,26 @@ export default function CourseDetailPage() {
                         </Link>
                       </div>
                     </form>
-                  ) : settingsMaterial ? (
-                    <form className="form" onSubmit={saveMaterialContentSettings}>
-                      <div className="field">
-                        <label htmlFor="settings-material-title">{t("courseDetail.activityTitle")}</label>
-                        <input
-                          id="settings-material-title"
-                          value={settingsMaterialTitle}
-                          onChange={(event) => setSettingsMaterialTitle(event.target.value)}
-                          required
-                        />
-                      </div>
-                      {settingsMaterial.kind === "github_repo" ? (
-                        <div className="field">
-                          <label htmlFor="settings-material-url">{t("courseDetail.githubEditLabel")}</label>
-                          <input
-                            id="settings-material-url"
-                            type="url"
-                            value={settingsMaterialUrl}
-                            onChange={(event) => setSettingsMaterialUrl(event.target.value)}
-                          />
-                        </div>
-                      ) : null}
-                      {settingsMaterial.kind === "file" ? (
-                        <div className="field">
-                          <label htmlFor="settings-material-file">{t("courseDetail.file")}</label>
-                          <input
-                            id="settings-material-file"
-                            type="file"
-                            onChange={(event) => setSettingsMaterialFile(event.target.files?.[0] ?? null)}
-                          />
-                          <p className="muted">{materialDetail(settingsMaterial)}</p>
-                        </div>
-                      ) : null}
-                      {settingsMaterial.kind === "text" ? (
-                        <div className="field">
-                          <label htmlFor="settings-material-body">{t("courseDetail.materialBody")}</label>
-                          <textarea
-                            id="settings-material-body"
-                            value={settingsMaterialBody}
-                            onChange={(event) => setSettingsMaterialBody(event.target.value)}
-                            rows={12}
-                          />
-                        </div>
-                      ) : null}
-                      {settingsError ? <p className="error">{settingsError}</p> : null}
-                      <div className="row">
-                        <button type="submit">{t("courseDetail.saveMaterial")}</button>
-                      </div>
-                    </form>
+                  ) : settingsContentResource && settingsContentType && SettingsContentTypeRenderer ? (
+                    SettingsContentTypeRenderer({
+                      definition: settingsContentType,
+                      contentItem: settingsContentItem ?? undefined,
+                      resource: settingsContentResource,
+                      locale,
+                      settings: {
+                        title: settingsMaterialTitle,
+                        url: settingsMaterialUrl,
+                        body: settingsMaterialBody,
+                        detail: contentResourceDetail(settingsContentResource),
+                        error: settingsError,
+                        onTitleChange: setSettingsMaterialTitle,
+                        onUrlChange: setSettingsMaterialUrl,
+                        onBodyChange: setSettingsMaterialBody,
+                        onFileChange: setSettingsMaterialFile,
+                        onSubmit: saveContentResourceSettings
+                      },
+                      t
+                    })
                   ) : (
                     <p className="muted">{t("courseDetail.contentSettingsUnavailable")}</p>
                   )}
@@ -1828,18 +1869,18 @@ export default function CourseDetailPage() {
                               {t("courseDetail.createFolder")}
                             </button>
                           </form>
-                          {pickerMaterialTypes.map((materialType) => (
+                          {pickerContentTypes.map((contentType) => (
                             <button
-                              key={materialType.kind}
+                              key={contentType.key}
                               className="activity-type-option"
                               disabled={isAddingActivity}
-                              onClick={() => createPickerMaterial(materialType.kind)}
+                              onClick={() => createPickerContentResource(contentType)}
                               type="button"
                             >
-                              <MaterialTypeIcon iconName={materialType.icon} />
+                              <MaterialTypeIcon iconName={contentType.icon} />
                               <span>
-                                <strong>{t(materialType.labelKey)}</strong>
-                                <small>{t(materialType.descriptionKey)}</small>
+                                <strong>{resolveLocalizedText(contentType.label, locale)}</strong>
+                                <small>{resolveLocalizedText(contentType.description, locale)}</small>
                               </span>
                             </button>
                           ))}
@@ -1940,6 +1981,20 @@ function withMaterialDownloadVersion(url: string, material: CourseMaterial) {
       ? material.metadata.storedName
       : typeof material.metadata?.originalName === "string"
         ? material.metadata.originalName
+        : null;
+  return version ? `${url}?v=${encodeURIComponent(version)}` : url;
+}
+
+function legacyMaterialHasStoredFile(material: CourseMaterial) {
+  return typeof material.metadata?.storedName === "string";
+}
+
+function withContentResourceDownloadVersion(url: string, resource: CourseContentResource) {
+  const version =
+    typeof resource.metadata?.storedName === "string"
+      ? resource.metadata.storedName
+      : typeof resource.metadata?.originalName === "string"
+        ? resource.metadata.originalName
         : null;
   return version ? `${url}?v=${encodeURIComponent(version)}` : url;
 }
@@ -2298,44 +2353,6 @@ function FolderContentIcon({ collapsed }: { collapsed: boolean }) {
         <path d="M4 9h9l3 4h12v13H4z" />
         <path d="M4 9v17" />
         <path d={collapsed ? "m18 17 4 3-4 3" : "m18 18 3 4 3-4"} />
-      </svg>
-    </span>
-  );
-}
-
-function MaterialTypeIcon({ iconName }: { iconName: MaterialTypeIconName }) {
-  const paths = {
-    github: (
-      <>
-        <path d="M16 25c-6 0-11-4.8-11-10.8 0-2.4.8-4.7 2.3-6.5-.2-.9-.4-2.9.5-5 0 0 1.9-.6 5 1.9A16.8 16.8 0 0 1 16 4.3c1.1 0 2.2.1 3.2.3 3.1-2.5 5-1.9 5-1.9.9 2.1.7 4.1.5 5A10 10 0 0 1 27 14.2C27 20.2 22 25 16 25Z" />
-        <path d="M12.5 24.2c-.5.9-.7 1.9-.7 3.1" />
-        <path d="M19.5 24.2c.5.9.7 1.9.7 3.1" />
-        <path d="M13 17.5h.01" />
-        <path d="M19 17.5h.01" />
-      </>
-    ),
-    file: (
-      <>
-        <path d="M10 4h8l5 5v19H10z" />
-        <path d="M18 4v6h5" />
-        <path d="M13 16h7" />
-        <path d="M13 21h7" />
-      </>
-    ),
-    text: (
-      <>
-        <path d="M7 6h18" />
-        <path d="M16 6v20" />
-        <path d="M11 26h10" />
-        <path d="M9 12h14" />
-      </>
-    )
-  } as const;
-
-  return (
-    <span className="activity-type-icon" aria-hidden="true">
-      <svg fill="none" height="28" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 32 32" width="28">
-        {paths[iconName]}
       </svg>
     </span>
   );
