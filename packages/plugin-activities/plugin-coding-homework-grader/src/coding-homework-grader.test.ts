@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { codingHomeworkChallengePromptVersion, codingHomeworkGraderPlugin, prototypePipelineSteps } from "./index";
+import { codingHomeworkGraderDatabaseModule } from "./db";
 import { codingHomeworkGraderServerPlugin } from "./server";
 
 describe("coding homework grader plugin manifest", () => {
@@ -8,6 +9,16 @@ describe("coding homework grader plugin manifest", () => {
     expect(codingHomeworkGraderPlugin.activities[0]?.key).toBe("coding-homework-grader");
     expect(codingHomeworkGraderPlugin.activities[0]?.name).toBe("Coding Homework Grader");
     expect(codingHomeworkGraderServerPlugin.routes).toEqual([]);
+  });
+
+  it("declares plugin-owned persistence tables for activation backup coverage", () => {
+    expect(codingHomeworkGraderDatabaseModule.namespace).toBe("plugin_coding_homework_grader");
+    expect(codingHomeworkGraderDatabaseModule.tables).toContain("PluginCodingHomeworkAssignment");
+    expect(codingHomeworkGraderDatabaseModule.tables).toContain("PluginCodingHomeworkSubmissionRequirementSet");
+    expect(codingHomeworkGraderDatabaseModule.tables).toContain("PluginCodingHomeworkChallengeQuestion");
+    expect(codingHomeworkGraderDatabaseModule.migrations[0]?.statements.join("\n")).toContain(
+      'CREATE TABLE IF NOT EXISTS "PluginCodingHomeworkSubmission"'
+    );
   });
 
   it("documents the research prototype pipeline without depending on tmp files at runtime", () => {

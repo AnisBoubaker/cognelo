@@ -2,7 +2,7 @@
 
 This plan describes the phased implementation of the new Coding Homework Grader activity plugin.
 
-The existing `plugin-coding-homework-grader` package is currently a renamed scaffold. The product direction is to turn it into a full programming-homework submission workflow:
+The existing `plugin-coding-homework-grader` package is currently a renamed scaffold with a plugin-owned persistence foundation. The product direction is to turn it into a full programming-homework submission workflow:
 
 - Teachers define the homework statement as editable text or an uploaded PDF.
 - Teachers add and assign the activity through the normal course content and gradebook workflow.
@@ -32,6 +32,14 @@ The Python prototype maps to these future TypeScript modules:
 - `5_generate_questions.py` -> RAG-backed challenge question generation
 
 The implementation must be TypeScript/Node/Postgres-native. The Python prototype is only a behavioral reference.
+
+## Implementation Progress
+
+As of May 28, 2026:
+
+- Phase 0 is complete: prototype-to-TypeScript algorithm contracts, prompt versioning, plugin README, and plugin memory were added without production dependency on `tmp`.
+- Phase 1 is complete: the former homework grader scaffold was renamed to Coding Homework Grader with package name `@cognelo/plugin-coding-homework-grader`, plugin key `coding-homework-grader`, activity key `coding-homework-grader`, and database namespace `plugin_coding_homework_grader`.
+- Phase 2 is complete: the plugin-owned Prisma schema, generated client, activation migration manifest, and table registration were added for authoring, requirements, artifacts, documentation snapshots, submissions, generated challenge questions, and teacher reviews. `npm run db:migrate:all` succeeds with the new plugin migration.
 
 ## Product Boundaries
 
@@ -116,7 +124,6 @@ The exact Prisma names can evolve, but the plugin should start with these concep
 - `promptMarkdown`
 - `promptPdfAttachmentId`
 - `languageKey`
-- `submissionRequirements` JSON
 - `candidateLimit`
 - `retrievedExampleCount`
 - `questionCount`
@@ -131,7 +138,24 @@ The exact Prisma names can evolve, but the plugin should start with these concep
 - same authoring fields as course assignment
 - timestamps
 
-`submissionRequirements` should support teacher-authored or uploaded requirements such as:
+`PluginCodingHomeworkSubmissionRequirementSet`
+
+- `id`
+- `activityId` unique
+- `languageKey`
+- `requirements` JSON
+- `sourceAttachmentId`
+- `metadata` JSON
+- timestamps
+
+`PluginBankCodingHomeworkSubmissionRequirementSet`
+
+- `id`
+- `bankActivityId` unique
+- same requirement fields as course requirement set
+- timestamps
+
+`requirements` should support teacher-authored or uploaded requirements such as:
 
 - required files
 - required folders
@@ -142,14 +166,14 @@ The exact Prisma names can evolve, but the plugin should start with these concep
 - maximum file count and archive size
 - language-specific parser expectations
 
-The first implementation can store this as JSON while exposing a structured editor/import flow in the plugin UI.
+The first implementation stores requirements as JSON while exposing a structured editor/import flow in the plugin UI.
 
 `PluginCodingHomeworkAttachment`
 
 - `id`
 - `ownerKind`: course activity, bank activity, or submission
 - `ownerId`
-- `kind`: assignment PDF, submission ZIP, extracted source, extracted non-source
+- `kind`: assignment PDF, requirements upload, submission ZIP, extracted source, extracted non-source
 - `originalName`
 - `storedName`
 - `mimeType`
@@ -478,7 +502,7 @@ Deliverables:
 
 - Add plugin Prisma schema and generated client.
 - Add plugin database module with activation migrations.
-- Add assignment, attachment, submission requirement, snapshot, reference function, submission, submission file, submission function, question, and review tables.
+- Add assignment, bank assignment, submission requirement, bank submission requirement, attachment, snapshot, reference function, submission, submission file, submission function, question, and review tables.
 - Add backup/deactivation coverage through existing plugin lifecycle.
 
 Acceptance:
@@ -486,6 +510,13 @@ Acceptance:
 - Plugin activation creates all tables.
 - Plugin deactivation backs them up.
 - `npm run db:migrate:all` succeeds.
+
+Progress:
+
+- Added `prisma/schema.prisma`, `src/db.ts`, `src/db-client.ts`, generated Prisma client output, and `prisma/migrations/202605280010_baseline/migration.sql`.
+- Registered 12 plugin-owned tables in the activity plugin database manifest so existing activation/deactivation backup logic can see them.
+- Verified `npm run db:migrate:all` applies `coding-homework-grader/202605280010_baseline` and regenerates the plugin Prisma client.
+- Kept route handlers, storage behavior, teacher authoring, and bank-to-course copy hooks for later phases.
 
 ### Phase 3: Teacher Assignment Authoring
 

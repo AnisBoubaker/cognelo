@@ -1,16 +1,13 @@
 import { z } from "zod";
 import type { ActivityPlugin } from "@cognelo/activity-sdk";
+import { codingHomeworkGraderDatabaseModule } from "./db";
 export * from "./algorithm";
 
 export const codingHomeworkGraderPlugin: ActivityPlugin = {
   key: "coding-homework-grader",
   packageName: "@cognelo/plugin-coding-homework-grader",
   name: "Coding Homework Grader",
-  db: {
-    namespace: "plugin_coding_homework_grader",
-    tables: [],
-    notes: ["Future Coding Homework Grader tables should live in this plugin namespace instead of altering core course/activity tables."]
-  },
+  db: codingHomeworkGraderDatabaseModule,
   activities: [
     {
       key: "coding-homework-grader",
