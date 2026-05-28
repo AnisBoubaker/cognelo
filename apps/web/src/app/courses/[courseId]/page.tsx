@@ -34,6 +34,10 @@ import { ContentTypeIcon as MaterialTypeIcon, resolveContentTypeSettingsRenderer
 import { useI18n } from "@/lib/i18n";
 
 type ActivityPickerTabId = "activity-banks" | ActivityCategoryId | "material";
+type ActivityPickerTab = {
+  id: ActivityPickerTabId;
+  label: string;
+};
 type ContentDropPlacement = "after" | "before" | "inside";
 type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
 
@@ -583,6 +587,11 @@ export default function CourseDetailPage() {
   const visibleActivityCategories = activityCategories.filter((category) =>
     activityTypes.some((type) => activityTypeCreatesCategory(type.key, category.id))
   );
+  const activityPickerTabs: ActivityPickerTab[] = [
+    { id: "activity-banks", label: t("courseDetail.activityBanksPickerTab") },
+    { id: "material", label: t("courseDetail.materialPickerTab") },
+    ...visibleActivityCategories.map((category) => ({ id: category.id, label: t(category.labelKey) }))
+  ];
 
   useEffect(() => {
     if (selectedActivityPickerTab === "activity-banks" || selectedActivityPickerTab === "material") {
@@ -1912,34 +1921,16 @@ export default function CourseDetailPage() {
                   </div>
                   <div className="activity-picker-layout">
                     <div className="activity-category-tabs" role="tablist" aria-label={t("activityBankDetail.categoryTabsLabel")}>
-                      <button
-                        aria-selected={selectedActivityPickerTab === "activity-banks"}
-                        className={selectedActivityPickerTab === "activity-banks" ? "activity-category-tab is-active" : "activity-category-tab"}
-                        onClick={() => setSelectedActivityPickerTab("activity-banks")}
-                        role="tab"
-                        type="button"
-                      >
-                        {t("courseDetail.activityBanksPickerTab")}
-                      </button>
-                      <button
-                        aria-selected={selectedActivityPickerTab === "material"}
-                        className={selectedActivityPickerTab === "material" ? "activity-category-tab is-active" : "activity-category-tab"}
-                        onClick={() => setSelectedActivityPickerTab("material")}
-                        role="tab"
-                        type="button"
-                      >
-                        {t("courseDetail.materialPickerTab")}
-                      </button>
-                      {visibleActivityCategories.map((category) => (
+                      {activityPickerTabs.map((tab) => (
                         <button
-                          key={category.id}
-                          aria-selected={selectedActivityPickerTab === category.id}
-                          className={selectedActivityPickerTab === category.id ? "activity-category-tab is-active" : "activity-category-tab"}
-                          onClick={() => setSelectedActivityPickerTab(category.id)}
+                          key={tab.id}
+                          aria-selected={selectedActivityPickerTab === tab.id}
+                          className={selectedActivityPickerTab === tab.id ? "activity-category-tab is-active" : "activity-category-tab"}
+                          onClick={() => setSelectedActivityPickerTab(tab.id)}
                           role="tab"
                           type="button"
                         >
-                          {t(category.labelKey)}
+                          {tab.label}
                         </button>
                       ))}
                     </div>
