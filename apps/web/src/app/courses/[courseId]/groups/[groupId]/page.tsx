@@ -188,7 +188,9 @@ export default function CourseGroupPage() {
   const materials = group?.materials ?? [];
   const courseMaterials = course?.materials ?? [];
   const assignedActivities = group?.activities ?? [];
-  const contentFolders = contentItems.filter((item) => item.kind === "folder").sort(compareContentItems);
+  const contentFolderOptions = flattenContentItems(contentItems, new Set())
+    .filter(({ item }) => item.kind === "folder")
+    .map(({ item, depth }) => ({ item, depth }));
   const visibleContentItems = flattenContentItems(contentItems, collapsedContentFolderIds);
   const studentContentItems = contentItems.filter((item) => item.kind !== "activity" || Boolean(item.courseGroupActivityId));
   const studentRootContentItems = studentContentItems.filter((item) => !item.parentId).sort(compareContentItems);
@@ -1179,8 +1181,14 @@ export default function CourseGroupPage() {
                           <p className="muted">{t("groupPage.assignedActivitiesText")}</p>
                         </div>
                         {canManage ? (
-                          <button className="secondary" type="button" onClick={() => setIsAssigningActivity((current) => !current)}>
-                            {isAssigningActivity ? t("common.cancel") : t("groupPage.assignActivityTitle")}
+                          <button
+                            aria-label={isAssigningActivity ? t("common.cancel") : t("groupPage.assignActivityTitle")}
+                            className="secondary icon-button section-action-icon-button"
+                            title={isAssigningActivity ? t("common.cancel") : t("groupPage.assignActivityTitle")}
+                            type="button"
+                            onClick={() => setIsAssigningActivity((current) => !current)}
+                          >
+                            <MaterialActionIcon name={isAssigningActivity ? "close" : "activityAdd"} />
                           </button>
                         ) : null}
                       </div>
@@ -1220,9 +1228,9 @@ export default function CourseGroupPage() {
                                 disabled={!canManage}
                               >
                                 <option value="">{t("courseDetail.contentFolderRoot")}</option>
-                                {contentFolders.map((folder) => (
+                                {contentFolderOptions.map(({ item: folder, depth }) => (
                                   <option key={folder.id} value={folder.id}>
-                                    {folder.titleSnapshot ?? t("courseDetail.untitledFolder")}
+                                    {formatFolderOptionLabel(folder, depth, t("courseDetail.untitledFolder"))}
                                   </option>
                                 ))}
                               </select>
@@ -2440,7 +2448,7 @@ function flattenContentItems(contentItems: CourseContentItem[], collapsedFolderI
 
   walk("root", 0);
 
-  for (const item of contentItems.sort(compareContentItems)) {
+  for (const item of [...contentItems].sort(compareContentItems)) {
     const parentIsMissing = item.parentId && !itemIds.has(item.parentId);
     if (!visited.has(item.id) && parentIsMissing) {
       rows.push({ item, depth: 0 });
@@ -2448,6 +2456,11 @@ function flattenContentItems(contentItems: CourseContentItem[], collapsedFolderI
   }
 
   return rows;
+}
+
+function formatFolderOptionLabel(folder: CourseContentItem, depth: number, fallbackTitle: string) {
+  const title = folder.titleSnapshot ?? fallbackTitle;
+  return depth > 0 ? `${"  ".repeat(depth)}- ${title}` : title;
 }
 
 function flattenContentItemsFromParent(
@@ -2526,8 +2539,26 @@ function FolderContentIcon({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-function MaterialActionIcon({ name }: { name: "download" | "down" | "drag" | "edit" | "hidden" | "open" | "remove" | "save" | "up" | "visible" }) {
+function MaterialActionIcon({
+  name
+}: {
+  name: "activityAdd" | "close" | "download" | "down" | "drag" | "edit" | "hidden" | "open" | "remove" | "save" | "up" | "visible";
+}) {
   const paths = {
+    activityAdd: (
+      <>
+        <path d="M6 4h9l3 3v13H6z" />
+        <path d="M15 4v4h4" />
+        <path d="M10 12h5" />
+        <path d="M12.5 9.5v5" />
+      </>
+    ),
+    close: (
+      <>
+        <path d="M6 6l12 12" />
+        <path d="M18 6 6 18" />
+      </>
+    ),
     download: (
       <>
         <path d="M12 3v10" />

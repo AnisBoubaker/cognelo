@@ -27,7 +27,7 @@ import {
 import { ContentTypeIcon as MaterialTypeIcon, resolveContentTypeSettingsRenderer } from "@/lib/content-type-renderers";
 import { useI18n } from "@/lib/i18n";
 
-type ActivityCategoryId = "programming" | "miscellaneous";
+type ActivityCategoryId = "generic" | "programming" | "miscellaneous";
 type ActivityPickerTabId = "activity-banks" | ActivityCategoryId | "material";
 type ContentDropPlacement = "after" | "before" | "inside";
 type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
@@ -35,6 +35,7 @@ type ContentDropTarget = { id: string; type: "root" } | { id: string; placement:
 const contentDragActivationDistance = 8;
 
 const activityCategories: Array<{ id: ActivityCategoryId; labelKey: string }> = [
+  { id: "generic", labelKey: "activityBankDetail.categoryGeneric" },
   { id: "programming", labelKey: "activityBankDetail.categoryProgramming" },
   { id: "miscellaneous", labelKey: "activityBankDetail.categoryMiscellaneous" }
 ];
@@ -575,9 +576,34 @@ export default function CourseDetailPage() {
     return defaultCategoryIds.includes(categoryId);
   }
 
+  function activityTypeCreatesCategory(activityTypeKey: string, categoryId: ActivityCategoryId) {
+    const defaultCategoryIds = activityDefinitions.find((candidate) => candidate.key === activityTypeKey)?.defaultCategoryIds;
+    if (defaultCategoryIds === "all") {
+      return categoryId === "generic";
+    }
+    if (!defaultCategoryIds?.length) {
+      return categoryId === "miscellaneous";
+    }
+    return defaultCategoryIds.includes(categoryId);
+  }
+
   function activityTypeIconName(activityTypeKey: string): NonNullable<ActivityDefinition["icon"]> {
     return activityDefinitions.find((candidate) => candidate.key === activityTypeKey)?.icon ?? "placeholder";
   }
+
+  const visibleActivityCategories = activityCategories.filter((category) =>
+    activityTypes.some((type) => activityTypeCreatesCategory(type.key, category.id))
+  );
+
+  useEffect(() => {
+    if (selectedActivityPickerTab === "activity-banks" || selectedActivityPickerTab === "material") {
+      return;
+    }
+    if (visibleActivityCategories.some((category) => category.id === selectedActivityPickerTab)) {
+      return;
+    }
+    setSelectedActivityPickerTab(visibleActivityCategories[0]?.id ?? "activity-banks");
+  }, [selectedActivityPickerTab, visibleActivityCategories]);
 
   if (course && !canManage) {
     return (
@@ -590,9 +616,9 @@ export default function CourseDetailPage() {
   }
 
   const materials = course?.materials ?? [];
-  const contentFolders = contentItems
-    .filter((item) => item.kind === "folder")
-    .sort((a, b) => a.position - b.position || (a.titleSnapshot ?? "").localeCompare(b.titleSnapshot ?? ""));
+  const contentFolderOptions = flattenContentItems(contentItems, new Set())
+    .filter(({ item }) => item.kind === "folder")
+    .map(({ item, depth }) => ({ item, depth }));
   const attachedBankActivityIds = new Set(
     (course?.activities ?? [])
       .map((activity) => activity.bankActivityId)
@@ -1099,12 +1125,24 @@ export default function CourseDetailPage() {
                           <p className="muted">{t("courseDetail.contentText")}</p>
                         </div>
                         <div className="section-actions">
-                          <button className="secondary" disabled={isAddingActivity} type="button" onClick={() => void createInlineFolder(null)}>
-                            <MaterialActionIcon name="add" />
-                            {t("courseDetail.addRootFolder")}
+                          <button
+                            aria-label={t("courseDetail.addRootFolder")}
+                            className="secondary icon-button section-action-icon-button"
+                            disabled={isAddingActivity}
+                            title={t("courseDetail.addRootFolder")}
+                            type="button"
+                            onClick={() => void createInlineFolder(null)}
+                          >
+                            <MaterialActionIcon name="folderAdd" />
                           </button>
-                          <button className="secondary" type="button" onClick={() => setShowActivityPicker(true)}>
-                            {t("courseDetail.activityShellTitle")}
+                          <button
+                            aria-label={t("courseDetail.activityShellTitle")}
+                            className="secondary icon-button section-action-icon-button"
+                            title={t("courseDetail.activityShellTitle")}
+                            type="button"
+                            onClick={() => setShowActivityPicker(true)}
+                          >
+                            <MaterialActionIcon name="activityAdd" />
                           </button>
                         </div>
                       </div>
@@ -1651,9 +1689,9 @@ export default function CourseDetailPage() {
                             onChange={(event) => setAssignAllParentId(event.target.value)}
                           >
                             <option value="">{t("courseDetail.contentFolderRoot")}</option>
-                            {contentFolders.map((folder) => (
+                            {contentFolderOptions.map(({ item: folder, depth }) => (
                               <option key={folder.id} value={folder.id}>
-                                {folder.titleSnapshot ?? t("courseDetail.untitledFolder")}
+                                {formatFolderOptionLabel(folder, depth, t("courseDetail.untitledFolder"))}
                               </option>
                             ))}
                           </select>
@@ -1903,7 +1941,7 @@ export default function CourseDetailPage() {
                       >
                         {t("courseDetail.materialPickerTab")}
                       </button>
-                      {activityCategories.map((category) => (
+                      {visibleActivityCategories.map((category) => (
                         <button
                           key={category.id}
                           aria-selected={selectedActivityPickerTab === category.id}
@@ -1917,14 +1955,14 @@ export default function CourseDetailPage() {
                       ))}
                     </div>
                     <div className="activity-type-options" role="tabpanel">
-                      <div className="grid compact-form-grid" style={{ marginBottom: 16 }}>
+                      <div className="grid compact-form-grid activity-picker-placement">
                         <div className="field">
                           <label htmlFor="courseContentFolder">{t("courseDetail.contentFolderLabel")}</label>
                           <select id="courseContentFolder" value={pickerParentId} onChange={(event) => setPickerParentId(event.target.value)}>
                             <option value="">{t("courseDetail.contentFolderRoot")}</option>
-                            {contentFolders.map((folder) => (
+                            {contentFolderOptions.map(({ item: folder, depth }) => (
                               <option key={folder.id} value={folder.id}>
-                                {folder.titleSnapshot ?? t("courseDetail.untitledFolder")}
+                                {formatFolderOptionLabel(folder, depth, t("courseDetail.untitledFolder"))}
                               </option>
                             ))}
                           </select>
@@ -1979,7 +2017,7 @@ export default function CourseDetailPage() {
                           )}
                         </div>
                       ) : selectedActivityPickerTab === "material" ? (
-                        <div className="activity-bank-picker-panel">
+                        <div className="activity-type-picker-grid">
                           {pickerContentTypes.map((contentType) => (
                             <button
                               key={contentType.key}
@@ -2356,7 +2394,7 @@ function flattenContentItems(contentItems: CourseContentItem[], collapsedFolderI
 
   walk("root", 0);
 
-  for (const item of contentItems.sort(compareContentItems)) {
+  for (const item of [...contentItems].sort(compareContentItems)) {
     const parentIsMissing = item.parentId && !itemIds.has(item.parentId);
     if (!visited.has(item.id) && parentIsMissing) {
       rows.push({ item, depth: 0 });
@@ -2364,6 +2402,11 @@ function flattenContentItems(contentItems: CourseContentItem[], collapsedFolderI
   }
 
   return rows;
+}
+
+function formatFolderOptionLabel(folder: CourseContentItem, depth: number, fallbackTitle: string) {
+  const title = folder.titleSnapshot ?? fallbackTitle;
+  return depth > 0 ? `${"  ".repeat(depth)}- ${title}` : title;
 }
 
 function isContentDescendant(contentItems: CourseContentItem[], possibleChildId: string, possibleAncestorId: string) {
@@ -2472,9 +2515,17 @@ function FolderContentIcon({ collapsed }: { collapsed: boolean }) {
 function MaterialActionIcon({
   name
 }: {
-  name: "add" | "assign" | "download" | "down" | "drag" | "edit" | "hidden" | "open" | "remove" | "up" | "visible";
+  name: "activityAdd" | "add" | "assign" | "download" | "down" | "drag" | "edit" | "folderAdd" | "hidden" | "open" | "remove" | "up" | "visible";
 }) {
   const paths = {
+    activityAdd: (
+      <>
+        <path d="M6 4h9l3 3v13H6z" />
+        <path d="M15 4v4h4" />
+        <path d="M10 12h5" />
+        <path d="M12.5 9.5v5" />
+      </>
+    ),
     add: (
       <>
         <path d="M12 5v14" />
@@ -2516,6 +2567,13 @@ function MaterialActionIcon({
       <>
         <path d="m4 16 1 4 4-1 9-9-5-5-9 9Z" />
         <path d="m12 6 5 5" />
+      </>
+    ),
+    folderAdd: (
+      <>
+        <path d="M3 7h7l2 3h9v9H3z" />
+        <path d="M15 12v5" />
+        <path d="M12.5 14.5h5" />
       </>
     ),
     hidden: (

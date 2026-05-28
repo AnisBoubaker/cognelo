@@ -542,6 +542,17 @@ a.card:hover,
   gap: 8px;
 }
 
+.section-actions .section-action-icon-button {
+  height: 46px;
+  min-height: 46px;
+  width: 46px;
+}
+
+.section-actions .section-action-icon-button svg {
+  height: 22px;
+  width: 22px;
+}
+
 .hero-panel {
   background:
     linear-gradient(140deg, rgba(41, 213, 207, 0.12), rgba(46, 131, 216, 0.08) 45%, rgba(90, 42, 191, 0.08)),
@@ -1675,6 +1686,12 @@ a.card:hover,
   padding: 16px;
 }
 
+.activity-picker-placement {
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr;
+  margin-bottom: 16px;
+}
+
 .activity-bank-picker-panel {
   display: grid;
   gap: 12px;
@@ -1686,19 +1703,29 @@ a.card:hover,
   max-width: none;
 }
 
+.activity-type-picker-grid {
+  display: contents;
+}
+
 .activity-type-option {
-  align-items: center;
+  align-items: start;
   background: #fff;
   border: 1px solid var(--line);
   box-shadow: none;
   color: var(--ink);
   display: grid;
   gap: 12px;
-  grid-template-columns: 54px 1fr;
+  grid-template-columns: 54px minmax(0, 1fr);
+  height: auto;
   justify-content: start;
-  min-height: 86px;
+  min-height: 132px;
+  overflow: visible;
   padding: 14px;
   text-align: left;
+}
+
+.activity-type-option > span {
+  min-width: 0;
 }
 
 .activity-type-option:hover {
@@ -1716,6 +1743,7 @@ a.card:hover,
   font-weight: 600;
   line-height: 1.35;
   margin-top: 4px;
+  overflow-wrap: anywhere;
 }
 
 .activity-type-icon {
