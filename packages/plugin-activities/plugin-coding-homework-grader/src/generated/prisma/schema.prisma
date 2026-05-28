@@ -1,0 +1,258 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PluginCodingHomeworkAttachmentOwnerKind {
+  course_activity
+  bank_activity
+  submission
+}
+
+enum PluginCodingHomeworkAttachmentKind {
+  assignment_pdf
+  requirements_upload
+  submission_zip
+  extracted_source
+  extracted_non_source
+}
+
+enum PluginCodingHomeworkSnapshotStatus {
+  pending
+  ready
+  failed
+}
+
+enum PluginCodingHomeworkSubmissionKind {
+  preflight
+  final
+}
+
+enum PluginCodingHomeworkSubmissionStatus {
+  uploaded
+  validating
+  invalid_structure
+  structure_valid
+  processing
+  challenge_ready
+  answered
+  ready_for_grading
+  graded
+  failed
+}
+
+model PluginCodingHomeworkAssignment {
+  id                     String   @id @default(cuid())
+  activityId             String   @unique
+  promptMarkdown         String   @default("")
+  promptPdfAttachmentId  String?
+  languageKey            String   @default("c")
+  candidateLimit         Int      @default(5)
+  retrievedExampleCount  Int      @default(3)
+  questionCount          Int      @default(3)
+  generationInstructions String   @default("")
+  settings               Json     @default("{}")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model PluginBankCodingHomeworkAssignment {
+  id                     String   @id @default(cuid())
+  bankActivityId         String   @unique
+  promptMarkdown         String   @default("")
+  promptPdfAttachmentId  String?
+  languageKey            String   @default("c")
+  candidateLimit         Int      @default(5)
+  retrievedExampleCount  Int      @default(3)
+  questionCount          Int      @default(3)
+  generationInstructions String   @default("")
+  settings               Json     @default("{}")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model PluginCodingHomeworkSubmissionRequirementSet {
+  id                 String   @id @default(cuid())
+  activityId         String   @unique
+  languageKey        String   @default("c")
+  requirements       Json     @default("{}")
+  sourceAttachmentId String?
+  metadata           Json     @default("{}")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model PluginBankCodingHomeworkSubmissionRequirementSet {
+  id                 String   @id @default(cuid())
+  bankActivityId     String   @unique
+  languageKey        String   @default("c")
+  requirements       Json     @default("{}")
+  sourceAttachmentId String?
+  metadata           Json     @default("{}")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model PluginCodingHomeworkAttachment {
+  id           String                                  @id @default(cuid())
+  ownerKind    PluginCodingHomeworkAttachmentOwnerKind
+  ownerId      String
+  kind         PluginCodingHomeworkAttachmentKind
+  originalName String
+  storedName   String
+  mimeType     String?
+  sizeBytes    BigInt
+  sha256       String
+  metadata     Json                                    @default("{}")
+  createdAt    DateTime                                @default(now())
+  updatedAt    DateTime                                @updatedAt
+
+  @@index([ownerKind, ownerId, kind], map: "PluginCodingHomeworkAttachment_owner_idx")
+  @@index([sha256], map: "PluginCodingHomeworkAttachment_sha256_idx")
+}
+
+model PluginCodingHomeworkDocumentationSnapshot {
+  id                      String                                  @id @default(cuid())
+  activityId              String
+  courseId                String
+  groupId                 String?
+  contentTreeAnchorItemId String?
+  contentTreeFingerprint  String                                  @default("")
+  status                  PluginCodingHomeworkSnapshotStatus      @default(pending)
+  metadata                Json                                    @default("{}")
+  createdAt               DateTime                                @default(now())
+  updatedAt               DateTime                                @updatedAt
+  referenceFunctions      PluginCodingHomeworkReferenceFunction[]
+  submissions             PluginCodingHomeworkSubmission[]
+
+  @@index([activityId, status, createdAt], map: "PluginCodingHomeworkSnapshot_activity_status_idx")
+  @@index([courseId, groupId, createdAt], map: "PluginCodingHomeworkSnapshot_course_group_idx")
+}
+
+model PluginCodingHomeworkReferenceFunction {
+  id                String                                    @id @default(cuid())
+  snapshotId        String
+  contentResourceId String?
+  sourceTitle       String
+  sourceKind        String
+  languageKey       String
+  functionName      String
+  functionCode      String
+  astText           String
+  embedding         Json                                      @default("[]")
+  metadata          Json                                      @default("{}")
+  createdAt         DateTime                                  @default(now())
+  updatedAt         DateTime                                  @updatedAt
+  snapshot          PluginCodingHomeworkDocumentationSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId, languageKey], map: "PluginCodingHomeworkReferenceFunction_snapshot_idx")
+  @@index([contentResourceId], map: "PluginCodingHomeworkReferenceFunction_resource_idx")
+  @@index([functionName], map: "PluginCodingHomeworkReferenceFunction_name_idx")
+}
+
+model PluginCodingHomeworkSubmission {
+  id                         String                                     @id @default(cuid())
+  activityId                 String
+  groupId                    String
+  userId                     String
+  coreAttemptId              String?
+  documentationSnapshotId    String?
+  zipAttachmentId            String?
+  kind                       PluginCodingHomeworkSubmissionKind         @default(final)
+  status                     PluginCodingHomeworkSubmissionStatus       @default(uploaded)
+  structureValidationSummary Json                                       @default("{}")
+  processingError            String?
+  metadata                   Json                                       @default("{}")
+  createdAt                  DateTime                                   @default(now())
+  updatedAt                  DateTime                                   @updatedAt
+  documentationSnapshot      PluginCodingHomeworkDocumentationSnapshot? @relation(fields: [documentationSnapshotId], references: [id], onDelete: SetNull)
+  files                      PluginCodingHomeworkSubmissionFile[]
+  functions                  PluginCodingHomeworkSubmissionFunction[]
+  questions                  PluginCodingHomeworkChallengeQuestion[]
+  reviews                    PluginCodingHomeworkReview[]
+
+  @@index([activityId, groupId, userId, createdAt], map: "PluginCodingHomeworkSubmission_activity_user_idx")
+  @@index([activityId, status, createdAt], map: "PluginCodingHomeworkSubmission_status_idx")
+  @@index([coreAttemptId], map: "PluginCodingHomeworkSubmission_coreAttempt_idx")
+}
+
+model PluginCodingHomeworkSubmissionFile {
+  id           String                                   @id @default(cuid())
+  submissionId String
+  path         String
+  languageKey  String?
+  sizeBytes    BigInt
+  sha256       String
+  storedName   String
+  metadata     Json                                     @default("{}")
+  createdAt    DateTime                                 @default(now())
+  submission   PluginCodingHomeworkSubmission           @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  functions    PluginCodingHomeworkSubmissionFunction[]
+
+  @@unique([submissionId, path], map: "PluginCodingHomeworkSubmissionFile_submission_path_key")
+  @@index([sha256], map: "PluginCodingHomeworkSubmissionFile_sha256_idx")
+}
+
+model PluginCodingHomeworkSubmissionFunction {
+  id                  String                                  @id @default(cuid())
+  submissionId        String
+  fileId              String
+  functionName        String
+  functionCode        String
+  astText             String
+  embedding           Json                                    @default("[]")
+  nearestExamples     Json                                    @default("[]")
+  divergenceScore     Float?
+  selectedForQuestion Boolean                                 @default(false)
+  createdAt           DateTime                                @default(now())
+  updatedAt           DateTime                                @updatedAt
+  submission          PluginCodingHomeworkSubmission          @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  file                PluginCodingHomeworkSubmissionFile      @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  questions           PluginCodingHomeworkChallengeQuestion[]
+
+  @@index([submissionId, selectedForQuestion], map: "PluginCodingHomeworkSubmissionFunction_selected_idx")
+  @@index([fileId, functionName], map: "PluginCodingHomeworkSubmissionFunction_file_idx")
+}
+
+model PluginCodingHomeworkChallengeQuestion {
+  id                      String                                  @id @default(cuid())
+  submissionId            String
+  submissionFunctionId    String?
+  orderIndex              Int
+  questionText            String
+  studentAnswer           String?
+  answerSubmittedAt       DateTime?
+  generationModel         String
+  generationPromptVersion String
+  nearestExamples         Json                                    @default("[]")
+  metadata                Json                                    @default("{}")
+  createdAt               DateTime                                @default(now())
+  updatedAt               DateTime                                @updatedAt
+  submission              PluginCodingHomeworkSubmission          @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submissionFunction      PluginCodingHomeworkSubmissionFunction? @relation(fields: [submissionFunctionId], references: [id], onDelete: SetNull)
+
+  @@unique([submissionId, orderIndex], map: "PluginCodingHomeworkQuestion_submission_order_key")
+  @@index([submissionFunctionId], map: "PluginCodingHomeworkQuestion_function_idx")
+}
+
+model PluginCodingHomeworkReview {
+  id             String                         @id @default(cuid())
+  submissionId   String
+  reviewerUserId String
+  score          Float?
+  maxScore       Float?
+  feedback       String                         @default("")
+  rubric         Json                           @default("{}")
+  metadata       Json                           @default("{}")
+  createdAt      DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
+  submission     PluginCodingHomeworkSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId], map: "PluginCodingHomeworkReview_submission_idx")
+  @@index([reviewerUserId, createdAt], map: "PluginCodingHomeworkReview_reviewer_idx")
+}
