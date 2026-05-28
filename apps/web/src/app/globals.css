@@ -528,6 +528,20 @@ a.card:hover,
   justify-content: space-between;
 }
 
+.section-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.section-actions .secondary {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
 .hero-panel {
   background:
     linear-gradient(140deg, rgba(41, 213, 207, 0.12), rgba(46, 131, 216, 0.08) 45%, rgba(90, 42, 191, 0.08)),
@@ -993,8 +1007,14 @@ a.card:hover,
 }
 
 .table-row-content-tree strong,
+.table-row-content-tree .content-title-input,
 .table-row-content-tree .metadata-badges {
   grid-column: 3;
+}
+
+.table-row-content-tree .content-title-input {
+  max-width: min(100%, 360px);
+  min-height: 34px;
 }
 
 .table-row-content-tree .metadata-badges {

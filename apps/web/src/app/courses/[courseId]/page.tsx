@@ -4,7 +4,7 @@ import { MarkdownRenderer } from "@cognelo/activity-ui";
 import { resolveLocalizedText, type ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { CSSProperties, FormEvent, PointerEvent, useEffect, useState } from "react";
+import { CSSProperties, FormEvent, KeyboardEvent as ReactKeyboardEvent, PointerEvent, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
@@ -68,8 +68,10 @@ export default function CourseDetailPage() {
   const [selectedActivityBankId, setSelectedActivityBankId] = useState("");
   const [pickerParentId, setPickerParentId] = useState("");
   const [pickerIsVisible, setPickerIsVisible] = useState(true);
-  const [pickerFolderTitle, setPickerFolderTitle] = useState("");
   const [isAddingActivity, setIsAddingActivity] = useState(false);
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const [editingFolderTitle, setEditingFolderTitle] = useState("");
+  const [editingFolderSelectAll, setEditingFolderSelectAll] = useState(false);
   const [assignAllActivityId, setAssignAllActivityId] = useState<string | null>(null);
   const [assignAllParentId, setAssignAllParentId] = useState("");
   const [assignAllIsVisible, setAssignAllIsVisible] = useState(true);
@@ -100,6 +102,9 @@ export default function CourseDetailPage() {
   const [collapsedContentFolderIds, setCollapsedContentFolderIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [materialActionError, setMaterialActionError] = useState("");
+  const folderTitleInputRef = useRef<HTMLInputElement | null>(null);
+  const cancelFolderEditRef = useRef(false);
+  const skipFolderBlurRef = useRef(false);
 
   async function refresh() {
     const [courseResult, typeResult] = await Promise.all([api.course(courseId), api.activityTypes()]);
@@ -148,6 +153,26 @@ export default function CourseDetailPage() {
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("courseDetail.loadError")));
   }, [courseId, t, user, gradebookGroupId, gradebookActivityId, gradebookStatus]);
+
+  useEffect(() => {
+    if (!editingFolderId) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      const input = folderTitleInputRef.current;
+      if (!input || input.dataset.folderId !== editingFolderId) {
+        return;
+      }
+      input.focus();
+      if (editingFolderSelectAll) {
+        input.select();
+      } else {
+        const end = input.value.length;
+        input.setSelectionRange(end, end);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [editingFolderId, editingFolderSelectAll, contentItems]);
 
   async function setGradebookRelease(gradebookItemId: string, released: boolean, activityTitle: string) {
     const confirmed = window.confirm(
@@ -299,24 +324,33 @@ export default function CourseDetailPage() {
     }
   }
 
-  async function createPickerFolder(event: FormEvent) {
-    event.preventDefault();
-    if (!pickerFolderTitle.trim()) {
-      return;
-    }
-    setError("");
+  async function createInlineFolder(parentId: string | null) {
+    setMaterialActionError("");
     setIsAddingActivity(true);
     try {
+      const title = t("courseDetail.defaultFolderTitle");
       const result = await api.createContentFolder(courseId, {
-        title: pickerFolderTitle,
-        parentId: pickerParentId || null,
-        isVisible: pickerIsVisible
+        title,
+        parentId,
+        isVisible: true,
+        position: 0
       });
-      setPickerFolderTitle("");
-      setPickerParentId(result.contentItem.id);
+      const siblings = contentItems.filter((item) => item.id !== result.contentItem.id && (item.parentId ?? null) === parentId && !item.groupId).sort(compareContentItems);
+      await Promise.all([
+        api.updateContentItem(courseId, result.contentItem.id, { position: 0 }),
+        ...siblings.map((item, index) => api.updateContentItem(courseId, item.id, { position: index + 1 }))
+      ]);
+      if (parentId) {
+        setCollapsedContentFolderIds((current) => {
+          const next = new Set(current);
+          next.delete(parentId);
+          return next;
+        });
+      }
+      startEditingFolder({ ...result.contentItem, titleSnapshot: title }, true);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("courseDetail.createMaterialError"));
+      setMaterialActionError(err instanceof Error ? err.message : t("courseDetail.createMaterialError"));
     } finally {
       setIsAddingActivity(false);
     }
@@ -598,6 +632,65 @@ export default function CourseDetailPage() {
     };
   }
 
+  function startEditingFolder(item: CourseContentItem, selectAll: boolean) {
+    cancelFolderEditRef.current = false;
+    skipFolderBlurRef.current = false;
+    setEditingFolderId(item.id);
+    setEditingFolderTitle(item.titleSnapshot ?? t("courseDetail.defaultFolderTitle"));
+    setEditingFolderSelectAll(selectAll);
+  }
+
+  function cancelFolderEdit() {
+    cancelFolderEditRef.current = true;
+    setEditingFolderId(null);
+    setEditingFolderTitle("");
+    setEditingFolderSelectAll(false);
+  }
+
+  async function commitFolderEdit(item: CourseContentItem) {
+    if (cancelFolderEditRef.current) {
+      cancelFolderEditRef.current = false;
+      return;
+    }
+    if (editingFolderId !== item.id) {
+      return;
+    }
+    const nextTitle = editingFolderTitle.trim() || t("courseDetail.defaultFolderTitle");
+    setEditingFolderId(null);
+    setEditingFolderTitle("");
+    setEditingFolderSelectAll(false);
+    if (nextTitle === (item.titleSnapshot ?? "")) {
+      return;
+    }
+    setMaterialActionError("");
+    try {
+      await updateContentInScope(item, { titleSnapshot: nextTitle });
+      await refresh();
+    } catch (err) {
+      setMaterialActionError(err instanceof Error ? err.message : t("courseDetail.contentUpdateError"));
+    }
+  }
+
+  function handleFolderTitleBlur(item: CourseContentItem) {
+    if (skipFolderBlurRef.current) {
+      skipFolderBlurRef.current = false;
+      return;
+    }
+    void commitFolderEdit(item);
+  }
+
+  function handleFolderTitleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>, item: CourseContentItem) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      skipFolderBlurRef.current = true;
+      void commitFolderEdit(item);
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelFolderEdit();
+    }
+  }
+
   async function toggleContentVisibility(item: CourseContentItem) {
     setMaterialActionError("");
     try {
@@ -714,7 +807,10 @@ export default function CourseDetailPage() {
     }
   }
 
-  async function updateContentInScope(item: CourseContentItem, input: { parentId?: string | null; isVisible?: boolean; position?: number }) {
+  async function updateContentInScope(
+    item: CourseContentItem,
+    input: { parentId?: string | null; isVisible?: boolean; position?: number; titleSnapshot?: string | null }
+  ) {
     if (item.groupId) {
       await api.updateGroupContentItem(courseId, item.groupId, item.id, input);
     } else {
@@ -1002,9 +1098,15 @@ export default function CourseDetailPage() {
                           <h2>{t("courseDetail.contentTitle")}</h2>
                           <p className="muted">{t("courseDetail.contentText")}</p>
                         </div>
-                        <button className="secondary" type="button" onClick={() => setShowActivityPicker(true)}>
-                          {t("courseDetail.activityShellTitle")}
-                        </button>
+                        <div className="section-actions">
+                          <button className="secondary" disabled={isAddingActivity} type="button" onClick={() => void createInlineFolder(null)}>
+                            <MaterialActionIcon name="add" />
+                            {t("courseDetail.addRootFolder")}
+                          </button>
+                          <button className="secondary" type="button" onClick={() => setShowActivityPicker(true)}>
+                            {t("courseDetail.activityShellTitle")}
+                          </button>
+                        </div>
                       </div>
 
                       {visibleContentItems.length ? (
@@ -1079,25 +1181,38 @@ export default function CourseDetailPage() {
                                       )}
                                     </span>
                                   )}
-                                  <strong>
-                                    {href && material ? (
-                                      <a
-                                        href={href}
-                                        rel={materialIsDownloadable ? undefined : "noreferrer"}
-                                        target={materialIsDownloadable ? undefined : "_blank"}
-                                      >
-                                        {title}
-                                      </a>
-                                    ) : href && contentResource ? (
-                                      <a href={href} rel={contentResourceIsFile ? undefined : "noreferrer"} target={contentResourceIsFile ? undefined : "_blank"}>
-                                        {title}
-                                      </a>
-                                    ) : href ? (
-                                      <Link href={href}>{title}</Link>
-                                    ) : (
-                                      title
-                                    )}
-                                  </strong>
+                                  {item.kind === "folder" && editingFolderId === item.id ? (
+                                    <input
+                                      ref={folderTitleInputRef}
+                                      className="content-title-input"
+                                      data-folder-id={item.id}
+                                      value={editingFolderTitle}
+                                      aria-label={t("courseDetail.renameFolder", { title })}
+                                      onBlur={() => handleFolderTitleBlur(item)}
+                                      onChange={(event) => setEditingFolderTitle(event.target.value)}
+                                      onKeyDown={(event) => handleFolderTitleKeyDown(event, item)}
+                                    />
+                                  ) : (
+                                    <strong>
+                                      {href && material ? (
+                                        <a
+                                          href={href}
+                                          rel={materialIsDownloadable ? undefined : "noreferrer"}
+                                          target={materialIsDownloadable ? undefined : "_blank"}
+                                        >
+                                          {title}
+                                        </a>
+                                      ) : href && contentResource ? (
+                                        <a href={href} rel={contentResourceIsFile ? undefined : "noreferrer"} target={contentResourceIsFile ? undefined : "_blank"}>
+                                          {title}
+                                        </a>
+                                      ) : href ? (
+                                        <Link href={href}>{title}</Link>
+                                      ) : (
+                                        title
+                                      )}
+                                    </strong>
+                                  )}
                                   {activity || contentResourceIsUnavailable ? (
                                     <span className="metadata-badges">
                                       {activityLabel ? <span className="metadata-badge is-activity-type">{activityLabel}</span> : null}
@@ -1117,7 +1232,18 @@ export default function CourseDetailPage() {
                                   ) : null}
                                 </div>
                                 <div className="table-actions content-row-actions">
-                                  {href ? (
+                                  {item.kind === "folder" ? (
+                                    <button
+                                      aria-label={t("courseDetail.addSubfolder", { title })}
+                                      className="secondary icon-button"
+                                      disabled={isAddingActivity}
+                                      title={t("courseDetail.addSubfolder", { title })}
+                                      type="button"
+                                      onClick={() => void createInlineFolder(item.id)}
+                                    >
+                                      <MaterialActionIcon name="add" />
+                                    </button>
+                                  ) : href ? (
                                     material ? (
                                       <a
                                         aria-label={t(
@@ -1161,7 +1287,7 @@ export default function CourseDetailPage() {
                                     className="secondary icon-button"
                                     title={t("courseDetail.settingsTitle")}
                                     type="button"
-                                    onClick={() => openContentSettings(item)}
+                                    onClick={() => (item.kind === "folder" ? startEditingFolder(item, false) : openContentSettings(item))}
                                   >
                                     <MaterialActionIcon name="edit" />
                                   </button>
@@ -1854,21 +1980,6 @@ export default function CourseDetailPage() {
                         </div>
                       ) : selectedActivityPickerTab === "material" ? (
                         <div className="activity-bank-picker-panel">
-                          <form className="form inline-panel" onSubmit={createPickerFolder}>
-                            <div className="field">
-                              <label htmlFor="pickerFolderTitle">{t("courseDetail.newFolderLabel")}</label>
-                              <input
-                                id="pickerFolderTitle"
-                                value={pickerFolderTitle}
-                                onChange={(event) => setPickerFolderTitle(event.target.value)}
-                                minLength={2}
-                                placeholder={t("courseDetail.newFolderPlaceholder")}
-                              />
-                            </div>
-                            <button type="submit" disabled={isAddingActivity || !pickerFolderTitle.trim()}>
-                              {t("courseDetail.createFolder")}
-                            </button>
-                          </form>
                           {pickerContentTypes.map((contentType) => (
                             <button
                               key={contentType.key}
@@ -2358,8 +2469,18 @@ function FolderContentIcon({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-function MaterialActionIcon({ name }: { name: "assign" | "download" | "down" | "drag" | "edit" | "hidden" | "open" | "remove" | "up" | "visible" }) {
+function MaterialActionIcon({
+  name
+}: {
+  name: "add" | "assign" | "download" | "down" | "drag" | "edit" | "hidden" | "open" | "remove" | "up" | "visible";
+}) {
   const paths = {
+    add: (
+      <>
+        <path d="M12 5v14" />
+        <path d="M5 12h14" />
+      </>
+    ),
     assign: (
       <>
         <path d="M4 6h10" />
