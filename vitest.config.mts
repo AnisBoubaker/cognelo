@@ -7,6 +7,7 @@ export default defineConfig({
       "@cognelo/activity-sdk/server": new URL("./packages/activity-sdk/src/server.ts", import.meta.url).pathname,
       "@cognelo/activity-sdk": new URL("./packages/activity-sdk/src/index.ts", import.meta.url).pathname,
       "@cognelo/content-type-sdk/server": new URL("./packages/content-type-sdk/src/server.ts", import.meta.url).pathname,
+      "@cognelo/content-type-sdk/vector": new URL("./packages/content-type-sdk/src/vector.ts", import.meta.url).pathname,
       "@cognelo/content-type-sdk": new URL("./packages/content-type-sdk/src/index.ts", import.meta.url).pathname,
       "@cognelo/plugin-file-content/server": new URL("./packages/plugin-content-types/plugin-file/src/server.ts", import.meta.url).pathname,
       "@cognelo/plugin-file-content": new URL("./packages/plugin-content-types/plugin-file/src/index.ts", import.meta.url).pathname,

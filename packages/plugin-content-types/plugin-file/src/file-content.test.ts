@@ -50,4 +50,29 @@ describe("file content plugin", () => {
       sourceId: "resource-1"
     });
   });
+
+  it("reports missing uploads through the generic embedding document interface", async () => {
+    await expect(
+      fileContentServerPlugin.handlers?.getEmbeddingDocuments?.({
+        resource: {
+          id: "resource-1",
+          courseId: "course-1",
+          contentTypeKey: "file",
+          pluginKey: "file-content",
+          title: "Slides",
+          metadata: { setupStatus: "draft" }
+        }
+      })
+    ).resolves.toEqual({
+      sourceId: "resource-1",
+      documents: [],
+      diagnostics: [
+        {
+          code: "FILE_CONTENT_NOT_UPLOADED",
+          message: "This file resource has no uploaded file.",
+          severity: "warning"
+        }
+      ]
+    });
+  });
 });

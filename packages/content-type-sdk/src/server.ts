@@ -3,6 +3,22 @@ import { githubRepoContentServerPlugin } from "@cognelo/plugin-github-repo/serve
 import { textContentServerPlugin } from "@cognelo/plugin-text-content/server";
 import type { CurrentUser } from "@cognelo/contracts";
 import type { ContentEmbeddingSourceKind } from "./index";
+import type { ContentVectorIndexResult, ContentVectorSearchResult } from "./vector";
+export {
+  buildContentVectorIndex,
+  cosineSimilarity,
+  createDeterministicContentEmbeddingProvider,
+  searchContentVectorIndex
+} from "./vector";
+export type {
+  ContentEmbeddingVector,
+  ContentVectorEmbeddingProvider,
+  ContentVectorIndex,
+  ContentVectorIndexedDocument,
+  ContentVectorIndexResult,
+  ContentVectorSearchMatch,
+  ContentVectorSearchResult
+} from "./vector";
 
 export type ServerContentResourceRecord = {
   id: string;
@@ -84,10 +100,56 @@ export type ContentEmbeddingSource =
   | { kind: "external_url"; url: string; sourceId: string }
   | { kind: "none"; sourceId: string };
 
+export type ContentEmbeddingDiagnostic = {
+  code: string;
+  message: string;
+  severity: "info" | "warning" | "error";
+  metadata?: Record<string, unknown>;
+};
+
+export type ContentEmbeddingDocument = {
+  id: string;
+  sourceId: string;
+  title: string;
+  text: string;
+  kind: "markdown" | "plain_text" | "code" | "external_reference";
+  languageKey?: string | null;
+  path?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type ContentEmbeddingDocumentsResult = {
+  sourceId: string;
+  documents: ContentEmbeddingDocument[];
+  diagnostics: ContentEmbeddingDiagnostic[];
+  metadata?: Record<string, unknown>;
+};
+
 export type ContentTypeEmbeddingSourceHandler = (input: {
   resource: ServerContentResourceRecord;
   preferredKind?: ContentEmbeddingSourceKind;
 }) => Promise<ContentEmbeddingSource>;
+
+export type ContentTypeEmbeddingDocumentsHandler = (input: {
+  resource: ServerContentResourceRecord;
+  preferredKind?: ContentEmbeddingSourceKind;
+}) => Promise<ContentEmbeddingDocumentsResult>;
+
+export type ContentTypeEmbeddingIndexHandler = (input: {
+  user: CurrentUser;
+  resource: ServerContentResourceRecord;
+  preferredKind?: ContentEmbeddingSourceKind;
+}) => Promise<ContentVectorIndexResult>;
+
+export type ContentTypeEmbeddingSearchHandler = (input: {
+  user: CurrentUser;
+  resource: ServerContentResourceRecord;
+  queryText?: string;
+  queryVector?: number[];
+  limit?: number;
+  minScore?: number;
+  preferredKind?: ContentEmbeddingSourceKind;
+}) => Promise<ContentVectorSearchResult>;
 
 export type ServerContentTypePlugin = {
   key: string;
@@ -98,6 +160,9 @@ export type ServerContentTypePlugin = {
     delete?: ContentTypeDeleteHandler;
     resolveOpenAction?: ContentTypeOpenActionHandler;
     getEmbeddingSource?: ContentTypeEmbeddingSourceHandler;
+    getEmbeddingDocuments?: ContentTypeEmbeddingDocumentsHandler;
+    indexEmbeddingDocuments?: ContentTypeEmbeddingIndexHandler;
+    searchEmbeddingDocuments?: ContentTypeEmbeddingSearchHandler;
   };
 };
 

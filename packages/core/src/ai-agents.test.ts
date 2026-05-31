@@ -9,6 +9,9 @@ const mockPrisma = vi.hoisted(() => ({
     findUnique: vi.fn(),
     update: vi.fn()
   },
+  course: {
+    findUnique: vi.fn()
+  },
   user: {
     findUnique: vi.fn(),
     update: vi.fn()
@@ -23,6 +26,7 @@ vi.mock("@cognelo/db", () => ({
 const {
   createAiAgentConnection,
   deleteAiAgentConnection,
+  getCourseStudentSupportAiAgentConnection,
   generateQuestionAuthoringText,
   getQuestionAuthoringAiAgentConnection,
   listAiAgentConnections,
@@ -37,6 +41,13 @@ const teacherUser = {
   firstName: null,
   lastName: null,
   roles: ["teacher" as const]
+};
+
+const adminUser = {
+  ...teacherUser,
+  id: "admin-1",
+  email: "admin@example.test",
+  roles: ["admin" as const]
 };
 
 const connectionId = "clx0000000000000000000000";
@@ -177,6 +188,31 @@ describe("AI agent services", () => {
       apiKey: null
     });
     await expect(getQuestionAuthoringAiAgentConnection(teacherUser)).resolves.toMatchObject({ id: "agent-ollama" });
+  });
+
+  it("gets the configured course student-support connection for course-scoped AI work", async () => {
+    mockPrisma.course.findUnique.mockResolvedValue({
+      metadata: { aiSettings: { studentSupportAiAgentConnectionId: connectionId } }
+    });
+    mockPrisma.aiAgentConnection.findFirst.mockResolvedValue({
+      id: "course-agent",
+      provider: "openai",
+      apiKey: "secret"
+    });
+
+    await expect(getCourseStudentSupportAiAgentConnection(adminUser, "course-1")).resolves.toMatchObject({ id: "course-agent" });
+    expect(mockPrisma.aiAgentConnection.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: connectionId,
+        isEnabled: true
+      }
+    });
+
+    mockPrisma.course.findUnique.mockResolvedValue({ metadata: { aiSettings: {} } });
+    await expect(getCourseStudentSupportAiAgentConnection(adminUser, "course-1")).rejects.toMatchObject({
+      status: 400,
+      code: "AI_AGENT_NOT_CONFIGURED"
+    });
   });
 
   it("calls OpenAI-compatible, Claude, and Ollama providers and maps failed requests", async () => {

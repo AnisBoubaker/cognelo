@@ -58,14 +58,14 @@ docs/
 
 Activity plugins live under `packages/plugin-activities/plugin-*`. Content type plugins live under `packages/plugin-content-types/plugin-*`.
 
-The Coding Homework Grader scaffold is registered as `coding-homework-grader` in `packages/plugin-activities/plugin-coding-homework-grader`; its phased design lives in `docs/CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md`, and its plugin-owned persistence foundation now lives in the plugin package rather than core Prisma.
+The Coding Homework Grader scaffold is registered as `coding-homework-grader` in `packages/plugin-activities/plugin-coding-homework-grader`; its phased design lives in `docs/CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md`, and its teacher authoring, prior-documentation snapshot/extraction behavior, C parser adapter, ZIP preflight/final-submission validation, submitted-function candidate analysis, challenge question generation, student challenge answers, and plugin-owned persistence foundation live in the plugin package rather than core Prisma. Course content extraction and reference similarity are requested through the shared content type plugin server interface; content-specific text/PDF/repository extraction stays inside the owning content type plugins.
 
 The intended boundary is:
 
 - **Core tables stay generic**: `Subject`, `ActivityBank`, `BankActivity`, `ActivityVersion`, `Activity`, `ActivityType`, `CourseContentResource`, `CourseContentItem`, `Course`, and related auth/course tables remain shared.
 - **Plugin tables belong to the plugin**: plugin-specific persistence lives in plugin-local Prisma schemas, migrations, clients, and database modules rather than in the core Prisma schema.
 - **Plugin HTTP handlers belong to the plugin**: the API app provides a generic dispatcher route, while plugin-specific subroutes are declared in plugin packages.
-- **Content type behavior belongs to content type plugins**: validation, settings forms, plugin routes, storage behavior, open/download behavior, and embedding source extraction live in `packages/plugin-content-types/*`.
+- **Content type behavior belongs to content type plugins**: validation, settings forms, plugin routes, storage behavior, open/download behavior, extracted embedding/reference documents, and content-resource extraction/chunking logic live in `packages/plugin-content-types/*`; production vector persistence/search should use shared platform vector services.
 - **Bank-to-course copies are explicit**: author in an activity bank, create a new bank version when saving there, and copy the selected version into a course when assigning it to that course. Course edits mutate only the course copy.
 - **Plugin activation and enablement are platform-managed**: installed activity plugins have `ActivityPluginInstallation` records. Newly discovered plugins start inactive and disabled; admins activate them first, then enable them when they should be available. Deactivation disables the plugin and renames plugin-owned tables into versioned backup tables that can be restored during reactivation. Plugin-local migrations provide the activation SQL for creating fresh empty plugin-owned tables when reactivated without restoring a backup.
 - **Content type activation mirrors activity plugins**: installed content type plugins have `ContentTypePluginInstallation` records. Enabled content type plugins can create new resources; active but disabled plugins may still serve existing resources; inactive/unavailable plugins render existing rows with an unavailable state.
@@ -90,7 +90,8 @@ Content type plugin packages can export:
 - settings/rendering components registered by renderer key
 - server create/update/delete/open-action handlers
 - plugin routes for upload/download/viewer behavior
-- `getEmbeddingSource` handlers that return generic text, file, external URL, or none descriptors for future indexing
+- `getEmbeddingDocuments` handlers that return extracted text/reference documents and diagnostics for future indexing
+- vector indexing/search handlers that submit/search plugin-owned content documents through the shared vector service behind the unified content type interface
 - database manifests and plugin-owned migrations when generic resource metadata is not enough
 
 For the beginner-friendly plugin authoring handbook, including step-by-step setup, shared services, persistence patterns, and research/grading guidance, see [docs/plugin-authoring/README.md](docs/plugin-authoring/README.md).
@@ -265,7 +266,7 @@ Visibility is content-tree state and is separate from activity availability. A v
 
 Course content resources are now plugin-backed through content type plugins. The current content type plugins are GitHub repo, File, and Text under `packages/plugin-content-types/*`. The course picker reads enabled content type definitions, while existing content rows can still render through active disabled plugins. Folders remain generic core content tree items rather than plugins.
 
-Each content type plugin can expose a `getEmbeddingSource` handler. Core exposes the generic `getContentResourceEmbeddingSource` service so future indexing or activity-generation code can ask for descriptors without importing concrete content plugins. The descriptor is intentionally generic: text, file reference, external URL, or none. Phase 11 does not create an embeddings database.
+Each content type plugin can expose `getEmbeddingDocuments`, `indexEmbeddingDocuments`, and `searchEmbeddingDocuments` handlers. Core exposes generic dispatchers so indexing or activity-generation code can ask for extracted documents and vector similarity without importing concrete content plugins. Content-specific extraction/chunking stays in the owning content type plugin. The current development implementation uses deterministic embeddings and plugin-owned resource metadata; production should use common platform pgvector tables behind the same handler contract so activity plugins can search all relevant course content across content types.
 
 Core gradebook services create numbered `ActivityAttempt` records for assigned group activities, enforce attempt limits, compute lateness at submission time, normalize raw plugin scores to the gradebook item scale, apply pass/fail thresholds and late penalties, select the current grade across attempts, and record grading results with `GradeEvent` audit entries. Plugins keep their private attempt/submission artifacts in plugin tables and call the core services to keep gradebook records consistent.
 
@@ -293,7 +294,9 @@ teacher@cognelo.local
 student@cognelo.local
 ```
 
-The seed also creates a sample subject, an activity bank with coding/web-design/Parsons examples, a sample course, starter materials, a section, assigned activities, and a mixed course content tree for development. The seeded content tree includes visible and hidden folders with materials and activities placed side by side.
+The seed also creates a sample subject, an activity bank with coding/web-design/Parsons/Coding Homework Grader examples, a sample course, starter materials, a section, assigned activities, and a mixed course content tree for development. The seeded content tree includes visible and hidden folders with materials and activities placed side by side.
+
+The Coding Homework Grader seed fixture creates `Coding homework grader: INF-155 TP1 Labyrinthe` in Programming 101 / Section A, with the extracted `tmp/INF155-A2023-TP1.pdf` assignment text, a copied assignment PDF attachment when the local file exists, ZIP structure requirements based on `tmp/FichiersFournis`, a ready prior-documentation snapshot, a summative group assignment, and a gradebook item. It also creates `seed-ai-agent-student-support` and selects it for the course student-support AI setting. The seed uses OpenAI when `OPENAI_API_KEY` is present, otherwise it falls back to local Ollama (`llama3.1`); set `SEED_AI_AGENT_PROVIDER`, `SEED_AI_AGENT_MODEL`, `SEED_AI_AGENT_BASE_URL`, or `SEED_AI_AGENT_API_KEY` before seeding if you want a different provider.
 
 ## Run Locally
 

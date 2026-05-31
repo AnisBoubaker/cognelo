@@ -2436,6 +2436,123 @@ a.card:hover,
   grid-template-columns: minmax(0, 1fr) minmax(360px, 0.95fr);
 }
 
+.coding-homework-authoring-grid {
+  align-items: start;
+  display: grid;
+  gap: 22px;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.82fr);
+}
+
+.settings-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.section-subheading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.inline-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.preview-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 120px;
+  padding: 16px;
+}
+
+.documentation-resource-list {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  max-height: 280px;
+  overflow: auto;
+  padding: 0;
+}
+
+.documentation-resource-list li {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.documentation-resource-list li + li {
+  border-top: 1px solid var(--line);
+}
+
+.documentation-resource-list .muted {
+  font-size: 0.88rem;
+  text-align: right;
+}
+
+.preflight-summary {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.preflight-summary > div {
+  padding: 12px;
+}
+
+.preflight-summary > div + div {
+  border-left: 1px solid var(--line);
+}
+
+.preflight-issue-list {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.preflight-issue-list li {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.preflight-issue-list li + li {
+  border-top: 1px solid var(--line);
+}
+
+.challenge-question {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.challenge-question textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.button.is-disabled {
+  opacity: 0.58;
+}
+
 .mcq-authoring-preview {
   min-width: 0;
 }
@@ -2590,6 +2707,11 @@ a.card:hover,
   }
 
   .mcq-authoring-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .coding-homework-authoring-grid,
+  .settings-grid {
     grid-template-columns: 1fr;
   }
 

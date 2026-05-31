@@ -1,6 +1,13 @@
 import { Prisma, prisma } from "@cognelo/db";
 import { getContentTypePluginForType } from "@cognelo/content-type-sdk";
-import { getServerContentTypePlugin, type ContentEmbeddingSource } from "@cognelo/content-type-sdk/server";
+import {
+  getServerContentTypePlugin,
+  type ContentEmbeddingDiagnostic,
+  type ContentEmbeddingDocumentsResult,
+  type ContentEmbeddingSource,
+  type ContentVectorIndexResult,
+  type ContentVectorSearchMatch
+} from "@cognelo/content-type-sdk/server";
 import type { CurrentUser } from "@cognelo/contracts";
 import { assertCanManageCourse, assertCanViewCourse, canManageCourse } from "./authorization";
 import { AppError, notFound } from "./errors";
@@ -90,6 +97,18 @@ type CourseContentDb = Pick<
 >;
 
 export type EffectiveContentVisibility = "visible" | "hidden" | "hidden_by_parent";
+
+export type ContentResourceVectorSearchMatch = ContentVectorSearchMatch & {
+  contentResourceId: string;
+  contentTypeKey: string;
+  pluginKey: string;
+  resourceTitle: string;
+};
+
+export type ContentResourceVectorSearchResult = {
+  matches: ContentResourceVectorSearchMatch[];
+  diagnostics: Array<ContentEmbeddingDiagnostic & { contentResourceId?: string; resourceTitle?: string }>;
+};
 
 export async function createContentFolder(user: CurrentUser, courseId: string, input: CreateFolderInput) {
   await assertCanManageCourse(user, courseId);
@@ -338,6 +357,125 @@ export async function getContentResourceEmbeddingSource(
     return { kind: "none", sourceId: resource.id };
   }
   return getEmbeddingSource({ resource: toServerResourceRecord(resource) });
+}
+
+export async function getContentResourceEmbeddingDocuments(
+  user: CurrentUser,
+  courseId: string,
+  contentResourceId: string,
+  options: ContentScope & { enforceVisibility?: boolean } = {}
+): Promise<ContentEmbeddingDocumentsResult> {
+  const resource = await getContentResourceForPluginRoute(user, courseId, contentResourceId, options);
+  const serverPlugin = getServerContentTypePlugin(resource.pluginKey);
+  const getEmbeddingDocuments = serverPlugin?.handlers?.getEmbeddingDocuments;
+  if (!serverPlugin || !getEmbeddingDocuments) {
+    return {
+      sourceId: resource.id,
+      documents: [],
+      diagnostics: [
+        {
+          code: "CONTENT_EMBEDDING_DOCUMENTS_UNAVAILABLE",
+          message: "This content type does not expose extracted embedding documents.",
+          severity: "warning"
+        }
+      ]
+    };
+  }
+  return getEmbeddingDocuments({ resource: toServerResourceRecord(resource) });
+}
+
+export async function indexContentResourceEmbeddingDocuments(
+  user: CurrentUser,
+  courseId: string,
+  contentResourceId: string,
+  options: ContentScope & { enforceVisibility?: boolean } = {}
+): Promise<ContentVectorIndexResult> {
+  const resource = await getContentResourceForPluginRoute(user, courseId, contentResourceId, options);
+  await assertCanManageCourse(user, courseId);
+  const serverPlugin = getServerContentTypePlugin(resource.pluginKey);
+  const indexEmbeddingDocuments = serverPlugin?.handlers?.indexEmbeddingDocuments;
+  if (!serverPlugin || !indexEmbeddingDocuments) {
+    return {
+      sourceId: resource.id,
+      documentCount: 0,
+      vectorCount: 0,
+      diagnostics: [
+        {
+          code: "CONTENT_VECTOR_INDEX_UNAVAILABLE",
+          message: "This content type does not expose vector indexing.",
+          severity: "warning"
+        }
+      ]
+    };
+  }
+  return indexEmbeddingDocuments({ user, resource: toServerResourceRecord(resource) });
+}
+
+export async function searchContentResourceEmbeddingDocuments(
+  user: CurrentUser,
+  courseId: string,
+  input: ContentScope & {
+    contentResourceIds: string[];
+    enforceVisibility?: boolean;
+    limit?: number;
+    minScore?: number;
+    queryText?: string;
+    queryVector?: number[];
+  }
+): Promise<ContentResourceVectorSearchResult> {
+  if (!input.queryText && !input.queryVector) {
+    throw new AppError(400, "CONTENT_VECTOR_QUERY_REQUIRED", "Vector search requires query text or a query vector.");
+  }
+
+  const limit = Math.max(1, input.limit ?? 10);
+  const matches: ContentResourceVectorSearchMatch[] = [];
+  const diagnostics: ContentResourceVectorSearchResult["diagnostics"] = [];
+
+  for (const contentResourceId of [...new Set(input.contentResourceIds)]) {
+    const resource = await getContentResourceForPluginRoute(user, courseId, contentResourceId, input);
+    const serverPlugin = getServerContentTypePlugin(resource.pluginKey);
+    const searchEmbeddingDocuments = serverPlugin?.handlers?.searchEmbeddingDocuments;
+    if (!serverPlugin || !searchEmbeddingDocuments) {
+      diagnostics.push({
+        code: "CONTENT_VECTOR_SEARCH_UNAVAILABLE",
+        message: "This content type does not expose vector search.",
+        severity: "warning",
+        contentResourceId: resource.id,
+        resourceTitle: resource.title
+      });
+      continue;
+    }
+
+    const result = await searchEmbeddingDocuments({
+      user,
+      resource: toServerResourceRecord(resource),
+      limit,
+      minScore: input.minScore,
+      queryText: input.queryText,
+      queryVector: input.queryVector
+    });
+    diagnostics.push(
+      ...result.diagnostics.map((diagnostic) => ({
+        ...diagnostic,
+        contentResourceId: resource.id,
+        resourceTitle: resource.title
+      }))
+    );
+    matches.push(
+      ...result.matches.map((match) => ({
+        ...match,
+        contentResourceId: resource.id,
+        contentTypeKey: resource.contentTypeKey,
+        pluginKey: resource.pluginKey,
+        resourceTitle: resource.title
+      }))
+    );
+  }
+
+  return {
+    diagnostics,
+    matches: matches.sort((left, right) => right.score - left.score || left.documentId.localeCompare(right.documentId)).slice(0, limit)
+  };
 }
 
 export async function getContentResourceForPluginRoute(

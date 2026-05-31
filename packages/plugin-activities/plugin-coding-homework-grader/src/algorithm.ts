@@ -67,6 +67,7 @@ export type CodingHomeworkSubmissionRequirements = {
 export type CodingHomeworkValidationIssue = {
   code:
     | "archive_too_large"
+    | "archive_error"
     | "file_count_exceeded"
     | "forbidden_path"
     | "missing_file"

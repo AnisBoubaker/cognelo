@@ -49,7 +49,10 @@ const serverContentTypePlugin = vi.hoisted(() => ({
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
-    getEmbeddingSource: vi.fn()
+    getEmbeddingDocuments: vi.fn(),
+    getEmbeddingSource: vi.fn(),
+    indexEmbeddingDocuments: vi.fn(),
+    searchEmbeddingDocuments: vi.fn()
   }
 }));
 
@@ -77,10 +80,13 @@ const {
   deletePluginContentResource,
   deleteContentResource,
   deleteContentItem,
+  getContentResourceEmbeddingDocuments,
   getContentResourceEmbeddingSource,
   getContentResourceForPluginRoute,
+  indexContentResourceEmbeddingDocuments,
   listContentResources,
   listContentItems,
+  searchContentResourceEmbeddingDocuments,
   updatePluginContentResource,
   updateContentResource,
   updateContentItem
@@ -312,6 +318,108 @@ describe("course content services", () => {
     });
     expect(serverContentTypePlugin.handlers.getEmbeddingSource).toHaveBeenCalledWith({
       resource: expect.objectContaining({ id: "resource-1", pluginKey: "github-repo-content" })
+    });
+  });
+
+  it("resolves generic extracted embedding documents through content type plugin hooks", async () => {
+    mockPrisma.courseContentResource.findFirst.mockResolvedValue({
+      id: "resource-1",
+      courseId: "course-1",
+      groupId: null,
+      contentTypeKey: "text",
+      pluginKey: "github-repo-content",
+      title: "Examples",
+      metadata: { body: "Hello" }
+    });
+    serverContentTypePlugin.handlers.getEmbeddingDocuments.mockResolvedValue({
+      sourceId: "resource-1",
+      documents: [{ id: "resource-1:body", sourceId: "resource-1", title: "Examples", text: "Hello", kind: "markdown" }],
+      diagnostics: []
+    });
+
+    await expect(getContentResourceEmbeddingDocuments(teacherUser, "course-1", "resource-1")).resolves.toEqual({
+      sourceId: "resource-1",
+      documents: [{ id: "resource-1:body", sourceId: "resource-1", title: "Examples", text: "Hello", kind: "markdown" }],
+      diagnostics: []
+    });
+    expect(serverContentTypePlugin.handlers.getEmbeddingDocuments).toHaveBeenCalledWith({
+      resource: expect.objectContaining({ id: "resource-1", pluginKey: "github-repo-content" })
+    });
+  });
+
+  it("indexes and searches content vectors through content type plugin hooks", async () => {
+    mockPrisma.courseContentResource.findFirst.mockResolvedValue({
+      id: "resource-1",
+      courseId: "course-1",
+      groupId: null,
+      contentTypeKey: "text",
+      pluginKey: "github-repo-content",
+      title: "Examples",
+      metadata: { body: "int add(int a, int b) { return a + b; }" }
+    });
+    serverContentTypePlugin.handlers.indexEmbeddingDocuments.mockResolvedValue({
+      sourceId: "resource-1",
+      documentCount: 1,
+      vectorCount: 1,
+      diagnostics: []
+    });
+    serverContentTypePlugin.handlers.searchEmbeddingDocuments.mockResolvedValue({
+      sourceId: "resource-1",
+      matches: [
+        {
+          sourceId: "resource-1",
+          documentId: "resource-1:body",
+          title: "Examples",
+          text: "int add(int a, int b) { return a + b; }",
+          kind: "code",
+          score: 0.9,
+          distance: 0.1
+        }
+      ],
+      diagnostics: []
+    });
+
+    await expect(indexContentResourceEmbeddingDocuments(teacherUser, "course-1", "resource-1")).resolves.toEqual({
+      sourceId: "resource-1",
+      documentCount: 1,
+      vectorCount: 1,
+      diagnostics: []
+    });
+    await expect(
+      searchContentResourceEmbeddingDocuments(teacherUser, "course-1", {
+        contentResourceIds: ["resource-1"],
+        queryText: "add function",
+        limit: 5
+      })
+    ).resolves.toEqual({
+      diagnostics: [],
+      matches: [
+        {
+          sourceId: "resource-1",
+          documentId: "resource-1:body",
+          title: "Examples",
+          text: "int add(int a, int b) { return a + b; }",
+          kind: "code",
+          score: 0.9,
+          distance: 0.1,
+          contentResourceId: "resource-1",
+          contentTypeKey: "text",
+          pluginKey: "github-repo-content",
+          resourceTitle: "Examples"
+        }
+      ]
+    });
+    expect(serverContentTypePlugin.handlers.indexEmbeddingDocuments).toHaveBeenCalledWith({
+      user: teacherUser,
+      resource: expect.objectContaining({ id: "resource-1", pluginKey: "github-repo-content" })
+    });
+    expect(serverContentTypePlugin.handlers.searchEmbeddingDocuments).toHaveBeenCalledWith({
+      user: teacherUser,
+      resource: expect.objectContaining({ id: "resource-1", pluginKey: "github-repo-content" }),
+      limit: 5,
+      minScore: undefined,
+      queryText: "add function",
+      queryVector: undefined
     });
   });
 

@@ -23,6 +23,7 @@
       "@cognelo/activity-sdk/server": ["packages/activity-sdk/src/server.ts"],
       "@cognelo/content-type-sdk": ["packages/content-type-sdk/src/index.ts"],
       "@cognelo/content-type-sdk/server": ["packages/content-type-sdk/src/server.ts"],
+      "@cognelo/content-type-sdk/vector": ["packages/content-type-sdk/src/vector.ts"],
       "@cognelo/plugin-file-content": ["packages/plugin-content-types/plugin-file/src/index.ts"],
       "@cognelo/plugin-file-content/server": ["packages/plugin-content-types/plugin-file/src/server.ts"],
       "@cognelo/plugin-github-repo": ["packages/plugin-content-types/plugin-github-repo/src/index.ts"],

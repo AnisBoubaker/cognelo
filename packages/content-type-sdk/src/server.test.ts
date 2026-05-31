@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { createServerContentTypeRegistry, getServerContentTypePlugin, type ContentEmbeddingSource, type ServerContentTypePlugin } from "./server";
+import {
+  createServerContentTypeRegistry,
+  buildContentVectorIndex,
+  searchContentVectorIndex,
+  getServerContentTypePlugin,
+  type ContentEmbeddingDocumentsResult,
+  type ContentEmbeddingSource,
+  type ServerContentTypePlugin
+} from "./server";
 
 const handler = vi.fn();
 
@@ -70,5 +78,57 @@ describe("server content type SDK registry", () => {
     ];
 
     expect(descriptors.map((descriptor) => descriptor.kind)).toEqual(["text", "file", "external_url", "none"]);
+  });
+
+  it("exposes generic extracted embedding document shapes", () => {
+    const result: ContentEmbeddingDocumentsResult = {
+      sourceId: "resource-1",
+      documents: [
+        {
+          id: "resource-1:body",
+          sourceId: "resource-1",
+          title: "Lesson",
+          text: "int main(void) { return 0; }",
+          kind: "code",
+          languageKey: "c",
+          path: "main.c",
+          metadata: { origin: "fixture" }
+        }
+      ],
+      diagnostics: [{ code: "OK", message: "Extracted.", severity: "info" }]
+    };
+
+    expect(result.documents[0]?.kind).toBe("code");
+    expect(result.diagnostics[0]?.severity).toBe("info");
+  });
+
+  it("builds deterministic vector indexes and ranks matches", async () => {
+    const index = await buildContentVectorIndex({
+      sourceId: "resource-1",
+      documents: [
+        {
+          id: "resource-1:add",
+          sourceId: "resource-1",
+          title: "Add",
+          text: "int add(int a, int b) { return a + b; }",
+          kind: "code",
+          languageKey: "c"
+        },
+        {
+          id: "resource-1:print",
+          sourceId: "resource-1",
+          title: "Print",
+          text: "printf hello world",
+          kind: "code",
+          languageKey: "c"
+        }
+      ],
+      diagnostics: []
+    });
+
+    const matches = await searchContentVectorIndex(index, { queryText: "add two numbers", limit: 2 });
+
+    expect(matches[0]?.documentId).toBe("resource-1:add");
+    expect(matches[0]?.score).toBeGreaterThan(matches[1]?.score ?? 0);
   });
 });
