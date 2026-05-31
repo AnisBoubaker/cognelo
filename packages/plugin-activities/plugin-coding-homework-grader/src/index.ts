@@ -2,6 +2,9 @@ import { z } from "zod";
 import type { ActivityPlugin } from "@cognelo/activity-sdk";
 import { codingHomeworkGraderDatabaseModule } from "./db";
 export * from "./algorithm";
+export * from "./parsers";
+export * from "./web/client";
+export * from "./web/coding-homework-grader-activity-view";
 
 export const codingHomeworkGraderPlugin: ActivityPlugin = {
   key: "coding-homework-grader",

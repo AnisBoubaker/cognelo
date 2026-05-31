@@ -6,10 +6,14 @@
   "main": "src/index.ts",
   "dependencies": {
     "@cognelo/activity-sdk": "0.1.0",
+    "@cognelo/activity-ui": "0.1.0",
+    "@cognelo/core": "0.1.0",
     "@prisma/client": "^5.14.0",
+    "react": "^19.2.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/react": "^19.2.7",
     "prisma": "^5.14.0",
     "typescript": "^5.4.5"
   },

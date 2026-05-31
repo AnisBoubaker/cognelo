@@ -1,11 +1,25 @@
+import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
+import { copyFile, mkdir, readdir, readFile, stat } from "node:fs/promises";
+import path from "node:path";
+import { promisify } from "node:util";
 import bcrypt from "bcryptjs";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { listActivityDefinitions, listActivityPlugins } from "@cognelo/activity-sdk";
 import { listContentTypePlugins } from "@cognelo/content-type-sdk";
 import { prisma as codingExercisesPrisma } from "../../plugin-activities/plugin-coding-exercises/src/db-client";
+import { prisma as codingHomeworkGraderPrisma } from "../../plugin-activities/plugin-coding-homework-grader/src/db-client";
 import { prisma as webDesignCodingExercisesPrisma } from "../../plugin-activities/plugin-web-design-coding-exercises/src/db-client";
 
 const prisma = new PrismaClient();
+const execFileAsync = promisify(execFile);
+const CODING_HOMEWORK_ACTIVITY_ID = "seed-activity-coding-homework-grader";
+const CODING_HOMEWORK_BANK_ACTIVITY_ID = "seed-bank-activity-coding-homework-grader";
+const CODING_HOMEWORK_BANK_PDF_ATTACHMENT_ID = "seed-coding-homework-assignment-pdf-bank";
+const CODING_HOMEWORK_COURSE_PDF_ATTACHMENT_ID = "seed-coding-homework-assignment-pdf-course";
+const SEED_AI_CONNECTION_ID = "seed-ai-agent-student-support";
+
+type SeedAiAgentProvider = "ollama" | "openai" | "codex" | "claude";
 
 async function ensurePluginLocalTables() {
   for (const plugin of listActivityPlugins()) {
@@ -177,6 +191,262 @@ async function upsertCourseContentItem(params: {
   });
 }
 
+function normalizeSeedAiAgentProvider(value: string | undefined): SeedAiAgentProvider {
+  if (value === "openai" || value === "codex" || value === "claude" || value === "ollama") {
+    return value;
+  }
+  return process.env.OPENAI_API_KEY ? "openai" : "ollama";
+}
+
+function defaultSeedAiAgentModel(provider: SeedAiAgentProvider) {
+  if (provider === "openai" || provider === "codex") {
+    return "gpt-4.1-mini";
+  }
+  if (provider === "claude") {
+    return "claude-3-5-sonnet-latest";
+  }
+  return "llama3.1";
+}
+
+function defaultSeedAiAgentBaseUrl(provider: SeedAiAgentProvider) {
+  if (provider === "ollama") {
+    return process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
+  }
+  if (provider === "claude") {
+    return process.env.ANTHROPIC_BASE_URL ?? null;
+  }
+  return process.env.OPENAI_BASE_URL ?? null;
+}
+
+function seedAiAgentApiKey(provider: SeedAiAgentProvider) {
+  if (process.env.SEED_AI_AGENT_API_KEY) {
+    return process.env.SEED_AI_AGENT_API_KEY;
+  }
+  if (provider === "openai" || provider === "codex") {
+    return process.env.OPENAI_API_KEY ?? null;
+  }
+  if (provider === "claude") {
+    return process.env.ANTHROPIC_API_KEY ?? null;
+  }
+  return null;
+}
+
+function asJsonRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function repoRootDir() {
+  const cwd = process.cwd();
+  return path.basename(cwd) === "db" && path.basename(path.dirname(cwd)) === "packages" ? path.resolve(cwd, "../..") : cwd;
+}
+
+function codingHomeworkStorageDir() {
+  return path.join(repoRootDir(), "storage/coding-homework-grader");
+}
+
+function codingHomeworkSeedPdfPath() {
+  return path.join(repoRootDir(), "tmp/INF155-A2023-TP1.pdf");
+}
+
+function codingHomeworkSeedProvidedFilesDir() {
+  return path.join(repoRootDir(), "tmp/FichiersFournis");
+}
+
+async function readOptionalFile(filePath: string) {
+  try {
+    return await readFile(filePath);
+  } catch {
+    return null;
+  }
+}
+
+function decodeSeedText(bytes: Buffer) {
+  const utf8 = bytes.toString("utf8");
+  return utf8.includes("\uFFFD") ? bytes.toString("latin1") : utf8;
+}
+
+async function extractOptionalPdfText(pdfPath: string) {
+  try {
+    const { stdout } = await execFileAsync("pdftotext", [pdfPath, "-"], { maxBuffer: 5 * 1024 * 1024 });
+    return normalizeExtractedPdfText(String(stdout));
+  } catch {
+    return "";
+  }
+}
+
+function normalizeExtractedPdfText(text: string) {
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/\f/g, "\n\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{4,}/g, "\n\n\n")
+    .trim();
+}
+
+async function listProvidedHomeworkFiles() {
+  try {
+    const dir = codingHomeworkSeedProvidedFilesDir();
+    const entries = await readdir(dir, { withFileTypes: true });
+    return entries
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name)
+      .sort((left, right) => left.localeCompare(right));
+  } catch {
+    return [];
+  }
+}
+
+async function readProvidedHomeworkFiles(names: string[]) {
+  const dir = codingHomeworkSeedProvidedFilesDir();
+  const sections = [];
+  for (const name of names) {
+    const bytes = await readOptionalFile(path.join(dir, name));
+    if (!bytes) {
+      continue;
+    }
+    sections.push({
+      name,
+      text: decodeSeedText(bytes).trimEnd()
+    });
+  }
+  return sections;
+}
+
+async function buildCodingHomeworkSeedAssets() {
+  const pdfPath = codingHomeworkSeedPdfPath();
+  const pdfBytes = await readOptionalFile(pdfPath);
+  const pdfText = pdfBytes ? await extractOptionalPdfText(pdfPath) : "";
+  const providedFiles = await listProvidedHomeworkFiles();
+  const starterSections = await readProvidedHomeworkFiles(["labyrinthe.h", "labyrinthe_io.h", "pile.h", "main.c"]);
+  const promptMarkdown = [
+    "# INF-155 TP1 - Labyrinthe",
+    "",
+    "Travail pratique en C: resoudre un labyrinthe rectangulaire imparfait avec un parcours en profondeur, une pile de coordonnees, des modules separes, et les fichiers de depart fournis par l'enseignant.",
+    "",
+    "La remise attendue est une archive ZIP contenant le projet C complet. Le PDF original est attache a cette activite lorsque `tmp/INF155-A2023-TP1.pdf` est present au moment du seed.",
+    "",
+    "## Fichiers fournis attendus",
+    "",
+    ...(providedFiles.length ? providedFiles.map((fileName) => `- \`${fileName}\``) : ["- Les fichiers fournis ne sont pas presents dans `tmp/FichiersFournis` sur cette machine."]),
+    "",
+    "## Fonctions principales a implementer",
+    "",
+    "- `lab_afficher_grille`",
+    "- `lab_calculer_deplacements_possibles`",
+    "- `lab_choisir_deplacement`",
+    "- `lab_est_cases_adjacentes`",
+    "- `lab_est_une_sortie`",
+    "- `lab_resoudre_profondeur`",
+    "- `selection_menu`",
+    "- `menu_charger_labyrinthe`",
+    "",
+    pdfText ? "## Enonce extrait du PDF" : "## Enonce",
+    "",
+    pdfText || "Le fichier `tmp/INF155-A2023-TP1.pdf` n'etait pas present ou `pdftotext` n'a pas pu l'extraire pendant le seed.",
+    ""
+  ].join("\n");
+  const starterFilesMarkdown = [
+    "# TP1 Labyrinthe - fichiers fournis",
+    "",
+    "Ces fichiers sont lus depuis `tmp/FichiersFournis` pendant le seed et servent de documentation de depart avant l'activite.",
+    "",
+    ...(starterSections.length
+      ? starterSections.flatMap((section) => [
+          `## ${section.name}`,
+          "",
+          "```c",
+          section.text,
+          "```",
+          ""
+        ])
+      : ["Aucun fichier fourni n'a ete trouve au moment du seed.", ""])
+  ].join("\n");
+
+  return {
+    pdfBytes,
+    promptMarkdown,
+    providedFiles,
+    starterFilesMarkdown
+  };
+}
+
+async function upsertCodingHomeworkSeedPdfAttachment(input: {
+  bytes: Buffer | null;
+  id: string;
+  ownerId: string;
+  ownerKind: "bank_activity" | "course_activity";
+}) {
+  if (!input.bytes) {
+    await codingHomeworkGraderPrisma.pluginCodingHomeworkAttachment.deleteMany({ where: { id: input.id } });
+    return null;
+  }
+
+  const originalName = "INF155-A2023-TP1.pdf";
+  const sha256 = createHash("sha256").update(input.bytes).digest("hex");
+  const storedName = `seed-${sha256.slice(0, 16)}-${originalName}`;
+  await mkdir(codingHomeworkStorageDir(), { recursive: true });
+  await copyFile(codingHomeworkSeedPdfPath(), path.join(codingHomeworkStorageDir(), storedName));
+  const fileStat = await stat(path.join(codingHomeworkStorageDir(), storedName));
+
+  const attachment = await codingHomeworkGraderPrisma.pluginCodingHomeworkAttachment.upsert({
+    where: { id: input.id },
+    update: {
+      ownerKind: input.ownerKind,
+      ownerId: input.ownerId,
+      kind: "assignment_pdf",
+      originalName,
+      storedName,
+      mimeType: "application/pdf",
+      sizeBytes: BigInt(fileStat.size),
+      sha256,
+      metadata: { seed: true, sourceAsset: "tmp/INF155-A2023-TP1.pdf" }
+    },
+    create: {
+      id: input.id,
+      ownerKind: input.ownerKind,
+      ownerId: input.ownerId,
+      kind: "assignment_pdf",
+      originalName,
+      storedName,
+      mimeType: "application/pdf",
+      sizeBytes: BigInt(fileStat.size),
+      sha256,
+      metadata: { seed: true, sourceAsset: "tmp/INF155-A2023-TP1.pdf" }
+    }
+  });
+
+  return attachment.id;
+}
+
+async function upsertSeedAiConnection() {
+  const provider = normalizeSeedAiAgentProvider(process.env.SEED_AI_AGENT_PROVIDER);
+  const model = process.env.SEED_AI_AGENT_MODEL ?? defaultSeedAiAgentModel(provider);
+  const baseUrl = process.env.SEED_AI_AGENT_BASE_URL ?? defaultSeedAiAgentBaseUrl(provider);
+  const apiKey = seedAiAgentApiKey(provider);
+
+  return prisma.aiAgentConnection.upsert({
+    where: { id: SEED_AI_CONNECTION_ID },
+    update: {
+      provider,
+      displayName: "Seed student-support AI",
+      model,
+      baseUrl,
+      apiKey,
+      isEnabled: true
+    },
+    create: {
+      id: SEED_AI_CONNECTION_ID,
+      ownerId: null,
+      provider,
+      displayName: "Seed student-support AI",
+      model,
+      baseUrl,
+      apiKey,
+      isEnabled: true
+    }
+  });
+}
+
 async function main() {
   await ensurePluginLocalTables();
 
@@ -188,6 +458,22 @@ async function main() {
   const admin = await upsertUser("admin@cognelo.local", "Ada Admin", ["admin"]);
   const teacher = await upsertUser("teacher@cognelo.local", "Terry Teacher", ["course_manager", "teacher"]);
   const student = await upsertUser("student@cognelo.local", "Sam Student", ["student"]);
+  const seedAiConnection = await upsertSeedAiConnection();
+
+  const teacherMetadata = asJsonRecord(teacher.metadata);
+  const teacherAiPreferences = asJsonRecord(teacherMetadata.aiPreferences);
+  await prisma.user.update({
+    where: { id: teacher.id },
+    data: {
+      metadata: {
+        ...teacherMetadata,
+        aiPreferences: {
+          ...teacherAiPreferences,
+          questionAuthoringAiAgentConnectionId: seedAiConnection.id
+        }
+      } as Prisma.InputJsonValue
+    }
+  });
 
   const activityTypesByKey = new Map<string, Awaited<ReturnType<typeof prisma.activityType.upsert>>>();
   const pluginKeyByActivityKey = new Map<string, string>();
@@ -277,6 +563,7 @@ async function main() {
   }
 
   const placeholderType = activityTypesByKey.get("placeholder");
+  const codingHomeworkType = activityTypesByKey.get("coding-homework-grader");
   const parsonsType = activityTypesByKey.get("parsons-problem");
   const mcqType = activityTypesByKey.get("mcq");
   const codingExerciseType = activityTypesByKey.get("coding-exercise");
@@ -284,7 +571,15 @@ async function main() {
   const missingSeededActivityTypes = listActivityDefinitions()
     .map((definition) => definition.key)
     .filter((key) => !activityTypesByKey.has(key));
-  if (!placeholderType || !parsonsType || !mcqType || !codingExerciseType || !webDesignExerciseType || missingSeededActivityTypes.length > 0) {
+  if (
+    !placeholderType ||
+    !codingHomeworkType ||
+    !parsonsType ||
+    !mcqType ||
+    !codingExerciseType ||
+    !webDesignExerciseType ||
+    missingSeededActivityTypes.length > 0
+  ) {
     throw new Error(`Missing seeded activity types from plugin registry: ${missingSeededActivityTypes.join(", ")}`);
   }
 
@@ -448,6 +743,80 @@ async function main() {
     position: 3
   });
 
+  const codingHomeworkConfig = {
+    gradingMode: "manual",
+    maxAttempts: 3
+  };
+  const codingHomeworkSeedAssets = await buildCodingHomeworkSeedAssets();
+  const codingHomeworkPromptMarkdown = codingHomeworkSeedAssets.promptMarkdown;
+  const codingHomeworkGenerationInstructions = [
+    "Generate oral-defense questions in French unless the learner UI locale says otherwise.",
+    "Focus on the student's implementation of depth-first labyrinth solving, stack usage, adjacency checks, exit detection, movement selection, and module boundaries.",
+    "Ask questions that reveal whether the student understands backtracking and why their code avoids revisiting cells."
+  ].join("\n");
+  const codingHomeworkRequirements = {
+    allowedExtensions: [".c", ".h", ".txt"],
+    ignoredPaths: ["build", "dist", "cmake-build-debug", ".git", ".idea", ".vscode", "__MACOSX"],
+    languageKey: "c",
+    maxArchiveBytes: 25 * 1024 * 1024,
+    maxFileCount: 80,
+    requiredFiles: [
+      { path: "labyrinthe.h", description: "Header for the labyrinth-solving module." },
+      { path: "labyrinthe.c", description: "Implementation of the labyrinth-solving functions." },
+      { path: "labyrinthe_io.h", description: "Header for labyrinth input/output functions." },
+      { path: "labyrinthe_io.c", description: "Implementation of file loading and menu input/output functions." },
+      { path: "pile.h", description: "Provided stack header." },
+      { path: "pile.c", description: "Provided stack implementation." },
+      { path: "utilitaires.h", description: "Header for utility functions such as random-number generation." },
+      { path: "utilitaires.c", description: "Implementation of utility functions." },
+      { path: "main.c", description: "Main program wiring the menu, loading, solving, and display flows." },
+      { path: "grille1.txt", description: "Provided labyrinth test grid." }
+    ],
+    requiredFolders: [],
+    requiredFunctions: [
+      { name: "lab_afficher_grille", filePath: "labyrinthe.c", description: "Display the labyrinth grid and optionally the solution path.", required: true },
+      {
+        name: "lab_calculer_deplacements_possibles",
+        filePath: "labyrinthe.c",
+        description: "Compute valid adjacent moves from the current position.",
+        required: true
+      },
+      { name: "lab_choisir_deplacement", filePath: "labyrinthe.c", description: "Select one possible move.", required: true },
+      { name: "lab_est_cases_adjacentes", filePath: "labyrinthe.c", description: "Determine whether two cells are adjacent.", required: true },
+      { name: "lab_est_une_sortie", filePath: "labyrinthe.c", description: "Determine whether a position is an exit.", required: true },
+      { name: "lab_resoudre_profondeur", filePath: "labyrinthe.c", description: "Solve the labyrinth with depth-first search and backtracking.", required: true },
+      { name: "charger_labyrinthe", filePath: "labyrinthe_io.c", description: "Load a labyrinth grid from disk.", required: true },
+      { name: "selection_menu", filePath: "labyrinthe_io.c", description: "Display the main menu and validate the user's choice.", required: true },
+      { name: "menu_charger_labyrinthe", filePath: "labyrinthe_io.c", description: "Prompt the user for the labyrinth file name.", required: true },
+      {
+        name: "generer_nombre_aleatoire",
+        filePath: "utilitaires.c",
+        description: "Recommended helper for selecting a random move.",
+        required: false
+      }
+    ]
+  };
+  const codingHomeworkSeed = await upsertBankActivityWithVersion({
+    id: CODING_HOMEWORK_BANK_ACTIVITY_ID,
+    bankId: programmingBasicsBank.id,
+    activityTypeId: codingHomeworkType.id,
+    title: "Coding homework grader: INF-155 TP1 Labyrinthe",
+    description: "Submit the C labyrinth solver project as a ZIP, then answer generated challenge questions.",
+    lifecycle: "published",
+    config: codingHomeworkConfig,
+    metadata: {
+      researchTags: ["coding-homework-grader", "labyrinth", "depth-first-search", "c"],
+      instrumented: true,
+      seedAssets: {
+        assignmentPdf: Boolean(codingHomeworkSeedAssets.pdfBytes),
+        providedFiles: codingHomeworkSeedAssets.providedFiles
+      },
+      plugin: pluginKeyByActivityKey.get("coding-homework-grader")
+    },
+    createdById: teacher.id,
+    position: 4
+  });
+
   const course = await prisma.course.upsert({
     where: { id: "seed-course-programming-101" },
     update: {
@@ -465,10 +834,32 @@ async function main() {
       createdById: teacher.id
     }
   });
+  const courseMetadata = asJsonRecord(course.metadata);
+  const courseAiSettings = asJsonRecord(courseMetadata.aiSettings);
+  await prisma.course.update({
+    where: { id: course.id },
+    data: {
+      metadata: {
+        ...courseMetadata,
+        aiSettings: {
+          ...courseAiSettings,
+          studentSupportAiAgentConnectionId: seedAiConnection.id
+        }
+      } as Prisma.InputJsonValue
+    }
+  });
 
   const seededCodingActivityIds = [
+    CODING_HOMEWORK_ACTIVITY_ID,
     "seed-activity-coding-template"
   ] as const;
+
+  await codingHomeworkGraderPrisma.pluginCodingHomeworkSubmission.deleteMany({
+    where: { activityId: CODING_HOMEWORK_ACTIVITY_ID }
+  });
+  await codingHomeworkGraderPrisma.pluginCodingHomeworkDocumentationSnapshot.deleteMany({
+    where: { activityId: CODING_HOMEWORK_ACTIVITY_ID }
+  });
 
   await prisma.activity.deleteMany({
     where: {
@@ -509,6 +900,13 @@ async function main() {
           "seed-material-loops-slides",
           "seed-material-loops-resource"
         ]
+      }
+    }
+  });
+  await prisma.courseContentResource.deleteMany({
+    where: {
+      id: {
+        in: ["seed-content-resource-c-arrays-reference", "seed-content-resource-c-testing-checklist"]
       }
     }
   });
@@ -651,6 +1049,64 @@ async function main() {
         module: "week-2",
         audience: "extra-practice",
         body: "Extra practice resource: https://www.codecademy.com/resources/docs/python/loops",
+        format: "markdown"
+      }
+    }
+  });
+
+  const tp1AssignmentResource = await prisma.courseContentResource.upsert({
+    where: { id: "seed-content-resource-tp1-labyrinth-assignment" },
+    update: {
+      courseId: course.id,
+      groupId: null,
+      contentTypeKey: "text",
+      pluginKey: "text-content",
+      title: "INF-155 TP1 Labyrinthe - enonce",
+      metadata: {
+        module: "week-3",
+        body: codingHomeworkPromptMarkdown,
+        format: "markdown"
+      }
+    },
+    create: {
+      id: "seed-content-resource-tp1-labyrinth-assignment",
+      courseId: course.id,
+      groupId: null,
+      contentTypeKey: "text",
+      pluginKey: "text-content",
+      title: "INF-155 TP1 Labyrinthe - enonce",
+      metadata: {
+        module: "week-3",
+        body: codingHomeworkPromptMarkdown,
+        format: "markdown"
+      }
+    }
+  });
+
+  const tp1StarterFilesResource = await prisma.courseContentResource.upsert({
+    where: { id: "seed-content-resource-tp1-labyrinth-starter-files" },
+    update: {
+      courseId: course.id,
+      groupId: null,
+      contentTypeKey: "text",
+      pluginKey: "text-content",
+      title: "INF-155 TP1 Labyrinthe - fichiers fournis",
+      metadata: {
+        module: "week-3",
+        body: codingHomeworkSeedAssets.starterFilesMarkdown,
+        format: "markdown"
+      }
+    },
+    create: {
+      id: "seed-content-resource-tp1-labyrinth-starter-files",
+      courseId: course.id,
+      groupId: null,
+      contentTypeKey: "text",
+      pluginKey: "text-content",
+      title: "INF-155 TP1 Labyrinthe - fichiers fournis",
+      metadata: {
+        module: "week-3",
+        body: codingHomeworkSeedAssets.starterFilesMarkdown,
         format: "markdown"
       }
     }
@@ -833,6 +1289,142 @@ async function main() {
         plugin: pluginKeyByActivityKey.get("web-design-coding-exercise")
       },
       createdById: teacher.id
+    }
+  });
+
+  await prisma.activity.upsert({
+    where: { id: CODING_HOMEWORK_ACTIVITY_ID },
+    update: {
+      title: "Coding homework grader: INF-155 TP1 Labyrinthe",
+      description: "Submit the C labyrinth solver project as a ZIP, then answer generated challenge questions.",
+      lifecycle: "published",
+      config: codingHomeworkConfig,
+      bankActivityId: codingHomeworkSeed.bankActivity.id,
+      activityVersionId: codingHomeworkSeed.version.id,
+      metadata: {
+        researchTags: ["coding-homework-grader", "labyrinth", "depth-first-search", "c"],
+        instrumented: true,
+        seedAssets: {
+          assignmentPdf: Boolean(codingHomeworkSeedAssets.pdfBytes),
+          providedFiles: codingHomeworkSeedAssets.providedFiles
+        },
+        plugin: pluginKeyByActivityKey.get("coding-homework-grader")
+      }
+    },
+    create: {
+      id: CODING_HOMEWORK_ACTIVITY_ID,
+      courseId: course.id,
+      activityTypeId: codingHomeworkType.id,
+      title: "Coding homework grader: INF-155 TP1 Labyrinthe",
+      description: "Submit the C labyrinth solver project as a ZIP, then answer generated challenge questions.",
+      lifecycle: "published",
+      config: codingHomeworkConfig,
+      bankActivityId: codingHomeworkSeed.bankActivity.id,
+      activityVersionId: codingHomeworkSeed.version.id,
+      metadata: {
+        researchTags: ["coding-homework-grader", "labyrinth", "depth-first-search", "c"],
+        instrumented: true,
+        seedAssets: {
+          assignmentPdf: Boolean(codingHomeworkSeedAssets.pdfBytes),
+          providedFiles: codingHomeworkSeedAssets.providedFiles
+        },
+        plugin: pluginKeyByActivityKey.get("coding-homework-grader")
+      },
+      createdById: teacher.id,
+      position: 4
+    }
+  });
+
+  const codingHomeworkBankPdfAttachmentId = await upsertCodingHomeworkSeedPdfAttachment({
+    bytes: codingHomeworkSeedAssets.pdfBytes,
+    id: CODING_HOMEWORK_BANK_PDF_ATTACHMENT_ID,
+    ownerId: CODING_HOMEWORK_BANK_ACTIVITY_ID,
+    ownerKind: "bank_activity"
+  });
+  const codingHomeworkCoursePdfAttachmentId = await upsertCodingHomeworkSeedPdfAttachment({
+    bytes: codingHomeworkSeedAssets.pdfBytes,
+    id: CODING_HOMEWORK_COURSE_PDF_ATTACHMENT_ID,
+    ownerId: CODING_HOMEWORK_ACTIVITY_ID,
+    ownerKind: "course_activity"
+  });
+
+  await codingHomeworkGraderPrisma.pluginBankCodingHomeworkAssignment.upsert({
+    where: { bankActivityId: CODING_HOMEWORK_BANK_ACTIVITY_ID },
+    update: {
+      promptMarkdown: codingHomeworkPromptMarkdown,
+      promptPdfAttachmentId: codingHomeworkBankPdfAttachmentId,
+      languageKey: "c",
+      candidateLimit: 5,
+      retrievedExampleCount: 3,
+      questionCount: 3,
+      generationInstructions: codingHomeworkGenerationInstructions,
+      settings: { seed: true, sourceAsset: "tmp/INF155-A2023-TP1.pdf" }
+    },
+    create: {
+      bankActivityId: CODING_HOMEWORK_BANK_ACTIVITY_ID,
+      promptMarkdown: codingHomeworkPromptMarkdown,
+      promptPdfAttachmentId: codingHomeworkBankPdfAttachmentId,
+      languageKey: "c",
+      candidateLimit: 5,
+      retrievedExampleCount: 3,
+      questionCount: 3,
+      generationInstructions: codingHomeworkGenerationInstructions,
+      settings: { seed: true, sourceAsset: "tmp/INF155-A2023-TP1.pdf" }
+    }
+  });
+
+  await codingHomeworkGraderPrisma.pluginBankCodingHomeworkSubmissionRequirementSet.upsert({
+    where: { bankActivityId: CODING_HOMEWORK_BANK_ACTIVITY_ID },
+    update: {
+      languageKey: "c",
+      requirements: codingHomeworkRequirements,
+      metadata: { seed: true }
+    },
+    create: {
+      bankActivityId: CODING_HOMEWORK_BANK_ACTIVITY_ID,
+      languageKey: "c",
+      requirements: codingHomeworkRequirements,
+      metadata: { seed: true }
+    }
+  });
+
+  await codingHomeworkGraderPrisma.pluginCodingHomeworkAssignment.upsert({
+    where: { activityId: CODING_HOMEWORK_ACTIVITY_ID },
+    update: {
+      promptMarkdown: codingHomeworkPromptMarkdown,
+      promptPdfAttachmentId: codingHomeworkCoursePdfAttachmentId,
+      languageKey: "c",
+      candidateLimit: 5,
+      retrievedExampleCount: 3,
+      questionCount: 3,
+      generationInstructions: codingHomeworkGenerationInstructions,
+      settings: { seed: true, sourceAsset: "tmp/INF155-A2023-TP1.pdf" }
+    },
+    create: {
+      activityId: CODING_HOMEWORK_ACTIVITY_ID,
+      promptMarkdown: codingHomeworkPromptMarkdown,
+      promptPdfAttachmentId: codingHomeworkCoursePdfAttachmentId,
+      languageKey: "c",
+      candidateLimit: 5,
+      retrievedExampleCount: 3,
+      questionCount: 3,
+      generationInstructions: codingHomeworkGenerationInstructions,
+      settings: { seed: true, sourceAsset: "tmp/INF155-A2023-TP1.pdf" }
+    }
+  });
+
+  await codingHomeworkGraderPrisma.pluginCodingHomeworkSubmissionRequirementSet.upsert({
+    where: { activityId: CODING_HOMEWORK_ACTIVITY_ID },
+    update: {
+      languageKey: "c",
+      requirements: codingHomeworkRequirements,
+      metadata: { seed: true }
+    },
+    create: {
+      activityId: CODING_HOMEWORK_ACTIVITY_ID,
+      languageKey: "c",
+      requirements: codingHomeworkRequirements,
+      metadata: { seed: true }
     }
   });
 
@@ -1185,6 +1777,55 @@ async function main() {
     }
   });
 
+  const codingHomeworkAssignment = await prisma.courseGroupActivity.upsert({
+    where: {
+      groupId_activityId: {
+        groupId: group.id,
+        activityId: CODING_HOMEWORK_ACTIVITY_ID
+      }
+    },
+    update: {
+      availableFrom: new Date("2026-05-20T13:00:00.000Z"),
+      availableUntil: new Date("2026-07-01T03:59:00.000Z"),
+      metadata: { assessmentMode: "summative", seed: true },
+      position: 4
+    },
+    create: {
+      groupId: group.id,
+      activityId: CODING_HOMEWORK_ACTIVITY_ID,
+      availableFrom: new Date("2026-05-20T13:00:00.000Z"),
+      availableUntil: new Date("2026-07-01T03:59:00.000Z"),
+      metadata: { assessmentMode: "summative", seed: true },
+      position: 4
+    }
+  });
+
+  await prisma.gradebookItem.upsert({
+    where: { groupActivityId: codingHomeworkAssignment.id },
+    update: {
+      titleSnapshot: "Coding homework grader: INF-155 TP1 Labyrinthe",
+      pointsPossible: 100,
+      gradingMode: "points",
+      attemptLimitMode: "max_attempts",
+      maxAttempts: 3,
+      gradeStrategy: "latest",
+      metadata: { seed: true, plugin: "coding-homework-grader", assignment: "INF155-A2023-TP1" }
+    },
+    create: {
+      courseId: course.id,
+      groupId: group.id,
+      groupActivityId: codingHomeworkAssignment.id,
+      activityId: CODING_HOMEWORK_ACTIVITY_ID,
+      titleSnapshot: "Coding homework grader: INF-155 TP1 Labyrinthe",
+      pointsPossible: 100,
+      gradingMode: "points",
+      attemptLimitMode: "max_attempts",
+      maxAttempts: 3,
+      gradeStrategy: "latest",
+      metadata: { seed: true, plugin: "coding-homework-grader", assignment: "INF155-A2023-TP1" }
+    }
+  });
+
   await prisma.courseContentItem.deleteMany({
     where: {
       courseId: course.id,
@@ -1318,6 +1959,159 @@ async function main() {
     metadata: { seed: true }
   });
 
+  const week3Folder = await upsertCourseContentItem({
+    id: "seed-content-course-week-3",
+    courseId: course.id,
+    kind: "folder",
+    titleSnapshot: "Week 3: Labyrinthe et parcours en profondeur",
+    position: 3,
+    metadata: { seed: true, week: 3 }
+  });
+
+  const tp1AssignmentContentItem = await upsertCourseContentItem({
+    id: "seed-content-section-a-tp1-labyrinth-assignment",
+    courseId: course.id,
+    parentId: week3Folder.id,
+    kind: "content",
+    titleSnapshot: tp1AssignmentResource.title,
+    position: 0,
+    contentResourceId: tp1AssignmentResource.id,
+    metadata: { seed: true }
+  });
+
+  const tp1StarterFilesContentItem = await upsertCourseContentItem({
+    id: "seed-content-section-a-tp1-labyrinth-starter-files",
+    courseId: course.id,
+    parentId: week3Folder.id,
+    kind: "content",
+    titleSnapshot: tp1StarterFilesResource.title,
+    position: 1,
+    contentResourceId: tp1StarterFilesResource.id,
+    metadata: { seed: true }
+  });
+
+  const codingHomeworkContentItem = await upsertCourseContentItem({
+    id: "seed-content-section-a-coding-homework",
+    courseId: course.id,
+    groupId: group.id,
+    parentId: week3Folder.id,
+    kind: "activity",
+    titleSnapshot: "Homework: INF-155 TP1 Labyrinthe",
+    position: 2,
+    activityId: CODING_HOMEWORK_ACTIVITY_ID,
+    courseGroupActivityId: codingHomeworkAssignment.id,
+    metadata: { seed: true }
+  });
+
+  await codingHomeworkGraderPrisma.pluginCodingHomeworkDocumentationSnapshot.upsert({
+    where: { id: "seed-coding-homework-doc-snapshot" },
+    update: {
+      activityId: CODING_HOMEWORK_ACTIVITY_ID,
+      courseId: course.id,
+      groupId: group.id,
+      contentTreeAnchorItemId: codingHomeworkContentItem.id,
+      contentTreeFingerprint: "seed-week-3-labyrinth-depth-first-search",
+      status: "ready",
+      metadata: {
+        anchor: {
+          id: codingHomeworkContentItem.id,
+          depth: 1,
+          path: ["Week 3: Labyrinthe et parcours en profondeur"],
+          title: codingHomeworkContentItem.titleSnapshot,
+          updatedAt: codingHomeworkContentItem.updatedAt.toISOString()
+        },
+        generatedAt: new Date("2026-05-29T12:00:00.000Z").toISOString(),
+        includedResources: [
+          {
+            contentResourceId: tp1AssignmentResource.id,
+            contentTypeKey: tp1AssignmentResource.contentTypeKey,
+            depth: 1,
+            groupId: tp1AssignmentResource.groupId,
+            itemId: tp1AssignmentContentItem.id,
+            materialId: null,
+            orderIndex: 0,
+            path: ["Week 3: Labyrinthe et parcours en profondeur"],
+            pluginKey: tp1AssignmentResource.pluginKey,
+            resourceFingerprint: "seed-tp1-labyrinth-assignment",
+            sourceKind: "content_resource",
+            title: tp1AssignmentContentItem.titleSnapshot,
+            updatedAt: tp1AssignmentResource.updatedAt.toISOString()
+          },
+          {
+            contentResourceId: tp1StarterFilesResource.id,
+            contentTypeKey: tp1StarterFilesResource.contentTypeKey,
+            depth: 1,
+            groupId: tp1StarterFilesResource.groupId,
+            itemId: tp1StarterFilesContentItem.id,
+            materialId: null,
+            orderIndex: 1,
+            path: ["Week 3: Labyrinthe et parcours en profondeur"],
+            pluginKey: tp1StarterFilesResource.pluginKey,
+            resourceFingerprint: "seed-tp1-labyrinth-starter-files",
+            sourceKind: "content_resource",
+            title: tp1StarterFilesContentItem.titleSnapshot,
+            updatedAt: tp1StarterFilesResource.updatedAt.toISOString()
+          }
+        ],
+        resourceCount: 2,
+        seed: true
+      }
+    },
+    create: {
+      id: "seed-coding-homework-doc-snapshot",
+      activityId: CODING_HOMEWORK_ACTIVITY_ID,
+      courseId: course.id,
+      groupId: group.id,
+      contentTreeAnchorItemId: codingHomeworkContentItem.id,
+      contentTreeFingerprint: "seed-week-3-labyrinth-depth-first-search",
+      status: "ready",
+      metadata: {
+        anchor: {
+          id: codingHomeworkContentItem.id,
+          depth: 1,
+          path: ["Week 3: Labyrinthe et parcours en profondeur"],
+          title: codingHomeworkContentItem.titleSnapshot,
+          updatedAt: codingHomeworkContentItem.updatedAt.toISOString()
+        },
+        generatedAt: new Date("2026-05-29T12:00:00.000Z").toISOString(),
+        includedResources: [
+          {
+            contentResourceId: tp1AssignmentResource.id,
+            contentTypeKey: tp1AssignmentResource.contentTypeKey,
+            depth: 1,
+            groupId: tp1AssignmentResource.groupId,
+            itemId: tp1AssignmentContentItem.id,
+            materialId: null,
+            orderIndex: 0,
+            path: ["Week 3: Labyrinthe et parcours en profondeur"],
+            pluginKey: tp1AssignmentResource.pluginKey,
+            resourceFingerprint: "seed-tp1-labyrinth-assignment",
+            sourceKind: "content_resource",
+            title: tp1AssignmentContentItem.titleSnapshot,
+            updatedAt: tp1AssignmentResource.updatedAt.toISOString()
+          },
+          {
+            contentResourceId: tp1StarterFilesResource.id,
+            contentTypeKey: tp1StarterFilesResource.contentTypeKey,
+            depth: 1,
+            groupId: tp1StarterFilesResource.groupId,
+            itemId: tp1StarterFilesContentItem.id,
+            materialId: null,
+            orderIndex: 1,
+            path: ["Week 3: Labyrinthe et parcours en profondeur"],
+            pluginKey: tp1StarterFilesResource.pluginKey,
+            resourceFingerprint: "seed-tp1-labyrinth-starter-files",
+            sourceKind: "content_resource",
+            title: tp1StarterFilesContentItem.titleSnapshot,
+            updatedAt: tp1StarterFilesResource.updatedAt.toISOString()
+          }
+        ],
+        resourceCount: 2,
+        seed: true
+      }
+    }
+  });
+
   await upsertCourseContentItem({
     id: "seed-content-section-a-web-design",
     courseId: course.id,
@@ -1333,12 +2127,14 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
     await codingExercisesPrisma.$disconnect();
+    await codingHomeworkGraderPrisma.$disconnect();
     await webDesignCodingExercisesPrisma.$disconnect();
   })
   .catch(async (error) => {
     console.error(error);
     await prisma.$disconnect();
     await codingExercisesPrisma.$disconnect();
+    await codingHomeworkGraderPrisma.$disconnect();
     await webDesignCodingExercisesPrisma.$disconnect();
     process.exit(1);
   });

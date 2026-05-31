@@ -8,7 +8,21 @@ describe("coding homework grader plugin manifest", () => {
     expect(codingHomeworkGraderPlugin.key).toBe("coding-homework-grader");
     expect(codingHomeworkGraderPlugin.activities[0]?.key).toBe("coding-homework-grader");
     expect(codingHomeworkGraderPlugin.activities[0]?.name).toBe("Coding Homework Grader");
-    expect(codingHomeworkGraderServerPlugin.routes).toEqual([]);
+    expect(codingHomeworkGraderServerPlugin.routes?.map((route) => route.path)).toEqual([
+      "coding-homework-grader/authoring",
+      "coding-homework-grader/assignment-pdf",
+      "coding-homework-grader/requirements-upload",
+      "coding-homework-grader/documentation-preview",
+      "coding-homework-grader/documentation-snapshot",
+      "coding-homework-grader/documentation-extraction",
+      "coding-homework-grader/reference-search",
+      "coding-homework-grader/preflight",
+      "coding-homework-grader/assignment",
+      "coding-homework-grader/submission",
+      "coding-homework-grader/submission-analysis",
+      "coding-homework-grader/challenge-generation",
+      "coding-homework-grader/challenge-answers"
+    ]);
   });
 
   it("declares plugin-owned persistence tables for activation backup coverage", () => {

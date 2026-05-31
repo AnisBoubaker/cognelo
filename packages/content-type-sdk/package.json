@@ -6,7 +6,8 @@
   "main": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./server": "./src/server.ts"
+    "./server": "./src/server.ts",
+    "./vector": "./src/vector.ts"
   },
   "dependencies": {
     "@cognelo/contracts": "0.1.0",

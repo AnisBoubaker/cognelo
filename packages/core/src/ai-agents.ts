@@ -7,7 +7,7 @@ import {
 } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import { AppError, forbidden, notFound } from "./errors";
-import { isAdmin } from "./authorization";
+import { assertCanViewCourse, isAdmin } from "./authorization";
 
 export async function listAiAgentConnections(user: CurrentUser) {
   const [connections, userRecord] = await Promise.all([
@@ -122,6 +122,37 @@ export async function getQuestionAuthoringAiAgentConnection(user: CurrentUser) {
   return connection;
 }
 
+export async function getCourseStudentSupportAiAgentConnection(user: CurrentUser, courseId: string) {
+  await assertCanViewCourse(user, courseId);
+  const course = await prisma.course.findUnique({ where: { id: courseId }, select: { metadata: true } });
+  if (!course) {
+    throw notFound("Course");
+  }
+
+  const metadata = asMetadataRecord(course.metadata);
+  const aiSettings = asMetadataRecord(metadata.aiSettings);
+  const connectionId = typeof aiSettings.studentSupportAiAgentConnectionId === "string" ? aiSettings.studentSupportAiAgentConnectionId : null;
+  if (!connectionId) {
+    throw new AppError(400, "AI_AGENT_NOT_CONFIGURED", "No AI agent is configured for this course.");
+  }
+
+  const connection = await prisma.aiAgentConnection.findFirst({
+    where: {
+      id: connectionId,
+      isEnabled: true
+    }
+  });
+
+  if (!connection) {
+    throw notFound("AI agent connection");
+  }
+  if (!connection.apiKey && connection.provider !== "ollama") {
+    throw new AppError(400, "AI_AGENT_KEY_MISSING", "The selected AI agent connection does not have an API key.");
+  }
+
+  return connection;
+}
+
 export async function generateQuestionAuthoringText(
   user: CurrentUser,
   input: {
@@ -131,6 +162,22 @@ export async function generateQuestionAuthoringText(
   }
 ) {
   const connection = await getQuestionAuthoringAiAgentConnection(user);
+  return generateAiAgentText(connection, input);
+}
+
+export async function generateAiAgentText(
+  connection: {
+    provider: "ollama" | "openai" | "codex" | "claude";
+    model: string;
+    baseUrl: string | null;
+    apiKey: string | null;
+  },
+  input: {
+    systemPrompt: string;
+    userPrompt: string;
+    maxOutputTokens?: number;
+  }
+) {
   return callAiAgent(connection, input);
 }
 

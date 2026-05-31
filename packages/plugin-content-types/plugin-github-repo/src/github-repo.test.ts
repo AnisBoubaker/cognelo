@@ -71,5 +71,37 @@ describe("GitHub repo content plugin", () => {
       url: "https://github.com/cognelo/examples",
       sourceId: "resource-1"
     });
+
+    await expect(
+      githubRepoContentServerPlugin.handlers?.getEmbeddingDocuments?.({
+        resource: {
+          id: "resource-1",
+          courseId: "course-1",
+          contentTypeKey: "github-repo",
+          pluginKey: "github-repo-content",
+          title: "Examples",
+          metadata: { url: "https://github.com/cognelo/examples" }
+        }
+      })
+    ).resolves.toEqual({
+      sourceId: "resource-1",
+      documents: [
+        {
+          id: "resource-1:repo-url",
+          sourceId: "resource-1",
+          title: "Examples",
+          text: "https://github.com/cognelo/examples",
+          kind: "external_reference",
+          metadata: { url: "https://github.com/cognelo/examples" }
+        }
+      ],
+      diagnostics: [
+        {
+          code: "GITHUB_REPO_URL_INDEXING_DEFERRED",
+          message: "Repository cloning and source extraction are owned by the GitHub content plugin and are not implemented yet.",
+          severity: "info"
+        }
+      ]
+    });
   });
 });

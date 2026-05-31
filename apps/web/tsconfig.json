@@ -33,6 +33,9 @@
       "@cognelo/content-type-sdk/server": [
         "../../packages/content-type-sdk/src/server.ts"
       ],
+      "@cognelo/content-type-sdk/vector": [
+        "../../packages/content-type-sdk/src/vector.ts"
+      ],
       "@cognelo/plugin-file-content": [
         "../../packages/plugin-content-types/plugin-file/src/index.ts"
       ],

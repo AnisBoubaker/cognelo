@@ -2,6 +2,7 @@ import type { ComponentProps, JSXElementConstructor, ReactNode } from "react";
 import { useMemo } from "react";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { CodingExerciseActivityView } from "@cognelo/plugin-coding-exercises";
+import { CodingHomeworkGraderActivityView, createCodingHomeworkGraderClient } from "@cognelo/plugin-coding-homework-grader";
 import {
   createParsonsClient,
   ParsonsActivityView,
@@ -235,6 +236,81 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
   );
 }
 
+function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeof CodingHomeworkGraderActivityView>) {
+  const {
+    activityRouteCourseId,
+    groupId,
+    hasQuestionAuthoringAgent: _hasQuestionAuthoringAgent,
+    onSubmitted: _onSubmitted,
+    showReleasedAnswers: _showReleasedAnswers,
+    releasedMaxScore: _releasedMaxScore,
+    studentViewMode: _studentViewMode,
+    onNewAttemptAvailabilityChange: _onNewAttemptAvailabilityChange,
+    onPreviousSubmissionsAvailabilityChange: _onPreviousSubmissionsAvailabilityChange,
+    ...activityProps
+  } = props;
+  const courseId = activityRouteCourseId ?? activityProps.course?.id;
+  const codingHomeworkClient = useMemo(() => createCodingHomeworkGraderClient(apiRequest), []);
+  const authoringClient = useMemo(() => {
+    if (!activityProps.canManage || !courseId) {
+      return undefined;
+    }
+    return {
+      get: (activityId: string) => codingHomeworkClient.getCourseAuthoring(courseId, activityId),
+      createDocumentationSnapshot: (activityId: string) =>
+        groupId
+          ? codingHomeworkClient.createGroupDocumentationSnapshot(courseId, groupId, activityId)
+          : codingHomeworkClient.createCourseDocumentationSnapshot(courseId, activityId),
+      getDocumentationPreview: (activityId: string) =>
+        groupId
+          ? codingHomeworkClient.previewGroupDocumentation(courseId, groupId, activityId)
+          : codingHomeworkClient.previewCourseDocumentation(courseId, activityId),
+      extractDocumentation: (activityId: string, input?: { snapshotId?: string | null }) =>
+        groupId
+          ? codingHomeworkClient.extractGroupDocumentation(courseId, groupId, activityId, input)
+          : codingHomeworkClient.extractCourseDocumentation(courseId, activityId, input),
+      importRequirements: (activityId: string, input: Parameters<typeof codingHomeworkClient.importCourseRequirements>[2]) =>
+        codingHomeworkClient.importCourseRequirements(courseId, activityId, input),
+      save: (activityId: string, input: Parameters<typeof codingHomeworkClient.saveCourseAuthoring>[2]) =>
+        codingHomeworkClient.saveCourseAuthoring(courseId, activityId, input),
+      uploadAssignmentPdf: (activityId: string, input: Parameters<typeof codingHomeworkClient.uploadCourseAssignmentPdf>[2]) =>
+        codingHomeworkClient.uploadCourseAssignmentPdf(courseId, activityId, input)
+    };
+  }, [activityProps.canManage, codingHomeworkClient, courseId, groupId]);
+  const preflightClient = useMemo(() => {
+    if (!courseId) {
+      return undefined;
+    }
+    return {
+      run: (activityId: string, input: Parameters<typeof codingHomeworkClient.runCoursePreflight>[2]) =>
+        groupId ? codingHomeworkClient.runGroupPreflight(courseId, groupId, activityId, input) : codingHomeworkClient.runCoursePreflight(courseId, activityId, input)
+    };
+  }, [codingHomeworkClient, courseId, groupId]);
+  const submissionClient = useMemo(() => {
+    if (!courseId || !groupId) {
+      return undefined;
+    }
+    return {
+      getAssignment: (activityId: string) => codingHomeworkClient.getGroupStudentAssignment(courseId, groupId, activityId),
+      getLatestSubmission: (activityId: string) => codingHomeworkClient.getGroupSubmission(courseId, groupId, activityId),
+      saveAnswers: (activityId: string, input: Parameters<typeof codingHomeworkClient.saveGroupChallengeAnswers>[3]) =>
+        codingHomeworkClient.saveGroupChallengeAnswers(courseId, groupId, activityId, input),
+      submit: (activityId: string, input: Parameters<typeof codingHomeworkClient.submitGroupSubmission>[3]) =>
+        codingHomeworkClient.submitGroupSubmission(courseId, groupId, activityId, input),
+      submitAnswers: (activityId: string, input: Parameters<typeof codingHomeworkClient.submitGroupChallengeAnswers>[3]) =>
+        codingHomeworkClient.submitGroupChallengeAnswers(courseId, groupId, activityId, input)
+    };
+  }, [codingHomeworkClient, courseId, groupId]);
+  return (
+    <CodingHomeworkGraderActivityView
+      {...activityProps}
+      authoringClient={authoringClient}
+      preflightClient={preflightClient}
+      submissionClient={submissionClient}
+    />
+  );
+}
+
 function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<typeof WebDesignCodingExerciseActivityView>) {
   const {
     activityRouteCourseId: _activityRouteCourseId,
@@ -405,6 +481,31 @@ function CodingExerciseBankActivityRenderer(context: BankActivityRendererContext
   );
 }
 
+function CodingHomeworkGraderBankActivityRenderer(context: BankActivityRendererContext) {
+  const codingHomeworkClient = useMemo(() => createCodingHomeworkGraderClient(apiRequest), []);
+  const authoringClient = useMemo(
+    () => ({
+      get: (activityId: string) => codingHomeworkClient.getBankAuthoring(context.activityBankId, activityId),
+      importRequirements: (activityId: string, input: Parameters<typeof codingHomeworkClient.importBankRequirements>[2]) =>
+        codingHomeworkClient.importBankRequirements(context.activityBankId, activityId, input),
+      save: (activityId: string, input: Parameters<typeof codingHomeworkClient.saveBankAuthoring>[2]) =>
+        codingHomeworkClient.saveBankAuthoring(context.activityBankId, activityId, input),
+      uploadAssignmentPdf: (activityId: string, input: Parameters<typeof codingHomeworkClient.uploadBankAssignmentPdf>[2]) =>
+        codingHomeworkClient.uploadBankAssignmentPdf(context.activityBankId, activityId, input)
+    }),
+    [codingHomeworkClient, context.activityBankId]
+  );
+  return (
+    <CodingHomeworkGraderActivityView
+      activity={context.activity}
+      canManage
+      locale={context.locale}
+      onSave={context.onSave}
+      authoringClient={authoringClient}
+    />
+  );
+}
+
 function McqBankActivityRenderer(context: BankActivityRendererContext) {
   const mcqClient = createMcqClient(apiRequest);
   return (
@@ -451,6 +552,7 @@ function WebDesignCodingExerciseBankActivityRenderer(context: BankActivityRender
 
 export const activityRenderers = {
   "coding-exercise": CodingExerciseActivityRenderer,
+  "coding-homework-grader": CodingHomeworkGraderActivityRenderer,
   "parsons-problem": ParsonsActivityRenderer,
   mcq: McqActivityRenderer,
   "web-design-coding-exercise": WebDesignCodingExerciseActivityRenderer
@@ -458,6 +560,7 @@ export const activityRenderers = {
 
 export const bankActivityRenderers: Record<string, (context: BankActivityRendererContext) => ReactNode> = {
   "coding-exercise": CodingExerciseBankActivityRenderer,
+  "coding-homework-grader": CodingHomeworkGraderBankActivityRenderer,
   "parsons-problem": ParsonsBankActivityRenderer,
   mcq: McqBankActivityRenderer,
   "web-design-coding-exercise": WebDesignCodingExerciseBankActivityRenderer
