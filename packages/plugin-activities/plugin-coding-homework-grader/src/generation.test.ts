@@ -14,7 +14,7 @@ const coreMocks = vi.hoisted(() => ({
   },
   canManageCourse: vi.fn(),
   generateAiAgentText: vi.fn(),
-  getCourseStudentSupportAiAgentConnection: vi.fn(),
+  getCourseTeacherQuestionAuthoringAiAgentConnection: vi.fn(),
   getQuestionAuthoringAiAgentConnection: vi.fn()
 }));
 
@@ -49,7 +49,7 @@ describe("coding homework challenge generation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     coreMocks.canManageCourse.mockResolvedValue(true);
-    coreMocks.getCourseStudentSupportAiAgentConnection.mockResolvedValue(testAiConnection());
+    coreMocks.getCourseTeacherQuestionAuthoringAiAgentConnection.mockResolvedValue(testAiConnection());
     coreMocks.getQuestionAuthoringAiAgentConnection.mockResolvedValue(testAiConnection());
     coreMocks.generateAiAgentText.mockResolvedValue(
       JSON.stringify({
@@ -153,7 +153,7 @@ describe("coding homework challenge generation", () => {
     expect(result.questions[0]?.metadata).toMatchObject({ attempts: 2 });
   });
 
-  it("uses the course AI connection for automatic student submission generation", async () => {
+  it("uses the course teacher AI connection for automatic student submission generation", async () => {
     coreMocks.canManageCourse.mockResolvedValue(false);
 
     const result = await generateCodingHomeworkChallengeQuestionsForStudentSubmission(
@@ -166,7 +166,7 @@ describe("coding homework challenge generation", () => {
       { submissionId: "submission-1" }
     );
 
-    expect(coreMocks.getCourseStudentSupportAiAgentConnection).toHaveBeenCalledWith(testStudent(), "course-1");
+    expect(coreMocks.getCourseTeacherQuestionAuthoringAiAgentConnection).toHaveBeenCalledWith(testStudent(), "course-1");
     expect(coreMocks.getQuestionAuthoringAiAgentConnection).not.toHaveBeenCalled();
     expect(dbMocks.pluginCodingHomeworkSubmission.findFirst).toHaveBeenCalledWith({
       where: {
@@ -179,6 +179,29 @@ describe("coding homework challenge generation", () => {
       orderBy: { createdAt: "desc" }
     });
     expect(result.submission.status).toBe("challenge_ready");
+  });
+
+  it("rejects local AI connections for challenge question generation", async () => {
+    coreMocks.getQuestionAuthoringAiAgentConnection.mockResolvedValue({
+      ...testAiConnection(),
+      provider: "ollama",
+      model: "llama3.1",
+      apiKey: null
+    });
+
+    await expect(
+      generateCodingHomeworkChallengeQuestions(
+        {
+          activityId: "activity-1",
+          courseId: "course-1",
+          groupId: "group-1",
+          user: testUser()
+        },
+        { submissionId: "submission-1" }
+      )
+    ).rejects.toMatchObject({ status: 400, code: "AI_AGENT_LOCAL_MODEL_NOT_ALLOWED" });
+
+    expect(coreMocks.generateAiAgentText).not.toHaveBeenCalled();
   });
 
   it("returns a student-safe challenge generation payload", async () => {

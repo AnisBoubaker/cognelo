@@ -35,7 +35,7 @@ The implementation must be TypeScript/Node/Postgres-native. The Python prototype
 
 ## Implementation Progress
 
-As of May 28, 2026:
+As of June 17, 2026:
 
 - Phase 0 is complete: prototype-to-TypeScript algorithm contracts, prompt versioning, plugin README, and plugin memory were added without production dependency on `tmp`.
 - Phase 1 is complete: the former homework grader scaffold was renamed to Coding Homework Grader with package name `@cognelo/plugin-coding-homework-grader`, plugin key `coding-homework-grader`, activity key `coding-homework-grader`, and database namespace `plugin_coding_homework_grader`.
@@ -50,6 +50,7 @@ As of May 28, 2026:
 - Phase 10 is complete: valid final submissions can be analyzed into parsed submitted functions, deterministic dev embeddings, nearest reference examples from the shared content vector dispatcher, divergence scores, and selected candidate rows.
 - Phase 11 is complete: teachers can trigger or retry server-side challenge question generation for analyzed submissions. Generated questions are stored with prompt version, model, selected function provenance, nearest-example audit metadata, and submission status moves to `challenge_ready`.
 - Phase 12 is complete: valid student ZIP submissions now run analysis and challenge generation immediately, return student-safe challenge questions, collect draft/final answers, and mark the plugin submission `ready_for_grading` once every question is answered.
+- Phase 13 is complete: final answer submission creates/submits a core gradebook attempt for summative assignments, and teachers can review coding homework submissions from the gradebook manual grading surfaces.
 
 ## Product Boundaries
 
@@ -531,7 +532,7 @@ Declare grading capability:
 
 Submission flow:
 
-- For summative assignments, create a core attempt when the student uploads the ZIP or when the challenge set is finalized.
+- For summative assignments, create a core attempt when the challenge-answer set is finalized.
 - Prefer final answer submission as the core submission point so incomplete challenge flows do not count as submitted work.
 - Store plugin submission ID as `pluginAttemptRef`.
 - Mark the core attempt submitted only when challenge answers are final.
@@ -829,25 +830,25 @@ Acceptance:
 
 - Students cannot finalize until required questions are answered.
 - Once finalized, ZIP and answers are read-only for that attempt.
-- Finalization marks the plugin submission ready for grading; core attempt creation/submission is deferred to the manual grading/gradebook phase.
+- Finalization marks the plugin submission ready for grading and creates/submits the core attempt for summative assignments.
 
 Progress:
 
 - The assigned-group student submission route now runs final ZIP validation, submitted-function analysis, and challenge question generation in sequence for valid archives. The response includes only student-safe question fields; nearest examples, prompt metadata, raw model output, and generation provenance remain server-side/teacher-only.
-- Automatic student-path generation uses the course's configured student-support AI connection through a core helper, so students do not need personal question-authoring AI preferences and provider keys stay server-side.
+- Automatic student-path generation uses a course teacher/owner's configured non-local question-authoring AI connection through a core helper, so students do not need personal AI preferences and provider keys stay server-side.
 - Added `coding-homework-grader/challenge-answers` with `PUT` for draft answer saves and `POST` for final answer submission. Finalization requires every generated question to have a non-empty answer.
 - The student UI now shows generated challenge questions immediately after a valid ZIP submission, locks the ZIP upload once questions are ready, allows draft saves, and marks the submission complete when final answers are submitted.
-- Final answer submission updates the plugin submission status to `ready_for_grading`. Core gradebook attempt creation/submission remains for Phase 13 because manual grading integration is not implemented yet.
+- Final answer submission updates the plugin submission status to `ready_for_grading` and records the core gradebook attempt/submission for summative assigned activities.
 
 ### Phase 13: Teacher Manual Grading And Gradebook Integration
 
 Deliverables:
 
-- Manual grading renderer.
-- Gradebook attempts route.
-- Teacher review UI with code/question/answer/source context.
-- Core grade recording.
-- Released grade visibility through existing gradebook.
+- Manual grading renderer. Complete: `coding-homework-grader-manual-grading`.
+- Gradebook attempts route. Complete: `coding-homework-grader/gradebook-attempts`.
+- Teacher review UI with code/question/answer/source context. Complete in the detailed gradebook overlay and basic bulk manual grading page.
+- Core grade recording. Complete through final-answer core attempts plus existing gradebook override saves.
+- Released grade visibility through existing gradebook. Complete through normal gradebook release behavior.
 
 Acceptance:
 

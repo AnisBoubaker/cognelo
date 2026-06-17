@@ -5,6 +5,7 @@ export * from "./algorithm";
 export * from "./parsers";
 export * from "./web/client";
 export * from "./web/coding-homework-grader-activity-view";
+export * from "./web/coding-homework-manual-grading-panel";
 
 export const codingHomeworkGraderPlugin: ActivityPlugin = {
   key: "coding-homework-grader",
@@ -18,6 +19,16 @@ export const codingHomeworkGraderPlugin: ActivityPlugin = {
       description: "Programming assignment submission and grading workflow.",
       defaultCategoryIds: ["programming"],
       icon: "document-check",
+      grading: {
+        supportsAttempts: true,
+        supportsManualGrading: true,
+        supportsFeedbackRenderer: true,
+        supportsAnalyticsPayloads: true,
+        defaultMaxAttempts: 3
+      },
+      manualGrading: {
+        rendererKey: "coding-homework-grader-manual-grading"
+      },
       i18n: {
         en: {
           name: "Coding Homework Grader",

@@ -44,7 +44,7 @@ The teacher authoring form is registered with `useUnsavedChangesGuard` from `@co
 
 ## Seed Fixture
 
-The root Prisma seed creates `Coding homework grader: INF-155 TP1 Labyrinthe` as a complete dev fixture in Programming 101 / Section A. It reads `tmp/INF155-A2023-TP1.pdf` with `pdftotext`, attaches a copied PDF to the activity when the local file exists, uses `tmp/FichiersFournis` to build starter-file documentation, and stores bank/course plugin authoring rows, required ZIP structure/functions, a ready group documentation snapshot, a summative group assignment, and a gradebook item. The course student-support AI setting points to `seed-ai-agent-student-support`, which uses OpenAI when `OPENAI_API_KEY` is present and otherwise falls back to local Ollama unless overridden with `SEED_AI_AGENT_*` environment variables before running `npm run db:seed`.
+The root Prisma seed creates `Coding homework grader: INF-155 TP1 Labyrinthe` as a complete dev fixture in Programming 101 / Section A. It reads `tmp/INF155-A2023-TP1.pdf` with `pdftotext`, attaches a copied PDF to the activity when the local file exists, uses `tmp/FichiersFournis` to build starter-file documentation, and stores bank/course plugin authoring rows, required ZIP structure/functions, a ready group documentation snapshot, a summative group assignment, and a gradebook item. Challenge question generation uses a course teacher/owner's configured non-local question-authoring AI connection; the seed does not point teacher question authoring at the local Ollama fallback.
 
 ## Implementation Direction
 
@@ -76,7 +76,9 @@ Phase 10 added `src/analysis.ts` and the `coding-homework-grader/submission-anal
 
 Phase 11 added `src/generation.ts` and the teacher-only `coding-homework-grader/challenge-generation` route. Teachers can trigger or retry challenge question generation for analyzed submissions using their server-side question-authoring AI agent connection. Generated questions are stored in `PluginCodingHomeworkChallengeQuestion` with prompt version, model, selected function provenance, nearest examples, prompt hash/text, raw response, and attempt count. Student-facing question/answer UI remains a later phase, and prior examples must not be exposed to students.
 
-Phase 12 added automatic student-path challenge generation and `src/challenge-answers.ts`. Valid student ZIP submissions now analyze the submitted functions, generate the challenge set through the course's configured student-support AI connection, and return a student-safe question payload immediately. The `coding-homework-grader/challenge-answers` route saves draft answers with `PUT` and finalizes answers with `POST`; finalization requires every question to be answered and moves the plugin submission to `ready_for_grading`. Core gradebook attempt/submission integration remains a later grading phase.
+Phase 12 added automatic student-path challenge generation and `src/challenge-answers.ts`. Valid student ZIP submissions now analyze the submitted functions, generate the challenge set through a course teacher/owner's configured non-local question-authoring AI connection, and return a student-safe question payload immediately. The `coding-homework-grader/challenge-answers` route saves draft answers with `PUT` and finalizes answers with `POST`; finalization requires every question to be answered and moves the plugin submission to `ready_for_grading`.
+
+Phase 13 added gradebook integration and teacher manual grading. For summative assigned activities, final answer submission creates/submits a core `ActivityAttempt` linked to the plugin submission. Teachers can open the activity gradebook detail page, use Review/Grade, inspect submitted file metadata, generated questions, student answers, and selected function source, then save score/feedback through the normal core gradebook override workflow.
 
 Current plugin-owned tables:
 

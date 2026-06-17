@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AppError } from "@cognelo/core";
+import { AppError, startActivityAttempt, submitActivityAttempt } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "./db-client";
 import { toStudentChallengeQuestionRecord } from "./generation";
@@ -48,6 +48,12 @@ type SubmissionWithQuestions = SubmissionRow & {
   questions: ChallengeQuestionRow[];
 };
 
+type ChallengeAnswerGradebookOptions = {
+  activityConfigFingerprint?: string | null;
+  assessmentMode?: string | null;
+  pluginVersion?: string;
+};
+
 const challengeAnswersInputSchema = z.object({
   answers: z
     .array(
@@ -60,7 +66,14 @@ const challengeAnswersInputSchema = z.object({
   submissionId: z.string().trim().min(1).nullable().optional()
 });
 
-export async function saveCodingHomeworkChallengeAnswers(scope: AnswerScope, input: unknown, options: { finalize: boolean }) {
+export async function saveCodingHomeworkChallengeAnswers(
+  scope: AnswerScope,
+  input: unknown,
+  options: {
+    finalize: boolean;
+    gradebook?: ChallengeAnswerGradebookOptions;
+  }
+) {
   const parsed = challengeAnswersInputSchema.parse(input ?? {});
   const submission = await findStudentChallengeSubmission(scope, parsed.submissionId ?? null);
   if (!submission) {
@@ -111,9 +124,15 @@ export async function saveCodingHomeworkChallengeAnswers(scope: AnswerScope, inp
     }
   }
 
+  const coreAttemptId =
+    options.finalize && !submission.coreAttemptId && options.gradebook?.assessmentMode === "summative"
+      ? await createSubmittedCoreAttempt(scope, submission, nextAnswers, submittedAt ?? new Date(), options.gradebook)
+      : submission.coreAttemptId;
+
   const updatedSubmission = await prisma.pluginCodingHomeworkSubmission.update({
     where: { id: submission.id },
     data: {
+      coreAttemptId,
       metadata: {
         ...normalizeObject(submission.metadata),
         challengeAnswers: {
@@ -136,6 +155,39 @@ export async function saveCodingHomeworkChallengeAnswers(scope: AnswerScope, inp
     questions: refreshedQuestions.map(toStudentChallengeQuestionRecord),
     submission: toSubmissionRecord(updatedSubmission)
   };
+}
+
+async function createSubmittedCoreAttempt(
+  scope: AnswerScope,
+  submission: SubmissionWithQuestions,
+  answers: Map<string, string>,
+  submittedAt: Date,
+  gradebook: ChallengeAnswerGradebookOptions
+) {
+  const submittedAnswers = Object.fromEntries(submission.questions.map((question) => [question.id, answers.get(question.id) ?? ""]));
+  const metadata = {
+    mode: "summative",
+    questionCount: submission.questions.length,
+    submittedAnswers,
+    submittedAt: submittedAt.toISOString(),
+    submissionId: submission.id
+  } as Prisma.InputJsonValue;
+  const coreAttempt = await startActivityAttempt(scope.user, {
+    courseId: scope.courseId,
+    groupId: scope.groupId,
+    activityId: scope.activityId,
+    pluginKey: "coding-homework-grader",
+    pluginVersion: gradebook.pluginVersion ?? "0.1.0",
+    pluginAttemptRef: submission.id,
+    activityConfigFingerprint: gradebook.activityConfigFingerprint ?? null,
+    metadata
+  });
+  const submittedAttempt = await submitActivityAttempt(scope.user, {
+    attemptId: coreAttempt.id,
+    pluginAttemptRef: submission.id,
+    metadata
+  });
+  return submittedAttempt.id;
 }
 
 async function findStudentChallengeSubmission(scope: AnswerScope, submissionId: string | null): Promise<SubmissionWithQuestions | null> {

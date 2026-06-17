@@ -281,6 +281,58 @@ export type CodingHomeworkChallengeAnswerResult = {
   submission: CodingHomeworkSubmissionRecord;
 };
 
+export type CodingHomeworkGradebookAttemptRecord = {
+  id: string;
+  attemptNumber: number | null;
+  coreAttemptId: string | null;
+  createdAt: string;
+  gradedAt: string | null;
+  lifecycle: string;
+  metadata: Record<string, unknown>;
+  status: string;
+  submittedAt: string | null;
+  files: Array<{
+    id: string;
+    languageKey: string | null;
+    metadata: Record<string, unknown>;
+    path: string;
+    sha256: string;
+    sizeBytes: number;
+  }>;
+  functions: Array<{
+    id: string;
+    divergenceScore: number | null;
+    fileId: string;
+    filePath: string;
+    functionCode: string;
+    functionName: string;
+    nearestExamples: unknown[];
+    selectedForQuestion: boolean;
+  }>;
+  questions: Array<{
+    id: string;
+    answerSubmittedAt: string | null;
+    generationModel: string;
+    metadata: Record<string, unknown>;
+    nearestExamples: unknown[];
+    orderIndex: number;
+    questionText: string;
+    studentAnswer: string | null;
+    submissionFunctionId: string | null;
+  }>;
+  reviews: Array<{
+    id: string;
+    createdAt: string;
+    feedback: string;
+    maxScore: number | null;
+    metadata: Record<string, unknown>;
+    reviewerUserId: string;
+    rubric: Record<string, unknown>;
+    score: number | null;
+    updatedAt: string;
+  }>;
+};
+
 export type CodingHomeworkSubmissionResult = {
   analysis?: CodingHomeworkAnalysisResult;
   challenge?: CodingHomeworkStudentChallengeGenerationResult;
@@ -433,6 +485,27 @@ export function createCodingHomeworkGraderClient(request: Requester) {
           body: JSON.stringify(input ?? {})
         }
       ),
+    groupGradebookAttempts: (
+      courseId: string,
+      groupId: string,
+      activityId: string,
+      input: { includeAttempts?: boolean; participantId: string }
+    ) => {
+      const params = new URLSearchParams({ participantId: input.participantId });
+      if (input.includeAttempts) {
+        params.set("includeAttempts", "true");
+      }
+      return request<{
+        participant: {
+          id: string;
+          email: string | null;
+          firstName: string | null;
+          lastName: string | null;
+          userId: string | null;
+        };
+        attempts: CodingHomeworkGradebookAttemptRecord[];
+      }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-homework-grader/gradebook-attempts?${params.toString()}`);
+    },
     getBankAuthoring: (activityBankId: string, bankActivityId: string) =>
       request<CodingHomeworkAuthoringRecord>(
         `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-homework-grader/authoring`

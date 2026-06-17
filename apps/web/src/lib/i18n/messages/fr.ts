@@ -334,6 +334,8 @@ export const frMessages = {
       groupsEyebrow: "Groupes",
       groupsTitle: "Groupes du cours",
       noGroups: "Aucun groupe pour le moment.",
+      noAvailableGroups: "Aucune section n'est actuellement disponible pour votre compte.",
+      backToCourses: "Retour aux cours",
       groupCardEyebrow: "Groupe",
       groupShellEyebrow: "Structure de groupe",
       groupShellTitle: "Créer un groupe",

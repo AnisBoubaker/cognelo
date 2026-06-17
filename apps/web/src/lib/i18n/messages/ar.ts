@@ -286,6 +286,7 @@ export const arMessages = {
       groupsEyebrow: "المجموعات",
       groupsTitle: "مجموعات المقرر",
       noGroups: "لا توجد مجموعات بعد.",
+      noAvailableGroups: "لا توجد أقسام متاحة حالياً لحسابك.",
       groupCardEyebrow: "مجموعة",
       groupShellEyebrow: "هيكل المجموعة",
       groupShellTitle: "إنشاء مجموعة",

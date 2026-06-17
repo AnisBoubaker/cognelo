@@ -39,7 +39,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Global authorization supports many-to-many user roles (`admin`, `teacher`, `student`) and is designed for more roles later.
 - Users have account-wide profile settings with editable first and last name fields. Email changes are intentionally admin-only.
 - AI agent/model connection settings are account-wide. Personal connections are owned by a user; global connections have no owner and are admin-managed for later teacher/course use.
-- Core exposes a course-scoped AI helper for server-side plugin work that uses `Course.metadata.aiSettings.studentSupportAiAgentConnectionId`. This lets student-triggered server workflows, such as Coding Homework Grader challenge generation, use a course-configured connection without exposing provider keys or requiring student-owned AI preferences.
+- Core exposes course-scoped AI helpers for server-side plugin work. `Course.metadata.aiSettings.studentSupportAiAgentConnectionId` remains the course student-support setting. Coding Homework Grader challenge generation resolves a course teacher/owner's question-authoring AI preference for student-triggered generation instead of using a student-owned or local student-support connection.
 - Accounts can be activated on first login when a person was pre-added to a group participant list by email and no user record existed yet.
 - Courses support create, edit, archive, and draft/published/archived status.
 - Users have a generic `metadata` JSON field used for account-level preferences, including the selected AI agent for question authoring help.
@@ -162,6 +162,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Arabic (`ar`) is supported as a frontend locale. Selecting Arabic sets the document direction to RTL, and plugin activity metadata can provide Arabic `name`, `description`, and `defaultTitle` values.
 - Platform-owned web translations are split by locale under `apps/web/src/lib/i18n/messages/*` and composed by `apps/web/src/lib/i18n/messages/index.ts`. Plugin-owned strings remain in the plugin package that owns the behavior or metadata, and platform locale files may compose plugin message bundles such as Parsons without moving those strings into core/web.
 - Gradebook manual adjustment starts with a core teacher override workflow and a plugin-backed regrade workflow. Overrides update the current grade and write `overridden` grade events; automatic regrades resolve the plugin grading handler and record through the core grade service as `regraded` events. Parsons regrade evaluates the stored submitted attempt state against the current course-local activity config, so teacher corrections to an assigned course activity affect regrade results.
+- Coding Homework Grader Phase 13 is implemented. Final challenge-answer submission for summative assigned activities creates/submits a core `ActivityAttempt` linked to the plugin submission; teachers review submissions from the activity gradebook detail page through the plugin manual grading renderer and save score/feedback with the existing core gradebook override workflow.
 
 ## Known MVP Constraints
 

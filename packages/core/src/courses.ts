@@ -67,7 +67,7 @@ export async function listCourses(user: CurrentUser) {
   return prisma.course.findMany({
     where: {
       memberships: { some: { userId: user.id, role: "student" } },
-      groups: { some: { participants: { some: { userId: user.id } } } }
+      groups: { some: buildVisibleStudentGroupWhere(user.id) }
     },
     include: buildCourseIncludeForStudent(user.id),
     orderBy: { updatedAt: "desc" }

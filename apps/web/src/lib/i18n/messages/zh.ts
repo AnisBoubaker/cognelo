@@ -334,6 +334,8 @@ export const zhMessages = {
       groupsEyebrow: "分组",
       groupsTitle: "课程分组",
       noGroups: "暂无分组。",
+      noAvailableGroups: "当前没有可供你的账号访问的班级。",
+      backToCourses: "返回课程",
       groupCardEyebrow: "分组",
       groupShellEyebrow: "分组设置",
       groupShellTitle: "创建分组",

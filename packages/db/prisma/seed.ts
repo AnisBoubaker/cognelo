@@ -462,18 +462,20 @@ async function main() {
 
   const teacherMetadata = asJsonRecord(teacher.metadata);
   const teacherAiPreferences = asJsonRecord(teacherMetadata.aiPreferences);
-  await prisma.user.update({
-    where: { id: teacher.id },
-    data: {
-      metadata: {
-        ...teacherMetadata,
-        aiPreferences: {
-          ...teacherAiPreferences,
-          questionAuthoringAiAgentConnectionId: seedAiConnection.id
-        }
-      } as Prisma.InputJsonValue
-    }
-  });
+  if (!teacherAiPreferences.questionAuthoringAiAgentConnectionId && seedAiConnection.provider !== "ollama") {
+    await prisma.user.update({
+      where: { id: teacher.id },
+      data: {
+        metadata: {
+          ...teacherMetadata,
+          aiPreferences: {
+            ...teacherAiPreferences,
+            questionAuthoringAiAgentConnectionId: seedAiConnection.id
+          }
+        } as Prisma.InputJsonValue
+      }
+    });
+  }
 
   const activityTypesByKey = new Map<string, Awaited<ReturnType<typeof prisma.activityType.upsert>>>();
   const pluginKeyByActivityKey = new Map<string, string>();
@@ -1635,7 +1637,7 @@ async function main() {
       description: "Monday lab group with its own launch notes and activity schedule.",
       status: "published",
       availableFrom: new Date("2026-04-20T13:00:00.000Z"),
-      availableUntil: new Date("2026-05-30T03:59:00.000Z")
+      availableUntil: new Date("2026-07-31T03:59:00.000Z")
     },
     create: {
       id: "seed-group-programming-101-section-a",
@@ -1644,7 +1646,7 @@ async function main() {
       description: "Monday lab group with its own launch notes and activity schedule.",
       status: "published",
       availableFrom: new Date("2026-04-20T13:00:00.000Z"),
-      availableUntil: new Date("2026-05-30T03:59:00.000Z"),
+      availableUntil: new Date("2026-07-31T03:59:00.000Z"),
       createdById: teacher.id
     }
   });

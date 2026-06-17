@@ -4,7 +4,7 @@ import {
   AppError,
   canManageCourse,
   generateAiAgentText,
-  getCourseStudentSupportAiAgentConnection,
+  getCourseTeacherQuestionAuthoringAiAgentConnection,
   getQuestionAuthoringAiAgentConnection
 } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -67,7 +67,7 @@ type ChallengeQuestionRow = {
 };
 
 type GenerationOptions = {
-  aiConnectionKind: "course_student_support" | "teacher_question_authoring";
+  aiConnectionKind: "course_teacher_question_authoring" | "teacher_question_authoring";
   requireManager: boolean;
   restrictToUser: boolean;
 };
@@ -91,7 +91,7 @@ export async function generateCodingHomeworkChallengeQuestions(scope: Generation
 
 export async function generateCodingHomeworkChallengeQuestionsForStudentSubmission(scope: GenerationScope, input: unknown = {}) {
   return generateChallengeQuestions(scope, input, {
-    aiConnectionKind: "course_student_support",
+    aiConnectionKind: "course_teacher_question_authoring",
     requireManager: false,
     restrictToUser: true
   });
@@ -348,10 +348,20 @@ async function assertCanGenerateQuestions(scope: GenerationScope) {
 }
 
 async function resolveAiConnection(scope: GenerationScope, kind: GenerationOptions["aiConnectionKind"]) {
-  if (kind === "course_student_support") {
-    return getCourseStudentSupportAiAgentConnection(scope.user, scope.courseId);
+  const connection =
+    kind === "course_teacher_question_authoring"
+      ? await getCourseTeacherQuestionAuthoringAiAgentConnection(scope.user, scope.courseId)
+      : await getQuestionAuthoringAiAgentConnection(scope.user);
+
+  if (connection.provider === "ollama") {
+    throw new AppError(
+      400,
+      "AI_AGENT_LOCAL_MODEL_NOT_ALLOWED",
+      "Coding homework challenge questions must use a teacher-configured non-local AI model."
+    );
   }
-  return getQuestionAuthoringAiAgentConnection(scope.user);
+
+  return connection;
 }
 
 async function findSubmission(scope: GenerationScope, submissionId: string | null, options: GenerationOptions): Promise<SubmissionRow | null> {
