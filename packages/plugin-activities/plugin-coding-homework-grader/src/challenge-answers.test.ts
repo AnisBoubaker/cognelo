@@ -9,7 +9,9 @@ const coreMocks = vi.hoisted(() => ({
       this.status = status;
       this.code = code;
     }
-  }
+  },
+  startActivityAttempt: vi.fn(),
+  submitActivityAttempt: vi.fn()
 }));
 
 const dbMocks = vi.hoisted(() => ({
@@ -42,10 +44,13 @@ describe("coding homework challenge answers", () => {
     }));
     dbMocks.pluginCodingHomeworkSubmission.update.mockImplementation(async ({ data, where }) => ({
       ...testSubmission({ status: data.status }),
+      coreAttemptId: data.coreAttemptId ?? null,
       id: where.id,
       metadata: data.metadata,
       processingError: data.processingError
     }));
+    coreMocks.startActivityAttempt.mockResolvedValue({ id: "core-attempt-1" });
+    coreMocks.submitActivityAttempt.mockResolvedValue({ id: "core-attempt-1" });
   });
 
   it("saves draft answers without completing the submission", async () => {
@@ -114,6 +119,38 @@ describe("coding homework challenge answers", () => {
     expect(dbMocks.pluginCodingHomeworkChallengeQuestion.update).toHaveBeenCalledTimes(2);
     expect(result.submission.status).toBe("ready_for_grading");
     expect(result.questions.every((question) => question.answerSubmittedAt)).toBe(true);
+  });
+
+  it("creates a core gradebook attempt when finalized in summative mode", async () => {
+    const result = await saveCodingHomeworkChallengeAnswers(
+      {
+        activityId: "activity-1",
+        courseId: "course-1",
+        groupId: "group-1",
+        user: testUser()
+      },
+      {
+        answers: [
+          { questionId: "question-1", answer: "The loop accumulates values before returning." },
+          { questionId: "question-2", answer: "The base case decides the edge behavior." }
+        ],
+        submissionId: "submission-1"
+      },
+      { finalize: true, gradebook: { assessmentMode: "summative", pluginVersion: "0.1.0" } }
+    );
+
+    expect(coreMocks.startActivityAttempt).toHaveBeenCalledWith(
+      testUser(),
+      expect.objectContaining({
+        activityId: "activity-1",
+        courseId: "course-1",
+        groupId: "group-1",
+        pluginAttemptRef: "submission-1",
+        pluginKey: "coding-homework-grader"
+      })
+    );
+    expect(coreMocks.submitActivityAttempt).toHaveBeenCalledWith(testUser(), expect.objectContaining({ attemptId: "core-attempt-1" }));
+    expect(result.submission.coreAttemptId).toBe("core-attempt-1");
   });
 
   it("locks completed submissions", async () => {

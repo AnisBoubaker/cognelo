@@ -198,18 +198,29 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
     ? (await resolveEnabledActivityTypeId(data.activityTypeKey))
     : undefined;
 
-  return prisma.activity.update({
-    where: { id: activityId },
-    data: {
-      activityTypeId,
-      title: data.title,
-      description: data.description,
-      lifecycle: data.lifecycle,
-      config: mergedConfig as Prisma.InputJsonValue | undefined,
-      metadata: data.metadata as Prisma.InputJsonValue | undefined,
-      position: data.position
-    },
-    include: { activityType: true, bankActivity: true, activityVersion: true }
+  return prisma.$transaction(async (tx) => {
+    const updatedActivity = await tx.activity.update({
+      where: { id: activityId },
+      data: {
+        activityTypeId,
+        title: data.title,
+        description: data.description,
+        lifecycle: data.lifecycle,
+        config: mergedConfig as Prisma.InputJsonValue | undefined,
+        metadata: data.metadata as Prisma.InputJsonValue | undefined,
+        position: data.position
+      },
+      include: { activityType: true, bankActivity: true, activityVersion: true }
+    });
+
+    if (data.title !== undefined) {
+      await tx.gradebookItem.updateMany({
+        where: { courseId, activityId },
+        data: { titleSnapshot: data.title }
+      });
+    }
+
+    return updatedActivity;
   });
 }
 

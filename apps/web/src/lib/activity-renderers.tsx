@@ -2,7 +2,12 @@ import type { ComponentProps, JSXElementConstructor, ReactNode } from "react";
 import { useMemo } from "react";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { CodingExerciseActivityView } from "@cognelo/plugin-coding-exercises";
-import { CodingHomeworkGraderActivityView, createCodingHomeworkGraderClient } from "@cognelo/plugin-coding-homework-grader";
+import {
+  CodingHomeworkGraderActivityView,
+  CodingHomeworkManualGradingPanel,
+  createCodingHomeworkGraderClient,
+  type CodingHomeworkGradebookAttemptRecord
+} from "@cognelo/plugin-coding-homework-grader";
 import {
   createParsonsClient,
   ParsonsActivityView,
@@ -71,8 +76,8 @@ type ManualGradingRendererContext = {
   row: CourseGradebookRow;
   activityConfig?: Record<string, unknown>;
   locale: "en" | "fr" | "zh" | "ar";
-  attempts: Array<ParsonsGradebookAttemptRecord | McqSubmission>;
-  selectedAttempt: ParsonsGradebookAttemptRecord | McqSubmission | null;
+  attempts: Array<ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord>;
+  selectedAttempt: ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | null;
   selectedIndex: number;
   includeAttempts: boolean;
   loading: boolean;
@@ -576,6 +581,13 @@ export const manualGradingRenderers: Record<string, (context: ManualGradingRende
   ),
   "mcq-manual-grading": (context) => (
     <McqManualGradingPanel {...context} attempts={context.attempts as McqSubmission[]} selectedAttempt={context.selectedAttempt as McqSubmission | null} />
+  ),
+  "coding-homework-grader-manual-grading": (context) => (
+    <CodingHomeworkManualGradingPanel
+      {...context}
+      attempts={context.attempts as CodingHomeworkGradebookAttemptRecord[]}
+      selectedAttempt={context.selectedAttempt as CodingHomeworkGradebookAttemptRecord | null}
+    />
   )
 };
 

@@ -341,6 +341,8 @@ export const enMessages = {
       groupsEyebrow: "Groups",
       groupsTitle: "Course groups",
       noGroups: "No groups yet.",
+      noAvailableGroups: "No sections are currently available for your account.",
+      backToCourses: "Back to courses",
       groupCardEyebrow: "Group",
       groupShellEyebrow: "Group shell",
       groupShellTitle: "Create a group",

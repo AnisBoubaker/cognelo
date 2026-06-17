@@ -122,6 +122,60 @@ export async function getQuestionAuthoringAiAgentConnection(user: CurrentUser) {
   return connection;
 }
 
+export async function getCourseTeacherQuestionAuthoringAiAgentConnection(user: CurrentUser, courseId: string) {
+  await assertCanViewCourse(user, courseId);
+  const course = await prisma.course.findUnique({
+    where: { id: courseId },
+    select: {
+      createdById: true,
+      memberships: {
+        where: {
+          role: { in: ["owner", "teacher"] }
+        },
+        select: {
+          role: true,
+          userId: true,
+          user: { select: { metadata: true } }
+        },
+        orderBy: [{ role: "asc" }, { createdAt: "asc" }]
+      }
+    }
+  });
+  if (!course) {
+    throw notFound("Course");
+  }
+
+  const staffPreferences = course.memberships
+    .sort((left, right) => staffPreferencePriority(left, right, course.createdById))
+    .map((membership) => ({
+      userId: membership.userId,
+      preferences: getAiPreferences(membership.user.metadata)
+    }))
+    .find((entry) => entry.preferences.questionAuthoringAiAgentConnectionId);
+
+  const connectionId = staffPreferences?.preferences.questionAuthoringAiAgentConnectionId ?? null;
+  if (!connectionId || !staffPreferences) {
+    throw new AppError(400, "AI_AGENT_NOT_CONFIGURED", "No course teacher AI agent is configured for question authoring.");
+  }
+
+  const connection = await prisma.aiAgentConnection.findFirst({
+    where: {
+      id: connectionId,
+      isEnabled: true,
+      OR: [{ ownerId: staffPreferences.userId }, { ownerId: null }]
+    }
+  });
+
+  if (!connection) {
+    throw notFound("AI agent connection");
+  }
+  if (!connection.apiKey && connection.provider !== "ollama") {
+    throw new AppError(400, "AI_AGENT_KEY_MISSING", "The selected course teacher AI agent connection does not have an API key.");
+  }
+
+  return connection;
+}
+
 export async function getCourseStudentSupportAiAgentConnection(user: CurrentUser, courseId: string) {
   await assertCanViewCourse(user, courseId);
   const course = await prisma.course.findUnique({ where: { id: courseId }, select: { metadata: true } });
@@ -203,6 +257,23 @@ function assertCanManageScope(user: CurrentUser, scope: AiAgentScope) {
 
 function scopeForOwner(ownerId: string | null): AiAgentScope {
   return ownerId === null ? "global" : "personal";
+}
+
+function staffPreferencePriority(
+  left: { role: string; userId: string },
+  right: { role: string; userId: string },
+  createdById: string
+) {
+  const score = (membership: { role: string; userId: string }) => {
+    if (membership.userId === createdById) {
+      return 0;
+    }
+    if (membership.role === "owner") {
+      return 1;
+    }
+    return 2;
+  };
+  return score(left) - score(right);
 }
 
 function normalizeNullable(value: string | null | undefined) {

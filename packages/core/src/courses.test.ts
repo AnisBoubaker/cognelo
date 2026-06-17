@@ -116,7 +116,12 @@ describe("course services", () => {
       expect.objectContaining({
         where: {
           memberships: { some: { userId: "student-1", role: "student" } },
-          groups: { some: { participants: { some: { userId: "student-1" } } } }
+          groups: {
+            some: expect.objectContaining({
+              participants: { some: { userId: "student-1" } },
+              status: "published"
+            })
+          }
         },
         include: expect.objectContaining({
           groups: expect.objectContaining({

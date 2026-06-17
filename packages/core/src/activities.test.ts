@@ -3,12 +3,16 @@ import type { CurrentUser } from "@cognelo/contracts";
 
 const tx = vi.hoisted(() => ({
   activity: {
-    create: vi.fn()
+    create: vi.fn(),
+    update: vi.fn()
   },
   courseContentItem: {
     count: vi.fn(),
     create: vi.fn(),
     findFirst: vi.fn()
+  },
+  gradebookItem: {
+    updateMany: vi.fn()
   }
 }));
 
@@ -16,7 +20,8 @@ const mockPrisma = vi.hoisted(() => ({
   $transaction: vi.fn(async (handler: (transaction: typeof tx) => unknown) => handler(tx)),
   activity: {
     create: vi.fn(),
-    findFirst: vi.fn()
+    findFirst: vi.fn(),
+    update: vi.fn()
   },
   activityType: {
     findUnique: vi.fn()
@@ -57,6 +62,7 @@ vi.mock("./authorization", () => authMocks);
 vi.mock("./plugins", () => pluginMocks);
 
 const { createActivity, deleteActivity } = await import("./activities");
+const { updateActivity } = await import("./activities");
 
 const teacherUser: CurrentUser = {
   id: "teacher-1",
@@ -72,6 +78,7 @@ describe("activity services", () => {
     vi.clearAllMocks();
     mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof tx) => unknown) => handler(tx));
     tx.activity.create.mockImplementation((...args) => mockPrisma.activity.create(...args));
+    tx.activity.update.mockImplementation((...args) => mockPrisma.activity.update(...args));
     tx.courseContentItem.count.mockResolvedValue(0);
   });
 
@@ -235,6 +242,32 @@ describe("activity services", () => {
     ).rejects.toMatchObject({ status: 400, code: "BANK_ACTIVITY_NOT_PUBLISHED" });
 
     expect(mockPrisma.activity.create).not.toHaveBeenCalled();
+  });
+
+  it("syncs assigned gradebook item titles when a course activity is renamed", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      title: "Old title",
+      activityType: { key: "placeholder" },
+      config: {}
+    });
+    tx.activity.update.mockResolvedValue({
+      id: "activity-1",
+      title: "TP1"
+    });
+
+    await updateActivity(teacherUser, "course-1", "activity-1", { title: "TP1" });
+
+    expect(tx.activity.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "activity-1" },
+        data: expect.objectContaining({ title: "TP1" })
+      })
+    );
+    expect(tx.gradebookItem.updateMany).toHaveBeenCalledWith({
+      where: { courseId: "course-1", activityId: "activity-1" },
+      data: { titleSnapshot: "TP1" }
+    });
   });
 
   it("deletes only course-local activity IDs that belong to the course", async () => {

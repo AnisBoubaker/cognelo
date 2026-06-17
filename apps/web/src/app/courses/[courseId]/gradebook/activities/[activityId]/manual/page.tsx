@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useNotifications } from "@cognelo/activity-ui";
+import { createCodingHomeworkGraderClient, type CodingHomeworkGradebookAttemptRecord } from "@cognelo/plugin-coding-homework-grader";
 import {
   createMcqClient,
   getMcqManualGradingCopy,
@@ -26,7 +27,7 @@ type DraftGrade = {
   questionScores?: Record<string, string>;
 };
 
-type ManualGradingAttempt = ParsonsGradebookAttemptRecord | McqSubmission;
+type ManualGradingAttempt = ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord;
 
 export default function ManualActivityGradingPage() {
   const params = useParams<{ courseId: string; activityId: string }>();
@@ -36,6 +37,7 @@ export default function ManualActivityGradingPage() {
   const { locale, t } = useI18n();
   const notifications = useNotifications();
   const mcqCopy = getMcqManualGradingCopy(locale);
+  const codingHomeworkClient = useMemo(() => createCodingHomeworkGraderClient(apiRequest), []);
   const mcqClient = useMemo(() => createMcqClient(apiRequest), []);
   const parsonsClient = useMemo(() => createParsonsClient(apiRequest), []);
   const [course, setCourse] = useState<Course | null>(null);
@@ -90,6 +92,16 @@ export default function ManualActivityGradingPage() {
           const [result, activityResult] = await Promise.all([
             mcqClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
               participantId: row.participantId
+            }),
+            api.groupActivity(courseId, row.groupId, row.activityId)
+          ]);
+          return { row, attempts: sortAttemptsByDisplayedTimestamp(result.attempts), activityConfig: activityResult.activity.config ?? {} };
+        }
+        if (row.activityTypeKey === "coding-homework-grader") {
+          const [result, activityResult] = await Promise.all([
+            codingHomeworkClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
+              participantId: row.participantId,
+              includeAttempts: false
             }),
             api.groupActivity(courseId, row.groupId, row.activityId)
           ]);
@@ -163,7 +175,7 @@ export default function ManualActivityGradingPage() {
     return () => {
       cancelled = true;
     };
-  }, [courseId, mcqClient, notifications, pageRows, parsonsClient, t]);
+  }, [codingHomeworkClient, courseId, mcqClient, notifications, pageRows, parsonsClient, t]);
 
   async function saveCurrentPage() {
     setSaving(true);
@@ -404,6 +416,20 @@ export default function ManualActivityGradingPage() {
                           <pre key={block.id} style={{ marginLeft: `${block.currentIndent * 18}px` }}>
                             {block.displayText}
                           </pre>
+                        ))}
+                      </div>
+                    ) : selectedAttempt && "questions" in selectedAttempt ? (
+                      <div className="stack">
+                        {selectedAttempt.questions.map((question) => (
+                          <article
+                            className="stack"
+                            key={question.id}
+                            style={{ border: "1px solid rgba(13, 27, 71, 0.12)", borderRadius: 10, gap: 12, padding: 16 }}
+                          >
+                            <p className="eyebrow" style={{ margin: 0 }}>Question {question.orderIndex + 1}</p>
+                            <strong>{question.questionText}</strong>
+                            <p style={{ whiteSpace: "pre-wrap" }}>{question.studentAnswer || "-"}</p>
+                          </article>
                         ))}
                       </div>
                     ) : (

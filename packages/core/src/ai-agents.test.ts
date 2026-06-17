@@ -12,6 +12,12 @@ const mockPrisma = vi.hoisted(() => ({
   course: {
     findUnique: vi.fn()
   },
+  courseGroupParticipant: {
+    findFirst: vi.fn()
+  },
+  courseMembership: {
+    findMany: vi.fn()
+  },
   user: {
     findUnique: vi.fn(),
     update: vi.fn()
@@ -26,6 +32,7 @@ vi.mock("@cognelo/db", () => ({
 const {
   createAiAgentConnection,
   deleteAiAgentConnection,
+  getCourseTeacherQuestionAuthoringAiAgentConnection,
   getCourseStudentSupportAiAgentConnection,
   generateQuestionAuthoringText,
   getQuestionAuthoringAiAgentConnection,
@@ -55,6 +62,8 @@ const connectionId = "clx0000000000000000000000";
 describe("AI agent services", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue({ id: "participant-1" });
+    mockPrisma.courseMembership.findMany.mockResolvedValue([]);
   });
 
   it("prevents non-admin users from creating global connections", async () => {
@@ -212,6 +221,36 @@ describe("AI agent services", () => {
     await expect(getCourseStudentSupportAiAgentConnection(adminUser, "course-1")).rejects.toMatchObject({
       status: 400,
       code: "AI_AGENT_NOT_CONFIGURED"
+    });
+  });
+
+  it("gets a course teacher question-authoring connection for student-triggered course work", async () => {
+    mockPrisma.course.findUnique.mockResolvedValue({
+      createdById: "teacher-1",
+      memberships: [
+        {
+          role: "teacher",
+          userId: "teacher-1",
+          user: { metadata: { aiPreferences: { questionAuthoringAiAgentConnectionId: connectionId } } }
+        }
+      ]
+    });
+    mockPrisma.aiAgentConnection.findFirst.mockResolvedValue({
+      id: "teacher-agent",
+      ownerId: "teacher-1",
+      provider: "openai",
+      apiKey: "secret"
+    });
+
+    await expect(getCourseTeacherQuestionAuthoringAiAgentConnection({ ...teacherUser, id: "student-1", roles: ["student"] }, "course-1")).resolves.toMatchObject({
+      id: "teacher-agent"
+    });
+    expect(mockPrisma.aiAgentConnection.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: connectionId,
+        isEnabled: true,
+        OR: [{ ownerId: "teacher-1" }, { ownerId: null }]
+      }
     });
   });
 

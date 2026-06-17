@@ -1,5 +1,6 @@
 import type { PluginRouteDefinition, PluginRouteContext } from "@cognelo/activity-sdk/server";
 import { AppError, assertCanManageActivityBank, assertCanManageCourse } from "@cognelo/core";
+import { prisma as corePrisma } from "@cognelo/db";
 import { analyzeCodingHomeworkSubmission } from "./analysis";
 import { saveCodingHomeworkChallengeAnswers } from "./challenge-answers";
 import {
@@ -15,6 +16,7 @@ import {
   generateCodingHomeworkChallengeQuestionsForStudentSubmission,
   toStudentChallengeGenerationResult
 } from "./generation";
+import { prisma } from "./db-client";
 import { runCodingHomeworkPreflight } from "./preflight";
 import { searchCodingHomeworkReferenceContent } from "./reference-search";
 import { getCodingHomeworkStudentAssignment, getLatestCodingHomeworkSubmission, runCodingHomeworkSubmission } from "./submission";
@@ -248,7 +250,195 @@ export const codingHomeworkChallengeAnswersRoute: PluginRouteDefinition = {
       return saveCodingHomeworkChallengeAnswers(resolveStudentSubmissionScope(context), await readJson(), { finalize: false });
     },
     POST: async ({ context, readJson }) => {
-      return saveCodingHomeworkChallengeAnswers(resolveStudentSubmissionScope(context), await readJson(), { finalize: true });
+      return saveCodingHomeworkChallengeAnswers(resolveStudentSubmissionScope(context), await readJson(), {
+        finalize: true,
+        gradebook: {
+          assessmentMode: typeof context.activity.assignment?.metadata?.assessmentMode === "string"
+            ? context.activity.assignment.metadata.assessmentMode
+            : null,
+          pluginVersion: "0.1.0"
+        }
+      });
     }
   }
 };
+
+export const codingHomeworkGradebookAttemptsRoute: PluginRouteDefinition = {
+  path: "coding-homework-grader/gradebook-attempts",
+  activityTypeKeys: ["coding-homework-grader"],
+  methods: {
+    GET: async ({ context, request }) => {
+      const courseId = requireCourseId(context.courseId);
+      if (!context.groupId) {
+        throw new AppError(400, "GROUP_CONTEXT_REQUIRED", "Gradebook attempts require a group activity context.");
+      }
+      await assertCanManageCourse(context.user, courseId);
+
+      const participantId = new URL(request.url).searchParams.get("participantId");
+      if (!participantId) {
+        throw new AppError(400, "PARTICIPANT_REQUIRED", "A participant is required.");
+      }
+
+      const participant = await corePrisma.courseGroupParticipant.findFirst({
+        where: {
+          id: participantId,
+          groupId: context.groupId,
+          role: "student"
+        },
+        select: {
+          id: true,
+          userId: true,
+          firstName: true,
+          lastName: true,
+          email: true
+        }
+      });
+      if (!participant) {
+        throw new AppError(404, "PARTICIPANT_NOT_FOUND", "The participant was not found.");
+      }
+      if (!participant.userId) {
+        return { participant, attempts: [] };
+      }
+
+      const includeAttempts = new URL(request.url).searchParams.get("includeAttempts") === "true";
+      const submissions = await listCodingHomeworkGradebookSubmissions({
+        activityId: context.activity.id,
+        groupId: context.groupId,
+        includeAttempts,
+        userId: participant.userId
+      });
+
+      const coreAttemptIds = submissions.map((submission) => submission.coreAttemptId).filter((id): id is string => Boolean(id));
+      const coreAttempts = coreAttemptIds.length
+        ? await corePrisma.activityAttempt.findMany({
+            where: {
+              id: { in: coreAttemptIds },
+              courseId,
+              groupId: context.groupId,
+              activityId: context.activity.id,
+              participantId,
+              pluginKey: "coding-homework-grader",
+              lifecycle: { not: "deleted" }
+            },
+            select: {
+              id: true,
+              attemptNumber: true,
+              lifecycle: true,
+              submittedAt: true,
+              gradedAt: true
+            }
+          })
+        : [];
+      const coreAttemptById = new Map(coreAttempts.map((attempt) => [attempt.id, attempt]));
+
+      return {
+        participant,
+        attempts: submissions.map((submission) => toGradebookSubmissionRecord(submission, coreAttemptById.get(submission.coreAttemptId ?? "")))
+      };
+    }
+  }
+};
+
+async function listCodingHomeworkGradebookSubmissions(input: {
+  activityId: string;
+  groupId: string;
+  includeAttempts: boolean;
+  userId: string;
+}) {
+  return prisma.pluginCodingHomeworkSubmission.findMany({
+    where: {
+      activityId: input.activityId,
+      groupId: input.groupId,
+      kind: "final",
+      userId: input.userId,
+      ...(input.includeAttempts
+        ? {}
+        : {
+            coreAttemptId: { not: null },
+            status: { in: ["ready_for_grading", "graded"] }
+          })
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      files: { orderBy: { path: "asc" } },
+      functions: {
+        include: { file: true },
+        orderBy: [{ selectedForQuestion: "desc" }, { functionName: "asc" }]
+      },
+      questions: { orderBy: { orderIndex: "asc" } },
+      reviews: { orderBy: { createdAt: "desc" } }
+    }
+  });
+}
+
+function toGradebookSubmissionRecord(
+  submission: Awaited<ReturnType<typeof listCodingHomeworkGradebookSubmissions>>[number],
+  coreAttempt?: { attemptNumber: number; lifecycle: string; submittedAt: Date | string | null; gradedAt: Date | string | null }
+) {
+  return {
+    id: submission.id,
+    attemptNumber: coreAttempt?.attemptNumber ?? null,
+    coreAttemptId: submission.coreAttemptId,
+    createdAt: submission.createdAt.toISOString(),
+    gradedAt: toIsoString(coreAttempt?.gradedAt ?? null),
+    lifecycle: coreAttempt?.lifecycle ?? (submission.coreAttemptId ? "submitted" : "plugin_only"),
+    metadata: normalizeObject(submission.metadata),
+    status: submission.status,
+    submittedAt: toIsoString(coreAttempt?.submittedAt ?? submission.updatedAt),
+    files: submission.files.map((file) => ({
+      id: file.id,
+      path: file.path,
+      languageKey: file.languageKey,
+      sizeBytes: Number(file.sizeBytes),
+      sha256: file.sha256,
+      metadata: normalizeObject(file.metadata)
+    })),
+    functions: submission.functions.map((fn) => ({
+      id: fn.id,
+      fileId: fn.fileId,
+      filePath: fn.file.path,
+      functionCode: fn.functionCode,
+      functionName: fn.functionName,
+      nearestExamples: normalizeArray(fn.nearestExamples),
+      divergenceScore: fn.divergenceScore,
+      selectedForQuestion: fn.selectedForQuestion
+    })),
+    questions: submission.questions.map((question) => ({
+      id: question.id,
+      answerSubmittedAt: toIsoString(question.answerSubmittedAt),
+      generationModel: question.generationModel,
+      metadata: normalizeObject(question.metadata),
+      nearestExamples: normalizeArray(question.nearestExamples),
+      orderIndex: question.orderIndex,
+      questionText: question.questionText,
+      studentAnswer: question.studentAnswer,
+      submissionFunctionId: question.submissionFunctionId
+    })),
+    reviews: submission.reviews.map((review) => ({
+      id: review.id,
+      createdAt: review.createdAt.toISOString(),
+      feedback: review.feedback,
+      maxScore: review.maxScore,
+      metadata: normalizeObject(review.metadata),
+      reviewerUserId: review.reviewerUserId,
+      rubric: normalizeObject(review.rubric),
+      score: review.score,
+      updatedAt: review.updatedAt.toISOString()
+    }))
+  };
+}
+
+function normalizeObject(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function normalizeArray(value: unknown) {
+  return Array.isArray(value) ? value : [];
+}
+
+function toIsoString(value: Date | string | null) {
+  if (!value) {
+    return null;
+  }
+  return typeof value === "string" ? value : value.toISOString();
+}

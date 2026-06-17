@@ -64,7 +64,7 @@ export default function CourseDetailPage() {
   const courseId = params.courseId;
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { locale, t } = useI18n();
   const [course, setCourse] = useState<Course | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
@@ -256,14 +256,15 @@ export default function CourseDetailPage() {
 
   const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
   const canManage = user?.roles.includes("admin") || membershipRole === "owner" || membershipRole === "teacher";
+  const studentRedirectGroupId = course && !canManage ? course.groups?.[0]?.id : null;
   const gradebookActivities = buildGradebookActivitySummaries(gradebook?.items ?? [], gradebook?.rows ?? []);
   const gradebookOverview = buildGradebookOverview(gradebookActivities);
 
   useEffect(() => {
-    if (course && !canManage && course.groups?.[0]?.id) {
-      router.replace(`/courses/${courseId}/groups/${course.groups[0].id}`);
+    if (studentRedirectGroupId) {
+      router.replace(`/courses/${courseId}/groups/${studentRedirectGroupId}`);
     }
-  }, [canManage, course, courseId, router]);
+  }, [courseId, router, studentRedirectGroupId]);
 
   useEffect(() => {
     if (!showActivityPicker) {
@@ -692,11 +693,32 @@ export default function CourseDetailPage() {
     setSelectedActivityPickerTab(visibleActivityCategories[0]?.id ?? "activity-banks");
   }, [selectedActivityPickerTab, visibleActivityCategories]);
 
-  if (course && !canManage) {
+  if (((authLoading || !course) && !canManage) || studentRedirectGroupId) {
     return (
       <AppShell>
         <main className="page stack">
           <p>{t("common.loading")}</p>
+        </main>
+      </AppShell>
+    );
+  }
+
+  if (course && !canManage) {
+    return (
+      <AppShell>
+        <main className="page stack">
+          <section className="hero-panel hero-panel-compact">
+            <div className="hero-meta">
+              <p className="eyebrow">{t("courseDetail.groupsEyebrow")}</p>
+              <h1>{course.title}</h1>
+              <p className="muted">{t("courseDetail.noAvailableGroups")}</p>
+            </div>
+            <div className="hero-actions">
+              <Link className="button secondary" href="/courses">
+                {t("courseDetail.backToCourses")}
+              </Link>
+            </div>
+          </section>
         </main>
       </AppShell>
     );

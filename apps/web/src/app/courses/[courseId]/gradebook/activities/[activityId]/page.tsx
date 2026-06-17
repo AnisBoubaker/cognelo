@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useNotifications } from "@cognelo/activity-ui";
+import { createCodingHomeworkGraderClient, type CodingHomeworkGradebookAttemptRecord } from "@cognelo/plugin-coding-homework-grader";
 import { createMcqClient, type McqSubmission } from "@cognelo/plugin-mcq";
 import { createParsonsClient, type ParsonsGradebookAttemptRecord } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
@@ -19,7 +20,7 @@ import {
 import { getManualGradingRenderer } from "@/lib/activity-renderers";
 import { useI18n } from "@/lib/i18n";
 
-type GradebookReviewAttempt = ParsonsGradebookAttemptRecord | McqSubmission;
+type GradebookReviewAttempt = ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord;
 
 export default function GradebookActivityResultsPage() {
   const params = useParams<{ courseId: string; activityId: string }>();
@@ -28,6 +29,7 @@ export default function GradebookActivityResultsPage() {
   const groupId = searchParams.get("groupId") || undefined;
   const { locale, t } = useI18n();
   const notifications = useNotifications();
+  const codingHomeworkClient = useMemo(() => createCodingHomeworkGraderClient(apiRequest), []);
   const mcqClient = useMemo(() => createMcqClient(apiRequest), []);
   const parsonsClient = useMemo(() => createParsonsClient(apiRequest), []);
   const [course, setCourse] = useState<Course | null>(null);
@@ -78,6 +80,11 @@ export default function GradebookActivityResultsPage() {
           ? mcqClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
               participantId: row.participantId
             })
+          : row.activityTypeKey === "coding-homework-grader"
+            ? codingHomeworkClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
+                participantId: row.participantId,
+                includeAttempts
+              })
           : parsonsClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
               participantId: row.participantId,
               includeAttempts
@@ -246,8 +253,10 @@ export default function GradebookActivityResultsPage() {
   }
 
   async function regradeAllRows() {
-    const rowsWithAttempts = groupedRows.filter((row) =>
-      row.attempts.some((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted")
+    const rowsWithAttempts = groupedRows.filter(
+      (row) =>
+        row.activityTypeKey !== "coding-homework-grader" &&
+        row.attempts.some((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted")
     );
     if (!rowsWithAttempts.length) {
       notifications.error(t("courseDetail.regradeUnavailable"));
@@ -408,6 +417,7 @@ function GradebookStudentRow({
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const rowHasSubmittedAttempt = hasSubmittedAttempt(row);
+  const regradeAvailable = row.activityTypeKey !== "coding-homework-grader";
 
   return (
     <div className="table-row table-row-gradebook-detail">
@@ -428,7 +438,7 @@ function GradebookStudentRow({
         )}
         <button
           className="button secondary"
-          disabled={!rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:regrade`}
+          disabled={!regradeAvailable || !rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:regrade`}
           type="button"
           onClick={() => onRegrade(row)}
         >
