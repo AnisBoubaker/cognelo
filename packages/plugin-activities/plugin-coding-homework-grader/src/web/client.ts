@@ -281,6 +281,20 @@ export type CodingHomeworkChallengeAnswerResult = {
   submission: CodingHomeworkSubmissionRecord;
 };
 
+export type CodingHomeworkProcessingJobRecord = {
+  id: string;
+  attempts: number;
+  completedAt: string | null;
+  createdAt: string;
+  error: Record<string, unknown> | null;
+  failedAt: string | null;
+  handlerKey: string;
+  queue: string;
+  result: Record<string, unknown> | null;
+  status: string;
+  updatedAt: string;
+};
+
 export type CodingHomeworkGradebookAttemptRecord = {
   id: string;
   attemptNumber: number | null;
@@ -338,16 +352,19 @@ export type CodingHomeworkSubmissionResult = {
   challenge?: CodingHomeworkStudentChallengeGenerationResult;
   files: CodingHomeworkSubmissionFileRecord[];
   idempotent?: boolean;
+  processingJob?: CodingHomeworkProcessingJobRecord | null;
   questions?: CodingHomeworkStudentChallengeQuestionRecord[];
   submission: CodingHomeworkSubmissionRecord;
   summary: CodingHomeworkPreflightSummary;
 };
 
 export type CodingHomeworkReprocessResult = {
-  analysis: CodingHomeworkAnalysisResult;
-  generation: CodingHomeworkChallengeGenerationResult;
-  questions: CodingHomeworkChallengeQuestionRecord[];
+  processingJob: CodingHomeworkProcessingJobRecord | null;
   submission: CodingHomeworkSubmissionRecord;
+};
+
+export type CodingHomeworkProcessingJobResult = {
+  processingJob: CodingHomeworkProcessingJobRecord | null;
 };
 
 export type CodingHomeworkLatestSubmissionResult = {
@@ -443,6 +460,12 @@ export function createCodingHomeworkGraderClient(request: Requester) {
       request<CodingHomeworkLatestSubmissionResult>(
         `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-homework-grader/submission`
       ),
+    getGroupProcessingJob: (courseId: string, groupId: string, activityId: string, jobId: string) => {
+      const params = new URLSearchParams({ jobId });
+      return request<CodingHomeworkProcessingJobResult>(
+        `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-homework-grader/processing-job?${params.toString()}`
+      );
+    },
     submitGroupSubmission: (courseId: string, groupId: string, activityId: string, input: CodingHomeworkUploadInput) =>
       request<CodingHomeworkSubmissionResult>(
         `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-homework-grader/submission`,
