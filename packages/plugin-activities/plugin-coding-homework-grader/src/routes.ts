@@ -1,5 +1,5 @@
 import type { PluginRouteDefinition, PluginRouteContext } from "@cognelo/activity-sdk/server";
-import { AppError, assertCanManageActivityBank, assertCanManageCourse } from "@cognelo/core";
+import { AppError, assertCanManageActivityBank, assertCanManageCourse, getBackgroundJob } from "@cognelo/core";
 import { prisma as corePrisma } from "@cognelo/db";
 import { analyzeCodingHomeworkSubmission } from "./analysis";
 import { saveCodingHomeworkChallengeAnswers } from "./challenge-answers";
@@ -11,12 +11,9 @@ import {
 } from "./authoring";
 import { buildCodingHomeworkDocumentationPreview, createCodingHomeworkDocumentationSnapshot } from "./documentation";
 import { extractCodingHomeworkDocumentationSnapshot } from "./extraction";
-import {
-  generateCodingHomeworkChallengeQuestions,
-  generateCodingHomeworkChallengeQuestionsForStudentSubmission,
-  toStudentChallengeGenerationResult
-} from "./generation";
+import { generateCodingHomeworkChallengeQuestions } from "./generation";
 import { prisma } from "./db-client";
+import { enqueueCodingHomeworkSubmissionProcessing } from "./background-processing";
 import { runCodingHomeworkPreflight } from "./preflight";
 import { searchCodingHomeworkReferenceContent } from "./reference-search";
 import { getCodingHomeworkStudentAssignment, getLatestCodingHomeworkSubmission, runCodingHomeworkSubmission } from "./submission";
@@ -34,7 +31,7 @@ function normalizeReprocessInput(input: unknown) {
   if (!submissionId) {
     throw new AppError(400, "CODING_HOMEWORK_SUBMISSION_REQUIRED", "A submission id is required.");
   }
-  const locale = record.locale === "fr" || record.locale === "zh" || record.locale === "ar" ? record.locale : "en";
+  const locale = normalizeLocale(record.locale);
   return { locale, submissionId };
 }
 
@@ -221,19 +218,14 @@ export const codingHomeworkSubmissionRoute: PluginRouteDefinition = {
       ) {
         return submissionResult;
       }
-      const analysis = await analyzeCodingHomeworkSubmission(scope, { submissionId: submissionResult.submission.id });
-      const challenge = toStudentChallengeGenerationResult(
-        await generateCodingHomeworkChallengeQuestionsForStudentSubmission(scope, {
-          ...(input && typeof input === "object" && !Array.isArray(input) ? input : {}),
-          submissionId: analysis.submission.id
-        })
-      );
+      const job = await enqueueCodingHomeworkSubmissionProcessing(scope, {
+        locale: input && typeof input === "object" && !Array.isArray(input) ? normalizeLocale((input as Record<string, unknown>).locale) : "en",
+        mode: "student",
+        submissionId: submissionResult.submission.id
+      });
       return {
         ...submissionResult,
-        analysis,
-        challenge,
-        questions: challenge.questions,
-        submission: challenge.submission
+        processingJob: toProcessingJobRecord(job)
       };
     }
   }
@@ -264,17 +256,40 @@ export const codingHomeworkReprocessRoute: PluginRouteDefinition = {
         throw new AppError(400, "CODING_HOMEWORK_SUBMISSION_INVALID_STRUCTURE", "Fix the submission structure before reprocessing.");
       }
 
-      const analysis = await analyzeCodingHomeworkSubmission(scope, { submissionId: submission.id });
-      const generation = await generateCodingHomeworkChallengeQuestions(scope, {
+      const job = await enqueueCodingHomeworkSubmissionProcessing(scope, {
         locale: input.locale,
-        submissionId: analysis.submission.id
+        mode: "teacher",
+        submissionId: submission.id
       });
       return {
-        analysis,
-        generation,
-        questions: generation.questions,
-        submission: generation.submission
+        processingJob: toProcessingJobRecord(job),
+        submission
       };
+    }
+  }
+};
+
+export const codingHomeworkProcessingJobRoute: PluginRouteDefinition = {
+  path: "coding-homework-grader/processing-job",
+  activityTypeKeys: ["coding-homework-grader"],
+  methods: {
+    GET: async ({ context, request }) => {
+      resolveStudentSubmissionScope(context);
+      const jobId = new URL(request.url).searchParams.get("jobId")?.trim();
+      if (!jobId) {
+        throw new AppError(400, "BACKGROUND_JOB_REQUIRED", "A background job id is required.");
+      }
+      const job = await getBackgroundJob(jobId);
+      if (
+        !job ||
+        job.metadata.pluginKey !== "coding-homework-grader" ||
+        job.metadata.activityId !== context.activity.id ||
+        job.metadata.groupId !== context.groupId ||
+        job.metadata.userId !== context.user.id
+      ) {
+        throw new AppError(404, "BACKGROUND_JOB_NOT_FOUND", "The processing job was not found.");
+      }
+      return { processingJob: toProcessingJobRecord(job) };
     }
   }
 };
@@ -288,6 +303,29 @@ export const codingHomeworkSubmissionAnalysisRoute: PluginRouteDefinition = {
     }
   }
 };
+
+function normalizeLocale(value: unknown): "en" | "fr" | "zh" | "ar" {
+  return value === "fr" || value === "zh" || value === "ar" ? value : "en";
+}
+
+function toProcessingJobRecord(job: Awaited<ReturnType<typeof getBackgroundJob>>) {
+  if (!job) {
+    return null;
+  }
+  return {
+    attempts: job.attempts,
+    completedAt: job.completedAt?.toISOString() ?? null,
+    createdAt: job.createdAt.toISOString(),
+    error: job.error,
+    failedAt: job.failedAt?.toISOString() ?? null,
+    handlerKey: job.handlerKey,
+    id: job.id,
+    queue: job.queue,
+    result: job.result,
+    status: job.status,
+    updatedAt: job.updatedAt.toISOString()
+  };
+}
 
 export const codingHomeworkChallengeGenerationRoute: PluginRouteDefinition = {
   path: "coding-homework-grader/challenge-generation",

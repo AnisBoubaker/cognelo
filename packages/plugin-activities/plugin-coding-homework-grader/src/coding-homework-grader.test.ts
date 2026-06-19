@@ -19,9 +19,12 @@ describe("coding homework grader plugin manifest", () => {
       "coding-homework-grader/preflight",
       "coding-homework-grader/assignment",
       "coding-homework-grader/submission",
+      "coding-homework-grader/processing-job",
       "coding-homework-grader/submission-analysis",
       "coding-homework-grader/challenge-generation",
-      "coding-homework-grader/challenge-answers"
+      "coding-homework-grader/challenge-answers",
+      "coding-homework-grader/gradebook-attempts",
+      "coding-homework-grader/reprocess"
     ]);
   });
 

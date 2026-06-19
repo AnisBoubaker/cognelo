@@ -262,6 +262,34 @@ export function CodingHomeworkGraderActivityView({
     };
   }, [activity.id, applyChallengeQuestions, canManage, copy.saveError, notifications, submissionClient]);
 
+  useEffect(() => {
+    if (canManage || !submissionClient || !latestSubmission || !isSubmissionProcessing(latestSubmission.submission.status) || challengeQuestions.length) {
+      return;
+    }
+
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const next = await submissionClient.getLatestSubmission(activity.id);
+        if (cancelled || !next) {
+          return;
+        }
+        setLatestSubmission(next);
+        applyChallengeQuestions(next.questions);
+      } catch {
+        // Keep polling; transient job/status checks should not interrupt the student.
+      }
+    };
+    const interval = window.setInterval(() => {
+      void refresh();
+    }, 2500);
+    void refresh();
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activity.id, applyChallengeQuestions, canManage, challengeQuestions.length, latestSubmission, submissionClient]);
+
   const loadDocumentationPreview = useCallback(
     async (options?: { notify?: boolean }) => {
       if (!authoringClient?.getDocumentationPreview) {
@@ -526,7 +554,7 @@ export function CodingHomeworkGraderActivityView({
       const questions = result.questions ?? [];
       setLatestSubmission({ files: result.files, questions, submission: result.submission });
       applyChallengeQuestions(questions);
-      notifications[result.summary.isValid ? "success" : "error"](result.summary.isValid ? (questions.length ? copy.challengesReady : copy.submissionReady) : copy.submissionInvalid);
+      notifications[result.summary.isValid ? "success" : "error"](result.summary.isValid ? (questions.length ? copy.challengesReady : copy.submissionProcessing) : copy.submissionInvalid);
     } catch (error) {
       notifications.error(error instanceof Error ? error.message : copy.submissionError);
     } finally {
@@ -931,14 +959,16 @@ function SubmissionPanel({
         ? copy.submissionComplete
         : currentSubmissionStatus === "challenge_ready"
           ? copy.challengesReady
-          : currentSubmissionStatus === "structure_valid"
-            ? copy.submissionReady
+          : currentSubmissionStatus === "structure_valid" || currentSubmissionStatus === "validating" || currentSubmissionStatus === "processing"
+            ? copy.submissionProcessing
             : currentSubmissionStatus === "invalid_structure"
               ? copy.submissionInvalid
+              : currentSubmissionStatus === "failed"
+                ? copy.submissionFailed
               : null;
   const isValid = submissionResult
     ? submissionResult.summary.isValid
-    : currentSubmissionStatus === "structure_valid" || currentSubmissionStatus === "challenge_ready" || currentSubmissionStatus === "ready_for_grading";
+    : currentSubmissionStatus === "structure_valid" || currentSubmissionStatus === "validating" || currentSubmissionStatus === "processing" || currentSubmissionStatus === "challenge_ready" || currentSubmissionStatus === "ready_for_grading";
   const fileCount = submissionResult?.files.length ?? latestSubmission?.files.length ?? 0;
   const uploadLocked = currentSubmissionStatus === "challenge_ready" || currentSubmissionStatus === "ready_for_grading";
 
@@ -953,6 +983,8 @@ function SubmissionPanel({
         {status ? <span className={isValid ? "status-pill is-enabled" : "status-pill is-disabled"}>{status}</span> : null}
       </div>
       {uploadLocked ? <p className="muted">{copy.submissionLocked}</p> : null}
+      {isSubmissionProcessing(currentSubmissionStatus) ? <p className="muted">{copy.submissionProcessingDetail}</p> : null}
+      {currentSubmissionStatus === "failed" && latestSubmission?.submission.processingError ? <p className="muted">{latestSubmission.submission.processingError}</p> : null}
       {latestSubmission ? (
         <p className="muted">
           {copy.latestSubmission}: {new Date(latestSubmission.submission.createdAt).toLocaleString()}
@@ -986,6 +1018,10 @@ function SubmissionPanel({
       ) : null}
     </div>
   );
+}
+
+function isSubmissionProcessing(status: string | null) {
+  return status === "validating" || status === "structure_valid" || status === "processing";
 }
 
 function ChallengeQuestionsPanel({

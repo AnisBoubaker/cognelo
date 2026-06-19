@@ -860,16 +860,16 @@ Acceptance:
 
 Deliverables:
 
-- Background job model or resumable processing service for long extraction/embedding/generation tasks. First slice complete with explicit teacher reprocess route; true background worker remains deferred.
+- Shared core background job model/resumable processing service for long extraction/embedding/generation tasks. Complete: core owns the durable `BackgroundJob` table/service, the API starts the default in-process worker, and the grader registers a plugin handler for submission analysis/question generation.
 - Idempotency keys for retries. Complete for student final ZIP submissions.
 - Processing status timeline. Complete for upload/extraction, analysis, and challenge generation metadata.
 - Logging and error categorization. Complete in submission metadata through categorized retryable/non-retryable processing errors.
-- Rate limiting and file size limits. File size limits already enforced by teacher requirements; centralized rate limiting remains deferred.
+- Rate limiting and file size limits. File size limits already enforced by teacher requirements; centralized rate limiting remains a separate platform policy item.
 
 Acceptance:
 
 - Failed processing can be retried without duplicate attempts/questions. Complete for analysis/question generation because retries replace derived function/question rows and use the new reprocess route.
-- Long-running processing does not block normal page requests. Partially complete: processing remains request-driven, but retry/replay is resumable/idempotent; true background queue is still future work.
+- Long-running processing does not block normal page requests. Complete for student final ZIP processing: uploads enqueue background work and the student view polls until challenge questions are ready or processing fails.
 
 ### Phase 15: Production Object Storage
 

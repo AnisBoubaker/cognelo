@@ -15,6 +15,7 @@ import {
   codingHomeworkDocumentationSnapshotRoute,
   codingHomeworkGradebookAttemptsRoute,
   codingHomeworkPreflightRoute,
+  codingHomeworkProcessingJobRoute,
   codingHomeworkReprocessRoute,
   codingHomeworkReferenceSearchRoute,
   codingHomeworkRequirementsUploadRoute,
@@ -22,6 +23,9 @@ import {
   codingHomeworkSubmissionAnalysisRoute,
   codingHomeworkSubmissionRoute
 } from "./routes";
+import { registerCodingHomeworkBackgroundJobs } from "./background-processing";
+
+registerCodingHomeworkBackgroundJobs();
 
 export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
   key: "coding-homework-grader",
@@ -36,6 +40,7 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
     codingHomeworkPreflightRoute,
     codingHomeworkStudentAssignmentRoute,
     codingHomeworkSubmissionRoute,
+    codingHomeworkProcessingJobRoute,
     codingHomeworkSubmissionAnalysisRoute,
     codingHomeworkChallengeGenerationRoute,
     codingHomeworkChallengeAnswersRoute,

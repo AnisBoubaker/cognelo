@@ -16,12 +16,16 @@ vi.mock("./routes", () => ({
   codingHomeworkDocumentationSnapshotRoute: { path: "documentation-snapshot", methods: {} },
   codingHomeworkGradebookAttemptsRoute: { path: "gradebook-attempts", methods: {} },
   codingHomeworkPreflightRoute: { path: "preflight", methods: {} },
+  codingHomeworkProcessingJobRoute: { path: "processing-job", methods: {} },
   codingHomeworkReprocessRoute: { path: "reprocess", methods: {} },
   codingHomeworkReferenceSearchRoute: { path: "reference-search", methods: {} },
   codingHomeworkRequirementsUploadRoute: { path: "requirements-upload", methods: {} },
   codingHomeworkStudentAssignmentRoute: { path: "assignment", methods: {} },
   codingHomeworkSubmissionAnalysisRoute: { path: "submission-analysis", methods: {} },
   codingHomeworkSubmissionRoute: { path: "submission", methods: {} }
+}));
+vi.mock("./background-processing", () => ({
+  registerCodingHomeworkBackgroundJobs: vi.fn()
 }));
 
 const { codingHomeworkGraderServerPlugin } = await import("./server");

@@ -106,6 +106,14 @@ enum GradeEventType {
   submission_deleted
 }
 
+enum BackgroundJobStatus {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+}
+
 model User {
   id                      String                   @id @default(cuid())
   email                   String                   @unique
@@ -137,6 +145,33 @@ model User {
   gradeEvents             GradeEvent[]             @relation("GradeEventActor")
 
   @@index([email])
+}
+
+model BackgroundJob {
+  id             String              @id
+  queue          String              @default("default")
+  handlerKey     String
+  status         BackgroundJobStatus @default(queued)
+  priority       Int                 @default(0)
+  payload        Json                @default("{}")
+  result         Json?
+  error          Json?
+  metadata       Json                @default("{}")
+  idempotencyKey String?
+  attempts       Int                 @default(0)
+  maxAttempts    Int                 @default(3)
+  runAfter       DateTime            @default(now())
+  lockedAt       DateTime?
+  lockedBy       String?
+  completedAt    DateTime?
+  failedAt       DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([queue, idempotencyKey])
+  @@index([status, runAfter, priority])
+  @@index([queue, status, runAfter])
+  @@index([handlerKey])
 }
 
 model AiAgentConnection {
