@@ -10,6 +10,7 @@ import {
 import type { CurrentUser } from "@cognelo/contracts";
 import { codingHomeworkChallengePromptVersion } from "./algorithm";
 import { Prisma, prisma } from "./db-client";
+import { appendProcessingEvent, buildProcessingEvent, buildProcessingOperationId, processingFailureMetadata } from "./processing";
 
 type GenerationScope = {
   activityId: string;
@@ -121,9 +122,21 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
     throw new AppError(400, "CODING_HOMEWORK_CANDIDATES_EMPTY", "Analyze the submission and select candidate functions before generating questions.");
   }
 
+  const operationId = buildProcessingOperationId("challenge-generation", submission.id);
   await prisma.pluginCodingHomeworkSubmission.update({
     where: { id: submission.id },
-    data: { status: "processing", processingError: null }
+    data: {
+      metadata: appendProcessingEvent(
+        submission.metadata,
+        buildProcessingEvent({
+          operationId,
+          stage: "challenge-generation",
+          status: "started"
+        })
+      ) as Prisma.InputJsonValue,
+      status: "processing",
+      processingError: null
+    }
   });
 
   try {
@@ -192,7 +205,14 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
       where: { id: submission.id },
       data: {
         metadata: {
-          ...normalizeObject(submission.metadata),
+          ...appendProcessingEvent(
+            submission.metadata,
+            buildProcessingEvent({
+              operationId,
+              stage: "challenge-generation",
+              status: "completed"
+            })
+          ),
           challengeGeneration: generation
         } as Prisma.InputJsonValue,
         processingError: null,
@@ -206,10 +226,12 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
       submission: toSubmissionRecord(updatedSubmission)
     };
   } catch (error) {
+    const failure = processingFailureMetadata(submission.metadata, "challenge-generation", error, operationId);
     await prisma.pluginCodingHomeworkSubmission.update({
       where: { id: submission.id },
       data: {
-        processingError: error instanceof Error ? error.message : "Challenge question generation failed.",
+        metadata: failure.metadata as Prisma.InputJsonValue,
+        processingError: failure.processingError.message,
         status: "failed"
       }
     });

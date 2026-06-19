@@ -860,16 +860,16 @@ Acceptance:
 
 Deliverables:
 
-- Background job model or resumable processing service for long extraction/embedding/generation tasks.
-- Idempotency keys for retries.
-- Processing status timeline.
-- Logging and error categorization.
-- Rate limiting and file size limits.
+- Background job model or resumable processing service for long extraction/embedding/generation tasks. First slice complete with explicit teacher reprocess route; true background worker remains deferred.
+- Idempotency keys for retries. Complete for student final ZIP submissions.
+- Processing status timeline. Complete for upload/extraction, analysis, and challenge generation metadata.
+- Logging and error categorization. Complete in submission metadata through categorized retryable/non-retryable processing errors.
+- Rate limiting and file size limits. File size limits already enforced by teacher requirements; centralized rate limiting remains deferred.
 
 Acceptance:
 
-- Failed processing can be retried without duplicate attempts/questions.
-- Long-running processing does not block normal page requests.
+- Failed processing can be retried without duplicate attempts/questions. Complete for analysis/question generation because retries replace derived function/question rows and use the new reprocess route.
+- Long-running processing does not block normal page requests. Partially complete: processing remains request-driven, but retry/replay is resumable/idempotent; true background queue is still future work.
 
 ### Phase 15: Production Object Storage
 

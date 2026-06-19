@@ -337,9 +337,17 @@ export type CodingHomeworkSubmissionResult = {
   analysis?: CodingHomeworkAnalysisResult;
   challenge?: CodingHomeworkStudentChallengeGenerationResult;
   files: CodingHomeworkSubmissionFileRecord[];
+  idempotent?: boolean;
   questions?: CodingHomeworkStudentChallengeQuestionRecord[];
   submission: CodingHomeworkSubmissionRecord;
   summary: CodingHomeworkPreflightSummary;
+};
+
+export type CodingHomeworkReprocessResult = {
+  analysis: CodingHomeworkAnalysisResult;
+  generation: CodingHomeworkChallengeGenerationResult;
+  questions: CodingHomeworkChallengeQuestionRecord[];
+  submission: CodingHomeworkSubmissionRecord;
 };
 
 export type CodingHomeworkLatestSubmissionResult = {
@@ -485,6 +493,19 @@ export function createCodingHomeworkGraderClient(request: Requester) {
           body: JSON.stringify(input ?? {})
         }
       ),
+    reprocessGroupSubmission: (
+      courseId: string,
+      groupId: string,
+      activityId: string,
+      input: { locale?: "en" | "fr" | "zh" | "ar"; submissionId: string }
+    ) =>
+      request<CodingHomeworkReprocessResult>(
+        `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-homework-grader/reprocess`,
+        {
+          method: "POST",
+          body: JSON.stringify(input)
+        }
+      ),
     groupGradebookAttempts: (
       courseId: string,
       groupId: string,
@@ -540,6 +561,7 @@ export function createCodingHomeworkGraderClient(request: Requester) {
 export type CodingHomeworkUploadInput = {
   base64: string;
   fileName: string;
+  idempotencyKey?: string;
   locale?: "en" | "fr" | "zh" | "ar";
   mimeType?: string;
 };

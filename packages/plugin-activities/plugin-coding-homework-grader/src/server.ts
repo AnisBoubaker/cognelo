@@ -15,6 +15,7 @@ import {
   codingHomeworkDocumentationSnapshotRoute,
   codingHomeworkGradebookAttemptsRoute,
   codingHomeworkPreflightRoute,
+  codingHomeworkReprocessRoute,
   codingHomeworkReferenceSearchRoute,
   codingHomeworkRequirementsUploadRoute,
   codingHomeworkStudentAssignmentRoute,
@@ -38,7 +39,8 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
     codingHomeworkSubmissionAnalysisRoute,
     codingHomeworkChallengeGenerationRoute,
     codingHomeworkChallengeAnswersRoute,
-    codingHomeworkGradebookAttemptsRoute
+    codingHomeworkGradebookAttemptsRoute,
+    codingHomeworkReprocessRoute
   ],
   grading: {
     gradeAttempt: async ({ activityId, pluginAttemptRef }) => {

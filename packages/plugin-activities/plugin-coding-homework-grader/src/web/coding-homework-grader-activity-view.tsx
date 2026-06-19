@@ -57,7 +57,7 @@ type SubmissionClient = {
   ) => Promise<{ questions: CodingHomeworkStudentChallengeQuestionRecord[]; submission: CodingHomeworkSubmissionRecord }>;
   getAssignment: (activityId: string) => Promise<CodingHomeworkStudentAssignment>;
   getLatestSubmission: (activityId: string) => Promise<CodingHomeworkLatestSubmissionResult>;
-  submit: (activityId: string, input: { base64: string; fileName: string; locale?: CodingHomeworkLocale; mimeType?: string }) => Promise<CodingHomeworkSubmissionResult>;
+  submit: (activityId: string, input: { base64: string; fileName: string; idempotencyKey?: string; locale?: CodingHomeworkLocale; mimeType?: string }) => Promise<CodingHomeworkSubmissionResult>;
   submitAnswers: (
     activityId: string,
     input: { answers: Array<{ questionId: string; answer: string }>; submissionId?: string | null }
@@ -517,7 +517,11 @@ export function CodingHomeworkGraderActivityView({
 
     setSubmitting(true);
     try {
-      const result = await submissionClient.submit(activity.id, { ...(await fileToUploadInput(file)), locale });
+      const result = await submissionClient.submit(activity.id, {
+        ...(await fileToUploadInput(file)),
+        idempotencyKey: uploadIdempotencyKey(activity.id, file),
+        locale
+      });
       setSubmissionResult(result);
       const questions = result.questions ?? [];
       setLatestSubmission({ files: result.files, questions, submission: result.submission });
@@ -1109,6 +1113,10 @@ function bufferToBase64(buffer: ArrayBuffer) {
     binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
   }
   return btoa(binary);
+}
+
+function uploadIdempotencyKey(activityId: string, file: File) {
+  return `submission:${activityId}:${file.name}:${file.size}:${file.lastModified}`.replace(/[^a-zA-Z0-9._:-]/g, "_").slice(0, 120);
 }
 
 function requirementsToDraft(requirements: CodingHomeworkAuthoringSubmissionRequirements): RequirementDraft {

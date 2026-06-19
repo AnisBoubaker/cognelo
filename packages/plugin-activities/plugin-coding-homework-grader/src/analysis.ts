@@ -6,6 +6,7 @@ import type { CurrentUser } from "@cognelo/contracts";
 import { z } from "zod";
 import { Prisma, prisma } from "./db-client";
 import { parseCodingHomeworkSourceFiles } from "./parsers";
+import { appendProcessingEvent, buildProcessingEvent, buildProcessingOperationId, processingFailureMetadata } from "./processing";
 
 type AnalysisScope = {
   activityId: string;
@@ -100,9 +101,21 @@ export async function analyzeCodingHomeworkSubmission(scope: AnalysisScope, inpu
     throw new AppError(400, "CODING_HOMEWORK_SUBMISSION_INVALID_STRUCTURE", "Fix the submission structure before analysis.");
   }
 
+  const operationId = buildProcessingOperationId("analysis", submission.id);
   await prisma.pluginCodingHomeworkSubmission.update({
     where: { id: submission.id },
-    data: { status: "processing", processingError: null }
+    data: {
+      metadata: appendProcessingEvent(
+        submission.metadata,
+        buildProcessingEvent({
+          operationId,
+          stage: "analysis",
+          status: "started"
+        })
+      ) as Prisma.InputJsonValue,
+      status: "processing",
+      processingError: null
+    }
   });
 
   try {
@@ -203,7 +216,14 @@ export async function analyzeCodingHomeworkSubmission(scope: AnalysisScope, inpu
       where: { id: submission.id },
       data: {
         metadata: {
-          ...normalizeObject(submission.metadata),
+          ...appendProcessingEvent(
+            submission.metadata,
+            buildProcessingEvent({
+              operationId,
+              stage: "analysis",
+              status: "completed"
+            })
+          ),
           analysis
         } as Prisma.InputJsonValue,
         processingError: null,
@@ -217,10 +237,12 @@ export async function analyzeCodingHomeworkSubmission(scope: AnalysisScope, inpu
       submission: toSubmissionRecord(updatedSubmission)
     };
   } catch (error) {
+    const failure = processingFailureMetadata(submission.metadata, "analysis", error, operationId);
     await prisma.pluginCodingHomeworkSubmission.update({
       where: { id: submission.id },
       data: {
-        processingError: error instanceof Error ? error.message : "Submission analysis failed.",
+        metadata: failure.metadata as Prisma.InputJsonValue,
+        processingError: failure.processingError.message,
         status: "failed"
       }
     });
