@@ -107,7 +107,16 @@ describe("coding homework challenge generation", () => {
     expect(coreMocks.generateAiAgentText).toHaveBeenCalledTimes(1);
     expect(dbMocks.pluginCodingHomeworkSubmission.update).toHaveBeenNthCalledWith(1, {
       where: { id: "submission-1" },
-      data: { status: "processing", processingError: null }
+      data: expect.objectContaining({
+        metadata: expect.objectContaining({
+          currentProcessingStep: "challenge-generation",
+          processingTimeline: expect.arrayContaining([
+            expect.objectContaining({ stage: "challenge-generation", status: "started" })
+          ])
+        }),
+        status: "processing",
+        processingError: null
+      })
     });
     expect(dbMocks.pluginCodingHomeworkChallengeQuestion.deleteMany).toHaveBeenCalledWith({ where: { submissionId: "submission-1" } });
     expect(dbMocks.pluginCodingHomeworkChallengeQuestion.create).toHaveBeenCalledWith({
@@ -269,10 +278,21 @@ describe("coding homework challenge generation", () => {
 
     expect(dbMocks.pluginCodingHomeworkSubmission.update).toHaveBeenLastCalledWith({
       where: { id: "submission-1" },
-      data: {
+      data: expect.objectContaining({
+        metadata: expect.objectContaining({
+          currentProcessingStep: null,
+          processingError: expect.objectContaining({
+            category: "generation",
+            code: "CODING_HOMEWORK_CHALLENGE_GENERATION_INVALID",
+            retryable: false
+          }),
+          processingTimeline: expect.arrayContaining([
+            expect.objectContaining({ stage: "challenge-generation", status: "failed" })
+          ])
+        }),
         processingError: "The AI agent could not generate a valid challenge question.",
         status: "failed"
-      }
+      })
     });
   });
 });

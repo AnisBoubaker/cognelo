@@ -28,6 +28,16 @@ function requireCourseId(courseId: string | undefined) {
   return courseId;
 }
 
+function normalizeReprocessInput(input: unknown) {
+  const record = input && typeof input === "object" && !Array.isArray(input) ? (input as Record<string, unknown>) : {};
+  const submissionId = typeof record.submissionId === "string" ? record.submissionId.trim() : "";
+  if (!submissionId) {
+    throw new AppError(400, "CODING_HOMEWORK_SUBMISSION_REQUIRED", "A submission id is required.");
+  }
+  const locale = record.locale === "fr" || record.locale === "zh" || record.locale === "ar" ? record.locale : "en";
+  return { locale, submissionId };
+}
+
 async function resolveOwner(context: PluginRouteContext) {
   if (context.activityBankId) {
     await assertCanManageActivityBank(context.user, context.activityBankId);
@@ -204,6 +214,13 @@ export const codingHomeworkSubmissionRoute: PluginRouteDefinition = {
       if (!submissionResult.summary.isValid) {
         return submissionResult;
       }
+      if (
+        submissionResult.idempotent &&
+        submissionResult.questions?.length &&
+        ["challenge_ready", "ready_for_grading", "graded"].includes(submissionResult.submission.status)
+      ) {
+        return submissionResult;
+      }
       const analysis = await analyzeCodingHomeworkSubmission(scope, { submissionId: submissionResult.submission.id });
       const challenge = toStudentChallengeGenerationResult(
         await generateCodingHomeworkChallengeQuestionsForStudentSubmission(scope, {
@@ -217,6 +234,46 @@ export const codingHomeworkSubmissionRoute: PluginRouteDefinition = {
         challenge,
         questions: challenge.questions,
         submission: challenge.submission
+      };
+    }
+  }
+};
+
+export const codingHomeworkReprocessRoute: PluginRouteDefinition = {
+  path: "coding-homework-grader/reprocess",
+  activityTypeKeys: ["coding-homework-grader"],
+  methods: {
+    POST: async ({ context, readJson }) => {
+      const scope = await resolveTeacherSubmissionScope(context);
+      const input = normalizeReprocessInput(await readJson());
+      const submission = await prisma.pluginCodingHomeworkSubmission.findFirst({
+        where: {
+          id: input.submissionId,
+          activityId: scope.activityId,
+          groupId: scope.groupId,
+          kind: "final"
+        }
+      });
+      if (!submission) {
+        throw new AppError(404, "CODING_HOMEWORK_SUBMISSION_NOT_FOUND", "The requested submission was not found.");
+      }
+      if (submission.status === "ready_for_grading" || submission.status === "graded") {
+        throw new AppError(409, "CODING_HOMEWORK_SUBMISSION_LOCKED", "Completed coding homework submissions cannot be reprocessed.");
+      }
+      if (submission.status === "invalid_structure") {
+        throw new AppError(400, "CODING_HOMEWORK_SUBMISSION_INVALID_STRUCTURE", "Fix the submission structure before reprocessing.");
+      }
+
+      const analysis = await analyzeCodingHomeworkSubmission(scope, { submissionId: submission.id });
+      const generation = await generateCodingHomeworkChallengeQuestions(scope, {
+        locale: input.locale,
+        submissionId: analysis.submission.id
+      });
+      return {
+        analysis,
+        generation,
+        questions: generation.questions,
+        submission: generation.submission
       };
     }
   }

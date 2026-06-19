@@ -6,6 +6,7 @@ import { AppError } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "./db-client";
 import { toStudentChallengeQuestionRecord } from "./generation";
+import { appendProcessingEvent, buildProcessingEvent, buildProcessingOperationId } from "./processing";
 import { normalizeCodingHomeworkSubmissionRequirements, validateCodingHomeworkArchive } from "./validation";
 import { readCodingHomeworkZip, type CodingHomeworkZipEntry } from "./zip";
 
@@ -15,6 +16,7 @@ const submissionInputSchema = z.object({
   base64: z.string().min(1),
   documentationSnapshotId: z.string().trim().min(1).nullable().optional(),
   fileName: z.string().trim().min(1).max(240),
+  idempotencyKey: z.string().trim().min(8).max(120).regex(/^[a-zA-Z0-9._:-]+$/).optional(),
   mimeType: z.string().trim().max(120).optional()
 });
 
@@ -52,6 +54,20 @@ type SubmissionFileRow = {
   storedName: string;
   metadata: unknown;
   createdAt: Date;
+};
+
+type SubmissionQuestionRow = {
+  id: string;
+  answerSubmittedAt: Date | null;
+  orderIndex: number;
+  questionText: string;
+  studentAnswer: string | null;
+  submissionId: string;
+};
+
+type SubmissionWithReplayData = SubmissionRow & {
+  files: SubmissionFileRow[];
+  questions: SubmissionQuestionRow[];
 };
 
 export async function getCodingHomeworkStudentAssignment(scope: SubmissionScope) {
@@ -120,6 +136,24 @@ export async function runCodingHomeworkSubmission(scope: SubmissionScope, input:
 
   const requirements = await getCourseActivityRequirements(scope.activityId);
   const bytes = decodeUploadBytes(parsed.base64, requirements.maxArchiveBytes);
+  const uploadFingerprint = createHash("sha256").update(bytes).digest("hex");
+  const idempotencyKey = parsed.idempotencyKey?.trim() || null;
+  const operationId = buildProcessingOperationId("submission", idempotencyKey);
+  const existingSubmission = idempotencyKey ? await findIdempotentSubmission(scope, idempotencyKey) : null;
+  if (existingSubmission) {
+    const metadata = normalizeObject(existingSubmission.metadata);
+    if (metadata.uploadFingerprint && metadata.uploadFingerprint !== uploadFingerprint) {
+      throw new AppError(409, "CODING_HOMEWORK_IDEMPOTENCY_CONFLICT", "This upload retry key was already used for different file content.");
+    }
+    return {
+      files: existingSubmission.files.map(toSubmissionFileRecord),
+      idempotent: true,
+      questions: existingSubmission.questions.map(toStudentChallengeQuestionRecord),
+      submission: toSubmissionRecord(existingSubmission),
+      summary: normalizeCodingHomeworkSubmissionSummary(existingSubmission.structureValidationSummary)
+    };
+  }
+
   const zip = readCodingHomeworkZip(bytes);
   const summary = await validateCodingHomeworkArchive({
     archiveSizeBytes: bytes.length,
@@ -136,10 +170,22 @@ export async function runCodingHomeworkSubmission(scope: SubmissionScope, input:
         documentationSnapshotId,
         groupId: scope.groupId,
         kind: "final",
-        metadata: {
-          originalName: parsed.fileName,
-          rejectedAt: new Date().toISOString()
-        } as Prisma.InputJsonValue,
+        metadata: appendProcessingEvent(
+          {
+            idempotencyKey,
+            originalName: parsed.fileName,
+            rejectedAt: new Date().toISOString(),
+            uploadFingerprint
+          },
+          buildProcessingEvent({
+            code: "CODING_HOMEWORK_SUBMISSION_INVALID_STRUCTURE",
+            message: "Submission structure validation failed.",
+            operationId,
+            retryable: false,
+            stage: "validation",
+            status: "failed"
+          })
+        ) as Prisma.InputJsonValue,
         status: "invalid_structure",
         structureValidationSummary: summary as Prisma.InputJsonValue,
         userId: scope.user.id
@@ -160,7 +206,16 @@ export async function runCodingHomeworkSubmission(scope: SubmissionScope, input:
       groupId: scope.groupId,
       kind: "final",
       metadata: {
+        idempotencyKey,
         originalName: parsed.fileName,
+        processingTimeline: [
+          buildProcessingEvent({
+            operationId,
+            stage: "upload",
+            status: "completed"
+          })
+        ],
+        uploadFingerprint,
         uploadedAt: new Date().toISOString()
       } as Prisma.InputJsonValue,
       status: "validating",
@@ -183,7 +238,21 @@ export async function runCodingHomeworkSubmission(scope: SubmissionScope, input:
     where: { id: submission.id },
     data: {
       metadata: {
+        idempotencyKey,
         originalName: parsed.fileName,
+        processingTimeline: [
+          buildProcessingEvent({
+            operationId,
+            stage: "upload",
+            status: "completed"
+          }),
+          buildProcessingEvent({
+            operationId,
+            stage: "extraction",
+            status: "completed"
+          })
+        ],
+        uploadFingerprint,
         uploadedAt: new Date().toISOString(),
         zipAttachmentId: zipAttachment.id,
         extractedFileCount: files.length,
@@ -204,6 +273,41 @@ export async function runCodingHomeworkSubmission(scope: SubmissionScope, input:
 async function getCourseActivityRequirements(activityId: string) {
   const row = await prisma.pluginCodingHomeworkSubmissionRequirementSet.findUnique({ where: { activityId } });
   return normalizeCodingHomeworkSubmissionRequirements(row?.requirements);
+}
+
+async function findIdempotentSubmission(scope: SubmissionScope, idempotencyKey: string): Promise<SubmissionWithReplayData | null> {
+  const submissions = await prisma.pluginCodingHomeworkSubmission.findMany({
+    where: {
+      activityId: scope.activityId,
+      groupId: scope.groupId,
+      kind: "final",
+      userId: scope.user.id
+    },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    include: {
+      files: { orderBy: { path: "asc" } },
+      questions: { orderBy: { orderIndex: "asc" } }
+    }
+  });
+
+  return submissions.find((submission) => normalizeObject(submission.metadata).idempotencyKey === idempotencyKey) ?? null;
+}
+
+function normalizeCodingHomeworkSubmissionSummary(value: unknown) {
+  const summary = normalizeObject(value);
+  return {
+    fileCount: typeof summary.fileCount === "number" ? summary.fileCount : 0,
+    ignoredFiles: Array.isArray(summary.ignoredFiles) ? summary.ignoredFiles.filter((item): item is string => typeof item === "string") : [],
+    issues: Array.isArray(summary.issues) ? summary.issues : [],
+    isValid: summary.isValid === true,
+    matchedFunctions: Array.isArray(summary.matchedFunctions) ? summary.matchedFunctions : [],
+    missingRequired: Array.isArray(summary.missingRequired) ? summary.missingRequired : [],
+    parserDiagnostics: Array.isArray(summary.parserDiagnostics) ? summary.parserDiagnostics : [],
+    unexpectedItems: Array.isArray(summary.unexpectedItems) ? summary.unexpectedItems : [],
+    validFiles: Array.isArray(summary.validFiles) ? summary.validFiles.filter((item): item is string => typeof item === "string") : [],
+    validFunctions: Array.isArray(summary.validFunctions) ? summary.validFunctions : []
+  };
 }
 
 async function resolveDocumentationSnapshotId(scope: SubmissionScope, requestedSnapshotId: string | null) {

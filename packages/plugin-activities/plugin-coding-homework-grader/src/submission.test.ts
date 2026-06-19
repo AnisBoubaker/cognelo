@@ -18,6 +18,7 @@ const dbMocks = vi.hoisted(() => ({
   },
   pluginCodingHomeworkSubmission: {
     create: vi.fn(),
+    findMany: vi.fn(),
     findFirst: vi.fn(),
     update: vi.fn()
   },
@@ -57,6 +58,7 @@ describe("coding homework final submissions", () => {
       }
     });
     dbMocks.pluginCodingHomeworkDocumentationSnapshot.findFirst.mockResolvedValue(null);
+    dbMocks.pluginCodingHomeworkSubmission.findMany.mockResolvedValue([]);
     dbMocks.pluginCodingHomeworkAttachment.create.mockResolvedValue({
       id: "zip-attachment-1"
     });
@@ -159,6 +161,75 @@ describe("coding homework final submissions", () => {
     expect(dbMocks.pluginCodingHomeworkSubmissionFile.create).not.toHaveBeenCalled();
     expect(fsMocks.writeFile).not.toHaveBeenCalled();
   });
+
+  it("reuses an existing submission for matching idempotency retries", async () => {
+    const zip = createStoredZip([{ path: "main.c", content: "int main(void) { return 0; }" }]);
+    const fingerprint = await sha256Hex(zip);
+    dbMocks.pluginCodingHomeworkSubmission.findMany.mockResolvedValue([
+      {
+        id: "submission-existing",
+        activityId: "activity-1",
+        coreAttemptId: null,
+        documentationSnapshotId: null,
+        groupId: "group-1",
+        kind: "final",
+        metadata: {
+          idempotencyKey: "retry-key-1",
+          uploadFingerprint: fingerprint
+        },
+        processingError: null,
+        status: "challenge_ready",
+        structureValidationSummary: {
+          fileCount: 1,
+          ignoredFiles: [],
+          issues: [],
+          isValid: true,
+          matchedFunctions: [],
+          missingRequired: [],
+          parserDiagnostics: [],
+          unexpectedItems: [],
+          validFiles: ["main.c"],
+          validFunctions: []
+        },
+        userId: "student-1",
+        zipAttachmentId: "zip-1",
+        createdAt: now,
+        updatedAt: now,
+        files: [],
+        questions: [
+          {
+            id: "question-1",
+            answerSubmittedAt: null,
+            orderIndex: 0,
+            questionText: "Explain your main function.",
+            studentAnswer: null,
+            submissionId: "submission-existing"
+          }
+        ]
+      }
+    ]);
+
+    const result = await runCodingHomeworkSubmission(
+      {
+        activityId: "activity-1",
+        courseId: "course-1",
+        groupId: "group-1",
+        user: testUser()
+      },
+      {
+        base64: zip.toString("base64"),
+        fileName: "submission.zip",
+        idempotencyKey: "retry-key-1",
+        mimeType: "application/zip"
+      }
+    );
+
+    expect(result.idempotent).toBe(true);
+    expect(result.submission.id).toBe("submission-existing");
+    expect(result.questions).toHaveLength(1);
+    expect(dbMocks.pluginCodingHomeworkSubmission.create).not.toHaveBeenCalled();
+    expect(dbMocks.pluginCodingHomeworkAttachment.create).not.toHaveBeenCalled();
+  });
 });
 
 function testUser() {
@@ -226,4 +297,9 @@ function createStoredZip(files: Array<{ path: string; content: string }>) {
   eocd.writeUInt32LE(locals.length, 16);
   eocd.writeUInt16LE(0, 20);
   return Buffer.concat([locals, centralDirectory, eocd]);
+}
+
+async function sha256Hex(buffer: Buffer) {
+  const { createHash } = await import("node:crypto");
+  return createHash("sha256").update(buffer).digest("hex");
 }
