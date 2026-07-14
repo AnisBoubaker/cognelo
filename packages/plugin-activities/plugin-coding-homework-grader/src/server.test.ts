@@ -4,8 +4,12 @@ const authoringMocks = vi.hoisted(() => ({
   copyBankCodingHomeworkAuthoringToCourseActivity: vi.fn(),
   deleteBankCodingHomeworkAuthoring: vi.fn()
 }));
+const deletionMocks = vi.hoisted(() => ({
+  markCodingHomeworkSubmissionDeleted: vi.fn()
+}));
 
 vi.mock("./authoring", () => authoringMocks);
+vi.mock("./submission-deletion", () => deletionMocks);
 vi.mock("./routes", () => ({
   codingHomeworkAssignmentPdfRoute: { path: "assignment-pdf", methods: {} },
   codingHomeworkAuthoringRoute: { path: "authoring", methods: {} },
@@ -25,7 +29,8 @@ vi.mock("./routes", () => ({
   codingHomeworkSubmissionRoute: { path: "submission", methods: {} }
 }));
 vi.mock("./background-processing", () => ({
-  registerCodingHomeworkBackgroundJobs: vi.fn()
+  registerCodingHomeworkBackgroundJobs: vi.fn(),
+  startCodingHomeworkProcessingWorker: vi.fn()
 }));
 
 const { codingHomeworkGraderServerPlugin } = await import("./server");
@@ -80,6 +85,29 @@ describe("coding homework grader server plugin lifecycle hooks", () => {
 
     expect(authoringMocks.copyBankCodingHomeworkAuthoringToCourseActivity).not.toHaveBeenCalled();
     expect(authoringMocks.deleteBankCodingHomeworkAuthoring).not.toHaveBeenCalled();
+  });
+
+  it("marks the plugin submission deleted when a core gradebook attempt is deleted", async () => {
+    await codingHomeworkGraderServerPlugin.hooks?.onActivityAttemptDeleted?.({
+      user: testUser(),
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      coreAttemptId: "attempt-1",
+      pluginAttemptRef: "submission-1",
+      reason: "Wrong file",
+      deletedAt: "2026-06-19T10:00:00.000Z"
+    });
+
+    expect(deletionMocks.markCodingHomeworkSubmissionDeleted).toHaveBeenCalledWith({
+      activityId: "activity-1",
+      coreAttemptId: "attempt-1",
+      deletedAt: "2026-06-19T10:00:00.000Z",
+      deletedByUserId: "user-1",
+      groupId: "group-1",
+      pluginAttemptRef: "submission-1",
+      reason: "Wrong file"
+    });
   });
 });
 

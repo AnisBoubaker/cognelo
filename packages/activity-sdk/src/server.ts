@@ -67,6 +67,17 @@ export type BankActivityDeletedHook = (input: {
   activityTypeKey: string;
 }) => Promise<void>;
 
+export type ActivityAttemptDeletedHook = (input: {
+  user: CurrentUser;
+  courseId: string;
+  groupId: string;
+  activityId: string;
+  coreAttemptId: string;
+  pluginAttemptRef: string | null;
+  reason: string;
+  deletedAt: Date | string;
+}) => Promise<void>;
+
 export type PluginGradingResult = {
   rawScore: number;
   rawMaxScore: number;
@@ -95,6 +106,7 @@ export type ServerActivityPlugin = {
   hooks?: {
     onCourseActivityCreatedFromBankVersion?: CourseActivityCreatedFromBankVersionHook;
     onBankActivityDeleted?: BankActivityDeletedHook;
+    onActivityAttemptDeleted?: ActivityAttemptDeletedHook;
   };
 };
 
@@ -204,4 +216,36 @@ export async function runBankActivityDeletedHooksForPlugins(
   for (const plugin of plugins) {
     await plugin.hooks?.onBankActivityDeleted?.(input);
   }
+}
+
+export async function runActivityAttemptDeletedHooks(input: {
+  user: CurrentUser;
+  courseId: string;
+  groupId: string;
+  activityId: string;
+  pluginKey: string;
+  coreAttemptId: string;
+  pluginAttemptRef: string | null;
+  reason: string;
+  deletedAt: Date | string;
+}) {
+  await runActivityAttemptDeletedHooksForPlugins(serverPlugins, input);
+}
+
+export async function runActivityAttemptDeletedHooksForPlugins(
+  plugins: readonly ServerActivityPlugin[],
+  input: {
+    user: CurrentUser;
+    courseId: string;
+    groupId: string;
+    activityId: string;
+    pluginKey: string;
+    coreAttemptId: string;
+    pluginAttemptRef: string | null;
+    reason: string;
+    deletedAt: Date | string;
+  }
+) {
+  const plugin = plugins.find((candidate) => candidate.key === input.pluginKey);
+  await plugin?.hooks?.onActivityAttemptDeleted?.(input);
 }

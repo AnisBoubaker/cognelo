@@ -24,6 +24,7 @@ import {
   codingHomeworkSubmissionRoute
 } from "./routes";
 import { registerCodingHomeworkBackgroundJobs } from "./background-processing";
+import { markCodingHomeworkSubmissionDeleted } from "./submission-deletion";
 
 registerCodingHomeworkBackgroundJobs();
 
@@ -96,6 +97,17 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
       }
 
       await deleteBankCodingHomeworkAuthoring({ bankActivityId });
+    },
+    onActivityAttemptDeleted: async ({ activityId, coreAttemptId, deletedAt, groupId, pluginAttemptRef, reason, user }) => {
+      await markCodingHomeworkSubmissionDeleted({
+        activityId,
+        coreAttemptId,
+        deletedAt,
+        deletedByUserId: user.id,
+        groupId,
+        pluginAttemptRef,
+        reason
+      });
     }
   }
 };

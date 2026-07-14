@@ -6,6 +6,7 @@ import {
   resolvePluginRoute,
   runBankActivityDeletedHooks,
   runBankActivityDeletedHooksForPlugins,
+  runActivityAttemptDeletedHooksForPlugins,
   runCourseActivityCreatedFromBankVersionHooksForPlugins,
   type ServerActivityRecord,
   type ServerActivityPlugin
@@ -160,5 +161,40 @@ describe("server activity SDK", () => {
       })
     ).rejects.toThrow("copy cleanup failed");
     expect(afterFailure).not.toHaveBeenCalled();
+  });
+
+  it("runs attempt deletion hooks only for the owning plugin", async () => {
+    const matchingHook = vi.fn();
+    const otherHook = vi.fn();
+    const plugins: ServerActivityPlugin[] = [
+      {
+        key: "coding-homework-grader",
+        hooks: {
+          onActivityAttemptDeleted: matchingHook
+        }
+      },
+      {
+        key: "parsons",
+        hooks: {
+          onActivityAttemptDeleted: otherHook
+        }
+      },
+      { key: "mcq" }
+    ];
+
+    await runActivityAttemptDeletedHooksForPlugins(plugins, {
+      user,
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      pluginKey: "coding-homework-grader",
+      coreAttemptId: "attempt-1",
+      pluginAttemptRef: "submission-1",
+      reason: "Wrong file",
+      deletedAt: "2026-06-19T10:00:00.000Z"
+    });
+
+    expect(matchingHook).toHaveBeenCalledWith(expect.objectContaining({ pluginAttemptRef: "submission-1" }));
+    expect(otherHook).not.toHaveBeenCalled();
   });
 });

@@ -4,10 +4,13 @@ const globalForPrisma = globalThis as unknown as {
   parsonsPrisma?: PrismaClient;
 };
 
+const prismaLogLevels: NonNullable<ConstructorParameters<typeof PrismaClient>[0]>["log"] =
+  process.env.PRISMA_LOG_QUERIES === "true" ? ["query", "error", "warn"] : ["error"];
+
 export const prisma =
   globalForPrisma.parsonsPrisma ??
   new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"]
+    log: prismaLogLevels
   });
 
 if (process.env.NODE_ENV !== "production") {
