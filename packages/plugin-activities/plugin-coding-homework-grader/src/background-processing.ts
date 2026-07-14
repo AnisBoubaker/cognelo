@@ -3,6 +3,7 @@ import {
   enqueueBackgroundJob,
   isBackgroundJobHandlerRegistered,
   registerBackgroundJobHandler,
+  startBackgroundJobWorker,
   type BackgroundJobRecord
 } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -47,7 +48,7 @@ export async function enqueueCodingHomeworkSubmissionProcessing(
   scope: CodingHomeworkProcessingScope,
   input: { locale?: "en" | "fr" | "zh" | "ar"; mode?: "student" | "teacher"; submissionId: string }
 ) {
-  return enqueueBackgroundJob({
+  const job = await enqueueBackgroundJob({
     handlerKey: codingHomeworkSubmissionProcessingHandlerKey,
     idempotencyKey: `submission:${input.submissionId}`,
     maxAttempts: 3,
@@ -68,6 +69,19 @@ export async function enqueueCodingHomeworkSubmissionProcessing(
       user: scope.user
     },
     queue: codingHomeworkProcessingQueue
+  });
+  startCodingHomeworkProcessingWorker();
+  return job;
+}
+
+export function startCodingHomeworkProcessingWorker() {
+  if (process.env.COGNELO_BACKGROUND_JOBS_DISABLED === "true") {
+    return;
+  }
+  startBackgroundJobWorker({
+    idleTimeoutMs: 60_000,
+    queue: codingHomeworkProcessingQueue,
+    workerId: "coding-homework-grader-api-worker"
   });
 }
 

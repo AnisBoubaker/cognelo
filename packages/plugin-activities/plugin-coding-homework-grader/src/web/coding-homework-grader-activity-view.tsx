@@ -95,6 +95,7 @@ const defaultRequirements: CodingHomeworkAuthoringSubmissionRequirements = {
   requiredFolders: [],
   requiredFunctions: []
 };
+const processingPollIntervalMs = 2500;
 
 function defaultAuthoring(activity: RenderableActivity): CodingHomeworkAuthoringRecord {
   const now = new Date().toISOString();
@@ -262,8 +263,11 @@ export function CodingHomeworkGraderActivityView({
     };
   }, [activity.id, applyChallengeQuestions, canManage, copy.saveError, notifications, submissionClient]);
 
+  const latestSubmissionId = latestSubmission?.submission.id ?? null;
+  const latestSubmissionStatus = latestSubmission?.submission.status ?? null;
+
   useEffect(() => {
-    if (canManage || !submissionClient || !latestSubmission || !isSubmissionProcessing(latestSubmission.submission.status) || challengeQuestions.length) {
+    if (canManage || !submissionClient || !latestSubmissionId || !isSubmissionProcessing(latestSubmissionStatus) || challengeQuestions.length) {
       return;
     }
 
@@ -282,13 +286,13 @@ export function CodingHomeworkGraderActivityView({
     };
     const interval = window.setInterval(() => {
       void refresh();
-    }, 2500);
+    }, processingPollIntervalMs);
     void refresh();
     return () => {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [activity.id, applyChallengeQuestions, canManage, challengeQuestions.length, latestSubmission, submissionClient]);
+  }, [activity.id, applyChallengeQuestions, canManage, challengeQuestions.length, latestSubmissionId, latestSubmissionStatus, submissionClient]);
 
   const loadDocumentationPreview = useCallback(
     async (options?: { notify?: boolean }) => {
@@ -605,16 +609,19 @@ export function CodingHomeworkGraderActivityView({
   }
 
   if (!canManage) {
+    const submissionStatus = latestSubmission?.submission.status ?? null;
+    const processingSubmission = isSubmissionProcessing(submissionStatus) && !challengeQuestions.length;
     return (
-      <section className="section stack">
+      <section className="section stack" aria-busy={processingSubmission}>
         <h2>{activity.title}</h2>
         {loadingStudentAssignment ? <p>{copy.loading}</p> : <MarkdownRenderer markdown={studentAssignment?.assignment.promptMarkdown || activity.description} />}
         {studentAssignment?.assignment.promptPdf ? <p className="muted">{studentAssignment.assignment.promptPdf.originalName}</p> : null}
-        <PreflightPanel copy={copy} preflightResult={preflightResult} runningPreflight={runningPreflight} onUpload={runPreflight} />
+        <PreflightPanel copy={copy} disabled={processingSubmission} preflightResult={preflightResult} runningPreflight={runningPreflight} onUpload={runPreflight} />
         {submissionClient ? (
           <>
             <SubmissionPanel
               copy={copy}
+              disabled={processingSubmission}
               latestSubmission={latestSubmission}
               onUpload={submitFinalSubmission}
               submissionResult={submissionResult}
@@ -631,6 +638,7 @@ export function CodingHomeworkGraderActivityView({
               onSave={() => void saveChallengeAnswers()}
               onSubmit={() => void submitChallengeAnswers()}
             />
+            {processingSubmission ? <ProcessingWaitPanel copy={copy} startedAt={latestSubmission?.submission.createdAt ?? null} /> : null}
           </>
         ) : null}
       </section>
@@ -887,11 +895,13 @@ export function CodingHomeworkGraderActivityView({
 
 function PreflightPanel({
   copy,
+  disabled = false,
   onUpload,
   preflightResult,
   runningPreflight
 }: {
   copy: CodingHomeworkCopy;
+  disabled?: boolean;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   preflightResult: CodingHomeworkPreflightResult | null;
   runningPreflight: boolean;
@@ -899,9 +909,9 @@ function PreflightPanel({
   return (
     <div className="stack">
       <div className="inline-actions">
-        <label className="button secondary">
+        <label className={`button secondary${disabled ? " is-disabled" : ""}`}>
           {runningPreflight ? "..." : copy.preflightUpload}
-          <input accept="application/zip,.zip" hidden type="file" onChange={onUpload} />
+          <input accept="application/zip,.zip" disabled={disabled || runningPreflight} hidden type="file" onChange={onUpload} />
         </label>
         {preflightResult ? (
           <span className={preflightResult.summary.isValid ? "status-pill is-enabled" : "status-pill is-disabled"}>
@@ -941,12 +951,14 @@ function PreflightPanel({
 
 function SubmissionPanel({
   copy,
+  disabled = false,
   latestSubmission,
   onUpload,
   submissionResult,
   submitting
 }: {
   copy: CodingHomeworkCopy;
+  disabled?: boolean;
   latestSubmission: CodingHomeworkLatestSubmissionResult;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   submissionResult: CodingHomeworkSubmissionResult | null;
@@ -970,7 +982,13 @@ function SubmissionPanel({
     ? submissionResult.summary.isValid
     : currentSubmissionStatus === "structure_valid" || currentSubmissionStatus === "validating" || currentSubmissionStatus === "processing" || currentSubmissionStatus === "challenge_ready" || currentSubmissionStatus === "ready_for_grading";
   const fileCount = submissionResult?.files.length ?? latestSubmission?.files.length ?? 0;
-  const uploadLocked = currentSubmissionStatus === "challenge_ready" || currentSubmissionStatus === "ready_for_grading";
+  const uploadLocked =
+    disabled ||
+    currentSubmissionStatus === "validating" ||
+    currentSubmissionStatus === "structure_valid" ||
+    currentSubmissionStatus === "processing" ||
+    currentSubmissionStatus === "challenge_ready" ||
+    currentSubmissionStatus === "ready_for_grading";
 
   return (
     <div className="stack">
@@ -982,7 +1000,7 @@ function SubmissionPanel({
         </label>
         {status ? <span className={isValid ? "status-pill is-enabled" : "status-pill is-disabled"}>{status}</span> : null}
       </div>
-      {uploadLocked ? <p className="muted">{copy.submissionLocked}</p> : null}
+      {uploadLocked && !isSubmissionProcessing(currentSubmissionStatus) ? <p className="muted">{copy.submissionLocked}</p> : null}
       {isSubmissionProcessing(currentSubmissionStatus) ? <p className="muted">{copy.submissionProcessingDetail}</p> : null}
       {currentSubmissionStatus === "failed" && latestSubmission?.submission.processingError ? <p className="muted">{latestSubmission.submission.processingError}</p> : null}
       {latestSubmission ? (
@@ -1023,6 +1041,46 @@ function SubmissionPanel({
 function isSubmissionProcessing(status: string | null) {
   return status === "validating" || status === "structure_valid" || status === "processing";
 }
+
+function ProcessingWaitPanel({ copy, startedAt }: { copy: CodingHomeworkCopy; startedAt: string | null }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+  const elapsedSeconds = startedAt ? Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000)) : 0;
+
+  return (
+    <section className="stack">
+      <style>{`@keyframes coding-homework-spin { to { transform: rotate(360deg); } }`}</style>
+      <div className="section-subheading">
+        <div>
+          <h3>{copy.challengeQuestions}</h3>
+          <p className="muted">{copy.submissionProcessingDetail}</p>
+          <p className="muted">
+            {formatMessage(copy.submissionProcessingElapsed, { seconds: elapsedSeconds })} · {copy.submissionProcessingPoll}
+          </p>
+        </div>
+        <span className="status-pill is-enabled" style={{ alignItems: "center", display: "inline-flex", gap: "0.45rem" }}>
+          <span aria-hidden="true" style={spinnerStyle} />
+          {copy.submissionProcessing}
+        </span>
+      </div>
+    </section>
+  );
+}
+
+const spinnerStyle = {
+  animation: "coding-homework-spin 0.9s linear infinite",
+  border: "2px solid rgba(13, 27, 71, 0.2)",
+  borderTopColor: "#0d1b47",
+  borderRadius: "999px",
+  display: "inline-block",
+  height: "0.85rem",
+  width: "0.85rem"
+} as const;
 
 function ChallengeQuestionsPanel({
   answers,

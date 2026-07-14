@@ -16,6 +16,7 @@ import { prisma } from "./db-client";
 import { enqueueCodingHomeworkSubmissionProcessing } from "./background-processing";
 import { runCodingHomeworkPreflight } from "./preflight";
 import { searchCodingHomeworkReferenceContent } from "./reference-search";
+import { isCodingHomeworkSubmissionDeleted } from "./submission-deletion";
 import { getCodingHomeworkStudentAssignment, getLatestCodingHomeworkSubmission, runCodingHomeworkSubmission } from "./submission";
 
 function requireCourseId(courseId: string | undefined) {
@@ -396,12 +397,12 @@ export const codingHomeworkGradebookAttemptsRoute: PluginRouteDefinition = {
       }
 
       const includeAttempts = new URL(request.url).searchParams.get("includeAttempts") === "true";
-      const submissions = await listCodingHomeworkGradebookSubmissions({
+      const submissions = (await listCodingHomeworkGradebookSubmissions({
         activityId: context.activity.id,
         groupId: context.groupId,
         includeAttempts,
         userId: participant.userId
-      });
+      })).filter((submission) => !isCodingHomeworkSubmissionDeleted(submission.metadata));
 
       const coreAttemptIds = submissions.map((submission) => submission.coreAttemptId).filter((id): id is string => Boolean(id));
       const coreAttempts = coreAttemptIds.length

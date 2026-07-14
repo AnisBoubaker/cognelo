@@ -16,7 +16,8 @@ const {
   enqueueBackgroundJob,
   getBackgroundJob,
   registerBackgroundJobHandler,
-  runBackgroundJobOnce
+  runBackgroundJobOnce,
+  startBackgroundJobWorker
 } = await import("./background-jobs");
 
 describe("background job service", () => {
@@ -124,6 +125,25 @@ describe("background job service", () => {
 
     await expect(getBackgroundJob("job-read")).resolves.toMatchObject({ id: "job-read" });
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(expect.stringContaining('WHERE "id" = $1'), "job-read");
+  });
+
+  it("stops interval polling after the configured idle timeout", async () => {
+    vi.useFakeTimers();
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+
+    try {
+      const worker = startBackgroundJobWorker({ idleTimeoutMs: 500, intervalMs: 250, queue: "idle", workerId: "idle-worker" });
+      await vi.advanceTimersByTimeAsync(750);
+      const callsAfterIdleStop = mockPrisma.$queryRawUnsafe.mock.calls.length;
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalled();
+      expect(mockPrisma.$queryRawUnsafe.mock.calls.length).toBe(callsAfterIdleStop);
+      worker.stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

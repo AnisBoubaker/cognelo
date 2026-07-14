@@ -36,7 +36,7 @@ vi.mock("./db-client", () => ({
   prisma: dbMocks
 }));
 
-const { runCodingHomeworkSubmission } = await import("./submission");
+const { getLatestCodingHomeworkSubmission, runCodingHomeworkSubmission } = await import("./submission");
 
 describe("coding homework final submissions", () => {
   const now = new Date("2026-05-28T12:00:00.000Z");
@@ -229,6 +229,62 @@ describe("coding homework final submissions", () => {
     expect(result.questions).toHaveLength(1);
     expect(dbMocks.pluginCodingHomeworkSubmission.create).not.toHaveBeenCalled();
     expect(dbMocks.pluginCodingHomeworkAttachment.create).not.toHaveBeenCalled();
+  });
+
+  it("treats a teacher-deleted latest submission as no active student submission", async () => {
+    dbMocks.pluginCodingHomeworkSubmission.findMany.mockResolvedValueOnce([
+      {
+        id: "submission-deleted",
+        activityId: "activity-1",
+        coreAttemptId: null,
+        documentationSnapshotId: null,
+        files: [],
+        groupId: "group-1",
+        kind: "final",
+        metadata: {
+          deletion: {
+            coreAttemptId: "attempt-1",
+            deletedAt: "2026-06-19T10:00:00.000Z",
+            reason: "Wrong file"
+          }
+        },
+        processingError: null,
+        questions: [],
+        status: "ready_for_grading",
+        structureValidationSummary: {},
+        userId: "student-1",
+        zipAttachmentId: "zip-1",
+        createdAt: now,
+        updatedAt: now
+      },
+      {
+        id: "submission-active",
+        activityId: "activity-1",
+        coreAttemptId: null,
+        documentationSnapshotId: null,
+        files: [],
+        groupId: "group-1",
+        kind: "final",
+        metadata: {},
+        processingError: null,
+        questions: [],
+        status: "challenge_ready",
+        structureValidationSummary: {},
+        userId: "student-1",
+        zipAttachmentId: "zip-2",
+        createdAt: now,
+        updatedAt: now
+      }
+    ]);
+
+    const result = await getLatestCodingHomeworkSubmission({
+      activityId: "activity-1",
+      courseId: "course-1",
+      groupId: "group-1",
+      user: testUser()
+    });
+
+    expect(result).toBeNull();
   });
 });
 

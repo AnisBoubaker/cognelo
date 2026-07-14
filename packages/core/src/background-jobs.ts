@@ -172,7 +172,7 @@ export async function runBackgroundJobOnce(options: { queue?: string; workerId?:
   return getBackgroundJob(job.id);
 }
 
-export function startBackgroundJobWorker(options: { concurrency?: number; intervalMs?: number; queue?: string; workerId?: string } = {}) {
+export function startBackgroundJobWorker(options: { concurrency?: number; idleTimeoutMs?: number; intervalMs?: number; queue?: string; workerId?: string } = {}) {
   const queueKey = options.queue ?? "all";
   const workerId = options.workerId ?? `worker-${randomUUID()}`;
   const key = `${queueKey}:${workerId}`;
@@ -183,8 +183,21 @@ export function startBackgroundJobWorker(options: { concurrency?: number; interv
 
   const concurrency = Math.max(1, Math.min(options.concurrency ?? 1, 10));
   const intervalMs = Math.max(250, options.intervalMs ?? 1000);
+  const idleTimeoutMs = options.idleTimeoutMs && options.idleTimeoutMs > 0 ? options.idleTimeoutMs : null;
+  let lastWorkAt = Date.now();
   let stopped = false;
   let running = false;
+  let interval: ReturnType<typeof setInterval> | null = null;
+
+  const worker = {
+    stop: () => {
+      stopped = true;
+      if (interval) {
+        clearInterval(interval);
+      }
+      workers.delete(key);
+    }
+  };
 
   const tick = async () => {
     if (stopped || running) {
@@ -192,24 +205,22 @@ export function startBackgroundJobWorker(options: { concurrency?: number; interv
     }
     running = true;
     try {
-      await Promise.all(Array.from({ length: concurrency }, () => runBackgroundJobOnce({ queue: options.queue, workerId })));
+      const results = await Promise.all(Array.from({ length: concurrency }, () => runBackgroundJobOnce({ queue: options.queue, workerId })));
+      if (results.some(Boolean)) {
+        lastWorkAt = Date.now();
+      } else if (idleTimeoutMs && Date.now() - lastWorkAt >= idleTimeoutMs) {
+        worker.stop();
+      }
     } finally {
       running = false;
     }
   };
 
-  const interval = setInterval(() => {
+  interval = setInterval(() => {
     void tick();
   }, intervalMs);
   void tick();
 
-  const worker = {
-    stop: () => {
-      stopped = true;
-      clearInterval(interval);
-      workers.delete(key);
-    }
-  };
   workers.set(key, worker);
   return worker;
 }

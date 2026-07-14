@@ -7,6 +7,7 @@ import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "./db-client";
 import { toStudentChallengeQuestionRecord } from "./generation";
 import { appendProcessingEvent, buildProcessingEvent, buildProcessingOperationId } from "./processing";
+import { isCodingHomeworkSubmissionDeleted } from "./submission-deletion";
 import { normalizeCodingHomeworkSubmissionRequirements, validateCodingHomeworkArchive } from "./validation";
 import { readCodingHomeworkZip, type CodingHomeworkZipEntry } from "./zip";
 
@@ -105,7 +106,7 @@ export async function getCodingHomeworkStudentAssignment(scope: SubmissionScope)
 }
 
 export async function getLatestCodingHomeworkSubmission(scope: SubmissionScope) {
-  const submission = await prisma.pluginCodingHomeworkSubmission.findFirst({
+  const submissions = await prisma.pluginCodingHomeworkSubmission.findMany({
     where: {
       activityId: scope.activityId,
       groupId: scope.groupId,
@@ -113,13 +114,15 @@ export async function getLatestCodingHomeworkSubmission(scope: SubmissionScope) 
       userId: scope.user.id
     },
     orderBy: { createdAt: "desc" },
+    take: 20,
     include: {
       files: { orderBy: { path: "asc" } },
       questions: { orderBy: { orderIndex: "asc" } }
     }
   });
+  const submission = submissions[0];
 
-  if (!submission) {
+  if (!submission || isCodingHomeworkSubmissionDeleted(submission.metadata)) {
     return null;
   }
 
@@ -291,7 +294,7 @@ async function findIdempotentSubmission(scope: SubmissionScope, idempotencyKey: 
     }
   });
 
-  return submissions.find((submission) => normalizeObject(submission.metadata).idempotencyKey === idempotencyKey) ?? null;
+  return submissions.find((submission) => !isCodingHomeworkSubmissionDeleted(submission.metadata) && normalizeObject(submission.metadata).idempotencyKey === idempotencyKey) ?? null;
 }
 
 function normalizeCodingHomeworkSubmissionSummary(value: unknown) {
