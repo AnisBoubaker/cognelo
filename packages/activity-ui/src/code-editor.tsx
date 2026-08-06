@@ -14,6 +14,7 @@ type CodeEditorProps = {
   leftRailWidth?: number;
   rightRailWidth?: number;
   getLineClassName?: (lineIndex: number) => string | undefined;
+  disabled?: boolean;
 };
 
 export function CodeEditor({
@@ -26,7 +27,8 @@ export function CodeEditor({
   rightRail,
   leftRailWidth = 0,
   rightRailWidth = 0,
-  getLineClassName
+  getLineClassName,
+  disabled = false
 }: CodeEditorProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -168,6 +170,7 @@ export function CodeEditor({
         ref={textareaRef}
         className="code-editor-input"
         spellCheck={false}
+        disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}

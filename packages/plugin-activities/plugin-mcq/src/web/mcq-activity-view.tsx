@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { CodeEditor, MarkdownRenderer, codeLanguageOptions, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { CodeEditor, MarkdownRenderer, RichTextEditor, codeLanguageOptions, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   parseMcqSource,
   type McqChoice,
@@ -546,7 +546,14 @@ export function McqActivityView({
 
         <div className="field">
           <label htmlFor="mcq-description">{copy.description}</label>
-          <textarea id="mcq-description" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />
+          <RichTextEditor
+            id="mcq-description"
+            ariaLabel={copy.description}
+            locale={locale}
+            minHeight={150}
+            value={description}
+            onChange={setDescription}
+          />
         </div>
 
         {aiGenerationClient ? (

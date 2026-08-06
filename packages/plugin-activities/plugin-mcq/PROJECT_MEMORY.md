@@ -6,6 +6,7 @@ This file is for MCQ plugin memory only.
 - MCQ config supports `randomizeChoices`; rendering shuffles displayed choices while preserving choice IDs for scoring.
 - The MCQ authoring form registers with the shared unsaved-change guard so navigating away can save, discard, or continue editing. Future MCQ authoring options/settings must keep using `useUnsavedChangesGuard` rather than adding plugin-local navigation prompts.
 - MCQ authoring keeps one complete source editor so teachers can copy/paste or save the full activity text externally; the rendered preview sits beside that single editor rather than below it.
+- The student prompt uses the shared Markdown-backed `RichTextEditor` from `@cognelo/activity-ui`. Its Visual and Markdown modes edit the same stored description value, and the Markdown source mode must remain available whenever this editor is used.
 - MCQ source editor uses the shared Markdown renderer behavior from `@cognelo/activity-ui`, including syntax coloring inside fenced code blocks such as ```c choices.
 - The plugin currently infers single-choice versus multiple-choice from the number of correct answers in each question.
 - Authored MCQ content remains in generic activity config. Summative submissions are persisted as core `ActivityAttempt` records and graded through the shared gradebook workflow, while formative checks remain client-side.
