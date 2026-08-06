@@ -323,6 +323,7 @@ exports.PluginCodingHomeworkAttachmentOwnerKind = exports.$Enums.PluginCodingHom
 
 exports.PluginCodingHomeworkAttachmentKind = exports.$Enums.PluginCodingHomeworkAttachmentKind = {
   assignment_pdf: 'assignment_pdf',
+  provided_file: 'provided_file',
   requirements_upload: 'requirements_upload',
   submission_zip: 'submission_zip',
   extracted_source: 'extracted_source',

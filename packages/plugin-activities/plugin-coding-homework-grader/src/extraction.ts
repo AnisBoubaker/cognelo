@@ -1,5 +1,6 @@
 import { AppError, getContentResourceEmbeddingDocuments } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
+import { getCodingHomeworkActivityReferenceDocuments } from "./activity-documents";
 import { prisma, type Prisma } from "./db-client";
 
 type ExtractionScope = {
@@ -50,6 +51,21 @@ export async function extractCodingHomeworkDocumentationSnapshot(scope: Extracti
   const diagnostics: Array<Record<string, unknown>> = [];
   const documents: Array<Record<string, unknown>> = [];
 
+  const activityDocuments = await getCodingHomeworkActivityReferenceDocuments(scope.activityId);
+  diagnostics.push(...activityDocuments.diagnostics);
+  documents.push(
+    ...activityDocuments.documents.map((document, index) => ({
+      ...document,
+      contentResourceId: null,
+      contentTypeKey: null,
+      itemId: null,
+      orderIndex: index,
+      pluginKey: "coding-homework-grader",
+      resourceFingerprint: null,
+      snapshotResourceTitle: document.title
+    }))
+  );
+
   for (const resource of includedResources) {
     if (!resource.contentResourceId) {
       diagnostics.push({
@@ -83,7 +99,7 @@ export async function extractCodingHomeworkDocumentationSnapshot(scope: Extracti
           contentResourceId: resource.contentResourceId,
           contentTypeKey: resource.contentTypeKey,
           itemId: resource.itemId,
-          orderIndex: resource.orderIndex ?? documents.length,
+          orderIndex: activityDocuments.documents.length + (resource.orderIndex ?? documents.length),
           path: document.path ?? resource.path ?? null,
           pluginKey: resource.pluginKey,
           resourceFingerprint: resource.resourceFingerprint,
@@ -106,6 +122,7 @@ export async function extractCodingHomeworkDocumentationSnapshot(scope: Extracti
     status: "ready",
     extractedAt: new Date().toISOString(),
     resourceCount: includedResources.length,
+    activityDocumentCount: activityDocuments.documents.length,
     documentCount: documents.length,
     diagnosticCount: diagnostics.length,
     documents,

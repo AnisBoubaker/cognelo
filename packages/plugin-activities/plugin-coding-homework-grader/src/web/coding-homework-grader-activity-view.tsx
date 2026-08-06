@@ -42,8 +42,10 @@ type AuthoringClient = {
   extractDocumentation?: (activityId: string, input?: { snapshotId?: string | null }) => Promise<CodingHomeworkDocumentationExtractionResult>;
   getDocumentationPreview?: (activityId: string) => Promise<CodingHomeworkDocumentationPreview>;
   importRequirements: (activityId: string, input: { base64: string; fileName: string; mimeType?: string }) => Promise<CodingHomeworkAuthoringRecord>;
+  deleteProvidedFile: (activityId: string, attachmentId: string) => Promise<CodingHomeworkAuthoringRecord>;
   save: (activityId: string, input: CodingHomeworkAuthoringInput) => Promise<CodingHomeworkAuthoringRecord>;
   uploadAssignmentPdf: (activityId: string, input: { base64: string; fileName: string; mimeType?: string }) => Promise<CodingHomeworkAuthoringRecord>;
+  uploadProvidedFile: (activityId: string, input: { base64: string; fileName: string; mimeType?: string }) => Promise<CodingHomeworkAuthoringRecord>;
 };
 
 type PreflightClient = {
@@ -66,6 +68,7 @@ type SubmissionClient = {
 
 type CodingHomeworkGraderActivityViewProps = {
   activity: RenderableActivity;
+  activityFileUrl?: (attachmentId: string) => string;
   authoringClient?: AuthoringClient;
   canManage: boolean;
   course?: { id: string; title?: string } | null;
@@ -123,12 +126,14 @@ function defaultAuthoring(activity: RenderableActivity): CodingHomeworkAuthoring
       sourceAttachmentId: null,
       updatedAt: now
     },
-    requirementsUpload: null
+    requirementsUpload: null,
+    providedFiles: []
   };
 }
 
 export function CodingHomeworkGraderActivityView({
   activity,
+  activityFileUrl,
   authoringClient,
   canManage,
   locale = "en",
@@ -144,6 +149,7 @@ export function CodingHomeworkGraderActivityView({
   const [assignmentPdf, setAssignmentPdf] = useState<CodingHomeworkAttachmentRecord | null>(null);
   const [requirementDraft, setRequirementDraft] = useState<RequirementDraft>(() => requirementsToDraft(defaultRequirements));
   const [requirementsUpload, setRequirementsUpload] = useState<CodingHomeworkAttachmentRecord | null>(null);
+  const [providedFiles, setProvidedFiles] = useState<CodingHomeworkAttachmentRecord[]>([]);
   const [loading, setLoading] = useState(Boolean(canManage && authoringClient));
   const [documentationPreview, setDocumentationPreview] = useState<CodingHomeworkDocumentationPreview | null>(null);
   const [loadingDocumentation, setLoadingDocumentation] = useState(false);
@@ -154,6 +160,8 @@ export function CodingHomeworkGraderActivityView({
   const [saving, setSaving] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [importingRequirements, setImportingRequirements] = useState(false);
+  const [uploadingProvidedFile, setUploadingProvidedFile] = useState(false);
+  const [deletingProvidedFileId, setDeletingProvidedFileId] = useState<string | null>(null);
   const [studentAssignment, setStudentAssignment] = useState<CodingHomeworkStudentAssignment | null>(null);
   const [latestSubmission, setLatestSubmission] = useState<CodingHomeworkLatestSubmissionResult>(null);
   const [submissionResult, setSubmissionResult] = useState<CodingHomeworkSubmissionResult | null>(null);
@@ -172,6 +180,7 @@ export function CodingHomeworkGraderActivityView({
       setAssignmentPdf(record.assignmentPdf);
       setRequirementDraft(nextRequirementDraft);
       setRequirementsUpload(record.requirementsUpload);
+      setProvidedFiles(record.providedFiles);
       savedSnapshotRef.current = serializeSnapshot({
         assignment: record.assignment,
         description: nextDescription,
@@ -479,6 +488,40 @@ export function CodingHomeworkGraderActivityView({
     }
   }
 
+  async function uploadProvidedFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !authoringClient) {
+      return;
+    }
+    setUploadingProvidedFile(true);
+    try {
+      const record = await authoringClient.uploadProvidedFile(activity.id, await fileToUploadInput(file));
+      setProvidedFiles(record.providedFiles);
+      notifications.success(copy.providedFileUploaded);
+    } catch (error) {
+      notifications.error(error instanceof Error ? error.message : copy.saveError);
+    } finally {
+      setUploadingProvidedFile(false);
+    }
+  }
+
+  async function deleteProvidedFile(attachmentId: string) {
+    if (!authoringClient) {
+      return;
+    }
+    setDeletingProvidedFileId(attachmentId);
+    try {
+      const record = await authoringClient.deleteProvidedFile(activity.id, attachmentId);
+      setProvidedFiles(record.providedFiles);
+      notifications.success(copy.providedFileRemoved);
+    } catch (error) {
+      notifications.error(error instanceof Error ? error.message : copy.saveError);
+    } finally {
+      setDeletingProvidedFileId(null);
+    }
+  }
+
   async function createDocumentationSnapshot() {
     if (!authoringClient?.createDocumentationSnapshot) {
       return;
@@ -615,7 +658,17 @@ export function CodingHomeworkGraderActivityView({
       <section className="section stack" aria-busy={processingSubmission}>
         <h2>{activity.title}</h2>
         {loadingStudentAssignment ? <p>{copy.loading}</p> : <MarkdownRenderer markdown={studentAssignment?.assignment.promptMarkdown || activity.description} />}
-        {studentAssignment?.assignment.promptPdf ? <p className="muted">{studentAssignment.assignment.promptPdf.originalName}</p> : null}
+        {studentAssignment?.assignment.promptPdf && activityFileUrl ? (
+          <p><a className="button secondary" href={activityFileUrl(studentAssignment.assignment.promptPdf.id)} target="_blank" rel="noreferrer">{copy.viewPdf}</a></p>
+        ) : null}
+        {studentAssignment?.assignment.providedFiles.length && activityFileUrl ? (
+          <div className="stack">
+            <h3>{copy.providedFiles}</h3>
+            {studentAssignment.assignment.providedFiles.map((file) => (
+              <a key={file.id} href={activityFileUrl(file.id)} target="_blank" rel="noreferrer">{file.originalName}</a>
+            ))}
+          </div>
+        ) : null}
         <PreflightPanel copy={copy} disabled={processingSubmission} preflightResult={preflightResult} runningPreflight={runningPreflight} onUpload={runPreflight} />
         {submissionClient ? (
           <>
@@ -698,7 +751,39 @@ export function CodingHomeworkGraderActivityView({
                 <input accept="application/pdf,.pdf" hidden type="file" onChange={uploadPdf} />
               </label>
               <span className="muted">{assignmentPdf?.originalName ?? copy.noPdf}</span>
+              {assignmentPdf && activityFileUrl ? (
+                <a className="button secondary" href={activityFileUrl(assignmentPdf.id)} target="_blank" rel="noreferrer">{copy.viewPdf}</a>
+              ) : null}
             </div>
+            {assignmentPdf && activityFileUrl ? (
+              <iframe
+                src={activityFileUrl(assignmentPdf.id)}
+                title={`${copy.assignmentPdf}: ${assignmentPdf.originalName}`}
+                style={{ border: "1px solid var(--color-border, #d8deea)", borderRadius: "0.5rem", minHeight: "32rem", width: "100%" }}
+              />
+            ) : null}
+          </div>
+          <div className="field">
+            <label>{copy.providedFiles}</label>
+            <div className="inline-actions">
+              <label className="button secondary">
+                {uploadingProvidedFile ? "..." : copy.uploadProvidedFile}
+                <input hidden type="file" onChange={uploadProvidedFile} />
+              </label>
+              <span className="muted">{copy.providedFilesHelp}</span>
+            </div>
+            {providedFiles.length ? (
+              <div className="stack">
+                {providedFiles.map((file) => (
+                  <div className="inline-actions" key={file.id}>
+                    {activityFileUrl ? <a href={activityFileUrl(file.id)} target="_blank" rel="noreferrer">{file.originalName}</a> : <span>{file.originalName}</span>}
+                    <button className="button secondary" disabled={deletingProvidedFileId === file.id} type="button" onClick={() => void deleteProvidedFile(file.id)}>
+                      {deletingProvidedFileId === file.id ? "..." : copy.removeProvidedFile}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : <span className="muted">{copy.noProvidedFiles}</span>}
           </div>
         </section>
 

@@ -10,6 +10,7 @@ const dbMocks = vi.hoisted(() => ({
     update: vi.fn()
   }
 }));
+const activityDocumentMocks = vi.hoisted(() => ({ getCodingHomeworkActivityReferenceDocuments: vi.fn() }));
 
 vi.mock("@cognelo/core", () => ({
   AppError: class AppError extends Error {
@@ -28,12 +29,16 @@ vi.mock("@cognelo/core", () => ({
 vi.mock("./db-client", () => ({
   prisma: dbMocks
 }));
+vi.mock("./activity-documents", () => ({
+  getCodingHomeworkActivityReferenceDocuments: activityDocumentMocks.getCodingHomeworkActivityReferenceDocuments
+}));
 
 const { extractCodingHomeworkDocumentationSnapshot } = await import("./extraction");
 
 describe("coding homework source extraction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    activityDocumentMocks.getCodingHomeworkActivityReferenceDocuments.mockResolvedValue({ sourceId: "activity-1", documents: [], diagnostics: [] });
     dbMocks.pluginCodingHomeworkDocumentationSnapshot.findFirst.mockResolvedValue(snapshot());
     dbMocks.pluginCodingHomeworkDocumentationSnapshot.update.mockImplementation(async ({ data }) => ({
       ...snapshot(),

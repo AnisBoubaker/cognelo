@@ -15,6 +15,7 @@ Current scope:
 - initial config schema
 - plugin-owned Prisma schema, generated client, and activation migration manifest
 - teacher authoring routes and React renderer
+- secure inline viewing of the plugin-owned assignment PDF and upload/download management for files provided with the assignment
 - prior-documentation preview and snapshot routes for course activities
 - prior-documentation extraction route that consumes generic content type plugin extracted documents
 - language-neutral parser registry with a C adapter
@@ -25,6 +26,7 @@ Current scope:
 - teacher-triggered challenge question generation and retry storage for analyzed submissions
 - automatic student-path challenge generation plus draft/final challenge answer routes and UI
 - bank-to-course copy hook for authored prompt/settings/requirements
+- assignment text, assignment PDF text, and provided source/text files included with prior course material during challenge-reference extraction and similarity analysis
 
 ## Activity Type
 
@@ -38,7 +40,7 @@ Current config shape:
 
 ## Current State
 
-This plugin is still building toward full grading, but it now has teacher authoring, prior-documentation snapshot/extraction flows, the first C parser adapter, temporary ZIP preflight validation, final ZIP submission storage, submitted-function candidate analysis, challenge question generation, and student challenge answer submission. It is registered as `coding-homework-grader`, uses the package `@cognelo/plugin-coding-homework-grader`, and owns the persistence foundation for authoring, documentation snapshots, submissions, challenge questions, and review records. It does not yet expose core gradebook attempts or grading routes.
+The plugin now has the complete manual-grading workflow: teacher authoring, prior-documentation snapshot/extraction, plugin-owned assignment/provided files, the first C parser adapter, ZIP preflight validation, final ZIP submission storage, submitted-function candidate analysis, challenge question generation, student challenge answers, core attempts, and teacher gradebook review. It is registered as `coding-homework-grader`, uses the package `@cognelo/plugin-coding-homework-grader`, and owns its authoring, attachment, snapshot, submission, challenge-question, and review records.
 
 The teacher authoring form is registered with `useUnsavedChangesGuard` from `@cognelo/activity-ui` so navigation uses the platform-wide unsaved-change dialog.
 
@@ -74,13 +76,15 @@ Phase 9 added `src/submission.ts`, the `coding-homework-grader/assignment` route
 
 Phase 10 added `src/analysis.ts` and the `coding-homework-grader/submission-analysis` route. Valid final submissions now analyze extracted source files, parse submitted functions, store deterministic development embeddings, retrieve nearest prior examples through core/content-plugin vector search, compute divergence scores, and mark selected candidates for future challenge generation. Prior course-content vector search stays behind the shared content type plugin interface; submitted functions are plugin-owned assessment artifacts.
 
-Phase 11 added `src/generation.ts` and the teacher-only `coding-homework-grader/challenge-generation` route. Teachers can trigger or retry challenge question generation for analyzed submissions using their server-side question-authoring AI agent connection. Generated questions are stored in `PluginCodingHomeworkChallengeQuestion` with prompt version, model, selected function provenance, nearest examples, prompt hash/text, raw response, and attempt count. Student-facing question/answer UI remains a later phase, and prior examples must not be exposed to students.
+Phase 11 added `src/generation.ts` and the teacher-only `coding-homework-grader/challenge-generation` route. Teachers can trigger or retry challenge question generation for analyzed submissions using their server-side question-authoring AI agent connection. Generated questions are stored in `PluginCodingHomeworkChallengeQuestion` with prompt version, model, selected function provenance, nearest examples, prompt hash/text, raw response, and attempt count. Phase 12 added the student-facing question/answer UI; prior examples and generation provenance remain server-side and must not be exposed to students.
 
 Phase 12 added automatic student-path challenge generation and `src/challenge-answers.ts`. Valid student ZIP submissions now analyze the submitted functions, generate the challenge set through a course teacher/owner's configured non-local question-authoring AI connection, and return a student-safe question payload immediately. The `coding-homework-grader/challenge-answers` route saves draft answers with `PUT` and finalizes answers with `POST`; finalization requires every question to be answered and moves the plugin submission to `ready_for_grading`.
 
 Phase 13 added gradebook integration and teacher manual grading. For summative assigned activities, final answer submission creates/submits a core `ActivityAttempt` linked to the plugin submission. Teachers can open the activity gradebook detail page, use Review/Grade, inspect submitted file metadata, generated questions, student answers, and selected function source, then save score/feedback through the normal core gradebook override workflow.
 
 Phase 14 added operational hardening on top of the shared core background job service. Student final ZIP submissions include an `idempotencyKey` so browser/network retries reuse the existing submission instead of creating duplicates, then enqueue `coding-homework-grader.process-submission` for analysis and challenge generation. Upload/extraction, analysis, and challenge generation append processing timeline entries to submission metadata; failed processing stores categorized retryable/non-retryable error details; and teachers can use `coding-homework-grader/reprocess` to retry unfinished/failed submissions without duplicating derived function/question rows. The student view polls latest submission state until questions are ready.
+
+Assignment PDFs and teacher-provided files are activity-owned attachments, not course content resources. Teachers can view the PDF inline and add, open, or remove provided files from the authoring screen; students can open the same assigned files. Bank-to-course copying preserves these attachment records. Documentation extraction adds the assignment Markdown, extractable PDF text, and provided text/source files to the snapshot alongside prior visible course resources. C functions from provided files are parsed into function-level reference documents, and submission analysis merges their similarity matches with course-content matches before selecting challenge candidates.
 
 Current plugin-owned tables:
 

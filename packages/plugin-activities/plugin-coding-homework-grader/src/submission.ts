@@ -72,10 +72,18 @@ type SubmissionWithReplayData = SubmissionRow & {
 };
 
 export async function getCodingHomeworkStudentAssignment(scope: SubmissionScope) {
-  const [assignment, requirementSet, latestSubmission] = await Promise.all([
+  const [assignment, requirementSet, latestSubmission, providedFiles] = await Promise.all([
     prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: scope.activityId } }),
     prisma.pluginCodingHomeworkSubmissionRequirementSet.findUnique({ where: { activityId: scope.activityId } }),
-    getLatestCodingHomeworkSubmission(scope)
+    getLatestCodingHomeworkSubmission(scope),
+    prisma.pluginCodingHomeworkAttachment.findMany({
+      where: {
+        ownerKind: "course_activity",
+        ownerId: scope.activityId,
+        kind: "provided_file"
+      },
+      orderBy: [{ originalName: "asc" }, { createdAt: "asc" }]
+    })
   ]);
   const assignmentPdf = assignment?.promptPdfAttachmentId
     ? await prisma.pluginCodingHomeworkAttachment.findFirst({
@@ -98,7 +106,13 @@ export async function getCodingHomeworkStudentAssignment(scope: SubmissionScope)
             originalName: assignmentPdf.originalName,
             sizeBytes: Number(assignmentPdf.sizeBytes)
           }
-        : null
+        : null,
+      providedFiles: providedFiles.map((file) => ({
+        id: file.id,
+        mimeType: file.mimeType,
+        originalName: file.originalName,
+        sizeBytes: Number(file.sizeBytes)
+      }))
     },
     latestSubmission,
     requirements: normalizeCodingHomeworkSubmissionRequirements(requirementSet?.requirements)
