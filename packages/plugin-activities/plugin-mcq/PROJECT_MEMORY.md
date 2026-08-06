@@ -8,10 +8,12 @@ This file is for MCQ plugin memory only.
 - MCQ authoring keeps one complete source editor so teachers can copy/paste or save the full activity text externally; the rendered preview sits beside that single editor rather than below it.
 - MCQ source editor uses the shared Markdown renderer behavior from `@cognelo/activity-ui`, including syntax coloring inside fenced code blocks such as ```c choices.
 - The plugin currently infers single-choice versus multiple-choice from the number of correct answers in each question.
-- The first version stores only authored MCQ content in the generic activity config; student submissions are not yet persisted.
+- Authored MCQ content remains in generic activity config. Summative submissions are persisted as core `ActivityAttempt` records and graded through the shared gradebook workflow, while formative checks remain client-side.
 - Since there is no private plugin-owned authoring data yet, bank-to-course copying relies only on the platform's generic config copy.
 - The MCQ authoring view is available from activity bank activity editing pages as well as course activity management pages.
 - AI-assisted MCQ source generation is available only when the teacher has selected an enabled question-authoring AI agent in `/settings/ai-agents`.
-- AI-assisted generation asks for confirmation before replacing a non-empty MCQ source field.
-- MCQ generation runs through a plugin server route so API keys stay server-side. The prompt includes syntax rules, current locale, subject context, the teacher description, and `defaultCodeLanguage`.
-- Generated MCQ source is parsed before it is returned. The route retries with validation issues up to three total model calls, then returns an error with the last issues/source.
+- AI-assisted generation lives in a collapsed teacher-only "Generate questions with AI" section. It accepts private optional model instructions and a requested question count, and asks for confirmation before replacing a non-empty MCQ source field.
+- The generic activity description is the student prompt: it renders before the MCQ questions and is also sent to the generation model. Private AI instructions and generation controls are never rendered in the student view or stored in activity config.
+- MCQ generation runs through a plugin server route so API keys stay server-side. The prompt includes syntax rules, current locale, subject context, the student prompt, private teacher instructions, the requested question count, and `defaultCodeLanguage`.
+- Generated MCQ source is parsed and checked for the requested question count before it is returned. The route retries with validation issues up to three total model calls, then returns an error with the last issues/source.
+- MCQ defaults `defaultCodeLanguage` to `none`, presented as "Not a programming exercise." Existing activities retain their saved language, and teachers can still select a programming language for unlabelled fenced code blocks.

@@ -3,6 +3,7 @@ import type { ActivityPlugin } from "@cognelo/activity-sdk";
 import { parseMcqSource } from "./mcq";
 
 const supportedLanguages = new Set<string>([
+  "none",
   "actionscript",
   "c",
   "coffee",
@@ -31,7 +32,7 @@ const supportedLanguages = new Set<string>([
 const mcqConfigSchema = z
   .object({
     source: z.string().min(20).max(30000),
-    defaultCodeLanguage: z.string().min(1).max(40).default("python"),
+    defaultCodeLanguage: z.string().min(1).max(40).default("none"),
     randomizeChoices: z.boolean().default(false)
   })
   .superRefine((value, context) => {
@@ -65,23 +66,18 @@ const defaultMcqSource = [
   "Write the MCQ activity with Markdown-style text.",
   "",
   "## Question 1",
-  "What does this program print?",
+  "Which planet is the largest in our solar system?",
   "",
-  "```python",
-  "value = 2 + 3",
-  "print(value)",
-  "```",
-  "",
-  "- [ ] 4",
-  "- [x] 5",
-  "- [ ] 6",
+  "- [ ] Earth",
+  "- [x] Jupiter",
+  "- [ ] Mars",
   "",
   "## Question 2",
-  "Which of these are Python collection types?",
+  "Which of these are renewable energy sources?",
   "",
-  "- [x] `list`",
-  "- [x] `dict`",
-  "- [ ] `switch`"
+  "- [x] Solar energy",
+  "- [x] Wind energy",
+  "- [ ] Coal"
 ].join("\n");
 
 export const mcqPlugin: ActivityPlugin = {
@@ -91,7 +87,7 @@ export const mcqPlugin: ActivityPlugin = {
   db: {
     namespace: "plugin_mcq",
     tables: [],
-    notes: ["MCQ currently relies only on core activity records and evaluates answers client-side."]
+    notes: ["MCQ uses generic activity config for authoring and core ActivityAttempt/gradebook records for summative submissions; it owns no plugin tables."]
   },
   activities: [
     {
@@ -124,7 +120,7 @@ export const mcqPlugin: ActivityPlugin = {
       },
       defaultConfig: {
         source: defaultMcqSource,
-        defaultCodeLanguage: "python",
+        defaultCodeLanguage: "none",
         randomizeChoices: false
       },
       configSchema: mcqConfigSchema,

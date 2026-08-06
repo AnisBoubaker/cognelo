@@ -1,7 +1,9 @@
 export type McqGenerationInput = {
   description: string;
   defaultCodeLanguage: string;
+  instructions?: string;
   locale: "en" | "fr" | "zh" | "ar";
+  questionCount: number;
 };
 
 export type McqGenerationResult = {

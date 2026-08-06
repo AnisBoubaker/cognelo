@@ -16,8 +16,10 @@ import { parseMcqSource, type McqAnswerState, type McqParseError } from "./mcq";
 
 const mcqGenerateInputSchema = z.object({
   description: z.string().min(10).max(4000),
-  defaultCodeLanguage: z.string().min(1).max(40).default("python"),
-  locale: z.enum(["en", "fr", "zh", "ar"]).default("en")
+  defaultCodeLanguage: z.string().min(1).max(40).default("none"),
+  instructions: z.string().max(4000).default(""),
+  locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
+  questionCount: z.number().int().min(1).max(20).default(5)
 });
 
 const mcqSubmissionInputSchema = z.object({
@@ -49,7 +51,9 @@ export const mcqGenerateRoute: PluginRouteDefinition = {
         user: context.user,
         description: input.description,
         defaultCodeLanguage: input.defaultCodeLanguage,
+        instructions: input.instructions,
         locale: input.locale,
+        questionCount: input.questionCount,
         subject
       });
 
@@ -294,7 +298,9 @@ async function generateValidMcqSource(input: {
   user: Parameters<typeof generateQuestionAuthoringText>[0];
   description: string;
   defaultCodeLanguage: string;
+  instructions: string;
   locale: "en" | "fr" | "zh" | "ar";
+  questionCount: number;
   subject: SubjectContext;
 }) {
   const systemPrompt = buildSystemPrompt(input);
@@ -310,7 +316,7 @@ async function generateValidMcqSource(input: {
     });
     const source = normalizeGeneratedSource(raw);
     const parsed = parseMcqSource(source, input.defaultCodeLanguage);
-    const issues = collectMcqIssues(source, parsed);
+    const issues = collectMcqIssues(source, parsed, input.questionCount);
 
     if (!issues.length) {
       return { source, attempts: attempt };
@@ -318,7 +324,7 @@ async function generateValidMcqSource(input: {
 
     lastSource = source;
     lastIssues = issues;
-    userPrompt = buildCorrectionPrompt(source, issues);
+    userPrompt = buildCorrectionPrompt(source, issues, input);
   }
 
   throw new AppError(422, "MCQ_AI_GENERATION_INVALID", "The AI agent could not generate valid MCQ syntax after three attempts.", {
@@ -346,7 +352,9 @@ function buildSystemPrompt(input: {
     "- Each question must include at least one correct choice.",
     "- Use one correct choice for single-answer questions and multiple `[x]` choices only when the question clearly asks for multiple answers.",
     "- Code blocks are allowed. If a code block has no explicit language, Cognelo will use the default language.",
-    `- Default code language: ${input.defaultCodeLanguage}.`,
+    input.defaultCodeLanguage === "none"
+      ? "- This is not a programming exercise. Do not introduce programming code unless the teacher explicitly requests it."
+      : `- Default code language: ${input.defaultCodeLanguage}.`,
     "- Prefer plausible distractors and avoid ambiguous wording.",
     "- If several questions are requested, order them crescendo from simpler to more complex.",
     "",
@@ -359,16 +367,32 @@ function buildSystemPrompt(input: {
   ].join("\n");
 }
 
-function buildInitialUserPrompt(input: { description: string }) {
+function buildInitialUserPrompt(input: { description: string; instructions: string; questionCount: number }) {
   return [
-    "Generate a valid Cognelo MCQ activity that matches this teacher description:",
-    input.description.trim()
+    `Generate exactly ${input.questionCount} valid Cognelo multiple-choice question${input.questionCount === 1 ? "" : "s"}.`,
+    "",
+    "Student prompt and activity context:",
+    input.description.trim(),
+    "",
+    "Additional instructions from the teacher:",
+    input.instructions.trim() || "No additional instructions were provided."
   ].join("\n\n");
 }
 
-function buildCorrectionPrompt(source: string, issues: McqParseError[]) {
+function buildCorrectionPrompt(
+  source: string,
+  issues: McqParseError[],
+  input: { description: string; instructions: string; questionCount: number }
+) {
   return [
     "The previous MCQ source was invalid. Return the full corrected MCQ source only.",
+    `The corrected source must contain exactly ${input.questionCount} question${input.questionCount === 1 ? "" : "s"}.`,
+    "",
+    "Student prompt and activity context:",
+    input.description.trim(),
+    "",
+    "Additional instructions from the teacher:",
+    input.instructions.trim() || "No additional instructions were provided.",
     "",
     "Validation issues:",
     ...issues.map((issue) => `- Line ${issue.line}: ${issue.message}`),
@@ -378,13 +402,18 @@ function buildCorrectionPrompt(source: string, issues: McqParseError[]) {
   ].join("\n");
 }
 
-function collectMcqIssues(source: string, parsed: ReturnType<typeof parseMcqSource>): McqParseError[] {
+function collectMcqIssues(source: string, parsed: ReturnType<typeof parseMcqSource>, questionCount: number): McqParseError[] {
   const issues = [...parsed.errors];
   if (!source.trim()) {
     issues.push({ line: 1, message: "Generated source is empty." });
   }
   if (!parsed.questions.length) {
     issues.push({ line: 1, message: "The activity must include at least one `## Question` section." });
+  } else if (parsed.questions.length !== questionCount) {
+    issues.push({
+      line: 1,
+      message: `The activity must include exactly ${questionCount} question${questionCount === 1 ? "" : "s"}; it currently includes ${parsed.questions.length}.`
+    });
   }
   return issues;
 }

@@ -83,11 +83,47 @@ describe("MCQ generation route", () => {
       mcqGenerateRoute.methods.POST?.({
         request: new Request("http://test.local"),
         context,
-        readJson: async () => ({ description: "Generate a simple programming MCQ.", defaultCodeLanguage: "python", locale: "en" })
+        readJson: async () => ({
+          description: "A student-facing prompt about programming basics.",
+          defaultCodeLanguage: "python",
+          instructions: "Focus on common misconceptions.",
+          locale: "en",
+          questionCount: 1
+        })
       })
     ).resolves.toMatchObject({ attempts: 1, source: expect.stringContaining("## Question") });
 
     expect(mocks.assertCanManageCourse).toHaveBeenCalledWith(context.user, "course-1");
+    expect(mocks.generateQuestionAuthoringText).toHaveBeenCalledWith(
+      context.user,
+      expect.objectContaining({
+        userPrompt: expect.stringContaining("Focus on common misconceptions.")
+      })
+    );
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.userPrompt).toContain("Generate exactly 1 valid Cognelo multiple-choice question.");
+  });
+
+  it("retries when the model returns the wrong number of questions", async () => {
+    mocks.generateQuestionAuthoringText
+      .mockResolvedValueOnce(`## Question 1\n\n- [x] Correct\n- [ ] Wrong`)
+      .mockResolvedValueOnce(`## Question 1\n\n- [x] Correct\n- [ ] Wrong\n\n## Question 2\n\n- [x] Correct\n- [ ] Wrong`);
+
+    await expect(
+      mcqGenerateRoute.methods.POST?.({
+        request: new Request("http://test.local"),
+        context,
+        readJson: async () => ({
+          description: "A student-facing prompt for two questions.",
+          defaultCodeLanguage: "none",
+          locale: "en",
+          questionCount: 2
+        })
+      })
+    ).resolves.toMatchObject({ attempts: 2, source: expect.stringContaining("## Question 2") });
+
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("This is not a programming exercise.");
+    expect(mocks.generateQuestionAuthoringText.mock.calls[1]?.[1]?.userPrompt).toContain("A student-facing prompt for two questions.");
+    expect(mocks.generateQuestionAuthoringText.mock.calls[1]?.[1]?.userPrompt).toContain("exactly 2 questions");
   });
 
   it("retries malformed source and fails after repeated invalid output", async () => {
@@ -97,7 +133,7 @@ describe("MCQ generation route", () => {
       mcqGenerateRoute.methods.POST?.({
         request: new Request("http://test.local"),
         context,
-        readJson: async () => ({ description: "Generate a simple programming MCQ.", defaultCodeLanguage: "python", locale: "en" })
+        readJson: async () => ({ description: "Generate a simple programming MCQ.", defaultCodeLanguage: "python", locale: "en", questionCount: 1 })
       })
     ).rejects.toMatchObject({ status: 422, code: "MCQ_AI_GENERATION_INVALID" });
   });
@@ -107,7 +143,7 @@ describe("MCQ generation route", () => {
       mcqGenerateRoute.methods.POST?.({
         request: new Request("http://test.local"),
         context: { ...context, courseId: undefined },
-        readJson: async () => ({ description: "Generate a simple programming MCQ.", defaultCodeLanguage: "python", locale: "en" })
+        readJson: async () => ({ description: "Generate a simple programming MCQ.", defaultCodeLanguage: "python", locale: "en", questionCount: 1 })
       })
     ).rejects.toMatchObject({ status: 400, code: "ACTIVITY_CONTEXT_REQUIRED" });
   });
