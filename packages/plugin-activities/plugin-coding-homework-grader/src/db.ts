@@ -293,6 +293,12 @@ export const codingHomeworkGraderDatabaseModule = {
           WHEN duplicate_object THEN null;
         END $$`
       ]
+    },
+    {
+      id: "202607140010_provided_activity_files",
+      statements: [
+        `ALTER TYPE "PluginCodingHomeworkAttachmentKind" ADD VALUE IF NOT EXISTS 'provided_file'`
+      ]
     }
   ],
   notes: [

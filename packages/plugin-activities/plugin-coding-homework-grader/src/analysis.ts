@@ -1,10 +1,11 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { createDeterministicContentEmbeddingProvider } from "@cognelo/content-type-sdk/vector";
+import { buildContentVectorIndex, createDeterministicContentEmbeddingProvider, searchContentVectorIndex } from "@cognelo/content-type-sdk/vector";
 import { AppError, canManageCourse, searchContentResourceEmbeddingDocuments } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
 import { z } from "zod";
 import { Prisma, prisma } from "./db-client";
+import { getCodingHomeworkActivityReferenceDocuments } from "./activity-documents";
 import { parseCodingHomeworkSourceFiles } from "./parsers";
 import { appendProcessingEvent, buildProcessingEvent, buildProcessingOperationId, processingFailureMetadata } from "./processing";
 
@@ -128,7 +129,15 @@ export async function analyzeCodingHomeworkSubmission(scope: AnalysisScope, inpu
     const fileIdsByPath = new Map(submission.files.map((file) => [file.path, file.id]));
     const snapshot = submission.documentationSnapshotId ? await findSnapshot(scope, submission.documentationSnapshotId) : null;
     const contentResourceIds = snapshot ? readSnapshotContentResourceIds(snapshot) : [];
+    const snapshotActivityDocuments = snapshot ? readSnapshotActivityDocuments(snapshot) : null;
+    const activityReferenceDocuments = snapshotActivityDocuments?.documents.length
+      ? snapshotActivityDocuments
+      : await getCodingHomeworkActivityReferenceDocuments(scope.activityId);
+    const activityReferenceIndex = activityReferenceDocuments.documents.length
+      ? await buildContentVectorIndex(activityReferenceDocuments, { embeddingProvider: provider })
+      : null;
     const referenceDiagnostics: unknown[] = [];
+    referenceDiagnostics.push(...activityReferenceDocuments.diagnostics);
 
     const prepared: PreparedFunction[] = [];
     for (const parsedFunction of parseResult.functions) {
@@ -147,19 +156,40 @@ export async function analyzeCodingHomeworkSubmission(scope: AnalysisScope, inpu
             queryText: parsedFunction.astText
           })
         : { diagnostics: [], matches: [] };
+      const activityMatches = activityReferenceIndex
+        ? await searchContentVectorIndex(activityReferenceIndex, {
+            embeddingProvider: provider,
+            limit: nearestExampleCount,
+            queryVector: embedding.values
+          })
+        : [];
       referenceDiagnostics.push(...referenceSearch.diagnostics);
-      const nearestExamples = referenceSearch.matches.map((match) => ({
-        contentResourceId: match.contentResourceId,
-        contentTypeKey: match.contentTypeKey,
-        distance: match.distance,
-        documentId: match.documentId,
-        functionCode: match.text,
-        functionName: readFunctionName(match.metadata) ?? match.title,
-        pluginKey: match.pluginKey,
-        referenceId: match.documentId,
-        score: match.score,
-        sourceTitle: match.resourceTitle || match.title
-      }));
+      const nearestExamples = [
+        ...referenceSearch.matches.map((match) => ({
+          contentResourceId: match.contentResourceId,
+          contentTypeKey: match.contentTypeKey,
+          distance: match.distance,
+          documentId: match.documentId,
+          functionCode: match.text,
+          functionName: readFunctionName(match.metadata) ?? match.title,
+          pluginKey: match.pluginKey,
+          referenceId: match.documentId,
+          score: match.score,
+          sourceTitle: match.resourceTitle || match.title
+        })),
+        ...activityMatches.map((match) => ({
+          distance: match.distance,
+          documentId: match.documentId,
+          functionCode: readFunctionCode(match.metadata) ?? match.text,
+          functionName: readFunctionName(match.metadata) ?? match.title,
+          pluginKey: "coding-homework-grader",
+          referenceId: match.documentId,
+          score: match.score,
+          sourceTitle: match.title
+        }))
+      ]
+        .sort((left, right) => right.score - left.score || left.documentId.localeCompare(right.documentId))
+        .slice(0, nearestExampleCount);
       prepared.push({
         astText: parsedFunction.astText,
         divergenceScore: nearestExamples[0]?.distance ?? 1,
@@ -205,6 +235,7 @@ export async function analyzeCodingHomeworkSubmission(scope: AnalysisScope, inpu
       storedFunctionCount: created.length,
       selectedCandidateCount: selectedKeys.size,
       referenceResourceCount: contentResourceIds.length,
+      activityReferenceDocumentCount: activityReferenceDocuments.documents.length,
       nearestExampleCount,
       candidateLimit,
       diagnostics: {
@@ -306,6 +337,22 @@ function readSnapshotContentResourceIds(snapshot: SnapshotRow) {
   return [...new Set(includedResources.flatMap((resource) => (resource.contentResourceId ? [resource.contentResourceId] : [])))];
 }
 
+function readSnapshotActivityDocuments(snapshot: SnapshotRow) {
+  const metadata = normalizeObject(snapshot.metadata);
+  const extraction = normalizeObject(metadata.extraction);
+  const documents = Array.isArray(extraction.documents)
+    ? extraction.documents.filter((document) => normalizeObject(document).pluginKey === "coding-homework-grader")
+    : [];
+  const diagnostics = Array.isArray(extraction.diagnostics)
+    ? extraction.diagnostics.filter((diagnostic) => normalizeObject(normalizeObject(diagnostic).metadata).attachmentId)
+    : [];
+  return {
+    sourceId: snapshot.id,
+    documents: documents as Awaited<ReturnType<typeof getCodingHomeworkActivityReferenceDocuments>>["documents"],
+    diagnostics: diagnostics as Awaited<ReturnType<typeof getCodingHomeworkActivityReferenceDocuments>>["diagnostics"]
+  };
+}
+
 function selectCandidateKeys(functions: PreparedFunction[], limit: number) {
   const ranked = [...functions].sort(
     (left, right) =>
@@ -344,6 +391,11 @@ function candidateKey(fn: { functionName: string; sourcePath: string }) {
 function readFunctionName(metadata: unknown) {
   const object = normalizeObject(metadata);
   return typeof object.functionName === "string" && object.functionName.trim() ? object.functionName : null;
+}
+
+function readFunctionCode(metadata: unknown) {
+  const object = normalizeObject(metadata);
+  return typeof object.functionCode === "string" && object.functionCode.trim() ? object.functionCode : null;
 }
 
 function toSubmissionRecord(row: SubmissionRow) {

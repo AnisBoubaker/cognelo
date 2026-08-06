@@ -11,6 +11,8 @@ describe("coding homework grader plugin manifest", () => {
     expect(codingHomeworkGraderServerPlugin.routes?.map((route) => route.path)).toEqual([
       "coding-homework-grader/authoring",
       "coding-homework-grader/assignment-pdf",
+      "coding-homework-grader/activity-file",
+      "coding-homework-grader/provided-files",
       "coding-homework-grader/requirements-upload",
       "coding-homework-grader/documentation-preview",
       "coding-homework-grader/documentation-snapshot",

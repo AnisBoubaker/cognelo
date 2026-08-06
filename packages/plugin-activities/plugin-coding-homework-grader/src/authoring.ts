@@ -6,6 +6,7 @@ import { AppError } from "@cognelo/core";
 import { Prisma, prisma } from "./db-client";
 
 const MAX_ASSIGNMENT_PDF_BYTES = 25 * 1024 * 1024;
+const MAX_PROVIDED_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_REQUIREMENTS_UPLOAD_BYTES = 2 * 1024 * 1024;
 const SAFE_NAME_PATTERN = /[^a-zA-Z0-9._-]/g;
 
@@ -95,7 +96,7 @@ type AttachmentRow = {
   id: string;
   ownerKind: "course_activity" | "bank_activity" | "submission";
   ownerId: string;
-  kind: "assignment_pdf" | "requirements_upload" | "submission_zip" | "extracted_source" | "extracted_non_source";
+  kind: "assignment_pdf" | "provided_file" | "requirements_upload" | "submission_zip" | "extracted_source" | "extracted_non_source";
   originalName: string;
   storedName: string;
   mimeType: string | null;
@@ -119,13 +120,23 @@ export async function getCodingHomeworkAuthoring(owner: OwnerContext) {
       })
     : [];
 
+  const providedFiles = await prisma.pluginCodingHomeworkAttachment.findMany({
+    where: {
+      ownerKind: owner.ownerKind,
+      ownerId: owner.ownerId,
+      kind: "provided_file"
+    },
+    orderBy: [{ originalName: "asc" }, { createdAt: "asc" }]
+  });
+
   return {
     assignment: toAssignmentRecord(assignment),
     assignmentPdf: assignment?.promptPdfAttachmentId ? toAttachmentRecord(attachments.find((attachment) => attachment.id === assignment.promptPdfAttachmentId)) : null,
     requirements: toRequirementRecord(requirementSet),
     requirementsUpload: requirementSet?.sourceAttachmentId
       ? toAttachmentRecord(attachments.find((attachment) => attachment.id === requirementSet.sourceAttachmentId))
-      : null
+      : null,
+    providedFiles: providedFiles.map((attachment) => toAttachmentRecord(attachment)).filter(Boolean)
   };
 }
 
@@ -214,6 +225,56 @@ export async function uploadCodingHomeworkAssignmentPdf(owner: OwnerContext, inp
   return getCodingHomeworkAuthoring(owner);
 }
 
+export async function uploadCodingHomeworkProvidedFile(owner: OwnerContext, input: unknown) {
+  const parsed = codingHomeworkFileUploadInputSchema.parse(input);
+  const bytes = decodeUploadBytes(parsed.base64, MAX_PROVIDED_FILE_BYTES);
+  await createAttachment(owner, {
+    bytes,
+    kind: "provided_file",
+    mimeType: parsed.mimeType || "application/octet-stream",
+    originalName: parsed.fileName
+  });
+  return getCodingHomeworkAuthoring(owner);
+}
+
+export async function deleteCodingHomeworkProvidedFile(owner: OwnerContext, attachmentId: string) {
+  const attachment = await prisma.pluginCodingHomeworkAttachment.findFirst({
+    where: {
+      id: attachmentId,
+      ownerKind: owner.ownerKind,
+      ownerId: owner.ownerId,
+      kind: "provided_file"
+    }
+  });
+  if (!attachment) {
+    throw new AppError(404, "CODING_HOMEWORK_PROVIDED_FILE_NOT_FOUND", "The provided activity file was not found.");
+  }
+  await prisma.pluginCodingHomeworkAttachment.delete({ where: { id: attachment.id } });
+  return getCodingHomeworkAuthoring(owner);
+}
+
+export async function getCodingHomeworkActivityAttachment(owner: OwnerContext, attachmentId: string) {
+  const assignment = await findAssignment(owner);
+  const attachment = await prisma.pluginCodingHomeworkAttachment.findFirst({
+    where: {
+      id: attachmentId,
+      ownerKind: owner.ownerKind,
+      ownerId: owner.ownerId,
+      OR: [
+        { kind: "provided_file" },
+        ...(assignment?.promptPdfAttachmentId === attachmentId ? [{ kind: "assignment_pdf" as const }] : [])
+      ]
+    }
+  });
+  if (!attachment) {
+    throw new AppError(404, "CODING_HOMEWORK_ATTACHMENT_NOT_FOUND", "The activity attachment was not found.");
+  }
+  return {
+    attachment: toAttachmentRecord(attachment),
+    filePath: codingHomeworkAttachmentPath(attachment.storedName)
+  };
+}
+
 export async function importCodingHomeworkRequirements(owner: OwnerContext, input: unknown) {
   const parsed = codingHomeworkFileUploadInputSchema.parse(input);
   const bytes = decodeUploadBytes(parsed.base64, MAX_REQUIREMENTS_UPLOAD_BYTES);
@@ -242,15 +303,13 @@ export async function copyBankCodingHomeworkAuthoringToCourseActivity(params: { 
     prisma.pluginBankCodingHomeworkSubmissionRequirementSet.findUnique({ where: { bankActivityId: params.bankActivityId } })
   ]);
   const attachmentIds = [assignment?.promptPdfAttachmentId, requirementSet?.sourceAttachmentId].filter(Boolean) as string[];
-  const sourceAttachments = attachmentIds.length
-    ? await prisma.pluginCodingHomeworkAttachment.findMany({
-        where: {
-          id: { in: attachmentIds },
-          ownerKind: "bank_activity",
-          ownerId: params.bankActivityId
-        }
-      })
-    : [];
+  const sourceAttachments = await prisma.pluginCodingHomeworkAttachment.findMany({
+    where: {
+      ownerKind: "bank_activity",
+      ownerId: params.bankActivityId,
+      OR: [{ id: { in: attachmentIds } }, { kind: "provided_file" }]
+    }
+  });
 
   await prisma.$transaction(async (transaction) => {
     await transaction.pluginCodingHomeworkAssignment.deleteMany({ where: { activityId: params.activityId } });
@@ -259,7 +318,7 @@ export async function copyBankCodingHomeworkAuthoringToCourseActivity(params: { 
       where: {
         ownerKind: "course_activity",
         ownerId: params.activityId,
-        kind: { in: ["assignment_pdf", "requirements_upload"] }
+        kind: { in: ["assignment_pdf", "provided_file", "requirements_upload"] }
       }
     });
 
@@ -339,6 +398,13 @@ function fileStorageDir() {
   return path.join(process.cwd(), "../../storage/coding-homework-grader");
 }
 
+export function codingHomeworkAttachmentPath(storedName: string) {
+  if (path.basename(storedName) !== storedName) {
+    throw new AppError(400, "CODING_HOMEWORK_ATTACHMENT_PATH_INVALID", "The stored attachment path is invalid.");
+  }
+  return path.join(fileStorageDir(), storedName);
+}
+
 function decodeUploadBytes(base64: string, maxBytes: number) {
   const bytes = Buffer.from(base64, "base64");
   if (!bytes.length) {
@@ -354,7 +420,7 @@ async function createAttachment(
   owner: OwnerContext,
   input: {
     bytes: Buffer;
-    kind: "assignment_pdf" | "requirements_upload";
+    kind: "assignment_pdf" | "provided_file" | "requirements_upload";
     mimeType: string;
     originalName: string;
   }

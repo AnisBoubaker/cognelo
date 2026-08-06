@@ -1,13 +1,19 @@
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
+import { Readable } from "node:stream";
 import type { PluginRouteDefinition, PluginRouteContext } from "@cognelo/activity-sdk/server";
 import { AppError, assertCanManageActivityBank, assertCanManageCourse, getBackgroundJob } from "@cognelo/core";
 import { prisma as corePrisma } from "@cognelo/db";
 import { analyzeCodingHomeworkSubmission } from "./analysis";
 import { saveCodingHomeworkChallengeAnswers } from "./challenge-answers";
 import {
+  deleteCodingHomeworkProvidedFile,
+  getCodingHomeworkActivityAttachment,
   getCodingHomeworkAuthoring,
   importCodingHomeworkRequirements,
   saveCodingHomeworkAuthoring,
-  uploadCodingHomeworkAssignmentPdf
+  uploadCodingHomeworkAssignmentPdf,
+  uploadCodingHomeworkProvidedFile
 } from "./authoring";
 import { buildCodingHomeworkDocumentationPreview, createCodingHomeworkDocumentationSnapshot } from "./documentation";
 import { extractCodingHomeworkDocumentationSnapshot } from "./extraction";
@@ -47,6 +53,21 @@ async function resolveOwner(context: PluginRouteContext) {
 
   const courseId = requireCourseId(context.courseId);
   await assertCanManageCourse(context.user, courseId);
+  return {
+    ownerKind: "course_activity" as const,
+    ownerId: context.activity.id
+  };
+}
+
+async function resolveReadableActivityOwner(context: PluginRouteContext) {
+  if (context.activityBankId) {
+    return resolveOwner(context);
+  }
+  requireCourseId(context.courseId);
+  if (!context.groupId) {
+    return resolveOwner(context);
+  }
+  resolveStudentSubmissionScope(context);
   return {
     ownerKind: "course_activity" as const,
     ownerId: context.activity.id
@@ -115,6 +136,49 @@ export const codingHomeworkAssignmentPdfRoute: PluginRouteDefinition = {
   methods: {
     POST: async ({ context, readJson }) => {
       return uploadCodingHomeworkAssignmentPdf(await resolveOwner(context), await readJson());
+    }
+  }
+};
+
+export const codingHomeworkProvidedFilesRoute: PluginRouteDefinition = {
+  path: "coding-homework-grader/provided-files",
+  activityTypeKeys: ["coding-homework-grader"],
+  methods: {
+    POST: async ({ context, readJson }) => {
+      return uploadCodingHomeworkProvidedFile(await resolveOwner(context), await readJson());
+    },
+    DELETE: async ({ context, request }) => {
+      const attachmentId = new URL(request.url).searchParams.get("attachmentId")?.trim();
+      if (!attachmentId) {
+        throw new AppError(400, "CODING_HOMEWORK_ATTACHMENT_REQUIRED", "An attachment id is required.");
+      }
+      return deleteCodingHomeworkProvidedFile(await resolveOwner(context), attachmentId);
+    }
+  }
+};
+
+export const codingHomeworkActivityFileRoute: PluginRouteDefinition = {
+  path: "coding-homework-grader/activity-file",
+  activityTypeKeys: ["coding-homework-grader"],
+  methods: {
+    GET: async ({ context, request }) => {
+      const attachmentId = new URL(request.url).searchParams.get("attachmentId")?.trim();
+      if (!attachmentId) {
+        throw new AppError(400, "CODING_HOMEWORK_ATTACHMENT_REQUIRED", "An attachment id is required.");
+      }
+      const { attachment, filePath } = await getCodingHomeworkActivityAttachment(await resolveReadableActivityOwner(context), attachmentId);
+      const fileStat = await stat(filePath);
+      const stream = Readable.toWeb(createReadStream(filePath)) as ReadableStream;
+      const disposition = attachment?.mimeType === "application/pdf" ? "inline" : "attachment";
+      return new Response(stream, {
+        headers: {
+          "Cache-Control": "private, no-store, max-age=0",
+          "Content-Disposition": `${disposition}; filename="${encodeURIComponent(attachment?.originalName ?? "activity-file")}"`,
+          "Content-Length": String(fileStat.size),
+          "Content-Type": attachment?.mimeType ?? "application/octet-stream",
+          "X-Content-Type-Options": "nosniff"
+        }
+      });
     }
   }
 };

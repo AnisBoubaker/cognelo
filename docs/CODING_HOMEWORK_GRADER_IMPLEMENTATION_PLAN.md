@@ -2,7 +2,7 @@
 
 This plan describes the phased implementation of the new Coding Homework Grader activity plugin.
 
-The existing `plugin-coding-homework-grader` package is currently a renamed scaffold with a plugin-owned persistence foundation. The product direction is to turn it into a full programming-homework submission workflow:
+The `plugin-coding-homework-grader` package now implements the complete first manual-grading workflow on a plugin-owned persistence foundation. The remaining roadmap focuses on production storage hardening, shared vector retrieval, research analytics, and rollout. The implemented workflow is:
 
 - Teachers define the homework statement as editable text or an uploaded PDF.
 - Teachers add and assign the activity through the normal course content and gradebook workflow.
@@ -35,7 +35,7 @@ The implementation must be TypeScript/Node/Postgres-native. The Python prototype
 
 ## Implementation Progress
 
-As of June 17, 2026:
+As of August 6, 2026:
 
 - Phase 0 is complete: prototype-to-TypeScript algorithm contracts, prompt versioning, plugin README, and plugin memory were added without production dependency on `tmp`.
 - Phase 1 is complete: the former homework grader scaffold was renamed to Coding Homework Grader with package name `@cognelo/plugin-coding-homework-grader`, plugin key `coding-homework-grader`, activity key `coding-homework-grader`, and database namespace `plugin_coding_homework_grader`.
@@ -51,6 +51,7 @@ As of June 17, 2026:
 - Phase 11 is complete: teachers can trigger or retry server-side challenge question generation for analyzed submissions. Generated questions are stored with prompt version, model, selected function provenance, nearest-example audit metadata, and submission status moves to `challenge_ready`.
 - Phase 12 is complete: valid student ZIP submissions now run analysis and challenge generation immediately, return student-safe challenge questions, collect draft/final answers, and mark the plugin submission `ready_for_grading` once every question is answered.
 - Phase 13 is complete: final answer submission creates/submits a core gradebook attempt for summative assignments, and teachers can review coding homework submissions from the gradebook manual grading surfaces.
+- Activity-owned assignment resources are implemented: teachers can view the assignment PDF inline, manage files provided with the assignment, and those resources are extracted and searched alongside prior course material for challenge generation without creating separate course content resources.
 
 ## Product Boundaries
 
@@ -72,7 +73,7 @@ As of June 17, 2026:
 - Student answers to generated challenge questions.
 - Teacher review and manual grading.
 - Core gradebook integration for summative submissions.
-- Long-term production object storage for homework artifacts.
+- Production-safe storage of homework artifacts on the Cognelo webserver filesystem.
 - A global cross-course embeddings/indexing service for reusable course context retrieval.
 
 ### Out Of Scope For The First Complete Version
@@ -94,7 +95,7 @@ As of June 17, 2026:
 - Let content type plugins own extraction, chunking, source-specific metadata, and invalidation decisions behind a unified content type plugin interface.
 - Let shared platform vector services own production embedding persistence, model/version bookkeeping, indexing, and cross-content-type score merging.
 - Let activity plugins request vector-based similarity through core/content-plugin dispatchers instead of reading content-plugin embedding tables directly.
-- Store uploaded and generated artifacts behind a storage abstraction so local development storage can evolve into production object storage without rewriting plugin workflows.
+- Store uploaded and generated artifacts behind a storage abstraction. The production target is the Cognelo webserver filesystem for now, while the abstraction should allow a future external storage adapter without rewriting plugin workflows.
 - Prefer Postgres/pgvector for production vector storage so development can stay close to the existing Postgres setup while still supporting indexed similarity search at scale.
 - For the pgvector migration, prefer common platform vector tables over one vector table per content plugin. Content plugins should own extraction/chunking semantics and submit documents/chunks to the shared vector service; core owns authorization-aware retrieval across all course content types.
 - Store historical snapshots for assignment documentation and generated questions so later content edits do not mutate an existing submission record.
@@ -618,6 +619,7 @@ Progress:
 - Added `src/web/coding-homework-grader-activity-view.tsx` and registered it with the web activity renderer registry for course activities and bank activity authoring.
 - Added local plugin messages for English, French, Chinese, and Arabic authoring copy.
 - Added bank-to-course and bank-delete hooks in `src/server.ts`; authored assignment, requirement-set, and attachment metadata rows are copied into course-owned rows on assignment.
+- Assignment PDFs and teacher-provided files remain plugin-owned activity attachments. Secure plugin routes allow authorized viewing/downloading, and the authoring UI supports inline PDF viewing plus provided-file upload/open/removal.
 - Kept student submission, documentation snapshot generation, object-storage migration, and parser/embedding processing for later phases.
 
 ### Phase 4: Prior Documentation Snapshot
@@ -667,6 +669,7 @@ Progress:
 - Added `getContentResourceEmbeddingDocuments` in core so activity plugins can request extracted documents through the platform dispatcher.
 - Implemented extracted-document handlers in text, file, and GitHub repository content plugins. The file plugin owns source-like text extraction and a basic local PDF text extractor; GitHub repository cloning/source indexing remains inside the GitHub content plugin and is reported as deferred diagnostics for now.
 - Added `src/extraction.ts` and the `coding-homework-grader/documentation-extraction` route. Extraction reads `PluginCodingHomeworkDocumentationSnapshot.metadata.includedResources`, calls the generic core interface for plugin-backed content resources, and writes `metadata.extraction` with documents, diagnostics, counts, and timestamps.
+- Extraction also adds the activity's assignment Markdown, assignment PDF text, and provided text/source files. Provided C files are parsed into function-level reference documents; these plugin-owned sources supplement prior course content without being added to the course content tree.
 - Added a teacher UI action to extract sources from the latest documentation snapshot and display the extracted-document count.
 - Legacy material snapshot entries are diagnosed as unavailable for extraction rather than handled with legacy-specific parsing in the Coding Homework Grader.
 
@@ -790,6 +793,7 @@ Acceptance:
 Progress:
 
 - Added `src/analysis.ts` with `analyzeCodingHomeworkSubmission`. It loads extracted source files from local submission storage, parses functions through the language-neutral parser registry, embeds submitted AST text with the deterministic dev embedding provider, and stores `PluginCodingHomeworkSubmissionFunction` rows.
+- Analysis merges nearest matches from activity-owned assignment/provided-file documents with matches returned by course content plugins before ranking divergence and selecting candidates.
 - Reference comparison uses `searchContentResourceEmbeddingDocuments` against the submission's documentation snapshot resources; the Coding Homework Grader does not read or own prior-content vector tables.
 - Divergence score is the distance to the nearest retrieved reference example. Candidate selection ranks by highest divergence and does a simple first pass to diversify across source files before filling remaining slots.
 - Added `coding-homework-grader/submission-analysis` for reprocessing/inspection. The final ZIP submission route now runs analysis automatically for valid submissions and returns the analysis payload.
@@ -871,22 +875,29 @@ Acceptance:
 - Failed processing can be retried without duplicate attempts/questions. Complete for analysis/question generation because retries replace derived function/question rows and use the new reprocess route.
 - Long-running processing does not block normal page requests. Complete for student final ZIP processing: uploads enqueue background work and the student view polls until challenge questions are ready or processing fails.
 
-### Phase 15: Production Object Storage
+### Phase 15: Production-Safe Webserver Storage
 
 Deliverables:
 
 - Introduce a platform storage abstraction for plugin artifacts.
-- Move assignment PDFs, student ZIP files, extracted source files, generated artifacts, and review downloads from local disk to configurable object storage.
-- Store object keys, checksums, content type, size, and retention metadata in plugin-owned attachment rows.
-- Add signed, permission-checked download routes rather than exposing object URLs directly.
+- Use the Cognelo webserver filesystem as the production storage adapter for assignment PDFs, student ZIP files, extracted source files, generated artifacts, and review downloads.
+- Store artifacts outside publicly served directories and address them with generated opaque storage keys rather than user-provided paths or filenames.
+- Prevent path traversal and symlink escapes, use atomic writes, and verify configured file-count, file-size, aggregate-size, and available-disk-space limits.
+- Store storage keys, checksums, content type, size, original filename, ownership, and retention metadata in plugin-owned attachment rows.
+- Serve artifacts only through authenticated, permission-checked Cognelo download routes; never expose filesystem paths directly.
 - Add lifecycle/retention policies for submitted homework artifacts and extracted temporary files.
-- Keep local filesystem storage as the development adapter.
+- Add scheduled cleanup for expired preflight and temporary extraction artifacts without deleting retained submissions or grading evidence.
+- Document filesystem permissions, required storage directories, disk monitoring, backup, restore, and disaster-recovery procedures.
+- Keep the storage interface adapter-based so an external backend can be introduced later without changing plugin workflows or attachment records.
 
 Acceptance:
 
-- The plugin can run with local storage in development and object storage in production using the same service interface.
+- The plugin can run safely in development and production using the webserver filesystem through the same storage service interface.
 - Student submissions and teacher downloads continue to pass through Cognelo authorization checks.
-- Reprocessing can retrieve historical artifacts from object storage by stable object key.
+- Reprocessing can retrieve historical artifacts from the filesystem by stable opaque storage key.
+- Uploaded artifacts cannot be reached through static web paths, user-controlled traversal, or symlink escapes.
+- Interrupted writes do not leave partial artifacts that are treated as valid submissions.
+- Temporary artifact cleanup, disk-capacity monitoring, backup, and restore behavior are documented and testable.
 
 ### Phase 16: Cross-Course Vector Retrieval And Reuse
 
@@ -973,7 +984,7 @@ Integration tests:
 - create bank activity, assign to course, verify independent course-owned plugin data
 - summative student submission creates a core attempt only after final answers
 - manual grade records normalized grade
-- object storage-backed artifacts remain downloadable through authorized plugin routes
+- webserver-filesystem artifacts remain downloadable through authorized plugin routes
 - shared-index retrieval respects content visibility and assignment cutoff rules
 
 Frontend checks:
@@ -1000,7 +1011,7 @@ Frontend checks:
 - Whether a student may create a new attempt after seeing challenge questions. Recommended: yes only if the assignment attempt policy allows another attempt, and the next attempt gets a newly generated challenge set.
 - Whether group-specific content before the assignment should be included in the documentation snapshot. Recommended: defer to a later phase.
 - Whether PDF assignment statements should also be indexed as documentation. Recommended: no; the assignment statement describes the task, while prior content resources define the taught material.
-- Which object storage backend should be the first production target. Recommended: design for S3-compatible APIs while keeping a local adapter for development.
+- Whether a future deployment needs an external storage backend. Current decision: use hardened webserver-local storage in production and preserve the adapter boundary so this can change later without rewriting plugin workflows.
 - Whether to introduce `pgvector` before cross-course retrieval. Recommended: yes, as the shared Postgres-backed vector capability used by content plugins and activity plugins during development and early production.
 - Whether the vector retrieval service should be platform-wide or packaged as a separate indexing package/app. Recommended: start as a shared platform service with content-plugin extraction/chunking boundaries, then split operationally only if scale requires it.
 - Embedding model and vector dimensions for pgvector. Pending discussion; do not hardcode a production dimension until the first embedding provider/model is selected.

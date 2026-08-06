@@ -65,6 +65,7 @@ export type CodingHomeworkAuthoringRecord = {
   assignmentPdf: CodingHomeworkAttachmentRecord | null;
   requirements: CodingHomeworkRequirementSetRecord;
   requirementsUpload: CodingHomeworkAttachmentRecord | null;
+  providedFiles: CodingHomeworkAttachmentRecord[];
 };
 
 export type CodingHomeworkDocumentationResource = {
@@ -378,6 +379,7 @@ export type CodingHomeworkStudentAssignment = {
     languageKey: string;
     promptMarkdown: string;
     promptPdf: { id: string; originalName: string; sizeBytes: number } | null;
+    providedFiles: Array<{ id: string; mimeType: string | null; originalName: string; sizeBytes: number }>;
   };
   latestSubmission: CodingHomeworkLatestSubmissionResult;
   requirements: CodingHomeworkAuthoringSubmissionRequirements;
@@ -404,6 +406,18 @@ export function createCodingHomeworkGraderClient(request: Requester) {
         method: "POST",
         body: JSON.stringify(input)
       }),
+    uploadCourseProvidedFile: (courseId: string, activityId: string, input: CodingHomeworkUploadInput) =>
+      request<CodingHomeworkAuthoringRecord>(`/courses/${courseId}/activities/${activityId}/coding-homework-grader/provided-files`, {
+        method: "POST",
+        body: JSON.stringify(input)
+      }),
+    deleteCourseProvidedFile: (courseId: string, activityId: string, attachmentId: string) => {
+      const params = new URLSearchParams({ attachmentId });
+      return request<CodingHomeworkAuthoringRecord>(
+        `/courses/${courseId}/activities/${activityId}/coding-homework-grader/provided-files?${params.toString()}`,
+        { method: "DELETE" }
+      );
+    },
     importCourseRequirements: (courseId: string, activityId: string, input: CodingHomeworkUploadInput) =>
       request<CodingHomeworkAuthoringRecord>(`/courses/${courseId}/activities/${activityId}/coding-homework-grader/requirements-upload`, {
         method: "POST",
@@ -570,6 +584,21 @@ export function createCodingHomeworkGraderClient(request: Requester) {
           body: JSON.stringify(input)
         }
       ),
+    uploadBankProvidedFile: (activityBankId: string, bankActivityId: string, input: CodingHomeworkUploadInput) =>
+      request<CodingHomeworkAuthoringRecord>(
+        `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-homework-grader/provided-files`,
+        {
+          method: "POST",
+          body: JSON.stringify(input)
+        }
+      ),
+    deleteBankProvidedFile: (activityBankId: string, bankActivityId: string, attachmentId: string) => {
+      const params = new URLSearchParams({ attachmentId });
+      return request<CodingHomeworkAuthoringRecord>(
+        `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-homework-grader/provided-files?${params.toString()}`,
+        { method: "DELETE" }
+      );
+    },
     importBankRequirements: (activityBankId: string, bankActivityId: string, input: CodingHomeworkUploadInput) =>
       request<CodingHomeworkAuthoringRecord>(
         `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-homework-grader/requirements-upload`,

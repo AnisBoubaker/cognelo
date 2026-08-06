@@ -7,6 +7,7 @@ import {
 } from "./authoring";
 import {
   codingHomeworkAssignmentPdfRoute,
+  codingHomeworkActivityFileRoute,
   codingHomeworkAuthoringRoute,
   codingHomeworkChallengeAnswersRoute,
   codingHomeworkChallengeGenerationRoute,
@@ -15,6 +16,7 @@ import {
   codingHomeworkDocumentationSnapshotRoute,
   codingHomeworkGradebookAttemptsRoute,
   codingHomeworkPreflightRoute,
+  codingHomeworkProvidedFilesRoute,
   codingHomeworkProcessingJobRoute,
   codingHomeworkReprocessRoute,
   codingHomeworkReferenceSearchRoute,
@@ -33,6 +35,8 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
   routes: [
     codingHomeworkAuthoringRoute,
     codingHomeworkAssignmentPdfRoute,
+    codingHomeworkActivityFileRoute,
+    codingHomeworkProvidedFilesRoute,
     codingHomeworkRequirementsUploadRoute,
     codingHomeworkDocumentationPreviewRoute,
     codingHomeworkDocumentationSnapshotRoute,

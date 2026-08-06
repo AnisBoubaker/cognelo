@@ -37,6 +37,12 @@ export const codingHomeworkMessages = {
     noPdf: "No PDF uploaded",
     noPriorResources: "No prior resources found before this activity.",
     pdfUploaded: "PDF uploaded",
+    providedFileRemoved: "Provided file removed.",
+    providedFileUploaded: "Provided file uploaded.",
+    providedFiles: "Files provided with the assignment",
+    providedFilesHelp: "These files stay with the activity and are used with course material when generating questions.",
+    noProvidedFiles: "No files provided",
+    removeProvidedFile: "Remove",
     preview: "Preview",
     preflight: "Preflight check",
     preflightError: "Unable to check this ZIP.",
@@ -76,7 +82,9 @@ export const codingHomeworkMessages = {
     latestSubmission: "Latest submission",
     title: "Title",
     teacherSetup: "Teacher setup",
-    uploadPdf: "Upload PDF"
+    uploadPdf: "Upload PDF",
+    uploadProvidedFile: "Add file",
+    viewPdf: "View PDF"
   },
   fr: {
     activityDescription: "Décrivez ce que les étudiants devront construire.",
@@ -114,6 +122,12 @@ export const codingHomeworkMessages = {
     noPdf: "Aucun PDF téléversé",
     noPriorResources: "Aucune ressource précédente trouvée avant cette activité.",
     pdfUploaded: "PDF téléversé",
+    providedFileRemoved: "Fichier fourni supprimé.",
+    providedFileUploaded: "Fichier fourni téléversé.",
+    providedFiles: "Fichiers fournis avec le devoir",
+    providedFilesHelp: "Ces fichiers restent liés à l'activité et sont utilisés avec le matériel du cours pour générer les questions.",
+    noProvidedFiles: "Aucun fichier fourni",
+    removeProvidedFile: "Supprimer",
     preview: "Aperçu",
     preflight: "Vérification préalable",
     preflightError: "Impossible de vérifier ce ZIP.",
@@ -153,7 +167,9 @@ export const codingHomeworkMessages = {
     latestSubmission: "Dernière remise",
     title: "Titre",
     teacherSetup: "Configuration enseignant",
-    uploadPdf: "Téléverser le PDF"
+    uploadPdf: "Téléverser le PDF",
+    uploadProvidedFile: "Ajouter un fichier",
+    viewPdf: "Voir le PDF"
   },
   zh: {
     activityDescription: "描述学生要完成的作业。",
@@ -191,6 +207,12 @@ export const codingHomeworkMessages = {
     noPdf: "尚未上传 PDF",
     noPriorResources: "此活动前没有找到先前资源。",
     pdfUploaded: "PDF 已上传",
+    providedFileRemoved: "已移除提供的文件。",
+    providedFileUploaded: "已上传提供的文件。",
+    providedFiles: "作业随附文件",
+    providedFilesHelp: "这些文件保留在活动中，并与课程材料一起用于生成问题。",
+    noProvidedFiles: "未提供文件",
+    removeProvidedFile: "移除",
     preview: "预览",
     preflight: "预检",
     preflightError: "无法检查此 ZIP。",
@@ -230,7 +252,9 @@ export const codingHomeworkMessages = {
     latestSubmission: "最近提交",
     title: "标题",
     teacherSetup: "教师设置",
-    uploadPdf: "上传 PDF"
+    uploadPdf: "上传 PDF",
+    uploadProvidedFile: "添加文件",
+    viewPdf: "查看 PDF"
   },
   ar: {
     activityDescription: "صف ما سيبنيه الطلاب.",
@@ -268,6 +292,12 @@ export const codingHomeworkMessages = {
     noPdf: "لم يتم رفع PDF",
     noPriorResources: "لم يتم العثور على موارد سابقة قبل هذا النشاط.",
     pdfUploaded: "تم رفع PDF",
+    providedFileRemoved: "تمت إزالة الملف المرفق.",
+    providedFileUploaded: "تم رفع الملف المرفق.",
+    providedFiles: "الملفات المرفقة بالواجب",
+    providedFilesHelp: "تبقى هذه الملفات ضمن النشاط وتُستخدم مع مواد المقرر عند إنشاء الأسئلة.",
+    noProvidedFiles: "لا توجد ملفات مرفقة",
+    removeProvidedFile: "إزالة",
     preview: "معاينة",
     preflight: "فحص مبدئي",
     preflightError: "تعذر فحص ملف ZIP هذا.",
@@ -307,7 +337,9 @@ export const codingHomeworkMessages = {
     latestSubmission: "آخر تسليم",
     title: "العنوان",
     teacherSetup: "إعداد المعلم",
-    uploadPdf: "رفع PDF"
+    uploadPdf: "رفع PDF",
+    uploadProvidedFile: "إضافة ملف",
+    viewPdf: "عرض PDF"
   }
 } as const;
 

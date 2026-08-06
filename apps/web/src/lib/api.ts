@@ -651,6 +651,10 @@ export type StudentGradeFeedback = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
+export function apiAbsoluteUrl(path: string) {
+  return `${API_URL}/api${path}`;
+}
+
 export class ApiError extends Error {
   code?: string;
   details?: unknown;

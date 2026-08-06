@@ -19,6 +19,7 @@ import { createMcqClient, McqActivityView, McqManualGradingPanel, type McqSubmis
 import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
 import {
   api,
+  apiAbsoluteUrl,
   apiRequest,
   type CodingExerciseExecution,
   type CodingExerciseHiddenTest,
@@ -278,6 +279,10 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
         codingHomeworkClient.importCourseRequirements(courseId, activityId, input),
       save: (activityId: string, input: Parameters<typeof codingHomeworkClient.saveCourseAuthoring>[2]) =>
         codingHomeworkClient.saveCourseAuthoring(courseId, activityId, input),
+      deleteProvidedFile: (activityId: string, attachmentId: string) =>
+        codingHomeworkClient.deleteCourseProvidedFile(courseId, activityId, attachmentId),
+      uploadProvidedFile: (activityId: string, input: Parameters<typeof codingHomeworkClient.uploadCourseProvidedFile>[2]) =>
+        codingHomeworkClient.uploadCourseProvidedFile(courseId, activityId, input),
       uploadAssignmentPdf: (activityId: string, input: Parameters<typeof codingHomeworkClient.uploadCourseAssignmentPdf>[2]) =>
         codingHomeworkClient.uploadCourseAssignmentPdf(courseId, activityId, input)
     };
@@ -309,6 +314,13 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
   return (
     <CodingHomeworkGraderActivityView
       {...activityProps}
+      activityFileUrl={(attachmentId) =>
+        apiAbsoluteUrl(
+          groupId
+            ? `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityProps.activity.id}/coding-homework-grader/activity-file?attachmentId=${encodeURIComponent(attachmentId)}`
+            : `/courses/${courseId}/activities/${activityProps.activity.id}/coding-homework-grader/activity-file?attachmentId=${encodeURIComponent(attachmentId)}`
+        )
+      }
       authoringClient={authoringClient}
       preflightClient={preflightClient}
       submissionClient={submissionClient}
@@ -495,6 +507,10 @@ function CodingHomeworkGraderBankActivityRenderer(context: BankActivityRendererC
         codingHomeworkClient.importBankRequirements(context.activityBankId, activityId, input),
       save: (activityId: string, input: Parameters<typeof codingHomeworkClient.saveBankAuthoring>[2]) =>
         codingHomeworkClient.saveBankAuthoring(context.activityBankId, activityId, input),
+      deleteProvidedFile: (activityId: string, attachmentId: string) =>
+        codingHomeworkClient.deleteBankProvidedFile(context.activityBankId, activityId, attachmentId),
+      uploadProvidedFile: (activityId: string, input: Parameters<typeof codingHomeworkClient.uploadBankProvidedFile>[2]) =>
+        codingHomeworkClient.uploadBankProvidedFile(context.activityBankId, activityId, input),
       uploadAssignmentPdf: (activityId: string, input: Parameters<typeof codingHomeworkClient.uploadBankAssignmentPdf>[2]) =>
         codingHomeworkClient.uploadBankAssignmentPdf(context.activityBankId, activityId, input)
     }),
@@ -503,6 +519,11 @@ function CodingHomeworkGraderBankActivityRenderer(context: BankActivityRendererC
   return (
     <CodingHomeworkGraderActivityView
       activity={context.activity}
+      activityFileUrl={(attachmentId) =>
+        apiAbsoluteUrl(
+          `/activity-banks/${context.activityBankId}/activities/${context.activity.id}/coding-homework-grader/activity-file?attachmentId=${encodeURIComponent(attachmentId)}`
+        )
+      }
       canManage
       locale={context.locale}
       onSave={context.onSave}

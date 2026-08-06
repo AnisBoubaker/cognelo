@@ -34,12 +34,16 @@ const dbMocks = vi.hoisted(() => ({
     deleteMany: vi.fn()
   }
 }));
+const activityDocumentMocks = vi.hoisted(() => ({ getCodingHomeworkActivityReferenceDocuments: vi.fn() }));
 
 vi.mock("node:fs/promises", () => fsMocks);
 vi.mock("@cognelo/core", () => coreMocks);
 vi.mock("./db-client", () => ({
   Prisma: {},
   prisma: dbMocks
+}));
+vi.mock("./activity-documents", () => ({
+  getCodingHomeworkActivityReferenceDocuments: activityDocumentMocks.getCodingHomeworkActivityReferenceDocuments
 }));
 
 const { analyzeCodingHomeworkSubmission } = await import("./analysis");
@@ -49,6 +53,7 @@ describe("coding homework submission analysis", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    activityDocumentMocks.getCodingHomeworkActivityReferenceDocuments.mockResolvedValue({ sourceId: "activity-1", documents: [], diagnostics: [] });
     coreMocks.canManageCourse.mockResolvedValue(false);
     fsMocks.readFile.mockResolvedValue(`
       int main(void) { return 0; }

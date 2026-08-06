@@ -12,6 +12,7 @@ vi.mock("./authoring", () => authoringMocks);
 vi.mock("./submission-deletion", () => deletionMocks);
 vi.mock("./routes", () => ({
   codingHomeworkAssignmentPdfRoute: { path: "assignment-pdf", methods: {} },
+  codingHomeworkActivityFileRoute: { path: "activity-file", methods: {} },
   codingHomeworkAuthoringRoute: { path: "authoring", methods: {} },
   codingHomeworkChallengeAnswersRoute: { path: "challenge-answers", methods: {} },
   codingHomeworkChallengeGenerationRoute: { path: "challenge-generation", methods: {} },
@@ -20,6 +21,7 @@ vi.mock("./routes", () => ({
   codingHomeworkDocumentationSnapshotRoute: { path: "documentation-snapshot", methods: {} },
   codingHomeworkGradebookAttemptsRoute: { path: "gradebook-attempts", methods: {} },
   codingHomeworkPreflightRoute: { path: "preflight", methods: {} },
+  codingHomeworkProvidedFilesRoute: { path: "provided-files", methods: {} },
   codingHomeworkProcessingJobRoute: { path: "processing-job", methods: {} },
   codingHomeworkReprocessRoute: { path: "reprocess", methods: {} },
   codingHomeworkReferenceSearchRoute: { path: "reference-search", methods: {} },

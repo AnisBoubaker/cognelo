@@ -16,6 +16,7 @@ enum PluginCodingHomeworkAttachmentOwnerKind {
 
 enum PluginCodingHomeworkAttachmentKind {
   assignment_pdf
+  provided_file
   requirements_upload
   submission_zip
   extracted_source
