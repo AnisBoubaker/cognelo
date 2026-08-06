@@ -315,8 +315,8 @@ async function generateValidMcqSource(input: {
       maxOutputTokens: 6000
     });
     const source = normalizeGeneratedSource(raw);
-    const parsed = parseMcqSource(source, input.defaultCodeLanguage);
-    const issues = collectMcqIssues(source, parsed, input.questionCount);
+    const parsed = parseMcqSource(source, "none");
+    const issues = collectMcqIssues(source, parsed, input.questionCount, input.defaultCodeLanguage);
 
     if (!issues.length) {
       return { source, attempts: attempt };
@@ -347,14 +347,13 @@ function buildSystemPrompt(input: {
     "- The prompt follows the heading.",
     "- Choices must use task-list syntax: `- [x] correct choice` and `- [ ] incorrect choice`.",
     "- Choices may be code alternatives. For a code-only choice, write the marker on its own line and put a fenced code block immediately below it.",
-    "- Example code choice: `- [ ]` followed by a fenced code block using the default code language or an explicit fence language.",
+    "- Every fenced code block must include an explicit language identifier after the opening backticks. Never return an unlabeled fenced code block.",
     "- Each question must include at least three choices.",
     "- Each question must include at least one correct choice.",
     "- Use one correct choice for single-answer questions and multiple `[x]` choices only when the question clearly asks for multiple answers.",
-    "- Code blocks are allowed. If a code block has no explicit language, Cognelo will use the default language.",
     input.defaultCodeLanguage === "none"
-      ? "- This is not a programming exercise. Do not introduce programming code unless the teacher explicitly requests it."
-      : `- Default code language: ${input.defaultCodeLanguage}.`,
+      ? "- This is not a programming exercise. Do not introduce programming code unless the teacher explicitly requests it; if code is requested, label every fence with the appropriate language."
+      : `- The selected programming language is ${input.defaultCodeLanguage}. Every fenced code block must open with \`\`\`${input.defaultCodeLanguage}; do not use another language.`,
     "- Prefer plausible distractors and avoid ambiguous wording.",
     "- If several questions are requested, order them crescendo from simpler to more complex.",
     "",
@@ -402,8 +401,13 @@ function buildCorrectionPrompt(
   ].join("\n");
 }
 
-function collectMcqIssues(source: string, parsed: ReturnType<typeof parseMcqSource>, questionCount: number): McqParseError[] {
-  const issues = [...parsed.errors];
+function collectMcqIssues(
+  source: string,
+  parsed: ReturnType<typeof parseMcqSource>,
+  questionCount: number,
+  generationCodeLanguage: string
+): McqParseError[] {
+  const issues = [...parsed.errors, ...collectFenceLanguageIssues(source, generationCodeLanguage)];
   if (!source.trim()) {
     issues.push({ line: 1, message: "Generated source is empty." });
   }
@@ -415,6 +419,32 @@ function collectMcqIssues(source: string, parsed: ReturnType<typeof parseMcqSour
       message: `The activity must include exactly ${questionCount} question${questionCount === 1 ? "" : "s"}; it currently includes ${parsed.questions.length}.`
     });
   }
+  return issues;
+}
+
+function collectFenceLanguageIssues(source: string, generationCodeLanguage: string): McqParseError[] {
+  const issues: McqParseError[] = [];
+  let inFence = false;
+  source.replace(/\r\n/g, "\n").split("\n").forEach((line, index) => {
+    const fenceText = line.trim().replace(/^[-*]\s+\[(?:x|X| )\]\s*/, "");
+    if (!fenceText.startsWith("```")) {
+      return;
+    }
+    if (inFence) {
+      inFence = false;
+      return;
+    }
+    inFence = true;
+    const language = fenceText.slice(3).trim().split(/\s+/)[0] ?? "";
+    if (!language) {
+      issues.push({ line: index + 1, message: "Every generated code fence must include an explicit programming language." });
+    } else if (generationCodeLanguage !== "none" && language.toLowerCase() !== generationCodeLanguage.toLowerCase()) {
+      issues.push({
+        line: index + 1,
+        message: `Every generated code fence must use the selected ${generationCodeLanguage} language.`
+      });
+    }
+  });
   return issues;
 }
 

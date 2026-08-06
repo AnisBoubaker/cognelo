@@ -38,6 +38,5 @@ export function buildMcqGradingResult(parsed: ParsedMcq, answers: McqAnswerState
 
 export function buildMcqGradingResultFromConfig(config: Record<string, unknown> | undefined, answers: McqAnswerState) {
   const source = typeof config?.source === "string" ? config.source : "";
-  const defaultCodeLanguage = typeof config?.defaultCodeLanguage === "string" ? config.defaultCodeLanguage : "none";
-  return buildMcqGradingResult(parseMcqSource(source, defaultCodeLanguage), answers);
+  return buildMcqGradingResult(parseMcqSource(source, "none"), answers);
 }

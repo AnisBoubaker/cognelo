@@ -32,6 +32,8 @@ const supportedLanguages = new Set<string>([
 const mcqConfigSchema = z
   .object({
     source: z.string().min(20).max(30000),
+    aiGenerationInstructions: z.string().max(4000).default(""),
+    aiQuestionCount: z.number().int().min(1).max(20).default(5),
     defaultCodeLanguage: z.string().min(1).max(40).default("none"),
     randomizeChoices: z.boolean().default(false)
   })
@@ -44,7 +46,7 @@ const mcqConfigSchema = z
       });
     }
 
-    const parsed = parseMcqSource(value.source, value.defaultCodeLanguage);
+    const parsed = parseMcqSource(value.source, "none");
     if (!parsed.questions.length) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -120,6 +122,8 @@ export const mcqPlugin: ActivityPlugin = {
       },
       defaultConfig: {
         source: defaultMcqSource,
+        aiGenerationInstructions: "",
+        aiQuestionCount: 5,
         defaultCodeLanguage: "none",
         randomizeChoices: false
       },

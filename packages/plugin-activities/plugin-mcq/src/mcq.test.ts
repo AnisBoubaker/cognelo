@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { gradeMcqAnswers, parseMcqSource, renderInlineMarkdown } from "./mcq";
+import { mcqPlugin } from "./plugin";
 
 describe("MCQ source parser", () => {
   it("parses single and multiple answer questions from markdown", () => {
@@ -96,6 +97,36 @@ Which of these are Python collection types?
     expect(result.questions[0]).toMatchObject({
       isCorrect: false,
       rawScore: 0.5
+    });
+  });
+});
+
+describe("MCQ activity config", () => {
+  const configSchema = mcqPlugin.activities[0]?.configSchema;
+  const source = `## Saved settings
+
+- [x] Correct
+- [ ] Incorrect`;
+
+  it("persists AI generation settings in validated config", () => {
+    expect(configSchema?.parse({
+      source,
+      aiGenerationInstructions: "Focus on debugging scenarios.",
+      aiQuestionCount: 8,
+      defaultCodeLanguage: "python",
+      randomizeChoices: true
+    })).toMatchObject({
+      aiGenerationInstructions: "Focus on debugging scenarios.",
+      aiQuestionCount: 8,
+      defaultCodeLanguage: "python"
+    });
+  });
+
+  it("adds defaults for AI generation settings in older config", () => {
+    expect(configSchema?.parse({ source, randomizeChoices: false })).toMatchObject({
+      aiGenerationInstructions: "",
+      aiQuestionCount: 5,
+      defaultCodeLanguage: "none"
     });
   });
 });
