@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { CodeEditor, codeLanguageOptions, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { CodeEditor, MarkdownRenderer, codeLanguageOptions, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   parseMcqSource,
   type McqChoice,
@@ -40,7 +40,13 @@ type McqActivityViewProps = {
   showCorrectAnswers?: boolean;
   releasedMaxScore?: number;
   aiGenerationClient?: {
-    generate: (input: { description: string; defaultCodeLanguage: string; locale: "en" | "fr" | "zh" | "ar" }) => Promise<{ source: string; attempts: number }>;
+    generate: (input: {
+      description: string;
+      defaultCodeLanguage: string;
+      instructions?: string;
+      locale: "en" | "fr" | "zh" | "ar";
+      questionCount: number;
+    }) => Promise<{ source: string; attempts: number }>;
   };
 };
 
@@ -56,7 +62,7 @@ type McqFormSnapshot = {
 
 const fallbackConfig = {
   source: "",
-  defaultCodeLanguage: "python",
+  defaultCodeLanguage: "none",
   randomizeChoices: false
 };
 
@@ -65,8 +71,9 @@ const copyByLocale = {
     authoringTitle: "Multiple choice questions authoring",
     authoringHelp: "Write the activity as text. Use ## headings for questions and task-list syntax like - [x] and - [ ] for the choices. A choice can contain a code block.",
     title: "Title",
-    description: "Description",
+    description: "Student prompt",
     defaultCodeLanguage: "Default code language",
+    notProgrammingExercise: "Not a programming exercise",
     randomizeChoices: "Randomize choices",
     randomizeChoicesHelp: "Show answer choices in a random order for students.",
     source: "Multiple choice questions source",
@@ -76,10 +83,13 @@ const copyByLocale = {
     save: "Save multiple choice questions",
     saved: "Multiple choice questions activity saved.",
     saveError: "Unable to save the multiple choice questions activity right now.",
-    generate: "Generate source automatically",
+    generateSection: "Generate questions with AI",
+    aiInstructions: "Instructions to AI model (optional)",
+    questionCount: "Number of questions to generate",
+    generate: "Generate Multiple Choice Questions",
     generating: "Generating...",
     generated: "Multiple choice questions source generated.",
-    generateHelp: "Use the description above to generate a valid MCQ source.",
+    generateHelp: "The AI uses the student prompt, these private instructions, and the selected default language.",
     generateDescriptionRequired: "Add a more detailed description before generating.",
     generateError: "Unable to generate valid multiple choice questions right now.",
     replaceGeneratedTitle: "Replace existing source?",
@@ -111,8 +121,9 @@ const copyByLocale = {
     authoringTitle: "Edition des questions a choix multiples",
     authoringHelp: "Redigez l'activite sous forme de texte. Utilisez des titres ## pour les questions et la syntaxe de liste de taches comme - [x] et - [ ] pour les choix. Un choix peut contenir un bloc de code.",
     title: "Titre",
-    description: "Description",
+    description: "Consigne pour les etudiants",
     defaultCodeLanguage: "Langage de code par defaut",
+    notProgrammingExercise: "Pas un exercice de programmation",
     randomizeChoices: "Melanger les choix",
     randomizeChoicesHelp: "Affiche les choix de reponse dans un ordre aleatoire pour les etudiants.",
     source: "Source des questions a choix multiples",
@@ -122,10 +133,13 @@ const copyByLocale = {
     save: "Enregistrer les questions a choix multiples",
     saved: "L'activite de questions a choix multiples a ete enregistree.",
     saveError: "Impossible d'enregistrer l'activite de questions a choix multiples pour le moment.",
-    generate: "Generer l'enonce automatiquement",
+    generateSection: "Generer des questions avec l'IA",
+    aiInstructions: "Instructions au modele d'IA (facultatif)",
+    questionCount: "Nombre de questions a generer",
+    generate: "Generer les questions a choix multiples",
     generating: "Generation...",
     generated: "Source des questions a choix multiples generee.",
-    generateHelp: "Utilise la description ci-dessus pour generer une source QCM valide.",
+    generateHelp: "L'IA utilise la consigne etudiante, ces instructions privees et le langage par defaut selectionne.",
     generateDescriptionRequired: "Ajoutez une description plus detaillee avant la generation.",
     generateError: "Impossible de generer des questions a choix multiples valides pour le moment.",
     replaceGeneratedTitle: "Remplacer la source existante?",
@@ -157,8 +171,9 @@ const copyByLocale = {
     authoringTitle: "选择题编辑",
     authoringHelp: "使用文本来编写活动。用 ## 标题表示题目，用 - [x] 和 - [ ] 这样的任务列表语法表示选项。",
     title: "标题",
-    description: "说明",
+    description: "学生提示",
     defaultCodeLanguage: "默认代码语言",
+    notProgrammingExercise: "不是编程练习",
     randomizeChoices: "随机排列选项",
     randomizeChoicesHelp: "向学生随机显示答案选项。",
     source: "选择题源码",
@@ -168,10 +183,13 @@ const copyByLocale = {
     save: "保存选择题",
     saved: "选择题活动已保存。",
     saveError: "暂时无法保存选择题活动。",
-    generate: "自动生成题目",
+    generateSection: "使用 AI 生成题目",
+    aiInstructions: "给 AI 模型的说明（可选）",
+    questionCount: "要生成的题目数量",
+    generate: "生成选择题",
     generating: "正在生成...",
     generated: "选择题源码已生成。",
-    generateHelp: "根据上方说明生成有效的选择题源码。",
+    generateHelp: "AI 会使用学生提示、这些仅教师可见的说明和所选默认语言。",
     generateDescriptionRequired: "请先添加更详细的说明。",
     generateError: "暂时无法生成有效的选择题。",
     replaceGeneratedTitle: "替换现有源码？",
@@ -217,6 +235,10 @@ export function McqActivityView({
 }: McqActivityViewProps) {
   const copyLocale = locale === "ar" ? "en" : locale;
   const copy = copyByLocale[copyLocale] ?? copyByLocale.en;
+  const mcqCodeLanguageOptions = useMemo(
+    () => [{ value: "none", label: copy.notProgrammingExercise }, ...codeLanguageOptions],
+    [copy.notProgrammingExercise]
+  );
   const notifications = useNotifications();
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);
@@ -226,6 +248,8 @@ export function McqActivityView({
   const [savedSnapshot, setSavedSnapshot] = useState<McqFormSnapshot>(() => snapshotFromActivity(activity));
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [aiInstructions, setAiInstructions] = useState("");
+  const [questionCount, setQuestionCount] = useState(5);
   const [showReplaceGenerationDialog, setShowReplaceGenerationDialog] = useState(false);
   const [showSubmitConfirmDialog, setShowSubmitConfirmDialog] = useState(false);
   const [submissionAvailability, setSubmissionAvailability] = useState<{ attemptsRemaining: number | null; canStart: boolean; reason: string | null; gradesReleased?: boolean } | null>(null);
@@ -256,6 +280,8 @@ export function McqActivityView({
     setSubmissionAvailability(null);
     setLatestSubmissionReview(null);
     setLoadingSubmissionStatus(false);
+    setAiInstructions("");
+    setQuestionCount(5);
   }, [activity.id, activity.title, activity.description, activityConfigKey]);
 
   const parsedMcq = useMemo(() => parseMcqSource(source, defaultCodeLanguage), [defaultCodeLanguage, source]);
@@ -430,7 +456,9 @@ export function McqActivityView({
       const result = await aiGenerationClient.generate({
         description,
         defaultCodeLanguage,
-        locale
+        instructions: aiInstructions,
+        locale,
+        questionCount
       });
       setSource(result.source);
       setStudentAnswers({});
@@ -522,12 +550,38 @@ export function McqActivityView({
         </div>
 
         {aiGenerationClient ? (
-          <div className="stack" style={{ gap: 8 }}>
-            <button className="secondary" type="button" disabled={generating || description.trim().length < 10} onClick={requestMcqGeneration}>
-              {generating ? copy.generating : copy.generate}
-            </button>
-            <p className="muted">{copy.generateHelp}</p>
-          </div>
+          <details style={{ border: "1px solid rgba(13, 27, 71, 0.12)", borderRadius: 12, padding: "14px 16px" }}>
+            <summary style={{ cursor: "pointer", fontWeight: 800 }}>{copy.generateSection}</summary>
+            <div className="stack" style={{ marginTop: 16 }}>
+              <div className="field">
+                <label htmlFor="mcq-ai-instructions">{copy.aiInstructions}</label>
+                <textarea
+                  id="mcq-ai-instructions"
+                  maxLength={4000}
+                  rows={4}
+                  value={aiInstructions}
+                  onChange={(event) => setAiInstructions(event.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="mcq-ai-question-count">{copy.questionCount}</label>
+                <input
+                  id="mcq-ai-question-count"
+                  max={20}
+                  min={1}
+                  type="number"
+                  value={questionCount}
+                  onChange={(event) => setQuestionCount(Math.max(1, Math.min(20, Number(event.target.value) || 1)))}
+                />
+              </div>
+              <p className="muted">{copy.generateHelp}</p>
+              <div className="row">
+                <button type="button" disabled={generating || description.trim().length < 10} onClick={requestMcqGeneration}>
+                  {generating ? copy.generating : copy.generate}
+                </button>
+              </div>
+            </div>
+          </details>
         ) : null}
 
         {showReplaceGenerationDialog ? (
@@ -553,7 +607,7 @@ export function McqActivityView({
         <div className="field">
           <label htmlFor="mcq-default-language">{copy.defaultCodeLanguage}</label>
           <select id="mcq-default-language" value={defaultCodeLanguage} onChange={(event) => setDefaultCodeLanguage(event.target.value)}>
-            {codeLanguageOptions.map((option) => (
+            {mcqCodeLanguageOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -583,6 +637,7 @@ export function McqActivityView({
           <section className="stack mcq-authoring-preview">
             <h3>{copy.studentPreview}</h3>
             <McqStudentView
+              studentPrompt={description}
               parsedMcq={parsedMcq}
               studentAnswers={studentAnswers}
               submitted={submitted}
@@ -647,6 +702,7 @@ export function McqActivityView({
             ) : null}
           </div>
           <McqStudentView
+            studentPrompt={description}
             parsedMcq={parsedMcq}
             studentAnswers={latestSubmissionReview.answers}
             submitted
@@ -674,6 +730,7 @@ export function McqActivityView({
       ) : null}
       {studentViewMode === "attempt" ? (
         <McqStudentView
+          studentPrompt={description}
           parsedMcq={parsedMcq}
           studentAnswers={studentAnswers}
           submitted={submitted}
@@ -725,6 +782,7 @@ export function McqActivityView({
 }
 
 function McqStudentView({
+  studentPrompt,
   parsedMcq,
   studentAnswers,
   submitted,
@@ -748,6 +806,7 @@ function McqStudentView({
   releasedMaxScore,
   randomizeChoices
 }: {
+  studentPrompt: string;
   parsedMcq: ParsedMcq;
   studentAnswers: StudentAnswerState;
   submitted: boolean;
@@ -782,6 +841,7 @@ function McqStudentView({
 
   return (
     <div className="stack">
+      {studentPrompt.trim() ? <MarkdownRenderer markdown={studentPrompt} /> : null}
       {parsedMcq.introBlocks.length ? <MarkdownBlocksView blocks={parsedMcq.introBlocks} /> : null}
 
       {questions.map((question, index) => {
