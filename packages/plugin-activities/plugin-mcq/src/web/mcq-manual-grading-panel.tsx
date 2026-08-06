@@ -287,8 +287,7 @@ function buildReviewAnswers(activityConfig: Record<string, unknown> | undefined,
   }
 
   const source = typeof activityConfig?.source === "string" ? activityConfig.source : "";
-  const defaultCodeLanguage = typeof activityConfig?.defaultCodeLanguage === "string" ? activityConfig.defaultCodeLanguage : "none";
-  const parsed = source ? parseMcqSource(source, defaultCodeLanguage) : null;
+  const parsed = source ? parseMcqSource(source, "none") : null;
   const questions = new Map((parsed?.questions ?? []).map((question) => [question.id, question]));
   const questionIds = parsed?.questions.length ? parsed.questions.map((question) => question.id) : Object.keys(selectedAttempt.answers);
   const maxScores = allocateQuestionMaxScores(questionIds.length, maxScore);

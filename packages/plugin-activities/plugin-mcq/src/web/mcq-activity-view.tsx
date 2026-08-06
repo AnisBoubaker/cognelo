@@ -56,12 +56,16 @@ type McqFormSnapshot = {
   title: string;
   description: string;
   source: string;
+  aiGenerationInstructions: string;
+  aiQuestionCount: number;
   defaultCodeLanguage: string;
   randomizeChoices: boolean;
 };
 
 const fallbackConfig = {
   source: "",
+  aiGenerationInstructions: "",
+  aiQuestionCount: 5,
   defaultCodeLanguage: "none",
   randomizeChoices: false
 };
@@ -246,13 +250,13 @@ export function McqActivityView({
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);
   const [source, setSource] = useState(String(activity.config?.source ?? fallbackConfig.source));
-  const [defaultCodeLanguage, setDefaultCodeLanguage] = useState(String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage));
+  const [generationCodeLanguage, setGenerationCodeLanguage] = useState(String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage));
   const [randomizeChoices, setRandomizeChoices] = useState(Boolean(activity.config?.randomizeChoices ?? fallbackConfig.randomizeChoices));
   const [savedSnapshot, setSavedSnapshot] = useState<McqFormSnapshot>(() => snapshotFromActivity(activity));
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [aiInstructions, setAiInstructions] = useState("");
-  const [questionCount, setQuestionCount] = useState(5);
+  const [aiInstructions, setAiInstructions] = useState(String(activity.config?.aiGenerationInstructions ?? fallbackConfig.aiGenerationInstructions));
+  const [questionCount, setQuestionCount] = useState(normalizeQuestionCount(activity.config?.aiQuestionCount));
   const [showReplaceGenerationDialog, setShowReplaceGenerationDialog] = useState(false);
   const [showSubmitConfirmDialog, setShowSubmitConfirmDialog] = useState(false);
   const [submissionAvailability, setSubmissionAvailability] = useState<{ attemptsRemaining: number | null; canStart: boolean; reason: string | null; gradesReleased?: boolean } | null>(null);
@@ -272,7 +276,7 @@ export function McqActivityView({
     setTitle(activity.title);
     setDescription(activity.description);
     setSource(String(activity.config?.source ?? fallbackConfig.source));
-    setDefaultCodeLanguage(String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage));
+    setGenerationCodeLanguage(String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage));
     setRandomizeChoices(Boolean(activity.config?.randomizeChoices ?? fallbackConfig.randomizeChoices));
     setSavedSnapshot(snapshotFromActivity(activity));
     setStudentAnswers({});
@@ -283,11 +287,11 @@ export function McqActivityView({
     setSubmissionAvailability(null);
     setLatestSubmissionReview(null);
     setLoadingSubmissionStatus(false);
-    setAiInstructions("");
-    setQuestionCount(5);
+    setAiInstructions(String(activity.config?.aiGenerationInstructions ?? fallbackConfig.aiGenerationInstructions));
+    setQuestionCount(normalizeQuestionCount(activity.config?.aiQuestionCount));
   }, [activity.id, activity.title, activity.description, activityConfigKey]);
 
-  const parsedMcq = useMemo(() => parseMcqSource(source, defaultCodeLanguage), [defaultCodeLanguage, source]);
+  const parsedMcq = useMemo(() => parseMcqSource(source, "none"), [source]);
   const score = useMemo(() => {
     if (!submitted) {
       return null;
@@ -313,10 +317,12 @@ export function McqActivityView({
       title,
       description,
       source,
-      defaultCodeLanguage,
+      aiGenerationInstructions: aiInstructions,
+      aiQuestionCount: questionCount,
+      defaultCodeLanguage: generationCodeLanguage,
       randomizeChoices
     }),
-    [defaultCodeLanguage, description, randomizeChoices, source, title]
+    [aiInstructions, description, generationCodeLanguage, questionCount, randomizeChoices, source, title]
   );
   const hasUnsavedChanges = canManage && !snapshotsEqual(currentSnapshot, savedSnapshot);
 
@@ -376,7 +382,9 @@ export function McqActivityView({
     setTitle(savedSnapshot.title);
     setDescription(savedSnapshot.description);
     setSource(savedSnapshot.source);
-    setDefaultCodeLanguage(savedSnapshot.defaultCodeLanguage);
+    setAiInstructions(savedSnapshot.aiGenerationInstructions);
+    setQuestionCount(savedSnapshot.aiQuestionCount);
+    setGenerationCodeLanguage(savedSnapshot.defaultCodeLanguage);
     setRandomizeChoices(savedSnapshot.randomizeChoices);
     setStudentAnswers({});
     setSubmitted(false);
@@ -394,7 +402,9 @@ export function McqActivityView({
         description,
         config: {
           source,
-          defaultCodeLanguage,
+          aiGenerationInstructions: aiInstructions,
+          aiQuestionCount: questionCount,
+          defaultCodeLanguage: generationCodeLanguage,
           randomizeChoices
         }
       });
@@ -402,7 +412,9 @@ export function McqActivityView({
         title,
         description,
         source,
-        defaultCodeLanguage,
+        aiGenerationInstructions: aiInstructions,
+        aiQuestionCount: questionCount,
+        defaultCodeLanguage: generationCodeLanguage,
         randomizeChoices
       });
       notifications.success(copy.saved);
@@ -413,7 +425,7 @@ export function McqActivityView({
     } finally {
       setSaving(false);
     }
-  }, [copy.saveError, copy.saved, defaultCodeLanguage, description, notifications, onSave, randomizeChoices, source, title]);
+  }, [aiInstructions, copy.saveError, copy.saved, description, generationCodeLanguage, notifications, onSave, questionCount, randomizeChoices, source, title]);
 
   useUnsavedChangesGuard(
     useMemo(
@@ -458,7 +470,7 @@ export function McqActivityView({
     try {
       const result = await aiGenerationClient.generate({
         description,
-        defaultCodeLanguage,
+        defaultCodeLanguage: generationCodeLanguage,
         instructions: aiInstructions,
         locale,
         questionCount
@@ -584,6 +596,20 @@ export function McqActivityView({
                   onChange={(event) => setQuestionCount(Math.max(1, Math.min(20, Number(event.target.value) || 1)))}
                 />
               </div>
+              <div className="field">
+                <label htmlFor="mcq-ai-default-language">{copy.defaultCodeLanguage}</label>
+                <select
+                  id="mcq-ai-default-language"
+                  value={generationCodeLanguage}
+                  onChange={(event) => setGenerationCodeLanguage(event.target.value)}
+                >
+                  {mcqCodeLanguageOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <p className="muted">{copy.generateHelp}</p>
               <div className="row">
                 <button type="button" disabled={generating || description.trim().length < 10} onClick={requestMcqGeneration}>
@@ -613,17 +639,6 @@ export function McqActivityView({
             </div>
           </div>
         ) : null}
-
-        <div className="field">
-          <label htmlFor="mcq-default-language">{copy.defaultCodeLanguage}</label>
-          <select id="mcq-default-language" value={defaultCodeLanguage} onChange={(event) => setDefaultCodeLanguage(event.target.value)}>
-            {mcqCodeLanguageOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
 
         <label style={{ alignItems: "flex-start", display: "flex", gap: 12 }}>
           <input
@@ -1177,6 +1192,8 @@ function snapshotFromActivity(activity: ActivityLike): McqFormSnapshot {
     title: activity.title,
     description: activity.description,
     source: String(activity.config?.source ?? fallbackConfig.source),
+    aiGenerationInstructions: String(activity.config?.aiGenerationInstructions ?? fallbackConfig.aiGenerationInstructions),
+    aiQuestionCount: normalizeQuestionCount(activity.config?.aiQuestionCount),
     defaultCodeLanguage: String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage),
     randomizeChoices: Boolean(activity.config?.randomizeChoices ?? fallbackConfig.randomizeChoices)
   };
@@ -1187,9 +1204,16 @@ function snapshotsEqual(left: McqFormSnapshot, right: McqFormSnapshot) {
     left.title === right.title &&
     left.description === right.description &&
     left.source === right.source &&
+    left.aiGenerationInstructions === right.aiGenerationInstructions &&
+    left.aiQuestionCount === right.aiQuestionCount &&
     left.defaultCodeLanguage === right.defaultCodeLanguage &&
     left.randomizeChoices === right.randomizeChoices
   );
+}
+
+function normalizeQuestionCount(value: unknown) {
+  const numericValue = Number(value ?? fallbackConfig.aiQuestionCount);
+  return Math.max(1, Math.min(20, Number.isFinite(numericValue) ? Math.round(numericValue) : fallbackConfig.aiQuestionCount));
 }
 
 function formatSubmissionAvailability(

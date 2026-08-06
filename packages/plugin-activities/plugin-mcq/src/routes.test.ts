@@ -126,6 +126,52 @@ describe("MCQ generation route", () => {
     expect(mocks.generateQuestionAuthoringText.mock.calls[1]?.[1]?.userPrompt).toContain("exactly 2 questions");
   });
 
+  it("retries until generated code fences explicitly use the selected language", async () => {
+    mocks.generateQuestionAuthoringText
+      .mockResolvedValueOnce([
+        "## Question 1",
+        "",
+        "What is printed?",
+        "",
+        "```",
+        "print('hello')",
+        "```",
+        "",
+        "- [x] hello",
+        "- [ ] goodbye",
+        "- [ ] nothing"
+      ].join("\n"))
+      .mockResolvedValueOnce([
+        "## Question 1",
+        "",
+        "What is printed?",
+        "",
+        "```python",
+        "print('hello')",
+        "```",
+        "",
+        "- [x] hello",
+        "- [ ] goodbye",
+        "- [ ] nothing"
+      ].join("\n"));
+
+    await expect(
+      mcqGenerateRoute.methods.POST?.({
+        request: new Request("http://test.local"),
+        context,
+        readJson: async () => ({
+          description: "Generate a programming question about output.",
+          defaultCodeLanguage: "python",
+          locale: "en",
+          questionCount: 1
+        })
+      })
+    ).resolves.toMatchObject({ attempts: 2, source: expect.stringContaining("```python") });
+
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("must open with ```python");
+    expect(mocks.generateQuestionAuthoringText.mock.calls[1]?.[1]?.userPrompt).toContain("must include an explicit programming language");
+  });
+
   it("retries malformed source and fails after repeated invalid output", async () => {
     mocks.generateQuestionAuthoringText.mockResolvedValue("not mcq");
 
@@ -159,8 +205,7 @@ describe("MCQ generation route", () => {
           activity: {
             ...context.activity,
             config: {
-              source: "## Question\n\n- [x] Correct\n- [ ] Wrong",
-              defaultCodeLanguage: "python"
+              source: "## Question\n\n- [x] Correct\n- [ ] Wrong"
             },
             assignment: {
               id: "assignment-1",

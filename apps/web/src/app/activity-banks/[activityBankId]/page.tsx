@@ -250,7 +250,9 @@ export default function ActivityBankDetailPage() {
                 <div className="table-row" key={activity.id}>
                   <div className="table-main table-main-stack">
                     <strong>{activity.title}</strong>
-                    <span className="table-meta-note muted">{activity.description || t("common.noDescription")}</span>
+                    {activity.activityType.key !== "mcq" ? (
+                      <span className="table-meta-note muted">{activity.description || t("common.noDescription")}</span>
+                    ) : null}
                   </div>
                   <span className="eyebrow">{activityTypeLabel(activity.activityType.key)}</span>
                   <span className="table-meta muted">{t(`activityLifecycle.${activity.lifecycle}`)}</span>
