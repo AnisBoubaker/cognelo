@@ -97,6 +97,7 @@ const copyByLocale = {
     keepCurrentSource: "Keep current source",
     replaceCurrentSource: "Replace source",
     studentPreview: "Student preview",
+    studentPreviewPlaceholder: "Student prompt will be shown here",
     question: "Question",
     checkAnswers: "Check answers",
     submitAnswers: "Submit",
@@ -147,6 +148,7 @@ const copyByLocale = {
     keepCurrentSource: "Conserver la source",
     replaceCurrentSource: "Remplacer la source",
     studentPreview: "Apercu etudiant",
+    studentPreviewPlaceholder: "La consigne etudiante sera affichee ici",
     question: "Question",
     checkAnswers: "Verifier les reponses",
     submitAnswers: "Soumettre",
@@ -197,6 +199,7 @@ const copyByLocale = {
     keepCurrentSource: "保留当前源码",
     replaceCurrentSource: "替换源码",
     studentPreview: "学生预览",
+    studentPreviewPlaceholder: "学生提示将显示在这里",
     question: "问题",
     checkAnswers: "检查答案",
     submitAnswers: "提交",
@@ -636,39 +639,48 @@ export function McqActivityView({
         </label>
 
         <div className="mcq-authoring-grid">
-          <div className="stack">
+          <section className="stack mcq-authoring-preview-prompt">
+            <h3>{copy.studentPreview}</h3>
+            <div className="mcq-student-preview-placeholder">
+              <strong>{copy.studentPreviewPlaceholder}</strong>
+            </div>
+          </section>
+
+          <div className="stack mcq-authoring-source">
             <h3>{copy.source}</h3>
             <CodeEditor id="mcq-source" value={source} onChange={setSource} language="markdown" minHeight={620} />
           </div>
 
           <section className="stack mcq-authoring-preview">
-            <h3>{copy.studentPreview}</h3>
-            <McqStudentView
-              studentPrompt={description}
-              parsedMcq={parsedMcq}
-              studentAnswers={studentAnswers}
-              submitted={submitted}
-              showFeedback={submitted}
-              score={score}
-              onSubmit={() => setSubmitted(true)}
-              onReset={() => {
-                setStudentAnswers({});
-                setSubmitted(false);
-              }}
-              onSingleChoice={updateSingleChoice}
-              onMultipleChoice={updateMultipleChoice}
-              questionLabel={copy.question}
-              checkAnswersLabel={copy.checkAnswers}
-              disabled={false}
-              resetDisabled={false}
-              resetLabel={copy.reset}
-              scoreLabel={copy.score}
-              pointsLabel={copy.points}
-              correctLabel={copy.correct}
-              incorrectLabel={copy.incorrect}
-              missedCorrectAnswerLabel={copy.missedCorrectAnswer}
-              randomizeChoices={randomizeChoices}
-            />
+            <h3 aria-hidden="true" className="mcq-preview-alignment-heading">{copy.source}</h3>
+            <div className="mcq-preview-editor-inset">
+              <McqStudentView
+                studentPrompt=""
+                parsedMcq={parsedMcq}
+                studentAnswers={studentAnswers}
+                submitted={submitted}
+                showFeedback={submitted}
+                score={score}
+                onSubmit={() => setSubmitted(true)}
+                onReset={() => {
+                  setStudentAnswers({});
+                  setSubmitted(false);
+                }}
+                onSingleChoice={updateSingleChoice}
+                onMultipleChoice={updateMultipleChoice}
+                questionLabel={copy.question}
+                checkAnswersLabel={copy.checkAnswers}
+                disabled={false}
+                resetDisabled={false}
+                resetLabel={copy.reset}
+                scoreLabel={copy.score}
+                pointsLabel={copy.points}
+                correctLabel={copy.correct}
+                incorrectLabel={copy.incorrect}
+                missedCorrectAnswerLabel={copy.missedCorrectAnswer}
+                randomizeChoices={randomizeChoices}
+              />
+            </div>
           </section>
         </div>
 

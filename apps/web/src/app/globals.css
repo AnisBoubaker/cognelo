@@ -2519,7 +2519,32 @@ a.card:hover,
   align-items: start;
   display: grid;
   gap: 20px;
+  grid-template-areas:
+    ". prompt"
+    "source questions";
   grid-template-columns: minmax(0, 1fr) minmax(360px, 0.95fr);
+}
+
+.mcq-student-preview-placeholder {
+  background: rgba(238, 244, 251, 0.7);
+  border: 1px dashed rgba(46, 131, 216, 0.34);
+  border-radius: 10px;
+  color: var(--muted);
+  display: grid;
+  min-height: 96px;
+  padding: 18px;
+  place-items: center;
+  text-align: center;
+}
+
+.mcq-authoring-source {
+  grid-area: source;
+  min-width: 0;
+}
+
+.mcq-authoring-preview-prompt {
+  grid-area: prompt;
+  min-width: 0;
 }
 
 .coding-homework-authoring-grid {
@@ -2640,7 +2665,16 @@ a.card:hover,
 }
 
 .mcq-authoring-preview {
+  grid-area: questions;
   min-width: 0;
+}
+
+.mcq-preview-alignment-heading {
+  visibility: hidden;
+}
+
+.mcq-preview-editor-inset {
+  padding-top: 12px;
 }
 
 .parsons-inline-code .code-renderer-line {
@@ -2793,7 +2827,19 @@ a.card:hover,
   }
 
   .mcq-authoring-grid {
+    grid-template-areas:
+      "prompt"
+      "source"
+      "questions";
     grid-template-columns: 1fr;
+  }
+
+  .mcq-preview-alignment-heading {
+    display: none;
+  }
+
+  .mcq-preview-editor-inset {
+    padding-top: 0;
   }
 
   .coding-homework-authoring-grid,
