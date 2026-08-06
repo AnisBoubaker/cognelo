@@ -12,6 +12,8 @@ Students see the activity description as a student prompt before a rendered MCQ 
 
 During authoring, the complete source editor and rendered preview appear side by side. The source remains one copyable text block so teachers can paste or save a full activity outside Cognelo.
 
+The student prompt uses the shared Markdown-backed `RichTextEditor` from `@cognelo/activity-ui`. Teachers can edit visually or switch to the always-available Markdown source mode; the stored activity description remains Markdown.
+
 ## Authoring Model
 
 The main MCQ source is written as text.
