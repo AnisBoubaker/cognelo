@@ -26,7 +26,6 @@ vi.mock("./authorization", () => authorization);
 vi.mock("./plugins", () => plugins);
 vi.mock("./activities", () => activities);
 vi.mock("@cognelo/activity-sdk", () => ({
-  getActivityDefinition: vi.fn(() => ({ grading: { supportsAttempts: true, supportsAutoGrading: true } })),
   getActivityProviderForActivityType: vi.fn(() => ({ kind: "plugin", key: "mcq" }))
 }));
 

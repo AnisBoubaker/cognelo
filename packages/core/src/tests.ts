@@ -1,4 +1,4 @@
-import { getActivityDefinition, getActivityProviderForActivityType } from "@cognelo/activity-sdk";
+import { getActivityProviderForActivityType } from "@cognelo/activity-sdk";
 import { TestCreateSchema, TestItemCreateSchema, TestItemUpdateSchema, TestSettingsSchema, TestUpdateSchema } from "@cognelo/contracts";
 import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
@@ -239,13 +239,9 @@ async function findTestItem(courseId: string, testActivityId: string, testItemId
 }
 
 function assertActivityCanBelongToTest(activityTypeKey: string) {
-  const definition = getActivityDefinition(activityTypeKey);
   const provider = getActivityProviderForActivityType(activityTypeKey);
-  if (!definition || provider?.kind !== "plugin" || !definition.grading?.supportsAttempts) {
-    throw new AppError(400, "TEST_ITEM_ACTIVITY_UNSUPPORTED", "Choose a gradable plugin activity for this Test.");
-  }
-  if (!definition.grading.supportsAutoGrading && !definition.grading.supportsManualGrading) {
-    throw new AppError(400, "TEST_ITEM_ACTIVITY_UNSUPPORTED", "Test activities must support automatic or manual grading.");
+  if (provider?.kind !== "plugin") {
+    throw new AppError(400, "TEST_ITEM_ACTIVITY_UNSUPPORTED", "Choose a plugin activity for this Test.");
   }
 }
 
