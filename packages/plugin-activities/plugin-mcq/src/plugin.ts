@@ -133,7 +133,8 @@ export const mcqPlugin: ActivityPlugin = {
         supportsAutoGrading: true,
         supportsManualGrading: true,
         supportsFeedbackRenderer: true,
-        supportsAnalyticsPayloads: true
+        supportsAnalyticsPayloads: true,
+        supportsCompositeExecution: true
       },
       manualGrading: {
         rendererKey: "mcq-manual-grading"

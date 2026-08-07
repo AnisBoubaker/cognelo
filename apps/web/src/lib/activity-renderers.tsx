@@ -1,4 +1,4 @@
-import type { ComponentProps, JSXElementConstructor, ReactNode } from "react";
+import type { ComponentProps, ComponentType, JSXElementConstructor, ReactNode } from "react";
 import { useMemo } from "react";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { CodingExerciseActivityView } from "@cognelo/plugin-coding-exercises";
@@ -17,7 +17,7 @@ import {
 } from "@cognelo/plugin-parsons";
 import { createMcqClient, McqActivityView, McqManualGradingPanel, type McqSubmission } from "@cognelo/plugin-mcq";
 import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
-import { TestActivityView } from "@/components/test-activity-view";
+import { TestActivityView, type TestStudentItemRendererContext } from "@/components/test-activity-view";
 import {
   api,
   apiAbsoluteUrl,
@@ -444,6 +444,85 @@ function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView
   );
 }
 
+type TestItemRendererProps = TestStudentItemRendererContext;
+
+function McqTestItemRenderer({ executionHost, runtime, item }: TestItemRendererProps) {
+  const submissionClient = useMemo(() => ({
+    getStatus: async () => {
+      const savedState = await executionHost.load();
+      const itemAttempt = item.itemAttempt;
+      const answers = asStudentAnswers(savedState?.answers);
+      const completed = itemAttempt?.lifecycle === "submitted" || itemAttempt?.lifecycle === "graded";
+      return {
+        submission: itemAttempt ? { answers, lifecycle: itemAttempt.lifecycle } : null,
+        grade: completed && itemAttempt?.rawScore !== null && itemAttempt?.rawMaxScore !== null ? {
+          rawScore: itemAttempt.rawScore,
+          rawMaxScore: itemAttempt.rawMaxScore,
+          normalizedScore: itemAttempt.normalizedScore ?? undefined,
+          normalizedMaxScore: itemAttempt.normalizedMaxScore ?? undefined
+        } : null,
+        availability: {
+          attemptsRemaining: completed ? 0 : 1,
+          canStart: !completed && runtime.attempt?.lifecycle === "started",
+          reason: completed ? "This Test activity has already been submitted." : null
+        }
+      };
+    },
+    save: async (_activityId: string, answers: Record<string, string[]>) => {
+      await executionHost.save({ answers });
+    }
+  }), [executionHost, item.itemAttempt, runtime.attempt]);
+
+  return (
+    <McqActivityView
+      activity={{
+        ...item.activity,
+        assignment: {
+          metadata: { assessmentMode: "summative" }
+        }
+      }}
+      canManage={false}
+      onSave={async () => item.activity}
+      submissionClient={submissionClient}
+      deferSubmission
+      autosaveDelayMs={0}
+      showCorrectAnswers={false}
+      studentViewMode={runtime.attempt?.lifecycle === "started" ? "attempt" : "previous"}
+    />
+  );
+}
+
+const testItemRenderers: Record<string, ComponentType<TestItemRendererProps>> = {
+  mcq: McqTestItemRenderer
+};
+
+function TestActivityRenderer(props: ActivityRendererProps<typeof TestActivityView>) {
+  return (
+    <TestActivityView
+      {...props}
+      renderStudentItem={(context) => {
+        const Renderer = testItemRenderers[context.item.activity.activityType.key];
+        return Renderer ? (
+          <Renderer
+            {...context}
+          />
+        ) : null;
+      }}
+    />
+  );
+}
+
+function asStudentAnswers(value: unknown): Record<string, string[]> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([questionId, choiceIds]) =>
+      Array.isArray(choiceIds) && choiceIds.every((choiceId) => typeof choiceId === "string")
+        ? [[questionId, choiceIds as string[]]]
+        : []
+    )
+  );
+}
+
 function ParsonsBankActivityRenderer(context: BankActivityRendererContext) {
   const parsonsClient = createParsonsClient(apiRequest);
   return (
@@ -578,7 +657,7 @@ function WebDesignCodingExerciseBankActivityRenderer(context: BankActivityRender
 }
 
 export const activityRenderers = {
-  test: TestActivityView,
+  test: TestActivityRenderer,
   "coding-exercise": CodingExerciseActivityRenderer,
   "coding-homework-grader": CodingHomeworkGraderActivityRenderer,
   "parsons-problem": ParsonsActivityRenderer,

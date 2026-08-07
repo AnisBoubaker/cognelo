@@ -186,10 +186,27 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
   const data = ActivityUpdateSchema.parse(input);
   const activity = await prisma.activity.findFirst({
     where: { id: activityId, courseId },
-    include: { activityType: true, bankActivity: true, activityVersion: true }
+    include: {
+      activityType: true,
+      bankActivity: true,
+      activityVersion: true,
+      testItem: { select: { test: { select: { activityId: true } } } }
+    }
   });
   if (!activity) {
     throw notFound("Activity");
+  }
+  if (activity.testItem) {
+    const attemptCount = await prisma.activityAttempt.count({
+      where: { activityId: activity.testItem.test.activityId }
+    });
+    if (attemptCount > 0) {
+      throw new AppError(
+        409,
+        "TEST_STRUCTURE_LOCKED",
+        "This activity cannot be changed after a student has started its Test. Duplicate the Test to create a changed assessment."
+      );
+    }
   }
 
   const definition = getActivityDefinition(data.activityTypeKey ?? activity.activityType.key);

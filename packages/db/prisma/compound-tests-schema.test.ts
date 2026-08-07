@@ -6,6 +6,10 @@ const migration = readFileSync(
   new URL("./migrations/202608070001_compound_tests_foundation/migration.sql", import.meta.url),
   "utf8"
 );
+const executionMigration = readFileSync(
+  new URL("./migrations/202608070002_compound_test_execution/migration.sql", import.meta.url),
+  "utf8"
+);
 
 describe("compound Test schema foundation", () => {
   it("distinguishes core and plugin activity providers", () => {
@@ -31,5 +35,14 @@ describe("compound Test schema foundation", () => {
     expect(migration).toContain('CONSTRAINT "TestItem_points_positive"');
     expect(migration).toContain('CONSTRAINT "TestItem_testId_fkey"');
     expect(migration).toContain('CONSTRAINT "TestItem_activityId_fkey"');
+  });
+
+  it("persists one child execution record per Test item and parent attempt", () => {
+    expect(schema).toContain("model TestItemAttempt {");
+    expect(schema).toContain("@@unique([parentAttemptId, testItemId])");
+    expect(executionMigration).toContain('CREATE TABLE "TestItemAttempt"');
+    expect(executionMigration).toContain('CREATE UNIQUE INDEX "TestItemAttempt_parentAttemptId_testItemId_key"');
+    expect(executionMigration).toContain('CONSTRAINT "TestItemAttempt_parentAttemptId_fkey"');
+    expect(executionMigration).toContain('CONSTRAINT "TestItemAttempt_testItemId_fkey"');
   });
 });

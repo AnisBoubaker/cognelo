@@ -13,6 +13,7 @@ import {
 } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
+import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { assertCanManageCourse, assertCanViewCourse, canManageCourse, isAdmin } from "./authorization";
 import { AppError, notFound } from "./errors";
 
@@ -131,6 +132,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   validateAvailability(data.availableFrom, data.availableUntil);
   const activity = await assertActivityBelongsToCourse(courseId, activityId);
   assertTestAssignmentIsSummative(activity, data.assessmentMode);
+  await assertTestReadyForCompositeExecution(courseId, activity);
   const availableFrom = parseDateInput(data.availableFrom);
   const availableUntil = parseDateInput(data.availableUntil);
   const gradebookSettings = data.gradebookSettings ? normalizeGradebookItemSettings(data.gradebookSettings) : undefined;
@@ -611,6 +613,7 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
   const data = CourseGroupActivityInputSchema.parse(input);
   const activity = await assertActivityBelongsToCourse(courseId, data.activityId);
   assertTestAssignmentIsSummative(activity, data.metadata.assessmentMode);
+  await assertTestReadyForCompositeExecution(courseId, activity);
   validateAvailability(data.availableFrom, data.availableUntil);
 
   const existing = await prisma.courseGroupActivity.findFirst({
@@ -941,6 +944,39 @@ function assertTestAssignmentIsSummative(
 ) {
   if (activity?.activityType?.key === "test" && assessmentMode !== "summative") {
     throw new AppError(400, "TEST_SUMMATIVE_ONLY", "A Test must be assigned as a summative activity.");
+  }
+}
+
+async function assertTestReadyForCompositeExecution(
+  courseId: string,
+  activity: { id: string; activityType?: { key: string } | null }
+) {
+  if (activity.activityType?.key !== "test") return;
+  const test = await prisma.test.findFirst({
+    where: { courseId, activityId: activity.id },
+    select: {
+      items: {
+        select: {
+          activity: {
+            select: { title: true, activityType: { select: { key: true } } }
+          }
+        }
+      }
+    }
+  });
+  if (!test?.items.length) {
+    throw new AppError(409, "TEST_ITEMS_REQUIRED", "Add at least one activity before assigning this Test.");
+  }
+  const unsupported = test.items.filter((item) =>
+    !getActivityDefinition(item.activity.activityType.key)?.grading?.supportsCompositeExecution
+  );
+  if (unsupported.length) {
+    throw new AppError(
+      409,
+      "TEST_ITEM_COMPOSITE_UNSUPPORTED",
+      "Some Test activities do not support student execution yet.",
+      { activityTitles: unsupported.map((item) => item.activity.title) }
+    );
   }
 }
 

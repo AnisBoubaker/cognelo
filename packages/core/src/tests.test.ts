@@ -14,7 +14,8 @@ const db = vi.hoisted(() => ({
   testItem: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
   activity: { delete: vi.fn() },
   activityVersion: { findFirst: vi.fn() },
-  bankActivity: { findUnique: vi.fn() }
+  bankActivity: { findUnique: vi.fn() },
+  activityAttempt: { count: vi.fn() }
 }));
 
 const authorization = vi.hoisted(() => ({ assertCanManageCourse: vi.fn(), assertCanViewCourse: vi.fn() }));
@@ -29,7 +30,7 @@ vi.mock("@cognelo/activity-sdk", () => ({
   getActivityProviderForActivityType: vi.fn(() => ({ kind: "plugin", key: "mcq" }))
 }));
 
-const { createTest, createTestItem } = await import("./tests");
+const { createTest, createTestItem, updateTestItem } = await import("./tests");
 
 const teacher: CurrentUser = {
   id: "teacher-1",
@@ -45,6 +46,7 @@ describe("Test authoring services", () => {
     vi.clearAllMocks();
     db.$transaction.mockImplementation(async (handler: (transaction: typeof tx) => unknown) => handler(tx));
     tx.courseContentItem.count.mockResolvedValue(0);
+    db.activityAttempt.count.mockResolvedValue(0);
   });
 
   it("creates a core Test shell and normalized Test row", async () => {
@@ -90,5 +92,15 @@ describe("Test authoring services", () => {
     expect(db.testItem.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ testId: "test-1", activityId: "child-1", position: 2 })
     }));
+  });
+
+  it("locks Test structure after the first student attempt starts", async () => {
+    db.activityAttempt.count.mockResolvedValue(1);
+
+    await expect(
+      updateTestItem(teacher, "course-1", "test-activity-1", "item-1", { pointsPossible: 20 })
+    ).rejects.toMatchObject({ status: 409, code: "TEST_STRUCTURE_LOCKED" });
+
+    expect(db.testItem.update).not.toHaveBeenCalled();
   });
 });

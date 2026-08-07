@@ -34,6 +34,9 @@ const mockPrisma = vi.hoisted(() => ({
   },
   course: {
     findUnique: vi.fn()
+  },
+  activityAttempt: {
+    count: vi.fn()
   }
 }));
 
@@ -81,6 +84,7 @@ describe("activity services", () => {
     tx.activity.create.mockImplementation((...args) => mockPrisma.activity.create(...args));
     tx.activity.update.mockImplementation((...args) => mockPrisma.activity.update(...args));
     tx.courseContentItem.count.mockResolvedValue(0);
+    mockPrisma.activityAttempt.count.mockResolvedValue(0);
   });
 
   it("creates a local course activity only for enabled activity types", async () => {
@@ -281,6 +285,23 @@ describe("activity services", () => {
       where: { courseId: "course-1", activityId: "activity-1" },
       data: { titleSnapshot: "TP1" }
     });
+  });
+
+  it("locks contained child configuration after its Test has an attempt", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "child-activity-1",
+      title: "Question set",
+      activityType: { key: "mcq" },
+      config: {},
+      testItem: { test: { activityId: "test-activity-1" } }
+    });
+    mockPrisma.activityAttempt.count.mockResolvedValue(1);
+
+    await expect(
+      updateActivity(teacherUser, "course-1", "child-activity-1", { config: { source: "changed" } })
+    ).rejects.toMatchObject({ status: 409, code: "TEST_STRUCTURE_LOCKED" });
+
+    expect(tx.activity.update).not.toHaveBeenCalled();
   });
 
   it("deletes only course-local activity IDs that belong to the course", async () => {

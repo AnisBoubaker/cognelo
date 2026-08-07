@@ -2,6 +2,7 @@ import { AppError } from "@cognelo/core";
 import { prisma } from "@cognelo/db";
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import { buildMcqGradingResultFromConfig } from "./grading";
+import { z } from "zod";
 import { mcqGenerateRoute, mcqGradebookAttemptsRoute, mcqSubmissionRoute, submittedAnswersFromMetadata } from "./routes";
 
 export const mcqServerPlugin: ServerActivityPlugin = {
@@ -18,6 +19,18 @@ export const mcqServerPlugin: ServerActivityPlugin = {
       }
       const answers = submittedAnswersFromMetadata(attempt.metadata);
       return buildMcqGradingResultFromConfig(activity.config, answers);
+    }
+  },
+  compositeExecution: {
+    activityTypeKeys: ["mcq"],
+    submit: async ({ activity, payload }) => {
+      const input = z.object({
+        answers: z.record(z.array(z.string().min(1).max(120)).default([])).default({})
+      }).parse(payload);
+      return {
+        state: { answers: input.answers },
+        gradingResult: buildMcqGradingResultFromConfig(activity.config, input.answers)
+      };
     }
   }
 } as const;

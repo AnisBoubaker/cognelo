@@ -37,6 +37,29 @@ export type ActivityGradingResult = {
   metadata?: Record<string, unknown>;
 };
 
+export type ActivityExecutionContext =
+  | {
+      kind: "standalone";
+      groupActivityId: string;
+      activityAttemptId: string;
+    }
+  | {
+      kind: "test_item";
+      parentAttemptId: string;
+      testItemId: string;
+      testItemAttemptId: string | null;
+    };
+
+export type ActivityExecutionStateHost<TState> = {
+  context: ActivityExecutionContext;
+  load: () => Promise<TState | null>;
+  save: (state: TState) => Promise<TState>;
+};
+
+export type ActivityExecutionHost<TState, TSubmissionResult> = ActivityExecutionStateHost<TState> & {
+  submit: (state: TState) => Promise<TSubmissionResult>;
+};
+
 export type ActivityManualGradingContract = {
   routePath?: string;
   rendererKey?: string;

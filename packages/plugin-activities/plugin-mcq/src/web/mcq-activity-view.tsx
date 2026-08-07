@@ -27,11 +27,12 @@ type McqActivityViewProps = {
   locale?: "en" | "fr" | "zh" | "ar";
   submissionClient?: {
     getStatus?: (activityId: string) => Promise<{
-      submission: { answers: StudentAnswerState } | null;
+      submission: { answers: StudentAnswerState; lifecycle?: string } | null;
       grade?: { rawScore: number; rawMaxScore: number; normalizedScore?: number; normalizedMaxScore?: number } | null;
       availability: { attemptsRemaining: number | null; canStart: boolean; reason: string | null; gradesReleased?: boolean };
     }>;
-    submit: (activityId: string, answers: StudentAnswerState) => Promise<{ submission: { answers: StudentAnswerState } }>;
+    save?: (activityId: string, answers: StudentAnswerState) => Promise<void>;
+    submit?: (activityId: string, answers: StudentAnswerState) => Promise<{ submission: { answers: StudentAnswerState } }>;
   };
   onSubmitted?: () => void;
   studentViewMode?: "attempt" | "previous";
@@ -39,6 +40,8 @@ type McqActivityViewProps = {
   onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
   showCorrectAnswers?: boolean;
   releasedMaxScore?: number;
+  deferSubmission?: boolean;
+  autosaveDelayMs?: number;
   aiGenerationClient?: {
     generate: (input: {
       description: string;
@@ -238,6 +241,8 @@ export function McqActivityView({
   onPreviousSubmissionsAvailabilityChange,
   showCorrectAnswers = false,
   releasedMaxScore,
+  deferSubmission = false,
+  autosaveDelayMs = 500,
   aiGenerationClient
 }: McqActivityViewProps) {
   const copyLocale = locale === "ar" ? "en" : locale;
@@ -265,6 +270,7 @@ export function McqActivityView({
     grade: { rawScore: number; rawMaxScore: number; normalizedScore?: number; normalizedMaxScore?: number } | null;
   } | null>(null);
   const [loadingSubmissionStatus, setLoadingSubmissionStatus] = useState(false);
+  const [submissionStatusReady, setSubmissionStatusReady] = useState(false);
   const [error, setError] = useState("");
   const [studentAnswers, setStudentAnswers] = useState<StudentAnswerState>({});
   const [submitted, setSubmitted] = useState(false);
@@ -287,6 +293,7 @@ export function McqActivityView({
     setSubmissionAvailability(null);
     setLatestSubmissionReview(null);
     setLoadingSubmissionStatus(false);
+    setSubmissionStatusReady(false);
     setAiInstructions(String(activity.config?.aiGenerationInstructions ?? fallbackConfig.aiGenerationInstructions));
     setQuestionCount(normalizeQuestionCount(activity.config?.aiQuestionCount));
   }, [activity.id, activity.title, activity.description, activityConfigKey]);
@@ -328,6 +335,7 @@ export function McqActivityView({
 
   useEffect(() => {
     if (!isSummativeStudentSession || !submissionClient?.getStatus) {
+      setSubmissionStatusReady(true);
       return;
     }
 
@@ -340,15 +348,18 @@ export function McqActivityView({
         }
         setSubmissionAvailability(status.availability);
         onNewAttemptAvailabilityChange?.(status.availability.canStart);
-        onPreviousSubmissionsAvailabilityChange?.(Boolean(status.submission));
+        const isCompletedSubmission = status.submission?.lifecycle !== "started" && Boolean(status.submission);
+        onPreviousSubmissionsAvailabilityChange?.(isCompletedSubmission);
         if (status.submission) {
-          setLatestSubmissionReview({
-            answers: status.submission.answers,
-            grade: status.grade ?? null
-          });
-          if (status.availability.canStart === false) {
-            setStudentAnswers(status.submission.answers);
+          setStudentAnswers(status.submission.answers);
+          if (isCompletedSubmission) {
+            setLatestSubmissionReview({
+              answers: status.submission.answers,
+              grade: status.grade ?? null
+            });
             setSubmitted(true);
+          } else {
+            setLatestSubmissionReview(null);
           }
         } else {
           setLatestSubmissionReview(null);
@@ -362,6 +373,7 @@ export function McqActivityView({
       .finally(() => {
         if (!cancelled) {
           setLoadingSubmissionStatus(false);
+          setSubmissionStatusReady(true);
         }
       });
 
@@ -377,6 +389,23 @@ export function McqActivityView({
     onPreviousSubmissionsAvailabilityChange,
     submissionClient
   ]);
+
+  useEffect(() => {
+    if (!isSummativeStudentSession || !submissionClient?.save || !submissionStatusReady || submitted) {
+      return;
+    }
+    const save = () => {
+      submissionClient.save?.(activity.id, studentAnswers).catch((err) => {
+        notifications.error(err instanceof Error ? err.message : copy.submitError);
+      });
+    };
+    if (autosaveDelayMs <= 0) {
+      save();
+      return;
+    }
+    const timeout = window.setTimeout(save, autosaveDelayMs);
+    return () => window.clearTimeout(timeout);
+  }, [activity.id, autosaveDelayMs, copy.submitError, isSummativeStudentSession, notifications, studentAnswers, submissionClient, submissionStatusReady, submitted]);
 
   const discardChanges = useCallback(() => {
     setTitle(savedSnapshot.title);
@@ -509,7 +538,7 @@ export function McqActivityView({
   }
 
   async function requestSubmitMcqAnswers() {
-    if (!isSummativeStudentSession || !submissionClient) {
+    if (!isSummativeStudentSession || !submissionClient?.submit) {
       setSubmitted(true);
       return;
     }
@@ -527,7 +556,7 @@ export function McqActivityView({
   }
 
   async function submitMcqAnswers() {
-    if (!isSummativeStudentSession || !submissionClient) {
+    if (!isSummativeStudentSession || !submissionClient?.submit) {
       setSubmitted(true);
       return;
     }
@@ -788,6 +817,7 @@ export function McqActivityView({
           incorrectLabel={copy.incorrect}
           missedCorrectAnswerLabel={copy.missedCorrectAnswer}
           releasedMaxScore={releasedMaxScore}
+          hideActions={deferSubmission}
           randomizeChoices={randomizeChoices}
         />
       ) : null}
