@@ -199,10 +199,14 @@ export default function ActivityBankDetailPage() {
     return activityDefinitions.find((candidate) => candidate.key === activityTypeKey)?.icon ?? "placeholder";
   }
 
+  const bankActivityTypes = activityTypes.filter((type) => {
+    const definition = activityDefinitions.find((candidate) => candidate.key === type.key);
+    return definition?.provider?.kind !== "core" && (!definition?.creationScopes || definition.creationScopes.includes("bank"));
+  });
   const visibleActivityCategories = activityCategories.filter((category) =>
-    activityTypes.some((type) => activityTypeCreatesCategory(type.key, category.id))
+    bankActivityTypes.some((type) => activityTypeCreatesCategory(type.key, category.id))
   );
-  const visibleActivityTypes = activityTypes.filter((type) => activityTypeBelongsToCategory(type.key, selectedCategoryId));
+  const visibleActivityTypes = bankActivityTypes.filter((type) => activityTypeBelongsToCategory(type.key, selectedCategoryId));
 
   useEffect(() => {
     if (visibleActivityCategories.some((category) => category.id === selectedCategoryId)) {
@@ -362,7 +366,7 @@ export default function ActivityBankDetailPage() {
                   value={editingActivity.activityTypeKey}
                   onChange={(event) => setEditingActivity({ ...editingActivity, activityTypeKey: event.target.value })}
                 >
-                  {activityTypes.map((type) => (
+                  {bankActivityTypes.map((type) => (
                     <option key={type.id} value={type.key}>
                       {activityTypeLabel(type.key)}
                     </option>

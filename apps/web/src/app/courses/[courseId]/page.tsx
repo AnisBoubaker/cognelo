@@ -511,13 +511,14 @@ export default function CourseDetailPage() {
   function startAssigningActivityToAllGroups(activity: NonNullable<Course["activities"]>[number]) {
     const rule = getAllGroupsAssignmentRule(activity);
     const gradebookSettings = rule?.gradebookSettings;
+    const isTest = activity.activityType.key === "test";
     setAssignAllActivityId(activity.id);
     setAssignAllAvailableFrom(toDateTimeLocalValue(rule?.availableFrom));
     setAssignAllAvailableUntil(toDateTimeLocalValue(rule?.availableUntil));
     setAssignAllEnablePerGroupSettings(rule?.enablePerGroupSettings ?? true);
     setAssignAllParentId(rule?.contentPlacement?.parentId ?? "");
     setAssignAllIsVisible(rule?.contentPlacement?.isVisible ?? true);
-    setAssignAllAssessmentMode(rule?.assessmentMode ?? "formative");
+    setAssignAllAssessmentMode(isTest ? "summative" : rule?.assessmentMode ?? "formative");
     setAssignAllPointsPossible(String(gradebookSettings?.pointsPossible ?? 100));
     setAssignAllGradingMode(gradebookSettings?.gradingMode ?? "points");
     setAssignAllPassThresholdPoints(String(gradebookSettings?.passThresholdPoints ?? 50));
@@ -557,12 +558,14 @@ export default function CourseDetailPage() {
     setError("");
     setAssignAllSavingActivityId(assignAllActivityId);
     try {
+      const selectedActivity = course?.activities?.find((activity) => activity.id === assignAllActivityId);
+      const assessmentMode = selectedActivity?.activityType.key === "test" ? "summative" : assignAllAssessmentMode;
       await api.assignActivityToAllCourseGroups(courseId, assignAllActivityId, {
         availableFrom: toIsoOrNull(assignAllAvailableFrom),
         availableUntil: toIsoOrNull(assignAllAvailableUntil),
         enablePerGroupSettings: assignAllEnablePerGroupSettings,
-        assessmentMode: assignAllAssessmentMode,
-        ...(assignAllAssessmentMode === "summative" ? { gradebookSettings: buildAssignAllGradebookSettings() } : {}),
+        assessmentMode,
+        ...(assessmentMode === "summative" ? { gradebookSettings: buildAssignAllGradebookSettings() } : {}),
         contentPlacement: {
           parentId: assignAllParentId || null,
           isVisible: assignAllIsVisible,
@@ -711,6 +714,7 @@ export default function CourseDetailPage() {
   const courseGroupById = new Map((course?.groups ?? []).map((group) => [group.id, group]));
   const settingsContentItem = settingsContentItemId ? contentItems.find((item) => item.id === settingsContentItemId) ?? null : null;
   const settingsActivity = settingsContentItem?.activityId ? courseActivityById.get(settingsContentItem.activityId) ?? null : null;
+  const settingsActivityIsTest = settingsActivity?.activityType.key === "test";
   const settingsContentResource = settingsContentItem?.contentResourceId ? contentResourceById.get(settingsContentItem.contentResourceId) ?? null : null;
   const settingsContentType = settingsContentResource ? contentTypeByKey.get(settingsContentResource.contentTypeKey) ?? null : null;
   const SettingsContentTypeRenderer = resolveContentTypeSettingsRenderer(settingsContentType?.settingsRendererKey);
@@ -2000,7 +2004,7 @@ export default function CourseDetailPage() {
                           <select
                             id={`settings-assign-mode-${settingsActivity.id}`}
                             value={assignAllAssessmentMode}
-                            disabled={assignAllSavingActivityId === settingsActivity.id}
+                            disabled={assignAllSavingActivityId === settingsActivity.id || settingsActivityIsTest}
                             onChange={(event) => setAssignAllAssessmentMode(event.target.value as "formative" | "summative")}
                           >
                             <option value="formative">{t("groupPage.assessmentModeFormative")}</option>

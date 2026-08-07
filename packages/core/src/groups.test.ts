@@ -322,6 +322,62 @@ describe("group services", () => {
     });
   });
 
+  it("assigns a Test summatively to all groups with one gradebook item per assignment", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "test-activity-1",
+      courseId: "course-1",
+      title: "Final test",
+      metadata: {},
+      activityType: { key: "test" }
+    });
+    tx.courseGroup.findMany.mockResolvedValue([
+      { id: "group-1", activities: [] },
+      { id: "group-2", activities: [] }
+    ]);
+    tx.activity.update.mockResolvedValue({ id: "test-activity-1" });
+    tx.activity.findFirst = vi.fn().mockResolvedValue({ id: "test-activity-1" });
+
+    await assignActivityToAllCourseGroups(teacherUser, "course-1", "test-activity-1", {
+      assessmentMode: "summative",
+      gradebookSettings: { pointsPossible: 60 },
+      contentPlacement: { isVisible: true }
+    });
+
+    expect(tx.courseGroupActivity.upsert).toHaveBeenCalledTimes(2);
+    expect(tx.courseGroupActivity.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        activityId: "test-activity-1",
+        metadata: expect.objectContaining({ assessmentMode: "summative" })
+      })
+    }));
+    expect(tx.gradebookItem.upsert).toHaveBeenCalledTimes(2);
+    expect(tx.courseContentItem.create).toHaveBeenCalledTimes(2);
+    expect(tx.activity.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        metadata: expect.objectContaining({
+          allGroupsAssignment: expect.objectContaining({ assessmentMode: "summative" })
+        })
+      })
+    }));
+  });
+
+  it("rejects assigning a Test formatively to all groups", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "test-activity-1",
+      courseId: "course-1",
+      activityType: { key: "test" }
+    });
+
+    await expect(
+      assignActivityToAllCourseGroups(teacherUser, "course-1", "test-activity-1", {
+        assessmentMode: "formative"
+      })
+    ).rejects.toMatchObject({ status: 400, code: "TEST_SUMMATIVE_ONLY" });
+
+    expect(tx.courseGroupActivity.upsert).not.toHaveBeenCalled();
+    expect(tx.gradebookItem.upsert).not.toHaveBeenCalled();
+  });
+
   it("applies course-wide dates to existing group assignments when per-group settings are disabled", async () => {
     mockPrisma.activity.findFirst.mockResolvedValue({
       id: "activity-1",
@@ -559,7 +615,22 @@ describe("group services", () => {
     expect(mockPrisma.courseGroupActivity.create).not.toHaveBeenCalled();
   });
 
-  it("rejects Test assignment before the student runtime is enabled", async () => {
+  it("rejects assigning an activity contained by a Test", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
+    mockPrisma.activity.findFirst.mockResolvedValue(null);
+
+    await expect(
+      assignActivityToGroup(teacherUser, "course-1", "group-1", { activityId: "test-child-1" })
+    ).rejects.toMatchObject({ status: 404 });
+
+    expect(mockPrisma.activity.findFirst).toHaveBeenCalledWith({
+      where: { id: "test-child-1", courseId: "course-1", testItem: null },
+      include: { activityType: true }
+    });
+    expect(mockPrisma.courseGroupActivity.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects formative Test assignment", async () => {
     mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
     mockPrisma.activity.findFirst.mockResolvedValue({
       id: "test-activity-1",
@@ -568,8 +639,47 @@ describe("group services", () => {
     });
 
     await expect(
-      assignActivityToGroup(teacherUser, "course-1", "group-1", { activityId: "test-activity-1" })
-    ).rejects.toMatchObject({ status: 409, code: "TEST_ASSIGNMENT_NOT_AVAILABLE" });
+      assignActivityToGroup(teacherUser, "course-1", "group-1", {
+        activityId: "test-activity-1",
+        metadata: { assessmentMode: "formative" }
+      })
+    ).rejects.toMatchObject({ status: 400, code: "TEST_SUMMATIVE_ONLY" });
+  });
+
+  it("assigns a Test as one summative group activity with one gradebook item", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "test-activity-1",
+      courseId: "course-1",
+      title: "Midterm",
+      activityType: { key: "test" }
+    });
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue(null);
+
+    await assignActivityToGroup(teacherUser, "course-1", "group-1", {
+      activityId: "test-activity-1",
+      metadata: { assessmentMode: "summative" },
+      gradebookSettings: { pointsPossible: 40 },
+      contentPlacement: { isVisible: true }
+    });
+
+    expect(tx.courseGroupActivity.create).toHaveBeenCalledTimes(1);
+    expect(tx.courseGroupActivity.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        activityId: "test-activity-1",
+        groupId: "group-1",
+        metadata: { assessmentMode: "summative" }
+      })
+    }));
+    expect(tx.gradebookItem.upsert).toHaveBeenCalledTimes(1);
+    expect(tx.gradebookItem.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        activityId: "test-activity-1",
+        groupActivityId: "assignment-created",
+        pointsPossible: 40
+      })
+    }));
+    expect(tx.courseContentItem.create).toHaveBeenCalledTimes(1);
   });
 
   it("creates a gradebook item when assigning an activity to a group", async () => {
@@ -671,6 +781,24 @@ describe("group services", () => {
         maxAttempts: 3
       })
     });
+  });
+
+  it("rejects changing an assigned Test to formative", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({
+      id: "assignment-1",
+      groupId: "group-1",
+      metadata: { assessmentMode: "summative" },
+      activity: { activityType: { key: "test" } }
+    });
+
+    await expect(
+      updateGroupActivityAssignment(teacherUser, "course-1", "group-1", "assignment-1", {
+        metadata: { assessmentMode: "formative" }
+      })
+    ).rejects.toMatchObject({ status: 400, code: "TEST_SUMMATIVE_ONLY" });
+
+    expect(mockPrisma.courseGroupActivity.update).not.toHaveBeenCalled();
   });
 
   it("allows course-wide group assignments to be reordered inside a group", async () => {

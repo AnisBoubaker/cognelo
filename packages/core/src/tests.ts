@@ -22,7 +22,7 @@ export async function createTest(user: CurrentUser, courseId: string, input: unk
   const data = TestCreateSchema.parse(input);
   await ensureCoreActivityTypes();
   const activityType = await prisma.activityType.findUnique({ where: { key: "test" } });
-  if (!activityType || activityType.providerKind !== "core") {
+  if (!activityType || activityType.providerKind !== "core" || !activityType.isEnabled) {
     throw new AppError(409, "TEST_ACTIVITY_TYPE_MISSING", "The core Test activity type is not available.");
   }
 
@@ -273,7 +273,7 @@ async function createTestContentItem(
       kind: "activity",
       titleSnapshot: input.placement.titleSnapshot ?? input.title,
       position,
-      isVisible: false,
+      isVisible: input.placement.isVisible,
       activityId: input.activityId,
       metadata: input.placement.metadata as Prisma.InputJsonValue
     }

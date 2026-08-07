@@ -400,14 +400,15 @@ Routes should be core Test routes, not plugin-dispatch routes. Authorization use
 - [x] Build the initial Test authoring shell and item editor routing.
 
 Phase 2 intentionally leaves Test duplication, teacher runtime preview, and immutable revisions for the later hardening/runtime phases. Test item editing reuses each plugin's normal course authoring renderer and returns to the owning Test.
-Until the student runtime phase, new Test content items are forced hidden and group/all-groups assignment rejects the core `test` type.
 
 ### Phase 3 — Assignment and Content
 
-- Enable the Test activity type for course creation.
-- Enforce summative-only assignment.
-- Reuse group/all-groups assignment, content placement, and one gradebook item.
-- Reject child assignment/content placement outside the Test.
+- [x] Enable the Test activity type for course creation through its dedicated core flow.
+- [x] Enforce summative-only assignment in direct-group and all-groups services and authoring UI.
+- [x] Reuse group/all-groups assignment, content placement, future-group inheritance, and one gradebook item per assigned Test.
+- [x] Reject child assignment/content placement outside the Test.
+
+Core Test types remain protected from the generic plugin activity creation/update routes so a Test shell cannot be created without its normalized `Test` row. Test content visibility now follows the teacher's selected placement. Student execution remains unavailable until Phase 4 adds the composite execution contract and Test runtime.
 
 ### Phase 4 — Execution Contract and MCQ
 
@@ -452,4 +453,5 @@ Each phase requires:
 - Design documented.
 - Phase 1 foundation implemented.
 - Phase 2 authoring and ownership implemented: dedicated Test creation, settings, local/bank child composition, reorder/remove/edit flows, containment filters, and lifecycle-safe deletion.
-- The core Test type is still excluded from generic plugin activity creation and student execution remains unavailable until the assignment/runtime phases.
+- Phase 3 assignment and content integration implemented: Test is enabled through its dedicated creation flow, assignments are summative-only, direct/all-groups/future-group materialization reuses the existing content and gradebook paths, and contained children cannot be assigned or placed independently.
+- Student Test execution remains unavailable until Phase 4.

@@ -48,7 +48,7 @@ describe("Test authoring services", () => {
   });
 
   it("creates a core Test shell and normalized Test row", async () => {
-    db.activityType.findUnique.mockResolvedValue({ id: "type-test", key: "test", providerKind: "core" });
+    db.activityType.findUnique.mockResolvedValue({ id: "type-test", key: "test", providerKind: "core", isEnabled: true });
     tx.activity.create.mockResolvedValue({ id: "activity-test", title: "Midterm" });
     tx.test.create.mockResolvedValue({ id: "test-1" });
     tx.test.findUniqueOrThrow.mockResolvedValue({ id: "test-1", activityId: "activity-test", items: [] });
@@ -63,7 +63,7 @@ describe("Test authoring services", () => {
       data: expect.objectContaining({ courseId: "course-1", activityId: "activity-test", settings: expect.objectContaining({ navigationMode: "free" }) })
     });
     expect(tx.courseContentItem.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ activityId: "activity-test", kind: "activity", titleSnapshot: "Midterm", isVisible: false })
+      data: expect.objectContaining({ activityId: "activity-test", kind: "activity", titleSnapshot: "Midterm", isVisible: true })
     });
   });
 

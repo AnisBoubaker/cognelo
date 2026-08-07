@@ -213,6 +213,9 @@ export default function CourseGroupPage() {
   const assignableActivities = (course?.activities ?? []).filter(
     (activity) => !assignedActivities.some((assignment) => assignment.activityId === activity.id)
   );
+  const selectedAssignableActivity = assignableActivities.find((activity) => activity.id === assignActivityId);
+  const assignActivityIsTest = selectedAssignableActivity?.activityType.key === "test";
+  const effectiveAssignAssessmentMode = assignActivityIsTest ? "summative" : assignAssessmentMode;
   const gradebookActivities = buildGroupGradebookActivitySummaries(gradebook?.items ?? [], gradebook?.rows ?? []);
   const gradebookOverview = buildGroupGradebookOverview(gradebookActivities);
   const now = Date.now();
@@ -599,15 +602,15 @@ export default function CourseGroupPage() {
     event.preventDefault();
     setAssignmentError("");
 
-    const selectedActivity = assignableActivities.find((activity) => activity.id === assignActivityId);
+    const selectedActivity = selectedAssignableActivity;
     try {
       await api.assignGroupActivity(courseId, groupId, {
         activityId: assignActivityId,
         availableFrom: toIsoOrNull(assignAvailableFrom),
         availableUntil: toIsoOrNull(assignAvailableUntil),
         config: {},
-        metadata: { assessmentMode: assignAssessmentMode },
-        ...(assignAssessmentMode === "summative" ? { gradebookSettings: buildAssignGradebookSettings() } : {}),
+        metadata: { assessmentMode: effectiveAssignAssessmentMode },
+        ...(effectiveAssignAssessmentMode === "summative" ? { gradebookSettings: buildAssignGradebookSettings() } : {}),
         position: assignedActivities.length,
         contentPlacement: {
           parentId: assignParentId || null,
@@ -1205,7 +1208,12 @@ export default function CourseGroupPage() {
                               <select
                                 id="assignActivity"
                                 value={assignActivityId}
-                                onChange={(event) => setAssignActivityId(event.target.value)}
+                                onChange={(event) => {
+                                  const nextActivityId = event.target.value;
+                                  const nextActivity = assignableActivities.find((activity) => activity.id === nextActivityId);
+                                  setAssignActivityId(nextActivityId);
+                                  setAssignAssessmentMode(nextActivity?.activityType.key === "test" ? "summative" : "formative");
+                                }}
                                 disabled={!assignableActivities.length || !canManage}
                               >
                                 {assignableActivities.length ? (
@@ -1267,15 +1275,15 @@ export default function CourseGroupPage() {
                               <label htmlFor="assignAssessmentMode">{t("groupPage.assessmentMode")}</label>
                               <select
                                 id="assignAssessmentMode"
-                                value={assignAssessmentMode}
+                                value={effectiveAssignAssessmentMode}
                                 onChange={(event) => setAssignAssessmentMode(event.target.value as "formative" | "summative")}
-                                disabled={!canManage}
+                                disabled={!canManage || assignActivityIsTest}
                               >
                                 <option value="formative">{t("groupPage.assessmentModeFormative")}</option>
                                 <option value="summative">{t("groupPage.assessmentModeSummative")}</option>
                               </select>
                             </div>
-                            {assignAssessmentMode === "summative" ? (
+                            {effectiveAssignAssessmentMode === "summative" ? (
                               <>
                                 <div className="field">
                                   <label htmlFor="assignPointsPossible">{t("groupPage.pointsPossible")}</label>

@@ -552,6 +552,23 @@ describe("course content services", () => {
     expect(mockPrisma.courseContentItem.create).not.toHaveBeenCalled();
   });
 
+  it("rejects direct content placement for an activity contained by a Test", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue(null);
+
+    await expect(
+      createActivityContentItem(teacherUser, "course-1", {
+        activityId: "test-child-1",
+        isVisible: true
+      })
+    ).rejects.toMatchObject({ status: 404 });
+
+    expect(mockPrisma.activity.findFirst).toHaveBeenCalledWith({
+      where: { id: "test-child-1", courseId: "course-1", testItem: null },
+      select: { id: true, title: true }
+    });
+    expect(mockPrisma.courseContentItem.create).not.toHaveBeenCalled();
+  });
+
   it("rejects moving a content item into itself", async () => {
     mockPrisma.courseContentItem.findFirst.mockResolvedValue({ id: "folder-1", courseId: "course-1", groupId: null });
 

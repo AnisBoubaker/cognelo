@@ -40,7 +40,7 @@ describe("activity SDK registry", () => {
     expect(isCoreActivityType("test")).toBe(true);
     expect(getActivityDefinition("test")).toMatchObject({
       creationScopes: ["course"],
-      isEnabledByDefault: false
+      isEnabledByDefault: true
     });
   });
 
