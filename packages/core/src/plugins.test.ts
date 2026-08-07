@@ -110,6 +110,9 @@ vi.mock("@cognelo/db", () => ({
 vi.mock("@cognelo/activity-sdk", () => ({
   getActivityPlugin: vi.fn((key: string) => (key === fakePlugin.key ? fakePlugin : undefined)),
   getActivityPluginForActivityType: vi.fn((key: string) => (key === "placeholder" ? fakePlugin : undefined)),
+  getActivityProviderForActivityType: vi.fn((key: string) =>
+    key === "test" ? { kind: "core", key: "test" } : key === "placeholder" ? { kind: "plugin", key: "placeholder" } : undefined
+  ),
   listActivityPlugins: vi.fn(() => [fakePlugin])
 }));
 
@@ -121,6 +124,7 @@ vi.mock("@cognelo/content-type-sdk", () => ({
 }));
 
 const {
+  assertActivityTypeAvailable,
   assertActivityTypePluginEnabled,
   assertContentResourcePluginActive,
   assertContentTypePluginEnabled,
@@ -226,8 +230,13 @@ describe("plugin lifecycle services", () => {
     expect(tx.activityType.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { key: "placeholder" },
-        create: expect.objectContaining({ key: "placeholder", isEnabled: false }),
-        update: expect.objectContaining({ isEnabled: false })
+        create: expect.objectContaining({
+          key: "placeholder",
+          providerKind: "plugin",
+          providerKey: "placeholder",
+          isEnabled: false
+        }),
+        update: expect.objectContaining({ providerKind: "plugin", providerKey: "placeholder", isEnabled: false })
       })
     );
   });
@@ -252,6 +261,11 @@ describe("plugin lifecycle services", () => {
       status: 400,
       code: "PLUGIN_DISABLED"
     });
+  });
+
+  it("treats core activity types as available without a plugin installation", async () => {
+    await expect(assertActivityTypeAvailable("test")).resolves.toBeUndefined();
+    expect(mockPrisma.activityPluginInstallation.findUnique).not.toHaveBeenCalled();
   });
 
   it("disables an active plugin without touching owned tables", async () => {

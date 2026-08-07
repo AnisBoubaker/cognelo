@@ -621,6 +621,44 @@ describe("course content services", () => {
     });
   });
 
+  it("replaces a shared activity placement with its assigned group placement", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1" });
+    mockPrisma.courseContentItem.findMany.mockResolvedValue([
+      { id: "week-1", parentId: null, isVisible: true, groupId: null, kind: "folder", activityId: null, courseGroupActivityId: null },
+      {
+        id: "course-activity-1",
+        parentId: "week-1",
+        isVisible: true,
+        groupId: null,
+        kind: "activity",
+        activityId: "activity-1",
+        courseGroupActivityId: null
+      },
+      {
+        id: "group-activity-1",
+        parentId: "week-1",
+        isVisible: true,
+        groupId: "group-1",
+        kind: "activity",
+        activityId: "activity-1",
+        courseGroupActivityId: "assignment-1"
+      },
+      {
+        id: "course-activity-2",
+        parentId: "week-1",
+        isVisible: true,
+        groupId: null,
+        kind: "activity",
+        activityId: "activity-2",
+        courseGroupActivityId: null
+      }
+    ]);
+
+    const result = await listContentItems(teacherUser, "course-1", { groupId: "group-1" });
+
+    expect(result.map((item) => item.id)).toEqual(["week-1", "group-activity-1", "course-activity-2"]);
+  });
+
   it("deletes only content items belonging to the course", async () => {
     mockPrisma.courseContentItem.findFirst.mockResolvedValue({ id: "item-1", courseId: "course-1" });
 

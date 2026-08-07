@@ -7,7 +7,10 @@ import {
   getActivityMessages,
   getActivityPlugin,
   getActivityPluginForActivityType,
+  getActivityProviderForActivityType,
+  isCoreActivityType,
   listActivityCategories,
+  listCoreActivityDefinitions,
   listActivityDefinitions,
   listActivityPlugins,
   listPluginDatabaseModules
@@ -21,13 +24,24 @@ describe("activity SDK registry", () => {
     );
 
     const definitionKeys = listActivityDefinitions().map((definition) => definition.key);
-    expect(definitionKeys).toEqual(expect.arrayContaining(["coding-exercise", "mcq", "parsons-problem", "placeholder"]));
+    expect(definitionKeys).toEqual(expect.arrayContaining(["coding-exercise", "mcq", "parsons-problem", "placeholder", "test"]));
   });
 
   it("resolves plugins by plugin key and activity type key", () => {
     expect(getActivityPlugin("coding-exercises")?.packageName).toBe("@cognelo/plugin-coding-exercises");
     expect(getActivityPluginForActivityType("coding-exercise")?.key).toBe("coding-exercises");
     expect(getActivityDefinition("coding-exercise")?.icon).toBe("code");
+  });
+
+  it("distinguishes core activity definitions from plugin-backed definitions", () => {
+    expect(listCoreActivityDefinitions().map((definition) => definition.key)).toEqual(["test"]);
+    expect(getActivityProviderForActivityType("test")).toEqual({ kind: "core", key: "test" });
+    expect(getActivityProviderForActivityType("mcq")).toEqual({ kind: "plugin", key: "mcq" });
+    expect(isCoreActivityType("test")).toBe(true);
+    expect(getActivityDefinition("test")).toMatchObject({
+      creationScopes: ["course"],
+      isEnabledByDefault: false
+    });
   });
 
   it("returns localized activity messages with stable fallbacks", () => {
