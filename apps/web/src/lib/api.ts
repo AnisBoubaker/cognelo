@@ -722,6 +722,32 @@ export type StudentGradeFeedback = {
   details?: Record<string, unknown>;
 };
 
+export type CourseTestAttemptReview = {
+  id: string;
+  attemptNumber: number;
+  lifecycle: string;
+  submittedAt: string | null;
+  gradedAt: string | null;
+  items: Array<{
+    testItemId: string;
+    activityId: string;
+    activityTypeKey: string;
+    title: string;
+    pointsPossible: number;
+    activity: Activity;
+    itemAttempt: {
+      id: string;
+      lifecycle: string;
+      rawScore: number | null;
+      rawMaxScore: number | null;
+      normalizedScore: number | null;
+      normalizedMaxScore: number | null;
+      state: Record<string, unknown>;
+      feedback: Record<string, unknown>;
+    };
+  }>;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 export function apiAbsoluteUrl(path: string) {
@@ -926,6 +952,21 @@ export const api = {
         body: JSON.stringify(input ?? {})
       }
     ),
+  gradeTestItem: (
+    courseId: string,
+    attemptId: string,
+    testItemId: string,
+    input: { score: number; reason?: string | null; feedbackText?: string | null }
+  ) =>
+    request<{ result: { attempt: GradebookMutationAttempt; grade: GradebookMutationGrade } }>(
+      `/courses/${courseId}/gradebook/attempts/${attemptId}/test-items/${testItemId}/grade`,
+      {
+        method: "POST",
+        body: JSON.stringify(input)
+      }
+    ),
+  testAttemptReview: (courseId: string, attemptId: string) =>
+    request<{ review: CourseTestAttemptReview }>(`/courses/${courseId}/gradebook/attempts/${attemptId}/test-review`),
   deleteActivitySubmission: (courseId: string, attemptId: string, input: { reason: string }) =>
     request<{ result: { attempt: GradebookMutationAttempt; grade: GradebookMutationGrade | null } }>(
       `/courses/${courseId}/gradebook/attempts/${attemptId}`,

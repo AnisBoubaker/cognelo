@@ -135,6 +135,9 @@ const coreDefinitions: ActivityDefinition[] = [
       supportsFeedbackRenderer: true,
       supportsAnalyticsPayloads: true
     },
+    manualGrading: {
+      rendererKey: "test-manual-grading"
+    },
     i18n: {
       en: {
         name: "Test",

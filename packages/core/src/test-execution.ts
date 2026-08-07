@@ -3,7 +3,13 @@ import { getActivityDefinition, type ActivityGradingResult } from "@cognelo/acti
 import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import { AppError, forbidden, notFound } from "./errors";
-import { getActivityAttemptAvailability, startActivityAttempt, submitActivityAttempt } from "./gradebook";
+import {
+  getActivityAttemptAvailability,
+  getActivityAttemptRegradeContext,
+  recordActivityAttemptGradingResult,
+  startActivityAttempt,
+  submitActivityAttempt
+} from "./gradebook";
 import { getGroupAssignedActivity } from "./groups";
 
 const CORE_TEST_RUNTIME_KEY = "core:test";
@@ -259,7 +265,217 @@ export async function submitTestAttempt(
       submittedItemIds: [...completedIds]
     } as Prisma.InputJsonValue
   });
+  await recordTestAttemptGrade(user, courseId, parentAttempt.id, "auto");
   return getTestRuntime(user, courseId, groupId, testActivityId, "previous");
+}
+
+export async function regradeTestAttempt(
+  user: CurrentUser,
+  courseId: string,
+  parentAttemptId: string,
+  reason?: string | null
+) {
+  return recordTestAttemptGrade(user, courseId, parentAttemptId, "regrade", reason);
+}
+
+export async function getTestAttemptReview(user: CurrentUser, courseId: string, parentAttemptId: string) {
+  const context = await getActivityAttemptRegradeContext(user, courseId, parentAttemptId);
+  if (context.activityTypeKey !== "test") {
+    throw new AppError(400, "TEST_ATTEMPT_REQUIRED", "This attempt does not belong to a Test.");
+  }
+  const parentAttempt = await prisma.activityAttempt.findFirst({
+    where: { id: parentAttemptId, courseId, pluginKey: CORE_TEST_RUNTIME_KEY, lifecycle: { in: ["submitted", "graded"] } },
+    include: {
+      testItemAttempts: {
+        include: {
+          activity: { include: { activityType: true } }
+        }
+      }
+    }
+  });
+  if (!parentAttempt) throw notFound("Submitted Test attempt");
+  const attemptByItemId = new Map(parentAttempt.testItemAttempts.map((attempt) => [attempt.testItemId, attempt]));
+  return {
+    id: parentAttempt.id,
+    attemptNumber: parentAttempt.attemptNumber,
+    lifecycle: parentAttempt.lifecycle,
+    submittedAt: parentAttempt.submittedAt?.toISOString() ?? null,
+    gradedAt: parentAttempt.gradedAt?.toISOString() ?? null,
+    items: manifestItems(parentAttempt.metadata).flatMap((manifestItem) => {
+      const itemAttempt = attemptByItemId.get(manifestItem.testItemId);
+      if (!itemAttempt) return [];
+      return [{
+        testItemId: manifestItem.testItemId,
+        activityId: manifestItem.activityId ?? itemAttempt.activityId,
+        activityTypeKey: manifestItem.activityTypeKey ?? itemAttempt.activity.activityType.key,
+        title: manifestItem.title ?? itemAttempt.activity.title,
+        pointsPossible: manifestItem.pointsPossible ?? itemAttempt.normalizedMaxScore ?? 0,
+        activity: {
+          id: itemAttempt.activity.id,
+          title: itemAttempt.activity.title,
+          description: itemAttempt.activity.description,
+          lifecycle: itemAttempt.activity.lifecycle,
+          config: asRecord(itemAttempt.activity.config),
+          metadata: asRecord(itemAttempt.activity.metadata),
+          activityType: {
+            id: itemAttempt.activity.activityType.id,
+            key: itemAttempt.activity.activityType.key,
+            name: itemAttempt.activity.activityType.name,
+            description: itemAttempt.activity.activityType.description
+          }
+        },
+        itemAttempt: {
+          id: itemAttempt.id,
+          lifecycle: itemAttempt.lifecycle,
+          rawScore: itemAttempt.rawScore,
+          rawMaxScore: itemAttempt.rawMaxScore,
+          normalizedScore: itemAttempt.normalizedScore,
+          normalizedMaxScore: itemAttempt.normalizedMaxScore,
+          state: asRecord(asRecord(itemAttempt.result).state),
+          feedback: asRecord(itemAttempt.feedback)
+        }
+      }];
+    })
+  };
+}
+
+export async function gradeTestItemManually(
+  user: CurrentUser,
+  courseId: string,
+  parentAttemptId: string,
+  testItemId: string,
+  input: { score: number; reason?: string | null; feedbackText?: string | null }
+) {
+  const context = await getActivityAttemptRegradeContext(user, courseId, parentAttemptId);
+  if (context.activityTypeKey !== "test") {
+    throw new AppError(400, "TEST_ATTEMPT_REQUIRED", "This attempt does not belong to a Test.");
+  }
+  const parentAttempt = await prisma.activityAttempt.findFirst({
+    where: { id: parentAttemptId, courseId, pluginKey: CORE_TEST_RUNTIME_KEY, lifecycle: { in: ["submitted", "graded"] } },
+    include: { testItemAttempts: true }
+  });
+  if (!parentAttempt) throw notFound("Submitted Test attempt");
+  const manifestItem = manifestItems(parentAttempt.metadata).find((item) => item.testItemId === testItemId);
+  const itemAttempt = parentAttempt.testItemAttempts.find((attempt) => attempt.testItemId === testItemId);
+  const pointsPossible = manifestItem?.pointsPossible ?? itemAttempt?.normalizedMaxScore ?? null;
+  if (!manifestItem || !itemAttempt || pointsPossible === null) throw notFound("Test item attempt");
+  if (!Number.isFinite(input.score) || input.score < 0 || input.score > pointsPossible) {
+    throw new AppError(400, "TEST_ITEM_SCORE_OUT_OF_RANGE", `Score must be between zero and ${pointsPossible}.`);
+  }
+
+  const gradedAt = new Date();
+  await prisma.testItemAttempt.update({
+    where: { id: itemAttempt.id },
+    data: {
+      lifecycle: "graded",
+      rawScore: input.score,
+      rawMaxScore: pointsPossible,
+      normalizedScore: input.score,
+      normalizedMaxScore: pointsPossible,
+      feedback: {
+        ...asRecord(itemAttempt.feedback),
+        ...(input.feedbackText === undefined ? {} : { feedbackText: input.feedbackText })
+      } as Prisma.InputJsonValue,
+      result: {
+        ...asRecord(itemAttempt.result),
+        manualGrading: {
+          score: input.score,
+          pointsPossible,
+          graderUserId: user.id,
+          reason: input.reason ?? null,
+          gradedAt: gradedAt.toISOString()
+        }
+      } as Prisma.InputJsonValue,
+      gradedAt
+    }
+  });
+  return recordTestAttemptGrade(user, courseId, parentAttemptId, "manual", input.reason);
+}
+
+async function recordTestAttemptGrade(
+  user: CurrentUser,
+  courseId: string,
+  parentAttemptId: string,
+  source: "auto" | "manual" | "regrade",
+  reason?: string | null
+) {
+  const parentAttempt = await prisma.activityAttempt.findFirst({
+    where: {
+      id: parentAttemptId,
+      courseId,
+      pluginKey: CORE_TEST_RUNTIME_KEY,
+      lifecycle: { in: ["submitted", "graded"] }
+    },
+    include: { testItemAttempts: true }
+  });
+  if (!parentAttempt) {
+    throw notFound("Submitted Test attempt");
+  }
+
+  const manifest = manifestItems(parentAttempt.metadata);
+  const attemptByItemId = new Map(parentAttempt.testItemAttempts.map((attempt) => [attempt.testItemId, attempt]));
+  const incompleteItemIds: string[] = [];
+  const items = manifest.flatMap((item) => {
+    const attempt = attemptByItemId.get(item.testItemId);
+    if (
+      !attempt ||
+      attempt.lifecycle !== "graded" ||
+      attempt.rawScore === null ||
+      attempt.rawMaxScore === null ||
+      attempt.normalizedScore === null ||
+      attempt.normalizedMaxScore === null
+    ) {
+      incompleteItemIds.push(item.testItemId);
+      return [];
+    }
+    return [{
+      testItemId: item.testItemId,
+      activityId: item.activityId ?? attempt.activityId,
+      activityTypeKey: item.activityTypeKey ?? "unknown",
+      title: item.title ?? "Activity",
+      position: item.position,
+      rawScore: attempt.rawScore,
+      rawMaxScore: attempt.rawMaxScore,
+      pointsEarned: attempt.normalizedScore,
+      pointsPossible: attempt.normalizedMaxScore,
+      feedback: asRecord(attempt.feedback)
+    }];
+  });
+  if (incompleteItemIds.length) {
+    throw new AppError(409, "TEST_ITEMS_NOT_GRADED", "All Test activities must be graded before the Test grade can be calculated.", {
+      incompleteItemIds
+    });
+  }
+
+  const rawScore = items.reduce((sum, item) => sum + item.pointsEarned, 0);
+  const rawMaxScore = items.reduce((sum, item) => sum + item.pointsPossible, 0);
+  if (rawMaxScore <= 0) {
+    throw new AppError(409, "TEST_POINTS_REQUIRED", "The Test must have a positive total point value before it can be graded.");
+  }
+
+  return recordActivityAttemptGradingResult(user, {
+    attemptId: parentAttempt.id,
+    rawScore,
+    rawMaxScore,
+    source,
+    rawResult: {
+      kind: "test",
+      testId: asRecord(asRecord(parentAttempt.metadata).manifest).testId ?? null,
+      items
+    } as Prisma.InputJsonValue,
+    normalizedResult: {
+      studentFeedback: {
+        kind: "test",
+        details: { items }
+      }
+    } as Prisma.InputJsonValue,
+    metadata: {
+      runtimeHandlerKey: CORE_TEST_RUNTIME_KEY,
+      itemCount: items.length,
+      gradedItemCount: items.length
+    } as Prisma.InputJsonValue,
+    reason: reason ?? null
+  });
 }
 
 async function resolveTestRuntimeContext(user: CurrentUser, courseId: string, groupId: string, testActivityId: string) {
@@ -385,6 +601,11 @@ function manifestItems(metadata: unknown) {
     const item = asRecord(value);
     return typeof item.testItemId === "string" ? [{
       testItemId: item.testItemId,
+      activityId: typeof item.activityId === "string" ? item.activityId : null,
+      activityTypeKey: typeof item.activityTypeKey === "string" ? item.activityTypeKey : null,
+      title: typeof item.title === "string" ? item.title : null,
+      position: typeof item.position === "number" && Number.isFinite(item.position) ? item.position : null,
+      pointsPossible: typeof item.pointsPossible === "number" && Number.isFinite(item.pointsPossible) ? item.pointsPossible : null,
       isRequired: item.isRequired !== false
     }] : [];
   });

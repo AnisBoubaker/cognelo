@@ -18,6 +18,7 @@ import {
 import { createMcqClient, McqActivityView, McqManualGradingPanel, type McqSubmission } from "@cognelo/plugin-mcq";
 import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
 import { TestActivityView, type TestStudentItemRendererContext } from "@/components/test-activity-view";
+import { TestManualGradingPanel } from "@/components/test-manual-grading-panel";
 import {
   api,
   apiAbsoluteUrl,
@@ -25,6 +26,7 @@ import {
   type CodingExerciseExecution,
   type CodingExerciseHiddenTest,
   type CourseGradebookRow,
+  type CourseTestAttemptReview,
   type WebDesignExerciseReferenceBundle,
   type WebDesignExerciseSubmission,
   type WebDesignExerciseTest
@@ -78,12 +80,13 @@ type ManualGradingRendererContext = {
   row: CourseGradebookRow;
   activityConfig?: Record<string, unknown>;
   locale: "en" | "fr" | "zh" | "ar";
-  attempts: Array<ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord>;
-  selectedAttempt: ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | null;
+  attempts: Array<ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview>;
+  selectedAttempt: ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview | null;
   selectedIndex: number;
   includeAttempts: boolean;
   loading: boolean;
   error: string;
+  readOnly?: boolean;
   isSavingOverride: boolean;
   isSavingRegrade: boolean;
   isSavingDelete: boolean;
@@ -93,6 +96,7 @@ type ManualGradingRendererContext = {
   onOverrideGrade: (input: { score: number; maxScore: number; reason: string | null; feedbackText?: string | null }) => Promise<void>;
   onRegradeAttempt: () => Promise<void>;
   onDeleteSubmission: () => Promise<void>;
+  onGradeTestItem?: (parentAttemptId: string, testItemId: string, score: number, reason: string | null) => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
@@ -455,12 +459,9 @@ function McqTestItemRenderer({ executionHost, runtime, item }: TestItemRendererP
       const completed = itemAttempt?.lifecycle === "submitted" || itemAttempt?.lifecycle === "graded";
       return {
         submission: itemAttempt ? { answers, lifecycle: itemAttempt.lifecycle } : null,
-        grade: completed && itemAttempt?.rawScore !== null && itemAttempt?.rawMaxScore !== null ? {
-          rawScore: itemAttempt.rawScore,
-          rawMaxScore: itemAttempt.rawMaxScore,
-          normalizedScore: itemAttempt.normalizedScore ?? undefined,
-          normalizedMaxScore: itemAttempt.normalizedMaxScore ?? undefined
-        } : null,
+        // A compound Test exposes one released parent grade. Child scores remain
+        // private here and are shown only through the released Test breakdown.
+        grade: null,
         availability: {
           attemptsRemaining: completed ? 0 : 1,
           canStart: !completed && runtime.attempt?.lifecycle === "started",
@@ -494,6 +495,39 @@ function McqTestItemRenderer({ executionHost, runtime, item }: TestItemRendererP
 
 const testItemRenderers: Record<string, ComponentType<TestItemRendererProps>> = {
   mcq: McqTestItemRenderer
+};
+
+type TestReviewItem = CourseTestAttemptReview["items"][number];
+
+function McqTestGradebookReview({ item }: { item: TestReviewItem }) {
+  const submissionClient = useMemo(() => ({
+    getStatus: async () => ({
+      submission: { answers: asStudentAnswers(item.itemAttempt.state.answers), lifecycle: item.itemAttempt.lifecycle },
+      grade: item.itemAttempt.rawScore !== null && item.itemAttempt.rawMaxScore !== null ? {
+        rawScore: item.itemAttempt.rawScore,
+        rawMaxScore: item.itemAttempt.rawMaxScore,
+        normalizedScore: item.itemAttempt.normalizedScore ?? undefined,
+        normalizedMaxScore: item.itemAttempt.normalizedMaxScore ?? undefined
+      } : null,
+      availability: { attemptsRemaining: 0, canStart: false, reason: null }
+    })
+  }), [item.itemAttempt]);
+
+  return (
+    <McqActivityView
+      activity={{ ...item.activity, assignment: { metadata: { assessmentMode: "summative" } } }}
+      canManage={false}
+      onSave={async () => item.activity}
+      submissionClient={submissionClient}
+      deferSubmission
+      showCorrectAnswers
+      studentViewMode="previous"
+    />
+  );
+}
+
+const testGradebookReviewRenderers: Record<string, ComponentType<{ item: TestReviewItem }>> = {
+  mcq: McqTestGradebookReview
 };
 
 function TestActivityRenderer(props: ActivityRendererProps<typeof TestActivityView>) {
@@ -674,6 +708,19 @@ export const bankActivityRenderers: Record<string, (context: BankActivityRendere
 };
 
 export const manualGradingRenderers: Record<string, (context: ManualGradingRendererContext) => ReactNode> = {
+  "test-manual-grading": (context) => (
+    <TestManualGradingPanel
+      {...context}
+      attempts={context.attempts as CourseTestAttemptReview[]}
+      selectedAttempt={context.selectedAttempt as CourseTestAttemptReview | null}
+      readOnly={Boolean(context.readOnly)}
+      onGradeTestItem={context.onGradeTestItem ?? (async () => undefined)}
+      renderItemReview={(item) => {
+        const Renderer = testGradebookReviewRenderers[item.activityTypeKey];
+        return Renderer ? <Renderer item={item} /> : null;
+      }}
+    />
+  ),
   "parsons-manual-grading": (context) => (
     <ParsonsManualGradingPanel
       {...context}
