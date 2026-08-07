@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { gradeMcqAnswers, parseMcqSource, renderInlineMarkdown } from "./mcq";
 import { mcqPlugin } from "./plugin";
+import { mcqServerPlugin } from "./server";
 
 describe("MCQ source parser", () => {
   it("parses single and multiple answer questions from markdown", () => {
@@ -128,5 +129,54 @@ describe("MCQ activity config", () => {
       aiQuestionCount: 5,
       defaultCodeLanguage: "none"
     });
+  });
+});
+
+describe("MCQ composite Test execution", () => {
+  it("advertises composite support and grades through the generic server adapter", async () => {
+    expect(mcqPlugin.activities[0]?.grading?.supportsCompositeExecution).toBe(true);
+    const result = await mcqServerPlugin.compositeExecution!.submit({
+      user: { id: "student-1", email: "student@example.test", name: null, firstName: null, lastName: null, roles: ["student"] },
+      courseId: "course-1",
+      groupId: "group-1",
+      parentAttemptId: "test-attempt-1",
+      testItemId: "test-item-1",
+      activity: {
+        id: "mcq-1",
+        title: "MCQ",
+        description: "",
+        lifecycle: "published",
+        config: {
+          source: `## Capital\n\n- [x] Paris\n- [ ] Lyon`
+        },
+        activityType: { key: "mcq", name: "MCQ", description: "" }
+      },
+      payload: { answers: { "question-1": ["question-1-choice-1"] } }
+    });
+
+    expect(result.state).toEqual({ answers: { "question-1": ["question-1-choice-1"] } });
+    expect(result.gradingResult).toMatchObject({ rawScore: 1, rawMaxScore: 1 });
+  });
+
+  it("treats an unvisited Test item as an unanswered MCQ during whole-Test submission", async () => {
+    const result = await mcqServerPlugin.compositeExecution!.submit({
+      user: { id: "student-1", email: "student@example.test", name: null, firstName: null, lastName: null, roles: ["student"] },
+      courseId: "course-1",
+      groupId: "group-1",
+      parentAttemptId: "test-attempt-1",
+      testItemId: "test-item-1",
+      activity: {
+        id: "mcq-1",
+        title: "MCQ",
+        description: "",
+        lifecycle: "published",
+        config: { source: `## Capital\n\n- [x] Paris\n- [ ] Lyon` },
+        activityType: { key: "mcq", name: "MCQ", description: "" }
+      },
+      payload: {}
+    });
+
+    expect(result.state).toEqual({ answers: {} });
+    expect(result.gradingResult).toMatchObject({ rawScore: 0, rawMaxScore: 1 });
   });
 });

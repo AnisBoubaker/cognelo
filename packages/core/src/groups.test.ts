@@ -91,6 +91,9 @@ const mockPrisma = vi.hoisted(() => ({
   },
   user: {
     findUnique: vi.fn()
+  },
+  test: {
+    findFirst: vi.fn()
   }
 }));
 
@@ -164,6 +167,9 @@ describe("group services", () => {
     tx.gradebookItem.upsert.mockResolvedValue({ id: "gradebook-item-1" });
     authMocks.canManageCourse.mockResolvedValue(true);
     authMocks.isAdmin.mockReturnValue(false);
+    mockPrisma.test.findFirst.mockResolvedValue({
+      items: [{ activity: { title: "Knowledge check", activityType: { key: "mcq" } } }]
+    });
   });
 
   it("creates groups as drafts with the creator as a teacher participant", async () => {
@@ -376,6 +382,25 @@ describe("group services", () => {
 
     expect(tx.courseGroupActivity.upsert).not.toHaveBeenCalled();
     expect(tx.gradebookItem.upsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects assigning a Test whose child plugin has not opted into composite execution", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "test-activity-1",
+      courseId: "course-1",
+      activityType: { key: "test" }
+    });
+    mockPrisma.test.findFirst.mockResolvedValue({
+      items: [{ activity: { title: "Unsupported activity", activityType: { key: "placeholder" } } }]
+    });
+
+    await expect(
+      assignActivityToAllCourseGroups(teacherUser, "course-1", "test-activity-1", {
+        assessmentMode: "summative"
+      })
+    ).rejects.toMatchObject({ status: 409, code: "TEST_ITEM_COMPOSITE_UNSUPPORTED" });
+
+    expect(tx.courseGroupActivity.upsert).not.toHaveBeenCalled();
   });
 
   it("applies course-wide dates to existing group assignments when per-group settings are disabled", async () => {

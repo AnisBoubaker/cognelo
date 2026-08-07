@@ -104,11 +104,28 @@ export type PluginGradingHandler = (input: {
   activity: ServerActivityRecord;
 }) => Promise<PluginGradingResult>;
 
+export type CompositeExecutionSubmissionHandler = (input: {
+  user: CurrentUser;
+  courseId: string;
+  groupId: string;
+  parentAttemptId: string;
+  testItemId: string;
+  activity: ServerActivityRecord;
+  payload: unknown;
+}) => Promise<{
+  state: Record<string, unknown>;
+  gradingResult: PluginGradingResult;
+}>;
+
 export type ServerActivityPlugin = {
   key: string;
   routes?: readonly PluginRouteDefinition[];
   grading?: {
     gradeAttempt?: PluginGradingHandler;
+  };
+  compositeExecution?: {
+    activityTypeKeys: readonly string[];
+    submit: CompositeExecutionSubmissionHandler;
   };
   hooks?: {
     onCourseActivityCreatedFromBankVersion?: CourseActivityCreatedFromBankVersionHook;
@@ -176,6 +193,12 @@ export function resolvePluginGradingHandler(activityTypeKey: string) {
   return serverPlugins.find((plugin) =>
     plugin.grading?.gradeAttempt && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
   )?.grading?.gradeAttempt ?? null;
+}
+
+export function resolveCompositeExecutionSubmissionHandler(activityTypeKey: string) {
+  return serverPlugins.find((plugin) =>
+    plugin.compositeExecution?.activityTypeKeys.includes(activityTypeKey)
+  )?.compositeExecution?.submit ?? null;
 }
 
 export async function runCourseActivityCreatedFromBankVersionHooks(input: {

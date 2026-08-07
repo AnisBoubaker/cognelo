@@ -140,9 +140,9 @@ Invariants:
 
 Cross-row invariants are enforced in the core Test service and covered by service tests.
 
-### Future `TestItemAttempt`
+### `TestItemAttempt`
 
-Added during the execution phase:
+Added in Phase 4:
 
 ```text
 id
@@ -233,7 +233,7 @@ type ActivityExecutionContext =
       kind: "test_item";
       parentAttemptId: string;
       testItemId: string;
-      testItemAttemptId: string;
+      testItemAttemptId: string | null;
     };
 ```
 
@@ -243,15 +243,22 @@ Activity definitions declare a capability such as:
 supportsCompositeExecution?: boolean;
 ```
 
-The Test item picker shows only activities that:
-
-- support attempts;
-- support automatic or manual grading;
-- support composite execution.
+The authoring picker remains the shared, provider-neutral activity picker and may show any enabled current or future plugin activity. This is intentional: teachers can compose a Test before every child plugin has implemented student execution. Assignment/start validation must clearly identify children that do not yet declare `supportsCompositeExecution`.
 
 Plugin UI should receive a host adapter rather than hardcode standalone submission routes. The adapter supplies operations such as load, start, save, submit, and obtain grading result. The existing standalone adapter continues using assigned-activity routes; the Test adapter writes a `TestItemAttempt` under the parent attempt.
 
+Inside a Test, child student renderers receive only the state-loading and autosave portion of that host. They must not display or invoke an individual activity submission. The single **Submit Test** action submits every child from its saved state through the registered server adapters, persists each item result, and only then finalizes the parent attempt.
+
 MCQ is the first integration because its grading is deterministic and it has no plugin-owned submission tables. Other plugins opt in one at a time.
+
+The extension points are deliberately split by responsibility:
+
+- activity definitions advertise `supportsCompositeExecution`;
+- server plugins register a composite submission handler by activity type key;
+- the web application registers an embedded student renderer by activity type key;
+- core stores generic item state, scores, feedback, plugin references, and fingerprints without importing plugin-specific schemas.
+
+Adding a future activity plugin to Tests therefore requires capability declaration and server/web adapters, not a new Test table, Test route family, or plugin-key branch in core orchestration.
 
 ## Attempt Lifecycle
 
@@ -264,8 +271,8 @@ Suggested lifecycle:
 3. Core snapshots ordered Test items, points, titles, activity config fingerprints, and presentation settings into the attempt manifest.
 4. Entering an item creates or resumes its `TestItemAttempt`.
 5. Plugin submission produces an ordinary `ActivityGradingResult` for that item.
-6. Auto-graded results are stored immediately; manual items remain submitted and awaiting grading.
-7. Final Test submission prevents further student edits.
+6. Child state is autosaved while the student works; no child has an individual submission action.
+7. Final Test submission dispatches all saved child states, stores auto-graded results (or marks manual items for grading), and prevents further student edits.
 8. When all required item results are available, core aggregates them and records one parent grading result.
 
 Test-level rules apply to the entire sitting:
@@ -412,11 +419,13 @@ Core Test types remain protected from the generic plugin activity creation/updat
 
 ### Phase 4 — Execution Contract and MCQ
 
-- Add `TestItemAttempt` persistence.
-- Add shared standalone/test-item execution host contract.
-- Add parent Test attempt orchestration.
-- Implement MCQ composite execution first.
-- Add Test student runtime and submission flow.
+- [x] Add `TestItemAttempt` persistence.
+- [x] Add shared standalone/test-item execution host contract.
+- [x] Add parent Test attempt orchestration.
+- [x] Implement MCQ composite execution first.
+- [x] Add Test student runtime and submission flow.
+
+Phase 4 establishes plugin-neutral persistence and dispatch. The student Test shell now starts/resumes one parent attempt, snapshots an ordered manifest, autosaves child state without child-level submit controls, and uses the single final Test submission to grade all MCQ items through the MCQ adapter before finalizing the parent attempt. Parent score aggregation and gradebook review remain Phase 5 work; timer enforcement, immutable revisions, and more plugin adapters remain Phase 6 work.
 
 ### Phase 5 — Grading and Review
 
@@ -454,4 +463,5 @@ Each phase requires:
 - Phase 1 foundation implemented.
 - Phase 2 authoring and ownership implemented: dedicated Test creation, settings, local/bank child composition, reorder/remove/edit flows, containment filters, and lifecycle-safe deletion.
 - Phase 3 assignment and content integration implemented: Test is enabled through its dedicated creation flow, assignments are summative-only, direct/all-groups/future-group materialization reuses the existing content and gradebook paths, and contained children cannot be assigned or placed independently.
-- Student Test execution remains unavailable until Phase 4.
+- Phase 4 execution and the first MCQ adapter are implemented. Students receive a dedicated Test start/resume and navigation shell rather than the teacher authoring form. Core persists one parent attempt plus generic per-item attempts. MCQ answers autosave without an individual submit button; **Submit Test** dispatches every child through capability/handler/renderer registries designed for additional plugins and then submits the parent once.
+- Parent Test score aggregation, gradebook breakdown/review, and released item feedback remain Phase 5 work.

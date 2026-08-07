@@ -80,6 +80,9 @@ export async function updateTest(user: CurrentUser, courseId: string, activityId
   const settings = data.settings
     ? TestSettingsSchema.parse({ ...asRecord(current.settings), ...data.settings })
     : undefined;
+  if (settings) {
+    await assertTestStructureMutable(activityId);
+  }
 
   return prisma.$transaction(async (tx) => {
     if (data.title !== undefined || data.description !== undefined || data.lifecycle !== undefined) {
@@ -109,6 +112,7 @@ export async function createTestItem(user: CurrentUser, courseId: string, testAc
   if (!test) {
     throw notFound("Test");
   }
+  await assertTestStructureMutable(testActivityId);
   const position = data.position ?? test._count.items;
 
   let activity;
@@ -178,6 +182,7 @@ async function resolveBankTestItemSource(bankActivityId: string, activityVersion
 export async function updateTestItem(user: CurrentUser, courseId: string, testActivityId: string, testItemId: string, input: unknown) {
   await assertCanManageCourse(user, courseId);
   const data = TestItemUpdateSchema.parse(input);
+  await assertTestStructureMutable(testActivityId);
   const item = await findTestItem(courseId, testActivityId, testItemId);
   return prisma.testItem.update({
     where: { id: item.id },
@@ -198,6 +203,7 @@ export async function getTestItemForDeletion(user: CurrentUser, courseId: string
 
 export async function deleteTestItem(user: CurrentUser, courseId: string, testActivityId: string, testItemId: string) {
   await assertCanManageCourse(user, courseId);
+  await assertTestStructureMutable(testActivityId);
   const item = await findTestItem(courseId, testActivityId, testItemId);
   await prisma.activity.delete({ where: { id: item.activityId } });
   return { ok: true } as const;
@@ -236,6 +242,17 @@ async function findTestItem(courseId: string, testActivityId: string, testItemId
     throw notFound("Test item");
   }
   return item;
+}
+
+async function assertTestStructureMutable(testActivityId: string) {
+  const attemptCount = await prisma.activityAttempt.count({ where: { activityId: testActivityId } });
+  if (attemptCount > 0) {
+    throw new AppError(
+      409,
+      "TEST_STRUCTURE_LOCKED",
+      "This Test cannot be reconfigured after a student has started an attempt. Duplicate it to create a changed assessment."
+    );
+  }
 }
 
 function assertActivityCanBelongToTest(activityTypeKey: string) {

@@ -606,6 +606,7 @@ model Activity {
   groupAssignments  CourseGroupActivity[]
   gradebookItems    GradebookItem[]
   activityAttempts  ActivityAttempt[]
+  testItemAttempts  TestItemAttempt[]
   contentItems      CourseContentItem[]
   testDefinition    Test?                 @relation("TestShellActivity")
   testItem          TestItem?             @relation("TestItemActivity")
@@ -643,6 +644,7 @@ model TestItem {
   updatedAt      DateTime @updatedAt
   test           Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
   activity       Activity @relation("TestItemActivity", fields: [activityId], references: [id], onDelete: Cascade)
+  attempts       TestItemAttempt[]
 
   @@index([testId, position])
 }
@@ -777,6 +779,7 @@ model ActivityAttempt {
   activityVersion           ActivityVersion?         @relation(fields: [activityVersionId], references: [id], onDelete: SetNull)
   selectedForGrades         Grade[]
   gradeEvents               GradeEvent[]
+  testItemAttempts          TestItemAttempt[]
 
   @@unique([gradebookItemId, participantId, attemptNumber])
   @@index([courseId, groupId, activityId])
@@ -786,6 +789,36 @@ model ActivityAttempt {
   @@index([lifecycle])
   @@index([pluginKey, pluginAttemptRef])
   @@index([activityVersionId])
+}
+
+model TestItemAttempt {
+  id                        String                   @id @default(cuid())
+  parentAttemptId           String
+  testItemId                String
+  activityId                String
+  lifecycle                 ActivityAttemptLifecycle @default(started)
+  rawScore                  Float?
+  rawMaxScore               Float?
+  normalizedScore           Float?
+  normalizedMaxScore        Float?
+  pluginAttemptRef          String?
+  result                    Json                     @default("{}")
+  feedback                  Json                     @default("{}")
+  activityConfigFingerprint String?
+  startedAt                 DateTime                 @default(now())
+  submittedAt               DateTime?
+  gradedAt                  DateTime?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  parentAttempt             ActivityAttempt          @relation(fields: [parentAttemptId], references: [id], onDelete: Cascade)
+  testItem                  TestItem                 @relation(fields: [testItemId], references: [id], onDelete: Cascade)
+  activity                  Activity                 @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@unique([parentAttemptId, testItemId])
+  @@index([testItemId])
+  @@index([activityId])
+  @@index([lifecycle])
+  @@index([pluginAttemptRef])
 }
 
 model Grade {

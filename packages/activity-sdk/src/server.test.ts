@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   getAssignedGroupActivityAttemptSource,
   listPluginRoutes,
+  resolveCompositeExecutionSubmissionHandler,
   resolvePluginGradingHandler,
   resolvePluginRoute,
   runBankActivityDeletedHooks,
@@ -85,6 +86,11 @@ describe("server activity SDK", () => {
     expect(resolvePluginGradingHandler("parsons-problem")).toBeTypeOf("function");
     expect(resolvePluginGradingHandler("mcq")).toBeTypeOf("function");
     expect(resolvePluginGradingHandler("placeholder")).toBeNull();
+  });
+
+  it("resolves composite execution handlers by activity type without coupling the Test runtime to a plugin", () => {
+    expect(resolveCompositeExecutionSubmissionHandler("mcq")).toBeTypeOf("function");
+    expect(resolveCompositeExecutionSubmissionHandler("placeholder")).toBeNull();
   });
 
   it("runs bank deletion hooks without requiring every plugin to implement one", async () => {

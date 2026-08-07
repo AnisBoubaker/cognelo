@@ -11,6 +11,7 @@ This file is for MCQ plugin memory only.
 - MCQ source editor uses the shared Markdown renderer behavior from `@cognelo/activity-ui`, including syntax coloring inside fenced code blocks such as ```c choices.
 - The plugin currently infers single-choice versus multiple-choice from the number of correct answers in each question.
 - Authored MCQ content remains in generic activity config. Summative submissions are persisted as core `ActivityAttempt` records and graded through the shared gradebook workflow, while formative checks remain client-side.
+- MCQ declares `supportsCompositeExecution` and is the first child activity supported by the core Test runtime. Its web adapter reuses `McqActivityView` and autosaves answers into `TestItemAttempt` without showing an individual Submit button. The single parent Test submission sends all saved child states to their server adapters; the MCQ adapter returns the ordinary grading result without creating a child gradebook entry. Additional Test-capable plugins must register their own adapters rather than add plugin-specific branches to core Test orchestration.
 - Since there is no private plugin-owned authoring data yet, bank-to-course copying relies only on the platform's generic config copy.
 - The MCQ authoring view is available from activity bank activity editing pages as well as course activity management pages.
 - AI-assisted MCQ source generation is available only when the teacher has selected an enabled question-authoring AI agent in `/settings/ai-agents`.

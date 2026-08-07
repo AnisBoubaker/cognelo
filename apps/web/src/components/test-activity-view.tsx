@@ -1,10 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ConfirmationDialog, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { ConfirmationDialog, MarkdownRenderer, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
-import { api, type Activity, type ActivityBank, type ActivityDefinition, type ActivityType, type BankActivity, type CourseTest, type CourseTestItem } from "@/lib/api";
+import {
+  api,
+  type Activity,
+  type ActivityBank,
+  type ActivityDefinition,
+  type ActivityType,
+  type BankActivity,
+  type CourseTest,
+  type CourseTestItem,
+  type CourseTestRuntime,
+  type CourseTestRuntimeItem
+} from "@/lib/api";
 import type { Locale } from "@/lib/i18n";
 
 type Props = {
@@ -12,13 +24,33 @@ type Props = {
   activityRouteCourseId?: string;
   canManage: boolean;
   course?: { id: string; title?: string; subjectId?: string } | null;
+  groupId?: string;
   locale: Locale;
   hasQuestionAuthoringAgent?: boolean;
+  onSubmitted?: () => void;
+  studentViewMode?: "attempt" | "previous";
+  onNewAttemptAvailabilityChange?: (canStartNewAttempt: boolean) => void;
+  onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
+  renderStudentItem?: (context: TestStudentItemRendererContext) => ReactNode;
   onSave?: unknown;
   t?: unknown;
 };
 
-export function TestActivityView({ activity, activityRouteCourseId, canManage, course, locale }: Props) {
+export type TestStudentItemRendererContext = {
+  runtime: CourseTestRuntime;
+  item: CourseTestRuntimeItem;
+  disabled: boolean;
+  executionHost: ActivityExecutionStateHost<Record<string, unknown>>;
+};
+
+export function TestActivityView(props: Props) {
+  if (!props.canManage && props.groupId) {
+    return <TestStudentRuntime {...props} groupId={props.groupId} />;
+  }
+  return <TestAuthoringView {...props} />;
+}
+
+function TestAuthoringView({ activity, activityRouteCourseId, canManage, course, locale }: Props) {
   const courseId = activityRouteCourseId ?? course?.id ?? "";
   const notifications = useNotifications();
   const [test, setTest] = useState<CourseTest | null>(null);
@@ -287,6 +319,248 @@ export function TestActivityView({ activity, activityRouteCourseId, canManage, c
             setItemPendingRemoval(null);
           }
         }}
+      />
+    </div>
+  );
+}
+
+function TestStudentRuntime({
+  activity,
+  activityRouteCourseId,
+  groupId,
+  onSubmitted,
+  studentViewMode = "attempt",
+  onNewAttemptAvailabilityChange,
+  onPreviousSubmissionsAvailabilityChange,
+  renderStudentItem
+}: Props & { groupId: string }) {
+  const courseId = activityRouteCourseId ?? "";
+  const notifications = useNotifications();
+  const [runtime, setRuntime] = useState<CourseTestRuntime | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [furthestVisitedIndex, setFurthestVisitedIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [pendingSaveCount, setPendingSaveCount] = useState(0);
+  const [showStartConfirmation, setShowStartConfirmation] = useState(false);
+  const [showSubmitConfirmation, setShowSubmitConfirmation] = useState(false);
+
+  const applyRuntime = useCallback((nextRuntime: CourseTestRuntime) => {
+    setRuntime(nextRuntime);
+    onNewAttemptAvailabilityChange?.(Boolean(nextRuntime.attempt?.lifecycle === "started") || nextRuntime.availability.canStart);
+    onPreviousSubmissionsAvailabilityChange?.(nextRuntime.hasPreviousSubmissions);
+  }, [onNewAttemptAvailabilityChange, onPreviousSubmissionsAvailabilityChange]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api.testRuntime(courseId, groupId, activity.id, studentViewMode)
+      .then((result) => {
+        if (!cancelled) applyRuntime(result.runtime);
+      })
+      .catch((reason) => {
+        if (!cancelled) notifications.error(reason instanceof Error ? reason.message : "Could not load this Test.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [activity.id, applyRuntime, courseId, groupId, notifications, studentViewMode]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+    setFurthestVisitedIndex(0);
+    setPendingSaveCount(0);
+  }, [runtime?.attempt?.id, studentViewMode]);
+
+  const selectedRuntimeItem = runtime?.test.items[selectedIndex] ?? null;
+  const executionHost = useMemo<ActivityExecutionStateHost<Record<string, unknown>> | null>(() => {
+    if (!runtime?.attempt || !selectedRuntimeItem) return null;
+    const parentAttemptId = runtime.attempt.id;
+    const testItemId = selectedRuntimeItem.id;
+    return {
+      context: {
+        kind: "test_item",
+        parentAttemptId,
+        testItemId,
+        testItemAttemptId: selectedRuntimeItem.itemAttempt?.id ?? null
+      },
+      load: async () => (await api.testItemAttempt(
+        courseId,
+        groupId,
+        activity.id,
+        testItemId,
+        parentAttemptId
+      )).itemAttempt?.state ?? null,
+      save: async (state) => {
+        setPendingSaveCount((current) => current + 1);
+        try {
+          await api.saveTestItemState(courseId, groupId, activity.id, testItemId, parentAttemptId, state);
+          return state;
+        } finally {
+          setPendingSaveCount((current) => Math.max(0, current - 1));
+        }
+      }
+    };
+  }, [activity.id, courseId, groupId, runtime?.attempt?.id, selectedRuntimeItem?.id, selectedRuntimeItem?.itemAttempt?.id]);
+
+  async function startTest() {
+    setBusy(true);
+    try {
+      const result = await api.startTestAttempt(courseId, groupId, activity.id);
+      applyRuntime(result.runtime);
+      setShowStartConfirmation(false);
+      notifications.success("Test started.");
+    } catch (reason) {
+      notifications.error(reason instanceof Error ? reason.message : "The Test could not be started.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function finishTest() {
+    if (!runtime?.attempt) return;
+    if (pendingSaveCount > 0) {
+      notifications.error("Please wait for your latest answers to finish saving.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await api.submitTestAttempt(courseId, groupId, activity.id, runtime.attempt.id);
+      applyRuntime(result.runtime);
+      setShowSubmitConfirmation(false);
+      notifications.success("Test submitted.");
+      onSubmitted?.();
+    } catch (reason) {
+      notifications.error(reason instanceof Error ? reason.message : "The Test could not be submitted.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading || !runtime) {
+    return <section className="section"><p className="muted">Loading Test…</p></section>;
+  }
+
+  const attemptStarted = runtime.attempt?.lifecycle === "started";
+  const selectedItem = selectedRuntimeItem;
+  const isReadOnly = !attemptStarted;
+
+  if (!runtime.attempt) {
+    return (
+      <section className="section stack">
+        <div>
+          <p className="eyebrow">Summative Test</p>
+          <h2>{runtime.test.activity.title}</h2>
+        </div>
+        <MarkdownRenderer markdown={runtime.test.activity.description} />
+        <div className="inline-panel stack stack-tight">
+          <strong>{runtime.test.items.length} {runtime.test.items.length === 1 ? "activity" : "activities"}</strong>
+          {runtime.test.settings.timeLimitMinutes ? <span className="muted">Time limit: {runtime.test.settings.timeLimitMinutes} minutes</span> : null}
+          <span className="muted">Navigation: {runtime.test.settings.navigationMode === "sequential" ? "sequential" : "free"}</span>
+        </div>
+        <button className="button" disabled={busy || !runtime.availability.canStart} type="button" onClick={() => setShowStartConfirmation(true)}>
+          Start Test
+        </button>
+        {!runtime.availability.canStart && runtime.availability.reason ? <p className="error">{runtime.availability.reason}</p> : null}
+        <ConfirmationDialog
+          open={showStartConfirmation}
+          eyebrow="Start Test"
+          title="Start this Test now?"
+          message={runtime.test.settings.timeLimitMinutes
+            ? `The ${runtime.test.settings.timeLimitMinutes}-minute timer begins when you start.`
+            : "Your Test attempt will begin now."}
+          confirmLabel={busy ? "Starting…" : "Start Test"}
+          cancelLabel="Not yet"
+          isConfirming={busy}
+          onCancel={() => setShowStartConfirmation(false)}
+          onConfirm={startTest}
+        />
+      </section>
+    );
+  }
+
+  return (
+    <div className="stack">
+      <section className="section stack">
+        <div>
+          <p className="eyebrow">{isReadOnly ? "Submitted Test" : `Attempt ${runtime.attempt.attemptNumber}`}</p>
+          <h2>{runtime.test.activity.title}</h2>
+        </div>
+        <MarkdownRenderer markdown={runtime.test.activity.description} />
+        <div className="inline-panel">
+          <strong>Activity {Math.min(selectedIndex + 1, runtime.test.items.length)} of {runtime.test.items.length}</strong>
+          {runtime.test.settings.timeLimitMinutes ? <span className="muted"> · {runtime.test.settings.timeLimitMinutes}-minute limit</span> : null}
+        </div>
+        <div className="section-actions" aria-label="Test activities">
+          {runtime.test.items.map((item, index) => {
+            const sequentiallyLocked = runtime.test.settings.navigationMode === "sequential" && index > furthestVisitedIndex;
+            return (
+              <button
+                aria-current={selectedIndex === index ? "step" : undefined}
+                className={selectedIndex === index ? "button" : "button secondary"}
+                disabled={sequentiallyLocked}
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setSelectedIndex(index);
+                  setFurthestVisitedIndex((current) => Math.max(current, index));
+                }}
+              >
+                {index + 1}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {selectedItem ? (
+        <section className="section stack">
+          <div>
+            <p className="eyebrow">Activity {selectedIndex + 1} of {runtime.test.items.length}</p>
+            <h2>{selectedItem.activity.title}</h2>
+          </div>
+          {renderStudentItem && executionHost ? renderStudentItem({
+            runtime,
+            item: selectedItem,
+            disabled: isReadOnly,
+            executionHost
+          }) : <p className="error">This activity type does not have a Test renderer yet.</p>}
+        </section>
+      ) : null}
+
+      <section className="section section-actions">
+        <button className="button secondary" disabled={selectedIndex === 0} type="button" onClick={() => setSelectedIndex((index) => Math.max(0, index - 1))}>
+          Previous activity
+        </button>
+        <button
+          className="button secondary"
+          disabled={selectedIndex >= runtime.test.items.length - 1}
+          type="button"
+          onClick={() => {
+            const nextIndex = Math.min(runtime.test.items.length - 1, selectedIndex + 1);
+            setSelectedIndex(nextIndex);
+            setFurthestVisitedIndex((current) => Math.max(current, nextIndex));
+          }}
+        >
+          Next activity
+        </button>
+        {attemptStarted ? (
+          <button className="button" disabled={busy || pendingSaveCount > 0} type="button" onClick={() => setShowSubmitConfirmation(true)}>
+            {pendingSaveCount > 0 ? "Saving answers…" : "Submit Test"}
+          </button>
+        ) : null}
+      </section>
+      <ConfirmationDialog
+        open={showSubmitConfirmation}
+        eyebrow="Submit Test"
+        title="Submit the entire Test?"
+        message="You will not be able to change your answers after submitting."
+        confirmLabel={busy ? "Submitting…" : "Submit Test"}
+        cancelLabel="Keep working"
+        isConfirming={busy}
+        onCancel={() => setShowSubmitConfirmation(false)}
+        onConfirm={finishTest}
       />
     </div>
   );
