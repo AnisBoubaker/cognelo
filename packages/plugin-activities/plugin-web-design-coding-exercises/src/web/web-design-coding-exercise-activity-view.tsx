@@ -1,6 +1,7 @@
 "use client";
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
 import { MarkdownRenderer, MonacoCodeEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   buildWebDesignPreviewDocument,
@@ -117,8 +118,11 @@ type WebDesignCodingExerciseActivityViewProps = {
   canManage: boolean;
   course?: CourseLike | null;
   onSave: (input: { title: string; description: string; config: Record<string, unknown> }) => Promise<ActivityLike>;
-  locale?: "en" | "fr" | "zh" | "ar";
+  locale?: string;
   webDesignClient?: WebDesignExerciseClient;
+  executionStateHost?: ActivityExecutionStateHost<Record<string, unknown>>;
+  deferSubmission?: boolean;
+  readOnly?: boolean;
 };
 
 type ApiErrorLike = Error & {
@@ -399,9 +403,12 @@ export function WebDesignCodingExerciseActivityView({
   course,
   onSave,
   locale = "en",
-  webDesignClient
+  webDesignClient,
+  executionStateHost,
+  deferSubmission = false,
+  readOnly = false
 }: WebDesignCodingExerciseActivityViewProps) {
-  const copyLocale = locale === "ar" ? "en" : locale;
+  const copyLocale = locale === "fr" || locale === "zh" ? locale : "en";
   const copy = copyByLocale[copyLocale] ?? copyByLocale.en;
   const notifications = useNotifications();
   const initialConfig = useMemo(() => parseWebDesignExerciseConfig(activity.config), [activity.config]);
@@ -434,6 +441,7 @@ export function WebDesignCodingExerciseActivityView({
   const [expectedResultImageDataUrl, setExpectedResultImageDataUrl] = useState<string | null>(null);
   const [authoringTests, setAuthoringTests] = useState<WebDesignExerciseTestRecord[]>([]);
   const [authoringTestsLoaded, setAuthoringTestsLoaded] = useState(false);
+  const [executionStateLoaded, setExecutionStateLoaded] = useState(!executionStateHost);
   const previousActivityIdRef = useRef(activity.id);
   const referencePreloadActivityIdRef = useRef<string | null>(null);
   const solutionDirtyRef = useRef(false);
@@ -498,6 +506,32 @@ export function WebDesignCodingExerciseActivityView({
       setAuthoringTestsLoaded(false);
     }
   }, [activity]);
+
+  useEffect(() => {
+    if (canManage || !executionStateHost) {
+      setExecutionStateLoaded(true);
+      return;
+    }
+    let cancelled = false;
+    setExecutionStateLoaded(false);
+    executionStateHost.load()
+      .then((saved) => {
+        if (cancelled) return;
+        const nextConfig = parseWebDesignExerciseConfig({
+          ...activity.config,
+          files: Array.isArray(saved?.files) ? saved.files : initialConfig.files
+        });
+        setStarterFiles(nextConfig.files);
+        setActivePath(nextConfig.files[0]?.path ?? "index.html");
+      })
+      .catch((err) => {
+        if (!cancelled) setExecutionError(err instanceof Error ? err.message : copy.noRunner);
+      })
+      .finally(() => {
+        if (!cancelled) setExecutionStateLoaded(true);
+      });
+    return () => { cancelled = true; };
+  }, [activity.id, canManage, executionStateHost]);
 
   useEffect(() => {
     if (!canManage || !course?.id || !webDesignClient) {
@@ -625,6 +659,13 @@ export function WebDesignCodingExerciseActivityView({
         .sort((left, right) => left.orderIndex - right.orderIndex),
     [solutionFiles]
   );
+  useEffect(() => {
+    if (!canManage && executionStateHost && executionStateLoaded && !readOnly) {
+      void executionStateHost.save({ files: normalizedStarterFiles }).catch((err) => {
+        setExecutionError(err instanceof Error ? err.message : copy.noRunner);
+      });
+    }
+  }, [canManage, executionStateHost, executionStateLoaded, normalizedStarterFiles, readOnly]);
   const activeFile = normalizedStarterFiles.find((file) => file.path === activePath) ?? normalizedStarterFiles[0];
   const activeSolutionFile = normalizedSolutionFiles.find((file) => file.path === activeSolutionPath) ?? normalizedSolutionFiles[0];
   const activeStarterFile = normalizedStarterFiles.find((file) => file.path === activeStarterPath) ?? normalizedStarterFiles[0];
@@ -1057,6 +1098,8 @@ export function WebDesignCodingExerciseActivityView({
           onUpdateFile={updateStudentFile}
           previewDocument={studentPreviewDocument}
           testsAvailable={Boolean(course?.id && webDesignClient)}
+          deferSubmission={deferSubmission}
+          readOnly={readOnly || !executionStateLoaded}
         />
       </section>
 
@@ -1088,6 +1131,8 @@ export function WebDesignCodingExerciseActivityView({
             onUpdateFile={updateStudentFile}
             previewDocument={studentPreviewDocument}
             testsAvailable={Boolean(course?.id && webDesignClient)}
+            deferSubmission={deferSubmission}
+            readOnly={readOnly || !executionStateLoaded}
           />
         </div>
       ) : null}
@@ -1281,7 +1326,9 @@ function StudentWorkspace({
   onSubmit,
   onUpdateFile,
   previewDocument,
-  testsAvailable
+  testsAvailable,
+  deferSubmission,
+  readOnly
 }: {
   activeFile: WebDesignExerciseFile | undefined;
   activePath: string;
@@ -1299,6 +1346,8 @@ function StudentWorkspace({
   onUpdateFile: (path: string, patch: Partial<WebDesignExerciseFile>) => void;
   previewDocument: string;
   testsAvailable: boolean;
+  deferSubmission: boolean;
+  readOnly: boolean;
 }) {
   return (
     <div
@@ -1312,12 +1361,14 @@ function StudentWorkspace({
     >
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div className="row">
-          <button type="button" className="secondary" onClick={onRunTests} disabled={!testsAvailable || executingKind !== null}>
+          <button type="button" className="secondary" onClick={onRunTests} disabled={readOnly || !testsAvailable || executingKind !== null}>
             {executingKind === "run" ? copy.runningTests : copy.runTests}
           </button>
-          <button type="button" onClick={onSubmit} disabled={!testsAvailable || executingKind !== null}>
-            {executingKind === "submit" ? copy.submitting : copy.submit}
-          </button>
+          {!deferSubmission ? (
+            <button type="button" onClick={onSubmit} disabled={readOnly || !testsAvailable || executingKind !== null}>
+              {executingKind === "submit" ? copy.submitting : copy.submit}
+            </button>
+          ) : null}
         </div>
         <button type="button" className="secondary" onClick={fullScreen ? onExitFullScreen : onEnterFullScreen}>
           {fullScreen ? copy.exitFullScreen : copy.fullScreen}
@@ -1372,7 +1423,7 @@ function StudentWorkspace({
               height="100%"
               minHeight={0}
               ariaLabel={`${copy.editor}: ${activeFile.path}`}
-              readOnly={!activeFile.isEditable}
+              readOnly={readOnly || !activeFile.isEditable}
             />
           ) : null}
         </div>

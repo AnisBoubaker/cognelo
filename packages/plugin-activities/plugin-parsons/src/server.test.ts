@@ -181,6 +181,46 @@ describe("Parsons server plugin grading contract", () => {
       })
     ).rejects.toMatchObject({ code: "PARSONS_ATTEMPT_NOT_GRADABLE" });
   });
+
+  it("grades a plugin-neutral Parsons state inside a compound Test", async () => {
+    const state = parsonsState([
+      parsonsBlock({ id: "block-1", text: "first", sourceIndex: 0, physicalLineIndex: 0 }),
+      parsonsBlock({ id: "block-2", text: "second", sourceIndex: 1, physicalLineIndex: 1 })
+    ]);
+
+    await expect(parsonsServerPlugin.compositeExecution?.submit({
+      user: {
+        id: "student-1",
+        email: "student@example.test",
+        name: "Sam Student",
+        firstName: "Sam",
+        lastName: "Student",
+        roles: ["student"]
+      },
+      courseId: "course-1",
+      groupId: "group-1",
+      parentAttemptId: "parent-attempt-1",
+      testItemId: "item-1",
+      activity: {
+        id: "activity-1",
+        title: "Parsons",
+        description: "",
+        lifecycle: "published",
+        config: {
+          solution: "first\nsecond",
+          language: "python",
+          stripIndentation: false,
+          groups: [],
+          precedenceRules: []
+        },
+        activityType: { key: "parsons-problem", name: "Parsons problem", description: "" }
+      },
+      payload: state
+    })).resolves.toMatchObject({
+      state: { ...state, lastEvaluation: { isCorrect: true } },
+      gradingResult: { rawScore: 1, rawMaxScore: 1, isPass: true }
+    });
+  });
 });
 
 function parsonsState(blocks: ReturnType<typeof parsonsBlock>[]) {

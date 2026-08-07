@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getTestRuntime: vi.fn(),
   startOrResumeTestAttempt: vi.fn(),
+  readJson: vi.fn(),
   requireUser: vi.fn()
 }));
 
@@ -15,6 +16,7 @@ vi.mock("@/lib/http", () => ({
   handleRoute: async (handler: () => Promise<Response>) => handler(),
   json: (data: unknown, init?: ResponseInit) => Response.json(data, init),
   options: () => new Response(null, { status: 204 }),
+  readJson: mocks.readJson,
   requireUser: mocks.requireUser
 }));
 
@@ -29,10 +31,11 @@ describe("student Test runtime route", () => {
     mocks.requireUser.mockResolvedValue({ id: "student-1", roles: ["student"] });
     mocks.getTestRuntime.mockResolvedValue({ attempt: { id: "attempt-1" } });
     mocks.startOrResumeTestAttempt.mockResolvedValue({ attempt: { id: "attempt-1" } });
+    mocks.readJson.mockResolvedValue({ sessionId: "session-1" });
   });
 
   it("loads the requested active or previous Test sitting", async () => {
-    const response = await GET(new Request("http://test.local?view=previous") as never, params);
+    const response = await GET(new Request("http://test.local?view=previous&sessionId=session-1") as never, params);
 
     await expect(response.json()).resolves.toEqual({ runtime: { attempt: { id: "attempt-1" } } });
     expect(mocks.getTestRuntime).toHaveBeenCalledWith(
@@ -40,7 +43,8 @@ describe("student Test runtime route", () => {
       "course-1",
       "group-1",
       "test-activity-1",
-      "previous"
+      "previous",
+      "session-1"
     );
   });
 
@@ -52,7 +56,8 @@ describe("student Test runtime route", () => {
       { id: "student-1", roles: ["student"] },
       "course-1",
       "group-1",
-      "test-activity-1"
+      "test-activity-1",
+      "session-1"
     );
   });
 });

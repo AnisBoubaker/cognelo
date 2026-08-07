@@ -54,6 +54,7 @@ export type ActivityExecutionStateHost<TState> = {
   context: ActivityExecutionContext;
   load: () => Promise<TState | null>;
   save: (state: TState) => Promise<TState>;
+  executeAction?: <TResult = unknown>(action: string, payload: unknown) => Promise<TResult>;
 };
 
 export type ActivityExecutionHost<TState, TSubmissionResult> = ActivityExecutionStateHost<TState> & {

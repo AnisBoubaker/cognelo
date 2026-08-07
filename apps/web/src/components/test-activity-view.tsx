@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmationDialog, MarkdownRenderer, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
@@ -33,7 +34,7 @@ type Props = {
   onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
   renderStudentItem?: (context: TestStudentItemRendererContext) => ReactNode;
   onSave?: unknown;
-  t?: unknown;
+  t?: (key: string, vars?: Record<string, string | number>) => string;
 };
 
 export type TestStudentItemRendererContext = {
@@ -52,6 +53,7 @@ export function TestActivityView(props: Props) {
 
 function TestAuthoringView({ activity, activityRouteCourseId, canManage, course, locale }: Props) {
   const courseId = activityRouteCourseId ?? course?.id ?? "";
+  const router = useRouter();
   const notifications = useNotifications();
   const [test, setTest] = useState<CourseTest | null>(null);
   const [definitions, setDefinitions] = useState<ActivityDefinition[]>([]);
@@ -161,6 +163,19 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
     );
   }, [activity.id, courseId, description, test, title]);
 
+  async function duplicateCurrentTest() {
+    setBusy(true);
+    try {
+      const result = await api.duplicateTest(courseId, activity.id);
+      notifications.success("Test duplicated. The copy is an editable draft.");
+      router.push(`/courses/${courseId}/activities/${result.test.activityId}`);
+    } catch (reason) {
+      notifications.error(reason instanceof Error ? reason.message : "The Test could not be duplicated.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   useUnsavedChangesGuard(
     useMemo(() => ({
       isDirty: hasUnsavedSettings,
@@ -228,9 +243,14 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
           <span>Allow students to resume an unfinished attempt</span>
         </label>
         {canManage ? (
-          <button className="button" disabled={busy || !title.trim()} type="button" onClick={saveSettings}>
-            Save test settings
-          </button>
+          <div className="section-actions">
+            <button className="button" disabled={busy || !title.trim()} type="button" onClick={saveSettings}>
+              Save test settings
+            </button>
+            <button className="button secondary" disabled={busy || hasUnsavedSettings} type="button" onClick={duplicateCurrentTest}>
+              Duplicate Test
+            </button>
+          </div>
         ) : null}
       </section>
 
@@ -332,7 +352,8 @@ function TestStudentRuntime({
   studentViewMode = "attempt",
   onNewAttemptAvailabilityChange,
   onPreviousSubmissionsAvailabilityChange,
-  renderStudentItem
+  renderStudentItem,
+  t = (key) => key
 }: Props & { groupId: string }) {
   const courseId = activityRouteCourseId ?? "";
   const notifications = useNotifications();
@@ -344,28 +365,34 @@ function TestStudentRuntime({
   const [pendingSaveCount, setPendingSaveCount] = useState(0);
   const [showStartConfirmation, setShowStartConfirmation] = useState(false);
   const [showSubmitConfirmation, setShowSubmitConfirmation] = useState(false);
+  const [clock, setClock] = useState(() => Date.now());
+  const [sessionId] = useState(() => globalThis.crypto?.randomUUID?.() ?? `test-session-${Date.now()}-${Math.random()}`);
+  const autoSubmittedAttemptRef = useRef<string | null>(null);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const applyRuntime = useCallback((nextRuntime: CourseTestRuntime) => {
     setRuntime(nextRuntime);
-    onNewAttemptAvailabilityChange?.(Boolean(nextRuntime.attempt?.lifecycle === "started") || nextRuntime.availability.canStart);
+    onNewAttemptAvailabilityChange?.(
+      Boolean(nextRuntime.attempt?.lifecycle === "started" && !nextRuntime.resume.blocked) || nextRuntime.availability.canStart
+    );
     onPreviousSubmissionsAvailabilityChange?.(nextRuntime.hasPreviousSubmissions);
   }, [onNewAttemptAvailabilityChange, onPreviousSubmissionsAvailabilityChange]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.testRuntime(courseId, groupId, activity.id, studentViewMode)
+    api.testRuntime(courseId, groupId, activity.id, studentViewMode, sessionId)
       .then((result) => {
         if (!cancelled) applyRuntime(result.runtime);
       })
       .catch((reason) => {
-        if (!cancelled) notifications.error(reason instanceof Error ? reason.message : "Could not load this Test.");
+        if (!cancelled) notifications.error(reason instanceof Error ? reason.message : t("courseDetail.testLoadError"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [activity.id, applyRuntime, courseId, groupId, notifications, studentViewMode]);
+  }, [activity.id, applyRuntime, courseId, groupId, notifications, sessionId, studentViewMode]);
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -390,29 +417,46 @@ function TestStudentRuntime({
         groupId,
         activity.id,
         testItemId,
-        parentAttemptId
+        parentAttemptId,
+        sessionId
       )).itemAttempt?.state ?? null,
       save: async (state) => {
         setPendingSaveCount((current) => current + 1);
+        const save = saveQueueRef.current.then(async () => {
+          await api.saveTestItemState(courseId, groupId, activity.id, testItemId, parentAttemptId, state, sessionId);
+        });
+        saveQueueRef.current = save.catch(() => undefined);
         try {
-          await api.saveTestItemState(courseId, groupId, activity.id, testItemId, parentAttemptId, state);
+          await save;
           return state;
         } finally {
           setPendingSaveCount((current) => Math.max(0, current - 1));
         }
+      },
+      executeAction: async <TResult,>(action: string, payload: unknown) => {
+        return api.executeTestItemAction<TResult>(
+          courseId,
+          groupId,
+          activity.id,
+          testItemId,
+          parentAttemptId,
+          sessionId,
+          action,
+          payload
+        );
       }
     };
-  }, [activity.id, courseId, groupId, runtime?.attempt?.id, selectedRuntimeItem?.id, selectedRuntimeItem?.itemAttempt?.id]);
+  }, [activity.id, courseId, groupId, runtime?.attempt?.id, selectedRuntimeItem?.id, selectedRuntimeItem?.itemAttempt?.id, sessionId]);
 
   async function startTest() {
     setBusy(true);
     try {
-      const result = await api.startTestAttempt(courseId, groupId, activity.id);
+      const result = await api.startTestAttempt(courseId, groupId, activity.id, sessionId);
       applyRuntime(result.runtime);
       setShowStartConfirmation(false);
-      notifications.success("Test started.");
+      notifications.success(t("courseDetail.testStarted"));
     } catch (reason) {
-      notifications.error(reason instanceof Error ? reason.message : "The Test could not be started.");
+      notifications.error(reason instanceof Error ? reason.message : t("courseDetail.testStartError"));
     } finally {
       setBusy(false);
     }
@@ -421,28 +465,55 @@ function TestStudentRuntime({
   async function finishTest() {
     if (!runtime?.attempt) return;
     if (pendingSaveCount > 0) {
-      notifications.error("Please wait for your latest answers to finish saving.");
+      notifications.error(t("courseDetail.testWaitForSave"));
       return;
     }
     setBusy(true);
     try {
-      const result = await api.submitTestAttempt(courseId, groupId, activity.id, runtime.attempt.id);
+      const result = await api.submitTestAttempt(courseId, groupId, activity.id, runtime.attempt.id, sessionId);
       applyRuntime(result.runtime);
       setShowSubmitConfirmation(false);
-      notifications.success("Test submitted.");
+      notifications.success(t("courseDetail.testSubmitted"));
       onSubmitted?.();
     } catch (reason) {
-      notifications.error(reason instanceof Error ? reason.message : "The Test could not be submitted.");
+      notifications.error(reason instanceof Error ? reason.message : t("courseDetail.testSubmitError"));
     } finally {
       setBusy(false);
     }
   }
 
+  useEffect(() => {
+    if (!runtime?.attempt || runtime.attempt.lifecycle !== "started" || !runtime.timing.expiresAt) return;
+    setClock(Date.now());
+    const interval = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [runtime?.attempt?.id, runtime?.attempt?.lifecycle, runtime?.timing.expiresAt]);
+
+  const remainingSeconds = runtime?.timing.expiresAt
+    ? Math.max(0, Math.ceil((new Date(runtime.timing.expiresAt).getTime() - clock) / 1000))
+    : null;
+
+  useEffect(() => {
+    if (
+      runtime?.attempt?.lifecycle === "started" &&
+      (remainingSeconds === 0 || runtime.resume.blocked) &&
+      autoSubmittedAttemptRef.current !== runtime.attempt.id &&
+      pendingSaveCount === 0 &&
+      !busy
+    ) {
+      autoSubmittedAttemptRef.current = runtime.attempt.id;
+      notifications.info(t(runtime.resume.blocked
+        ? "courseDetail.testResumeDisabledSubmitting"
+        : "courseDetail.testTimeExpiredSubmitting"));
+      void finishTest();
+    }
+  }, [busy, pendingSaveCount, remainingSeconds, runtime?.attempt?.id, runtime?.attempt?.lifecycle, runtime?.resume.blocked, t]);
+
   if (loading || !runtime) {
-    return <section className="section"><p className="muted">Loading Test…</p></section>;
+    return <section className="section"><p className="muted" role="status">{t("courseDetail.testLoading")}</p></section>;
   }
 
-  const attemptStarted = runtime.attempt?.lifecycle === "started";
+  const attemptStarted = runtime.attempt?.lifecycle === "started" && !runtime.resume.blocked;
   const selectedItem = selectedRuntimeItem;
   const isReadOnly = !attemptStarted;
 
@@ -450,28 +521,28 @@ function TestStudentRuntime({
     return (
       <section className="section stack">
         <div>
-          <p className="eyebrow">Summative Test</p>
+          <p className="eyebrow">{t("courseDetail.testSummative")}</p>
           <h2>{runtime.test.activity.title}</h2>
         </div>
         <MarkdownRenderer markdown={runtime.test.activity.description} />
         <div className="inline-panel stack stack-tight">
-          <strong>{runtime.test.items.length} {runtime.test.items.length === 1 ? "activity" : "activities"}</strong>
-          {runtime.test.settings.timeLimitMinutes ? <span className="muted">Time limit: {runtime.test.settings.timeLimitMinutes} minutes</span> : null}
-          <span className="muted">Navigation: {runtime.test.settings.navigationMode === "sequential" ? "sequential" : "free"}</span>
+          <strong>{t("courseDetail.testActivityCount", { count: runtime.test.items.length })}</strong>
+          {runtime.test.settings.timeLimitMinutes ? <span className="muted">{t("courseDetail.testTimeLimit", { count: runtime.test.settings.timeLimitMinutes })}</span> : null}
+          <span className="muted">{t(runtime.test.settings.navigationMode === "sequential" ? "courseDetail.testNavigationSequential" : "courseDetail.testNavigationFree")}</span>
         </div>
         <button className="button" disabled={busy || !runtime.availability.canStart} type="button" onClick={() => setShowStartConfirmation(true)}>
-          Start Test
+          {t("courseDetail.testStart")}
         </button>
         {!runtime.availability.canStart && runtime.availability.reason ? <p className="error">{runtime.availability.reason}</p> : null}
         <ConfirmationDialog
           open={showStartConfirmation}
-          eyebrow="Start Test"
-          title="Start this Test now?"
+          eyebrow={t("courseDetail.testStart")}
+          title={t("courseDetail.testStartConfirmTitle")}
           message={runtime.test.settings.timeLimitMinutes
-            ? `The ${runtime.test.settings.timeLimitMinutes}-minute timer begins when you start.`
-            : "Your Test attempt will begin now."}
-          confirmLabel={busy ? "Starting…" : "Start Test"}
-          cancelLabel="Not yet"
+            ? t("courseDetail.testTimerStarts", { count: runtime.test.settings.timeLimitMinutes })
+            : t("courseDetail.testAttemptBegins")}
+          confirmLabel={busy ? t("courseDetail.testStarting") : t("courseDetail.testStart")}
+          cancelLabel={t("courseDetail.testNotYet")}
           isConfirming={busy}
           onCancel={() => setShowStartConfirmation(false)}
           onConfirm={startTest}
@@ -484,15 +555,19 @@ function TestStudentRuntime({
     <div className="stack">
       <section className="section stack">
         <div>
-          <p className="eyebrow">{isReadOnly ? "Submitted Test" : `Attempt ${runtime.attempt.attemptNumber}`}</p>
+          <p className="eyebrow">{isReadOnly ? t("courseDetail.testSubmittedLabel") : t("courseDetail.testAttemptNumber", { number: runtime.attempt.attemptNumber })}</p>
           <h2>{runtime.test.activity.title}</h2>
         </div>
         <MarkdownRenderer markdown={runtime.test.activity.description} />
         <div className="inline-panel">
-          <strong>Activity {Math.min(selectedIndex + 1, runtime.test.items.length)} of {runtime.test.items.length}</strong>
-          {runtime.test.settings.timeLimitMinutes ? <span className="muted"> · {runtime.test.settings.timeLimitMinutes}-minute limit</span> : null}
+          <strong>{t("courseDetail.testActivityPosition", { current: Math.min(selectedIndex + 1, runtime.test.items.length), total: runtime.test.items.length })}</strong>
+          {remainingSeconds !== null ? (
+            <span aria-live="polite" className={remainingSeconds <= 60 ? "error" : "muted"} role="status">
+              {" · "}{t("courseDetail.testTimeRemaining", { time: formatRemainingTime(remainingSeconds) })}
+            </span>
+          ) : null}
         </div>
-        <div className="section-actions" aria-label="Test activities">
+        <div className="section-actions" aria-label={t("courseDetail.testActivitiesLabel")}>
           {runtime.test.items.map((item, index) => {
             const sequentiallyLocked = runtime.test.settings.navigationMode === "sequential" && index > furthestVisitedIndex;
             return (
@@ -517,21 +592,23 @@ function TestStudentRuntime({
       {selectedItem ? (
         <section className="section stack">
           <div>
-            <p className="eyebrow">Activity {selectedIndex + 1} of {runtime.test.items.length}</p>
+            <p className="eyebrow">{t("courseDetail.testActivityPosition", { current: selectedIndex + 1, total: runtime.test.items.length })}</p>
             <h2>{selectedItem.activity.title}</h2>
           </div>
-          {renderStudentItem && executionHost ? renderStudentItem({
+          {runtime.resume.blocked ? (
+            <p className="muted">{t("courseDetail.testResumeDisabledSubmitting")}</p>
+          ) : renderStudentItem && executionHost ? renderStudentItem({
             runtime,
             item: selectedItem,
             disabled: isReadOnly,
             executionHost
-          }) : <p className="error">This activity type does not have a Test renderer yet.</p>}
+          }) : <p className="error">{t("courseDetail.testRendererUnavailable")}</p>}
         </section>
       ) : null}
 
       <section className="section section-actions">
         <button className="button secondary" disabled={selectedIndex === 0} type="button" onClick={() => setSelectedIndex((index) => Math.max(0, index - 1))}>
-          Previous activity
+          {t("courseDetail.testPreviousActivity")}
         </button>
         <button
           className="button secondary"
@@ -543,25 +620,31 @@ function TestStudentRuntime({
             setFurthestVisitedIndex((current) => Math.max(current, nextIndex));
           }}
         >
-          Next activity
+          {t("courseDetail.testNextActivity")}
         </button>
         {attemptStarted ? (
           <button className="button" disabled={busy || pendingSaveCount > 0} type="button" onClick={() => setShowSubmitConfirmation(true)}>
-            {pendingSaveCount > 0 ? "Saving answers…" : "Submit Test"}
+            {pendingSaveCount > 0 ? t("courseDetail.testSavingAnswers") : t("courseDetail.testSubmit")}
           </button>
         ) : null}
       </section>
       <ConfirmationDialog
         open={showSubmitConfirmation}
-        eyebrow="Submit Test"
-        title="Submit the entire Test?"
-        message="You will not be able to change your answers after submitting."
-        confirmLabel={busy ? "Submitting…" : "Submit Test"}
-        cancelLabel="Keep working"
+        eyebrow={t("courseDetail.testSubmit")}
+        title={t("courseDetail.testSubmitConfirmTitle")}
+        message={t("courseDetail.testSubmitConfirmMessage")}
+        confirmLabel={busy ? t("courseDetail.testSubmitting") : t("courseDetail.testSubmit")}
+        cancelLabel={t("courseDetail.testKeepWorking")}
         isConfirming={busy}
         onCancel={() => setShowSubmitConfirmation(false)}
         onConfirm={finishTest}
       />
     </div>
   );
+}
+
+function formatRemainingTime(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }

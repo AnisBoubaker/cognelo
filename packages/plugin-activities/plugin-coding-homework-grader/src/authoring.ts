@@ -377,6 +377,61 @@ export async function copyBankCodingHomeworkAuthoringToCourseActivity(params: { 
   });
 }
 
+export async function copyCourseCodingHomeworkAuthoring(params: { sourceActivityId: string; activityId: string }) {
+  const [assignment, requirementSet, attachments] = await Promise.all([
+    prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: params.sourceActivityId } }),
+    prisma.pluginCodingHomeworkSubmissionRequirementSet.findUnique({ where: { activityId: params.sourceActivityId } }),
+    prisma.pluginCodingHomeworkAttachment.findMany({
+      where: { ownerKind: "course_activity", ownerId: params.sourceActivityId }
+    })
+  ]);
+  await prisma.$transaction(async (transaction) => {
+    const attachmentIdMap = new Map<string, string>();
+    for (const source of attachments) {
+      const copied = await transaction.pluginCodingHomeworkAttachment.create({
+        data: {
+          ownerKind: "course_activity",
+          ownerId: params.activityId,
+          kind: source.kind,
+          originalName: source.originalName,
+          storedName: source.storedName,
+          mimeType: source.mimeType,
+          sizeBytes: source.sizeBytes,
+          sha256: source.sha256,
+          metadata: normalizeObject(source.metadata) as Prisma.InputJsonValue
+        }
+      });
+      attachmentIdMap.set(source.id, copied.id);
+    }
+    if (assignment) {
+      await transaction.pluginCodingHomeworkAssignment.create({
+        data: {
+          activityId: params.activityId,
+          promptMarkdown: assignment.promptMarkdown,
+          promptPdfAttachmentId: assignment.promptPdfAttachmentId ? attachmentIdMap.get(assignment.promptPdfAttachmentId) ?? null : null,
+          languageKey: assignment.languageKey,
+          candidateLimit: assignment.candidateLimit,
+          retrievedExampleCount: assignment.retrievedExampleCount,
+          questionCount: assignment.questionCount,
+          generationInstructions: assignment.generationInstructions,
+          settings: normalizeObject(assignment.settings) as Prisma.InputJsonValue
+        }
+      });
+    }
+    if (requirementSet) {
+      await transaction.pluginCodingHomeworkSubmissionRequirementSet.create({
+        data: {
+          activityId: params.activityId,
+          languageKey: requirementSet.languageKey,
+          requirements: normalizeRequirements(requirementSet.requirements) as Prisma.InputJsonValue,
+          sourceAttachmentId: requirementSet.sourceAttachmentId ? attachmentIdMap.get(requirementSet.sourceAttachmentId) ?? null : null,
+          metadata: normalizeObject(requirementSet.metadata) as Prisma.InputJsonValue
+        }
+      });
+    }
+  });
+}
+
 export async function deleteBankCodingHomeworkAuthoring(params: { bankActivityId: string }) {
   await prisma.$transaction(async (transaction) => {
     await transaction.pluginBankCodingHomeworkAssignment.deleteMany({

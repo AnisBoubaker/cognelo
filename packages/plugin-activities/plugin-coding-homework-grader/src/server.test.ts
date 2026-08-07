@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authoringMocks = vi.hoisted(() => ({
   copyBankCodingHomeworkAuthoringToCourseActivity: vi.fn(),
+  copyCourseCodingHomeworkAuthoring: vi.fn(),
+  deleteCourseCodingHomeworkData: vi.fn(),
   deleteBankCodingHomeworkAuthoring: vi.fn()
 }));
 const deletionMocks = vi.hoisted(() => ({

@@ -628,8 +628,50 @@ model Test {
   course     Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
   activity   Activity   @relation("TestShellActivity", fields: [activityId], references: [id], onDelete: Cascade)
   items      TestItem[]
+  revisions  TestRevision[]
 
   @@index([courseId])
+}
+
+model TestRevision {
+  id             String             @id @default(cuid())
+  testId         String
+  revisionNumber Int
+  title          String
+  description    String
+  settings       Json               @default("{}")
+  fingerprint    String
+  createdAt      DateTime           @default(now())
+  test           Test               @relation(fields: [testId], references: [id], onDelete: Cascade)
+  items          TestRevisionItem[]
+  attempts       ActivityAttempt[]
+
+  @@unique([testId, revisionNumber])
+  @@unique([testId, fingerprint])
+  @@index([testId, createdAt])
+}
+
+model TestRevisionItem {
+  id                   String       @id @default(cuid())
+  testRevisionId       String
+  sourceTestItemId     String
+  sourceActivityId     String
+  activityTypeKey      String
+  title                String
+  description          String
+  config               Json         @default("{}")
+  metadata             Json         @default("{}")
+  position             Int
+  pointsPossible       Float
+  isRequired           Boolean
+  activityFingerprint  String
+  createdAt            DateTime     @default(now())
+  revision             TestRevision @relation(fields: [testRevisionId], references: [id], onDelete: Cascade)
+
+  @@unique([testRevisionId, sourceTestItemId])
+  @@index([testRevisionId, position])
+  @@index([sourceActivityId])
+  @@index([activityTypeKey])
 }
 
 model TestItem {
@@ -762,6 +804,7 @@ model ActivityAttempt {
   isLate                    Boolean                  @default(false)
   lateBySeconds             Int?
   activityVersionId         String?
+  testRevisionId            String?
   activityConfigFingerprint String?
   pluginKey                 String
   pluginVersion             String
@@ -777,9 +820,11 @@ model ActivityAttempt {
   participant               CourseGroupParticipant   @relation(fields: [participantId], references: [id], onDelete: Cascade)
   user                      User?                    @relation("ActivityAttemptUser", fields: [userId], references: [id], onDelete: SetNull)
   activityVersion           ActivityVersion?         @relation(fields: [activityVersionId], references: [id], onDelete: SetNull)
+  testRevision              TestRevision?             @relation(fields: [testRevisionId], references: [id], onDelete: SetNull)
   selectedForGrades         Grade[]
   gradeEvents               GradeEvent[]
   testItemAttempts          TestItemAttempt[]
+  testSubmissionClaim       TestSubmissionClaim?
 
   @@unique([gradebookItemId, participantId, attemptNumber])
   @@index([courseId, groupId, activityId])
@@ -789,6 +834,17 @@ model ActivityAttempt {
   @@index([lifecycle])
   @@index([pluginKey, pluginAttemptRef])
   @@index([activityVersionId])
+  @@index([testRevisionId])
+}
+
+model TestSubmissionClaim {
+  parentAttemptId String          @id
+  status          String          @default("processing")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  parentAttempt   ActivityAttempt @relation(fields: [parentAttemptId], references: [id], onDelete: Cascade)
+
+  @@index([status, updatedAt])
 }
 
 model TestItemAttempt {

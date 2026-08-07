@@ -29,6 +29,7 @@ describe("Test child state route", () => {
     mocks.requireUser.mockResolvedValue({ id: "student-1", roles: ["student"] });
     mocks.readJson.mockResolvedValue({
       parentAttemptId: "parent-attempt-1",
+      sessionId: "session-1",
       state: { answers: { "question-1": ["choice-1"] } }
     });
     mocks.saveTestItemAttemptState.mockResolvedValue({
@@ -59,7 +60,7 @@ describe("Test child state route", () => {
 
   it("loads saved child state from a completed parent attempt for Previous attempts", async () => {
     const response = await GET(
-      new Request("http://test.local?parentAttemptId=parent-attempt-1") as never,
+      new Request("http://test.local?parentAttemptId=parent-attempt-1&sessionId=session-1") as never,
       {
         params: Promise.resolve({
           courseId: "course-1",
@@ -77,7 +78,7 @@ describe("Test child state route", () => {
       "test-activity-1",
       "parent-attempt-1",
       "item-1",
-      { allowCompletedParent: true }
+      { allowCompletedParent: true, sessionId: "session-1" }
     );
     await expect(response.json()).resolves.toMatchObject({
       itemAttempt: { lifecycle: "graded", state: { answers: { "question-1": ["choice-1"] } } }
@@ -101,7 +102,8 @@ describe("Test child state route", () => {
       "test-activity-1",
       "parent-attempt-1",
       "item-1",
-      { answers: { "question-1": ["choice-1"] } }
+      { answers: { "question-1": ["choice-1"] } },
+      { sessionId: "session-1" }
     );
     await expect(response.json()).resolves.toMatchObject({
       itemAttempt: {

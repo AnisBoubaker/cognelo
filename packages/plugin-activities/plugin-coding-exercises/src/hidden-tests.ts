@@ -1,5 +1,5 @@
 import type { CurrentUser } from "@cognelo/contracts";
-import { assertCanManageActivityBank, assertCanManageCourse, AppError } from "@cognelo/core";
+import { assertActivityAuthoringMutable, assertCanManageActivityBank, assertCanManageCourse, AppError } from "@cognelo/core";
 import { codingExerciseHiddenTestsInputSchema, codingExerciseTemplateRequiresTestCodeMarker, parseCodingExercisePrivateConfig } from "./coding-exercises";
 import { Prisma, prisma } from "./db-client";
 import { getCodingExerciseReferenceSolution, validateReferenceSolutionAgainstHiddenTests } from "./executions";
@@ -97,6 +97,7 @@ export async function replaceCodingExerciseHiddenTests(params: {
   input: unknown;
 }) {
   await assertCanManageCourse(params.user, params.courseId);
+  await assertActivityAuthoringMutable(params.courseId, params.activityId);
   const input = await validateCodingExerciseHiddenTestsInput({
     activityConfig: params.activityConfig,
     input: params.input
@@ -247,6 +248,42 @@ export async function copyBankCodingExerciseDataToCourseActivity(params: { bankA
       });
     }
 
+    if (referenceSolution) {
+      await transaction.pluginCodingExerciseReferenceSolution.create({
+        data: {
+          activityId: params.activityId,
+          sourceCode: referenceSolution.sourceCode,
+          privateConfig: referenceSolution.privateConfig as Prisma.InputJsonValue,
+          validationSummary: referenceSolution.validationSummary as Prisma.InputJsonValue
+        }
+      });
+    }
+  });
+}
+
+export async function copyCourseCodingExerciseData(params: { sourceActivityId: string; activityId: string }) {
+  const [tests, referenceSolution] = await Promise.all([
+    prisma.pluginCodingExerciseHiddenTest.findMany({
+      where: { activityId: params.sourceActivityId },
+      orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }]
+    }),
+    prisma.pluginCodingExerciseReferenceSolution.findUnique({ where: { activityId: params.sourceActivityId } })
+  ]);
+  await prisma.$transaction(async (transaction) => {
+    if (tests.length) {
+      await transaction.pluginCodingExerciseHiddenTest.createMany({
+        data: tests.map((test) => ({
+          activityId: params.activityId,
+          name: test.name,
+          stdin: test.stdin,
+          expectedOutput: test.expectedOutput,
+          orderIndex: test.orderIndex,
+          isEnabled: test.isEnabled,
+          weight: test.weight,
+          metadata: test.metadata as Prisma.InputJsonValue
+        }))
+      });
+    }
     if (referenceSolution) {
       await transaction.pluginCodingExerciseReferenceSolution.create({
         data: {

@@ -79,7 +79,8 @@ describe("activity SDK registry", () => {
         supportsAttempts: true,
         supportsAutoGrading: true,
         supportsManualGrading: true,
-        supportsAnalyticsPayloads: true
+        supportsAnalyticsPayloads: true,
+        supportsCompositeExecution: true
       })
     );
     expect(getActivityDefinition("parsons-problem")?.manualGrading).toEqual(
@@ -99,6 +100,9 @@ describe("activity SDK registry", () => {
         rendererKey: "mcq-manual-grading"
       })
     );
+    expect(getActivityDefinition("coding-exercise")?.grading?.supportsCompositeExecution).toBe(true);
+    expect(getActivityDefinition("web-design-coding-exercise")?.grading?.supportsCompositeExecution).toBe(true);
+    expect(getActivityDefinition("coding-homework-grader")?.grading?.supportsCompositeExecution).not.toBe(true);
   });
 
   it("exposes plugin database manifests for lifecycle management", () => {

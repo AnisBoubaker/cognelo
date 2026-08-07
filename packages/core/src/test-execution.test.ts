@@ -5,7 +5,8 @@ const db = vi.hoisted(() => ({
   courseGroupParticipant: { findFirst: vi.fn() },
   test: { findFirst: vi.fn() },
   activityAttempt: { findMany: vi.fn(), findFirst: vi.fn() },
-  testItemAttempt: { findUnique: vi.fn(), upsert: vi.fn(), update: vi.fn() }
+  testItemAttempt: { findUnique: vi.fn(), upsert: vi.fn(), update: vi.fn() },
+  testRevision: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn() }
 }));
 
 const gradebook = vi.hoisted(() => ({
@@ -137,6 +138,23 @@ describe("compound Test execution", () => {
       attemptsRemaining: 1
     });
     db.testItemAttempt.findUnique.mockResolvedValue(null);
+    db.testRevision.findUnique.mockResolvedValue(null);
+    db.testRevision.findFirst.mockResolvedValue(null);
+    db.testRevision.create.mockResolvedValue({
+      id: "revision-1",
+      revisionNumber: 1,
+      settings: testRecord.settings,
+      items: [{
+        sourceTestItemId: "item-1",
+        sourceActivityId: "mcq-1",
+        activityTypeKey: "mcq",
+        title: "Knowledge check",
+        position: 0,
+        pointsPossible: 10,
+        isRequired: true,
+        activityFingerprint: "child-fingerprint"
+      }]
+    });
     gradebook.recordActivityAttemptGradingResult.mockResolvedValue({
       attempt: parentAttempt({ lifecycle: "graded" }),
       grade: { normalizedScore: 5, normalizedMaxScore: 10 }
@@ -153,6 +171,7 @@ describe("compound Test execution", () => {
     expect(gradebook.startActivityAttempt).toHaveBeenCalledWith(student, expect.objectContaining({
       activityId: "test-activity-1",
       pluginKey: "core:test",
+      testRevisionId: "revision-1",
       metadata: expect.objectContaining({
         runtimeHandlerKey: "core:test",
         manifest: expect.objectContaining({
@@ -221,6 +240,70 @@ describe("compound Test execution", () => {
     expect(db.activityAttempt.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ lifecycle: { in: ["started", "submitted", "graded"] } })
     }));
+  });
+
+  it("rejects autosaves after the manifest time limit while allowing final submission grading", async () => {
+    const expiredAttempt = parentAttempt({
+      startedAt: new Date(Date.now() - 120_000),
+      metadata: {
+        manifest: {
+          settings: { timeLimitMinutes: 1 },
+          items: [{ testItemId: "item-1", activityId: "mcq-1", isRequired: true }]
+        }
+      }
+    });
+    db.activityAttempt.findFirst.mockResolvedValue(expiredAttempt);
+
+    await expect(getTestItemExecutionContext(
+      student,
+      "course-1",
+      "group-1",
+      "test-activity-1",
+      "parent-attempt-1",
+      "item-1"
+    )).rejects.toMatchObject({ code: "TEST_TIME_LIMIT_EXPIRED" });
+
+    await expect(getTestItemExecutionContext(
+      student,
+      "course-1",
+      "group-1",
+      "test-activity-1",
+      "parent-attempt-1",
+      "item-1",
+      { allowExpiredParent: true }
+    )).resolves.toMatchObject({ parentAttempt: { id: "parent-attempt-1" } });
+  });
+
+  it("blocks child access from a new browser session when resume is disabled", async () => {
+    db.activityAttempt.findFirst.mockResolvedValue(parentAttempt({
+      metadata: {
+        manifest: {
+          sessionId: "session-original",
+          settings: { allowResume: false },
+          items: [{ testItemId: "item-1", activityId: "mcq-1", activityTypeKey: "mcq", pointsPossible: 10, isRequired: true }]
+        }
+      }
+    }));
+
+    await expect(getTestItemExecutionContext(
+      student,
+      "course-1",
+      "group-1",
+      "test-activity-1",
+      "parent-attempt-1",
+      "item-1",
+      { sessionId: "session-new" }
+    )).rejects.toMatchObject({ code: "TEST_RESUME_DISABLED" });
+
+    await expect(getTestItemExecutionContext(
+      student,
+      "course-1",
+      "group-1",
+      "test-activity-1",
+      "parent-attempt-1",
+      "item-1",
+      { sessionId: "session-original" }
+    )).resolves.toMatchObject({ item: { id: "item-1" } });
   });
 
   it("requires all required child activities before submitting the parent attempt", async () => {

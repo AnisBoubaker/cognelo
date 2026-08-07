@@ -27,7 +27,6 @@ The first implementation does not include:
 - independently assigned or independently released Test items;
 - nested Tests;
 - collaborative/group submissions;
-- immutable Test revisions;
 - support for every activity plugin on day one.
 
 ## Core Design Decision
@@ -360,13 +359,12 @@ No child activity should expose standalone submit, attempt-limit, grade-release,
 
 ## Version and Edit Safety
 
-Initial safety rule:
+Edit safety rules:
 
-- unrestricted edits are allowed before attempts exist;
-- after the first Test attempt starts, structure, points, and child configuration are locked;
-- teachers duplicate the Test when they need a changed future assessment.
-
-Later, introduce immutable `TestRevision` and `TestRevisionItem` snapshots so a draft revision can change while prior attempts remain attached to the exact published revision they used. Plugin-owned private configuration will need a snapshot/copy contract as part of that phase.
+- unrestricted edits are allowed until the first Test attempt starts;
+- starting an attempt creates an immutable `TestRevision` plus ordered `TestRevisionItem` snapshots and attaches the parent attempt to that revision;
+- after the first attempt, structure, points, generic child configuration, and supported plugin-owned private authoring data are locked;
+- teachers use **Duplicate Test** to create an independent draft shell, child activities, item settings, and plugin-owned private data for future changes.
 
 ## API and Service Boundaries
 
@@ -446,10 +444,21 @@ Implemented in Phase 5:
 
 ### Phase 6 — Additional Plugins and Hardening
 
-- Adapt Parsons and coding activities.
-- Add Test duplication and immutable revisions.
-- Add timer/resume enforcement and concurrency/idempotency tests.
-- Add accessibility, localization, and end-to-end coverage.
+- [x] Adapt Parsons through the generic composite execution, embedded student, individual review, and aggregate review contracts.
+- [x] Adapt coding exercise and web-design coding activities through the same generic contracts.
+- [x] Add Test duplication and immutable Test/Test-item revisions.
+- [x] Enforce the server-authoritative time limit for child writes and automatically submit saved answers when the browser countdown expires.
+- [x] Make repeated final-submit requests idempotent.
+- [x] Enforce the resume policy and protect final submission with a database-backed concurrency claim.
+- [x] Add accessibility, localization, route/service end-to-end, and full-suite coverage.
+
+The first Phase 6 slice adds Parsons without introducing Parsons-specific fields into the Test schema or orchestration. The embedded renderer persists the initial randomized block arrangement, autosaves subsequent moves through the shared execution host, and suppresses the child submit action. The one **Submit Test** operation evaluates the saved arrangement through the server adapter. Teacher review uses plugin-registered individual and aggregate renderers.
+
+Timed attempts now expose a server-derived deadline in the Test runtime. Child reads and writes reject expired attempts, while final submission is explicitly allowed to grade the last saved state after expiry. The student shell displays a live localized countdown and automatically finalizes once pending saves have drained. Repeating the same final-submit request returns the already-completed runtime instead of producing an active-attempt error.
+
+Coding exercise and web-design coding exercise now opt into composite execution without introducing type-specific branches in core. They load and autosave through the shared execution host, expose only registered safe preview/run actions, suppress child submission, and run hidden tests only when the parent Test is submitted. The coding homework grader remains intentionally excluded because its ZIP/preflight/manual-review workflow does not yet satisfy the autosaved-state and automatic-finalization contract.
+
+Each newly started Test attempt is attached to an immutable revision snapshot. Test duplication creates an independent draft shell and child rows, then invokes plugin duplication hooks for private authoring data. The no-resume policy is enforced with a browser-session identifier; returning in a new session causes the server to reject further child writes and the student shell to finalize the last saved state. A unique `TestSubmissionClaim` ensures that only one concurrent final-submit request runs child graders, while completed retries remain idempotent.
 
 ## Verification Strategy
 
@@ -475,4 +484,4 @@ Each phase requires:
 - Phase 3 assignment and content integration implemented: Test is enabled through its dedicated creation flow, assignments are summative-only, direct/all-groups/future-group materialization reuses the existing content and gradebook paths, and contained children cannot be assigned or placed independently.
 - Phase 4 execution and the first MCQ adapter are implemented. Students receive a dedicated Test start/resume and navigation shell rather than the teacher authoring form. Core persists one parent attempt plus generic per-item attempts. MCQ answers autosave without an individual submit button; **Submit Test** dispatches every child through capability/handler/renderer registries designed for additional plugins and then submits the parent once.
 - Phase 5 grading and review are implemented: parent aggregation, normal gradebook/release/audit integration, Test breakdowns, item-level manual adjustment with parent recomputation, parent override preservation, Test regrading, individual attempt review, and extensible aggregate review.
-- Phase 6 remains responsible for additional plugin adapters, timer enforcement, immutable revisions, and broader end-to-end hardening.
+- Phase 6 is implemented. MCQ, Parsons, coding exercise, and web-design coding exercise use plugin-owned composite execution/review adapters; Test attempts use immutable revisions; duplication copies generic and plugin-owned data; deadlines and no-resume rules are server-enforced; final submission is idempotent and concurrency-safe; and the student shell includes localized, accessible timing, navigation, save, and submission states.

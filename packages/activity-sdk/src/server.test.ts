@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   getAssignedGroupActivityAttemptSource,
   listPluginRoutes,
+  resolveCompositeExecutionActionHandler,
   resolveCompositeExecutionSubmissionHandler,
   resolvePluginGradingHandler,
   resolvePluginRoute,
@@ -90,6 +91,10 @@ describe("server activity SDK", () => {
 
   it("resolves composite execution handlers by activity type without coupling the Test runtime to a plugin", () => {
     expect(resolveCompositeExecutionSubmissionHandler("mcq")).toBeTypeOf("function");
+    expect(resolveCompositeExecutionSubmissionHandler("coding-exercise")).toBeTypeOf("function");
+    expect(resolveCompositeExecutionSubmissionHandler("web-design-coding-exercise")).toBeTypeOf("function");
+    expect(resolveCompositeExecutionActionHandler("coding-exercise", "run")).toBeTypeOf("function");
+    expect(resolveCompositeExecutionActionHandler("coding-exercise", "submit")).toBeNull();
     expect(resolveCompositeExecutionSubmissionHandler("placeholder")).toBeNull();
   });
 

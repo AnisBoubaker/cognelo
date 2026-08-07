@@ -74,6 +74,13 @@ export type CourseActivityDeletedHook = (input: {
   activityTypeKey: string;
 }) => Promise<void>;
 
+export type CourseActivityDuplicatedHook = (input: {
+  user: CurrentUser;
+  courseId: string;
+  sourceActivityId: string;
+  activity: ServerActivityRecord;
+}) => Promise<void>;
+
 export type ActivityAttemptDeletedHook = (input: {
   user: CurrentUser;
   courseId: string;
@@ -117,6 +124,16 @@ export type CompositeExecutionSubmissionHandler = (input: {
   gradingResult: PluginGradingResult;
 }>;
 
+export type CompositeExecutionActionHandler = (input: {
+  user: CurrentUser;
+  courseId: string;
+  groupId: string;
+  parentAttemptId: string;
+  testItemId: string;
+  activity: ServerActivityRecord;
+  payload: unknown;
+}) => Promise<unknown>;
+
 export type ServerActivityPlugin = {
   key: string;
   routes?: readonly PluginRouteDefinition[];
@@ -126,10 +143,12 @@ export type ServerActivityPlugin = {
   compositeExecution?: {
     activityTypeKeys: readonly string[];
     submit: CompositeExecutionSubmissionHandler;
+    actions?: Readonly<Record<string, CompositeExecutionActionHandler>>;
   };
   hooks?: {
     onCourseActivityCreatedFromBankVersion?: CourseActivityCreatedFromBankVersionHook;
     onCourseActivityDeleted?: CourseActivityDeletedHook;
+    onCourseActivityDuplicated?: CourseActivityDuplicatedHook;
     onBankActivityDeleted?: BankActivityDeletedHook;
     onActivityAttemptDeleted?: ActivityAttemptDeletedHook;
   };
@@ -201,6 +220,13 @@ export function resolveCompositeExecutionSubmissionHandler(activityTypeKey: stri
   )?.compositeExecution?.submit ?? null;
 }
 
+export function resolveCompositeExecutionActionHandler(activityTypeKey: string, action: string) {
+  const composite = serverPlugins.find((plugin) =>
+    plugin.compositeExecution?.activityTypeKeys.includes(activityTypeKey)
+  )?.compositeExecution;
+  return composite?.actions?.[action] ?? null;
+}
+
 export async function runCourseActivityCreatedFromBankVersionHooks(input: {
   user: CurrentUser;
   courseId: string;
@@ -242,6 +268,17 @@ export async function runCourseActivityDeletedHooks(input: {
   activityTypeKey: string;
 }) {
   await runCourseActivityDeletedHooksForPlugins(serverPlugins, input);
+}
+
+export async function runCourseActivityDuplicatedHooks(input: {
+  user: CurrentUser;
+  courseId: string;
+  sourceActivityId: string;
+  activity: ServerActivityRecord;
+}) {
+  for (const plugin of serverPlugins) {
+    await plugin.hooks?.onCourseActivityDuplicated?.(input);
+  }
 }
 
 export async function runCourseActivityDeletedHooksForPlugins(

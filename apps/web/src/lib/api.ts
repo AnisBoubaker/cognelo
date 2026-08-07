@@ -442,6 +442,16 @@ export type CourseTestRuntime = {
     submittedAt: string | null;
     gradedAt: string | null;
   } | null;
+  timing: {
+    timeLimitMinutes: number | null;
+    expiresAt: string | null;
+    remainingSeconds: number | null;
+    isExpired: boolean;
+  };
+  resume: {
+    allowed: boolean;
+    blocked: boolean;
+  };
   availability: {
     canStart: boolean;
     reason: string | null;
@@ -1236,24 +1246,29 @@ export const api = {
     lifecycle?: "draft" | "published" | "archived";
     settings?: Partial<CourseTestSettings>;
   }) => request<{ test: CourseTest }>(`/courses/${courseId}/activities/${activityId}/test`, { method: "PATCH", body: JSON.stringify(input) }),
+  duplicateTest: (courseId: string, activityId: string, input: { title?: string } = {}) =>
+    request<{ test: CourseTest }>(`/courses/${courseId}/activities/${activityId}/test/duplicate`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
   createTestItem: (courseId: string, activityId: string, input: Record<string, unknown>) =>
     request<{ item: CourseTestItem }>(`/courses/${courseId}/activities/${activityId}/test/items`, { method: "POST", body: JSON.stringify(input) }),
   updateTestItem: (courseId: string, activityId: string, itemId: string, input: Partial<Pick<CourseTestItem, "position" | "pointsPossible" | "isRequired" | "metadata">>) =>
     request<{ item: CourseTestItem }>(`/courses/${courseId}/activities/${activityId}/test/items/${itemId}`, { method: "PATCH", body: JSON.stringify(input) }),
   deleteTestItem: (courseId: string, activityId: string, itemId: string) =>
     request<{ ok: true }>(`/courses/${courseId}/activities/${activityId}/test/items/${itemId}`, { method: "DELETE" }),
-  testRuntime: (courseId: string, groupId: string, activityId: string, view: "attempt" | "previous" = "attempt") =>
+  testRuntime: (courseId: string, groupId: string, activityId: string, view: "attempt" | "previous" = "attempt", sessionId = "") =>
     request<{ runtime: CourseTestRuntime }>(
-      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/test?view=${view}`
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/test?view=${view}&sessionId=${encodeURIComponent(sessionId)}`
     ),
-  startTestAttempt: (courseId: string, groupId: string, activityId: string) =>
+  startTestAttempt: (courseId: string, groupId: string, activityId: string, sessionId: string) =>
     request<{ runtime: CourseTestRuntime }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/test`,
-      { method: "POST" }
+      { method: "POST", body: JSON.stringify({ sessionId }) }
     ),
-  testItemAttempt: (courseId: string, groupId: string, activityId: string, testItemId: string, parentAttemptId: string) =>
+  testItemAttempt: (courseId: string, groupId: string, activityId: string, testItemId: string, parentAttemptId: string, sessionId: string) =>
     request<{ itemAttempt: TestItemRuntimeAttempt | null }>(
-      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/test/items/${testItemId}?parentAttemptId=${encodeURIComponent(parentAttemptId)}`
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/test/items/${testItemId}?parentAttemptId=${encodeURIComponent(parentAttemptId)}&sessionId=${encodeURIComponent(sessionId)}`
     ),
   saveTestItemState: (
     courseId: string,
@@ -1261,15 +1276,29 @@ export const api = {
     activityId: string,
     testItemId: string,
     parentAttemptId: string,
-    state: Record<string, unknown>
+    state: Record<string, unknown>,
+    sessionId: string
   ) => request<{ itemAttempt: TestItemRuntimeAttempt }>(
     `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/test/items/${testItemId}`,
-    { method: "PUT", body: JSON.stringify({ parentAttemptId, state }) }
+    { method: "PUT", body: JSON.stringify({ parentAttemptId, state, sessionId }) }
   ),
-  submitTestAttempt: (courseId: string, groupId: string, activityId: string, parentAttemptId: string) =>
+  executeTestItemAction: <TResult>(
+    courseId: string,
+    groupId: string,
+    activityId: string,
+    testItemId: string,
+    parentAttemptId: string,
+    sessionId: string,
+    action: string,
+    payload: unknown
+  ) => request<TResult>(
+    `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/test/items/${testItemId}/actions/${encodeURIComponent(action)}`,
+    { method: "POST", body: JSON.stringify({ parentAttemptId, sessionId, payload }) }
+  ),
+  submitTestAttempt: (courseId: string, groupId: string, activityId: string, parentAttemptId: string, sessionId: string) =>
     request<{ runtime: CourseTestRuntime }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/test/submit`,
-      { method: "POST", body: JSON.stringify({ parentAttemptId }) }
+      { method: "POST", body: JSON.stringify({ parentAttemptId, sessionId }) }
     ),
   courseContent: (courseId: string, options?: { includeGroupItems?: boolean; visibleOnly?: boolean }) => {
     const params = new URLSearchParams();

@@ -274,6 +274,11 @@ export const TestUpdateSchema = z.object({
 });
 export type TestUpdate = z.infer<typeof TestUpdateSchema>;
 
+export const TestDuplicateSchema = z.object({
+  title: z.string().trim().min(2).max(180).optional()
+});
+export type TestDuplicate = z.infer<typeof TestDuplicateSchema>;
+
 const TestItemSettingsSchema = z.object({
   pointsPossible: z.number().positive().max(100000).optional().default(1),
   isRequired: z.boolean().optional().default(true),

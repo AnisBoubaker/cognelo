@@ -5,6 +5,7 @@ import { AppError } from "@cognelo/core";
 import { prisma } from "./db-client";
 import { buildParsonsGradingResult } from "./grading";
 import { parseParsonsConfig } from "./parsons";
+import { createInitialParsonsAttemptState, parsonsAttemptStateSchema } from "./attempt-types";
 import { parsonsAttemptRoute, parsonsGenerateRoute, parsonsGradebookAttemptsRoute, parsonsStudentSubmissionsRoute } from "./routes";
 import { evaluateParsonsAttemptStateForConfig } from "./attempts";
 
@@ -40,6 +41,19 @@ export const parsonsServerPlugin: ServerActivityPlugin = {
       } catch {
         throw new AppError(409, "PARSONS_ATTEMPT_NOT_GRADABLE", "The Parsons attempt does not contain a grading result.");
       }
+    }
+  },
+  compositeExecution: {
+    activityTypeKeys: ["parsons-problem"],
+    submit: async ({ activity, payload }) => {
+      const config = parseParsonsConfig(activity.config);
+      const parsedState = parsonsAttemptStateSchema.safeParse(payload);
+      const state = parsedState.success ? parsedState.data : createInitialParsonsAttemptState(config);
+      const evaluation = evaluateParsonsAttemptStateForConfig(state, config);
+      return {
+        state: { ...state, lastEvaluation: evaluation },
+        gradingResult: buildParsonsGradingResult(evaluation)
+      };
     }
   }
 };

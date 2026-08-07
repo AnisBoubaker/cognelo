@@ -40,6 +40,7 @@ export type StartActivityAttemptInput = ActivityAttemptSource & {
   pluginVersion: string;
   pluginAttemptRef?: string | null;
   activityConfigFingerprint?: string | null;
+  testRevisionId?: string | null;
   metadata?: JsonInput;
   now?: Date;
 };
@@ -147,6 +148,7 @@ export async function startActivityAttempt(user: CurrentUser, input: StartActivi
         attemptNumber,
         startedAt: now,
         activityVersionId: context.groupActivity.activity.activityVersionId,
+        testRevisionId: input.testRevisionId ?? null,
         activityConfigFingerprint: input.activityConfigFingerprint ?? null,
         pluginKey: input.pluginKey,
         pluginVersion: input.pluginVersion,
