@@ -1329,6 +1329,48 @@ a.card:hover,
   width: min(100%, 920px);
 }
 
+.answer-overlay.test-review-overlay {
+  max-width: 1840px;
+  width: min(100%, 1840px);
+}
+
+.test-review-choice-count {
+  align-items: center;
+  align-self: center;
+  background: var(--brand-blue);
+  border-radius: 999px;
+  color: white;
+  cursor: help;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 30px;
+  min-width: 30px;
+  padding: 4px 9px;
+}
+
+.test-review-choice-students {
+  background: #0f1b46;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(13, 27, 71, 0.26);
+  color: white;
+  display: grid;
+  font-size: 0.82rem;
+  font-weight: 600;
+  gap: 4px;
+  max-width: 320px;
+  max-height: min(240px, calc(100dvh - 32px));
+  min-width: 0;
+  overflow: auto;
+  padding: 10px 12px;
+  pointer-events: none;
+  position: fixed;
+  white-space: normal;
+  z-index: 120;
+}
+
 .answer-meta {
   align-items: center;
   display: flex;

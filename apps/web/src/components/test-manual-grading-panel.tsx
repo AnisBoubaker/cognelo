@@ -75,7 +75,7 @@ export function TestManualGradingPanel({
   }
 
   return (
-    <section className="dialog-panel answer-overlay" role="dialog" aria-modal="true">
+    <section className="dialog-panel answer-overlay test-review-overlay" role="dialog" aria-modal="true">
       <div className="section-heading">
         <div>
           <p className="eyebrow">{row.participantName}</p>

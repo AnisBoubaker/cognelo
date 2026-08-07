@@ -429,10 +429,11 @@ Phase 4 establishes plugin-neutral persistence and dispatch. The student Test sh
 
 ### Phase 5 — Grading and Review
 
-- Aggregate item scores into the parent grade.
-- Add manual item grading and parent recomputation.
-- Add gradebook Test breakdown and feedback renderer.
-- Add release, regrade, override, audit, and analytics coverage.
+- [x] Aggregate item scores into the parent grade.
+- [x] Add manual item grading and parent recomputation.
+- [x] Add gradebook Test breakdown and feedback renderer.
+- [x] Add release, regrade, override, audit, and analytics coverage.
+- [x] Add individual and aggregate teacher review surfaces.
 
 Implemented in Phase 5:
 
@@ -441,6 +442,7 @@ Implemented in Phase 5:
 - Teachers can adjust an individual Test item score; the item stores the manual-grading reason and the parent grade is recomputed immediately. Whole-Test overrides preserve the structured item breakdown.
 - Test regrading recomputes the parent from its immutable child result snapshot. Re-executing child plugin grading logic is unnecessary while attempted Test content is locked; later revision support must dispatch regrading through each child's registered adapter.
 - Child scores are not exposed by the embedded activity renderer. The released parent Test grade and breakdown are the student-facing result.
+- Teacher review reads child attempt state directly, including submissions created before parent aggregation was introduced. **Review all** uses each student's latest completed Test attempt and dispatches each contained activity through a review registry. The MCQ renderer aggregates selection counts per choice and exposes respondent names without coupling the Test shell to MCQ parsing.
 
 ### Phase 6 — Additional Plugins and Hardening
 
@@ -472,5 +474,5 @@ Each phase requires:
 - Phase 2 authoring and ownership implemented: dedicated Test creation, settings, local/bank child composition, reorder/remove/edit flows, containment filters, and lifecycle-safe deletion.
 - Phase 3 assignment and content integration implemented: Test is enabled through its dedicated creation flow, assignments are summative-only, direct/all-groups/future-group materialization reuses the existing content and gradebook paths, and contained children cannot be assigned or placed independently.
 - Phase 4 execution and the first MCQ adapter are implemented. Students receive a dedicated Test start/resume and navigation shell rather than the teacher authoring form. Core persists one parent attempt plus generic per-item attempts. MCQ answers autosave without an individual submit button; **Submit Test** dispatches every child through capability/handler/renderer registries designed for additional plugins and then submits the parent once.
-- Phase 5 grading and review are implemented: parent aggregation, normal gradebook/release/audit integration, Test breakdowns, item-level manual adjustment with parent recomputation, parent override preservation, and Test regrading.
+- Phase 5 grading and review are implemented: parent aggregation, normal gradebook/release/audit integration, Test breakdowns, item-level manual adjustment with parent recomputation, parent override preservation, Test regrading, individual attempt review, and extensible aggregate review.
 - Phase 6 remains responsible for additional plugin adapters, timer enforcement, immutable revisions, and broader end-to-end hardening.
