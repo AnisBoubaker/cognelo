@@ -7,6 +7,7 @@ import {
   runBankActivityDeletedHooks,
   runBankActivityDeletedHooksForPlugins,
   runActivityAttemptDeletedHooksForPlugins,
+  runCourseActivityDeletedHooksForPlugins,
   runCourseActivityCreatedFromBankVersionHooksForPlugins,
   type ServerActivityRecord,
   type ServerActivityPlugin
@@ -131,6 +132,24 @@ describe("server activity SDK", () => {
     expect(plugins[0].hooks?.onCourseActivityCreatedFromBankVersion).toHaveBeenCalledWith(
       expect.objectContaining({ courseId: "course-1", activity })
     );
+  });
+
+  it("runs course activity deletion hooks in plugin order", async () => {
+    const calls: string[] = [];
+    const plugins: ServerActivityPlugin[] = [
+      { key: "first", hooks: { onCourseActivityDeleted: vi.fn(async () => { calls.push("first"); }) } },
+      { key: "no-hooks" },
+      { key: "second", hooks: { onCourseActivityDeleted: vi.fn(async () => { calls.push("second"); }) } }
+    ];
+
+    await runCourseActivityDeletedHooksForPlugins(plugins, {
+      user,
+      courseId: "course-1",
+      activityId: "activity-1",
+      activityTypeKey: "placeholder"
+    });
+
+    expect(calls).toEqual(["first", "second"]);
   });
 
   it("stops hook execution and propagates failures", async () => {

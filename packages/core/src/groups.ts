@@ -916,9 +916,15 @@ async function assertCanViewGroup(user: CurrentUser, courseId: string, groupId: 
 }
 
 async function assertActivityBelongsToCourse(courseId: string, activityId: string) {
-  const activity = await prisma.activity.findFirst({ where: { id: activityId, courseId } });
+  const activity = await prisma.activity.findFirst({
+    where: { id: activityId, courseId, testItem: null },
+    include: { activityType: true }
+  });
   if (!activity) {
     throw notFound("Course activity");
+  }
+  if (activity.activityType?.key === "test") {
+    throw new AppError(409, "TEST_ASSIGNMENT_NOT_AVAILABLE", "Test assignment will be available when the student runtime is enabled.");
   }
   return activity;
 }

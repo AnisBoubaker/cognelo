@@ -17,10 +17,39 @@ import {
   EnrollmentInputSchema,
   LoginInputSchema,
   SubjectInputSchema,
+  TestCreateSchema,
+  TestItemCreateSchema,
   UserProfileUpdateSchema
 } from "./index";
 
 describe("shared contract schemas", () => {
+  it("normalizes Test authoring defaults", () => {
+    expect(TestCreateSchema.parse({ title: "Midterm" })).toMatchObject({
+      title: "Midterm",
+      description: "",
+      lifecycle: "draft",
+      settings: {
+        timeLimitMinutes: null,
+        navigationMode: "free",
+        randomizeItems: false,
+        allowResume: true
+      }
+    });
+  });
+
+  it("validates bank and local Test item sources", () => {
+    expect(TestItemCreateSchema.parse({ source: "bank", bankActivityId: "bank-activity-1" })).toMatchObject({
+      source: "bank",
+      pointsPossible: 1,
+      isRequired: true
+    });
+    expect(TestItemCreateSchema.parse({ source: "local", activityTypeKey: "mcq", title: "Question set" })).toMatchObject({
+      source: "local",
+      activityTypeKey: "mcq",
+      config: {}
+    });
+    expect(() => TestItemCreateSchema.parse({ source: "bank", activityTypeKey: "mcq" })).toThrow();
+  });
   it("normalizes activity input defaults", () => {
     expect(
       ActivityInputSchema.parse({

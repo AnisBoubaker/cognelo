@@ -559,6 +559,19 @@ describe("group services", () => {
     expect(mockPrisma.courseGroupActivity.create).not.toHaveBeenCalled();
   });
 
+  it("rejects Test assignment before the student runtime is enabled", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "test-activity-1",
+      courseId: "course-1",
+      activityType: { key: "test" }
+    });
+
+    await expect(
+      assignActivityToGroup(teacherUser, "course-1", "group-1", { activityId: "test-activity-1" })
+    ).rejects.toMatchObject({ status: 409, code: "TEST_ASSIGNMENT_NOT_AVAILABLE" });
+  });
+
   it("creates a gradebook item when assigning an activity to a group", async () => {
     mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
     mockPrisma.activity.findFirst.mockResolvedValue({ id: "activity-1", courseId: "course-1", title: "Trace loops" });

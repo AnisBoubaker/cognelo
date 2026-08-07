@@ -72,7 +72,7 @@ Core-backed activities:
 - use core services and core web renderers;
 - may still use the generic `Activity`, assignment, content, attempt, and gradebook infrastructure.
 
-The first core definition is `test`. It remains disabled in the database until the authoring and runtime surface is ready, so the unfinished type does not appear in activity pickers.
+The first core definition is `test`. It remains disabled in the generic activity-type list, but Phase 2 exposes a dedicated core Test action in the course picker. This keeps Test creation out of plugin installation/activation while allowing the authoring surface to evolve before student runtime is enabled.
 
 `ActivityType` records explicitly persist `providerKind` and `providerKey`. Existing activity types migrate to `providerKind = plugin`, with `providerKey` populated from existing plugin metadata where available.
 
@@ -133,7 +133,7 @@ Invariants:
 - a child activity belongs to exactly one Test;
 - the Test shell cannot be its own child;
 - a Test cannot contain another Test;
-- only activity definitions supporting summative attempts and composite execution may be added;
+- authoring accepts plugin activities with attempts and automatic or manual grading; publishing/assignment must additionally require `supportsCompositeExecution` once the runtime contract is enabled;
 - positions are non-negative and normalized by the service after reorder operations;
 - points are positive;
 - child activities do not have independent group assignments or content placements.
@@ -176,7 +176,7 @@ Adding a bank activity to a Test creates a course-local activity copy using the 
 - preserve `bankActivityId` and `activityVersionId` provenance;
 - copy generic activity configuration;
 - invoke the owning plugin's `onCourseActivityCreatedFromBankVersion` hook;
-- create the `TestItem` only after all plugin-owned copying succeeds;
+- compensate by deleting the child and `TestItem` if plugin-owned copying fails;
 - omit top-level course content placement.
 
 The Test never points directly at a mutable bank activity.
@@ -393,11 +393,14 @@ Routes should be core Test routes, not plugin-dispatch routes. Authorization use
 
 ### Phase 2 — Authoring and Ownership
 
-- Add core Test CRUD services and contracts.
-- Add bank-copy and local-child creation flows.
-- Add containment filtering to course activity/assignment lists.
-- Add Test deletion and plugin course-delete lifecycle hook.
-- Build the Test authoring shell and item editor routing.
+- [x] Add core Test CRUD services and contracts.
+- [x] Add bank-copy and local-child creation flows.
+- [x] Add containment filtering to course activity/assignment lists.
+- [x] Add Test deletion and plugin course-delete lifecycle hook.
+- [x] Build the initial Test authoring shell and item editor routing.
+
+Phase 2 intentionally leaves Test duplication, teacher runtime preview, and immutable revisions for the later hardening/runtime phases. Test item editing reuses each plugin's normal course authoring renderer and returns to the owning Test.
+Until the student runtime phase, new Test content items are forced hidden and group/all-groups assignment rejects the core `test` type.
 
 ### Phase 3 — Assignment and Content
 
@@ -448,4 +451,5 @@ Each phase requires:
 
 - Design documented.
 - Phase 1 foundation implemented.
-- Test creation remains intentionally unavailable until later phases.
+- Phase 2 authoring and ownership implemented: dedicated Test creation, settings, local/bank child composition, reorder/remove/edit flows, containment filters, and lifecycle-safe deletion.
+- The core Test type is still excluded from generic plugin activity creation and student execution remains unavailable until the assignment/runtime phases.

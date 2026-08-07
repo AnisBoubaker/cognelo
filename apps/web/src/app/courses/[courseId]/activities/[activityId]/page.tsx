@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
@@ -12,6 +12,8 @@ import { activityRenderers } from "@/lib/activity-renderers";
 export default function ActivityPage() {
   const params = useParams<{ courseId: string; activityId: string }>();
   const { courseId, activityId } = params;
+  const searchParams = useSearchParams();
+  const testActivityId = searchParams.get("testActivityId");
   const { user } = useAuth();
   const { locale, t } = useI18n();
   const [course, setCourse] = useState<Course | null>(null);
@@ -71,8 +73,8 @@ export default function ActivityPage() {
             <p className="muted">{course ? `${t("parsons.inCourse", { title: course.title })}` : t("common.loading")}</p>
           </div>
           <div className="hero-actions">
-            <Link className="button secondary" href={`/courses/${courseId}`}>
-              {t("parsons.backToCourse")}
+            <Link className="button secondary" href={testActivityId ? `/courses/${courseId}/activities/${testActivityId}` : `/courses/${courseId}`}>
+              {testActivityId ? "Back to Test" : t("parsons.backToCourse")}
             </Link>
           </div>
         </section>

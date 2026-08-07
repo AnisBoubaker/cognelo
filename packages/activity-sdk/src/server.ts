@@ -67,6 +67,13 @@ export type BankActivityDeletedHook = (input: {
   activityTypeKey: string;
 }) => Promise<void>;
 
+export type CourseActivityDeletedHook = (input: {
+  user: CurrentUser;
+  courseId: string;
+  activityId: string;
+  activityTypeKey: string;
+}) => Promise<void>;
+
 export type ActivityAttemptDeletedHook = (input: {
   user: CurrentUser;
   courseId: string;
@@ -105,6 +112,7 @@ export type ServerActivityPlugin = {
   };
   hooks?: {
     onCourseActivityCreatedFromBankVersion?: CourseActivityCreatedFromBankVersionHook;
+    onCourseActivityDeleted?: CourseActivityDeletedHook;
     onBankActivityDeleted?: BankActivityDeletedHook;
     onActivityAttemptDeleted?: ActivityAttemptDeletedHook;
   };
@@ -202,6 +210,29 @@ export async function runBankActivityDeletedHooks(input: {
   activityTypeKey: string;
 }) {
   await runBankActivityDeletedHooksForPlugins(serverPlugins, input);
+}
+
+export async function runCourseActivityDeletedHooks(input: {
+  user: CurrentUser;
+  courseId: string;
+  activityId: string;
+  activityTypeKey: string;
+}) {
+  await runCourseActivityDeletedHooksForPlugins(serverPlugins, input);
+}
+
+export async function runCourseActivityDeletedHooksForPlugins(
+  plugins: readonly ServerActivityPlugin[],
+  input: {
+    user: CurrentUser;
+    courseId: string;
+    activityId: string;
+    activityTypeKey: string;
+  }
+) {
+  for (const plugin of plugins) {
+    await plugin.hooks?.onCourseActivityDeleted?.(input);
+  }
 }
 
 export async function runBankActivityDeletedHooksForPlugins(

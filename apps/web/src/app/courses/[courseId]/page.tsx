@@ -394,6 +394,30 @@ export default function CourseDetailPage() {
     }
   }
 
+  async function createLocalTest() {
+    setError("");
+    setIsAddingActivity(true);
+    try {
+      const definition = activityDefinitions.find((candidate) => candidate.key === "test");
+      const localized = definition?.i18n?.[locale];
+      const title = localized?.defaultTitle ?? "New test";
+      const result = await api.createTest(courseId, {
+        title,
+        description: localized?.description ?? definition?.description ?? "",
+        lifecycle: "draft",
+        position: course?.activities?.length ?? 0,
+        contentPlacement: buildPickerContentPlacement(title)
+      });
+      setShowActivityPicker(false);
+      await refresh();
+      router.push(`/courses/${courseId}/activities/${result.test.activityId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.createActivityError"));
+    } finally {
+      setIsAddingActivity(false);
+    }
+  }
+
   async function attachBankActivity(bankActivity: NonNullable<ActivityBank["activities"]>[number]) {
     setError("");
     setIsAddingActivity(true);
@@ -2324,7 +2348,22 @@ export default function CourseDetailPage() {
                           ))}
                         </div>
                       ) : (
-                        visibleActivityTypes.map((type) => (
+                        <>
+                        {activityDefinitions.some((definition) => definition.key === "test" && definition.provider?.kind === "core") ? (
+                          <button
+                            className="activity-type-option"
+                            disabled={isAddingActivity}
+                            onClick={createLocalTest}
+                            type="button"
+                          >
+                            <ActivityTypeIcon iconName="document-check" />
+                            <span>
+                              <strong>{activityDefinitions.find((definition) => definition.key === "test")?.i18n?.[locale]?.name ?? "Test"}</strong>
+                              <small>{activityDefinitions.find((definition) => definition.key === "test")?.i18n?.[locale]?.description ?? "A summative assessment composed of activities."}</small>
+                            </span>
+                          </button>
+                        ) : null}
+                        {visibleActivityTypes.map((type) => (
                           <button
                             key={type.id}
                             className="activity-type-option"
@@ -2338,7 +2377,8 @@ export default function CourseDetailPage() {
                               <small>{activityCopy(type.key).description}</small>
                             </span>
                           </button>
-                        ))
+                        ))}
+                        </>
                       )}
                     </div>
                   </div>

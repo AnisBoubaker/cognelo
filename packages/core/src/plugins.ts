@@ -3,6 +3,7 @@ import {
   getActivityPlugin,
   getActivityPluginForActivityType,
   getActivityProviderForActivityType,
+  listCoreActivityDefinitions,
   listActivityPlugins
 } from "@cognelo/activity-sdk";
 import { getContentTypePlugin, getContentTypePluginForType, listContentTypeDefinitions, listContentTypePlugins } from "@cognelo/content-type-sdk";
@@ -27,6 +28,35 @@ function pluginMetadata(plugin: ActivityPluginManifest) {
 
 function pluginVersion(plugin: ActivityPluginManifest) {
   return plugin.version ?? "0.1.0";
+}
+
+export async function ensureCoreActivityTypes() {
+  const activityTypes = [];
+  for (const definition of listCoreActivityDefinitions()) {
+    activityTypes.push(
+      await prisma.activityType.upsert({
+        where: { key: definition.key },
+        update: {
+          name: definition.name,
+          description: definition.description,
+          providerKind: "core",
+          providerKey: definition.provider.key,
+          metadata: { researchReady: true, core: definition.provider.key },
+          isEnabled: definition.isEnabledByDefault ?? true
+        },
+        create: {
+          key: definition.key,
+          name: definition.name,
+          description: definition.description,
+          providerKind: "core",
+          providerKey: definition.provider.key,
+          metadata: { researchReady: true, core: definition.provider.key },
+          isEnabled: definition.isEnabledByDefault ?? true
+        }
+      })
+    );
+  }
+  return activityTypes;
 }
 
 function contentTypePluginMetadata(plugin: ContentTypePluginManifest) {

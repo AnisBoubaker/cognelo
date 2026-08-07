@@ -3,7 +3,8 @@ import { AppError } from "@cognelo/core";
 import { prisma } from "./db-client";
 import {
   copyBankCodingHomeworkAuthoringToCourseActivity,
-  deleteBankCodingHomeworkAuthoring
+  deleteBankCodingHomeworkAuthoring,
+  deleteCourseCodingHomeworkData
 } from "./authoring";
 import {
   codingHomeworkAssignmentPdfRoute,
@@ -101,6 +102,11 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
       }
 
       await deleteBankCodingHomeworkAuthoring({ bankActivityId });
+    },
+    onCourseActivityDeleted: async ({ activityTypeKey, activityId }) => {
+      if (activityTypeKey === "coding-homework-grader") {
+        await deleteCourseCodingHomeworkData({ activityId });
+      }
     },
     onActivityAttemptDeleted: async ({ activityId, coreAttemptId, deletedAt, groupId, pluginAttemptRef, reason, user }) => {
       await markCodingHomeworkSubmissionDeleted({

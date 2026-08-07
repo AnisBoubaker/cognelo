@@ -13,6 +13,7 @@ const courseInclude = {
   memberships: { include: { user: { select: { id: true, email: true, name: true } } } },
   materials: { orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }] },
   activities: {
+    where: { testItem: null },
     include: { activityType: true, bankActivity: true, activityVersion: true },
     orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }]
   },

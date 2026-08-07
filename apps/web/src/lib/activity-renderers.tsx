@@ -17,6 +17,7 @@ import {
 } from "@cognelo/plugin-parsons";
 import { createMcqClient, McqActivityView, McqManualGradingPanel, type McqSubmission } from "@cognelo/plugin-mcq";
 import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
+import { TestActivityView } from "@/components/test-activity-view";
 import {
   api,
   apiAbsoluteUrl,
@@ -577,6 +578,7 @@ function WebDesignCodingExerciseBankActivityRenderer(context: BankActivityRender
 }
 
 export const activityRenderers = {
+  test: TestActivityView,
   "coding-exercise": CodingExerciseActivityRenderer,
   "coding-homework-grader": CodingHomeworkGraderActivityRenderer,
   "parsons-problem": ParsonsActivityRenderer,

@@ -248,6 +248,65 @@ export type ActivityInput = z.infer<typeof ActivityInputSchema>;
 export const ActivityUpdateSchema = ActivityInputSchema.partial();
 export type ActivityUpdate = z.infer<typeof ActivityUpdateSchema>;
 
+export const TestSettingsSchema = z.object({
+  timeLimitMinutes: z.number().int().positive().max(1440).nullable().optional().default(null),
+  navigationMode: z.enum(["free", "sequential"]).optional().default("free"),
+  randomizeItems: z.boolean().optional().default(false),
+  allowResume: z.boolean().optional().default(true)
+});
+export type TestSettings = z.infer<typeof TestSettingsSchema>;
+
+export const TestCreateSchema = z.object({
+  title: z.string().trim().min(2).max(180),
+  description: z.string().max(4000).optional().default(""),
+  lifecycle: ActivityLifecycleSchema.optional().default("draft"),
+  position: z.number().int().min(0).optional().default(0),
+  settings: TestSettingsSchema.optional().default({}),
+  contentPlacement: CourseContentPlacementInputSchema.optional()
+});
+export type TestCreate = z.infer<typeof TestCreateSchema>;
+
+export const TestUpdateSchema = z.object({
+  title: z.string().trim().min(2).max(180).optional(),
+  description: z.string().max(4000).optional(),
+  lifecycle: ActivityLifecycleSchema.optional(),
+  settings: TestSettingsSchema.partial().optional()
+});
+export type TestUpdate = z.infer<typeof TestUpdateSchema>;
+
+const TestItemSettingsSchema = z.object({
+  pointsPossible: z.number().positive().max(100000).optional().default(1),
+  isRequired: z.boolean().optional().default(true),
+  position: z.number().int().min(0).optional(),
+  metadata: z.record(z.unknown()).optional().default({})
+});
+
+export const TestItemCreateSchema = z.discriminatedUnion("source", [
+  TestItemSettingsSchema.extend({
+    source: z.literal("bank"),
+    bankActivityId: RecordIdSchema,
+    activityVersionId: RecordIdSchema.optional()
+  }),
+  TestItemSettingsSchema.extend({
+    source: z.literal("local"),
+    activityTypeKey: z.string().min(2).max(80),
+    title: z.string().trim().min(2).max(180),
+    description: z.string().max(4000).optional().default(""),
+    lifecycle: ActivityLifecycleSchema.optional().default("draft"),
+    config: z.record(z.unknown()).optional().default({}),
+    activityMetadata: z.record(z.unknown()).optional().default({})
+  })
+]);
+export type TestItemCreate = z.infer<typeof TestItemCreateSchema>;
+
+export const TestItemUpdateSchema = z.object({
+  pointsPossible: z.number().positive().max(100000).optional(),
+  isRequired: z.boolean().optional(),
+  position: z.number().int().min(0).optional(),
+  metadata: z.record(z.unknown()).optional()
+});
+export type TestItemUpdate = z.infer<typeof TestItemUpdateSchema>;
+
 export const GradebookItemSettingsInputSchema = z.object({
   pointsPossible: z.number().positive().max(100000).optional(),
   gradingMode: z.enum(["points", "pass_fail"]).optional(),
