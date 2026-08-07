@@ -5,11 +5,13 @@ const db = vi.hoisted(() => ({
   courseGroupParticipant: { findFirst: vi.fn() },
   test: { findFirst: vi.fn() },
   activityAttempt: { findMany: vi.fn(), findFirst: vi.fn() },
-  testItemAttempt: { findUnique: vi.fn(), upsert: vi.fn() }
+  testItemAttempt: { findUnique: vi.fn(), upsert: vi.fn(), update: vi.fn() }
 }));
 
 const gradebook = vi.hoisted(() => ({
   getActivityAttemptAvailability: vi.fn(),
+  getActivityAttemptRegradeContext: vi.fn(),
+  recordActivityAttemptGradingResult: vi.fn(),
   startActivityAttempt: vi.fn(),
   submitActivityAttempt: vi.fn()
 }));
@@ -23,7 +25,9 @@ vi.mock("./gradebook", () => gradebook);
 vi.mock("./groups", () => groups);
 
 import {
+  gradeTestItemManually,
   getTestItemExecutionContext,
+  getTestAttemptReview,
   saveTestItemAttemptState,
   startOrResumeTestAttempt,
   submitTestAttempt,
@@ -97,7 +101,15 @@ function parentAttempt(overrides: Record<string, unknown> = {}) {
     activityConfigFingerprint: "fingerprint",
     metadata: {
       manifest: {
-        items: [{ testItemId: "item-1", activityId: "mcq-1", isRequired: true }]
+        items: [{
+          testItemId: "item-1",
+          activityId: "mcq-1",
+          activityTypeKey: "mcq",
+          title: "Knowledge check",
+          position: 0,
+          pointsPossible: 10,
+          isRequired: true
+        }]
       }
     },
     startedAt: new Date("2026-08-07T10:00:00.000Z"),
@@ -125,6 +137,11 @@ describe("compound Test execution", () => {
       attemptsRemaining: 1
     });
     db.testItemAttempt.findUnique.mockResolvedValue(null);
+    gradebook.recordActivityAttemptGradingResult.mockResolvedValue({
+      attempt: parentAttempt({ lifecycle: "graded" }),
+      grade: { normalizedScore: 5, normalizedMaxScore: 10 }
+    });
+    gradebook.getActivityAttemptRegradeContext.mockResolvedValue({ activityTypeKey: "test" });
   });
 
   it("starts one generic parent attempt with a stable child manifest", async () => {
@@ -210,7 +227,29 @@ describe("compound Test execution", () => {
     db.activityAttempt.findFirst
       .mockResolvedValueOnce(parentAttempt({ testItemAttempts: [] }))
       .mockResolvedValueOnce(parentAttempt({
-        testItemAttempts: [{ testItemId: "item-1", lifecycle: "graded" }]
+        testItemAttempts: [{
+          testItemId: "item-1",
+          activityId: "mcq-1",
+          lifecycle: "graded",
+          rawScore: 1,
+          rawMaxScore: 2,
+          normalizedScore: 5,
+          normalizedMaxScore: 10,
+          feedback: {}
+        }]
+      }))
+      .mockResolvedValueOnce(parentAttempt({
+        lifecycle: "submitted",
+        testItemAttempts: [{
+          testItemId: "item-1",
+          activityId: "mcq-1",
+          lifecycle: "graded",
+          rawScore: 1,
+          rawMaxScore: 2,
+          normalizedScore: 5,
+          normalizedMaxScore: 10,
+          feedback: {}
+        }]
       }));
 
     await expect(
@@ -226,5 +265,98 @@ describe("compound Test execution", () => {
       attemptId: "parent-attempt-1",
       pluginAttemptRef: "parent-attempt-1"
     }));
+    expect(gradebook.recordActivityAttemptGradingResult).toHaveBeenCalledWith(student, expect.objectContaining({
+      attemptId: "parent-attempt-1",
+      rawScore: 5,
+      rawMaxScore: 10,
+      source: "auto",
+      normalizedResult: {
+        studentFeedback: {
+          kind: "test",
+          details: {
+            items: [expect.objectContaining({
+              testItemId: "item-1",
+              activityTypeKey: "mcq",
+              title: "Knowledge check",
+              pointsEarned: 5,
+              pointsPossible: 10
+            })]
+          }
+        }
+      }
+    }));
+  });
+
+  it("manually grades one child and recomputes the parent Test grade", async () => {
+    const gradedItemAttempt = {
+      id: "item-attempt-1",
+      testItemId: "item-1",
+      activityId: "mcq-1",
+      lifecycle: "graded",
+      rawScore: 1,
+      rawMaxScore: 2,
+      normalizedScore: 5,
+      normalizedMaxScore: 10,
+      feedback: {},
+      result: { state: { answers: {} } }
+    };
+    db.activityAttempt.findFirst
+      .mockResolvedValueOnce(parentAttempt({ lifecycle: "graded", testItemAttempts: [gradedItemAttempt] }))
+      .mockResolvedValueOnce(parentAttempt({
+        lifecycle: "graded",
+        testItemAttempts: [{ ...gradedItemAttempt, rawScore: 8, rawMaxScore: 10, normalizedScore: 8 }]
+      }));
+    db.testItemAttempt.update.mockResolvedValue({ ...gradedItemAttempt, normalizedScore: 8 });
+
+    await gradeTestItemManually(student, "course-1", "parent-attempt-1", "item-1", {
+      score: 8,
+      reason: "Accepted alternate answer"
+    });
+
+    expect(db.testItemAttempt.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "item-attempt-1" },
+      data: expect.objectContaining({ rawScore: 8, rawMaxScore: 10, normalizedScore: 8, normalizedMaxScore: 10 })
+    }));
+    expect(gradebook.recordActivityAttemptGradingResult).toHaveBeenCalledWith(student, expect.objectContaining({
+      attemptId: "parent-attempt-1",
+      rawScore: 8,
+      rawMaxScore: 10,
+      source: "manual",
+      reason: "Accepted alternate answer"
+    }));
+  });
+
+  it("returns submitted child state for teacher review without requiring a parent grade", async () => {
+    db.activityAttempt.findFirst.mockResolvedValue(parentAttempt({
+      lifecycle: "submitted",
+      submittedAt: new Date("2026-08-07T11:00:00.000Z"),
+      testItemAttempts: [{
+        id: "item-attempt-1",
+        testItemId: "item-1",
+        activityId: "mcq-1",
+        lifecycle: "graded",
+        rawScore: 1,
+        rawMaxScore: 2,
+        normalizedScore: 5,
+        normalizedMaxScore: 10,
+        result: { state: { answers: { question1: ["choice1"] } } },
+        feedback: {},
+        activity: childActivity
+      }]
+    }));
+
+    await expect(getTestAttemptReview(student, "course-1", "parent-attempt-1")).resolves.toMatchObject({
+      id: "parent-attempt-1",
+      lifecycle: "submitted",
+      items: [{
+        testItemId: "item-1",
+        activityTypeKey: "mcq",
+        title: "Knowledge check",
+        itemAttempt: {
+          normalizedScore: 5,
+          state: { answers: { question1: ["choice1"] } }
+        }
+      }]
+    });
   });
 });

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { resolvePluginGradingHandler } from "@cognelo/activity-sdk/server";
-import { AppError, getActivityAttemptRegradeContext, recordActivityAttemptGradingResult } from "@cognelo/core";
+import { AppError, getActivityAttemptRegradeContext, recordActivityAttemptGradingResult, regradeTestAttempt } from "@cognelo/core";
 import type { Prisma } from "@cognelo/db";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
@@ -17,6 +17,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     const body = (await readJson(request)) as { reason?: unknown };
     const reason = typeof body.reason === "string" ? body.reason : null;
     const context = await getActivityAttemptRegradeContext(user, courseId, attemptId);
+    if (context.activityTypeKey === "test") {
+      return json({ result: await regradeTestAttempt(user, courseId, attemptId, reason) });
+    }
     const gradeAttempt = resolvePluginGradingHandler(context.activityTypeKey);
 
     if (!gradeAttempt) {

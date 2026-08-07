@@ -15,6 +15,7 @@ import {
 } from "@cognelo/plugin-mcq";
 import { createParsonsClient, type ParsonsAttemptEvaluation, type ParsonsGradebookAttemptRecord } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
+import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { api, apiRequest, Course, CourseGradebook, CourseGradebookRow } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
@@ -88,6 +89,10 @@ export default function ManualActivityGradingPage() {
 
     Promise.all(
       pageRows.map(async (row) => {
+        if (row.activityTypeKey === "test") {
+          const activityResult = await api.groupActivity(courseId, row.groupId, row.activityId);
+          return { row, attempts: [] as ManualGradingAttempt[], activityConfig: activityResult.activity.config ?? {} };
+        }
         if (row.activityTypeKey === "mcq") {
           const [result, activityResult] = await Promise.all([
             mcqClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
@@ -326,7 +331,9 @@ export default function ManualActivityGradingPage() {
                       <strong>{formatGradebookScore(row.score, row.maxScore)}</strong>
                     </div>
 
-                    {selectedAttempt && "answers" in selectedAttempt ? (
+                    {row.activityTypeKey === "test" ? (
+                      <TestGradeBreakdown feedback={row.feedback} heading={t("groupPage.gradingBreakdownTitle")} />
+                    ) : selectedAttempt && "answers" in selectedAttempt ? (
                       <div className="stack">
                         {mcqReviewAnswers.map((answer, index) => (
                           <article

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { useAuth } from "@/components/auth-provider";
 import { api, ApiError, Activity, ActivityDefinition, Course, CourseGroup, DeletedSubmissionAudit, StudentGradeFeedback, StudentReleasedGradeRow } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -350,6 +351,7 @@ function StudentFeedback({
           ))}
         </div>
       ) : null}
+      <TestGradeBreakdown feedback={feedback} heading={t("groupPage.gradingBreakdownTitle")} />
     </div>
   );
 }

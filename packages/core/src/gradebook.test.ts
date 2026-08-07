@@ -1072,7 +1072,13 @@ describe("gradebook attempt services", () => {
       isPass: null,
       latePenaltyApplied: false,
       latePenaltyPercent: null,
-      source: "auto"
+      source: "auto",
+      normalizedResult: {
+        studentFeedback: {
+          kind: "test",
+          details: { items: [{ testItemId: "item-1", pointsEarned: 8, pointsPossible: 10 }] }
+        }
+      }
     });
     const now = new Date("2026-05-19T13:00:00.000Z");
 
@@ -1100,7 +1106,9 @@ describe("gradebook attempt services", () => {
           source: "override",
           normalizedResult: expect.objectContaining({
             studentFeedback: expect.objectContaining({
-              feedbackText: "Good recovery after the ordering issue."
+              kind: "test",
+              feedbackText: "Good recovery after the ordering issue.",
+              details: { items: [{ testItemId: "item-1", pointsEarned: 8, pointsPossible: 10 }] }
             })
           })
         })

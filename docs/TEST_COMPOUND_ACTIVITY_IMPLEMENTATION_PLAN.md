@@ -434,6 +434,14 @@ Phase 4 establishes plugin-neutral persistence and dispatch. The student Test sh
 - Add gradebook Test breakdown and feedback renderer.
 - Add release, regrade, override, audit, and analytics coverage.
 
+Implemented in Phase 5:
+
+- Final Test submission now aggregates the manifest's weighted item scores and records one ordinary parent `Grade`. Existing grade strategies, late penalties, release controls, and `GradeEvent` audit records therefore apply without a Test-specific gradebook.
+- The normalized parent result carries a plugin-neutral per-item breakdown. Teachers see it in detailed results, and students see it only through the existing released-grade feedback path.
+- Teachers can adjust an individual Test item score; the item stores the manual-grading reason and the parent grade is recomputed immediately. Whole-Test overrides preserve the structured item breakdown.
+- Test regrading recomputes the parent from its immutable child result snapshot. Re-executing child plugin grading logic is unnecessary while attempted Test content is locked; later revision support must dispatch regrading through each child's registered adapter.
+- Child scores are not exposed by the embedded activity renderer. The released parent Test grade and breakdown are the student-facing result.
+
 ### Phase 6 — Additional Plugins and Hardening
 
 - Adapt Parsons and coding activities.
@@ -464,4 +472,5 @@ Each phase requires:
 - Phase 2 authoring and ownership implemented: dedicated Test creation, settings, local/bank child composition, reorder/remove/edit flows, containment filters, and lifecycle-safe deletion.
 - Phase 3 assignment and content integration implemented: Test is enabled through its dedicated creation flow, assignments are summative-only, direct/all-groups/future-group materialization reuses the existing content and gradebook paths, and contained children cannot be assigned or placed independently.
 - Phase 4 execution and the first MCQ adapter are implemented. Students receive a dedicated Test start/resume and navigation shell rather than the teacher authoring form. Core persists one parent attempt plus generic per-item attempts. MCQ answers autosave without an individual submit button; **Submit Test** dispatches every child through capability/handler/renderer registries designed for additional plugins and then submits the parent once.
-- Parent Test score aggregation, gradebook breakdown/review, and released item feedback remain Phase 5 work.
+- Phase 5 grading and review are implemented: parent aggregation, normal gradebook/release/audit integration, Test breakdowns, item-level manual adjustment with parent recomputation, parent override preservation, and Test regrading.
+- Phase 6 remains responsible for additional plugin adapters, timer enforcement, immutable revisions, and broader end-to-end hardening.

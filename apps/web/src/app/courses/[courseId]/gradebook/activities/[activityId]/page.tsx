@@ -8,19 +8,21 @@ import { createCodingHomeworkGraderClient, type CodingHomeworkGradebookAttemptRe
 import { createMcqClient, type McqSubmission } from "@cognelo/plugin-mcq";
 import { createParsonsClient, type ParsonsGradebookAttemptRecord } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
+import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import {
   api,
   apiRequest,
   Course,
   CourseGradebook,
   CourseGradebookRow,
+  CourseTestAttemptReview,
   GradebookMutationAttempt,
   GradebookMutationGrade
 } from "@/lib/api";
 import { getManualGradingRenderer } from "@/lib/activity-renderers";
 import { useI18n } from "@/lib/i18n";
 
-type GradebookReviewAttempt = ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord;
+type GradebookReviewAttempt = ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview;
 
 export default function GradebookActivityResultsPage() {
   const params = useParams<{ courseId: string; activityId: string }>();
@@ -37,6 +39,7 @@ export default function GradebookActivityResultsPage() {
   const [savingGradeKey, setSavingGradeKey] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<{
     row: CourseGradebookRow;
+    mode: "review" | "grade";
     activityConfig?: Record<string, unknown>;
     includeAttempts: boolean;
     attempts: GradebookReviewAttempt[];
@@ -67,14 +70,27 @@ export default function GradebookActivityResultsPage() {
   const selectedAttempt = overlay?.attempts[overlay.selectedIndex] ?? null;
   const hasRowsWithSubmittedAttempts = rows.some((row) => hasSubmittedAttempt(row));
 
-  async function openManualGrading(row: CourseGradebookRow) {
-    setOverlay({ row, includeAttempts: false, attempts: [], selectedIndex: 0, loading: true, error: "" });
+  async function openManualGrading(row: CourseGradebookRow, mode: "review" | "grade") {
+    setOverlay({ row, mode, includeAttempts: false, attempts: [], selectedIndex: 0, loading: true, error: "" });
     await loadAttempts(row, false);
   }
 
   async function loadAttempts(row: CourseGradebookRow, includeAttempts: boolean) {
     setOverlay((current) => (current ? { ...current, includeAttempts, loading: true, error: "" } : current));
     try {
+      if (row.activityTypeKey === "test") {
+        const parentAttempts = row.attempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
+        const reviews = await Promise.all(parentAttempts.map((attempt) => api.testAttemptReview(courseId, attempt.id)));
+        setOverlay((current) => current ? {
+          ...current,
+          includeAttempts,
+          attempts: sortAttemptsByDisplayedTimestamp(reviews.map((result) => result.review)),
+          selectedIndex: 0,
+          loading: false,
+          error: ""
+        } : current);
+        return;
+      }
       const [attemptsResult, activityResult] = await Promise.all([
         row.activityTypeKey === "mcq"
           ? mcqClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
@@ -208,6 +224,17 @@ export default function GradebookActivityResultsPage() {
       notifications.error(err instanceof Error ? err.message : t("courseDetail.regradeError"));
     } finally {
       setSavingGradeKey(null);
+    }
+  }
+
+  async function gradeTestItem(row: CourseGradebookRow, parentAttemptId: string, testItemId: string, score: number, reason: string | null) {
+    try {
+      await api.gradeTestItem(courseId, parentAttemptId, testItemId, { score, reason });
+      await refresh();
+      setOverlay(null);
+      notifications.success("Test item grade saved.");
+    } catch (err) {
+      notifications.error(err instanceof Error ? err.message : t("courseDetail.overrideGradeError"));
     }
   }
 
@@ -350,7 +377,8 @@ export default function GradebookActivityResultsPage() {
                   manualGradingAvailable={Boolean(manualGradingRenderer)}
                   row={row}
                   savingGradeKey={savingGradeKey}
-                  onOpenManualGrading={openManualGrading}
+                  onOpenReview={(row) => openManualGrading(row, "review")}
+                  onOpenManualGrading={(row) => openManualGrading(row, "grade")}
                   onRegrade={regradeRow}
                   t={t}
                 />
@@ -382,6 +410,7 @@ export default function GradebookActivityResultsPage() {
                   includeAttempts: overlay.includeAttempts,
                   loading: overlay.loading,
                   error: overlay.error,
+                  readOnly: overlay.mode === "review",
                   isSavingOverride: savingGradeKey === `${overlay.row.gradebookItemId}:${overlay.row.participantId}:override`,
                   isSavingRegrade: savingGradeKey === `${overlay.row.gradebookItemId}:${overlay.row.participantId}:regrade`,
                   isSavingDelete: savingGradeKey === `${overlay.row.gradebookItemId}:${overlay.row.participantId}:delete`,
@@ -391,6 +420,7 @@ export default function GradebookActivityResultsPage() {
                   onOverrideGrade: (input) => overrideGrade(overlay.row, input),
                   onRegradeAttempt: () => regradeRow(overlay.row),
                   onDeleteSubmission: () => deleteSelectedSubmission(overlay.row, selectedAttempt),
+                  onGradeTestItem: (parentAttemptId, testItemId, score, reason) => gradeTestItem(overlay.row, parentAttemptId, testItemId, score, reason),
                   t
                 })
               : null}
@@ -406,6 +436,7 @@ function GradebookStudentRow({
   row,
   savingGradeKey,
   onOpenManualGrading,
+  onOpenReview,
   onRegrade,
   t
 }: {
@@ -413,6 +444,7 @@ function GradebookStudentRow({
   row: CourseGradebookRow;
   savingGradeKey: string | null;
   onOpenManualGrading: (row: CourseGradebookRow) => Promise<void>;
+  onOpenReview: (row: CourseGradebookRow) => Promise<void>;
   onRegrade: (row: CourseGradebookRow) => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
@@ -424,13 +456,14 @@ function GradebookStudentRow({
       <div className="table-main table-main-stack">
         <strong>{row.participantName}</strong>
         <span className="table-meta-note muted">{row.participantEmail}</span>
+        <TestGradeBreakdown feedback={row.feedback} heading={t("groupPage.gradingBreakdownTitle")} compact />
       </div>
       <span className="table-meta muted">{row.groupTitle}</span>
       <strong>{rowHasSubmittedAttempt || row.score !== null ? formatGradebookScore(row.score, row.maxScore) : t("courseDetail.didNotSubmit")}</strong>
       <span className="table-meta muted">{row.submittedAttemptCount}</span>
       <div className="table-actions">
         {manualGradingAvailable ? (
-          <button className="button secondary" disabled={!rowHasSubmittedAttempt} type="button" onClick={() => onOpenManualGrading(row)}>
+          <button className="button secondary" disabled={!rowHasSubmittedAttempt} type="button" onClick={() => onOpenReview(row)}>
             {t("courseDetail.reviewGrade")}
           </button>
         ) : (

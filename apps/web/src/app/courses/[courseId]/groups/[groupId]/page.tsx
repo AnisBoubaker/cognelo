@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { CSSProperties, FocusEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
@@ -2259,6 +2260,7 @@ function StudentFeedback({
           ))}
         </div>
       ) : null}
+      <TestGradeBreakdown feedback={feedback} heading={t("groupPage.gradingBreakdownTitle")} />
     </div>
   );
 }

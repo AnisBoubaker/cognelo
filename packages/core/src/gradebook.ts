@@ -547,19 +547,6 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
     normalizedScore: input.score,
     normalizedMaxScore: maxScore
   });
-  const nextSnapshot = {
-    attemptId: null,
-    rawScore: input.score,
-    rawMaxScore: maxScore,
-    normalizedScore: input.score,
-    normalizedMaxScore: maxScore,
-    isPass,
-    latePenaltyApplied: false,
-    latePenaltyPercent: null,
-    source: "override",
-    ...buildManualStudentFeedbackResult(input.feedbackText)
-  };
-
   return prisma.$transaction(async (tx) => {
     const previousGrade = await tx.grade.findUnique({
       where: {
@@ -569,6 +556,22 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
         }
       }
     });
+    const previousFeedback = sanitizeStudentGradeFeedback(previousGrade?.normalizedResult);
+    const feedbackText = typeof input.feedbackText === "string" ? input.feedbackText.trim() : "";
+    const nextSnapshot = {
+      attemptId: null,
+      rawScore: input.score,
+      rawMaxScore: maxScore,
+      normalizedScore: input.score,
+      normalizedMaxScore: maxScore,
+      isPass,
+      latePenaltyApplied: false,
+      latePenaltyPercent: null,
+      source: "override",
+      ...(previousFeedback
+        ? { studentFeedback: { ...previousFeedback, ...(feedbackText ? { feedbackText } : {}) } }
+        : buildManualStudentFeedbackResult(input.feedbackText))
+    };
 
     const grade = await tx.grade.upsert({
       where: {
