@@ -140,6 +140,23 @@ export async function deleteBankWebDesignExerciseData(params: { bankActivityId: 
   });
 }
 
+export async function deleteCourseWebDesignExerciseData(params: { activityId: string }) {
+  await prisma.$transaction(async (transaction) => {
+    const submissions = await transaction.pluginWebDesignExerciseSubmission.findMany({
+      where: { activityId: params.activityId },
+      select: { id: true }
+    });
+    if (submissions.length) {
+      await transaction.pluginWebDesignExerciseTestResult.deleteMany({
+        where: { submissionId: { in: submissions.map(({ id }) => id) } }
+      });
+    }
+    await transaction.pluginWebDesignExerciseSubmission.deleteMany({ where: { activityId: params.activityId } });
+    await transaction.pluginWebDesignExerciseTest.deleteMany({ where: { activityId: params.activityId } });
+    await transaction.pluginWebDesignExerciseReferenceBundle.deleteMany({ where: { activityId: params.activityId } });
+  });
+}
+
 export async function replaceWebDesignExerciseTests(params: {
   activityId: string;
   activityConfig: Record<string, unknown> | undefined;

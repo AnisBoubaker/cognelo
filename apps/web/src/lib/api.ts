@@ -346,6 +346,15 @@ export type ActivityDefinition = {
   defaultCategoryIds?: string[];
   icon?: "code" | "checklist" | "document-check" | "list-check" | "placeholder";
   defaultConfig?: Record<string, unknown>;
+  provider?: { kind: "core" | "plugin"; key: string };
+  creationScopes?: readonly ("bank" | "course")[];
+  isEnabledByDefault?: boolean;
+  grading?: {
+    supportsAttempts?: boolean;
+    supportsAutoGrading?: boolean;
+    supportsManualGrading?: boolean;
+    supportsCompositeExecution?: boolean;
+  };
   i18n?: Partial<
     Record<
       "en" | "fr" | "zh" | "ar",
@@ -379,6 +388,32 @@ export type Activity = {
   bankActivity?: BankActivity | null;
   activityVersion?: ActivityVersion | null;
   position: number;
+};
+
+export type CourseTestSettings = {
+  timeLimitMinutes: number | null;
+  navigationMode: "free" | "sequential";
+  randomizeItems: boolean;
+  allowResume: boolean;
+};
+
+export type CourseTestItem = {
+  id: string;
+  activityId: string;
+  position: number;
+  pointsPossible: number;
+  isRequired: boolean;
+  metadata: Record<string, unknown>;
+  activity: Activity;
+};
+
+export type CourseTest = {
+  id: string;
+  courseId: string;
+  activityId: string;
+  settings: CourseTestSettings;
+  activity: Activity;
+  items: CourseTestItem[];
 };
 
 export type CourseGroupActivityAssignment = {
@@ -1106,6 +1141,28 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input)
     }),
+  createTest: (courseId: string, input: {
+    title: string;
+    description?: string;
+    lifecycle?: "draft" | "published" | "archived";
+    settings?: Partial<CourseTestSettings>;
+    position?: number;
+    contentPlacement?: { parentId?: string | null; position?: number; isVisible?: boolean; titleSnapshot?: string; metadata?: Record<string, unknown> };
+  }) => request<{ test: CourseTest }>(`/courses/${courseId}/tests`, { method: "POST", body: JSON.stringify(input) }),
+  test: (courseId: string, activityId: string) =>
+    request<{ test: CourseTest }>(`/courses/${courseId}/activities/${activityId}/test`),
+  updateTest: (courseId: string, activityId: string, input: {
+    title?: string;
+    description?: string;
+    lifecycle?: "draft" | "published" | "archived";
+    settings?: Partial<CourseTestSettings>;
+  }) => request<{ test: CourseTest }>(`/courses/${courseId}/activities/${activityId}/test`, { method: "PATCH", body: JSON.stringify(input) }),
+  createTestItem: (courseId: string, activityId: string, input: Record<string, unknown>) =>
+    request<{ item: CourseTestItem }>(`/courses/${courseId}/activities/${activityId}/test/items`, { method: "POST", body: JSON.stringify(input) }),
+  updateTestItem: (courseId: string, activityId: string, itemId: string, input: Partial<Pick<CourseTestItem, "position" | "pointsPossible" | "isRequired" | "metadata">>) =>
+    request<{ item: CourseTestItem }>(`/courses/${courseId}/activities/${activityId}/test/items/${itemId}`, { method: "PATCH", body: JSON.stringify(input) }),
+  deleteTestItem: (courseId: string, activityId: string, itemId: string) =>
+    request<{ ok: true }>(`/courses/${courseId}/activities/${activityId}/test/items/${itemId}`, { method: "DELETE" }),
   courseContent: (courseId: string, options?: { includeGroupItems?: boolean; visibleOnly?: boolean }) => {
     const params = new URLSearchParams();
     if (options?.includeGroupItems) {

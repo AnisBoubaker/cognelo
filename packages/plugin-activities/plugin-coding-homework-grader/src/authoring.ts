@@ -394,6 +394,28 @@ export async function deleteBankCodingHomeworkAuthoring(params: { bankActivityId
   });
 }
 
+export async function deleteCourseCodingHomeworkData(params: { activityId: string }) {
+  await prisma.$transaction(async (transaction) => {
+    const submissions = await transaction.pluginCodingHomeworkSubmission.findMany({
+      where: { activityId: params.activityId },
+      select: { id: true }
+    });
+    const submissionIds = submissions.map(({ id }) => id);
+    await transaction.pluginCodingHomeworkSubmission.deleteMany({ where: { activityId: params.activityId } });
+    await transaction.pluginCodingHomeworkDocumentationSnapshot.deleteMany({ where: { activityId: params.activityId } });
+    await transaction.pluginCodingHomeworkAssignment.deleteMany({ where: { activityId: params.activityId } });
+    await transaction.pluginCodingHomeworkSubmissionRequirementSet.deleteMany({ where: { activityId: params.activityId } });
+    await transaction.pluginCodingHomeworkAttachment.deleteMany({
+      where: {
+        OR: [
+          { ownerKind: "course_activity", ownerId: params.activityId },
+          ...(submissionIds.length ? [{ ownerKind: "submission" as const, ownerId: { in: submissionIds } }] : [])
+        ]
+      }
+    });
+  });
+}
+
 function fileStorageDir() {
   return path.join(process.cwd(), "../../storage/coding-homework-grader");
 }

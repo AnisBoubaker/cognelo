@@ -4,9 +4,10 @@ import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 import { assertCanManageCourse, assertCanViewCourse } from "./authorization";
 import { AppError, notFound } from "./errors";
-import { assertActivityTypeAvailable, getEnabledActivityPluginKeys } from "./plugins";
+import { assertActivityTypeAvailable, ensureCoreActivityTypes, getEnabledActivityPluginKeys } from "./plugins";
 
 export async function listActivityTypes() {
+  await ensureCoreActivityTypes();
   const enabledPluginKeys = await getEnabledActivityPluginKeys();
   const activityTypes = await prisma.activityType.findMany({ where: { isEnabled: true }, orderBy: { name: "asc" } });
   return activityTypes.filter((activityType) => {
@@ -44,7 +45,7 @@ export async function getActivity(user: CurrentUser, courseId: string, activityI
 export async function listActivities(user: CurrentUser, courseId: string) {
   await assertCanViewCourse(user, courseId);
   return prisma.activity.findMany({
-    where: { courseId },
+    where: { courseId, testItem: null },
     include: { activityType: true, bankActivity: true, activityVersion: true },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }]
   });
@@ -241,12 +242,27 @@ async function resolveEnabledActivityTypeId(activityTypeKey: string) {
 
 export async function deleteActivity(user: CurrentUser, courseId: string, activityId: string) {
   await assertCanManageCourse(user, courseId);
-  const activity = await prisma.activity.findFirst({ where: { id: activityId, courseId } });
+  const activity = await prisma.activity.findFirst({ where: { id: activityId, courseId }, include: { testItem: true } });
   if (!activity) {
     throw notFound("Activity");
   }
+  if (activity.testItem) {
+    throw new AppError(409, "TEST_ITEM_ACTIVITY_OWNED", "Remove this activity from its Test instead.");
+  }
   await prisma.activity.delete({ where: { id: activityId } });
   return { ok: true };
+}
+
+export async function getActivityForDeletion(user: CurrentUser, courseId: string, activityId: string) {
+  await assertCanManageCourse(user, courseId);
+  const activity = await prisma.activity.findFirst({
+    where: { id: activityId, courseId },
+    include: { activityType: true, testItem: true, testDefinition: true }
+  });
+  if (!activity) {
+    throw notFound("Activity");
+  }
+  return activity;
 }
 
 async function createCourseActivityContentItem(

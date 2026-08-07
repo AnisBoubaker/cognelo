@@ -279,4 +279,17 @@ describe("activity services", () => {
       code: "NOT_FOUND"
     });
   });
+
+  it("prevents direct deletion of an activity owned by a Test", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "child-activity-1",
+      courseId: "course-1",
+      testItem: { id: "test-item-1" }
+    });
+
+    await expect(deleteActivity(teacherUser, "course-1", "child-activity-1")).rejects.toMatchObject({
+      status: 409,
+      code: "TEST_ITEM_ACTIVITY_OWNED"
+    });
+  });
 });

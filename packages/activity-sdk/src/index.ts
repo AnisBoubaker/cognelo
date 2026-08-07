@@ -24,6 +24,7 @@ export type ActivityGradingCapability = {
   supportsManualGrading?: boolean;
   supportsFeedbackRenderer?: boolean;
   supportsAnalyticsPayloads?: boolean;
+  supportsCompositeExecution?: boolean;
   defaultMaxAttempts?: number | null;
 };
 

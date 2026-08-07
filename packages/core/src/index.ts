@@ -11,4 +11,5 @@ export * from "./groups";
 export * from "./materials";
 export * from "./plugins";
 export * from "./subjects";
+export * from "./tests";
 export * from "./users";

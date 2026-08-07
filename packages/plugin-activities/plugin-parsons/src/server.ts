@@ -11,6 +11,13 @@ import { evaluateParsonsAttemptStateForConfig } from "./attempts";
 export const parsonsServerPlugin: ServerActivityPlugin = {
   key: "parsons",
   routes: [parsonsAttemptRoute, parsonsGenerateRoute, parsonsGradebookAttemptsRoute, parsonsStudentSubmissionsRoute],
+  hooks: {
+    onCourseActivityDeleted: async ({ activityTypeKey, activityId }) => {
+      if (activityTypeKey === "parsons-problem") {
+        await prisma.pluginParsonsAttempt.deleteMany({ where: { activityId } });
+      }
+    }
+  },
   grading: {
     gradeAttempt: async ({ activityId, pluginAttemptRef, activity }) => {
       if (!pluginAttemptRef) {

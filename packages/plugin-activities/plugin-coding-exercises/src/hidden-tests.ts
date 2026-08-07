@@ -272,6 +272,14 @@ export async function deleteBankCodingExerciseData(params: { bankActivityId: str
   });
 }
 
+export async function deleteCourseCodingExerciseData(params: { activityId: string }) {
+  await prisma.$transaction(async (transaction) => {
+    await transaction.pluginCodingExerciseExecution.deleteMany({ where: { activityId: params.activityId } });
+    await transaction.pluginCodingExerciseHiddenTest.deleteMany({ where: { activityId: params.activityId } });
+    await transaction.pluginCodingExerciseReferenceSolution.deleteMany({ where: { activityId: params.activityId } });
+  });
+}
+
 async function validateCodingExerciseHiddenTestsInput(params: { activityConfig: unknown; input: unknown }) {
   const input = codingExerciseHiddenTestsInputSchema.parse(params.input);
   const seenIds = new Set<string>();
