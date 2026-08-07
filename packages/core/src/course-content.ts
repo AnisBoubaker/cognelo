@@ -584,8 +584,31 @@ export async function listContentItems(user: CurrentUser, courseId: string, opti
     },
     orderBy: [{ parentId: "asc" }, { position: "asc" }, { createdAt: "asc" }]
   });
-  const withVisibility = addEffectiveVisibility(items);
+  const scopedItems = removeCourseActivityPlacementsShadowedByGroupAssignments(items, scope.groupId);
+  const withVisibility = addEffectiveVisibility(scopedItems);
   return options.visibleOnly ? withVisibility.filter((item) => item.effectiveVisibility === "visible") : withVisibility;
+}
+
+function removeCourseActivityPlacementsShadowedByGroupAssignments<
+  T extends { activityId: string | null; courseGroupActivityId: string | null; groupId: string | null; kind: string }
+>(items: T[], groupId: string | null) {
+  if (!groupId) {
+    return items;
+  }
+
+  const assignedActivityIds = new Set(
+    items
+      .filter(
+        (item) =>
+          item.groupId === groupId && item.kind === "activity" && Boolean(item.courseGroupActivityId) && typeof item.activityId === "string"
+      )
+      .map((item) => item.activityId as string)
+  );
+
+  return items.filter(
+    (item) =>
+      !(item.groupId === null && item.kind === "activity" && typeof item.activityId === "string" && assignedActivityIds.has(item.activityId))
+  );
 }
 
 export async function deleteContentItem(user: CurrentUser, courseId: string, contentItemId: string, scope: ContentScope = {}) {

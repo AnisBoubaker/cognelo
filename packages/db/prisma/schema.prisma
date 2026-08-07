@@ -46,6 +46,11 @@ enum ActivityLifecycle {
   archived
 }
 
+enum ActivityProviderKind {
+  core
+  plugin
+}
+
 enum CourseGroupStatus {
   draft
   published
@@ -213,17 +218,17 @@ model UserRole {
 }
 
 model Course {
-  id               String              @id @default(cuid())
+  id               String                  @id @default(cuid())
   subjectId        String
   title            String
-  description      String              @default("")
-  status           CourseStatus        @default(draft)
-  metadata         Json                @default("{}")
+  description      String                  @default("")
+  status           CourseStatus            @default(draft)
+  metadata         Json                    @default("{}")
   createdById      String
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  subject          Subject             @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  createdBy        User                @relation("CourseCreator", fields: [createdById], references: [id])
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  subject          Subject                 @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdBy        User                    @relation("CourseCreator", fields: [createdById], references: [id])
   memberships      CourseMembership[]
   materials        CourseMaterial[]
   activities       Activity[]
@@ -232,6 +237,7 @@ model Course {
   activityAttempts ActivityAttempt[]
   contentItems     CourseContentItem[]
   contentResources CourseContentResource[]
+  tests            Test[]
 
   @@index([subjectId])
   @@index([status])
@@ -442,18 +448,23 @@ model CourseGroupHiddenCourseMaterial {
 }
 
 model ActivityType {
-  id               String            @id @default(cuid())
-  key              String            @unique
+  id               String               @id @default(cuid())
+  key              String               @unique
   name             String
   description      String
-  version          String            @default("0.1.0")
-  metadata         Json              @default("{}")
-  isEnabled        Boolean           @default(true)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  version          String               @default("0.1.0")
+  providerKind     ActivityProviderKind @default(plugin)
+  providerKey      String?
+  metadata         Json                 @default("{}")
+  isEnabled        Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
   activities       Activity[]
   bankActivities   BankActivity[]
   activityVersions ActivityVersion[]
+
+  @@index([providerKind])
+  @@index([providerKey])
 }
 
 model ActivityPluginInstallation {
@@ -596,12 +607,44 @@ model Activity {
   gradebookItems    GradebookItem[]
   activityAttempts  ActivityAttempt[]
   contentItems      CourseContentItem[]
+  testDefinition    Test?                 @relation("TestShellActivity")
+  testItem          TestItem?             @relation("TestItemActivity")
 
   @@index([courseId, position])
   @@index([bankActivityId])
   @@index([activityVersionId])
   @@index([activityTypeId])
   @@index([lifecycle])
+}
+
+model Test {
+  id         String     @id @default(cuid())
+  courseId   String
+  activityId String     @unique
+  settings   Json       @default("{}")
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  course     Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  activity   Activity   @relation("TestShellActivity", fields: [activityId], references: [id], onDelete: Cascade)
+  items      TestItem[]
+
+  @@index([courseId])
+}
+
+model TestItem {
+  id             String   @id @default(cuid())
+  testId         String
+  activityId     String   @unique
+  position       Int      @default(0)
+  pointsPossible Float    @default(1)
+  isRequired     Boolean  @default(true)
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  test           Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  activity       Activity @relation("TestItemActivity", fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([testId, position])
 }
 
 model CourseContentResource {
@@ -624,29 +667,29 @@ model CourseContentResource {
 }
 
 model CourseContentItem {
-  id                    String                @id @default(cuid())
+  id                    String                 @id @default(cuid())
   courseId              String
   groupId               String?
   parentId              String?
   kind                  CourseContentItemKind
   titleSnapshot         String?
-  position              Int                   @default(0)
-  isVisible             Boolean               @default(true)
+  position              Int                    @default(0)
+  isVisible             Boolean                @default(true)
   materialId            String?
   activityId            String?
   courseGroupActivityId String?
-  metadata              Json                  @default("{}")
+  metadata              Json                   @default("{}")
   contentResourceId     String?
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @updatedAt
-  course                Course                @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  group                 CourseGroup?          @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  parent                CourseContentItem?    @relation("CourseContentTree", fields: [parentId], references: [id], onDelete: Cascade)
-  children              CourseContentItem[]   @relation("CourseContentTree")
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  course                Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  group                 CourseGroup?           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  parent                CourseContentItem?     @relation("CourseContentTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children              CourseContentItem[]    @relation("CourseContentTree")
   contentResource       CourseContentResource? @relation(fields: [contentResourceId], references: [id], onDelete: Cascade)
-  material              CourseMaterial?       @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  activity              Activity?             @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  groupActivity         CourseGroupActivity?  @relation(fields: [courseGroupActivityId], references: [id], onDelete: Cascade)
+  material              CourseMaterial?        @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  activity              Activity?              @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  groupActivity         CourseGroupActivity?   @relation(fields: [courseGroupActivityId], references: [id], onDelete: Cascade)
 
   @@index([courseId, groupId, parentId, position])
   @@index([courseId, parentId, position])

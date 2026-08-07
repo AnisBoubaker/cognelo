@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
-import { getActivityPlugin, getActivityPluginForActivityType, listActivityPlugins } from "@cognelo/activity-sdk";
+import {
+  getActivityPlugin,
+  getActivityPluginForActivityType,
+  getActivityProviderForActivityType,
+  listActivityPlugins
+} from "@cognelo/activity-sdk";
 import { getContentTypePlugin, getContentTypePluginForType, listContentTypeDefinitions, listContentTypePlugins } from "@cognelo/content-type-sdk";
 import { ActivityPluginInstallationUpdateSchema, ContentTypePluginInstallationUpdateSchema } from "@cognelo/contracts";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -118,6 +123,21 @@ export async function assertActivityTypePluginEnabled(activityTypeKey: string) {
     return;
   }
   throw new AppError(400, "PLUGIN_DISABLED", "The activity plugin for this activity type is disabled.");
+}
+
+export async function isActivityTypeAvailable(activityTypeKey: string) {
+  const provider = getActivityProviderForActivityType(activityTypeKey);
+  if (provider?.kind === "core") {
+    return true;
+  }
+  return isActivityTypePluginEnabled(activityTypeKey);
+}
+
+export async function assertActivityTypeAvailable(activityTypeKey: string) {
+  if (await isActivityTypeAvailable(activityTypeKey)) {
+    return;
+  }
+  throw new AppError(400, "ACTIVITY_TYPE_UNAVAILABLE", "This activity type is not available.");
 }
 
 export async function ensureContentTypePluginInstallations() {
@@ -284,6 +304,8 @@ async function activateActivityPlugin(plugin: ActivityPluginManifest, restoreBac
         update: {
           name: definition.name,
           description: definition.description,
+          providerKind: "plugin",
+          providerKey: plugin.key,
           metadata: { researchReady: true, plugin: plugin.key },
           isEnabled: false
         },
@@ -291,6 +313,8 @@ async function activateActivityPlugin(plugin: ActivityPluginManifest, restoreBac
           key: definition.key,
           name: definition.name,
           description: definition.description,
+          providerKind: "plugin",
+          providerKey: plugin.key,
           metadata: { researchReady: true, plugin: plugin.key },
           isEnabled: false
         }

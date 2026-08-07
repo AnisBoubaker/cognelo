@@ -1,15 +1,18 @@
-import { getActivityDefinition, getActivityPluginForActivityType, listActivityDefinitions } from "@cognelo/activity-sdk";
+import { getActivityDefinition, getActivityPluginForActivityType, isCoreActivityType, listActivityDefinitions } from "@cognelo/activity-sdk";
 import { ActivityInputSchema, ActivityUpdateSchema } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 import { assertCanManageCourse, assertCanViewCourse } from "./authorization";
 import { AppError, notFound } from "./errors";
-import { assertActivityTypePluginEnabled, getEnabledActivityPluginKeys } from "./plugins";
+import { assertActivityTypeAvailable, getEnabledActivityPluginKeys } from "./plugins";
 
 export async function listActivityTypes() {
   const enabledPluginKeys = await getEnabledActivityPluginKeys();
   const activityTypes = await prisma.activityType.findMany({ where: { isEnabled: true }, orderBy: { name: "asc" } });
   return activityTypes.filter((activityType) => {
+    if (isCoreActivityType(activityType.key)) {
+      return true;
+    }
     const plugin = getActivityPluginForActivityType(activityType.key);
     return plugin ? enabledPluginKeys.has(plugin.key) : false;
   });
@@ -18,6 +21,9 @@ export async function listActivityTypes() {
 export async function listRegisteredActivityDefinitions() {
   const enabledPluginKeys = await getEnabledActivityPluginKeys();
   return listActivityDefinitions().filter((definition) => {
+    if (definition.provider.kind === "core") {
+      return true;
+    }
     const plugin = getActivityPluginForActivityType(definition.key);
     return plugin ? enabledPluginKeys.has(plugin.key) : false;
   });
@@ -57,7 +63,7 @@ export async function createActivity(user: CurrentUser, courseId: string, input:
   if (!activityType || !activityType.isEnabled) {
     throw new AppError(400, "UNKNOWN_ACTIVITY_TYPE", "The requested activity type is not available.");
   }
-  await assertActivityTypePluginEnabled(data.activityTypeKey);
+  await assertActivityTypeAvailable(data.activityTypeKey);
 
   const definition = getActivityDefinition(data.activityTypeKey);
   const mergedConfig = { ...(definition?.defaultConfig ?? {}), ...data.config };
@@ -128,7 +134,7 @@ async function createCourseActivityFromBankVersion(
   if (!version) {
     throw notFound("Activity version");
   }
-  await assertActivityTypePluginEnabled(version.activityType.key);
+  await assertActivityTypeAvailable(version.activityType.key);
   if (version.lifecycle !== "published") {
     throw new AppError(400, "BANK_ACTIVITY_NOT_PUBLISHED", "Publish this bank activity before adding it to a course.");
   }
@@ -229,7 +235,7 @@ async function resolveEnabledActivityTypeId(activityTypeKey: string) {
   if (!activityType || !activityType.isEnabled) {
     throw new AppError(400, "UNKNOWN_ACTIVITY_TYPE", "The requested activity type is not available.");
   }
-  await assertActivityTypePluginEnabled(activityTypeKey);
+  await assertActivityTypeAvailable(activityTypeKey);
   return activityType.id;
 }
 

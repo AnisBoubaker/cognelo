@@ -5,7 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import bcrypt from "bcryptjs";
 import { Prisma, PrismaClient } from "@prisma/client";
-import { listActivityDefinitions, listActivityPlugins } from "@cognelo/activity-sdk";
+import { listActivityDefinitions, listActivityPlugins, listCoreActivityDefinitions } from "@cognelo/activity-sdk";
 import { listContentTypePlugins } from "@cognelo/content-type-sdk";
 import { prisma as codingExercisesPrisma } from "../../plugin-activities/plugin-coding-exercises/src/db-client";
 import { prisma as codingHomeworkGraderPrisma } from "../../plugin-activities/plugin-coding-homework-grader/src/db-client";
@@ -479,6 +479,29 @@ async function main() {
 
   const activityTypesByKey = new Map<string, Awaited<ReturnType<typeof prisma.activityType.upsert>>>();
   const pluginKeyByActivityKey = new Map<string, string>();
+  for (const definition of listCoreActivityDefinitions()) {
+    const activityType = await prisma.activityType.upsert({
+      where: { key: definition.key },
+      update: {
+        name: definition.name,
+        description: definition.description,
+        providerKind: "core",
+        providerKey: definition.provider.key,
+        metadata: { researchReady: true, core: definition.provider.key },
+        isEnabled: definition.isEnabledByDefault ?? true
+      },
+      create: {
+        key: definition.key,
+        name: definition.name,
+        description: definition.description,
+        providerKind: "core",
+        providerKey: definition.provider.key,
+        metadata: { researchReady: true, core: definition.provider.key },
+        isEnabled: definition.isEnabledByDefault ?? true
+      }
+    });
+    activityTypesByKey.set(definition.key, activityType);
+  }
   for (const plugin of listActivityPlugins()) {
     await prisma.activityPluginInstallation.upsert({
       where: { key: plugin.key },
@@ -517,6 +540,8 @@ async function main() {
         update: {
           name: definition.name,
           description: definition.description,
+          providerKind: "plugin",
+          providerKey: plugin.key,
           metadata: { researchReady: true, plugin: plugin.key },
           isEnabled: true
         },
@@ -524,6 +549,8 @@ async function main() {
           key: definition.key,
           name: definition.name,
           description: definition.description,
+          providerKind: "plugin",
+          providerKey: plugin.key,
           metadata: { researchReady: true, plugin: plugin.key }
         }
       });

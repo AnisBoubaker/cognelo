@@ -41,11 +41,19 @@ export type ActivityManualGradingContract = {
   rendererKey?: string;
 };
 
+export type ActivityProvider =
+  | { kind: "core"; key: string }
+  | { kind: "plugin"; key: string };
+
+export type ActivityCreationScope = "bank" | "course";
+
 export type ActivityDefinition = {
   key: string;
   name: string;
   description: string;
+  creationScopes?: readonly ActivityCreationScope[];
   defaultCategoryIds?: ActivityCategoryAssignment;
+  isEnabledByDefault?: boolean;
   icon?: ActivityIconName;
   grading?: ActivityGradingCapability;
   manualGrading?: ActivityManualGradingContract;
@@ -53,6 +61,10 @@ export type ActivityDefinition = {
   defaultConfig?: Record<string, unknown>;
   configSchema?: z.ZodTypeAny;
   metadataSchema?: z.ZodTypeAny;
+};
+
+export type RegisteredActivityDefinition = ActivityDefinition & {
+  provider: ActivityProvider;
 };
 
 export type PluginDatabaseModule = {
@@ -83,14 +95,62 @@ const plugins: ActivityPlugin[] = [
   webDesignCodingExercisesPlugin
 ];
 
-const definitions = new Map<string, ActivityDefinition>();
+const coreDefinitions: ActivityDefinition[] = [
+  {
+    key: "test",
+    name: "Test",
+    description: "A summative assessment composed of regular activities.",
+    creationScopes: ["course"],
+    defaultCategoryIds: ["generic"],
+    isEnabledByDefault: false,
+    icon: "document-check",
+    grading: {
+      supportsAttempts: true,
+      supportsAutoGrading: true,
+      supportsManualGrading: true,
+      supportsFeedbackRenderer: true,
+      supportsAnalyticsPayloads: true
+    },
+    i18n: {
+      en: {
+        name: "Test",
+        description: "A summative assessment composed of regular activities.",
+        defaultTitle: "New test"
+      },
+      fr: {
+        name: "Test",
+        description: "Une évaluation sommative composée d'activités ordinaires.",
+        defaultTitle: "Nouveau test"
+      },
+      zh: {
+        name: "测验",
+        description: "由常规活动组成的总结性评估。",
+        defaultTitle: "新测验"
+      },
+      ar: {
+        name: "اختبار",
+        description: "تقييم ختامي مكوّن من أنشطة عادية.",
+        defaultTitle: "اختبار جديد"
+      }
+    }
+  }
+];
+
+const definitions = new Map<string, RegisteredActivityDefinition>();
+for (const definition of coreDefinitions) {
+  registerActivityDefinition(definition, { kind: "core", key: definition.key });
+}
 for (const plugin of plugins) {
   for (const definition of plugin.activities) {
-    if (definitions.has(definition.key)) {
-      throw new Error(`Activity type already registered: ${definition.key}`);
-    }
-    definitions.set(definition.key, definition);
+    registerActivityDefinition(definition, { kind: "plugin", key: plugin.key });
   }
+}
+
+function registerActivityDefinition(definition: ActivityDefinition, provider: ActivityProvider) {
+  if (definitions.has(definition.key)) {
+    throw new Error(`Activity type already registered: ${definition.key}`);
+  }
+  definitions.set(definition.key, { ...definition, provider });
 }
 
 export function getActivityDefinition(key: string) {
@@ -99,6 +159,18 @@ export function getActivityDefinition(key: string) {
 
 export function listActivityDefinitions() {
   return Array.from(definitions.values());
+}
+
+export function listCoreActivityDefinitions() {
+  return coreDefinitions.map((definition) => definitions.get(definition.key) as RegisteredActivityDefinition);
+}
+
+export function getActivityProviderForActivityType(activityTypeKey: string) {
+  return definitions.get(activityTypeKey)?.provider;
+}
+
+export function isCoreActivityType(activityTypeKey: string) {
+  return getActivityProviderForActivityType(activityTypeKey)?.kind === "core";
 }
 
 export function listActivityPlugins() {

@@ -43,7 +43,7 @@ const authMocks = vi.hoisted(() => ({
 }));
 
 const pluginMocks = vi.hoisted(() => ({
-  assertActivityTypePluginEnabled: vi.fn(),
+  assertActivityTypeAvailable: vi.fn(),
   getEnabledActivityPluginKeys: vi.fn()
 }));
 
@@ -55,6 +55,7 @@ vi.mock("@cognelo/db", () => ({
 vi.mock("@cognelo/activity-sdk", () => ({
   getActivityDefinition: vi.fn(() => ({ defaultConfig: { attempts: 3 } })),
   getActivityPluginForActivityType: vi.fn(),
+  isCoreActivityType: vi.fn(() => false),
   listActivityDefinitions: vi.fn()
 }));
 
@@ -92,7 +93,7 @@ describe("activity services", () => {
       config: { color: "blue" }
     });
 
-    expect(pluginMocks.assertActivityTypePluginEnabled).toHaveBeenCalledWith("placeholder");
+    expect(pluginMocks.assertActivityTypeAvailable).toHaveBeenCalledWith("placeholder");
     expect(mockPrisma.activity.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -177,7 +178,7 @@ describe("activity services", () => {
       metadata: { local: true }
     });
 
-    expect(pluginMocks.assertActivityTypePluginEnabled).toHaveBeenCalledWith("coding-exercise");
+    expect(pluginMocks.assertActivityTypeAvailable).toHaveBeenCalledWith("coding-exercise");
     expect(mockPrisma.activity.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
