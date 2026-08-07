@@ -9,6 +9,7 @@ import { createMcqClient, type McqSubmission } from "@cognelo/plugin-mcq";
 import { createParsonsClient, type ParsonsGradebookAttemptRecord } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
+import { TestReviewAllPanel } from "@/components/test-review-all-panel";
 import {
   api,
   apiRequest,
@@ -19,8 +20,9 @@ import {
   GradebookMutationAttempt,
   GradebookMutationGrade
 } from "@/lib/api";
-import { getManualGradingRenderer } from "@/lib/activity-renderers";
+import { getManualGradingRenderer, renderTestReviewAllItem } from "@/lib/activity-renderers";
 import { useI18n } from "@/lib/i18n";
+import { latestCompletedTestAttempt, type TestReviewAllSubmission } from "@/lib/test-review-all";
 
 type GradebookReviewAttempt = ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview;
 
@@ -47,6 +49,11 @@ export default function GradebookActivityResultsPage() {
     loading: boolean;
     error: string;
   } | null>(null);
+  const [reviewAll, setReviewAll] = useState<{
+    loading: boolean;
+    error: string;
+    submissions: TestReviewAllSubmission[];
+  } | null>(null);
 
   async function refresh() {
     const [courseResult, gradebookResult] = await Promise.all([
@@ -69,6 +76,28 @@ export default function GradebookActivityResultsPage() {
   const manualGradingRenderer = rows[0]?.activityTypeKey ? getManualGradingRenderer(rows[0].activityTypeKey) : null;
   const selectedAttempt = overlay?.attempts[overlay.selectedIndex] ?? null;
   const hasRowsWithSubmittedAttempts = rows.some((row) => hasSubmittedAttempt(row));
+  const isTest = rows[0]?.activityTypeKey === "test" || gradebook?.items[0]?.activityTypeKey === "test";
+
+  async function openReviewAll() {
+    setReviewAll({ loading: true, error: "", submissions: [] });
+    try {
+      const reviewTargets = rows.flatMap((row) => {
+        const attempt = latestCompletedTestAttempt(row);
+        return attempt ? [{ row, attemptId: attempt.id }] : [];
+      });
+      const submissions = await Promise.all(reviewTargets.map(async ({ row, attemptId }) => ({
+        participantId: row.participantId,
+        participantName: row.participantName,
+        groupTitle: row.groupTitle,
+        review: (await api.testAttemptReview(courseId, attemptId)).review
+      })));
+      setReviewAll({ loading: false, error: "", submissions });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("courseDetail.answerLoadError");
+      notifications.error(message);
+      setReviewAll({ loading: false, error: message, submissions: [] });
+    }
+  }
 
   async function openManualGrading(row: CourseGradebookRow, mode: "review" | "grade") {
     setOverlay({ row, mode, includeAttempts: false, attempts: [], selectedIndex: 0, loading: true, error: "" });
@@ -344,6 +373,11 @@ export default function GradebookActivityResultsPage() {
               <h2>{t("courseDetail.studentResultsTitle")}</h2>
             </div>
             <div className="row wrap">
+              {isTest ? (
+                <button className="button secondary" disabled={!hasRowsWithSubmittedAttempts} type="button" onClick={() => void openReviewAll()}>
+                  {t("courseDetail.reviewAll")}
+                </button>
+              ) : null}
               <button className="button secondary" disabled={savingGradeKey === "__all:regrade"} type="button" onClick={() => void regradeAllRows()}>
                 {savingGradeKey === "__all:regrade" ? t("common.saving") : t("courseDetail.regradeAll")}
               </button>
@@ -426,6 +460,25 @@ export default function GradebookActivityResultsPage() {
               : null}
           </div>
         ) : null}
+        {reviewAll ? (
+          <div
+            className="dialog-backdrop"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setReviewAll(null);
+            }}
+          >
+            <TestReviewAllPanel
+              activityTitle={activityTitle}
+              submissions={reviewAll.submissions}
+              loading={reviewAll.loading}
+              error={reviewAll.error}
+              onClose={() => setReviewAll(null)}
+              renderItem={renderTestReviewAllItem}
+              t={t}
+            />
+          </div>
+        ) : null}
       </main>
     </AppShell>
   );
@@ -493,6 +546,7 @@ function GradebookStudentRow({
 function hasSubmittedAttempt(row: CourseGradebookRow) {
   return row.attempts.some((attempt) => attempt.lifecycle === "graded" || attempt.lifecycle === "submitted");
 }
+
 
 function formatGradebookScore(score: number | null, maxScore: number) {
   if (score === null) {

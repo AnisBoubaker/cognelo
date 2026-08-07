@@ -1,5 +1,6 @@
 import type { ComponentProps, ComponentType, JSXElementConstructor, ReactNode } from "react";
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { CodingExerciseActivityView } from "@cognelo/plugin-coding-exercises";
 import {
@@ -15,10 +16,18 @@ import {
   type ParsonsAttemptRecord,
   type ParsonsGradebookAttemptRecord
 } from "@cognelo/plugin-parsons";
-import { createMcqClient, McqActivityView, McqManualGradingPanel, type McqSubmission } from "@cognelo/plugin-mcq";
+import {
+  createMcqClient,
+  MarkdownBlocksView,
+  McqActivityView,
+  McqManualGradingPanel,
+  parseMcqSource,
+  type McqSubmission
+} from "@cognelo/plugin-mcq";
 import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
 import { TestActivityView, type TestStudentItemRendererContext } from "@/components/test-activity-view";
 import { TestManualGradingPanel } from "@/components/test-manual-grading-panel";
+import { respondentsForMcqChoice, type TestReviewAllItemContext } from "@/lib/test-review-all";
 import {
   api,
   apiAbsoluteUrl,
@@ -529,6 +538,145 @@ function McqTestGradebookReview({ item }: { item: TestReviewItem }) {
 const testGradebookReviewRenderers: Record<string, ComponentType<{ item: TestReviewItem }>> = {
   mcq: McqTestGradebookReview
 };
+
+function McqTestReviewAll({ item, responses, t }: TestReviewAllItemContext) {
+  const source = typeof item.activity.config?.source === "string" ? item.activity.config.source : "";
+  const defaultCodeLanguage = typeof item.activity.config?.defaultCodeLanguage === "string" ? item.activity.config.defaultCodeLanguage : "none";
+  const parsed = parseMcqSource(source, defaultCodeLanguage);
+
+  return (
+    <div className="stack">
+      {parsed.introBlocks.length ? <MarkdownBlocksView blocks={parsed.introBlocks} /> : null}
+      {parsed.questions.map((question, questionIndex) => (
+        <article className="stack" key={question.id} style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 18 }}>
+          <div className="stack stack-tight">
+            <p className="eyebrow">Question {questionIndex + 1}</p>
+            <h3>{question.title}</h3>
+            <MarkdownBlocksView blocks={question.promptBlocks} />
+          </div>
+          <div className="stack stack-tight">
+            {question.choices.map((choice) => {
+              const students = respondentsForMcqChoice(responses, question.id, choice.id);
+              const studentNames = students.map((student) => `${student.participantName} (${student.groupTitle})`);
+              return (
+                <div
+                  key={choice.id}
+                  style={{
+                    alignItems: "flex-start",
+                    background: choice.isCorrect ? "rgba(34, 197, 94, 0.08)" : undefined,
+                    border: choice.isCorrect ? "1px solid rgba(22, 163, 74, 0.28)" : "1px solid rgba(13, 27, 71, 0.12)",
+                    borderRadius: 10,
+                    display: "flex",
+                    gap: 12,
+                    padding: 12
+                  }}
+                >
+                  <span
+                    aria-label={t(choice.isCorrect ? "courseDetail.correctAnswer" : "courseDetail.incorrectAnswer")}
+                    style={{ color: choice.isCorrect ? "#15803d" : "#64748b", flex: "0 0 auto", fontWeight: 900 }}
+                  >
+                    {choice.isCorrect ? "✓" : "○"}
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0 }}><MarkdownBlocksView blocks={choice.blocks} compact /></span>
+                  {students.length ? (
+                    <TestReviewChoiceBadge
+                      students={students}
+                      studentNames={studentNames}
+                      ariaLabel={t("courseDetail.choiceSelectedBy", { count: students.length, names: studentNames.join(", ") })}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function TestReviewChoiceBadge({
+  students,
+  studentNames,
+  ariaLabel
+}: {
+  students: TestReviewAllItemContext["responses"];
+  studentNames: string[];
+  ariaLabel: string;
+}) {
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const tooltipRef = useRef<HTMLSpanElement>(null);
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ left: 16, top: 16, width: 190 });
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    function placeTooltip() {
+      const anchor = anchorRef.current;
+      const tooltip = tooltipRef.current;
+      if (!anchor || !tooltip) return;
+      const margin = 16;
+      const gap = 8;
+      const anchorRect = anchor.getBoundingClientRect();
+      const width = Math.min(320, Math.max(160, window.innerWidth - margin * 2));
+      const tooltipHeight = tooltip.getBoundingClientRect().height;
+      const left = Math.min(
+        Math.max(margin, anchorRect.right - width),
+        Math.max(margin, window.innerWidth - width - margin)
+      );
+      const above = anchorRect.top - tooltipHeight - gap;
+      const below = anchorRect.bottom + gap;
+      const top = above >= margin
+        ? above
+        : Math.min(below, Math.max(margin, window.innerHeight - tooltipHeight - margin));
+      setPosition({ left, top, width });
+    }
+    placeTooltip();
+    window.addEventListener("resize", placeTooltip);
+    window.addEventListener("scroll", placeTooltip, true);
+    return () => {
+      window.removeEventListener("resize", placeTooltip);
+      window.removeEventListener("scroll", placeTooltip, true);
+    };
+  }, [open, studentNames.length]);
+
+  return (
+    <>
+      <span
+        aria-label={ariaLabel}
+        className="test-review-choice-count"
+        ref={anchorRef}
+        tabIndex={0}
+        onBlur={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+      >
+        {students.length}
+      </span>
+      {open && typeof document !== "undefined" ? createPortal(
+        <span
+          className="test-review-choice-students"
+          ref={tooltipRef}
+          role="tooltip"
+          style={{ left: position.left, top: position.top, width: position.width }}
+        >
+          {studentNames.map((name, index) => <span key={students[index].participantId}>{name}</span>)}
+        </span>,
+        document.body
+      ) : null}
+    </>
+  );
+}
+
+const testReviewAllRenderers: Record<string, ComponentType<TestReviewAllItemContext>> = {
+  mcq: McqTestReviewAll
+};
+
+export function renderTestReviewAllItem(context: TestReviewAllItemContext) {
+  const Renderer = testReviewAllRenderers[context.item.activityTypeKey];
+  return Renderer ? <Renderer {...context} /> : null;
+}
 
 function TestActivityRenderer(props: ActivityRendererProps<typeof TestActivityView>) {
   return (
