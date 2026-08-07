@@ -1,12 +1,6 @@
 "use client";
 
 import { MarkdownRenderer } from "@cognelo/activity-ui";
-import {
-  activityDefinitionBelongsToCategory,
-  activityDefinitionCreatesCategory,
-  listActivityCategories,
-  type ActivityCategoryId
-} from "@cognelo/activity-sdk/categories";
 import { resolveLocalizedText, type ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -21,6 +15,7 @@ import {
   useState
 } from "react";
 import { AppShell } from "@/components/app-shell";
+import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
 import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
@@ -42,11 +37,6 @@ import {
 import { ContentTypeIcon as MaterialTypeIcon, resolveContentTypeSettingsRenderer } from "@/lib/content-type-renderers";
 import { useI18n } from "@/lib/i18n";
 
-type ActivityPickerTabId = "activity-banks" | ActivityCategoryId | "material";
-type ActivityPickerTab = {
-  id: ActivityPickerTabId;
-  label: string;
-};
 type ContentDropPlacement = "after" | "before" | "inside";
 type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
 type ContentContextMenu = {
@@ -56,8 +46,6 @@ type ContentContextMenu = {
 };
 
 const contentDragActivationDistance = 8;
-
-const activityCategories = listActivityCategories();
 
 export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();
@@ -84,8 +72,6 @@ export default function CourseDetailPage() {
   const [studentSupportAgentId, setStudentSupportAgentId] = useState("");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [showActivityPicker, setShowActivityPicker] = useState(false);
-  const [selectedActivityPickerTab, setSelectedActivityPickerTab] = useState<ActivityPickerTabId>("activity-banks");
-  const [selectedActivityBankId, setSelectedActivityBankId] = useState("");
   const [pickerParentId, setPickerParentId] = useState("");
   const [pickerIsVisible, setPickerIsVisible] = useState(true);
   const [isAddingActivity, setIsAddingActivity] = useState(false);
@@ -358,15 +344,6 @@ export default function CourseDetailPage() {
     };
   }, [contentHeaderMenuOpen]);
 
-
-  useEffect(() => {
-    if (!activityBanks.length) {
-      setSelectedActivityBankId("");
-      return;
-    }
-
-    setSelectedActivityBankId((current) => (activityBanks.some((bank) => bank.id === current) ? current : activityBanks[0].id));
-  }, [activityBanks]);
 
   async function createLocalActivity(selectedActivityTypeKey: string) {
     setError("");
@@ -684,39 +661,6 @@ export default function CourseDetailPage() {
     };
   }
 
-  function activityTypeBelongsToCategory(activityTypeKey: string, categoryId: ActivityCategoryId) {
-    const definition = activityDefinitions.find((candidate) => candidate.key === activityTypeKey);
-    return activityDefinitionBelongsToCategory(definition, categoryId);
-  }
-
-  function activityTypeCreatesCategory(activityTypeKey: string, categoryId: ActivityCategoryId) {
-    const definition = activityDefinitions.find((candidate) => candidate.key === activityTypeKey);
-    return activityDefinitionCreatesCategory(definition, categoryId);
-  }
-
-  function activityTypeIconName(activityTypeKey: string): NonNullable<ActivityDefinition["icon"]> {
-    return activityDefinitions.find((candidate) => candidate.key === activityTypeKey)?.icon ?? "placeholder";
-  }
-
-  const visibleActivityCategories = activityCategories.filter((category) =>
-    activityTypes.some((type) => activityTypeCreatesCategory(type.key, category.id))
-  );
-  const activityPickerTabs: ActivityPickerTab[] = [
-    { id: "activity-banks", label: t("courseDetail.activityBanksPickerTab") },
-    { id: "material", label: t("courseDetail.materialPickerTab") },
-    ...visibleActivityCategories.map((category) => ({ id: category.id, label: t(category.labelKey) }))
-  ];
-
-  useEffect(() => {
-    if (selectedActivityPickerTab === "activity-banks" || selectedActivityPickerTab === "material") {
-      return;
-    }
-    if (visibleActivityCategories.some((category) => category.id === selectedActivityPickerTab)) {
-      return;
-    }
-    setSelectedActivityPickerTab(visibleActivityCategories[0]?.id ?? "activity-banks");
-  }, [selectedActivityPickerTab, visibleActivityCategories]);
-
   if (((authLoading || !course) && !canManage) || studentRedirectGroupId) {
     return (
       <AppShell>
@@ -758,18 +702,6 @@ export default function CourseDetailPage() {
       .map((activity) => activity.bankActivityId)
       .filter((bankActivityId): bankActivityId is string => Boolean(bankActivityId))
   );
-  const selectedActivityBank = activityBanks.find((bank) => bank.id === selectedActivityBankId) ?? activityBanks[0];
-  const availableBankActivities = (selectedActivityBank?.activities ?? []).filter(
-    (activity) =>
-      activity.lifecycle === "published" &&
-      activity.currentVersionId &&
-      activity.currentVersion?.lifecycle === "published" &&
-      !attachedBankActivityIds.has(activity.id)
-  );
-  const visibleActivityTypes =
-    selectedActivityPickerTab === "activity-banks" || selectedActivityPickerTab === "material"
-      ? []
-      : activityTypes.filter((type) => activityTypeBelongsToCategory(type.key, selectedActivityPickerTab));
   const pickerContentTypes = contentTypeDefinitions;
   const visibleContentItems = flattenContentItems(contentItems, collapsedContentFolderIds);
   const courseMaterialById = new Map(materials.map((material) => [material.id, material]));
@@ -782,6 +714,86 @@ export default function CourseDetailPage() {
   const settingsContentResource = settingsContentItem?.contentResourceId ? contentResourceById.get(settingsContentItem.contentResourceId) ?? null : null;
   const settingsContentType = settingsContentResource ? contentTypeByKey.get(settingsContentResource.contentTypeKey) ?? null : null;
   const SettingsContentTypeRenderer = resolveContentTypeSettingsRenderer(settingsContentType?.settingsRendererKey);
+  const pickerPlacementPanel = (
+    <div className="grid compact-form-grid activity-picker-placement">
+      <div className="field">
+        <span className="field-label" id="course-content-folder-label">{t("courseDetail.contentFolderLabel")}</span>
+        <div className="folder-picker">
+          <button
+            aria-expanded={pickerFolderMenuOpen}
+            aria-haspopup="listbox"
+            aria-labelledby="course-content-folder-label course-content-folder-current"
+            className="folder-picker-trigger"
+            id="courseContentFolder"
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setPickerFolderMenuOpen((current) => !current);
+            }}
+          >
+            <span className="folder-picker-current" id="course-content-folder-current">
+              {selectedPickerFolder ? selectedPickerFolder.item.titleSnapshot ?? t("courseDetail.untitledFolder") : t("courseDetail.contentFolderRoot")}
+            </span>
+            <MaterialActionIcon name="down" />
+          </button>
+          {pickerFolderMenuOpen ? (
+            <div className="folder-picker-menu" role="listbox" aria-labelledby="course-content-folder-label" onClick={(event) => event.stopPropagation()}>
+              <button
+                aria-selected={!pickerParentId}
+                className={!pickerParentId ? "folder-picker-option is-selected" : "folder-picker-option"}
+                role="option"
+                style={{ "--folder-picker-depth": 0 } as CSSProperties}
+                type="button"
+                onClick={() => {
+                  setPickerParentId("");
+                  setPickerFolderMenuOpen(false);
+                }}
+              >
+                <span className="folder-picker-tree-rails" aria-hidden="true" />
+                <span className="folder-picker-folder-icon"><MaterialActionIcon name="folder" /></span>
+                <span className="folder-picker-option-label">{t("courseDetail.contentFolderRoot")}</span>
+              </button>
+              {contentFolderOptions.map(({ item: folder, depth }) => (
+                <button
+                  key={folder.id}
+                  aria-selected={pickerParentId === folder.id}
+                  className={pickerParentId === folder.id ? "folder-picker-option is-selected" : "folder-picker-option"}
+                  role="option"
+                  style={{ "--folder-picker-depth": depth } as CSSProperties}
+                  type="button"
+                  onClick={() => {
+                    setPickerParentId(folder.id);
+                    setPickerFolderMenuOpen(false);
+                  }}
+                >
+                  <span className="folder-picker-tree-rails" aria-hidden="true" />
+                  <span className="folder-picker-folder-icon"><MaterialActionIcon name="folder" /></span>
+                  <span className="folder-picker-option-label">{folder.titleSnapshot ?? t("courseDetail.untitledFolder")}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+      <label className="checkbox-row" htmlFor="courseContentVisible">
+        <input id="courseContentVisible" type="checkbox" checked={pickerIsVisible} onChange={(event) => setPickerIsVisible(event.target.checked)} />
+        <span>{t("courseDetail.contentVisibleLabel")}</span>
+      </label>
+    </div>
+  );
+  const pickerMaterialPanel = (
+    <div className="activity-type-picker-grid">
+      {pickerContentTypes.map((contentType) => (
+        <button key={contentType.key} className="activity-type-option" disabled={isAddingActivity} onClick={() => createPickerContentResource(contentType)} type="button">
+          <MaterialTypeIcon iconName={contentType.icon} />
+          <span>
+            <strong>{resolveLocalizedText(contentType.label, locale)}</strong>
+            <small>{resolveLocalizedText(contentType.description, locale)}</small>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
 
   function buildPickerContentPlacement(titleSnapshot?: string) {
     return {
@@ -795,7 +807,6 @@ export default function CourseDetailPage() {
   function openActivityPicker(parentId: string | null = null) {
     setPickerParentId(parentId ?? "");
     setPickerIsVisible(true);
-    setSelectedActivityPickerTab((current) => (current === "material" ? "activity-banks" : current));
     setShowActivityPicker(true);
     setContentContextMenu(null);
     setContentHeaderMenuOpen(false);
@@ -2175,215 +2186,21 @@ export default function CourseDetailPage() {
               </div>
             ) : null}
             {showActivityPicker ? (
-              <div className="dialog-backdrop" role="presentation">
-                <section
-                  aria-labelledby="course-activity-picker-title"
-                  aria-modal="true"
-                  className="dialog-panel activity-picker-dialog"
-                  role="dialog"
-                >
-                  <div className="section-heading">
-                    <div>
-                      <p className="eyebrow">{t("courseDetail.chooseActivityEyebrow")}</p>
-                      <h2 id="course-activity-picker-title">{t("courseDetail.chooseActivityTitle")}</h2>
-                    </div>
-                    <button className="secondary icon-button" onClick={() => setShowActivityPicker(false)} title={t("common.cancel")} type="button">
-                      <CloseIcon />
-                    </button>
-                  </div>
-                  <div className="activity-picker-layout">
-                    <div className="activity-category-tabs" role="tablist" aria-label={t("activityBankDetail.categoryTabsLabel")}>
-                      {activityPickerTabs.map((tab) => (
-                        <button
-                          key={tab.id}
-                          aria-selected={selectedActivityPickerTab === tab.id}
-                          className={selectedActivityPickerTab === tab.id ? "activity-category-tab is-active" : "activity-category-tab"}
-                          onClick={() => setSelectedActivityPickerTab(tab.id)}
-                          role="tab"
-                          type="button"
-                        >
-                          {tab.label}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="activity-type-options" role="tabpanel">
-                      <div className="grid compact-form-grid activity-picker-placement">
-                        <div className="field">
-                          <span className="field-label" id="course-content-folder-label">
-                            {t("courseDetail.contentFolderLabel")}
-                          </span>
-                          <div className="folder-picker">
-                            <button
-                              aria-expanded={pickerFolderMenuOpen}
-                              aria-haspopup="listbox"
-                              aria-labelledby="course-content-folder-label course-content-folder-current"
-                              className="folder-picker-trigger"
-                              id="courseContentFolder"
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setPickerFolderMenuOpen((current) => !current);
-                              }}
-                            >
-                              <span className="folder-picker-current" id="course-content-folder-current">
-                                {selectedPickerFolder
-                                  ? selectedPickerFolder.item.titleSnapshot ?? t("courseDetail.untitledFolder")
-                                  : t("courseDetail.contentFolderRoot")}
-                              </span>
-                              <MaterialActionIcon name="down" />
-                            </button>
-                            {pickerFolderMenuOpen ? (
-                              <div
-                                className="folder-picker-menu"
-                                role="listbox"
-                                aria-labelledby="course-content-folder-label"
-                                onClick={(event) => event.stopPropagation()}
-                              >
-                                <button
-                                  aria-selected={!pickerParentId}
-                                  className={!pickerParentId ? "folder-picker-option is-selected" : "folder-picker-option"}
-                                  role="option"
-                                  style={{ "--folder-picker-depth": 0 } as CSSProperties}
-                                  type="button"
-                                  onClick={() => {
-                                    setPickerParentId("");
-                                    setPickerFolderMenuOpen(false);
-                                  }}
-                                >
-                                  <span className="folder-picker-tree-rails" aria-hidden="true" />
-                                  <span className="folder-picker-folder-icon">
-                                    <MaterialActionIcon name="folder" />
-                                  </span>
-                                  <span className="folder-picker-option-label">{t("courseDetail.contentFolderRoot")}</span>
-                                </button>
-                                {contentFolderOptions.map(({ item: folder, depth }) => (
-                                  <button
-                                    key={folder.id}
-                                    aria-selected={pickerParentId === folder.id}
-                                    className={pickerParentId === folder.id ? "folder-picker-option is-selected" : "folder-picker-option"}
-                                    role="option"
-                                    style={{ "--folder-picker-depth": depth } as CSSProperties}
-                                    type="button"
-                                    onClick={() => {
-                                      setPickerParentId(folder.id);
-                                      setPickerFolderMenuOpen(false);
-                                    }}
-                                  >
-                                    <span className="folder-picker-tree-rails" aria-hidden="true" />
-                                    <span className="folder-picker-folder-icon">
-                                      <MaterialActionIcon name="folder" />
-                                    </span>
-                                    <span className="folder-picker-option-label">{folder.titleSnapshot ?? t("courseDetail.untitledFolder")}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                        <label className="checkbox-row" htmlFor="courseContentVisible">
-                          <input
-                            id="courseContentVisible"
-                            type="checkbox"
-                            checked={pickerIsVisible}
-                            onChange={(event) => setPickerIsVisible(event.target.checked)}
-                          />
-                          <span>{t("courseDetail.contentVisibleLabel")}</span>
-                        </label>
-                      </div>
-                      {selectedActivityPickerTab === "activity-banks" ? (
-                        <div className="activity-bank-picker-panel">
-                          <div className="field">
-                            <label htmlFor="courseActivityBank">{t("courseDetail.activityBankPickerLabel")}</label>
-                            <select
-                              id="courseActivityBank"
-                              value={selectedActivityBank?.id ?? ""}
-                              onChange={(event) => setSelectedActivityBankId(event.target.value)}
-                              disabled={!activityBanks.length || isAddingActivity}
-                            >
-                              {activityBanks.map((bank) => (
-                                <option key={bank.id} value={bank.id}>
-                                  {bank.title}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          {availableBankActivities.length ? (
-                            availableBankActivities.map((activity) => (
-                              <button
-                                key={activity.id}
-                                className="activity-type-option"
-                                disabled={isAddingActivity}
-                                onClick={() => attachBankActivity(activity)}
-                                type="button"
-                              >
-                                <ActivityTypeIcon iconName={activityTypeIconName(activity.activityType.key)} />
-                                <span>
-                                  <strong>{activity.title}</strong>
-                                  <small>
-                                    v{activity.currentVersion?.versionNumber ?? 1} · {activityCopy(activity.activityType.key).name}
-                                  </small>
-                                </span>
-                              </button>
-                            ))
-                          ) : (
-                            <p className="muted">{t("courseDetail.noAvailableBankActivities")}</p>
-                          )}
-                        </div>
-                      ) : selectedActivityPickerTab === "material" ? (
-                        <div className="activity-type-picker-grid">
-                          {pickerContentTypes.map((contentType) => (
-                            <button
-                              key={contentType.key}
-                              className="activity-type-option"
-                              disabled={isAddingActivity}
-                              onClick={() => createPickerContentResource(contentType)}
-                              type="button"
-                            >
-                              <MaterialTypeIcon iconName={contentType.icon} />
-                              <span>
-                                <strong>{resolveLocalizedText(contentType.label, locale)}</strong>
-                                <small>{resolveLocalizedText(contentType.description, locale)}</small>
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <>
-                        {activityDefinitions.some((definition) => definition.key === "test" && definition.provider?.kind === "core") ? (
-                          <button
-                            className="activity-type-option"
-                            disabled={isAddingActivity}
-                            onClick={createLocalTest}
-                            type="button"
-                          >
-                            <ActivityTypeIcon iconName="document-check" />
-                            <span>
-                              <strong>{activityDefinitions.find((definition) => definition.key === "test")?.i18n?.[locale]?.name ?? "Test"}</strong>
-                              <small>{activityDefinitions.find((definition) => definition.key === "test")?.i18n?.[locale]?.description ?? "A summative assessment composed of activities."}</small>
-                            </span>
-                          </button>
-                        ) : null}
-                        {visibleActivityTypes.map((type) => (
-                          <button
-                            key={type.id}
-                            className="activity-type-option"
-                            disabled={isAddingActivity}
-                            onClick={() => createLocalActivity(type.key)}
-                            type="button"
-                          >
-                            <ActivityTypeIcon iconName={activityTypeIconName(type.key)} />
-                            <span>
-                              <strong>{activityCopy(type.key).name}</strong>
-                              <small>{activityCopy(type.key).description}</small>
-                            </span>
-                          </button>
-                        ))}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </section>
-              </div>
+              <ActivityPickerDialog
+                activityTypes={activityTypes}
+                activityDefinitions={activityDefinitions}
+                activityBanks={activityBanks}
+                disabled={isAddingActivity}
+                excludedBankActivityIds={attachedBankActivityIds}
+                extraLocalChoices={activityDefinitions
+                  .filter((definition) => definition.key === "test" && definition.provider?.kind === "core")
+                  .map((definition) => ({ definition, onSelect: createLocalTest }))}
+                placement={pickerPlacementPanel}
+                materialPanel={pickerMaterialPanel}
+                onClose={() => setShowActivityPicker(false)}
+                onSelectActivityType={(type) => createLocalActivity(type.key)}
+                onSelectBankActivity={attachBankActivity}
+              />
             ) : null}
           </>
         ) : (
@@ -2757,61 +2574,6 @@ function CloseIcon() {
     <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
       <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
     </svg>
-  );
-}
-
-function ActivityTypeIcon({ iconName }: { iconName: NonNullable<ActivityDefinition["icon"]> }) {
-  if (iconName === "checklist") {
-    return (
-      <span className="activity-type-icon" aria-hidden="true">
-        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
-          <path d="M8 9h5M8 16h5M8 23h5M17 9h7M17 16h7M17 23h7" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-          <path d="M5 6h22v20H5z" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (iconName === "list-check") {
-    return (
-      <span className="activity-type-icon" aria-hidden="true">
-        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
-          <path d="M7 8h18M7 14h13M7 20h18M7 26h10" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-          <path d="M5 5h22v22H5z" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (iconName === "code") {
-    return (
-      <span className="activity-type-icon" aria-hidden="true">
-        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
-          <path d="m13 10-6 6 6 6M19 10l6 6-6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-          <path d="M5 5h22v22H5z" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (iconName === "document-check") {
-    return (
-      <span className="activity-type-icon" aria-hidden="true">
-        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
-          <path d="M10 17l4 4 8-10" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-          <path d="M7 5h18v22H7z" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      </span>
-    );
-  }
-
-  return (
-    <span className="activity-type-icon" aria-hidden="true">
-      <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
-        <path d="M8 8h16v16H8z" stroke="currentColor" strokeWidth="2" />
-        <path d="M12 16h8M16 12v8" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-      </svg>
-    </span>
   );
 }
 

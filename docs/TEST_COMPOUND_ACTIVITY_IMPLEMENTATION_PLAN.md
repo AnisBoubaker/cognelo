@@ -133,7 +133,7 @@ Invariants:
 - a child activity belongs to exactly one Test;
 - the Test shell cannot be its own child;
 - a Test cannot contain another Test;
-- authoring accepts plugin activities with attempts and automatic or manual grading; publishing/assignment must additionally require `supportsCompositeExecution` once the runtime contract is enabled;
+- authoring accepts enabled plugin activities; publishing/assignment must require `supportsCompositeExecution` once the runtime contract is enabled;
 - positions are non-negative and normalized by the service after reorder operations;
 - points are positive;
 - child activities do not have independent group assignments or content placements.
