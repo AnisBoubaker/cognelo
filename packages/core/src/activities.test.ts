@@ -55,7 +55,7 @@ vi.mock("@cognelo/db", () => ({
 vi.mock("@cognelo/activity-sdk", () => ({
   getActivityDefinition: vi.fn(() => ({ defaultConfig: { attempts: 3 } })),
   getActivityPluginForActivityType: vi.fn(),
-  isCoreActivityType: vi.fn(() => false),
+  isCoreActivityType: vi.fn((key: string) => key === "test"),
   listActivityDefinitions: vi.fn()
 }));
 
@@ -143,6 +143,18 @@ describe("activity services", () => {
       })
     ).rejects.toMatchObject({ status: 400, code: "UNKNOWN_ACTIVITY_TYPE" });
 
+    expect(mockPrisma.activity.create).not.toHaveBeenCalled();
+  });
+
+  it("requires core activities to use their dedicated creation flow", async () => {
+    await expect(
+      createActivity(teacherUser, "course-1", {
+        activityTypeKey: "test",
+        title: "Midterm"
+      })
+    ).rejects.toMatchObject({ status: 400, code: "CORE_ACTIVITY_CREATION_ROUTE_REQUIRED" });
+
+    expect(mockPrisma.activityType.findUnique).not.toHaveBeenCalled();
     expect(mockPrisma.activity.create).not.toHaveBeenCalled();
   });
 

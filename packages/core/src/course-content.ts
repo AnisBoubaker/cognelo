@@ -655,7 +655,10 @@ async function assertValidParent(db: CourseContentDb, courseId: string, parentId
 }
 
 async function assertActivityTarget(courseId: string, activityId: string, groupId: string | null | undefined) {
-  const activity = await prisma.activity.findFirst({ where: { id: activityId, courseId }, select: { id: true, title: true } });
+  const activity = await prisma.activity.findFirst({
+    where: { id: activityId, courseId, testItem: null },
+    select: { id: true, title: true }
+  });
   if (!activity) {
     throw notFound("Activity");
   }

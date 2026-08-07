@@ -49,13 +49,20 @@ export function ActivityPickerDialog({
   const titleId = useId();
   const [selectedTab, setSelectedTab] = useState<PickerTabId>("activity-banks");
   const [selectedBankId, setSelectedBankId] = useState("");
+  const pluginActivityTypes = useMemo(
+    () => activityTypes.filter((type) => {
+      const definition = findDefinition(activityDefinitions, type.key);
+      return definition?.provider?.kind !== "core" && (!definition?.creationScopes || definition.creationScopes.includes("course"));
+    }),
+    [activityDefinitions, activityTypes]
+  );
 
   const visibleCategories = useMemo(
     () => activityCategories.filter((category) =>
-      activityTypes.some((type) => activityDefinitionCreatesCategory(findDefinition(activityDefinitions, type.key), category.id)) ||
+      pluginActivityTypes.some((type) => activityDefinitionCreatesCategory(findDefinition(activityDefinitions, type.key), category.id)) ||
       extraLocalChoices.some((choice) => activityDefinitionCreatesCategory(choice.definition, category.id))
     ),
-    [activityDefinitions, activityTypes, extraLocalChoices]
+    [activityDefinitions, extraLocalChoices, pluginActivityTypes]
   );
 
   useEffect(() => {
@@ -91,7 +98,7 @@ export function ActivityPickerDialog({
   );
   const visibleActivityTypes = selectedTab === "activity-banks" || selectedTab === "material"
     ? []
-    : activityTypes.filter((type) => activityDefinitionBelongsToCategory(findDefinition(activityDefinitions, type.key), selectedTab));
+    : pluginActivityTypes.filter((type) => activityDefinitionBelongsToCategory(findDefinition(activityDefinitions, type.key), selectedTab));
   const visibleExtraChoices = selectedTab === "activity-banks" || selectedTab === "material"
     ? []
     : extraLocalChoices.filter((choice) => activityDefinitionBelongsToCategory(choice.definition, selectedTab));

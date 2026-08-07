@@ -103,7 +103,7 @@ const coreDefinitions: ActivityDefinition[] = [
     description: "A summative assessment composed of regular activities.",
     creationScopes: ["course"],
     defaultCategoryIds: ["generic"],
-    isEnabledByDefault: false,
+    isEnabledByDefault: true,
     icon: "document-check",
     grading: {
       supportsAttempts: true,

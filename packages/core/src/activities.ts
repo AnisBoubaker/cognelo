@@ -54,6 +54,9 @@ export async function listActivities(user: CurrentUser, courseId: string) {
 export async function createActivity(user: CurrentUser, courseId: string, input: unknown) {
   await assertCanManageCourse(user, courseId);
   const data = ActivityInputSchema.parse(input);
+  if (isCoreActivityType(data.activityTypeKey)) {
+    throw new AppError(400, "CORE_ACTIVITY_CREATION_ROUTE_REQUIRED", "Create this core activity through its dedicated authoring flow.");
+  }
   if (data.bankActivityId || data.activityVersionId) {
     return createCourseActivityFromBankVersion(user, courseId, data);
   }
@@ -232,6 +235,9 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
 }
 
 async function resolveEnabledActivityTypeId(activityTypeKey: string) {
+  if (isCoreActivityType(activityTypeKey)) {
+    throw new AppError(400, "CORE_ACTIVITY_CREATION_ROUTE_REQUIRED", "Core activity types cannot replace plugin activities.");
+  }
   const activityType = await prisma.activityType.findUnique({ where: { key: activityTypeKey } });
   if (!activityType || !activityType.isEnabled) {
     throw new AppError(400, "UNKNOWN_ACTIVITY_TYPE", "The requested activity type is not available.");

@@ -130,6 +130,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   const data = CourseAllGroupsActivityAssignmentInputSchema.parse(input);
   validateAvailability(data.availableFrom, data.availableUntil);
   const activity = await assertActivityBelongsToCourse(courseId, activityId);
+  assertTestAssignmentIsSummative(activity, data.assessmentMode);
   const availableFrom = parseDateInput(data.availableFrom);
   const availableUntil = parseDateInput(data.availableUntil);
   const gradebookSettings = data.gradebookSettings ? normalizeGradebookItemSettings(data.gradebookSettings) : undefined;
@@ -609,6 +610,7 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
   await assertGroupBelongsToCourse(courseId, groupId);
   const data = CourseGroupActivityInputSchema.parse(input);
   const activity = await assertActivityBelongsToCourse(courseId, data.activityId);
+  assertTestAssignmentIsSummative(activity, data.metadata.assessmentMode);
   validateAvailability(data.availableFrom, data.availableUntil);
 
   const existing = await prisma.courseGroupActivity.findFirst({
@@ -673,11 +675,16 @@ export async function updateGroupActivityAssignment(
   validateAvailability(data.availableFrom, data.availableUntil);
 
   const assignment = await prisma.courseGroupActivity.findFirst({
-    where: { id: assignmentId, groupId }
+    where: { id: assignmentId, groupId },
+    include: { activity: { include: { activityType: true } } }
   });
   if (!assignment) {
     throw notFound("Group activity assignment");
   }
+  assertTestAssignmentIsSummative(
+    assignment.activity,
+    data.metadata !== undefined ? data.metadata.assessmentMode : asMetadataRecord(assignment.metadata).assessmentMode
+  );
   if (isCourseWideGroupAssignment(assignment.metadata) && !isAllowedCourseWideGroupAssignmentUpdate(data, assignment.metadata)) {
     throw new AppError(400, "COURSE_WIDE_GROUP_ACTIVITY_LOCKED", "This activity is assigned to all groups from the course.");
   }
@@ -726,7 +733,8 @@ async function createCourseWideAssignmentsForGroup(
   groupId: string
 ) {
   const courseActivities = await tx.activity.findMany({
-    where: { courseId },
+    where: { courseId, testItem: null },
+    include: { activityType: true },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }]
   });
   const assignmentData = courseActivities.flatMap((activity, index) => {
@@ -734,12 +742,13 @@ async function createCourseWideAssignmentsForGroup(
     if (!rule?.enabled) {
       return [];
     }
+    const assessmentMode = activity.activityType?.key === "test" ? "summative" : rule.assessmentMode ?? "formative";
     return {
       groupId,
       activityId: activity.id,
       availableFrom: parseDateInput(rule.availableFrom),
       availableUntil: parseDateInput(rule.availableUntil),
-      metadata: buildCourseWideGroupAssignmentMetadata(rule.enablePerGroupSettings ?? true, rule.assessmentMode ?? "formative"),
+      metadata: buildCourseWideGroupAssignmentMetadata(rule.enablePerGroupSettings ?? true, assessmentMode),
       position: index
     };
   });
@@ -923,10 +932,16 @@ async function assertActivityBelongsToCourse(courseId: string, activityId: strin
   if (!activity) {
     throw notFound("Course activity");
   }
-  if (activity.activityType?.key === "test") {
-    throw new AppError(409, "TEST_ASSIGNMENT_NOT_AVAILABLE", "Test assignment will be available when the student runtime is enabled.");
-  }
   return activity;
+}
+
+function assertTestAssignmentIsSummative(
+  activity: { activityType?: { key: string } | null } | null | undefined,
+  assessmentMode: unknown
+) {
+  if (activity?.activityType?.key === "test" && assessmentMode !== "summative") {
+    throw new AppError(400, "TEST_SUMMATIVE_ONLY", "A Test must be assigned as a summative activity.");
+  }
 }
 
 async function assertCourseMaterialBelongsToCourse(courseId: string, materialId: string) {
