@@ -89,6 +89,7 @@ type ParsonsActivityViewProps = {
   onSave: (input: { title: string; description: string; config: Record<string, unknown> }) => Promise<ActivityLike>;
   attemptsClient?: ParsonsAttemptsClient;
   studentViewMode?: "attempt" | "previous";
+  deferSubmission?: boolean;
   onNewAttemptAvailabilityChange?: (canStartNewAttempt: boolean) => void;
   onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
   t: (key: string, vars?: Record<string, string | number>) => string;
@@ -129,6 +130,7 @@ export function ParsonsActivityView({
   onSave,
   attemptsClient,
   studentViewMode = "attempt",
+  deferSubmission = false,
   onNewAttemptAvailabilityChange,
   onPreviousSubmissionsAvailabilityChange,
   t,
@@ -962,15 +964,15 @@ export function ParsonsActivityView({
           <button className="secondary" type="button" onClick={resetWorkspace} disabled={isReadOnlyStudentAttempt}>
             {t("parsons.reset")}
           </button>
-          {isSummativeStudentSession ? (
+          {isSummativeStudentSession && !deferSubmission ? (
             <button type="button" onClick={submitSolution} disabled={isReadOnlyStudentAttempt}>
               {t("parsons.submit")}
             </button>
-          ) : (
+          ) : !isSummativeStudentSession ? (
             <button type="button" onClick={checkSolution}>
               {t("parsons.check")}
             </button>
-          )}
+          ) : null}
         </div>
 
         <p className="muted">{t("parsons.keyboardHint")}</p>

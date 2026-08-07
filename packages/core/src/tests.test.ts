@@ -4,6 +4,7 @@ import type { CurrentUser } from "@cognelo/contracts";
 const tx = vi.hoisted(() => ({
   activity: { create: vi.fn(), update: vi.fn(), deleteMany: vi.fn(), delete: vi.fn() },
   test: { create: vi.fn(), update: vi.fn(), findUniqueOrThrow: vi.fn() },
+  testItem: { create: vi.fn() },
   courseContentItem: { count: vi.fn(), create: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() }
 }));
 
@@ -30,7 +31,7 @@ vi.mock("@cognelo/activity-sdk", () => ({
   getActivityProviderForActivityType: vi.fn(() => ({ kind: "plugin", key: "mcq" }))
 }));
 
-const { createTest, createTestItem, updateTestItem } = await import("./tests");
+const { createTest, createTestItem, duplicateTest, updateTestItem } = await import("./tests");
 
 const teacher: CurrentUser = {
   id: "teacher-1",
@@ -102,5 +103,62 @@ describe("Test authoring services", () => {
     ).rejects.toMatchObject({ status: 409, code: "TEST_STRUCTURE_LOCKED" });
 
     expect(db.testItem.update).not.toHaveBeenCalled();
+  });
+
+  it("duplicates the shell and every contained activity as an editable draft", async () => {
+    db.test.findFirst.mockResolvedValue({
+      id: "test-1",
+      settings: { allowResume: true },
+      activity: {
+        id: "test-activity-1",
+        activityTypeId: "type-test",
+        title: "Midterm",
+        description: "Instructions",
+        config: {},
+        metadata: { coreActivity: "test" },
+        position: 2
+      },
+      items: [{
+        id: "item-1",
+        activityId: "child-1",
+        position: 0,
+        pointsPossible: 5,
+        isRequired: true,
+        metadata: {},
+        activity: {
+          id: "child-1",
+          bankActivityId: null,
+          activityVersionId: null,
+          activityTypeId: "type-mcq",
+          title: "Question",
+          description: "",
+          config: { source: "question" },
+          metadata: {},
+          position: 0
+        }
+      }]
+    });
+    tx.activity.create
+      .mockResolvedValueOnce({ id: "test-copy" })
+      .mockResolvedValueOnce({
+        id: "child-copy",
+        bankActivityId: null,
+        activityVersionId: null,
+        title: "Question",
+        description: "",
+        lifecycle: "draft",
+        config: { source: "question" },
+        metadata: {},
+        activityType: { key: "mcq", name: "MCQ", description: "" }
+      });
+    tx.test.create.mockResolvedValue({ id: "test-copy-row" });
+    tx.test.findUniqueOrThrow.mockResolvedValue({ id: "test-copy-row", activityId: "test-copy", items: [] });
+
+    const result = await duplicateTest(teacher, "course-1", "test-activity-1", {});
+
+    expect(tx.activity.create).toHaveBeenNthCalledWith(1, { data: expect.objectContaining({ title: "Midterm (copy)", lifecycle: "draft" }) });
+    expect(tx.activity.create).toHaveBeenNthCalledWith(2, expect.objectContaining({ data: expect.objectContaining({ title: "Question", lifecycle: "draft" }) }));
+    expect(tx.testItem.create).toHaveBeenCalledWith({ data: expect.objectContaining({ testId: "test-copy-row", activityId: "child-copy" }) });
+    expect(result.activityCopies).toEqual([expect.objectContaining({ sourceActivityId: "child-1" })]);
   });
 });

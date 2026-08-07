@@ -1,5 +1,5 @@
 import { getActivityProviderForActivityType } from "@cognelo/activity-sdk";
-import { TestCreateSchema, TestItemCreateSchema, TestItemUpdateSchema, TestSettingsSchema, TestUpdateSchema } from "@cognelo/contracts";
+import { TestCreateSchema, TestDuplicateSchema, TestItemCreateSchema, TestItemUpdateSchema, TestSettingsSchema, TestUpdateSchema } from "@cognelo/contracts";
 import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import { createActivity } from "./activities";
@@ -68,6 +68,65 @@ export async function getTestByActivityId(user: CurrentUser, courseId: string, a
     throw notFound("Test");
   }
   return test;
+}
+
+export async function duplicateTest(user: CurrentUser, courseId: string, activityId: string, input: unknown) {
+  await assertCanManageCourse(user, courseId);
+  const data = TestDuplicateSchema.parse(input);
+  const source = await prisma.test.findFirst({ where: { courseId, activityId }, include: testInclude });
+  if (!source) throw notFound("Test");
+  return prisma.$transaction(async (tx) => {
+    const shell = await tx.activity.create({
+      data: {
+        courseId,
+        activityTypeId: source.activity.activityTypeId,
+        title: data.title ?? `${source.activity.title} (copy)`,
+        description: source.activity.description,
+        lifecycle: "draft",
+        config: source.activity.config as Prisma.InputJsonValue,
+        metadata: source.activity.metadata as Prisma.InputJsonValue,
+        position: source.activity.position + 1,
+        createdById: user.id
+      }
+    });
+    const duplicated = await tx.test.create({
+      data: { courseId, activityId: shell.id, settings: source.settings as Prisma.InputJsonValue }
+    });
+    const activityCopies = [];
+    for (const sourceItem of source.items) {
+      const child = await tx.activity.create({
+        data: {
+          courseId,
+          bankActivityId: sourceItem.activity.bankActivityId,
+          activityVersionId: sourceItem.activity.activityVersionId,
+          activityTypeId: sourceItem.activity.activityTypeId,
+          title: sourceItem.activity.title,
+          description: sourceItem.activity.description,
+          lifecycle: "draft",
+          config: sourceItem.activity.config as Prisma.InputJsonValue,
+          metadata: sourceItem.activity.metadata as Prisma.InputJsonValue,
+          position: sourceItem.activity.position,
+          createdById: user.id
+        },
+        include: { activityType: true }
+      });
+      await tx.testItem.create({
+        data: {
+          testId: duplicated.id,
+          activityId: child.id,
+          position: sourceItem.position,
+          pointsPossible: sourceItem.pointsPossible,
+          isRequired: sourceItem.isRequired,
+          metadata: sourceItem.metadata as Prisma.InputJsonValue
+        }
+      });
+      activityCopies.push({ sourceActivityId: sourceItem.activityId, activity: child });
+    }
+    return {
+      test: await tx.test.findUniqueOrThrow({ where: { id: duplicated.id }, include: testInclude }),
+      activityCopies
+    };
+  });
 }
 
 export async function updateTest(user: CurrentUser, courseId: string, activityId: string, input: unknown) {

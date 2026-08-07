@@ -10,6 +10,10 @@ const executionMigration = readFileSync(
   new URL("./migrations/202608070002_compound_test_execution/migration.sql", import.meta.url),
   "utf8"
 );
+const revisionMigration = readFileSync(
+  new URL("./migrations/202608070003_compound_test_revisions/migration.sql", import.meta.url),
+  "utf8"
+);
 
 describe("compound Test schema foundation", () => {
   it("distinguishes core and plugin activity providers", () => {
@@ -44,5 +48,16 @@ describe("compound Test schema foundation", () => {
     expect(executionMigration).toContain('CREATE UNIQUE INDEX "TestItemAttempt_parentAttemptId_testItemId_key"');
     expect(executionMigration).toContain('CONSTRAINT "TestItemAttempt_parentAttemptId_fkey"');
     expect(executionMigration).toContain('CONSTRAINT "TestItemAttempt_testItemId_fkey"');
+  });
+
+  it("persists immutable Test revision snapshots and links attempts to them", () => {
+    expect(schema).toContain("model TestRevision {");
+    expect(schema).toContain("model TestRevisionItem {");
+    expect(schema).toContain("testRevisionId            String?");
+    expect(schema).toContain("model TestSubmissionClaim {");
+    expect(revisionMigration).toContain('CREATE TABLE "TestRevision"');
+    expect(revisionMigration).toContain('CREATE TABLE "TestRevisionItem"');
+    expect(revisionMigration).toContain('ALTER TABLE "ActivityAttempt" ADD COLUMN "testRevisionId"');
+    expect(revisionMigration).toContain('CREATE TABLE "TestSubmissionClaim"');
   });
 });

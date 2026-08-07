@@ -11,6 +11,7 @@ type Params = { params: Promise<{ courseId: string; groupId: string; activityId:
 
 const stateInputSchema = z.object({
   parentAttemptId: z.string().min(1),
+  sessionId: z.string().min(1).max(200),
   state: z.record(z.unknown())
 });
 
@@ -22,7 +23,8 @@ export async function GET(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, groupId, activityId, testItemId } = await params;
-    const parentAttemptId = new URL(request.url).searchParams.get("parentAttemptId");
+    const searchParams = new URL(request.url).searchParams;
+    const parentAttemptId = searchParams.get("parentAttemptId");
     if (!parentAttemptId) {
       throw new AppError(400, "TEST_ATTEMPT_REQUIRED", "A parent Test attempt is required.");
     }
@@ -33,7 +35,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       activityId,
       parentAttemptId,
       testItemId,
-      { allowCompletedParent: true }
+      { allowCompletedParent: true, sessionId: searchParams.get("sessionId") }
     );
     return json({
       itemAttempt: context.itemAttempt ? serializeTestItemAttempt(context.itemAttempt) : null
@@ -53,7 +55,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
       activityId,
       input.parentAttemptId,
       testItemId,
-      input.state
+      input.state,
+      { sessionId: input.sessionId }
     );
     return json({ itemAttempt: serializeTestItemAttempt(itemAttempt) });
   });

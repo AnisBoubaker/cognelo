@@ -14,6 +14,13 @@ export const codingExercisesPlugin: ActivityPlugin = {
       description: "Students write code inside a teacher-defined scaffold and run or submit it through a sandboxed remote execution service.",
       defaultCategoryIds: ["programming"],
       icon: "code",
+      grading: {
+        supportsAttempts: true,
+        supportsAutoGrading: true,
+        supportsAnalyticsPayloads: true,
+        supportsCompositeExecution: true,
+        defaultMaxAttempts: null
+      },
       i18n: {
         en: {
           name: "Coding exercise",

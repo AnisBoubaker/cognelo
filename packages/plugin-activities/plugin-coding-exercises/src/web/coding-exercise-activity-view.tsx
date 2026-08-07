@@ -1,6 +1,7 @@
 "use client";
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
 import { CodeEditor, MarkdownRenderer, MonacoCodeEditor, codeLanguageOptions, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   alignCodingExerciseStarterCodeToTemplate,
@@ -172,6 +173,9 @@ type CodingExerciseActivityViewProps = {
   codingClient?: CodingExerciseClient;
   aiGenerationClient?: CodingExerciseAiGenerationClient;
   locale?: string;
+  executionStateHost?: ActivityExecutionStateHost<Record<string, unknown>>;
+  deferSubmission?: boolean;
+  readOnly?: boolean;
 };
 
 const fallbackConfig: CodingExerciseConfig = {
@@ -193,7 +197,10 @@ export function CodingExerciseActivityView({
   onSave,
   codingClient,
   aiGenerationClient,
-  locale
+  locale,
+  executionStateHost,
+  deferSubmission = false,
+  readOnly = false
 }: CodingExerciseActivityViewProps) {
   const pluginLocale = normalizeCodingExercisesLocale(locale);
   const t = (key: Parameters<typeof formatCodingExercisesMessage>[1], values?: Record<string, string | number>) =>
@@ -245,6 +252,7 @@ export function CodingExerciseActivityView({
   const [recentRuns, setRecentRuns] = useState<CodingExecution[]>([]);
   const [recentSubmissions, setRecentSubmissions] = useState<CodingExecution[]>([]);
   const [workingAction, setWorkingAction] = useState<"run" | "submit" | null>(null);
+  const [executionStateLoaded, setExecutionStateLoaded] = useState(!executionStateHost);
   const sampleValidationTests = getReferenceValidationTests(referenceValidationSummary, "sampleTests");
   const hiddenValidationTests = getReferenceValidationTests(referenceValidationSummary, "hiddenTests");
   const templateProjection = buildCodingExerciseStudentTemplateProjectionFromSource(
@@ -305,6 +313,32 @@ export function CodingExerciseActivityView({
     setReplacementDialog(null);
     previousActivityIdRef.current = activity.id;
   }, [activity]);
+
+  useEffect(() => {
+    if (canManage || !executionStateHost) {
+      setExecutionStateLoaded(true);
+      return;
+    }
+    let cancelled = false;
+    setExecutionStateLoaded(false);
+    const initialSourceCode = alignCodingExerciseStarterCodeToTemplate(config.starterCode, config.studentTemplateSource);
+    executionStateHost.load()
+      .then(async (saved) => {
+        const sourceCode = typeof saved?.sourceCode === "string" ? saved.sourceCode : initialSourceCode;
+        if (cancelled) return;
+        setEditorCode(sourceCode);
+        if (typeof saved?.sourceCode !== "string" && !readOnly) {
+          await executionStateHost.save({ sourceCode });
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : t("loadHistoryError"));
+      })
+      .finally(() => {
+        if (!cancelled) setExecutionStateLoaded(true);
+      });
+    return () => { cancelled = true; };
+  }, [activity.id, canManage, executionStateHost, readOnly]);
 
   useEffect(() => {
     if (!canManage || !course?.id || !codingClient) {
@@ -816,6 +850,15 @@ export function CodingExerciseActivityView({
     }
   }
 
+  function updateStudentCode(sourceCode: string) {
+    setEditorCode(sourceCode);
+    if (executionStateHost && executionStateLoaded && !readOnly) {
+      void executionStateHost.save({ sourceCode }).catch((err) => {
+        setError(err instanceof Error ? err.message : t("submitError"));
+      });
+    }
+  }
+
   function getReplacementDialogEyebrow() {
     if (replacementDialog === "prompt") {
       return t("generatePrompt");
@@ -1272,9 +1315,10 @@ export function CodingExerciseActivityView({
             id={`coding-exercise-student-${activity.id}`}
             ariaLabel={activity.title || t("starterCode")}
             value={editorCode}
-            onChange={setEditorCode}
+            onChange={updateStudentCode}
             language={config.language}
             minHeight={360}
+            readOnly={readOnly || !executionStateLoaded}
             readOnlyPrefix={templateProjection.readOnlyPrefix}
             readOnlySuffix={templateProjection.readOnlySuffix}
           />
@@ -1313,12 +1357,14 @@ export function CodingExerciseActivityView({
               <CodeEditor value={sampleTestCode} onChange={setSampleTestCode} language={config.language} minHeight={160} />
             </div>
             <div className="row">
-              <button type="button" onClick={runCode} disabled={workingAction === "run"}>
+              <button type="button" onClick={runCode} disabled={readOnly || workingAction === "run"}>
                 {workingAction === "run" ? t("running") : t("runSampleTest")}
               </button>
-              <button type="button" onClick={submitCode} disabled={workingAction === "submit"}>
-                {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
-              </button>
+              {!deferSubmission ? (
+                <button type="button" onClick={submitCode} disabled={readOnly || workingAction === "submit"}>
+                  {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
+                </button>
+              ) : null}
             </div>
           </section>
 

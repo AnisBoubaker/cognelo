@@ -89,6 +89,7 @@ const dbMocks = vi.hoisted(() => {
 });
 
 const coreMocks = vi.hoisted(() => ({
+  assertActivityAuthoringMutable: vi.fn(),
   assertCanManageActivityBank: vi.fn(),
   assertCanManageCourse: vi.fn(),
   AppError: class AppError extends Error {

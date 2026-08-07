@@ -2,11 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   assertActivityTypePluginEnabled: vi.fn(),
+  claimTestAttemptSubmission: vi.fn(),
+  completeTestAttemptSubmission: vi.fn(),
   getTestItemExecutionContext: vi.fn(),
   getTestRuntime: vi.fn(),
   handler: vi.fn(),
   readJson: vi.fn(),
   requireUser: vi.fn(),
+  releaseTestAttemptSubmission: vi.fn(),
   submitTestAttempt: vi.fn(),
   submitTestItemAttemptResult: vi.fn()
 }));
@@ -18,8 +21,11 @@ vi.mock("@cognelo/activity-sdk/server", () => ({
 vi.mock("@cognelo/core", () => ({
   AppError: class AppError extends Error {},
   assertActivityTypePluginEnabled: mocks.assertActivityTypePluginEnabled,
+  claimTestAttemptSubmission: mocks.claimTestAttemptSubmission,
+  completeTestAttemptSubmission: mocks.completeTestAttemptSubmission,
   getTestItemExecutionContext: mocks.getTestItemExecutionContext,
   getTestRuntime: mocks.getTestRuntime,
+  releaseTestAttemptSubmission: mocks.releaseTestAttemptSubmission,
   submitTestAttempt: mocks.submitTestAttempt,
   submitTestItemAttemptResult: mocks.submitTestItemAttemptResult
 }));
@@ -38,7 +44,8 @@ describe("whole Test submission route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.requireUser.mockResolvedValue({ id: "student-1", roles: ["student"] });
-    mocks.readJson.mockResolvedValue({ parentAttemptId: "parent-attempt-1" });
+    mocks.readJson.mockResolvedValue({ parentAttemptId: "parent-attempt-1", sessionId: "session-1" });
+    mocks.claimTestAttemptSubmission.mockResolvedValue(true);
     mocks.getTestRuntime.mockResolvedValue({
       attempt: { id: "parent-attempt-1", lifecycle: "started" },
       test: {
@@ -83,6 +90,15 @@ describe("whole Test submission route", () => {
     }));
     expect(mocks.handler).toHaveBeenNthCalledWith(2, expect.objectContaining({ testItemId: "item-2", payload: {} }));
     expect(mocks.submitTestItemAttemptResult).toHaveBeenCalledTimes(2);
+    expect(mocks.getTestItemExecutionContext).toHaveBeenCalledWith(
+      expect.anything(),
+      "course-1",
+      "group-1",
+      "test-activity-1",
+      "parent-attempt-1",
+      "item-1",
+      { allowExpiredParent: true, allowResumePolicyBypass: true }
+    );
     expect(mocks.submitTestAttempt).toHaveBeenCalledWith(
       { id: "student-1", roles: ["student"] },
       "course-1",
@@ -90,8 +106,38 @@ describe("whole Test submission route", () => {
       "test-activity-1",
       "parent-attempt-1"
     );
+    expect(mocks.completeTestAttemptSubmission).toHaveBeenCalledWith("parent-attempt-1");
     await expect(response.json()).resolves.toEqual({
       runtime: { attempt: { id: "parent-attempt-1", lifecycle: "submitted" } }
     });
+  });
+
+  it("returns an already-completed parent attempt for a repeated submit request", async () => {
+    const previousRuntime = {
+      attempt: { id: "parent-attempt-1", lifecycle: "graded" },
+      test: { items: [] }
+    };
+    mocks.getTestRuntime
+      .mockResolvedValueOnce({ attempt: null, test: { items: [] } })
+      .mockResolvedValueOnce(previousRuntime);
+
+    const response = await POST(new Request("http://test.local", { method: "POST" }) as never, {
+      params: Promise.resolve({ courseId: "course-1", groupId: "group-1", activityId: "test-activity-1" })
+    });
+
+    expect(mocks.handler).not.toHaveBeenCalled();
+    expect(mocks.submitTestAttempt).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toEqual({ runtime: previousRuntime });
+  });
+
+  it("rejects a concurrent final submission before dispatching child handlers", async () => {
+    mocks.claimTestAttemptSubmission.mockResolvedValue(false);
+
+    await expect(POST(new Request("http://test.local", { method: "POST" }) as never, {
+      params: Promise.resolve({ courseId: "course-1", groupId: "group-1", activityId: "test-activity-1" })
+    })).rejects.toBeInstanceOf(Error);
+
+    expect(mocks.handler).not.toHaveBeenCalled();
+    expect(mocks.submitTestAttempt).not.toHaveBeenCalled();
   });
 });

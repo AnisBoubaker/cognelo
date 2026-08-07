@@ -2,6 +2,7 @@ import type { ComponentProps, ComponentType, JSXElementConstructor, ReactNode } 
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
+import { CodeRenderer } from "@cognelo/activity-ui";
 import { CodingExerciseActivityView } from "@cognelo/plugin-coding-exercises";
 import {
   CodingHomeworkGraderActivityView,
@@ -11,6 +12,9 @@ import {
 } from "@cognelo/plugin-coding-homework-grader";
 import {
   createParsonsClient,
+  createInitialParsonsAttemptState,
+  parsonsAttemptStateSchema,
+  parseParsonsConfig,
   ParsonsActivityView,
   ParsonsManualGradingPanel,
   type ParsonsAttemptRecord,
@@ -27,6 +31,7 @@ import {
 import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
 import { TestActivityView, type TestStudentItemRendererContext } from "@/components/test-activity-view";
 import { TestManualGradingPanel } from "@/components/test-manual-grading-panel";
+import type { Locale } from "@/lib/i18n";
 import { respondentsForMcqChoice, type TestReviewAllItemContext } from "@/lib/test-review-all";
 import {
   api,
@@ -80,7 +85,7 @@ type BankActivityRendererContext = {
   bankActivityId: string;
   bankTitle: string;
   hasQuestionAuthoringAgent: boolean;
-  locale: "en" | "fr" | "zh" | "ar";
+  locale: Locale;
   onSave: SaveActivity;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
@@ -88,7 +93,7 @@ type BankActivityRendererContext = {
 type ManualGradingRendererContext = {
   row: CourseGradebookRow;
   activityConfig?: Record<string, unknown>;
-  locale: "en" | "fr" | "zh" | "ar";
+  locale: Locale;
   attempts: Array<ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview>;
   selectedAttempt: ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview | null;
   selectedIndex: number;
@@ -132,7 +137,7 @@ function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActi
     () =>
       activityProps.canManage && hasQuestionAuthoringAgent && courseId
         ? {
-            generate: (input: { description: string; language: string; locale: "en" | "fr" | "zh" | "ar" }) =>
+            generate: (input: { description: string; language: string; locale: Locale }) =>
               parsonsClient.generate(courseId, activityProps.activity.id, input)
           }
         : undefined,
@@ -457,7 +462,11 @@ function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView
   );
 }
 
-type TestItemRendererProps = TestStudentItemRendererContext;
+type TestItemRendererProps = TestStudentItemRendererContext & {
+  courseId: string;
+  locale: Locale;
+  t: (key: string, params?: Record<string, string | number>) => string;
+};
 
 function McqTestItemRenderer({ executionHost, runtime, item }: TestItemRendererProps) {
   const submissionClient = useMemo(() => ({
@@ -503,8 +512,118 @@ function McqTestItemRenderer({ executionHost, runtime, item }: TestItemRendererP
 }
 
 const testItemRenderers: Record<string, ComponentType<TestItemRendererProps>> = {
-  mcq: McqTestItemRenderer
+  mcq: McqTestItemRenderer,
+  "parsons-problem": ParsonsTestItemRenderer,
+  "coding-exercise": CodingExerciseTestItemRenderer,
+  "web-design-coding-exercise": WebDesignCodingExerciseTestItemRenderer
 };
+
+function CodingExerciseTestItemRenderer({ courseId, executionHost, item, locale, runtime }: TestItemRendererProps) {
+  const readOnly = runtime.attempt?.lifecycle !== "started";
+  const codingClient = useMemo(() => ({
+    listHiddenTests: async () => ({ tests: [], referenceSolution: null }),
+    saveHiddenTests: async () => ({ tests: [], referenceSolution: null }),
+    runCode: async (_courseId: string, _activityId: string, input: unknown) => {
+      if (!executionHost.executeAction) throw new Error("This Test cannot run sample code.");
+      return executionHost.executeAction<{ execution: CodingExerciseExecution }>("run", input);
+    },
+    listRuns: async () => ({ executions: [] }),
+    submitCode: async () => { throw new Error("Submit the whole Test to grade this activity."); },
+    listSubmissions: async () => ({ executions: [] })
+  }), [executionHost]);
+  return (
+    <CodingExerciseActivityView
+      activity={item.activity}
+      canManage={false}
+      course={{ id: courseId, title: runtime.test.activity.title }}
+      onSave={async () => item.activity}
+      codingClient={codingClient}
+      executionStateHost={executionHost}
+      deferSubmission
+      readOnly={readOnly}
+      locale={locale}
+    />
+  );
+}
+
+function WebDesignCodingExerciseTestItemRenderer({ courseId, executionHost, item, locale, runtime }: TestItemRendererProps) {
+  const readOnly = runtime.attempt?.lifecycle !== "started";
+  const webDesignClient = useMemo(() => ({
+    listTests: async () => ({ tests: [], referenceBundle: null }),
+    saveTests: async () => ({ tests: [], referenceBundle: null }),
+    getExpectedResult: async () => ({ imageDataUrl: null }),
+    runCode: async (_courseId: string, _activityId: string, input: unknown) => {
+      if (!executionHost.executeAction) throw new Error("This Test cannot run sample code.");
+      return executionHost.executeAction<{ submission: WebDesignExerciseSubmission }>("run", input);
+    },
+    listRuns: async () => ({ submissions: [] }),
+    submitCode: async () => { throw new Error("Submit the whole Test to grade this activity."); },
+    listSubmissions: async () => ({ submissions: [] })
+  }), [executionHost]);
+  return (
+    <WebDesignCodingExerciseActivityView
+      activity={item.activity}
+      canManage={false}
+      course={{ id: courseId }}
+      onSave={async () => item.activity}
+      webDesignClient={webDesignClient}
+      executionStateHost={executionHost}
+      deferSubmission
+      readOnly={readOnly}
+      locale={locale}
+    />
+  );
+}
+
+function ParsonsTestItemRenderer({ courseId, executionHost, item, locale, runtime, t }: TestItemRendererProps) {
+  const config = useMemo(() => parseParsonsConfig(item.activity.config), [item.activity.config]);
+  const completed = runtime.attempt?.lifecycle !== "started";
+  const attemptId = item.itemAttempt?.id ?? `${runtime.attempt?.id ?? "test"}:${item.id}`;
+  const startedAt = runtime.attempt?.startedAt ?? new Date().toISOString();
+  const completedAt = completed ? runtime.attempt?.submittedAt ?? runtime.attempt?.gradedAt ?? startedAt : null;
+  const attemptsClient = useMemo(() => {
+    async function currentAttempt() {
+      const saved = await executionHost.load();
+      const parsed = parsonsAttemptStateSchema.safeParse(saved);
+      const latestState = parsed.success ? parsed.data : createInitialParsonsAttemptState(config);
+      if (!parsed.success && !completed) {
+        // Persist the shuffled arrangement immediately. Otherwise an untouched
+        // item could be graded from a newly randomized arrangement at submit.
+        await executionHost.save(latestState);
+      }
+      return {
+        id: attemptId,
+        status: completed ? "completed" as const : "in_progress" as const,
+        startedAt,
+        lastInteractionAt: completedAt ?? startedAt,
+        completedAt,
+        latestState
+      };
+    }
+    return {
+      ensureAttempt: async () => ({ attempt: await currentAttempt(), attemptAvailability: { canStart: !completed, reason: null } }),
+      listSubmissions: async () => ({ submissions: completed ? [{ attempt: await currentAttempt(), grade: null }] : [] }),
+      updateAttempt: async (_activityId: string, _courseId: string, input: { state?: unknown }) => {
+        if (input.state) await executionHost.save(input.state as Record<string, unknown>);
+        return { attempt: await currentAttempt() };
+      }
+    };
+  }, [attemptId, completed, completedAt, config, executionHost, startedAt]);
+
+  return (
+    <ParsonsActivityView
+      activity={{ ...item.activity, assignment: { id: runtime.attempt?.id ?? item.id, metadata: { assessmentMode: "summative" } } }}
+      course={{ id: courseId, title: runtime.test.activity.title }}
+      canManage={false}
+      onSave={async () => item.activity}
+      attemptsClient={attemptsClient}
+      studentViewMode={completed ? "previous" : "attempt"}
+      deferSubmission
+      locale={locale}
+      t={t}
+    />
+  );
+}
 
 type TestReviewItem = CourseTestAttemptReview["items"][number];
 
@@ -536,8 +655,45 @@ function McqTestGradebookReview({ item }: { item: TestReviewItem }) {
 }
 
 const testGradebookReviewRenderers: Record<string, ComponentType<{ item: TestReviewItem }>> = {
-  mcq: McqTestGradebookReview
+  mcq: McqTestGradebookReview,
+  "parsons-problem": ParsonsTestGradebookReview,
+  "coding-exercise": CodingExerciseTestGradebookReview,
+  "web-design-coding-exercise": WebDesignCodingExerciseTestGradebookReview
 };
+
+function CodingExerciseTestGradebookReview({ item }: { item: TestReviewItem }) {
+  const sourceCode = typeof item.itemAttempt.state.sourceCode === "string" ? item.itemAttempt.state.sourceCode : "";
+  const language = typeof item.activity.config?.language === "string" ? item.activity.config.language : "text";
+  return sourceCode ? <CodeRenderer code={sourceCode} language={language} showLineNumbers /> : <p className="muted">No code was saved.</p>;
+}
+
+function WebDesignCodingExerciseTestGradebookReview({ item }: { item: TestReviewItem }) {
+  return <WebDesignFilesReview files={item.itemAttempt.state.files} />;
+}
+
+function ParsonsTestGradebookReview({ item }: { item: TestReviewItem }) {
+  const parsed = parsonsAttemptStateSchema.safeParse(item.itemAttempt.state);
+  const config = parseParsonsConfig(item.activity.config);
+  if (!parsed.success) return <p className="muted">No Parsons answer was saved.</p>;
+  return (
+    <div className="parsons-board">
+      {parsed.data.blocks.map((block, index) => (
+        <article className="parsons-block parsons-block-row" key={block.id}>
+          <div className="parsons-code-line parsons-code-line-compact">
+            <CodeRenderer
+              className="parsons-inline-code"
+              code={block.displayText}
+              contentOffset={block.currentIndent * 18}
+              language={config.language}
+              showLineNumbers
+              startingLineNumber={index + 1}
+            />
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
 
 function McqTestReviewAll({ item, responses, t }: TestReviewAllItemContext) {
   const source = typeof item.activity.config?.source === "string" ? item.activity.config.source : "";
@@ -670,8 +826,86 @@ function TestReviewChoiceBadge({
 }
 
 const testReviewAllRenderers: Record<string, ComponentType<TestReviewAllItemContext>> = {
-  mcq: McqTestReviewAll
+  mcq: McqTestReviewAll,
+  "parsons-problem": ParsonsTestReviewAll,
+  "coding-exercise": CodingExerciseTestReviewAll,
+  "web-design-coding-exercise": WebDesignCodingExerciseTestReviewAll
 };
+
+function CodingExerciseTestReviewAll({ item, responses }: TestReviewAllItemContext) {
+  const language = typeof item.activity.config?.language === "string" ? item.activity.config.language : "text";
+  return (
+    <div className="stack">
+      {responses.map((response) => {
+        const sourceCode = typeof response.item.itemAttempt.state.sourceCode === "string" ? response.item.itemAttempt.state.sourceCode : "";
+        return (
+          <article className="card card-compact stack" key={response.participantId}>
+            <div className="section-heading"><div><strong>{response.participantName}</strong><p className="muted">{response.groupTitle}</p></div></div>
+            {sourceCode ? <CodeRenderer code={sourceCode} language={language} showLineNumbers /> : <p className="muted">No code was saved.</p>}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function WebDesignCodingExerciseTestReviewAll({ responses }: TestReviewAllItemContext) {
+  return (
+    <div className="stack">
+      {responses.map((response) => (
+        <article className="card card-compact stack" key={response.participantId}>
+          <div className="section-heading"><div><strong>{response.participantName}</strong><p className="muted">{response.groupTitle}</p></div></div>
+          <WebDesignFilesReview files={response.item.itemAttempt.state.files} />
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function WebDesignFilesReview({ files }: { files: unknown }) {
+  const normalized = Array.isArray(files)
+    ? files.flatMap((file, index) => file && typeof file === "object" && !Array.isArray(file) && typeof (file as Record<string, unknown>).starterCode === "string"
+      ? [{
+          id: typeof (file as Record<string, unknown>).id === "string" ? (file as Record<string, unknown>).id as string : `file-${index}`,
+          path: typeof (file as Record<string, unknown>).path === "string" ? (file as Record<string, unknown>).path as string : "file",
+          language: typeof (file as Record<string, unknown>).language === "string" ? (file as Record<string, unknown>).language as string : "text",
+          code: (file as Record<string, unknown>).starterCode as string
+        }]
+      : [])
+    : [];
+  return normalized.length ? (
+    <div className="stack">
+      {normalized.map((file) => <section className="stack stack-tight" key={`${file.id}:${file.path}`}><strong>{file.path}</strong><CodeRenderer code={file.code} language={file.language} showLineNumbers /></section>)}
+    </div>
+  ) : <p className="muted">No files were saved.</p>;
+}
+
+function ParsonsTestReviewAll({ item, responses, t }: TestReviewAllItemContext) {
+  const config = parseParsonsConfig(item.activity.config);
+  const parsedResponses = responses.flatMap((response) => {
+    const parsed = parsonsAttemptStateSchema.safeParse(response.item.itemAttempt.state);
+    return parsed.success ? [{ ...response, state: parsed.data }] : [];
+  });
+  const correctCount = parsedResponses.filter((response) => response.state.lastEvaluation?.isCorrect).length;
+  return (
+    <div className="stack">
+      <div className="row wrap">
+        <span className="participant-status is-graded">{t("courseDetail.correctResponses", { count: correctCount })}</span>
+        <span className="participant-status">{t("courseDetail.incorrectResponses", { count: parsedResponses.length - correctCount })}</span>
+      </div>
+      {parsedResponses.map((response) => (
+        <article className="card card-compact stack" key={response.participantId}>
+          <div className="section-heading">
+            <div><strong>{response.participantName}</strong><p className="muted">{response.groupTitle}</p></div>
+            <strong>{response.state.lastEvaluation?.isCorrect ? t("courseDetail.correctAnswer") : t("courseDetail.incorrectAnswer")}</strong>
+          </div>
+          <pre className="code-block">{response.state.blocks.map((block) => `${"  ".repeat(block.currentIndent)}${block.displayText}`).join("\n")}</pre>
+          <span className="muted">{config.language}</span>
+        </article>
+      ))}
+    </div>
+  );
+}
 
 export function renderTestReviewAllItem(context: TestReviewAllItemContext) {
   const Renderer = testReviewAllRenderers[context.item.activityTypeKey];
@@ -679,6 +913,7 @@ export function renderTestReviewAllItem(context: TestReviewAllItemContext) {
 }
 
 function TestActivityRenderer(props: ActivityRendererProps<typeof TestActivityView>) {
+  const t = typeof props.t === "function" ? props.t as (key: string, params?: Record<string, string | number>) => string : (key: string) => key;
   return (
     <TestActivityView
       {...props}
@@ -687,6 +922,9 @@ function TestActivityRenderer(props: ActivityRendererProps<typeof TestActivityVi
         return Renderer ? (
           <Renderer
             {...context}
+            courseId={props.activityRouteCourseId ?? props.course?.id ?? ""}
+            locale={props.locale}
+            t={t}
           />
         ) : null;
       }}

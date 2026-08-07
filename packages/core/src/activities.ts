@@ -251,6 +251,23 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
   });
 }
 
+export async function assertActivityAuthoringMutable(courseId: string, activityId: string) {
+  const contained = await prisma.activity.findFirst({
+    where: { id: activityId, courseId },
+    select: { testItem: { select: { test: { select: { activityId: true } } } } }
+  });
+  if (!contained) throw notFound("Activity");
+  if (!contained.testItem) return;
+  const attemptCount = await prisma.activityAttempt.count({ where: { activityId: contained.testItem.test.activityId } });
+  if (attemptCount > 0) {
+    throw new AppError(
+      409,
+      "TEST_STRUCTURE_LOCKED",
+      "This activity cannot be changed after a student has started its Test. Duplicate the Test to create a changed assessment."
+    );
+  }
+}
+
 async function resolveEnabledActivityTypeId(activityTypeKey: string) {
   if (isCoreActivityType(activityTypeKey)) {
     throw new AppError(400, "CORE_ACTIVITY_CREATION_ROUTE_REQUIRED", "Core activity types cannot replace plugin activities.");

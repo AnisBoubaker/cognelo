@@ -1,5 +1,5 @@
 import type { CurrentUser } from "@cognelo/contracts";
-import { assertCanManageActivityBank, assertCanManageCourse, AppError } from "@cognelo/core";
+import { assertActivityAuthoringMutable, assertCanManageActivityBank, assertCanManageCourse, AppError } from "@cognelo/core";
 import {
   normalizeWebDesignExerciseConfig,
   parseWebDesignExerciseConfig,
@@ -129,6 +129,42 @@ export async function copyBankWebDesignExerciseTestsToCourseActivity(params: { b
   });
 }
 
+export async function copyCourseWebDesignExerciseData(params: { sourceActivityId: string; activityId: string }) {
+  const [referenceBundle, tests] = await Promise.all([
+    prisma.pluginWebDesignExerciseReferenceBundle.findUnique({ where: { activityId: params.sourceActivityId } }),
+    prisma.pluginWebDesignExerciseTest.findMany({
+      where: { activityId: params.sourceActivityId },
+      orderBy: [{ kind: "asc" }, { orderIndex: "asc" }, { createdAt: "asc" }]
+    })
+  ]);
+  await prisma.$transaction(async (transaction) => {
+    if (referenceBundle) {
+      await transaction.pluginWebDesignExerciseReferenceBundle.create({
+        data: {
+          activityId: params.activityId,
+          files: referenceBundle.files as Prisma.InputJsonValue,
+          validationSummary: referenceBundle.validationSummary as Prisma.InputJsonValue
+        }
+      });
+    }
+    if (tests.length) {
+      await transaction.pluginWebDesignExerciseTest.createMany({
+        data: tests.map((test) => ({
+          activityId: params.activityId,
+          name: test.name,
+          kind: test.kind,
+          testCode: test.testCode,
+          orderIndex: test.orderIndex,
+          isEnabled: test.isEnabled,
+          weight: test.weight,
+          metadata: test.metadata as Prisma.InputJsonValue,
+          validationSummary: test.validationSummary as Prisma.InputJsonValue
+        }))
+      });
+    }
+  });
+}
+
 export async function deleteBankWebDesignExerciseData(params: { bankActivityId: string }) {
   await prisma.$transaction(async (transaction) => {
     await transaction.pluginBankWebDesignExerciseTest.deleteMany({
@@ -165,6 +201,7 @@ export async function replaceWebDesignExerciseTests(params: {
   input: unknown;
 }) {
   await assertCanManageCourse(params.user, params.courseId);
+  await assertActivityAuthoringMutable(params.courseId, params.activityId);
   const input = webDesignExerciseTestsInputSchema.parse(params.input);
   const seenIds = new Set<string>();
   for (const test of input.tests) {
