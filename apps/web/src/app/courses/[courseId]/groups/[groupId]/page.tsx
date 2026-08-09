@@ -9,6 +9,7 @@ import { AppShell } from "@/components/app-shell";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
+import { SettingsSectionNav } from "@/components/settings-nav";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import {
   api,
@@ -30,6 +31,7 @@ import {
   StudentReleasedGrades
 } from "@/lib/api";
 import { ContentTypeIcon as MaterialTypeIcon } from "@/lib/content-type-renderers";
+import { normalizeStudentFolderTabDepth, resolveStudentContentLayout } from "@/lib/course-settings";
 import { useI18n } from "@/lib/i18n";
 
 type ContentDropPlacement = "after" | "before" | "inside";
@@ -195,8 +197,13 @@ export default function CourseGroupPage() {
   const visibleContentItems = flattenContentItems(contentItems, collapsedContentFolderIds);
   const studentContentItems = contentItems.filter((item) => item.kind !== "activity" || Boolean(item.courseGroupActivityId));
   const studentRootContentItems = studentContentItems.filter((item) => !item.parentId).sort(compareContentItems);
-  const studentRootFolderIds = studentRootContentItems.filter((item) => item.kind === "folder").map((item) => item.id);
+  const studentRootFolders = studentRootContentItems.filter((item) => item.kind === "folder");
+  const studentRootLooseItems = studentRootContentItems.filter((item) => item.kind !== "folder");
+  const studentRootFolderIds = studentRootFolders.map((item) => item.id);
   const studentRootFolderIdSignature = studentRootFolderIds.join("|");
+  const studentContentLayout = resolveStudentContentLayout(course?.metadata);
+  const requestedStudentFolderId = searchParams.get("folder");
+  const selectedStudentRootFolder = studentRootFolders.find((item) => item.id === requestedStudentFolderId) ?? studentRootFolders[0] ?? null;
   const studentAccordionStorageKey = `cognelo:course:${courseId}:group:${groupId}:student-content-accordion`;
   const studentContentReady = Boolean(course && group && contentLoaded);
   const courseMaterialById = new Map(courseMaterials.map((material) => [material.id, material]));
@@ -403,6 +410,84 @@ export default function CourseGroupPage() {
     );
   }
 
+  function renderStudentAccordionContent() {
+    return (
+      <div className="table-list">
+        {studentRootContentItems.map((item) => {
+          if (item.kind !== "folder") {
+            return renderStudentContentRow(item, 0);
+          }
+
+          const childRows =
+            openStudentRootFolderIds.has(item.id)
+              ? flattenContentItemsFromParent(studentContentItems, item.id, collapsedContentFolderIds, 1)
+              : [];
+
+          return (
+            <div className={`student-accordion-section ${openStudentRootFolderIds.has(item.id) ? "is-open" : ""}`} key={item.id}>
+              {renderStudentContentRow(item, 0, { isRootAccordionFolder: true })}
+              {childRows.length ? (
+                <div className="student-accordion-panel">
+                  {childRows.map(({ item: child, depth }) => renderStudentContentRow(child, depth))}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function renderStudentFolderTabsContent() {
+    if (!selectedStudentRootFolder) {
+      return <div className="table-list">{studentRootLooseItems.map((item) => renderStudentContentRow(item, 0))}</div>;
+    }
+
+    const selectedFolderRows = flattenContentItemsFromParent(
+      studentContentItems,
+      selectedStudentRootFolder.id,
+      collapsedContentFolderIds,
+      1
+    );
+    const navigationItems = studentRootFolders.map((folder) => ({
+      href: `/courses/${courseId}/groups/${groupId}?tab=content&folder=${encodeURIComponent(folder.id)}`,
+      id: folder.id,
+      isActive: folder.id === selectedStudentRootFolder.id,
+      label: contentItemTitle(folder),
+      text: t("courseDetail.studentFolderTabText", {
+        count: flattenContentItemsFromParent(studentContentItems, folder.id, new Set(), 1).length
+      })
+    }));
+
+    return (
+      <div className="settings-layout student-content-folder-tabs">
+        <SettingsSectionNav ariaLabel={t("courseDetail.studentFolderTabsNavLabel")} items={navigationItems} />
+        <div className="stack">
+          <section className="student-folder-tab-panel stack">
+            <h3>{contentItemTitle(selectedStudentRootFolder)}</h3>
+            {selectedFolderRows.length ? (
+              <div className="table-list">
+                {selectedFolderRows.map(({ item, depth }) =>
+                  renderStudentContentRow(item, normalizeStudentFolderTabDepth(depth))
+                )}
+              </div>
+            ) : (
+              <p className="muted">{t("courseDetail.noContentItems")}</p>
+            )}
+          </section>
+          {studentRootLooseItems.length ? (
+            <section className="student-folder-tab-panel stack">
+              <h3>{t("courseDetail.studentRootContentTitle")}</h3>
+              <div className="table-list">
+                {studentRootLooseItems.map((item) => renderStudentContentRow(item, 0))}
+              </div>
+            </section>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   if (group && course && !canManage) {
     return (
       <AppShell>
@@ -437,29 +522,7 @@ export default function CourseGroupPage() {
                     </div>
 
                     {studentRootContentItems.length ? (
-                      <div className="table-list">
-                        {studentRootContentItems.map((item) => {
-                          if (item.kind !== "folder") {
-                            return renderStudentContentRow(item, 0);
-                          }
-
-                          const childRows =
-                            openStudentRootFolderIds.has(item.id)
-                              ? flattenContentItemsFromParent(studentContentItems, item.id, collapsedContentFolderIds, 1)
-                              : [];
-
-                          return (
-                            <div className={`student-accordion-section ${openStudentRootFolderIds.has(item.id) ? "is-open" : ""}`} key={item.id}>
-                              {renderStudentContentRow(item, 0, { isRootAccordionFolder: true })}
-                              {childRows.length ? (
-                                <div className="student-accordion-panel">
-                                  {childRows.map(({ item: child, depth }) => renderStudentContentRow(child, depth))}
-                                </div>
-                              ) : null}
-                            </div>
-                          );
-                        })}
-                      </div>
+                      studentContentLayout === "folder_tabs" ? renderStudentFolderTabsContent() : renderStudentAccordionContent()
                     ) : (
                       <p className="muted">{t("courseDetail.noContentItems")}</p>
                     )}

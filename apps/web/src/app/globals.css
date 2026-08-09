@@ -1148,6 +1148,35 @@ a.card:hover,
   transform: none;
 }
 
+.student-content-folder-tabs {
+  grid-template-columns: minmax(220px, 0.24fr) minmax(0, 1fr);
+}
+
+.student-folder-tab-panel {
+  min-width: 0;
+}
+
+.student-folder-tab-panel > h3 {
+  margin: 0;
+}
+
+.student-folder-tab-panel .table-row-content-tree {
+  margin-left: var(--student-content-row-indent, 0);
+}
+
+.student-folder-tab-panel .table-row-content-tree .table-main-stack {
+  grid-template-columns: 58px minmax(0, 1fr);
+}
+
+.student-folder-tab-panel .content-tree-student-spacer {
+  display: none;
+}
+
+.student-folder-tab-panel .table-row-content-tree strong,
+.student-folder-tab-panel .table-row-content-tree .metadata-badges {
+  grid-column: 2;
+}
+
 .table-row-content-tree.is-folder-row strong {
   font-weight: 900;
 }

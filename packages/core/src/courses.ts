@@ -111,9 +111,28 @@ export async function createCourse(user: CurrentUser, input: unknown) {
 export async function updateCourse(user: CurrentUser, courseId: string, input: unknown) {
   await assertCanManageCourse(user, courseId);
   const data = CourseUpdateSchema.parse(input);
+  const { studentContentLayout, ...courseData } = data;
+  let metadata: Prisma.InputJsonValue | undefined;
+
+  if (studentContentLayout !== undefined) {
+    const course = await prisma.course.findUnique({ where: { id: courseId }, select: { metadata: true } });
+    if (!course) {
+      throw notFound("Course");
+    }
+    metadata = {
+      ...asMetadataRecord(course.metadata),
+      studentContentLayout
+    } as Prisma.InputJsonValue;
+  }
+
+  const updateData: Prisma.CourseUncheckedUpdateInput = {
+    ...courseData,
+    ...(metadata ? { metadata } : {})
+  };
+
   return prisma.course.update({
     where: { id: courseId },
-    data,
+    data: updateData,
     include: courseInclude
   });
 }

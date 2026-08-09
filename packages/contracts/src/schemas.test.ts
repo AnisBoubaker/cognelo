@@ -12,6 +12,7 @@ import {
   CourseGroupInputSchema,
   CourseGroupUpdateSchema,
   CourseInputSchema,
+  CourseUpdateSchema,
   CourseMaterialInputSchema,
   CourseMaterialUpdateSchema,
   EnrollmentInputSchema,
@@ -216,6 +217,9 @@ describe("shared contract schemas", () => {
     expect(CourseInputSchema.parse({ subjectId: "subject-1", title: "Programming" })).toMatchObject({
       description: "",
       status: "draft"
+    });
+    expect(CourseUpdateSchema.parse({ studentContentLayout: "folder_tabs" })).toEqual({
+      studentContentLayout: "folder_tabs"
     });
     expect(SubjectInputSchema.parse({ title: "Math" })).toMatchObject({ description: "", metadata: {} });
     expect(ActivityBankInputSchema.parse({ subjectId: "subject-1", title: "Bank" })).toMatchObject({
