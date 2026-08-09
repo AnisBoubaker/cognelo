@@ -17,6 +17,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
 import { useAuth } from "@/components/auth-provider";
+import { CourseSettingsPanel, type CourseSettingsSection } from "@/components/course-settings-panel";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import {
@@ -32,7 +33,8 @@ import {
   CourseGradebookItemSummary,
   CourseGradebookRow,
   CourseMaterial,
-  GradebookStatus
+  GradebookStatus,
+  Subject
 } from "@/lib/api";
 import { ContentTypeIcon as MaterialTypeIcon, resolveContentTypeSettingsRenderer } from "@/lib/content-type-renderers";
 import { useI18n } from "@/lib/i18n";
@@ -61,6 +63,7 @@ export default function CourseDetailPage() {
   const [activeContentTypeDefinitions, setActiveContentTypeDefinitions] = useState<ContentTypeDefinition[]>([]);
   const [contentResources, setContentResources] = useState<CourseContentResource[]>([]);
   const [activityBanks, setActivityBanks] = useState<ActivityBank[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [aiAgentConnections, setAiAgentConnections] = useState<AiAgentConnection[]>([]);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
   const [contentItems, setContentItems] = useState<CourseContentItem[]>([]);
@@ -69,8 +72,6 @@ export default function CourseDetailPage() {
   const [gradebookStatus, setGradebookStatus] = useState<GradebookStatus>("all");
   const [savingReleaseItemId, setSavingReleaseItemId] = useState<string | null>(null);
   const [expandedGradebookActivityIds, setExpandedGradebookActivityIds] = useState<Set<string>>(new Set());
-  const [studentSupportAgentId, setStudentSupportAgentId] = useState("");
-  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [showActivityPicker, setShowActivityPicker] = useState(false);
   const [pickerParentId, setPickerParentId] = useState("");
   const [pickerIsVisible, setPickerIsVisible] = useState(true);
@@ -123,7 +124,7 @@ export default function CourseDetailPage() {
     const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
     const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher";
     if (userCanManage) {
-      const [gradebookResult, contentResult, contentTypesResult, contentResourcesResult] = await Promise.all([
+      const [gradebookResult, contentResult, contentTypesResult, contentResourcesResult, subjectsResult] = await Promise.all([
         api.courseGradebook(courseId, {
           groupId: gradebookGroupId || undefined,
           activityId: gradebookActivityId || undefined,
@@ -131,22 +132,23 @@ export default function CourseDetailPage() {
         }),
         api.courseContent(courseId),
         api.courseContentTypes(courseId),
-        api.courseContentResources(courseId)
+        api.courseContentResources(courseId),
+        api.subjects()
       ]);
       setGradebook(gradebookResult.gradebook);
       setContentItems(contentResult.contentItems);
       setContentTypeDefinitions(contentTypesResult.contentTypes);
       setActiveContentTypeDefinitions(contentTypesResult.activeContentTypes ?? contentTypesResult.contentTypes);
       setContentResources(contentResourcesResult.resources);
+      setSubjects(subjectsResult.subjects);
     } else {
       setGradebook(null);
       setContentItems([]);
       setContentTypeDefinitions([]);
       setActiveContentTypeDefinitions([]);
       setContentResources([]);
+      setSubjects([]);
     }
-    const aiSettings = getCourseAiSettings(courseResult.course);
-    setStudentSupportAgentId(aiSettings.studentSupportAiAgentConnectionId);
     api
       .aiAgentConnections()
       .then((aiAgentResult) => setAiAgentConnections(aiAgentResult.connections.filter((connection) => connection.isEnabled)))
@@ -617,22 +619,6 @@ export default function CourseDetailPage() {
     }
   }
 
-  async function saveCourseSettings(event: FormEvent) {
-    event.preventDefault();
-    setError("");
-    setIsSavingSettings(true);
-    try {
-      const result = await api.updateCourseSettings(courseId, {
-        studentSupportAiAgentConnectionId: studentSupportAgentId || null
-      });
-      setCourse(result.course);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("courseDetail.settingsSaveError"));
-    } finally {
-      setIsSavingSettings(false);
-    }
-  }
-
   function materialHref(material: CourseMaterial) {
     if (legacyMaterialHasStoredFile(material)) {
       return withMaterialDownloadVersion(api.materialDownloadUrl(courseId, material.id), material);
@@ -718,6 +704,11 @@ export default function CourseDetailPage() {
   const settingsContentResource = settingsContentItem?.contentResourceId ? contentResourceById.get(settingsContentItem.contentResourceId) ?? null : null;
   const settingsContentType = settingsContentResource ? contentTypeByKey.get(settingsContentResource.contentTypeKey) ?? null : null;
   const SettingsContentTypeRenderer = resolveContentTypeSettingsRenderer(settingsContentType?.settingsRendererKey);
+  const requestedCourseTab = searchParams.get("tab");
+  const activeCourseTab = requestedCourseTab === "groups" || requestedCourseTab === "gradebook" || requestedCourseTab === "settings"
+    ? requestedCourseTab
+    : "content";
+  const activeCourseSettingsSection: CourseSettingsSection = searchParams.get("section") === "ai" ? "ai" : "general";
   const pickerPlacementPanel = (
     <div className="grid compact-form-grid activity-picker-placement">
       <div className="field">
@@ -1296,18 +1287,14 @@ export default function CourseDetailPage() {
                   <p className="muted">{t("common.noDescription")}</p>
                 )}
               </div>
-              <div className="hero-actions">
-                <Link className="button secondary" href={`/courses/${course.id}/edit`}>
-                  {t("courseDetail.edit")}
-                </Link>
-              </div>
             </section>
             {error ? <p className="error">{error}</p> : null}
             <WorkspaceTabs
               ariaLabel={t("courseDetail.workspaceTabs")}
-              initialTab={searchParams.get("tab") === "gradebook" ? "gradebook" : "content"}
+              initialTab={activeCourseTab}
               tabs={[
                 {
+                  href: `/courses/${courseId}?tab=content`,
                   id: "content",
                   label: t("courseDetail.contentTab"),
                   render: () => (
@@ -1645,6 +1632,7 @@ export default function CourseDetailPage() {
                   )
                 },
                 {
+                  href: `/courses/${courseId}?tab=groups`,
                   id: "groups",
                   label: t("courseDetail.groupsTab"),
                   render: () => (
@@ -1722,6 +1710,7 @@ export default function CourseDetailPage() {
                   )
                 },
                 {
+                  href: `/courses/${courseId}?tab=gradebook`,
                   id: "gradebook",
                   label: t("courseDetail.gradebookTab"),
                   render: () => (
@@ -1897,44 +1886,24 @@ export default function CourseDetailPage() {
                   )
                 },
                 {
+                  href: `/courses/${courseId}?tab=settings&section=${activeCourseSettingsSection}`,
                   id: "settings",
                   label: t("courseDetail.settingsTab"),
                   render: () => (
-                    <section className="section stack">
-                      <div className="section-heading">
-                        <div>
-                          <p className="eyebrow">{t("courseDetail.settingsEyebrow")}</p>
-                          <h2>{t("courseDetail.settingsTitle")}</h2>
-                        </div>
-                      </div>
-
-                      <form className="form" onSubmit={saveCourseSettings}>
-                        <div className="field">
-                          <label htmlFor="studentSupportAgent">{t("courseDetail.studentSupportAgent")}</label>
-                          <select
-                            id="studentSupportAgent"
-                            value={studentSupportAgentId}
-                            onChange={(event) => setStudentSupportAgentId(event.target.value)}
-                          >
-                            <option value="">{t("courseDetail.noAiAgentSelected")}</option>
-                            {aiAgentConnections.map((connection) => (
-                              <option key={connection.id} value={connection.id}>
-                                {formatAiAgentOption(connection, t)}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="muted">{t("courseDetail.studentSupportAgentHelp")}</p>
-                        </div>
-
-                        {aiAgentConnections.length ? null : <p className="muted">{t("courseDetail.noAiAgentsAvailable")}</p>}
-
-                        <div className="row">
-                          <button disabled={isSavingSettings} type="submit">
-                            {isSavingSettings ? t("common.saving") : t("courseDetail.saveSettings")}
-                          </button>
-                        </div>
-                      </form>
-                    </section>
+                    <CourseSettingsPanel
+                      activeSection={activeCourseSettingsSection}
+                      aiAgentConnections={aiAgentConnections}
+                      course={course}
+                      subjects={subjects}
+                      onCourseUpdated={(updatedCourse) => {
+                        setCourse(updatedCourse);
+                        if (updatedCourse.subjectId) {
+                          api.activityBanks(updatedCourse.subjectId)
+                            .then((result) => setActivityBanks(result.activityBanks))
+                            .catch(() => setActivityBanks([]));
+                        }
+                      }}
+                    />
                   )
                 }
               ]}
@@ -2213,25 +2182,6 @@ export default function CourseDetailPage() {
       </main>
     </AppShell>
   );
-}
-
-function getCourseAiSettings(course: Course) {
-  const metadata = course.metadata ?? {};
-  const aiSettings = metadata.aiSettings;
-  if (!aiSettings || typeof aiSettings !== "object" || Array.isArray(aiSettings)) {
-    return {
-      studentSupportAiAgentConnectionId: ""
-    };
-  }
-  const record = aiSettings as Record<string, unknown>;
-  return {
-    studentSupportAiAgentConnectionId: typeof record.studentSupportAiAgentConnectionId === "string" ? record.studentSupportAiAgentConnectionId : ""
-  };
-}
-
-function formatAiAgentOption(connection: AiAgentConnection, t: (key: string, vars?: Record<string, string | number>) => string) {
-  const scope = connection.scope === "global" ? t("courseDetail.aiAgentScopeGlobal") : t("courseDetail.aiAgentScopePersonal");
-  return `${connection.displayName} · ${t(`aiAgentProviders.${connection.provider}`)} · ${connection.model} · ${scope}`;
 }
 
 function getAllGroupsAssignmentRule(activity: NonNullable<Course["activities"]>[number]) {

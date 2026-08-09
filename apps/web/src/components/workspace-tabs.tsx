@@ -1,8 +1,10 @@
 "use client";
 
-import { type ReactNode, useId, useState } from "react";
+import Link from "next/link";
+import { type ReactNode, useEffect, useId, useState } from "react";
 
 export type WorkspaceTabDefinition<T extends string> = {
+  href?: string;
   id: T;
   label: string;
   render: () => ReactNode;
@@ -19,6 +21,10 @@ export function WorkspaceTabs<T extends string>({ ariaLabel, initialTab, tabs }:
   const instanceId = useId();
   const activeDefinition = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
 
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
+
   if (!activeDefinition) {
     return null;
   }
@@ -31,19 +37,17 @@ export function WorkspaceTabs<T extends string>({ ariaLabel, initialTab, tabs }:
           const panelId = `${instanceId}-${tab.id}-panel`;
           const isActive = tab.id === activeDefinition.id;
 
-          return (
-            <button
-              key={tab.id}
-              aria-controls={panelId}
-              aria-selected={isActive}
-              className={`tab-button ${isActive ? "is-active" : ""}`}
-              id={tabId}
-              role="tab"
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </button>
+          const tabProps = {
+            "aria-controls": panelId,
+            "aria-selected": isActive,
+            className: `tab-button ${isActive ? "is-active" : ""}`,
+            id: tabId,
+            role: "tab" as const
+          };
+          return tab.href ? (
+            <Link key={tab.id} {...tabProps} href={tab.href}>{tab.label}</Link>
+          ) : (
+            <button key={tab.id} {...tabProps} type="button" onClick={() => setActiveTab(tab.id)}>{tab.label}</button>
           );
         })}
       </div>
