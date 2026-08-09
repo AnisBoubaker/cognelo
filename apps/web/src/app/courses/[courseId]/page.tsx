@@ -512,14 +512,17 @@ export default function CourseDetailPage() {
 
   function startAssigningActivityToAllGroups(activity: NonNullable<Course["activities"]>[number]) {
     const rule = getAllGroupsAssignmentRule(activity);
+    const coursePlacement = contentItems.find(
+      (item) => item.groupId === null && item.kind === "activity" && item.activityId === activity.id
+    );
     const gradebookSettings = rule?.gradebookSettings;
     const isTest = activity.activityType.key === "test";
     setAssignAllActivityId(activity.id);
     setAssignAllAvailableFrom(toDateTimeLocalValue(rule?.availableFrom));
     setAssignAllAvailableUntil(toDateTimeLocalValue(rule?.availableUntil));
     setAssignAllEnablePerGroupSettings(rule?.enablePerGroupSettings ?? true);
-    setAssignAllParentId(rule?.contentPlacement?.parentId ?? "");
-    setAssignAllIsVisible(rule?.contentPlacement?.isVisible ?? true);
+    setAssignAllParentId(rule?.contentPlacement?.parentId ?? coursePlacement?.parentId ?? "");
+    setAssignAllIsVisible(rule?.contentPlacement?.isVisible ?? coursePlacement?.isVisible ?? true);
     setAssignAllAssessmentMode(isTest ? "summative" : rule?.assessmentMode ?? "formative");
     setAssignAllPointsPossible(String(gradebookSettings?.pointsPossible ?? 100));
     setAssignAllGradingMode(gradebookSettings?.gradingMode ?? "points");
