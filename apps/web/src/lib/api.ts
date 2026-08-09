@@ -25,6 +25,7 @@ import type {
   MaterialKind,
   SubjectInput,
   SubjectUpdate,
+  UserPasswordChange,
   UserProfileUpdate
 } from "@cognelo/contracts";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
@@ -828,6 +829,11 @@ export const api = {
   updateMyProfile: (input: UserProfileUpdate) =>
     request<{ user: CurrentUser }>("/users/me", {
       method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  changeMyPassword: (input: UserPasswordChange) =>
+    request<{ ok: true }>("/users/me/password", {
+      method: "PUT",
       body: JSON.stringify(input)
     }),
   aiAgentConnections: () => request<{ connections: AiAgentConnection[]; preferences: AiAgentPreferences }>("/ai-agents"),

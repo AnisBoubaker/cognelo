@@ -70,6 +70,30 @@ export const UserProfileUpdateSchema = z.object({
 });
 export type UserProfileUpdate = z.infer<typeof UserProfileUpdateSchema>;
 
+export const UserPasswordChangeSchema = z
+  .object({
+    currentPassword: z.string().min(8).max(200),
+    newPassword: z.string().min(8).max(200),
+    confirmNewPassword: z.string().min(8).max(200)
+  })
+  .superRefine((value, context) => {
+    if (value.newPassword !== value.confirmNewPassword) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmNewPassword"],
+        message: "Passwords must match."
+      });
+    }
+    if (value.currentPassword === value.newPassword) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["newPassword"],
+        message: "The new password must be different from the current password."
+      });
+    }
+  });
+export type UserPasswordChange = z.infer<typeof UserPasswordChangeSchema>;
+
 export const AiAgentConnectionInputSchema = z.object({
   displayName: z.string().trim().min(2).max(160),
   provider: AiAgentProviderSchema,

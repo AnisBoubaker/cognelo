@@ -32,7 +32,13 @@ import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-
 import { TestActivityView, type TestStudentItemRendererContext } from "@/components/test-activity-view";
 import { TestManualGradingPanel } from "@/components/test-manual-grading-panel";
 import type { Locale } from "@/lib/i18n";
-import { respondentsForMcqChoice, type TestReviewAllItemContext } from "@/lib/test-review-all";
+import {
+  itemScorePercentage,
+  respondentsForMcqChoice,
+  summarizeMcqQuestionResponses,
+  summarizeNumbers,
+  type TestReviewAllItemContext
+} from "@/lib/test-review-all";
 import {
   api,
   apiAbsoluteUrl,
@@ -699,16 +705,65 @@ function McqTestReviewAll({ item, responses, t }: TestReviewAllItemContext) {
   const source = typeof item.activity.config?.source === "string" ? item.activity.config.source : "";
   const defaultCodeLanguage = typeof item.activity.config?.defaultCodeLanguage === "string" ? item.activity.config.defaultCodeLanguage : "none";
   const parsed = parseMcqSource(source, defaultCodeLanguage);
+  const scoreSummary = summarizeNumbers(responses.flatMap((response) => {
+    const percentage = itemScorePercentage(response.item);
+    return percentage === null ? [] : [percentage];
+  }));
+  const questionReports = parsed.questions.map((question) => ({
+    question,
+    summary: summarizeMcqQuestionResponses(
+      responses,
+      question.id,
+      question.choices.filter((choice) => choice.isCorrect).map((choice) => choice.id)
+    )
+  }));
+  const totalQuestionResponses = responses.length * parsed.questions.length;
+  const correctQuestionResponses = questionReports.reduce((total, report) => total + report.summary.correctCount, 0);
+  const questionAccuracy = totalQuestionResponses ? (correctQuestionResponses / totalQuestionResponses) * 100 : null;
 
   return (
     <div className="stack">
+      <section className="test-plugin-report stack stack-tight">
+        <div>
+          <p className="eyebrow">{t("courseDetail.reportActivityAnalysis")}</p>
+          <h3>{t("courseDetail.reportMcqResults")}</h3>
+        </div>
+        <div className="test-report-metrics test-report-plugin-metrics">
+          <PluginReportMetric label={t("courseDetail.reportResponses")} value={String(responses.length)} />
+          <PluginReportMetric label={t("courseDetail.reportQuestions")} value={String(parsed.questions.length)} />
+          <PluginReportMetric label={t("courseDetail.reportAverageScore")} value={formatReportPercentage(scoreSummary.mean)} />
+          <PluginReportMetric label={t("courseDetail.reportMedianScore")} value={formatReportPercentage(scoreSummary.median)} />
+          <PluginReportMetric label={t("courseDetail.reportQuestionAccuracy")} value={formatReportPercentage(questionAccuracy)} />
+          <PluginReportMetric
+            label={t("courseDetail.reportScoreSpread")}
+            value={scoreSummary.standardDeviation === null ? "—" : formatReportDecimal(scoreSummary.standardDeviation)}
+            note={t("courseDetail.reportPercentagePoints")}
+          />
+        </div>
+      </section>
       {parsed.introBlocks.length ? <MarkdownBlocksView blocks={parsed.introBlocks} /> : null}
-      {parsed.questions.map((question, questionIndex) => (
-        <article className="stack" key={question.id} style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 18 }}>
-          <div className="stack stack-tight">
-            <p className="eyebrow">Question {questionIndex + 1}</p>
-            <h3>{question.title}</h3>
-            <MarkdownBlocksView blocks={question.promptBlocks} />
+      {questionReports.map(({ question, summary }, questionIndex) => (
+        <article className="stack test-report-question" key={question.id}>
+          <div className="section-heading test-report-question-heading">
+            <div className="stack stack-tight">
+              <p className="eyebrow">{t("courseDetail.reportQuestion", { number: questionIndex + 1 })}</p>
+              <h3>{question.title}</h3>
+              <MarkdownBlocksView blocks={question.promptBlocks} />
+            </div>
+            <div className="row wrap test-report-question-stats">
+              <span className="participant-status is-graded">
+                {t("courseDetail.reportQuestionCorrect", {
+                  count: summary.correctCount,
+                  total: summary.responseCount,
+                  rate: formatReportPercentage(summary.correctRate)
+                })}
+              </span>
+              {summary.unansweredCount ? (
+                <span className="participant-status is-missing">
+                  {t("courseDetail.reportQuestionUnanswered", { count: summary.unansweredCount })}
+                </span>
+              ) : null}
+            </div>
           </div>
           <div className="stack stack-tight">
             {question.choices.map((choice) => {
@@ -716,16 +771,8 @@ function McqTestReviewAll({ item, responses, t }: TestReviewAllItemContext) {
               const studentNames = students.map((student) => `${student.participantName} (${student.groupTitle})`);
               return (
                 <div
+                  className={`test-report-choice${choice.isCorrect ? " is-correct" : ""}`}
                   key={choice.id}
-                  style={{
-                    alignItems: "flex-start",
-                    background: choice.isCorrect ? "rgba(34, 197, 94, 0.08)" : undefined,
-                    border: choice.isCorrect ? "1px solid rgba(22, 163, 74, 0.28)" : "1px solid rgba(13, 27, 71, 0.12)",
-                    borderRadius: 10,
-                    display: "flex",
-                    gap: 12,
-                    padding: 12
-                  }}
                 >
                   <span
                     aria-label={t(choice.isCorrect ? "courseDetail.correctAnswer" : "courseDetail.incorrectAnswer")}
@@ -749,6 +796,24 @@ function McqTestReviewAll({ item, responses, t }: TestReviewAllItemContext) {
       ))}
     </div>
   );
+}
+
+function PluginReportMetric({ label, value, note }: { label: string; value: string; note?: string }) {
+  return (
+    <article className="test-report-metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      {note ? <small>{note}</small> : null}
+    </article>
+  );
+}
+
+function formatReportPercentage(value: number | null) {
+  return value === null ? "—" : `${formatReportDecimal(value)}%`;
+}
+
+function formatReportDecimal(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function TestReviewChoiceBadge({

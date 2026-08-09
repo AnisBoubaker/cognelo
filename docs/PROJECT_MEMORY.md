@@ -133,7 +133,8 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Branding uses the project logo from `docs/brand`.
 - The app favicon uses the square Cognelo icon asset.
 - The top header separates primary app navigation from personal controls.
-- General account configuration lives under `/settings`, currently reached from the account menu and structured so future non-course-specific settings can be added beside `/settings/profile`.
+- General account configuration lives under `/settings`, currently reached from the account menu. `/settings/profile` contains separate profile and password forms; password changes require the current password, use the shared notification/unsaved-change systems, and keep the authenticated session active.
+- Production deployment is documented in `docs/DEPLOYMENT_UBUNTU_APACHE.md`: Apache terminates TLS and routes same-origin `/api` traffic to a systemd-managed API process, the web process is separately managed by systemd, PostgreSQL runs on the host, uploads live in per-instance shared storage, and every cohosted instance has an isolated Unix account/database/port pair/JWT secret. `npm run production:bootstrap` initializes roles/plugin manifests/core activity types and the first administrator without development seed data. Optional untrusted-code runners should be isolated and remain disabled until secured.
 - AI agent configuration lives under `/settings/ai-agents` and uses the same settings navigation as profile configuration.
 - Plugin authoring UIs may expose AI-assisted generation only when the teacher has selected an enabled question-authoring AI agent. Calls should go through server-side plugin routes so stored API keys are never exposed to the browser.
 - Future plugin-route client work should reduce plugin-specific web/app wiring: plugin UIs should be able to call their own server routes through a shared client/service rather than requiring new hardcoded methods in `apps/web/src/lib/api.ts` and per-page prop plumbing for each plugin capability.
@@ -148,6 +149,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - The shared code editor should grow vertically with its content.
 - Monaco should be exposed as a shared editor primitive through `packages/activity-ui` for student coding flows and future plugin reuse, while lightweight authoring editors can remain plugin-specific or use the in-house editor where that fits better.
 - Save confirmations and user-facing error notifications should prefer the shared bottom-right notification system over inline “saved” messages when the message is transient and not tied to a specific field.
+- Aggregate **Review all** surfaces are teacher reports rather than answer dumps. For a compound Test, the platform shell owns plugin-neutral participation, score distribution, timing, lateness, and per-activity performance statistics based on each student's latest completed attempt. Each activity type owns its richer report renderer through the aggregate-review registry; future plugins should register a renderer instead of adding plugin-specific reporting branches to the Test shell.
 - Group participant management uses an inline panel form in the group workspace with an email-first flow.
 - Read-only inherited fields in forms should have a visible locked treatment rather than appearing identical to editable fields.
 - The student group workspace should stay intentionally minimal: assigned activities and visible course materials only, with no management forms, settings, or participant management.

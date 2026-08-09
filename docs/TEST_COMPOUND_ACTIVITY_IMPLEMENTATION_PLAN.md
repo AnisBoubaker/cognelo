@@ -440,7 +440,7 @@ Implemented in Phase 5:
 - Teachers can adjust an individual Test item score; the item stores the manual-grading reason and the parent grade is recomputed immediately. Whole-Test overrides preserve the structured item breakdown.
 - Test regrading recomputes the parent from its immutable child result snapshot. Re-executing child plugin grading logic is unnecessary while attempted Test content is locked; later revision support must dispatch regrading through each child's registered adapter.
 - Child scores are not exposed by the embedded activity renderer. The released parent Test grade and breakdown are the student-facing result.
-- Teacher review reads child attempt state directly, including submissions created before parent aggregation was introduced. **Review all** uses each student's latest completed Test attempt and dispatches each contained activity through a review registry. The MCQ renderer aggregates selection counts per choice and exposes respondent names without coupling the Test shell to MCQ parsing.
+- Teacher review reads child attempt state directly, including submissions created before parent aggregation was introduced. **Review all** uses each student's latest completed Test attempt and is a report: the Test shell shows submission rate, score distribution, duration, lateness, and plugin-neutral per-activity performance, then dispatches each contained activity through a review registry for richer analysis. The MCQ renderer adds activity score statistics and per-question exact-answer accuracy/unanswered counts while preserving selection counts and respondent names per choice, without coupling the Test shell to MCQ parsing.
 
 ### Phase 6 — Additional Plugins and Hardening
 

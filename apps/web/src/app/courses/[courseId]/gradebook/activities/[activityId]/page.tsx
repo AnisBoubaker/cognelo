@@ -8,7 +8,6 @@ import { createCodingHomeworkGraderClient, type CodingHomeworkGradebookAttemptRe
 import { createMcqClient, type McqSubmission } from "@cognelo/plugin-mcq";
 import { createParsonsClient, type ParsonsGradebookAttemptRecord } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
-import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { TestReviewAllPanel } from "@/components/test-review-all-panel";
 import {
   api,
@@ -83,13 +82,15 @@ export default function GradebookActivityResultsPage() {
     try {
       const reviewTargets = rows.flatMap((row) => {
         const attempt = latestCompletedTestAttempt(row);
-        return attempt ? [{ row, attemptId: attempt.id }] : [];
+        return attempt ? [{ row, attempt }] : [];
       });
-      const submissions = await Promise.all(reviewTargets.map(async ({ row, attemptId }) => ({
+      const submissions = await Promise.all(reviewTargets.map(async ({ row, attempt }) => ({
         participantId: row.participantId,
         participantName: row.participantName,
         groupTitle: row.groupTitle,
-        review: (await api.testAttemptReview(courseId, attemptId)).review
+        durationSeconds: attempt.durationSeconds,
+        isLate: attempt.isLate,
+        review: (await api.testAttemptReview(courseId, attempt.id)).review
       })));
       setReviewAll({ loading: false, error: "", submissions });
     } catch (err) {
@@ -397,7 +398,7 @@ export default function GradebookActivityResultsPage() {
           </div>
 
           {groupedRows.length ? (
-            <div className="table-list">
+            <div className="table-list table-list-gradebook-detail">
               <div className="table-row table-row-gradebook-detail table-head" aria-hidden="true">
                 <span>{t("courseDetail.studentHeader")}</span>
                 <span>{t("courseDetail.groupHeader")}</span>
@@ -470,6 +471,7 @@ export default function GradebookActivityResultsPage() {
           >
             <TestReviewAllPanel
               activityTitle={activityTitle}
+              participantCount={rows.length}
               submissions={reviewAll.submissions}
               loading={reviewAll.loading}
               error={reviewAll.error}
@@ -509,7 +511,6 @@ function GradebookStudentRow({
       <div className="table-main table-main-stack">
         <strong>{row.participantName}</strong>
         <span className="table-meta-note muted">{row.participantEmail}</span>
-        <TestGradeBreakdown feedback={row.feedback} heading={t("groupPage.gradingBreakdownTitle")} compact />
       </div>
       <span className="table-meta muted">{row.groupTitle}</span>
       <strong>{rowHasSubmittedAttempt || row.score !== null ? formatGradebookScore(row.score, row.maxScore) : t("courseDetail.didNotSubmit")}</strong>
