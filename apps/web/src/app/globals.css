@@ -50,7 +50,7 @@ h3 {
 }
 
 h1 {
-  font-size: clamp(2rem, 3vw, 3rem);
+  font-size: clamp(1.75rem, 2.4vw, 2.5rem);
 }
 
 h2 {
@@ -408,8 +408,9 @@ select:focus {
 
 .page {
   margin: 0 auto;
-  max-width: 1280px;
-  padding: 28px 20px 52px;
+  max-width: none;
+  padding: 28px max(16px, 2.5vw) 52px;
+  width: 100%;
 }
 
 .stack {
@@ -572,6 +573,7 @@ a.card:hover,
 }
 
 .hero-panel h1 {
+  font-size: clamp(1.75rem, 2.4vw, 2.5rem);
   max-width: 14ch;
 }
 
@@ -597,8 +599,7 @@ a.card:hover,
 }
 
 .hero-panel-compact h1 {
-  font-size: clamp(2rem, 3.8vw, 3.4rem);
-  line-height: 0.98;
+  line-height: 1.05;
   max-width: none;
 }
 
