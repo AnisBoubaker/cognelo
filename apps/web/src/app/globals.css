@@ -1312,8 +1312,28 @@ a.card:hover,
   grid-template-columns: minmax(220px, 1.2fr) minmax(160px, 0.8fr) max-content;
 }
 
-.table-row-gradebook-detail {
-  grid-template-columns: minmax(220px, 1.1fr) minmax(160px, 0.7fr) minmax(140px, 0.5fr) 110px max-content;
+.table-list-gradebook-detail {
+  column-gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(130px, 0.55fr) minmax(120px, 0.45fr) 110px max-content;
+  overflow: hidden;
+  row-gap: 0;
+}
+
+.table-list-gradebook-detail .table-row-gradebook-detail {
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  min-width: 0;
+}
+
+.table-row-gradebook-detail.table-head > span:last-child {
+  justify-self: center;
+}
+
+.table-row-gradebook-detail .button {
+  padding-left: 10px;
+  padding-right: 10px;
+  white-space: nowrap;
 }
 
 .table-row-simple {
@@ -1332,6 +1352,115 @@ a.card:hover,
 .answer-overlay.test-review-overlay {
   max-width: 1840px;
   width: min(100%, 1840px);
+}
+
+.test-report-summary {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--brand-blue), white 96%), #fff 58%, color-mix(in srgb, var(--brand-teal), white 96%));
+  border: 1px solid color-mix(in srgb, var(--brand-blue), white 78%);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.test-report-metrics {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+}
+
+.test-report-metric {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 14px 16px;
+}
+
+.test-report-metric > span,
+.test-report-metric > small {
+  color: var(--muted);
+}
+
+.test-report-metric > span {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.test-report-metric > strong {
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  line-height: 1.1;
+}
+
+.test-report-activity-table {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+.test-report-activity-row {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.82);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(260px, 1fr) repeat(3, minmax(100px, 0.25fr));
+  min-width: 680px;
+  padding: 12px 14px;
+}
+
+.test-report-activity-row + .test-report-activity-row {
+  border-top: 1px solid var(--line);
+}
+
+.test-report-activity-head {
+  background: color-mix(in srgb, var(--brand-blue), white 94%);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.test-plugin-report {
+  background: color-mix(in srgb, var(--brand-teal), white 95%);
+  border: 1px solid color-mix(in srgb, var(--brand-teal), white 72%);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.test-report-plugin-metrics {
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+}
+
+.test-report-question {
+  border: 1px solid rgba(13, 27, 71, 0.1);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.test-report-question-heading {
+  align-items: flex-start;
+}
+
+.test-report-question-stats {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.test-report-choice {
+  align-items: flex-start;
+  border: 1px solid rgba(13, 27, 71, 0.12);
+  border-radius: 10px;
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+}
+
+.test-report-choice.is-correct {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(22, 163, 74, 0.28);
 }
 
 .test-review-choice-count {
@@ -2826,6 +2955,18 @@ a.card:hover,
   color: #fff;
 }
 
+@media (max-width: 1200px) {
+  .test-report-plugin-metrics {
+    grid-template-columns: repeat(3, minmax(140px, 1fr));
+  }
+
+  .table-row-gradebook-detail .button {
+    font-size: 0.9rem;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+
 @media (max-width: 780px) {
   .topbar {
     align-items: flex-start;
@@ -2857,6 +2998,15 @@ a.card:hover,
   .section-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .test-report-metrics,
+  .test-report-plugin-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .test-report-question-stats {
+    justify-content: flex-start;
   }
 
   .split {
@@ -2904,6 +3054,16 @@ a.card:hover,
 
   .table-row {
     align-items: start;
+    grid-template-columns: 1fr;
+  }
+
+  .table-list-gradebook-detail {
+    display: block;
+  }
+
+  .table-list-gradebook-detail .table-row-gradebook-detail {
+    display: grid;
+    grid-column: auto;
     grid-template-columns: 1fr;
   }
 

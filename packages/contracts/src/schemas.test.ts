@@ -19,6 +19,7 @@ import {
   SubjectInputSchema,
   TestCreateSchema,
   TestItemCreateSchema,
+  UserPasswordChangeSchema,
   UserProfileUpdateSchema
 } from "./index";
 
@@ -143,6 +144,34 @@ describe("shared contract schemas", () => {
       firstName: "Ada",
       lastName: "Lovelace"
     });
+  });
+
+  it("validates password changes", () => {
+    expect(
+      UserPasswordChangeSchema.parse({
+        currentPassword: "OldPassword123!",
+        newPassword: "NewPassword456!",
+        confirmNewPassword: "NewPassword456!"
+      })
+    ).toEqual({
+      currentPassword: "OldPassword123!",
+      newPassword: "NewPassword456!",
+      confirmNewPassword: "NewPassword456!"
+    });
+    expect(() =>
+      UserPasswordChangeSchema.parse({
+        currentPassword: "OldPassword123!",
+        newPassword: "NewPassword456!",
+        confirmNewPassword: "DifferentPassword!"
+      })
+    ).toThrow();
+    expect(() =>
+      UserPasswordChangeSchema.parse({
+        currentPassword: "SamePassword123!",
+        newPassword: "SamePassword123!",
+        confirmNewPassword: "SamePassword123!"
+      })
+    ).toThrow();
   });
 
   it("validates auth and activation payloads", () => {

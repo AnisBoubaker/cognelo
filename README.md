@@ -103,8 +103,10 @@ Core endpoints:
 ```text
 POST   /api/auth/login
 POST   /api/auth/logout
+GET    /api/health
 GET    /api/users/me
 PATCH  /api/users/me
+PUT    /api/users/me/password
 GET    /api/ai-agents
 POST   /api/ai-agents
 PATCH  /api/ai-agents/:connectionId
@@ -366,6 +368,10 @@ Judge0 (dev): http://localhost:2358
 Web design runner (dev): http://localhost:3456
 ```
 
+## Production Deployment
+
+The step-by-step production runbook is [docs/DEPLOYMENT_UBUNTU_APACHE.md](docs/DEPLOYMENT_UBUNTU_APACHE.md). It covers a bare Ubuntu host, host-managed PostgreSQL, Apache and TLS, isolated systemd services, persistent uploads, production administrator bootstrap, backups, upgrades, optional sandbox services, and multiple Cognelo instances on one server.
+
 Judge0-related environment variables:
 
 ```text
@@ -388,8 +394,8 @@ WEB_DESIGN_RUNNER_URL=http://localhost:3456
 - The header and login page use the Cognelo logo from the repo's brand assets.
 - The favicon/app icon uses the square Cognelo icon asset served from `apps/web/src/app/icon.png`.
 - The top navigation separates primary app routes from the account dropdown.
-- Account-wide configuration lives under `/settings`, with the current profile editor at `/settings/profile`.
-- Users can update their first and last name from profile settings; email changes are reserved for administrators.
+- Account-wide configuration lives under `/settings`, with the current profile and security editor at `/settings/profile`.
+- Users can update their first and last name and change their password after confirming the current password; email changes are reserved for administrators.
 - AI agent connection settings live under `/settings/ai-agents`; users can create personal connections, choose their question-authoring helper, and admins can create global connections for later course use.
 - Plugin authoring screens can use the selected question-authoring AI agent through server-side plugin routes; the MCQ plugin uses this to generate validated MCQ source from a teacher description.
 - All core and plugin authoring/settings forms should register unsaved-change state through `useUnsavedChangesGuard` from `@cognelo/activity-ui`. Registered forms show a shared confirmation dialog before internal navigation, with actions to continue editing, save and leave, or discard changes. Browser refresh/close uses the native browser warning.

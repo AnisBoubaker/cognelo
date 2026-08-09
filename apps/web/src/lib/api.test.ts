@@ -56,6 +56,26 @@ describe("web API client", () => {
     });
   });
 
+  it("sends password changes to the dedicated account endpoint", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+    const input = {
+      currentPassword: "OldPassword123!",
+      newPassword: "NewPassword456!",
+      confirmNewPassword: "NewPassword456!"
+    };
+
+    await expect(api.changeMyPassword(input)).resolves.toEqual({ ok: true });
+    expect(fetch).toHaveBeenCalledWith(
+      "http://localhost:3001/api/users/me/password",
+      expect.objectContaining({ method: "PUT", body: JSON.stringify(input) })
+    );
+  });
+
   it("dispatches the unauthorized event on 401 responses", async () => {
     const dispatchEvent = vi.fn();
     vi.stubGlobal("window", { dispatchEvent });
