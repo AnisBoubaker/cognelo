@@ -278,11 +278,15 @@ select:focus {
 
 [role="tablist"] > button[role="tab"],
 .tab-button {
+  align-items: center;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 6px;
   box-shadow: none;
   color: var(--muted);
+  display: inline-flex;
+  font-weight: 700;
+  justify-content: center;
   min-height: 36px;
   padding: 0 14px;
   position: relative;
