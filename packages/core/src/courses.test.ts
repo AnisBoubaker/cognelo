@@ -154,6 +154,30 @@ describe("course services", () => {
     );
   });
 
+  it("stores the student content layout in course metadata without replacing other settings", async () => {
+    mockPrisma.course.findUnique.mockResolvedValue({ metadata: { theme: "quiet", aiSettings: { previous: true } } });
+    mockPrisma.course.update.mockResolvedValue({ id: "course-1" });
+
+    await updateCourse(teacherUser, "course-1", {
+      title: "Updated course",
+      studentContentLayout: "folder_tabs"
+    });
+
+    expect(mockPrisma.course.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "course-1" },
+        data: {
+          title: "Updated course",
+          metadata: {
+            theme: "quiet",
+            aiSettings: { previous: true },
+            studentContentLayout: "folder_tabs"
+          }
+        }
+      })
+    );
+  });
+
   it("adds non-student course memberships with the selected enrollment role", async () => {
     mockPrisma.courseMembership.create.mockResolvedValue({ id: "membership-1" });
 

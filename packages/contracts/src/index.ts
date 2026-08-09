@@ -135,7 +135,12 @@ export const CourseInputSchema = z.object({
 });
 export type CourseInput = z.infer<typeof CourseInputSchema>;
 
-export const CourseUpdateSchema = CourseInputSchema.partial();
+export const StudentContentLayoutSchema = z.enum(["accordion", "folder_tabs"]);
+export type StudentContentLayout = z.infer<typeof StudentContentLayoutSchema>;
+
+export const CourseUpdateSchema = CourseInputSchema.partial().extend({
+  studentContentLayout: StudentContentLayoutSchema.optional()
+});
 export type CourseUpdate = z.infer<typeof CourseUpdateSchema>;
 
 export const CourseSettingsInputSchema = z.object({

@@ -110,6 +110,7 @@ export function CourseSettingsPanel({
             </div>
             <CourseForm
               initial={course}
+              showStudentContentLayout
               subjects={subjects}
               submitLabel={t("courseForm.save")}
               onSubmit={async (input) => {
