@@ -203,7 +203,13 @@ export const SubjectKnowledgeGraphGenerationInputSchema = z.object({
   description: z.string().min(10).max(4000),
   directions: z.string().max(4000).optional().default(""),
   maxConcepts: z.number().int().min(1).max(50).default(12),
-  teachingLanguage: SubjectTeachingLanguageSchema.optional()
+  teachingLanguage: SubjectTeachingLanguageSchema.optional(),
+  mode: z.enum(["new", "iterate"]).default("new"),
+  existingGraph: SubjectKnowledgeGraphDraftSchema.optional()
+}).superRefine((value, context) => {
+  if (value.mode === "iterate" && !value.existingGraph?.concepts.length) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["existingGraph"], message: "Iteration requires a non-empty existing graph." });
+  }
 });
 export type SubjectKnowledgeGraphGenerationInput = z.infer<typeof SubjectKnowledgeGraphGenerationInputSchema>;
 

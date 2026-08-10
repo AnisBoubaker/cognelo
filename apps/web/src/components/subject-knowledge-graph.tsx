@@ -45,6 +45,7 @@ type Props = {
 
 type ConceptNode = Node<{ label: string }>;
 type LayoutPreset = "hierarchical" | "forest" | "radial" | "force" | "compact";
+type GenerationMode = "new" | "iterate";
 
 const elk = new ELK();
 
@@ -146,6 +147,7 @@ export function SubjectKnowledgeGraph({
   const [maxConcepts, setMaxConcepts] = useState(12);
   const [generating, setGenerating] = useState(false);
   const [showReplaceDialog, setShowReplaceDialog] = useState(false);
+  const [generationMode, setGenerationMode] = useState<GenerationMode>(initialConcepts.length ? "iterate" : "new");
   const [layoutPreset, setLayoutPreset] = useState<LayoutPreset>("hierarchical");
   const [arranging, setArranging] = useState(false);
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance<ConceptNode, Edge> | null>(null);
@@ -158,6 +160,10 @@ export function SubjectKnowledgeGraph({
   }, [initialConcepts, initialPrerequisites, setEdges, setNodes]);
 
   const selectedConcept = concepts.find((concept) => concept.id === selectedId) ?? null;
+
+  useEffect(() => {
+    setGenerationMode(concepts.length ? "iterate" : "new");
+  }, [concepts.length === 0]);
 
   const selectConcept = useCallback((concept: SubjectKnowledgeConcept | null) => {
     setSelectedId(concept?.id ?? null);
@@ -291,7 +297,7 @@ export function SubjectKnowledgeGraph({
       notify({ variant: "error", message: t("knowledgeGraph.aiDescriptionRequired") });
       return;
     }
-    if (concepts.length) {
+    if (generationMode === "new" && concepts.length) {
       setShowReplaceDialog(true);
       return;
     }
@@ -306,7 +312,14 @@ export function SubjectKnowledgeGraph({
         description: subjectDescription,
         directions: aiDirections,
         maxConcepts,
-        teachingLanguage
+        teachingLanguage,
+        mode: generationMode,
+        existingGraph: generationMode === "iterate" ? {
+          concepts: concepts.map(({ id, title, description, positionX, positionY }) => ({ id, title, description, positionX, positionY })),
+          prerequisites: prerequisites.map(({ id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle }) => ({
+            id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle
+          }))
+        } : undefined
       });
       applyGraph(result.concepts, result.prerequisites);
       selectConcept(null);
@@ -409,6 +422,14 @@ export function SubjectKnowledgeGraph({
         <details className="knowledge-graph-ai">
           <summary>{t("knowledgeGraph.aiSection")}</summary>
           <div className="stack knowledge-graph-ai-content">
+            <div className="field knowledge-graph-ai-mode">
+              <label htmlFor="knowledge-graph-ai-mode">{t("knowledgeGraph.aiMode")}</label>
+              <select id="knowledge-graph-ai-mode" value={generationMode} onChange={(event) => setGenerationMode(event.target.value as GenerationMode)}>
+                <option value="new">{t("knowledgeGraph.aiModeNew")}</option>
+                <option value="iterate" disabled={!concepts.length}>{t("knowledgeGraph.aiModeIterate")}</option>
+              </select>
+              <p className="muted">{t(generationMode === "iterate" ? "knowledgeGraph.aiModeIterateHelp" : "knowledgeGraph.aiModeNewHelp")}</p>
+            </div>
             <div className="field">
               <label htmlFor="knowledge-graph-ai-directions">{t("knowledgeGraph.aiDirections")}</label>
               <textarea
@@ -433,7 +454,9 @@ export function SubjectKnowledgeGraph({
             <p className="muted">{t("knowledgeGraph.aiHelp")}</p>
             <div className="row">
               <button type="button" disabled={generating || subjectDescription.trim().length < 10} onClick={requestGeneration}>
-                {generating ? t("knowledgeGraph.aiGenerating") : t("knowledgeGraph.aiGenerate")}
+                {generating
+                  ? t("knowledgeGraph.aiGenerating")
+                  : t(generationMode === "iterate" ? "knowledgeGraph.aiIterate" : "knowledgeGraph.aiGenerate")}
               </button>
               <button className="secondary" type="button" disabled={generating} onClick={revertGraph}>
                 {t("knowledgeGraph.revert")}

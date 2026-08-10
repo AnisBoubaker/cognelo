@@ -208,7 +208,15 @@ export async function generateSubjectKnowledgeGraph(user: CurrentUser, subjectId
     description: data.description,
     directions: data.directions,
     locale: data.teachingLanguage ?? SubjectTeachingLanguageSchema.parse(subject.teachingLanguage),
-    maxConcepts: data.maxConcepts
+    maxConcepts: data.maxConcepts,
+    mode: data.mode,
+    existingGraph: data.mode === "iterate" && data.existingGraph ? {
+      concepts: data.existingGraph.concepts.map((concept) => ({ key: concept.id, title: concept.title, description: concept.description })),
+      prerequisites: data.existingGraph.prerequisites.map((edge) => ({
+        sourceKey: edge.sourceConceptId,
+        requiredKey: edge.requiredConceptId
+      }))
+    } : undefined
   });
   const positions = layoutGeneratedKnowledgeGraph(graph);
   const concepts = graph.concepts.map((concept, index) => {
@@ -274,6 +282,8 @@ async function generateValidSubjectKnowledgeGraph(input: {
   directions: string;
   locale: "en" | "fr" | "zh" | "ar";
   maxConcepts: number;
+  mode: "new" | "iterate";
+  existingGraph?: GeneratedKnowledgeGraph;
 }) {
   let issues = "";
   for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -285,13 +295,21 @@ async function generateValidSubjectKnowledgeGraph(input: {
         `Use no more than ${input.maxConcepts} concepts; fewer concepts are preferred when sufficient.`,
         "The required shape is: {\"concepts\":[{\"key\":\"stable-short-key\",\"title\":\"...\",\"description\":\"...\"}],\"prerequisites\":[{\"sourceKey\":\"concept-that-requires\",\"requiredKey\":\"required-concept\"}]}.",
         "Every prerequisite must point from the concept that requires knowledge to the required concept.",
-        "Do not create cycles, self-links, duplicate concepts, or duplicate prerequisites."
+        "Do not create cycles, self-links, duplicate concepts, or duplicate prerequisites.",
+        input.mode === "iterate"
+          ? "Revise the supplied graph according to the teacher directions. Return the complete resulting graph, including unchanged concepts and prerequisites that should remain. Reuse existing concept keys whenever a concept remains."
+          : "Create a completely new graph from scratch. Do not assume or preserve any prior graph."
       ].join("\n"),
       userPrompt: [
         `Subject title: ${input.title}`,
         `Subject description: ${input.description}`,
+        input.mode === "iterate" ? `Current knowledge graph: ${JSON.stringify(input.existingGraph)}` : "Current knowledge graph: intentionally ignored.",
         input.directions.trim() ? `Additional teacher directions: ${input.directions.trim()}` : "Additional teacher directions: none.",
-        issues ? `The previous response was invalid. Correct these issues: ${issues}` : "Create the smallest useful prerequisite graph for this subject."
+        issues
+          ? `The previous response was invalid. Correct these issues: ${issues}`
+          : input.mode === "iterate"
+            ? "Apply the requested changes and return the full revised graph."
+            : "Create the smallest useful prerequisite graph for this subject."
       ].join("\n\n"),
       maxOutputTokens: Math.min(8000, 1200 + input.maxConcepts * 180)
     });
