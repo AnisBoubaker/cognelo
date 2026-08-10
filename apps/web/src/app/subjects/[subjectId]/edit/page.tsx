@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { EditActionBar, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { EditActionBar, RichTextEditor, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SubjectKnowledgeGraph } from "@/components/subject-knowledge-graph";
@@ -12,7 +12,7 @@ export default function EditSubjectPage() {
   const params = useParams<{ subjectId: string }>();
   const subjectId = params.subjectId;
   const router = useRouter();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [subject, setSubject] = useState<Subject | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -141,7 +141,14 @@ export default function EditSubjectPage() {
                 </div>
                 <div className="field">
                   <label htmlFor="subject-description">{t("subjects.descriptionLabel")}</label>
-                  <textarea id="subject-description" rows={8} value={description} onChange={(event) => setDescription(event.target.value)} />
+                  <RichTextEditor
+                    id="subject-description"
+                    value={description}
+                    locale={locale}
+                    minHeight={220}
+                    ariaLabel={t("subjects.descriptionLabel")}
+                    onChange={setDescription}
+                  />
                 </div>
                 <div className="field subject-language-field">
                   <label htmlFor="subject-teaching-language">{t("subjects.teachingLanguageLabel")}</label>
