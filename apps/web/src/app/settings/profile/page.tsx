@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { EditActionBar, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { SettingsNav } from "@/components/settings-nav";
@@ -202,11 +202,17 @@ export default function ProfileSettingsPage() {
 
                 {error ? <p className="error">{error}</p> : null}
 
-                <div className="row">
-                  <button disabled={saving} type="submit">
-                    {saving ? t("common.saving") : t("settings.saveProfile")}
-                  </button>
-                </div>
+                <EditActionBar
+                  isDirty={hasUnsavedChanges}
+                  isSaving={saving}
+                  savedLabel={t("common.savedStatus")}
+                  unsavedLabel={t("common.unsavedStatus")}
+                  saveLabel={t("settings.saveProfile")}
+                  savingLabel={t("common.saving")}
+                  cancelLabel={t("common.cancel")}
+                  onCancel={discardChanges}
+                  onSave={saveProfile}
+                />
               </form>
             </section>
 
@@ -266,11 +272,17 @@ export default function ProfileSettingsPage() {
 
                 {passwordError ? <p className="error" role="alert">{passwordError}</p> : null}
 
-                <div className="row">
-                  <button disabled={changingPassword || !hasUnsavedPassword} type="submit">
-                    {changingPassword ? t("settings.changingPassword") : t("settings.changePassword")}
-                  </button>
-                </div>
+                <EditActionBar
+                  isDirty={hasUnsavedPassword}
+                  isSaving={changingPassword}
+                  savedLabel={t("common.savedStatus")}
+                  unsavedLabel={t("common.unsavedStatus")}
+                  saveLabel={t("settings.changePassword")}
+                  savingLabel={t("settings.changingPassword")}
+                  cancelLabel={t("common.cancel")}
+                  onCancel={discardPassword}
+                  onSave={savePassword}
+                />
               </form>
             </section>
           </div>

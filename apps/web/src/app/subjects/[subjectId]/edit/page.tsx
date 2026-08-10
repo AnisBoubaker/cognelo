@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { EditActionBar, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SubjectKnowledgeGraph } from "@/components/subject-knowledge-graph";
@@ -167,17 +166,17 @@ export default function EditSubjectPage() {
                 setGraphPrerequisites(graph.prerequisites.map((prerequisite) => ({ ...prerequisite, subjectId })));
               }}
             />
-            <div className="subject-edit-action-bar">
-              <p className="muted">{t(hasUnsavedChanges ? "editSubject.unsavedChanges" : "editSubject.noUnsavedChanges")}</p>
-              <div className="hero-actions">
-                <Link className="button secondary" href={`/subjects/${subject.id}`}>
-                  {t("common.cancel")}
-                </Link>
-                <button type="submit" form="subject-metadata-form" disabled={saving || !hasUnsavedChanges}>
-                  {saving ? t("common.saving") : t("common.save")}
-                </button>
-              </div>
-            </div>
+            <EditActionBar
+              isDirty={hasUnsavedChanges}
+              isSaving={saving}
+              savedLabel={t("editSubject.noUnsavedChanges")}
+              unsavedLabel={t("editSubject.unsavedChanges")}
+              saveLabel={t("common.save")}
+              savingLabel={t("common.saving")}
+              cancelLabel={t("common.cancel")}
+              cancelHref={`/subjects/${subject.id}`}
+              form="subject-metadata-form"
+            />
           </>
         ) : null}
       </main>

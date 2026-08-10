@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { CodeEditor, MarkdownRenderer, RichTextEditor, codeLanguageOptions, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { CodeEditor, EditActionBar, MarkdownRenderer, RichTextEditor, codeLanguageOptions, getEditActionBarCopy, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   parseMcqSource,
   type McqChoice,
@@ -247,6 +247,7 @@ export function McqActivityView({
 }: McqActivityViewProps) {
   const copyLocale = locale === "ar" ? "en" : locale;
   const copy = copyByLocale[copyLocale] ?? copyByLocale.en;
+  const actionCopy = getEditActionBarCopy(locale);
   const mcqCodeLanguageOptions = useMemo(
     () => [{ value: "none", label: copy.notProgrammingExercise }, ...codeLanguageOptions],
     [copy.notProgrammingExercise]
@@ -740,11 +741,18 @@ export function McqActivityView({
         ) : null}
 
         {error ? <p className="error">{error}</p> : null}
-        <div className="row">
-          <button type="submit" disabled={saving || parsedMcq.errors.length > 0 || parsedMcq.questions.length === 0}>
-            {saving ? copy.saving : copy.save}
-          </button>
-        </div>
+        <EditActionBar
+          isDirty={hasUnsavedChanges}
+          isSaving={saving}
+          savedLabel={actionCopy.saved}
+          unsavedLabel={actionCopy.unsaved}
+          saveLabel={copy.save}
+          savingLabel={copy.saving}
+          cancelLabel={actionCopy.cancel}
+          onCancel={discardChanges}
+          onSave={saveMcqChanges}
+          saveDisabled={parsedMcq.errors.length > 0 || parsedMcq.questions.length === 0}
+        />
 
       </form>
     );

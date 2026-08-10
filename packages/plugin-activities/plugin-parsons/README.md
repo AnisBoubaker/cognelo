@@ -103,6 +103,7 @@ Summative submissions do not show correctness feedback during the activity. When
 - scrambling is random on each fresh try/reset
 - order feedback counts minimally misplaced units instead of cascading false counts
 - groups are stored as line ranges so edits inside a group keep the group coherent
+- teacher authoring uses the shared responsive `EditActionBar` for saved/unsaved status and snapshot-backed Cancel/Save actions
 
 ## Contributor Workflow
 

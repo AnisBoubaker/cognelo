@@ -39,6 +39,8 @@ In activity-bank lists, MCQ rows display the activity title without repeating th
 
 The MCQ authoring UI must stay registered with `useUnsavedChangesGuard` from `@cognelo/activity-ui`. Any new MCQ authoring option, generated-content panel, or settings form should participate in that same dirty/save/discard flow.
 
+The authoring form uses the shared responsive `EditActionBar` to display saved/unsaved status and expose Cancel/Save against that same draft snapshot.
+
 ## Contributor Workflow
 
 When changing this plugin, update:

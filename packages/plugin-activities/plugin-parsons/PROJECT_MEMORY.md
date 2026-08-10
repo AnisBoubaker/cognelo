@@ -43,6 +43,8 @@ This file is for Parsons-specific memory only.
 
 The plugin is being built to support:
 
+- Teacher authoring uses the shared responsive `EditActionBar`, driven by the same draft snapshot as `useUnsavedChangesGuard`.
+
 - teacher-facing flags when students may be lost
 - research on student behavior
 - future analytics over resets, checks, ordering mistakes, and time-on-task patterns

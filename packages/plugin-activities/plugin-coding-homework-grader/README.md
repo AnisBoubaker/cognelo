@@ -118,6 +118,8 @@ Prompt versioning starts with:
 
 - `coding-homework-grader.challenge-question.v1`
 
+Teacher authoring uses the shared responsive `EditActionBar`. Its saved/unsaved status covers the activity and plugin-owned grading configuration, while independently persisted uploads and processing actions retain their local feedback.
+
 ## Contributor Workflow
 
 When changing this plugin, update:

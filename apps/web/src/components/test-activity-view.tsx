@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ConfirmationDialog, MarkdownRenderer, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { ConfirmationDialog, EditActionBar, MarkdownRenderer, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
 import {
@@ -243,14 +243,28 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
           <span>Allow students to resume an unfinished attempt</span>
         </label>
         {canManage ? (
-          <div className="section-actions">
-            <button className="button" disabled={busy || !title.trim()} type="button" onClick={saveSettings}>
-              Save test settings
-            </button>
-            <button className="button secondary" disabled={busy || hasUnsavedSettings} type="button" onClick={duplicateCurrentTest}>
-              Duplicate Test
-            </button>
-          </div>
+          <EditActionBar
+            isDirty={hasUnsavedSettings}
+            isSaving={busy}
+            savedLabel="Everything is saved."
+            unsavedLabel="You have unsaved changes."
+            saveLabel="Save test settings"
+            savingLabel="Saving..."
+            cancelLabel="Cancel"
+            onCancel={() => {
+              if (!test) return;
+              setTitle(test.activity.title);
+              setDescription(test.activity.description);
+              setTest({ ...test, settings: JSON.parse(savedSettings) });
+            }}
+            onSave={saveSettings}
+            saveDisabled={!title.trim()}
+            secondaryActions={(
+              <button className="button secondary" disabled={busy || hasUnsavedSettings} type="button" onClick={duplicateCurrentTest}>
+                Duplicate Test
+              </button>
+            )}
+          />
         ) : null}
       </section>
 

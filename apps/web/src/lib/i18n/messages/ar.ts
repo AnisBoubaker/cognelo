@@ -25,7 +25,9 @@ export const arMessages = {
       remove: "إزالة",
       redirecting: "جار التحويل...",
       save: "حفظ",
+      savedStatus: "تم حفظ كل شيء.",
       saving: "جار الحفظ...",
+      unsavedStatus: "لديك تغييرات غير محفوظة.",
       time: "الوقت"
     },
     activityCategories: {

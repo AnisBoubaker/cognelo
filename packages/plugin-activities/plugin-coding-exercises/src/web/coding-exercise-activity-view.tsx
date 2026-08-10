@@ -2,7 +2,7 @@
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
-import { CodeEditor, MarkdownRenderer, MonacoCodeEditor, codeLanguageOptions, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { CodeEditor, EditActionBar, MarkdownRenderer, MonacoCodeEditor, codeLanguageOptions, getEditActionBarCopy, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   alignCodingExerciseStarterCodeToTemplate,
   buildCodingExerciseStudentTemplateProjectionFromSource,
@@ -203,6 +203,7 @@ export function CodingExerciseActivityView({
   readOnly = false
 }: CodingExerciseActivityViewProps) {
   const pluginLocale = normalizeCodingExercisesLocale(locale);
+  const actionCopy = getEditActionBarCopy(pluginLocale);
   const t = (key: Parameters<typeof formatCodingExercisesMessage>[1], values?: Record<string, string | number>) =>
     formatCodingExercisesMessage(pluginLocale, key, values);
   const notifications = useNotifications();
@@ -1301,11 +1302,17 @@ export function CodingExerciseActivityView({
           </section>
 
           {error ? <p className="error">{error}</p> : null}
-          <div className="row">
-            <button type="submit" disabled={saving}>
-              {saving ? t("saving") : t("saveCodingExercise")}
-            </button>
-          </div>
+          <EditActionBar
+            isDirty={hasUnsavedChanges}
+            isSaving={saving}
+            savedLabel={actionCopy.saved}
+            unsavedLabel={actionCopy.unsaved}
+            saveLabel={t("saveCodingExercise")}
+            savingLabel={t("saving")}
+            cancelLabel={actionCopy.cancel}
+            onCancel={discardChanges}
+            onSave={saveCodingExercise}
+          />
         </form>
       ) : (
         <div className="stack">
