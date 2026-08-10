@@ -11,6 +11,7 @@ import {
   SubjectKnowledgeGraphDraftSchema,
   SubjectKnowledgeGraphGenerationInputSchema,
   SubjectKnowledgePrerequisiteInputSchema,
+  SubjectTeachingLanguageSchema,
   SubjectUpdateSchema
 } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
@@ -68,6 +69,7 @@ export async function createSubject(user: CurrentUser, input: unknown) {
     data: {
       title: data.title,
       description: data.description,
+      teachingLanguage: data.teachingLanguage,
       metadata: data.metadata as Prisma.InputJsonValue,
       createdById: user.id
     },
@@ -84,6 +86,7 @@ export async function updateSubject(user: CurrentUser, subjectId: string, input:
       data: {
         title: data.title,
         description: data.description,
+        teachingLanguage: data.teachingLanguage,
         metadata: data.metadata as Prisma.InputJsonValue | undefined
       },
       include: subjectInclude
@@ -97,6 +100,7 @@ export async function updateSubject(user: CurrentUser, subjectId: string, input:
       data: {
         title: data.title,
         description: data.description,
+        teachingLanguage: data.teachingLanguage,
         metadata: data.metadata as Prisma.InputJsonValue | undefined
       }
     });
@@ -195,7 +199,7 @@ export async function deleteSubjectKnowledgePrerequisite(user: CurrentUser, subj
 export async function generateSubjectKnowledgeGraph(user: CurrentUser, subjectId: string, input: unknown) {
   await assertCanManageSubjectById(user, subjectId);
   const data = SubjectKnowledgeGraphGenerationInputSchema.parse(input);
-  const subject = await prisma.subject.findUnique({ where: { id: subjectId }, select: { title: true } });
+  const subject = await prisma.subject.findUnique({ where: { id: subjectId }, select: { title: true, teachingLanguage: true } });
   if (!subject) throw notFound("Subject");
 
   const graph = await generateValidSubjectKnowledgeGraph({
@@ -203,7 +207,7 @@ export async function generateSubjectKnowledgeGraph(user: CurrentUser, subjectId
     title: subject.title,
     description: data.description,
     directions: data.directions,
-    locale: data.locale,
+    locale: data.teachingLanguage ?? SubjectTeachingLanguageSchema.parse(subject.teachingLanguage),
     maxConcepts: data.maxConcepts
   });
   const positions = layoutGeneratedKnowledgeGraph(graph);

@@ -148,9 +148,13 @@ export const CourseSettingsInputSchema = z.object({
 });
 export type CourseSettingsInput = z.infer<typeof CourseSettingsInputSchema>;
 
+export const SubjectTeachingLanguageSchema = z.enum(["en", "fr", "zh", "ar"]);
+export type SubjectTeachingLanguage = z.infer<typeof SubjectTeachingLanguageSchema>;
+
 export const SubjectInputSchema = z.object({
   title: z.string().min(2).max(160),
   description: z.string().max(4000).optional().default(""),
+  teachingLanguage: SubjectTeachingLanguageSchema.default("en"),
   metadata: z.record(z.unknown()).optional().default({})
 });
 export type SubjectInput = z.infer<typeof SubjectInputSchema>;
@@ -199,7 +203,7 @@ export const SubjectKnowledgeGraphGenerationInputSchema = z.object({
   description: z.string().min(10).max(4000),
   directions: z.string().max(4000).optional().default(""),
   maxConcepts: z.number().int().min(1).max(50).default(12),
-  locale: z.enum(["en", "fr", "zh", "ar"]).default("en")
+  teachingLanguage: SubjectTeachingLanguageSchema.optional()
 });
 export type SubjectKnowledgeGraphGenerationInput = z.infer<typeof SubjectKnowledgeGraphGenerationInputSchema>;
 

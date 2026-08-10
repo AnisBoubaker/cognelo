@@ -7,7 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SubjectKnowledgeGraph } from "@/components/subject-knowledge-graph";
 import { api, type Subject, type SubjectKnowledgeConcept, type SubjectKnowledgeGraphDraft, type SubjectKnowledgePrerequisite } from "@/lib/api";
-import { useI18n } from "@/lib/i18n";
+import { locales, useI18n, type Locale } from "@/lib/i18n";
 
 export default function EditSubjectPage() {
   const params = useParams<{ subjectId: string }>();
@@ -17,14 +17,16 @@ export default function EditSubjectPage() {
   const [subject, setSubject] = useState<Subject | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [teachingLanguage, setTeachingLanguage] = useState<Locale>("en");
   const [graphConcepts, setGraphConcepts] = useState<SubjectKnowledgeConcept[]>([]);
   const [graphPrerequisites, setGraphPrerequisites] = useState<SubjectKnowledgePrerequisite[]>([]);
   const [savedSnapshot, setSavedSnapshot] = useState<{
     title: string;
     description: string;
+    teachingLanguage: Locale;
     concepts: SubjectKnowledgeConcept[];
     prerequisites: SubjectKnowledgePrerequisite[];
-  }>({ title: "", description: "", concepts: [], prerequisites: [] });
+  }>({ title: "", description: "", teachingLanguage: "en", concepts: [], prerequisites: [] });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [aiGenerationEnabled, setAiGenerationEnabled] = useState(false);
@@ -36,11 +38,12 @@ export default function EditSubjectPage() {
         setSubject(result.subject);
         setTitle(result.subject.title);
         setDescription(result.subject.description ?? "");
+        setTeachingLanguage(result.subject.teachingLanguage);
         const concepts = result.subject.knowledgeConcepts ?? [];
         const prerequisites = result.subject.knowledgePrerequisites ?? [];
         setGraphConcepts(concepts);
         setGraphPrerequisites(prerequisites);
-        setSavedSnapshot({ title: result.subject.title, description: result.subject.description ?? "", concepts, prerequisites });
+        setSavedSnapshot({ title: result.subject.title, description: result.subject.description ?? "", teachingLanguage: result.subject.teachingLanguage, concepts, prerequisites });
       })
       .catch((err) => setError(err instanceof Error ? err.message : t("editSubject.loadError")));
   }, [subjectId, t]);
@@ -57,12 +60,14 @@ export default function EditSubjectPage() {
 
   const hasUnsavedChanges = title !== savedSnapshot.title
     || description !== savedSnapshot.description
+    || teachingLanguage !== savedSnapshot.teachingLanguage
     || JSON.stringify({ concepts: graphConcepts, prerequisites: graphPrerequisites })
       !== JSON.stringify({ concepts: savedSnapshot.concepts, prerequisites: savedSnapshot.prerequisites });
 
   const discardChanges = useCallback(() => {
     setTitle(savedSnapshot.title);
     setDescription(savedSnapshot.description);
+    setTeachingLanguage(savedSnapshot.teachingLanguage);
     setGraphConcepts(savedSnapshot.concepts);
     setGraphPrerequisites(savedSnapshot.prerequisites);
     setError("");
@@ -80,8 +85,8 @@ export default function EditSubjectPage() {
           id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle
         }))
       };
-      const result = await api.updateSubject(subjectId, { title, description, knowledgeGraph });
-      setSavedSnapshot({ title, description, concepts: graphConcepts, prerequisites: graphPrerequisites });
+      const result = await api.updateSubject(subjectId, { title, description, teachingLanguage, knowledgeGraph });
+      setSavedSnapshot({ title, description, teachingLanguage, concepts: graphConcepts, prerequisites: graphPrerequisites });
       router.push(`/subjects/${result.subject.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("editSubject.saveError"));
@@ -89,7 +94,7 @@ export default function EditSubjectPage() {
     } finally {
       setSaving(false);
     }
-  }, [description, graphConcepts, graphPrerequisites, router, subjectId, t, title]);
+  }, [description, graphConcepts, graphPrerequisites, router, subjectId, t, teachingLanguage, title]);
 
   useUnsavedChangesGuard(
     useMemo(
@@ -128,11 +133,19 @@ export default function EditSubjectPage() {
                 <label htmlFor="subject-description">{t("subjects.descriptionLabel")}</label>
                 <textarea id="subject-description" value={description} onChange={(event) => setDescription(event.target.value)} />
               </div>
+              <div className="field">
+                <label htmlFor="subject-teaching-language">{t("subjects.teachingLanguageLabel")}</label>
+                <select id="subject-teaching-language" value={teachingLanguage} onChange={(event) => setTeachingLanguage(event.target.value as Locale)}>
+                  {locales.map((language) => <option key={language} value={language}>{t(`locale.${language}`)}</option>)}
+                </select>
+                <p className="muted">{t("subjects.teachingLanguageHelp")}</p>
+              </div>
             </form>
             <SubjectKnowledgeGraph
               aiGenerationEnabled={aiGenerationEnabled}
               subjectId={subject.id}
               subjectDescription={description}
+              teachingLanguage={teachingLanguage}
               initialConcepts={graphConcepts}
               initialPrerequisites={graphPrerequisites}
               savedConcepts={savedSnapshot.concepts}

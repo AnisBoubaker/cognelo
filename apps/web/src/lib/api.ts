@@ -203,6 +203,7 @@ export type Subject = {
   id: string;
   title: string;
   description: string;
+  teachingLanguage: "en" | "fr" | "zh" | "ar";
   metadata?: Record<string, unknown>;
   materials?: CourseMaterial[];
   activityBanks?: ActivityBank[];

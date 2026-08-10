@@ -223,14 +223,18 @@ describe("shared contract schemas", () => {
     expect(CourseUpdateSchema.parse({ studentContentLayout: "folder_tabs" })).toEqual({
       studentContentLayout: "folder_tabs"
     });
-    expect(SubjectInputSchema.parse({ title: "Math" })).toMatchObject({ description: "", metadata: {} });
+    expect(SubjectInputSchema.parse({ title: "Math" })).toMatchObject({ description: "", teachingLanguage: "en", metadata: {} });
+    expect(() => SubjectInputSchema.parse({ title: "Math", teachingLanguage: "es" })).toThrow();
     expect(SubjectKnowledgeGraphGenerationInputSchema.parse({ description: "A detailed mathematics curriculum." })).toEqual({
       description: "A detailed mathematics curriculum.",
       directions: "",
-      maxConcepts: 12,
-      locale: "en"
+      maxConcepts: 12
     });
     expect(() => SubjectKnowledgeGraphGenerationInputSchema.parse({ description: "Too short", maxConcepts: 51 })).toThrow();
+    expect(() => SubjectKnowledgeGraphGenerationInputSchema.parse({
+      description: "A detailed mathematics curriculum.",
+      teachingLanguage: "es"
+    })).toThrow();
     expect(SubjectUpdateSchema.parse({
       knowledgeGraph: {
         concepts: [
