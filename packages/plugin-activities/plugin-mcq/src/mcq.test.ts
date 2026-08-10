@@ -79,6 +79,42 @@ print("hello")
     expect(parsed.questions[0].choices[0]).toMatchObject({ isCorrect: true });
   });
 
+  it("parses dollar and standard LaTeX math delimiters", () => {
+    expect(renderInlineMarkdown("Derive \\(f(x)=x^2\\) or $g(x)=x^3$."))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: "math", expression: "f(x)=x^2" }),
+        expect.objectContaining({ type: "math", expression: "g(x)=x^3" })
+      ]));
+
+    const parsed = parseMcqSource(
+      `\\[x^2 + y^2 = z^2\\]
+
+## Derivative
+Compute \\(f'(x)\\).
+
+- [x] \\(2x\\)
+- [ ] \\(x\\)`,
+      "none"
+    );
+
+    expect(parsed.introBlocks[0]).toMatchObject({ type: "math", expression: "x^2 + y^2 = z^2", display: true });
+    expect(parsed.questions[0].promptBlocks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "paragraph", text: "Compute \\(f'(x)\\)." })
+    ]));
+    expect(parsed.questions[0].choices[0].blocks[0]).toMatchObject({ type: "paragraph", text: "\\(2x\\)" });
+  });
+
+  it("renders an escaped dollar sign as literal text", () => {
+    expect(renderInlineMarkdown("The price is \\$5 and the formula is $x+1$."))
+      .toEqual([
+        { type: "text", text: "The price is " },
+        { type: "text", text: "$" },
+        { type: "text", text: "5 and the formula is " },
+        { type: "math", expression: "x+1" },
+        { type: "text", text: "." }
+      ]);
+  });
+
   it("awards partial credit for incomplete multiple-answer selections", () => {
     const parsed = parseMcqSource(
       `## Choose the collection types
