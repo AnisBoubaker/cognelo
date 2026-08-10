@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { SubjectKnowledgeGraph } from "@/components/subject-knowledge-graph";
 import { api, type Subject } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
@@ -19,6 +20,7 @@ export default function EditSubjectPage() {
   const [savedSnapshot, setSavedSnapshot] = useState({ title: "", description: "" });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [aiGenerationEnabled, setAiGenerationEnabled] = useState(false);
 
   useEffect(() => {
     api
@@ -31,6 +33,16 @@ export default function EditSubjectPage() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : t("editSubject.loadError")));
   }, [subjectId, t]);
+
+  useEffect(() => {
+    api.aiAgentConnections()
+      .then((result) => setAiGenerationEnabled(
+        result.connections.some((connection) =>
+          connection.id === result.preferences.questionAuthoringAiAgentConnectionId && connection.isEnabled
+        )
+      ))
+      .catch(() => setAiGenerationEnabled(false));
+  }, []);
 
   const currentSnapshot = useMemo(() => ({ title, description }), [description, title]);
   const hasUnsavedChanges = currentSnapshot.title !== savedSnapshot.title || currentSnapshot.description !== savedSnapshot.description;
@@ -84,7 +96,7 @@ export default function EditSubjectPage() {
 
         {subject ? (
           <section className="section stack">
-            <form className="form" onSubmit={saveSubject}>
+            <form className="form" id="subject-metadata-form" onSubmit={saveSubject}>
               <div className="field">
                 <label htmlFor="subject-title">{t("subjects.titleLabel")}</label>
                 <input id="subject-title" value={title} minLength={2} required onChange={(event) => setTitle(event.target.value)} />
@@ -93,15 +105,22 @@ export default function EditSubjectPage() {
                 <label htmlFor="subject-description">{t("subjects.descriptionLabel")}</label>
                 <textarea id="subject-description" value={description} onChange={(event) => setDescription(event.target.value)} />
               </div>
-              <div className="hero-actions">
-                <button type="submit" disabled={saving}>
-                  {saving ? t("common.saving") : t("common.save")}
-                </button>
-                <Link className="button secondary" href={`/subjects/${subject.id}`}>
-                  {t("common.cancel")}
-                </Link>
-              </div>
             </form>
+            <SubjectKnowledgeGraph
+              aiGenerationEnabled={aiGenerationEnabled}
+              subjectId={subject.id}
+              subjectDescription={description}
+              initialConcepts={subject.knowledgeConcepts ?? []}
+              initialPrerequisites={subject.knowledgePrerequisites ?? []}
+            />
+            <div className="hero-actions">
+              <button type="submit" form="subject-metadata-form" disabled={saving}>
+                {saving ? t("common.saving") : t("common.save")}
+              </button>
+              <Link className="button secondary" href={`/subjects/${subject.id}`}>
+                {t("common.cancel")}
+              </Link>
+            </div>
           </section>
         ) : null}
       </main>

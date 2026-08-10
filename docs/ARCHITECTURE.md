@@ -35,7 +35,7 @@ docs/
 - **Auth** owns password hashing, JWT creation, login/logout, and current-user lookup.
 - **Authorization** maps global roles, course memberships, section participants, and activity-bank ownership into permissions.
 - **Users/Roles** support many-to-many global roles and future additional roles.
-- **Subjects** own reusable curriculum context and subject-level material.
+- **Subjects** own reusable curriculum context, subject-level material, and a subject-scoped prerequisite knowledge graph.
 - **Activity banks** own reusable activity authoring and version history for a subject.
 - **Courses** own course lifecycle, course-local material, and course-local copies of bank activities.
 - **Course content resources** are plugin-backed non-activity resources such as GitHub repos, files, and text notes.
@@ -50,6 +50,8 @@ The durable model is:
 ```text
 Subject
   SubjectMaterial
+  SubjectKnowledgeConcept
+    SubjectKnowledgePrerequisite (requiring concept -> required concept)
   ActivityBank
     BankActivity
       ActivityVersion

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { SubjectKnowledgeGraph } from "@/components/subject-knowledge-graph";
 import { api, type Subject } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
@@ -45,6 +46,7 @@ export default function SubjectDetailPage() {
         {error ? <p className="error">{error}</p> : null}
 
         {subject ? (
+          <>
           <section className="split">
             <div className="section stack">
               <div className="section-heading">
@@ -94,6 +96,13 @@ export default function SubjectDetailPage() {
               )}
             </div>
           </section>
+          <SubjectKnowledgeGraph
+            subjectId={subject.id}
+            initialConcepts={subject.knowledgeConcepts ?? []}
+            initialPrerequisites={subject.knowledgePrerequisites ?? []}
+            readOnly
+          />
+          </>
         ) : null}
       </main>
     </AppShell>
