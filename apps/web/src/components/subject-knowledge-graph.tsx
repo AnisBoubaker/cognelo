@@ -70,6 +70,50 @@ const toNode = (concept: SubjectKnowledgeConcept): ConceptNode => ({
   data: { label: concept.title }
 });
 
+function highlightConceptNodes(
+  nodes: ConceptNode[],
+  prerequisites: SubjectKnowledgePrerequisite[],
+  selectedId: string | null
+): ConceptNode[] {
+  if (!selectedId || !nodes.some((node) => node.id === selectedId)) {
+    return nodes.map((node) => ({ ...node, className: undefined }));
+  }
+
+  const directOutgoing = new Set<string>();
+  const directIncoming = new Set<string>();
+  const outgoingPrerequisites = new Map<string, Set<string>>();
+  for (const prerequisite of prerequisites) {
+    if (prerequisite.sourceConceptId === selectedId) directOutgoing.add(prerequisite.requiredConceptId);
+    if (prerequisite.requiredConceptId === selectedId) directIncoming.add(prerequisite.sourceConceptId);
+    if (!outgoingPrerequisites.has(prerequisite.sourceConceptId)) {
+      outgoingPrerequisites.set(prerequisite.sourceConceptId, new Set());
+    }
+    outgoingPrerequisites.get(prerequisite.sourceConceptId)!.add(prerequisite.requiredConceptId);
+  }
+
+  const transitivePrerequisites = new Set([selectedId]);
+  const pending = [selectedId];
+  while (pending.length) {
+    const current = pending.pop()!;
+    for (const prerequisiteId of outgoingPrerequisites.get(current) ?? []) {
+      if (transitivePrerequisites.has(prerequisiteId)) continue;
+      transitivePrerequisites.add(prerequisiteId);
+      pending.push(prerequisiteId);
+    }
+  }
+
+  return nodes.map((node) => {
+    const classes = [];
+    if (node.id === selectedId) classes.push("knowledge-node-selected");
+    if (directOutgoing.has(node.id)) classes.push("knowledge-node-direct-outgoing");
+    if (directIncoming.has(node.id)) classes.push("knowledge-node-direct-incoming");
+    if (!transitivePrerequisites.has(node.id) && !directIncoming.has(node.id)) {
+      classes.push("knowledge-node-not-prerequisite");
+    }
+    return { ...node, className: classes.join(" ") || undefined };
+  });
+}
+
 const sourceHandles = ["top", "right", "bottom", "left"];
 const targetHandles = ["bottom", "left", "top", "right"];
 
@@ -166,16 +210,18 @@ export function SubjectKnowledgeGraph({
   }, [concepts.length === 0]);
 
   const selectConcept = useCallback((concept: SubjectKnowledgeConcept | null) => {
-    setSelectedId(concept?.id ?? null);
+    const nextSelectedId = concept?.id ?? null;
+    setSelectedId(nextSelectedId);
     setEditTitle(concept?.title ?? "");
     setEditDescription(concept?.description ?? "");
-    setEdges((current) => highlightEdges(current, concept?.id ?? null));
-  }, [setEdges]);
+    setNodes((current) => highlightConceptNodes(current, prerequisites, nextSelectedId));
+    setEdges((current) => highlightEdges(current, nextSelectedId));
+  }, [prerequisites, setEdges, setNodes]);
 
   const applyGraph = useCallback((nextConcepts: SubjectKnowledgeConcept[], nextPrerequisites: SubjectKnowledgePrerequisite[]) => {
     setConcepts(nextConcepts);
     setPrerequisites(nextPrerequisites);
-    setNodes(nextConcepts.map(toNode));
+    setNodes(highlightConceptNodes(nextConcepts.map(toNode), nextPrerequisites, selectedId));
     setEdges(highlightEdges(toEdges(nextPrerequisites), selectedId));
     onChange?.({
       concepts: nextConcepts.map(({ id, title, description, positionX, positionY }) => ({ id, title, description, positionX, positionY })),

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { RichTextEditor } from "@cognelo/activity-ui";
 import { AppShell } from "@/components/app-shell";
 import { api, type Subject } from "@/lib/api";
 import { locales, useI18n, type Locale } from "@/lib/i18n";
@@ -81,7 +82,14 @@ export default function SubjectsPage() {
               </div>
               <div className="field">
                 <label htmlFor="subject-description">{t("subjects.descriptionLabel")}</label>
-                <textarea id="subject-description" value={description} onChange={(event) => setDescription(event.target.value)} />
+                <RichTextEditor
+                  id="subject-description"
+                  value={description}
+                  locale={locale}
+                  minHeight={180}
+                  ariaLabel={t("subjects.descriptionLabel")}
+                  onChange={setDescription}
+                />
               </div>
               <div className="field">
                 <label htmlFor="subject-teaching-language">{t("subjects.teachingLanguageLabel")}</label>
@@ -116,10 +124,9 @@ export default function SubjectsPage() {
           {subjects.length ? (
             <div className="table-list">
               {subjects.map((subject) => (
-                <Link className="table-row table-row-link" href={`/subjects/${subject.id}`} key={subject.id}>
+                <Link className="table-row table-row-link table-row-subject" href={`/subjects/${subject.id}`} key={subject.id}>
                   <span className="table-main table-main-stack">
                     <strong>{subject.title}</strong>
-                    <span className="table-meta-note muted">{subject.description || t("common.noDescription")}</span>
                   </span>
                   <span className="table-meta muted">
                     {t("subjects.summary", {
@@ -127,7 +134,6 @@ export default function SubjectsPage() {
                       courses: subject.courses?.length ?? 0
                     })}
                   </span>
-                  <span className="table-meta muted">{t("common.open")}</span>
                 </Link>
               ))}
             </div>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { MarkdownRenderer } from "@cognelo/activity-ui";
 import { AppShell } from "@/components/app-shell";
 import { SubjectKnowledgeGraph } from "@/components/subject-knowledge-graph";
 import { api, type Subject } from "@/lib/api";
@@ -103,7 +104,11 @@ export default function SubjectDetailPage() {
                 <h2>{t("subjectDetail.descriptionTitle")}</h2>
               </div>
             </div>
-            <p className="muted subject-description-text">{subject.description || t("common.noDescription")}</p>
+            {subject.description ? (
+              <MarkdownRenderer markdown={subject.description} className="muted subject-description-text" />
+            ) : (
+              <p className="muted subject-description-text">{t("common.noDescription")}</p>
+            )}
           </section>
           <SubjectKnowledgeGraph
             subjectId={subject.id}
