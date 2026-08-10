@@ -245,20 +245,53 @@ model Course {
 }
 
 model Subject {
-  id            String            @id @default(cuid())
-  title         String
-  description   String            @default("")
-  metadata      Json              @default("{}")
-  createdById   String
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  createdBy     User              @relation("SubjectCreator", fields: [createdById], references: [id])
-  courses       Course[]
-  materials     SubjectMaterial[]
-  activityBanks ActivityBank[]
+  id                     String                         @id @default(cuid())
+  title                  String
+  description            String                         @default("")
+  metadata               Json                           @default("{}")
+  createdById            String
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
+  createdBy              User                           @relation("SubjectCreator", fields: [createdById], references: [id])
+  courses                Course[]
+  materials              SubjectMaterial[]
+  activityBanks          ActivityBank[]
+  knowledgeConcepts      SubjectKnowledgeConcept[]
+  knowledgePrerequisites SubjectKnowledgePrerequisite[]
 
   @@index([createdById])
   @@index([updatedAt])
+}
+
+model SubjectKnowledgeConcept {
+  id                    String                         @id @default(cuid())
+  subjectId             String
+  title                 String
+  description           String                         @default("")
+  positionX             Float                          @default(0)
+  positionY             Float                          @default(0)
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
+  subject               Subject                        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  requiredPrerequisites SubjectKnowledgePrerequisite[] @relation("RequiringConcept")
+  requiredByConcepts    SubjectKnowledgePrerequisite[] @relation("RequiredConcept")
+
+  @@index([subjectId])
+}
+
+model SubjectKnowledgePrerequisite {
+  id                String                  @id @default(cuid())
+  subjectId         String
+  sourceConceptId   String
+  requiredConceptId String
+  createdAt         DateTime                @default(now())
+  subject           Subject                 @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  sourceConcept     SubjectKnowledgeConcept @relation("RequiringConcept", fields: [sourceConceptId], references: [id], onDelete: Cascade)
+  requiredConcept   SubjectKnowledgeConcept @relation("RequiredConcept", fields: [requiredConceptId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceConceptId, requiredConceptId])
+  @@index([subjectId])
+  @@index([requiredConceptId])
 }
 
 model SubjectMaterial {

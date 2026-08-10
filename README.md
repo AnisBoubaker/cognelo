@@ -43,7 +43,7 @@ docs/
 - Users: `/users/me` plus account-wide profile settings
 - AI agent connections: account-wide model/provider connection records, with admin-managed global entries
 - Authorization: global roles plus course memberships and activity-bank ownership
-- Subjects: shared curriculum containers for subject-level material and activity banks
+- Subjects: shared curriculum containers for subject-level material, activity banks, and subject-scoped knowledge graphs
 - Activity banks: reusable activity authoring libraries scoped to a subject and owned by an individual
 - Courses: create, list, read, update, archive; courses belong to a subject and receive activity copies from banks
 - Course settings: course-level AI agent selection for student support
@@ -115,6 +115,12 @@ GET    /api/subjects
 POST   /api/subjects
 GET    /api/subjects/:subjectId
 PATCH  /api/subjects/:subjectId
+POST   /api/subjects/:subjectId/concepts
+PATCH  /api/subjects/:subjectId/concepts/:conceptId
+DELETE /api/subjects/:subjectId/concepts/:conceptId
+POST   /api/subjects/:subjectId/prerequisites
+DELETE /api/subjects/:subjectId/prerequisites/:prerequisiteId
+POST   /api/subjects/:subjectId/knowledge-graph/generate
 GET    /api/activity-banks
 POST   /api/activity-banks
 GET    /api/activity-banks/:activityBankId
@@ -209,6 +215,8 @@ Core Prisma entities include:
 - `Role`
 - `UserRole`
 - `Subject`
+- `SubjectKnowledgeConcept`
+- `SubjectKnowledgePrerequisite`
 - `SubjectMaterial`
 - `ActivityBank`
 - `BankActivity`
@@ -239,6 +247,9 @@ The current content model is:
 ```text
 Subject
   subject-level material
+  knowledge graph
+    concept(s)
+      directed prerequisite edge(s)
   ActivityBank(s)
     BankActivity
       ActivityVersion(s)
@@ -400,6 +411,8 @@ WEB_DESIGN_RUNNER_URL=http://localhost:3456
 - Plugin authoring screens can use the selected question-authoring AI agent through server-side plugin routes; the MCQ plugin uses this to generate validated MCQ source from a teacher description.
 - All core and plugin authoring/settings forms should register unsaved-change state through `useUnsavedChangesGuard` from `@cognelo/activity-ui`. Registered forms show a shared confirmation dialog before internal navigation, with actions to continue editing, save and leave, or discard changes. Browser refresh/close uses the native browser warning.
 - The subjects area uses a list-first management flow: add subjects from the list header, open a subject detail page, and edit subject metadata from a dedicated edit page.
+- Each subject edit page includes a visual knowledge-graph editor built with React Flow directly after the subject description. Concepts and their canvas positions are persisted per subject. A directed edge originates at the concept that requires another concept and points to the required prerequisite; self-links, duplicate links, cross-subject links, and cycles are rejected. The editor supports adding, editing, deleting, dragging, panning, zooming, a minimap, and viewport controls. The subject detail page shows a read-only graph preview after its Activity banks and Courses panels; its viewport can still be panned and zoomed so larger graphs and routed edges remain inspectable.
+- When the current user has selected an enabled question-authoring AI agent, the Subject graph editor exposes a collapsed AI generation section. It accepts optional private directions and a maximum concept count; the model may return fewer concepts when sufficient. Generation uses the current Subject description, validates the complete graph and retries invalid model output up to three calls, then atomically replaces the graph only after confirmation when concepts already exist. Agent credentials remain server-side.
 - Course and group workspaces use a unified Content tab for folders, materials, and activities. Teachers can manage shared course folders, place course-wide or group-specific content inside them, toggle content visibility, drag/drop reorder content, and configure material/activity-specific settings from content rows.
 - Course workspaces include a Settings tab where teachers can choose the student-support AI agent from their personal connections or admin-managed global connections.
 - Activity banks are first-class authoring spaces. Course activities are copied from bank versions rather than edited live in the bank, and activity type labels are localized from plugin registry definitions.

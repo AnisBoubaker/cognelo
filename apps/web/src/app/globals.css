@@ -429,6 +429,150 @@ select:focus {
   grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
 }
 
+.knowledge-graph-section {
+  min-height: 620px;
+}
+
+.knowledge-graph-heading {
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.knowledge-graph-heading .muted {
+  max-width: 760px;
+}
+
+.knowledge-graph-add {
+  display: flex;
+  gap: 0.6rem;
+  min-width: min(100%, 430px);
+}
+
+.knowledge-graph-add input {
+  flex: 1;
+}
+
+.knowledge-graph-ai {
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--brand-blue), white 75%);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-3), white 55%);
+}
+
+.knowledge-graph-ai summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.knowledge-graph-ai-content {
+  margin-top: 16px;
+}
+
+.knowledge-graph-ai-limit {
+  max-width: 260px;
+}
+
+.knowledge-graph-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  min-height: 500px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.knowledge-graph-canvas {
+  min-height: 500px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--surface-3));
+}
+
+.knowledge-graph-preview {
+  min-height: 390px;
+}
+
+.knowledge-graph-preview .knowledge-graph-workspace {
+  display: block;
+  height: 300px;
+  min-height: 300px;
+}
+
+.knowledge-graph-preview .knowledge-graph-canvas {
+  height: 300px;
+  min-height: 300px;
+}
+
+.knowledge-graph-preview .react-flow__handle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.knowledge-graph-preview .react-flow__pane,
+.knowledge-graph-preview .react-flow__node {
+  cursor: default;
+}
+
+.knowledge-graph-canvas .react-flow__node-concept {
+  width: 180px;
+}
+
+.knowledge-concept-node {
+  position: relative;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--brand-blue);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 5px 18px rgb(15 23 42 / 8%);
+  font-weight: 700;
+  text-align: center;
+}
+
+.knowledge-concept-node .react-flow__handle {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--surface);
+  background: var(--brand-blue);
+}
+
+.knowledge-graph-canvas .react-flow__node.selected {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-blue) 24%, transparent);
+}
+
+.knowledge-graph-canvas .react-flow__edge-path {
+  stroke: var(--brand-blue);
+  stroke-width: 2;
+}
+
+.knowledge-graph-inspector {
+  padding: 1rem;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.knowledge-graph-empty {
+  align-content: center;
+  min-height: 100%;
+}
+
+@media (max-width: 800px) {
+  .knowledge-graph-heading,
+  .knowledge-graph-add {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .knowledge-graph-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .knowledge-graph-inspector {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+}
+
 .span-all {
   grid-column: 1 / -1;
 }

@@ -18,6 +18,7 @@ import {
   EnrollmentInputSchema,
   LoginInputSchema,
   SubjectInputSchema,
+  SubjectKnowledgeGraphGenerationInputSchema,
   TestCreateSchema,
   TestItemCreateSchema,
   UserPasswordChangeSchema,
@@ -222,6 +223,13 @@ describe("shared contract schemas", () => {
       studentContentLayout: "folder_tabs"
     });
     expect(SubjectInputSchema.parse({ title: "Math" })).toMatchObject({ description: "", metadata: {} });
+    expect(SubjectKnowledgeGraphGenerationInputSchema.parse({ description: "A detailed mathematics curriculum." })).toEqual({
+      description: "A detailed mathematics curriculum.",
+      directions: "",
+      maxConcepts: 12,
+      locale: "en"
+    });
+    expect(() => SubjectKnowledgeGraphGenerationInputSchema.parse({ description: "Too short", maxConcepts: 51 })).toThrow();
     expect(ActivityBankInputSchema.parse({ subjectId: "subject-1", title: "Bank" })).toMatchObject({
       description: "",
       metadata: {}

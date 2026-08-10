@@ -24,6 +24,10 @@ import type {
   ContentTypePluginInstallationUpdate,
   MaterialKind,
   SubjectInput,
+  SubjectKnowledgeConceptInput,
+  SubjectKnowledgeConceptUpdate,
+  SubjectKnowledgeGraphGenerationInput,
+  SubjectKnowledgePrerequisiteInput,
   SubjectUpdate,
   UserPasswordChange,
   UserProfileUpdate
@@ -202,6 +206,24 @@ export type Subject = {
   materials?: CourseMaterial[];
   activityBanks?: ActivityBank[];
   courses?: Course[];
+  knowledgeConcepts?: SubjectKnowledgeConcept[];
+  knowledgePrerequisites?: SubjectKnowledgePrerequisite[];
+};
+
+export type SubjectKnowledgeConcept = {
+  id: string;
+  subjectId: string;
+  title: string;
+  description: string;
+  positionX: number;
+  positionY: number;
+};
+
+export type SubjectKnowledgePrerequisite = {
+  id: string;
+  subjectId: string;
+  sourceConceptId: string;
+  requiredConceptId: string;
 };
 
 export type ActivityBank = {
@@ -880,6 +902,30 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(input)
     }),
+  createSubjectKnowledgeConcept: (subjectId: string, input: SubjectKnowledgeConceptInput) =>
+    request<{ concept: SubjectKnowledgeConcept }>(`/subjects/${subjectId}/concepts`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  updateSubjectKnowledgeConcept: (subjectId: string, conceptId: string, input: SubjectKnowledgeConceptUpdate) =>
+    request<{ concept: SubjectKnowledgeConcept }>(`/subjects/${subjectId}/concepts/${conceptId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  deleteSubjectKnowledgeConcept: (subjectId: string, conceptId: string) =>
+    request<{ ok: true }>(`/subjects/${subjectId}/concepts/${conceptId}`, { method: "DELETE" }),
+  createSubjectKnowledgePrerequisite: (subjectId: string, input: SubjectKnowledgePrerequisiteInput) =>
+    request<{ prerequisite: SubjectKnowledgePrerequisite }>(`/subjects/${subjectId}/prerequisites`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  deleteSubjectKnowledgePrerequisite: (subjectId: string, prerequisiteId: string) =>
+    request<{ ok: true }>(`/subjects/${subjectId}/prerequisites/${prerequisiteId}`, { method: "DELETE" }),
+  generateSubjectKnowledgeGraph: (subjectId: string, input: SubjectKnowledgeGraphGenerationInput) =>
+    request<{ concepts: SubjectKnowledgeConcept[]; prerequisites: SubjectKnowledgePrerequisite[] }>(
+      `/subjects/${subjectId}/knowledge-graph/generate`,
+      { method: "POST", body: JSON.stringify(input) }
+    ),
   activityBanks: (subjectId?: string) =>
     request<{ activityBanks: ActivityBank[] }>(`/activity-banks${subjectId ? `?subjectId=${encodeURIComponent(subjectId)}` : ""}`),
   activityBank: (activityBankId: string) => request<{ activityBank: ActivityBank }>(`/activity-banks/${activityBankId}`),

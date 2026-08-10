@@ -158,6 +158,33 @@ export type SubjectInput = z.infer<typeof SubjectInputSchema>;
 export const SubjectUpdateSchema = SubjectInputSchema.partial();
 export type SubjectUpdate = z.infer<typeof SubjectUpdateSchema>;
 
+export const SubjectKnowledgeConceptInputSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  description: z.string().max(4000).optional().default(""),
+  positionX: z.number().finite().optional().default(0),
+  positionY: z.number().finite().optional().default(0)
+});
+export type SubjectKnowledgeConceptInput = z.infer<typeof SubjectKnowledgeConceptInputSchema>;
+
+export const SubjectKnowledgeConceptUpdateSchema = SubjectKnowledgeConceptInputSchema.partial();
+export type SubjectKnowledgeConceptUpdate = z.infer<typeof SubjectKnowledgeConceptUpdateSchema>;
+
+export const SubjectKnowledgePrerequisiteInputSchema = z.object({
+  sourceConceptId: RecordIdSchema,
+  requiredConceptId: RecordIdSchema
+}).refine((value) => value.sourceConceptId !== value.requiredConceptId, {
+  message: "A concept cannot require itself."
+});
+export type SubjectKnowledgePrerequisiteInput = z.infer<typeof SubjectKnowledgePrerequisiteInputSchema>;
+
+export const SubjectKnowledgeGraphGenerationInputSchema = z.object({
+  description: z.string().min(10).max(4000),
+  directions: z.string().max(4000).optional().default(""),
+  maxConcepts: z.number().int().min(1).max(50).default(12),
+  locale: z.enum(["en", "fr", "zh", "ar"]).default("en")
+});
+export type SubjectKnowledgeGraphGenerationInput = z.infer<typeof SubjectKnowledgeGraphGenerationInputSchema>;
+
 export const ActivityBankInputSchema = z.object({
   subjectId: RecordIdSchema,
   title: z.string().min(2).max(160),
