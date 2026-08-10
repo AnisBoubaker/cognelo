@@ -112,6 +112,8 @@ npm run dev:runner
 
 The runner listens on port `3456`. The API reads `WEB_DESIGN_RUNNER_URL`, which defaults to `http://localhost:3456` for local development. Running `docker compose up -d web-design-runner` is equivalent to `npm run dev:runner`.
 
+Teacher authoring uses the shared responsive `EditActionBar` across its tabs. Saved/unsaved status covers the combined activity, file, solution, and test draft, and Cancel restores the last complete saved snapshot.
+
 ## Contributor Workflow
 
 When changing this plugin, update:

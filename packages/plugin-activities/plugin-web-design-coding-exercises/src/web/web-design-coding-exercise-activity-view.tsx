@@ -2,7 +2,7 @@
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
-import { MarkdownRenderer, MonacoCodeEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { EditActionBar, MarkdownRenderer, MonacoCodeEditor, getEditActionBarCopy, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   buildWebDesignPreviewDocument,
   defaultWebDesignExerciseConfig,
@@ -410,6 +410,7 @@ export function WebDesignCodingExerciseActivityView({
 }: WebDesignCodingExerciseActivityViewProps) {
   const copyLocale = locale === "fr" || locale === "zh" ? locale : "en";
   const copy = copyByLocale[copyLocale] ?? copyByLocale.en;
+  const actionCopy = getEditActionBarCopy(locale);
   const notifications = useNotifications();
   const initialConfig = useMemo(() => parseWebDesignExerciseConfig(activity.config), [activity.config]);
   const [title, setTitle] = useState(activity.title);
@@ -1069,11 +1070,18 @@ export function WebDesignCodingExerciseActivityView({
           />
         ) : null}
 
-        <div className="row">
-          <button type="submit" disabled={saving || Boolean(validationError)}>
-            {saving ? copy.saving : copy.save}
-          </button>
-        </div>
+        <EditActionBar
+          isDirty={hasUnsavedChanges}
+          isSaving={saving}
+          savedLabel={actionCopy.saved}
+          unsavedLabel={actionCopy.unsaved}
+          saveLabel={copy.save}
+          savingLabel={copy.saving}
+          cancelLabel={actionCopy.cancel}
+          onCancel={discardChanges}
+          onSave={saveWebDesignExercise}
+          saveDisabled={Boolean(validationError)}
+        />
       </form>
     );
   }

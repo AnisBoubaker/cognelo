@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CodeEditor, CodeRenderer, MarkdownRenderer, codeLanguageOptions, normalizeCodeLanguage, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { CodeEditor, CodeRenderer, EditActionBar, MarkdownRenderer, codeLanguageOptions, getEditActionBarCopy, normalizeCodeLanguage, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   createParsonsGroup,
   createParsonsPrecedenceRule,
@@ -137,6 +137,7 @@ export function ParsonsActivityView({
   locale = "en",
   aiGenerationClient
 }: ParsonsActivityViewProps) {
+  const actionCopy = getEditActionBarCopy(locale);
   const notifications = useNotifications();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -900,11 +901,17 @@ export function ParsonsActivityView({
                 )}
               </div>
             </section>
-            <div className="row">
-              <button disabled={saving} type="submit">
-                {saving ? t("common.saving") : t("common.save")}
-              </button>
-            </div>
+            <EditActionBar
+              isDirty={hasUnsavedChanges}
+              isSaving={saving}
+              savedLabel={actionCopy.saved}
+              unsavedLabel={actionCopy.unsaved}
+              saveLabel={t("common.save")}
+              savingLabel={t("common.saving")}
+              cancelLabel={actionCopy.cancel}
+              onCancel={discardChanges}
+              onSave={saveParsonsChanges}
+            />
           </form>
         </section>
       ) : null}

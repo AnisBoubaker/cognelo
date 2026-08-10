@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { EditActionBar, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { CourseInput, StudentContentLayout } from "@cognelo/contracts";
 import type { Course, Subject } from "@/lib/api";
 import { resolveStudentContentLayout } from "@/lib/course-settings";
@@ -133,9 +133,24 @@ export function CourseForm({ initial, showStudentContentLayout = false, subjects
         </div>
       ) : null}
       {error ? <p className="error">{error}</p> : null}
-      <button type="submit" disabled={saving || !subjectId}>
-        {saving ? t("common.saving") : submitLabel}
-      </button>
+      {initial ? (
+        <EditActionBar
+          isDirty={hasUnsavedChanges}
+          isSaving={saving}
+          savedLabel={t("common.savedStatus")}
+          unsavedLabel={t("common.unsavedStatus")}
+          saveLabel={submitLabel}
+          savingLabel={t("common.saving")}
+          cancelLabel={t("common.cancel")}
+          onCancel={discardChanges}
+          onSave={saveCourse}
+          saveDisabled={!subjectId}
+        />
+      ) : (
+        <button type="submit" disabled={saving || !subjectId}>
+          {saving ? t("common.saving") : submitLabel}
+        </button>
+      )}
     </form>
   );
 }

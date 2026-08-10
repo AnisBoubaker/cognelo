@@ -25,7 +25,9 @@ export const frMessages = {
       remove: "Supprimer",
       redirecting: "Redirection...",
       save: "Enregistrer",
+      savedStatus: "Tout est enregistré.",
       saving: "Enregistrement...",
+      unsavedStatus: "Vous avez des modifications non enregistrées.",
       time: "Heure"
     },
     activityCategories: {

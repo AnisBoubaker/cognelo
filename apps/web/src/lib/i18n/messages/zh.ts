@@ -25,7 +25,9 @@ export const zhMessages = {
       remove: "删除",
       redirecting: "正在跳转...",
       save: "保存",
+      savedStatus: "所有内容均已保存。",
       saving: "保存中...",
+      unsavedStatus: "你有未保存的更改。",
       time: "时间"
     },
     activityCategories: {

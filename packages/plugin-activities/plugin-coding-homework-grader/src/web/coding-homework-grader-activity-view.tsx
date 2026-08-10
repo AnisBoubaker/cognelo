@@ -1,7 +1,7 @@
 "use client";
 
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MarkdownRenderer, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { EditActionBar, MarkdownRenderer, getEditActionBarCopy, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   type CodingHomeworkAssignmentRecord,
   type CodingHomeworkAttachmentRecord,
@@ -142,6 +142,7 @@ export function CodingHomeworkGraderActivityView({
   submissionClient
 }: CodingHomeworkGraderActivityViewProps) {
   const copy: CodingHomeworkCopy = codingHomeworkMessages[locale] ?? codingHomeworkMessages.en;
+  const actionCopy = getEditActionBarCopy(locale);
   const notifications = useNotifications();
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);
@@ -713,9 +714,6 @@ export function CodingHomeworkGraderActivityView({
           <p className="eyebrow">{copy.teacherSetup}</p>
           <h2>{copy.authoringTitle}</h2>
         </div>
-        <button className="button primary" disabled={saving || !authoringClient || !onSave} type="submit">
-          {saving ? "..." : copy.save}
-        </button>
       </div>
 
       <div className="coding-homework-authoring-grid">
@@ -974,6 +972,18 @@ export function CodingHomeworkGraderActivityView({
           <PreflightPanel copy={copy} preflightResult={preflightResult} runningPreflight={runningPreflight} onUpload={runPreflight} />
         </section>
       ) : null}
+      <EditActionBar
+        isDirty={hasUnsavedChanges}
+        isSaving={saving}
+        savedLabel={actionCopy.saved}
+        unsavedLabel={actionCopy.unsaved}
+        saveLabel={copy.save}
+        savingLabel={actionCopy.saving}
+        cancelLabel={actionCopy.cancel}
+        onCancel={discardChanges}
+        onSave={() => saveHomework()}
+        saveDisabled={!authoringClient || !onSave}
+      />
     </form>
   );
 }

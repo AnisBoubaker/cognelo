@@ -463,7 +463,7 @@ select:focus {
   background: color-mix(in srgb, var(--surface-3), white 68%);
 }
 
-.subject-edit-action-bar {
+.edit-action-bar {
   position: sticky;
   bottom: 16px;
   z-index: 20;
@@ -479,7 +479,10 @@ select:focus {
   backdrop-filter: blur(12px);
 }
 
-.subject-edit-action-bar .hero-actions {
+.edit-action-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex-shrink: 0;
 }
 
@@ -670,15 +673,19 @@ select:focus {
 }
 
 @media (max-width: 800px) {
-  .subject-edit-action-bar {
+  .edit-action-bar {
     align-items: stretch;
-    bottom: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom));
     flex-direction: column;
   }
 
-  .subject-edit-action-bar .hero-actions {
+  .edit-action-bar-actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  .edit-action-bar-actions > * {
+    width: 100%;
   }
 
   .knowledge-graph-heading,

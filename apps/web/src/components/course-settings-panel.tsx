@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { EditActionBar, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import { CourseForm } from "@/components/course-form";
 import { SettingsSectionNav } from "@/components/settings-nav";
 import { api, type AiAgentConnection, type Course, type Subject } from "@/lib/api";
@@ -152,11 +152,17 @@ export function CourseSettingsPanel({
 
               {aiAgentConnections.length ? null : <p className="muted">{t("courseDetail.noAiAgentsAvailable")}</p>}
 
-              <div className="row">
-                <button disabled={isSavingAiSettings} type="submit">
-                  {isSavingAiSettings ? t("common.saving") : t("courseDetail.saveAiSettings")}
-                </button>
-              </div>
+              <EditActionBar
+                isDirty={studentSupportAgentId !== savedStudentSupportAgentId}
+                isSaving={isSavingAiSettings}
+                savedLabel={t("common.savedStatus")}
+                unsavedLabel={t("common.unsavedStatus")}
+                saveLabel={t("courseDetail.saveAiSettings")}
+                savingLabel={t("common.saving")}
+                cancelLabel={t("common.cancel")}
+                onCancel={discardAiSettings}
+                onSave={saveAiSettings}
+              />
             </form>
           </section>
         ) : null}

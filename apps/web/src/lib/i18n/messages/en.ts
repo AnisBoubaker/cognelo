@@ -25,7 +25,9 @@ export const enMessages = {
       remove: "Remove",
       redirecting: "Redirecting...",
       save: "Save",
+      savedStatus: "Everything is saved.",
       saving: "Saving...",
+      unsavedStatus: "You have unsaved changes.",
       time: "Time"
     },
     activityCategories: {

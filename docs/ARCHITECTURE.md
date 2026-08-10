@@ -30,6 +30,8 @@ docs/
   ARCHITECTURE.md      Architecture memory for future sessions
 ```
 
+Shared cross-plugin frontend primitives live in `packages/activity-ui`. In addition to editors, renderers, notifications, and unsaved-navigation guards, it owns the responsive `EditActionBar` used by guarded edit drafts. The bar is presentational and receives the owning form's dirty, saving, save, and discard state; it does not merge persistence boundaries or infer whether unrelated immediate mutations are saved.
+
 ## Core Modules
 
 - **Auth** owns password hashing, JWT creation, login/logout, and current-user lookup.

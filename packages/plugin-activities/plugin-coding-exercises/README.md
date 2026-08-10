@@ -146,6 +146,7 @@ As this plugin grows, expect to add:
 
 - richer execution policies per language/runtime
 - richer score/rubric reporting
+- responsive teacher-authoring actions use the shared `EditActionBar`, with saved/unsaved status and snapshot-backed Cancel/Save
 
 ## Contributor Workflow
 
