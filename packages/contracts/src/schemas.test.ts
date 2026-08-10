@@ -228,13 +228,26 @@ describe("shared contract schemas", () => {
     expect(SubjectKnowledgeGraphGenerationInputSchema.parse({ description: "A detailed mathematics curriculum." })).toEqual({
       description: "A detailed mathematics curriculum.",
       directions: "",
-      maxConcepts: 12
+      maxConcepts: 12,
+      mode: "new"
     });
     expect(() => SubjectKnowledgeGraphGenerationInputSchema.parse({ description: "Too short", maxConcepts: 51 })).toThrow();
     expect(() => SubjectKnowledgeGraphGenerationInputSchema.parse({
       description: "A detailed mathematics curriculum.",
       teachingLanguage: "es"
     })).toThrow();
+    expect(() => SubjectKnowledgeGraphGenerationInputSchema.parse({
+      description: "A detailed mathematics curriculum.",
+      mode: "iterate"
+    })).toThrow();
+    expect(SubjectKnowledgeGraphGenerationInputSchema.parse({
+      description: "A detailed mathematics curriculum.",
+      mode: "iterate",
+      existingGraph: {
+        concepts: [{ id: "variables", title: "Variables", description: "", positionX: 0, positionY: 0 }],
+        prerequisites: []
+      }
+    }).mode).toBe("iterate");
     expect(SubjectUpdateSchema.parse({
       knowledgeGraph: {
         concepts: [
