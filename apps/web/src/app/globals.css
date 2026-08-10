@@ -433,6 +433,11 @@ select:focus {
   min-height: 620px;
 }
 
+.subject-description-text {
+  max-width: 1100px;
+  white-space: pre-wrap;
+}
+
 .knowledge-graph-heading {
   align-items: flex-end;
   gap: 1rem;
