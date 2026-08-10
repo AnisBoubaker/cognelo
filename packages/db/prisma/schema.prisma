@@ -248,6 +248,7 @@ model Subject {
   id                     String                         @id @default(cuid())
   title                  String
   description            String                         @default("")
+  teachingLanguage       String                         @default("en")
   metadata               Json                           @default("{}")
   createdById            String
   createdAt              DateTime                       @default(now())

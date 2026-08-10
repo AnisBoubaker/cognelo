@@ -29,6 +29,7 @@ export default function SubjectDetailPage() {
           <div className="hero-meta">
             <p className="eyebrow">{t("subjectDetail.eyebrow")}</p>
             <h1>{subject?.title ?? t("subjectDetail.fallbackTitle")}</h1>
+            {subject ? <p className="muted">{t("subjects.teachingLanguageSummary", { language: t(`locale.${subject.teachingLanguage}`) })}</p> : null}
           </div>
           {subject ? (
             <div className="hero-actions">

@@ -39,6 +39,7 @@ type Props = {
   readOnly?: boolean;
   aiGenerationEnabled?: boolean;
   subjectDescription?: string;
+  teachingLanguage?: "en" | "fr" | "zh" | "ar";
   onChange?: (graph: SubjectKnowledgeGraphDraft) => void;
 };
 
@@ -128,9 +129,10 @@ export function SubjectKnowledgeGraph({
   readOnly = false,
   aiGenerationEnabled = false,
   subjectDescription = "",
+  teachingLanguage = "en",
   onChange
 }: Props) {
-  const { locale, t } = useI18n();
+  const { t } = useI18n();
   const { notify } = useNotifications();
   const [concepts, setConcepts] = useState(initialConcepts);
   const [prerequisites, setPrerequisites] = useState(initialPrerequisites);
@@ -304,7 +306,7 @@ export function SubjectKnowledgeGraph({
         description: subjectDescription,
         directions: aiDirections,
         maxConcepts,
-        locale
+        teachingLanguage
       });
       applyGraph(result.concepts, result.prerequisites);
       selectConcept(null);

@@ -4,13 +4,14 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { api, type Subject } from "@/lib/api";
-import { useI18n } from "@/lib/i18n";
+import { locales, useI18n, type Locale } from "@/lib/i18n";
 
 export default function SubjectsPage() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [teachingLanguage, setTeachingLanguage] = useState<Locale>(locale);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -31,9 +32,10 @@ export default function SubjectsPage() {
     setSaving(true);
     setError("");
     try {
-      await api.createSubject({ title, description, metadata: {} });
+      await api.createSubject({ title, description, teachingLanguage, metadata: {} });
       setTitle("");
       setDescription("");
+      setTeachingLanguage(locale);
       setShowCreateForm(false);
       loadSubjects();
     } catch (err) {
@@ -62,7 +64,12 @@ export default function SubjectsPage() {
               <p className="eyebrow">{t("subjects.listEyebrow")}</p>
               <h2>{t("subjects.listTitle")}</h2>
             </div>
-            <button className="secondary" type="button" onClick={() => setShowCreateForm((current) => !current)}>
+            <button className="secondary" type="button" onClick={() => {
+              setShowCreateForm((current) => {
+                if (!current) setTeachingLanguage(locale);
+                return !current;
+              });
+            }}>
               {showCreateForm ? t("common.cancel") : t("common.add")}
             </button>
           </div>
@@ -76,6 +83,17 @@ export default function SubjectsPage() {
                 <label htmlFor="subject-description">{t("subjects.descriptionLabel")}</label>
                 <textarea id="subject-description" value={description} onChange={(event) => setDescription(event.target.value)} />
               </div>
+              <div className="field">
+                <label htmlFor="subject-teaching-language">{t("subjects.teachingLanguageLabel")}</label>
+                <select
+                  id="subject-teaching-language"
+                  value={teachingLanguage}
+                  onChange={(event) => setTeachingLanguage(event.target.value as Locale)}
+                >
+                  {locales.map((language) => <option key={language} value={language}>{t(`locale.${language}`)}</option>)}
+                </select>
+                <p className="muted">{t("subjects.teachingLanguageHelp")}</p>
+              </div>
               <div className="hero-actions">
                 <button type="submit" disabled={saving}>
                   {saving ? t("common.saving") : t("common.create")}
@@ -87,6 +105,7 @@ export default function SubjectsPage() {
                     setShowCreateForm(false);
                     setTitle("");
                     setDescription("");
+                    setTeachingLanguage(locale);
                   }}
                 >
                   {t("common.cancel")}

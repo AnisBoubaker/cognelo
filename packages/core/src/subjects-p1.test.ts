@@ -93,16 +93,19 @@ describe("subject and activity bank services", () => {
     await expect(getSubject(adminUser, "subject-1")).resolves.toEqual({ id: "subject-1" });
 
     mockPrisma.subject.create.mockResolvedValue({ id: "subject-1" });
-    await createSubject(adminUser, { title: "Programming", metadata: { code: "INF" } });
+    await createSubject(adminUser, { title: "Programming", teachingLanguage: "fr", metadata: { code: "INF" } });
     expect(mockPrisma.subject.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ title: "Programming", metadata: { code: "INF" }, createdById: "admin-1" })
+        data: expect.objectContaining({ title: "Programming", teachingLanguage: "fr", metadata: { code: "INF" }, createdById: "admin-1" })
       })
     );
 
     mockPrisma.subject.update.mockResolvedValue({ id: "subject-1", title: "Updated" });
-    await updateSubject(adminUser, "subject-1", { title: "Updated" });
-    expect(mockPrisma.subject.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "subject-1" } }));
+    await updateSubject(adminUser, "subject-1", { title: "Updated", teachingLanguage: "zh" });
+    expect(mockPrisma.subject.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "subject-1" },
+      data: expect.objectContaining({ teachingLanguage: "zh" })
+    }));
   });
 
   it("filters activity banks by subject and lets admins assign bank owners", async () => {
