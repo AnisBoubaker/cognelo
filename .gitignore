@@ -6,6 +6,7 @@ dist
 .turbo
 .env
 .env.local
+.codex/
 *.log
 *.tsbuildinfo
 coverage
