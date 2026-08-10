@@ -433,6 +433,56 @@ select:focus {
   min-height: 620px;
 }
 
+.subject-edit-hero {
+  min-height: 150px;
+}
+
+.subject-details-section,
+.knowledge-graph-section {
+  box-shadow: 0 12px 34px rgb(15 23 42 / 7%);
+}
+
+.subject-details-section .section-heading {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.subject-details-form {
+  gap: 22px;
+}
+
+.subject-details-form textarea {
+  min-height: 180px;
+}
+
+.subject-language-field {
+  max-width: 680px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--brand-blue), white 76%);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-3), white 68%);
+}
+
+.subject-edit-action-bar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 18px;
+  border: 1px solid color-mix(in srgb, var(--brand-blue), white 65%);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface), transparent 4%);
+  box-shadow: 0 14px 38px rgb(15 23 42 / 18%);
+  backdrop-filter: blur(12px);
+}
+
+.subject-edit-action-bar .hero-actions {
+  flex-shrink: 0;
+}
+
 .subject-description-text {
   max-width: 1100px;
   white-space: pre-wrap;
@@ -620,6 +670,17 @@ select:focus {
 }
 
 @media (max-width: 800px) {
+  .subject-edit-action-bar {
+    align-items: stretch;
+    bottom: 8px;
+    flex-direction: column;
+  }
+
+  .subject-edit-action-bar .hero-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
   .knowledge-graph-heading,
   .knowledge-graph-add {
     align-items: stretch;

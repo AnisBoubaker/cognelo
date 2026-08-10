@@ -322,6 +322,12 @@ export const zhMessages = {
     editSubject: {
       eyebrow: "编辑学科",
       fallbackTitle: "正在加载学科...",
+      pageHelp: "更新学科信息和知识图谱，然后统一保存所有更改。",
+      detailsEyebrow: "学科设置",
+      detailsTitle: "学科信息",
+      detailsHelp: "用于课程和 AI 辅助创作的核心信息。",
+      unsavedChanges: "你有未保存的更改。",
+      noUnsavedChanges: "所有内容均已保存。",
       loadError: "无法加载学科。",
       saveError: "无法保存学科。"
     },

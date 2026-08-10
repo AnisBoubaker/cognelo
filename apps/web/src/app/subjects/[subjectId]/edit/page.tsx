@@ -115,32 +115,44 @@ export default function EditSubjectPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section>
-          <p className="eyebrow">{t("editSubject.eyebrow")}</p>
-          <h1>{subject?.title ?? t("editSubject.fallbackTitle")}</h1>
+        <section className="hero-panel hero-panel-compact subject-edit-hero">
+          <div className="hero-meta">
+            <p className="eyebrow">{t("editSubject.eyebrow")}</p>
+            <h1>{subject?.title ?? t("editSubject.fallbackTitle")}</h1>
+            <p className="muted">{t("editSubject.pageHelp")}</p>
+          </div>
         </section>
 
         {error ? <p className="error">{error}</p> : null}
 
         {subject ? (
-          <section className="section stack">
-            <form className="form" id="subject-metadata-form" onSubmit={saveSubject}>
-              <div className="field">
-                <label htmlFor="subject-title">{t("subjects.titleLabel")}</label>
-                <input id="subject-title" value={title} minLength={2} required onChange={(event) => setTitle(event.target.value)} />
+          <>
+            <section className="section stack subject-details-section">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">{t("editSubject.detailsEyebrow")}</p>
+                  <h2>{t("editSubject.detailsTitle")}</h2>
+                  <p className="muted">{t("editSubject.detailsHelp")}</p>
+                </div>
               </div>
-              <div className="field">
-                <label htmlFor="subject-description">{t("subjects.descriptionLabel")}</label>
-                <textarea id="subject-description" value={description} onChange={(event) => setDescription(event.target.value)} />
-              </div>
-              <div className="field">
-                <label htmlFor="subject-teaching-language">{t("subjects.teachingLanguageLabel")}</label>
-                <select id="subject-teaching-language" value={teachingLanguage} onChange={(event) => setTeachingLanguage(event.target.value as Locale)}>
-                  {locales.map((language) => <option key={language} value={language}>{t(`locale.${language}`)}</option>)}
-                </select>
-                <p className="muted">{t("subjects.teachingLanguageHelp")}</p>
-              </div>
-            </form>
+              <form className="form subject-details-form" id="subject-metadata-form" onSubmit={saveSubject}>
+                <div className="field">
+                  <label htmlFor="subject-title">{t("subjects.titleLabel")}</label>
+                  <input id="subject-title" value={title} minLength={2} required onChange={(event) => setTitle(event.target.value)} />
+                </div>
+                <div className="field">
+                  <label htmlFor="subject-description">{t("subjects.descriptionLabel")}</label>
+                  <textarea id="subject-description" rows={8} value={description} onChange={(event) => setDescription(event.target.value)} />
+                </div>
+                <div className="field subject-language-field">
+                  <label htmlFor="subject-teaching-language">{t("subjects.teachingLanguageLabel")}</label>
+                  <select id="subject-teaching-language" value={teachingLanguage} onChange={(event) => setTeachingLanguage(event.target.value as Locale)}>
+                    {locales.map((language) => <option key={language} value={language}>{t(`locale.${language}`)}</option>)}
+                  </select>
+                  <p className="muted">{t("subjects.teachingLanguageHelp")}</p>
+                </div>
+              </form>
+            </section>
             <SubjectKnowledgeGraph
               aiGenerationEnabled={aiGenerationEnabled}
               subjectId={subject.id}
@@ -155,15 +167,18 @@ export default function EditSubjectPage() {
                 setGraphPrerequisites(graph.prerequisites.map((prerequisite) => ({ ...prerequisite, subjectId })));
               }}
             />
-            <div className="hero-actions">
-              <button type="submit" form="subject-metadata-form" disabled={saving}>
-                {saving ? t("common.saving") : t("common.save")}
-              </button>
-              <Link className="button secondary" href={`/subjects/${subject.id}`}>
-                {t("common.cancel")}
-              </Link>
+            <div className="subject-edit-action-bar">
+              <p className="muted">{t(hasUnsavedChanges ? "editSubject.unsavedChanges" : "editSubject.noUnsavedChanges")}</p>
+              <div className="hero-actions">
+                <Link className="button secondary" href={`/subjects/${subject.id}`}>
+                  {t("common.cancel")}
+                </Link>
+                <button type="submit" form="subject-metadata-form" disabled={saving || !hasUnsavedChanges}>
+                  {saving ? t("common.saving") : t("common.save")}
+                </button>
+              </div>
             </div>
-          </section>
+          </>
         ) : null}
       </main>
     </AppShell>

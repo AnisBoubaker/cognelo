@@ -202,6 +202,12 @@ export const arMessages = {
     editSubject: {
       eyebrow: "تعديل المادة",
       fallbackTitle: "جار تحميل المادة...",
+      pageHelp: "حدّث معلومات المادة والرسم البياني للمعرفة، ثم احفظ جميع التغييرات معاً.",
+      detailsEyebrow: "إعدادات المادة",
+      detailsTitle: "معلومات المادة",
+      detailsHelp: "المعلومات الأساسية المستخدمة في المقررات والتأليف بمساعدة الذكاء الاصطناعي.",
+      unsavedChanges: "لديك تغييرات غير محفوظة.",
+      noUnsavedChanges: "تم حفظ كل شيء.",
       loadError: "تعذر تحميل المادة.",
       saveError: "تعذر حفظ المادة."
     },

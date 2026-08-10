@@ -322,6 +322,12 @@ export const frMessages = {
     editSubject: {
       eyebrow: "Modifier la matière",
       fallbackTitle: "Chargement de la matière...",
+      pageHelp: "Modifiez les informations de la matière et son graphe de connaissances, puis enregistrez tous les changements ensemble.",
+      detailsEyebrow: "Paramètres de la matière",
+      detailsTitle: "Informations de la matière",
+      detailsHelp: "Les informations principales utilisées dans les cours et la création assistée par l’IA.",
+      unsavedChanges: "Vous avez des modifications non enregistrées.",
+      noUnsavedChanges: "Tout est enregistré.",
       loadError: "Impossible de charger la matière.",
       saveError: "Impossible d'enregistrer la matière."
     },
