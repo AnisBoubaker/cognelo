@@ -1,0 +1,105 @@
+name: ${COMPOSE_PROJECT_NAME:-cognelo-instance1-sandbox}
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "25m"
+    max-file: "4"
+
+services:
+  judge0-server:
+    image: ${JUDGE0_IMAGE:-judge0/judge0:1.13.1}
+    privileged: true
+    restart: unless-stopped
+    volumes:
+      - ./judge0.conf:/judge0.conf:ro
+    ports:
+      - "${SANDBOX_BIND_ADDRESS:-127.0.0.1}:${JUDGE0_PORT:-2358}:2358"
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    networks:
+      - sandbox
+    logging: *default-logging
+
+  judge0-workers:
+    image: ${JUDGE0_IMAGE:-judge0/judge0:1.13.1}
+    command: ["./scripts/workers"]
+    privileged: true
+    restart: unless-stopped
+    volumes:
+      - ./judge0.conf:/judge0.conf:ro
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    networks:
+      - sandbox
+    logging: *default-logging
+
+  judge0-db:
+    image: postgres:16.2
+    restart: unless-stopped
+    env_file:
+      - ./judge0.conf
+    volumes:
+      - judge0-data:/var/lib/postgresql/data
+    networks:
+      - sandbox
+    logging: *default-logging
+
+  judge0-redis:
+    image: redis:7.2.4
+    command:
+      - bash
+      - -c
+      - 'docker-entrypoint.sh --appendonly no --requirepass "$$REDIS_PASSWORD"'
+    restart: unless-stopped
+    env_file:
+      - ./judge0.conf
+    networks:
+      - sandbox
+    logging: *default-logging
+
+  web-design-runner:
+    image: ${WEB_DESIGN_RUNNER_IMAGE:?Set WEB_DESIGN_RUNNER_IMAGE to the locally built tag}
+    init: true
+    user: pwuser
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=${PLAYWRIGHT_SECCOMP_PROFILE:-./seccomp_profile.json}
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    mem_limit: 2g
+    cpus: 2.0
+    shm_size: 1gb
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+      - /home/pwuser:rw,nosuid,size=128m
+    environment:
+      PORT: 3456
+      NODE_ENV: production
+    ports:
+      - "${SANDBOX_BIND_ADDRESS:-127.0.0.1}:${WEB_DESIGN_RUNNER_PORT:-3456}:3456"
+    networks:
+      - sandbox
+    logging: *default-logging
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3456/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+networks:
+  sandbox:
+    internal: true
+
+volumes:
+  judge0-data:
