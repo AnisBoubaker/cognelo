@@ -8,6 +8,7 @@ import {
   SubjectInputSchema,
   SubjectKnowledgeConceptInputSchema,
   SubjectKnowledgeConceptUpdateSchema,
+  SubjectKnowledgeGraphDraftSchema,
   SubjectKnowledgeGraphGenerationInputSchema,
   SubjectKnowledgePrerequisiteInputSchema,
   SubjectUpdateSchema
@@ -77,14 +78,54 @@ export async function createSubject(user: CurrentUser, input: unknown) {
 export async function updateSubject(user: CurrentUser, subjectId: string, input: unknown) {
   await assertCanManageSubjects(user);
   const data = SubjectUpdateSchema.parse(input);
-  return prisma.subject.update({
-    where: { id: subjectId },
-    data: {
-      title: data.title,
-      description: data.description,
-      metadata: data.metadata as Prisma.InputJsonValue | undefined
-    },
-    include: subjectInclude
+  if (!data.knowledgeGraph) {
+    return prisma.subject.update({
+      where: { id: subjectId },
+      data: {
+        title: data.title,
+        description: data.description,
+        metadata: data.metadata as Prisma.InputJsonValue | undefined
+      },
+      include: subjectInclude
+    });
+  }
+  const knowledgeGraph = data.knowledgeGraph;
+  validateKnowledgeGraphDraft(knowledgeGraph);
+  return prisma.$transaction(async (transaction) => {
+    await transaction.subject.update({
+      where: { id: subjectId },
+      data: {
+        title: data.title,
+        description: data.description,
+        metadata: data.metadata as Prisma.InputJsonValue | undefined
+      }
+    });
+    await transaction.subjectKnowledgeConcept.deleteMany({ where: { subjectId } });
+    const conceptIds = new Map<string, string>();
+    for (const concept of knowledgeGraph.concepts) {
+      const created = await transaction.subjectKnowledgeConcept.create({
+        data: {
+          subjectId,
+          title: concept.title,
+          description: concept.description,
+          positionX: concept.positionX,
+          positionY: concept.positionY
+        }
+      });
+      conceptIds.set(concept.id, created.id);
+    }
+    for (const prerequisite of knowledgeGraph.prerequisites) {
+      await transaction.subjectKnowledgePrerequisite.create({
+        data: {
+          subjectId,
+          sourceConceptId: conceptIds.get(prerequisite.sourceConceptId)!,
+          requiredConceptId: conceptIds.get(prerequisite.requiredConceptId)!,
+          sourceHandle: prerequisite.sourceHandle,
+          targetHandle: prerequisite.targetHandle
+        }
+      });
+    }
+    return transaction.subject.findUniqueOrThrow({ where: { id: subjectId }, include: subjectInclude });
   });
 }
 
@@ -117,7 +158,10 @@ export async function createSubjectKnowledgePrerequisite(user: CurrentUser, subj
   });
   if (conceptCount !== 2) throw new AppError(400, "INVALID_KNOWLEDGE_CONCEPT", "Both concepts must belong to this subject.");
   const existing = await prisma.subjectKnowledgePrerequisite.findUnique({
-    where: { sourceConceptId_requiredConceptId: data }
+    where: { sourceConceptId_requiredConceptId: {
+      sourceConceptId: data.sourceConceptId,
+      requiredConceptId: data.requiredConceptId
+    } }
   });
   if (existing) throw new AppError(409, "KNOWLEDGE_PREREQUISITE_EXISTS", "This prerequisite already exists.");
   const prerequisites = await prisma.subjectKnowledgePrerequisite.findMany({
@@ -163,37 +207,60 @@ export async function generateSubjectKnowledgeGraph(user: CurrentUser, subjectId
     maxConcepts: data.maxConcepts
   });
   const positions = layoutGeneratedKnowledgeGraph(graph);
-
-  return prisma.$transaction(async (transaction) => {
-    await transaction.subjectKnowledgeConcept.deleteMany({ where: { subjectId } });
-    const concepts = [];
-    const conceptIds = new Map<string, string>();
-    for (const concept of graph.concepts) {
-      const position = positions.get(concept.key) ?? { x: 0, y: 0 };
-      const created = await transaction.subjectKnowledgeConcept.create({
-        data: {
-          subjectId,
-          title: concept.title,
-          description: concept.description,
-          positionX: position.x,
-          positionY: position.y
-        }
-      });
-      concepts.push(created);
-      conceptIds.set(concept.key, created.id);
-    }
-    const prerequisites = [];
-    for (const prerequisite of graph.prerequisites) {
-      prerequisites.push(await transaction.subjectKnowledgePrerequisite.create({
-        data: {
-          subjectId,
-          sourceConceptId: conceptIds.get(prerequisite.sourceKey)!,
-          requiredConceptId: conceptIds.get(prerequisite.requiredKey)!
-        }
-      }));
-    }
-    return { concepts, prerequisites };
+  const concepts = graph.concepts.map((concept, index) => {
+    const position = positions.get(concept.key) ?? { x: 0, y: 0 };
+    return {
+      id: `generated-concept-${index}-${concept.key}`.slice(0, 160),
+      subjectId,
+      title: concept.title,
+      description: concept.description,
+      positionX: position.x,
+      positionY: position.y
+    };
   });
+  const conceptIds = new Map(graph.concepts.map((concept, index) => [concept.key, concepts[index]!.id]));
+  const prerequisites = graph.prerequisites.map((prerequisite, index) => ({
+    id: `generated-prerequisite-${index}`,
+    subjectId,
+    sourceConceptId: conceptIds.get(prerequisite.sourceKey)!,
+    requiredConceptId: conceptIds.get(prerequisite.requiredKey)!,
+    sourceHandle: null,
+    targetHandle: null
+  }));
+  return { concepts, prerequisites };
+}
+
+function validateKnowledgeGraphDraft(graph: ReturnType<typeof SubjectKnowledgeGraphDraftSchema.parse>) {
+  const conceptIds = new Set<string>();
+  for (const concept of graph.concepts) {
+    if (conceptIds.has(concept.id)) throw new AppError(400, "DUPLICATE_KNOWLEDGE_CONCEPT", "Knowledge concept identifiers must be unique.");
+    conceptIds.add(concept.id);
+  }
+  const edgeKeys = new Set<string>();
+  const outgoing = new Map<string, string[]>();
+  for (const prerequisite of graph.prerequisites) {
+    if (!conceptIds.has(prerequisite.sourceConceptId) || !conceptIds.has(prerequisite.requiredConceptId)) {
+      throw new AppError(400, "INVALID_KNOWLEDGE_CONCEPT", "Every prerequisite must reference concepts in this graph.");
+    }
+    if (prerequisite.sourceConceptId === prerequisite.requiredConceptId) {
+      throw new AppError(400, "KNOWLEDGE_PREREQUISITE_SELF_LINK", "A concept cannot require itself.");
+    }
+    const edgeKey = `${prerequisite.sourceConceptId}\u0000${prerequisite.requiredConceptId}`;
+    if (edgeKeys.has(edgeKey)) throw new AppError(400, "DUPLICATE_KNOWLEDGE_PREREQUISITE", "Knowledge prerequisites must be unique.");
+    edgeKeys.add(edgeKey);
+    outgoing.set(prerequisite.sourceConceptId, [...(outgoing.get(prerequisite.sourceConceptId) ?? []), prerequisite.requiredConceptId]);
+  }
+  for (const startId of conceptIds) {
+    const pending = [...(outgoing.get(startId) ?? [])];
+    const visited = new Set<string>();
+    while (pending.length) {
+      const conceptId = pending.pop()!;
+      if (conceptId === startId) throw new AppError(400, "KNOWLEDGE_PREREQUISITE_CYCLE", "Knowledge prerequisites cannot contain a cycle.");
+      if (visited.has(conceptId)) continue;
+      visited.add(conceptId);
+      pending.push(...(outgoing.get(conceptId) ?? []));
+    }
+  }
 }
 
 async function generateValidSubjectKnowledgeGraph(input: {

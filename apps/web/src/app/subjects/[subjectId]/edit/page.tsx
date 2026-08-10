@@ -6,7 +6,7 @@ import { useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SubjectKnowledgeGraph } from "@/components/subject-knowledge-graph";
-import { api, type Subject } from "@/lib/api";
+import { api, type Subject, type SubjectKnowledgeConcept, type SubjectKnowledgeGraphDraft, type SubjectKnowledgePrerequisite } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 export default function EditSubjectPage() {
@@ -17,7 +17,14 @@ export default function EditSubjectPage() {
   const [subject, setSubject] = useState<Subject | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [savedSnapshot, setSavedSnapshot] = useState({ title: "", description: "" });
+  const [graphConcepts, setGraphConcepts] = useState<SubjectKnowledgeConcept[]>([]);
+  const [graphPrerequisites, setGraphPrerequisites] = useState<SubjectKnowledgePrerequisite[]>([]);
+  const [savedSnapshot, setSavedSnapshot] = useState<{
+    title: string;
+    description: string;
+    concepts: SubjectKnowledgeConcept[];
+    prerequisites: SubjectKnowledgePrerequisite[];
+  }>({ title: "", description: "", concepts: [], prerequisites: [] });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [aiGenerationEnabled, setAiGenerationEnabled] = useState(false);
@@ -29,7 +36,11 @@ export default function EditSubjectPage() {
         setSubject(result.subject);
         setTitle(result.subject.title);
         setDescription(result.subject.description ?? "");
-        setSavedSnapshot({ title: result.subject.title, description: result.subject.description ?? "" });
+        const concepts = result.subject.knowledgeConcepts ?? [];
+        const prerequisites = result.subject.knowledgePrerequisites ?? [];
+        setGraphConcepts(concepts);
+        setGraphPrerequisites(prerequisites);
+        setSavedSnapshot({ title: result.subject.title, description: result.subject.description ?? "", concepts, prerequisites });
       })
       .catch((err) => setError(err instanceof Error ? err.message : t("editSubject.loadError")));
   }, [subjectId, t]);
@@ -44,12 +55,16 @@ export default function EditSubjectPage() {
       .catch(() => setAiGenerationEnabled(false));
   }, []);
 
-  const currentSnapshot = useMemo(() => ({ title, description }), [description, title]);
-  const hasUnsavedChanges = currentSnapshot.title !== savedSnapshot.title || currentSnapshot.description !== savedSnapshot.description;
+  const hasUnsavedChanges = title !== savedSnapshot.title
+    || description !== savedSnapshot.description
+    || JSON.stringify({ concepts: graphConcepts, prerequisites: graphPrerequisites })
+      !== JSON.stringify({ concepts: savedSnapshot.concepts, prerequisites: savedSnapshot.prerequisites });
 
   const discardChanges = useCallback(() => {
     setTitle(savedSnapshot.title);
     setDescription(savedSnapshot.description);
+    setGraphConcepts(savedSnapshot.concepts);
+    setGraphPrerequisites(savedSnapshot.prerequisites);
     setError("");
   }, [savedSnapshot]);
 
@@ -57,8 +72,16 @@ export default function EditSubjectPage() {
     setSaving(true);
     setError("");
     try {
-      const result = await api.updateSubject(subjectId, { title, description });
-      setSavedSnapshot({ title, description });
+      const knowledgeGraph: SubjectKnowledgeGraphDraft = {
+        concepts: graphConcepts.map(({ id, title: conceptTitle, description: conceptDescription, positionX, positionY }) => ({
+          id, title: conceptTitle, description: conceptDescription, positionX, positionY
+        })),
+        prerequisites: graphPrerequisites.map(({ id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle }) => ({
+          id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle
+        }))
+      };
+      const result = await api.updateSubject(subjectId, { title, description, knowledgeGraph });
+      setSavedSnapshot({ title, description, concepts: graphConcepts, prerequisites: graphPrerequisites });
       router.push(`/subjects/${result.subject.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("editSubject.saveError"));
@@ -66,7 +89,7 @@ export default function EditSubjectPage() {
     } finally {
       setSaving(false);
     }
-  }, [description, router, subjectId, t, title]);
+  }, [description, graphConcepts, graphPrerequisites, router, subjectId, t, title]);
 
   useUnsavedChangesGuard(
     useMemo(
@@ -110,8 +133,14 @@ export default function EditSubjectPage() {
               aiGenerationEnabled={aiGenerationEnabled}
               subjectId={subject.id}
               subjectDescription={description}
-              initialConcepts={subject.knowledgeConcepts ?? []}
-              initialPrerequisites={subject.knowledgePrerequisites ?? []}
+              initialConcepts={graphConcepts}
+              initialPrerequisites={graphPrerequisites}
+              savedConcepts={savedSnapshot.concepts}
+              savedPrerequisites={savedSnapshot.prerequisites}
+              onChange={(graph) => {
+                setGraphConcepts(graph.concepts.map((concept) => ({ ...concept, subjectId })));
+                setGraphPrerequisites(graph.prerequisites.map((prerequisite) => ({ ...prerequisite, subjectId })));
+              }}
             />
             <div className="hero-actions">
               <button type="submit" form="subject-metadata-form" disabled={saving}>
