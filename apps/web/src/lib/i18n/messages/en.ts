@@ -322,6 +322,12 @@ export const enMessages = {
     editSubject: {
       eyebrow: "Edit subject",
       fallbackTitle: "Loading subject...",
+      pageHelp: "Update the subject information and knowledge graph, then save all changes together.",
+      detailsEyebrow: "Subject settings",
+      detailsTitle: "Subject information",
+      detailsHelp: "Core information used throughout courses and AI-assisted authoring.",
+      unsavedChanges: "You have unsaved changes.",
+      noUnsavedChanges: "Everything is saved.",
       loadError: "Unable to load subject.",
       saveError: "Unable to save subject."
     },
