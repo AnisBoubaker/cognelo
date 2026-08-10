@@ -346,6 +346,7 @@ function buildSystemPrompt(input: {
     "- Each question starts with a level-2 Markdown heading: `## Question N`.",
     "- The prompt follows the heading.",
     "- Choices must use task-list syntax: `- [x] correct choice` and `- [ ] incorrect choice`.",
+    "- Write inline mathematics with `$...$` and display mathematics with `$$...$$`. Standard LaTeX delimiters `\\(...\\)` and `\\[...\\]` are also supported.",
     "- Choices may be code alternatives. For a code-only choice, write the marker on its own line and put a fenced code block immediately below it.",
     "- Every fenced code block must include an explicit language identifier after the opening backticks. Never return an unlabeled fenced code block.",
     "- Each question must include at least three choices.",

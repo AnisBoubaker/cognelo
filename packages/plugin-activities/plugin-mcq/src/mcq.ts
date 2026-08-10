@@ -392,6 +392,35 @@ function parseMarkdownBlocks(lines: string[], defaultCodeLanguage: string): McqB
       continue;
     }
 
+    const singleLineLatexMath = trimmed.match(/^\\\[(.+)\\\]$/);
+    if (singleLineLatexMath) {
+      blocks.push({
+        type: "math",
+        expression: singleLineLatexMath[1].trim(),
+        display: true
+      });
+      index += 1;
+      continue;
+    }
+
+    if (trimmed === "\\[") {
+      const mathLines: string[] = [];
+      index += 1;
+      while (index < lines.length && lines[index].trim() !== "\\]") {
+        mathLines.push(lines[index]);
+        index += 1;
+      }
+      if (index < lines.length) {
+        index += 1;
+      }
+      blocks.push({
+        type: "math",
+        expression: mathLines.join("\n").trim(),
+        display: true
+      });
+      continue;
+    }
+
     const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
     if (headingMatch) {
       blocks.push({
@@ -495,6 +524,21 @@ function parseInline(text: string): InlineToken[] {
       }
     }
 
+    if (text.startsWith("\\(", index)) {
+      const end = text.indexOf("\\)", index + 2);
+      if (end !== -1 && end > index + 2) {
+        tokens.push({ type: "math", expression: text.slice(index + 2, end) });
+        index = end + 2;
+        continue;
+      }
+    }
+
+    if (text.startsWith("\\$", index)) {
+      tokens.push({ type: "text", text: "$" });
+      index += 2;
+      continue;
+    }
+
     if (text[index] === "$") {
       const end = text.indexOf("$", index + 1);
       if (end !== -1 && end > index + 1) {
@@ -519,7 +563,7 @@ function parseInline(text: string): InlineToken[] {
 
 function findNextSpecial(text: string, start: number) {
   let next = text.length;
-  for (const marker of ["**", "*", "_", "`", "$"]) {
+  for (const marker of ["**", "*", "_", "`", "\\(", "\\$", "$"]) {
     const index = text.indexOf(marker, start);
     if (index !== -1) {
       next = Math.min(next, index);
