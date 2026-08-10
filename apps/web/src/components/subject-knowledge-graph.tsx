@@ -1,8 +1,8 @@
 "use client";
 
 import "@xyflow/react/dist/style.css";
+import ELK from "elkjs/lib/elk.bundled.js";
 import {
-  addEdge,
   Background,
   ConnectionMode,
   Controls,
@@ -16,6 +16,7 @@ import {
   type Node,
   type NodeProps,
   type NodeTypes,
+  type ReactFlowInstance,
   useEdgesState,
   useNodesState
 } from "@xyflow/react";
@@ -24,6 +25,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   api,
   type SubjectKnowledgeConcept,
+  type SubjectKnowledgeGraphDraft,
   type SubjectKnowledgePrerequisite
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -32,12 +34,18 @@ type Props = {
   subjectId: string;
   initialConcepts: SubjectKnowledgeConcept[];
   initialPrerequisites: SubjectKnowledgePrerequisite[];
+  savedConcepts?: SubjectKnowledgeConcept[];
+  savedPrerequisites?: SubjectKnowledgePrerequisite[];
   readOnly?: boolean;
   aiGenerationEnabled?: boolean;
   subjectDescription?: string;
+  onChange?: (graph: SubjectKnowledgeGraphDraft) => void;
 };
 
 type ConceptNode = Node<{ label: string }>;
+type LayoutPreset = "hierarchical" | "forest" | "radial" | "force" | "compact";
+
+const elk = new ELK();
 
 function ConceptGraphNode({ data }: NodeProps<ConceptNode>) {
   return (
@@ -60,41 +68,91 @@ const toNode = (concept: SubjectKnowledgeConcept): ConceptNode => ({
   data: { label: concept.title }
 });
 
-const toEdge = (prerequisite: SubjectKnowledgePrerequisite): Edge => ({
-  id: prerequisite.id,
-  source: prerequisite.sourceConceptId,
-  target: prerequisite.requiredConceptId,
-  markerEnd: { type: MarkerType.ArrowClosed },
-  type: "smoothstep"
-});
+const sourceHandles = ["top", "right", "bottom", "left"];
+const targetHandles = ["bottom", "left", "top", "right"];
+
+function toEdges(prerequisites: SubjectKnowledgePrerequisite[]): Edge[] {
+  const outgoing = new Map<string, SubjectKnowledgePrerequisite[]>();
+  const incoming = new Map<string, SubjectKnowledgePrerequisite[]>();
+  for (const prerequisite of prerequisites) {
+    outgoing.set(prerequisite.sourceConceptId, [...(outgoing.get(prerequisite.sourceConceptId) ?? []), prerequisite]);
+    incoming.set(prerequisite.requiredConceptId, [...(incoming.get(prerequisite.requiredConceptId) ?? []), prerequisite]);
+  }
+  const sourceHandleByEdge = new Map<string, string>();
+  const targetHandleByEdge = new Map<string, string>();
+  for (const group of outgoing.values()) {
+    group.sort((left, right) => left.id.localeCompare(right.id));
+    group.forEach((edge, index) => sourceHandleByEdge.set(edge.id, sourceHandles[index % sourceHandles.length]));
+  }
+  for (const group of incoming.values()) {
+    group.sort((left, right) => left.id.localeCompare(right.id));
+    group.forEach((edge, index) => targetHandleByEdge.set(edge.id, targetHandles[index % targetHandles.length]));
+  }
+  return prerequisites.map((prerequisite) => ({
+    id: prerequisite.id,
+    source: prerequisite.sourceConceptId,
+    target: prerequisite.requiredConceptId,
+    sourceHandle: prerequisite.sourceHandle ?? sourceHandleByEdge.get(prerequisite.id),
+    targetHandle: prerequisite.targetHandle ?? targetHandleByEdge.get(prerequisite.id),
+    markerEnd: { type: MarkerType.ArrowClosed },
+    type: "smoothstep"
+  }));
+}
+
+function highlightEdges(edges: Edge[], conceptId: string | null): Edge[] {
+  return edges.map((edge) => {
+    const direction = conceptId && edge.source === conceptId
+      ? "outgoing"
+      : conceptId && edge.target === conceptId
+        ? "incoming"
+        : conceptId
+          ? "unconnected"
+          : null;
+    const color = direction === "outgoing" ? "#008f8b" : direction === "incoming" ? "#6d28d9" : undefined;
+    return {
+      ...edge,
+      className: direction ? `knowledge-edge-${direction}` : undefined,
+      markerEnd: { type: MarkerType.ArrowClosed, color },
+      selected: false,
+      zIndex: direction === "outgoing" || direction === "incoming" ? 500 : 0
+    };
+  });
+}
 
 export function SubjectKnowledgeGraph({
   subjectId,
   initialConcepts,
   initialPrerequisites,
+  savedConcepts = initialConcepts,
+  savedPrerequisites = initialPrerequisites,
   readOnly = false,
   aiGenerationEnabled = false,
-  subjectDescription = ""
+  subjectDescription = "",
+  onChange
 }: Props) {
   const { locale, t } = useI18n();
   const { notify } = useNotifications();
   const [concepts, setConcepts] = useState(initialConcepts);
+  const [prerequisites, setPrerequisites] = useState(initialPrerequisites);
   const [nodes, setNodes, onNodesChange] = useNodesState<ConceptNode>(initialConcepts.map(toNode));
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialPrerequisites.map(toEdge));
+  const [edges, setEdges, onEdgesChange] = useEdgesState(toEdges(initialPrerequisites));
   const [newTitle, setNewTitle] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [saving, setSaving] = useState(false);
   const [aiDirections, setAiDirections] = useState("");
   const [maxConcepts, setMaxConcepts] = useState(12);
   const [generating, setGenerating] = useState(false);
   const [showReplaceDialog, setShowReplaceDialog] = useState(false);
+  const [layoutPreset, setLayoutPreset] = useState<LayoutPreset>("hierarchical");
+  const [arranging, setArranging] = useState(false);
+  const [flowInstance, setFlowInstance] = useState<ReactFlowInstance<ConceptNode, Edge> | null>(null);
 
   useEffect(() => {
     setConcepts(initialConcepts);
+    setPrerequisites(initialPrerequisites);
     setNodes(initialConcepts.map(toNode));
-    setEdges(initialPrerequisites.map(toEdge));
+    setEdges(toEdges(initialPrerequisites));
   }, [initialConcepts, initialPrerequisites, setEdges, setNodes]);
 
   const selectedConcept = concepts.find((concept) => concept.id === selectedId) ?? null;
@@ -103,84 +161,127 @@ export function SubjectKnowledgeGraph({
     setSelectedId(concept?.id ?? null);
     setEditTitle(concept?.title ?? "");
     setEditDescription(concept?.description ?? "");
-  }, []);
+    setEdges((current) => highlightEdges(current, concept?.id ?? null));
+  }, [setEdges]);
 
-  async function addConcept(event: FormEvent) {
+  const applyGraph = useCallback((nextConcepts: SubjectKnowledgeConcept[], nextPrerequisites: SubjectKnowledgePrerequisite[]) => {
+    setConcepts(nextConcepts);
+    setPrerequisites(nextPrerequisites);
+    setNodes(nextConcepts.map(toNode));
+    setEdges(highlightEdges(toEdges(nextPrerequisites), selectedId));
+    onChange?.({
+      concepts: nextConcepts.map(({ id, title, description, positionX, positionY }) => ({ id, title, description, positionX, positionY })),
+      prerequisites: nextPrerequisites.map(({ id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle }) => ({
+        id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle
+      }))
+    });
+  }, [onChange, selectedId, setEdges, setNodes]);
+
+  function addConcept(event: FormEvent) {
     event.preventDefault();
     const title = newTitle.trim();
-    if (!title || saving) return;
-    setSaving(true);
-    try {
-      const index = concepts.length;
-      const result = await api.createSubjectKnowledgeConcept(subjectId, {
-        title,
-        description: "",
-        positionX: 80 + (index % 4) * 220,
-        positionY: 80 + Math.floor(index / 4) * 140
-      });
-      setConcepts((current) => [...current, result.concept]);
-      setNodes((current) => [...current, toNode(result.concept)]);
-      setNewTitle("");
-      selectConcept(result.concept);
-    } catch (error) {
-      notify({ variant: "error", message: error instanceof Error ? error.message : t("knowledgeGraph.saveError") });
-    } finally {
-      setSaving(false);
-    }
+    if (!title) return;
+    const index = concepts.length;
+    const concept: SubjectKnowledgeConcept = {
+      id: crypto.randomUUID(),
+      subjectId,
+      title,
+      description: "",
+      positionX: 80 + (index % 4) * 220,
+      positionY: 80 + Math.floor(index / 4) * 140
+    };
+    applyGraph([...concepts, concept], prerequisites);
+    setNewTitle("");
+    selectConcept(concept);
   }
 
-  const connectConcepts = useCallback(async (connection: Connection) => {
+  const connectConcepts = useCallback((connection: Connection) => {
     if (!connection.source || !connection.target) return;
-    try {
-      const result = await api.createSubjectKnowledgePrerequisite(subjectId, {
-        sourceConceptId: connection.source,
-        requiredConceptId: connection.target
-      });
-      setEdges((current) => addEdge(toEdge(result.prerequisite), current));
-    } catch (error) {
-      notify({ variant: "error", message: error instanceof Error ? error.message : t("knowledgeGraph.linkError") });
+    if (connection.source === connection.target || prerequisites.some((edge) =>
+      edge.sourceConceptId === connection.source && edge.requiredConceptId === connection.target
+    )) {
+      notify({ variant: "error", message: t("knowledgeGraph.linkError") });
+      return;
     }
-  }, [notify, setEdges, subjectId, t]);
+    const outgoing = new Map<string, string[]>();
+    for (const edge of prerequisites) outgoing.set(edge.sourceConceptId, [...(outgoing.get(edge.sourceConceptId) ?? []), edge.requiredConceptId]);
+    const pending = [connection.target];
+    const visited = new Set<string>();
+    while (pending.length) {
+      const conceptId = pending.pop()!;
+      if (conceptId === connection.source) {
+        notify({ variant: "error", message: t("knowledgeGraph.linkError") });
+        return;
+      }
+      if (visited.has(conceptId)) continue;
+      visited.add(conceptId);
+      pending.push(...(outgoing.get(conceptId) ?? []));
+    }
+    applyGraph(concepts, [...prerequisites, {
+      id: crypto.randomUUID(),
+      subjectId,
+      sourceConceptId: connection.source,
+      requiredConceptId: connection.target,
+      sourceHandle: connection.sourceHandle as SubjectKnowledgePrerequisite["sourceHandle"],
+      targetHandle: connection.targetHandle as SubjectKnowledgePrerequisite["targetHandle"]
+    }]);
+  }, [applyGraph, concepts, notify, prerequisites, subjectId, t]);
 
-  async function saveConcept(event: FormEvent) {
+  const reconnectPrerequisite = useCallback((oldEdge: Edge, connection: Connection) => {
+    if (!connection.source || !connection.target) return;
+    const otherEdges = prerequisites.filter((edge) => edge.id !== oldEdge.id);
+    if (connection.source === connection.target || otherEdges.some((edge) =>
+      edge.sourceConceptId === connection.source && edge.requiredConceptId === connection.target
+    )) {
+      notify({ variant: "error", message: t("knowledgeGraph.linkError") });
+      return;
+    }
+    const outgoing = new Map<string, string[]>();
+    for (const edge of otherEdges) outgoing.set(edge.sourceConceptId, [...(outgoing.get(edge.sourceConceptId) ?? []), edge.requiredConceptId]);
+    outgoing.set(connection.source, [...(outgoing.get(connection.source) ?? []), connection.target]);
+    const pending = [...(outgoing.get(connection.target) ?? [])];
+    const visited = new Set<string>();
+    while (pending.length) {
+      const conceptId = pending.pop()!;
+      if (conceptId === connection.source) {
+        notify({ variant: "error", message: t("knowledgeGraph.linkError") });
+        return;
+      }
+      if (visited.has(conceptId)) continue;
+      visited.add(conceptId);
+      pending.push(...(outgoing.get(conceptId) ?? []));
+    }
+    applyGraph(concepts, prerequisites.map((edge) => edge.id === oldEdge.id ? {
+      ...edge,
+      sourceConceptId: connection.source!,
+      requiredConceptId: connection.target!,
+      sourceHandle: connection.sourceHandle as SubjectKnowledgePrerequisite["sourceHandle"],
+      targetHandle: connection.targetHandle as SubjectKnowledgePrerequisite["targetHandle"]
+    } : edge));
+  }, [applyGraph, concepts, notify, prerequisites, t]);
+
+  function saveConcept(event: FormEvent) {
     event.preventDefault();
-    if (!selectedConcept || !editTitle.trim() || saving) return;
-    setSaving(true);
-    try {
-      const result = await api.updateSubjectKnowledgeConcept(subjectId, selectedConcept.id, {
-        title: editTitle.trim(), description: editDescription
-      });
-      setConcepts((current) => current.map((concept) => concept.id === result.concept.id ? result.concept : concept));
-      setNodes((current) => current.map((node) => node.id === result.concept.id ? { ...node, data: { label: result.concept.title } } : node));
-      notify({ variant: "success", message: t("knowledgeGraph.saved") });
-    } catch (error) {
-      notify({ variant: "error", message: error instanceof Error ? error.message : t("knowledgeGraph.saveError") });
-    } finally {
-      setSaving(false);
-    }
+    if (!selectedConcept || !editTitle.trim()) return;
+    const next = concepts.map((concept) => concept.id === selectedConcept.id
+      ? { ...concept, title: editTitle.trim(), description: editDescription }
+      : concept);
+    applyGraph(next, prerequisites);
+    selectConcept(next.find((concept) => concept.id === selectedConcept.id) ?? null);
   }
 
-  async function deleteConcept() {
-    if (!selectedConcept || saving) return;
-    setSaving(true);
-    try {
-      await api.deleteSubjectKnowledgeConcept(subjectId, selectedConcept.id);
-      setConcepts((current) => current.filter((concept) => concept.id !== selectedConcept.id));
-      setNodes((current) => current.filter((node) => node.id !== selectedConcept.id));
-      setEdges((current) => current.filter((edge) => edge.source !== selectedConcept.id && edge.target !== selectedConcept.id));
-      selectConcept(null);
-    } catch (error) {
-      notify({ variant: "error", message: error instanceof Error ? error.message : t("knowledgeGraph.deleteError") });
-    } finally {
-      setSaving(false);
-    }
+  function deleteConcept() {
+    if (!selectedConcept) return;
+    applyGraph(
+      concepts.filter((concept) => concept.id !== selectedConcept.id),
+      prerequisites.filter((edge) => edge.sourceConceptId !== selectedConcept.id && edge.requiredConceptId !== selectedConcept.id)
+    );
+    selectConcept(null);
   }
 
-  async function deleteEdges(deleted: Edge[]) {
-    const results = await Promise.allSettled(deleted.map((edge) => api.deleteSubjectKnowledgePrerequisite(subjectId, edge.id)));
-    if (results.some((result) => result.status === "rejected")) {
-      notify({ variant: "error", message: t("knowledgeGraph.deleteError") });
-    }
+  function deleteEdges(deleted: Edge[]) {
+    const deletedIds = new Set(deleted.map((edge) => edge.id));
+    applyGraph(concepts, prerequisites.filter((edge) => !deletedIds.has(edge.id)));
   }
 
   function requestGeneration() {
@@ -205,15 +306,85 @@ export function SubjectKnowledgeGraph({
         maxConcepts,
         locale
       });
-      setConcepts(result.concepts);
-      setNodes(result.concepts.map(toNode));
-      setEdges(result.prerequisites.map(toEdge));
+      applyGraph(result.concepts, result.prerequisites);
       selectConcept(null);
       notify({ variant: "success", message: t("knowledgeGraph.aiGenerated") });
     } catch (error) {
       notify({ variant: "error", message: error instanceof Error ? error.message : t("knowledgeGraph.aiGenerateError") });
     } finally {
       setGenerating(false);
+    }
+  }
+
+  function revertGraph() {
+    applyGraph(savedConcepts, savedPrerequisites);
+    selectConcept(null);
+    notify({ variant: "info", message: t("knowledgeGraph.reverted") });
+  }
+
+  async function arrangeGraph() {
+    if (!concepts.length || arranging) return;
+    setArranging(true);
+    try {
+      const presetOptions: Record<LayoutPreset, Record<string, string>> = {
+        hierarchical: {
+          "elk.algorithm": "org.eclipse.elk.layered",
+          "elk.direction": "DOWN",
+          "elk.edgeRouting": "ORTHOGONAL",
+          "elk.layered.spacing.nodeNodeBetweenLayers": "90",
+          "elk.spacing.nodeNode": "70"
+        },
+        forest: {
+          "elk.algorithm": "org.eclipse.elk.mrtree",
+          "elk.direction": "DOWN",
+          "elk.spacing.nodeNode": "80",
+          "elk.spacing.componentComponent": "130"
+        },
+        radial: {
+          "elk.algorithm": "org.eclipse.elk.radial",
+          "elk.spacing.nodeNode": "90",
+          "elk.spacing.componentComponent": "150"
+        },
+        force: {
+          "elk.algorithm": "org.eclipse.elk.force",
+          "elk.force.model": "FR",
+          "elk.spacing.nodeNode": "80",
+          "elk.spacing.componentComponent": "140"
+        },
+        compact: {
+          "elk.algorithm": "org.eclipse.elk.layered",
+          "elk.direction": "DOWN",
+          "elk.edgeRouting": "ORTHOGONAL",
+          "elk.layered.spacing.nodeNodeBetweenLayers": "50",
+          "elk.spacing.nodeNode": "30",
+          "elk.spacing.componentComponent": "60",
+          "elk.aspectRatio": "1.8"
+        }
+      };
+      const result = await elk.layout({
+        id: "subject-knowledge-graph",
+        layoutOptions: {
+          "elk.separateConnectedComponents": "true",
+          ...presetOptions[layoutPreset]
+        },
+        children: concepts.map((concept) => ({ id: concept.id, width: 180, height: 58 })),
+        // Layout uses prerequisite -> dependent so foundations appear first; displayed arrows retain the authored direction.
+        edges: prerequisites.map((edge) => ({
+          id: edge.id,
+          sources: [edge.requiredConceptId],
+          targets: [edge.sourceConceptId]
+        }))
+      });
+      const positions = new Map((result.children ?? []).map((node) => [node.id, { x: node.x ?? 0, y: node.y ?? 0 }]));
+      applyGraph(concepts.map((concept) => {
+        const position = positions.get(concept.id);
+        return position ? { ...concept, positionX: position.x, positionY: position.y } : concept;
+      }), prerequisites);
+      setTimeout(() => void flowInstance?.fitView({ padding: 0.15, duration: 300 }), 0);
+    } catch (error) {
+      notify({ variant: "error", message: error instanceof Error ? error.message : t("knowledgeGraph.layoutError") });
+    } finally {
+      setArranging(false);
     }
   }
 
@@ -228,7 +399,7 @@ export function SubjectKnowledgeGraph({
         {!readOnly ? <form className="knowledge-graph-add" onSubmit={addConcept}>
           <label className="sr-only" htmlFor="new-concept-title">{t("knowledgeGraph.conceptTitle")}</label>
           <input id="new-concept-title" value={newTitle} onChange={(event) => setNewTitle(event.target.value)} placeholder={t("knowledgeGraph.addPlaceholder")} />
-          <button className="button" disabled={!newTitle.trim() || saving} type="submit">{t("knowledgeGraph.addConcept")}</button>
+          <button className="button" disabled={!newTitle.trim()} type="submit">{t("knowledgeGraph.addConcept")}</button>
         </form> : null}
       </div>
 
@@ -262,10 +433,40 @@ export function SubjectKnowledgeGraph({
               <button type="button" disabled={generating || subjectDescription.trim().length < 10} onClick={requestGeneration}>
                 {generating ? t("knowledgeGraph.aiGenerating") : t("knowledgeGraph.aiGenerate")}
               </button>
+              <button className="secondary" type="button" disabled={generating} onClick={revertGraph}>
+                {t("knowledgeGraph.revert")}
+              </button>
             </div>
           </div>
         </details>
       ) : null}
+
+      {!readOnly ? (
+        <div className="knowledge-graph-layout-controls">
+          <div className="field">
+            <label htmlFor="knowledge-graph-layout">{t("knowledgeGraph.layoutLabel")}</label>
+            <select
+              id="knowledge-graph-layout"
+              value={layoutPreset}
+              onChange={(event) => setLayoutPreset(event.target.value as LayoutPreset)}
+            >
+              <option value="hierarchical">{t("knowledgeGraph.layoutHierarchical")}</option>
+              <option value="forest">{t("knowledgeGraph.layoutForest")}</option>
+              <option value="radial">{t("knowledgeGraph.layoutRadial")}</option>
+              <option value="force">{t("knowledgeGraph.layoutForce")}</option>
+              <option value="compact">{t("knowledgeGraph.layoutCompact")}</option>
+            </select>
+          </div>
+          <button className="secondary" type="button" disabled={!concepts.length || arranging} onClick={() => void arrangeGraph()}>
+            {arranging ? t("knowledgeGraph.arranging") : t("knowledgeGraph.arrange")}
+          </button>
+        </div>
+      ) : null}
+
+      {selectedConcept ? <div className="knowledge-graph-edge-legend" aria-label={t("knowledgeGraph.edgeLegend")}>
+        <span><i className="knowledge-edge-swatch knowledge-edge-swatch-outgoing" />{t("knowledgeGraph.outgoingEdges")}</span>
+        <span><i className="knowledge-edge-swatch knowledge-edge-swatch-incoming" />{t("knowledgeGraph.incomingEdges")}</span>
+      </div> : null}
 
       {readOnly && !nodes.length ? <p className="muted">{t("knowledgeGraph.empty")}</p> : (
       <div className="knowledge-graph-workspace">
@@ -276,17 +477,36 @@ export function SubjectKnowledgeGraph({
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={readOnly ? undefined : connectConcepts}
+            onReconnect={readOnly ? undefined : reconnectPrerequisite}
             connectionMode={ConnectionMode.Loose}
+            elevateEdgesOnSelect
             nodeTypes={conceptNodeTypes}
-            onNodeClick={readOnly ? undefined : (_event, node) => selectConcept(concepts.find((concept) => concept.id === node.id) ?? null)}
+            onInit={setFlowInstance}
+            onPaneClick={() => selectConcept(null)}
+            onNodeClick={(_event, node) => selectConcept(concepts.find((concept) => concept.id === node.id) ?? null)}
             onNodeDragStop={readOnly ? undefined : (_event, node) => {
-              void api.updateSubjectKnowledgeConcept(subjectId, node.id, { positionX: node.position.x, positionY: node.position.y })
-                .catch(() => notify({ variant: "error", message: t("knowledgeGraph.positionError") }));
+              applyGraph(
+                concepts.map((concept) => concept.id === node.id
+                  ? { ...concept, positionX: node.position.x, positionY: node.position.y }
+                  : concept),
+                prerequisites
+              );
             }}
-            onEdgesDelete={readOnly ? undefined : (deleted) => void deleteEdges(deleted)}
+            onEdgesDelete={readOnly ? undefined : deleteEdges}
+            onEdgeClick={(_event, selectedEdge) => {
+              selectConcept(null);
+              setEdges((current) => [
+                ...current
+                  .filter((edge) => edge.id !== selectedEdge.id)
+                  .map((edge) => ({ ...edge, selected: false, zIndex: 0 })),
+                { ...selectedEdge, selected: true, zIndex: 1000 }
+              ]);
+            }}
             nodesDraggable={!readOnly}
             nodesConnectable={!readOnly}
-            elementsSelectable={!readOnly}
+            edgesReconnectable={!readOnly}
+            elementsSelectable
+            deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]}
             panOnDrag
             zoomOnScroll
             zoomOnPinch
@@ -317,8 +537,8 @@ export function SubjectKnowledgeGraph({
                 <label htmlFor="concept-description">{t("knowledgeGraph.conceptDescription")}</label>
                 <textarea id="concept-description" rows={5} value={editDescription} onChange={(event) => setEditDescription(event.target.value)} />
               </div>
-              <button className="button" disabled={!editTitle.trim() || saving} type="submit">{t("common.save")}</button>
-              <button className="button danger" disabled={saving} onClick={() => void deleteConcept()} type="button">{t("knowledgeGraph.deleteConcept")}</button>
+              <button className="button" disabled={!editTitle.trim()} type="submit">{t("knowledgeGraph.applyConcept")}</button>
+              <button className="button danger" onClick={deleteConcept} type="button">{t("knowledgeGraph.deleteConcept")}</button>
             </form>
           ) : (
             <div className="knowledge-graph-empty stack">

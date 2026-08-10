@@ -19,6 +19,7 @@ import {
   LoginInputSchema,
   SubjectInputSchema,
   SubjectKnowledgeGraphGenerationInputSchema,
+  SubjectUpdateSchema,
   TestCreateSchema,
   TestItemCreateSchema,
   UserPasswordChangeSchema,
@@ -230,6 +231,15 @@ describe("shared contract schemas", () => {
       locale: "en"
     });
     expect(() => SubjectKnowledgeGraphGenerationInputSchema.parse({ description: "Too short", maxConcepts: 51 })).toThrow();
+    expect(SubjectUpdateSchema.parse({
+      knowledgeGraph: {
+        concepts: [
+          { id: "variables", title: "Variables", description: "Stored values", positionX: 10, positionY: 20 },
+          { id: "loops", title: "Loops", description: "Repeated execution", positionX: 40, positionY: 80 }
+        ],
+        prerequisites: [{ id: "loops-variables", sourceConceptId: "loops", requiredConceptId: "variables" }]
+      }
+    }).knowledgeGraph?.concepts).toHaveLength(2);
     expect(ActivityBankInputSchema.parse({ subjectId: "subject-1", title: "Bank" })).toMatchObject({
       description: "",
       metadata: {}

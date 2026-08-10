@@ -6,6 +6,10 @@ const migration = readFileSync(
   new URL("./migrations/202608100001_subject_knowledge_graph/migration.sql", import.meta.url),
   "utf8"
 );
+const edgeHandleMigration = readFileSync(
+  new URL("./migrations/202608100002_subject_knowledge_edge_handles/migration.sql", import.meta.url),
+  "utf8"
+);
 
 describe("subject knowledge graph schema", () => {
   it("stores subject-scoped concepts and directed prerequisites", () => {
@@ -13,6 +17,8 @@ describe("subject knowledge graph schema", () => {
     expect(schema).toContain("model SubjectKnowledgePrerequisite");
     expect(schema).toContain("sourceConceptId");
     expect(schema).toContain("requiredConceptId");
+    expect(schema).toContain("sourceHandle");
+    expect(schema).toContain("targetHandle");
   });
 
   it("ships the graph tables, unique edge constraint, and cascading relationships", () => {
@@ -22,4 +28,10 @@ describe("subject knowledge graph schema", () => {
     expect(migration).toContain('REFERENCES "Subject"("id") ON DELETE CASCADE');
     expect(migration).toContain('REFERENCES "SubjectKnowledgeConcept"("id") ON DELETE CASCADE');
   });
+
+  it("persists manually arranged edge endpoints", () => {
+    expect(edgeHandleMigration).toContain('ADD COLUMN "sourceHandle" TEXT');
+    expect(edgeHandleMigration).toContain('ADD COLUMN "targetHandle" TEXT');
+  });
+
 });

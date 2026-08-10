@@ -26,6 +26,7 @@ import type {
   SubjectInput,
   SubjectKnowledgeConceptInput,
   SubjectKnowledgeConceptUpdate,
+  SubjectKnowledgeGraphDraft,
   SubjectKnowledgeGraphGenerationInput,
   SubjectKnowledgePrerequisiteInput,
   SubjectUpdate,
@@ -34,7 +35,7 @@ import type {
 } from "@cognelo/contracts";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 
-export type { MaterialKind };
+export type { MaterialKind, SubjectKnowledgeGraphDraft };
 
 export type AiAgentConnection = {
   id: string;
@@ -224,6 +225,8 @@ export type SubjectKnowledgePrerequisite = {
   subjectId: string;
   sourceConceptId: string;
   requiredConceptId: string;
+  sourceHandle?: "top" | "right" | "bottom" | "left" | null;
+  targetHandle?: "top" | "right" | "bottom" | "left" | null;
 };
 
 export type ActivityBank = {

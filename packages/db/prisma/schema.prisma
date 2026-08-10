@@ -284,6 +284,8 @@ model SubjectKnowledgePrerequisite {
   subjectId         String
   sourceConceptId   String
   requiredConceptId String
+  sourceHandle      String?
+  targetHandle      String?
   createdAt         DateTime                @default(now())
   subject           Subject                 @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   sourceConcept     SubjectKnowledgeConcept @relation("RequiringConcept", fields: [sourceConceptId], references: [id], onDelete: Cascade)

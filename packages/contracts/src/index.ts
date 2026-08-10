@@ -155,9 +155,6 @@ export const SubjectInputSchema = z.object({
 });
 export type SubjectInput = z.infer<typeof SubjectInputSchema>;
 
-export const SubjectUpdateSchema = SubjectInputSchema.partial();
-export type SubjectUpdate = z.infer<typeof SubjectUpdateSchema>;
-
 export const SubjectKnowledgeConceptInputSchema = z.object({
   title: z.string().trim().min(1).max(160),
   description: z.string().max(4000).optional().default(""),
@@ -169,13 +166,34 @@ export type SubjectKnowledgeConceptInput = z.infer<typeof SubjectKnowledgeConcep
 export const SubjectKnowledgeConceptUpdateSchema = SubjectKnowledgeConceptInputSchema.partial();
 export type SubjectKnowledgeConceptUpdate = z.infer<typeof SubjectKnowledgeConceptUpdateSchema>;
 
+export const SubjectKnowledgeHandleSchema = z.enum(["top", "right", "bottom", "left"]);
+
 export const SubjectKnowledgePrerequisiteInputSchema = z.object({
   sourceConceptId: RecordIdSchema,
-  requiredConceptId: RecordIdSchema
+  requiredConceptId: RecordIdSchema,
+  sourceHandle: SubjectKnowledgeHandleSchema.nullable().optional(),
+  targetHandle: SubjectKnowledgeHandleSchema.nullable().optional()
 }).refine((value) => value.sourceConceptId !== value.requiredConceptId, {
   message: "A concept cannot require itself."
 });
 export type SubjectKnowledgePrerequisiteInput = z.infer<typeof SubjectKnowledgePrerequisiteInputSchema>;
+
+export const SubjectKnowledgeGraphDraftSchema = z.object({
+  concepts: z.array(SubjectKnowledgeConceptInputSchema.extend({ id: z.string().min(1).max(160) })).max(200),
+  prerequisites: z.array(z.object({
+    id: z.string().min(1).max(160),
+    sourceConceptId: z.string().min(1).max(160),
+    requiredConceptId: z.string().min(1).max(160),
+    sourceHandle: SubjectKnowledgeHandleSchema.nullable().optional(),
+    targetHandle: SubjectKnowledgeHandleSchema.nullable().optional()
+  })).max(2000)
+});
+export type SubjectKnowledgeGraphDraft = z.infer<typeof SubjectKnowledgeGraphDraftSchema>;
+
+export const SubjectUpdateSchema = SubjectInputSchema.partial().extend({
+  knowledgeGraph: SubjectKnowledgeGraphDraftSchema.optional()
+});
+export type SubjectUpdate = z.infer<typeof SubjectUpdateSchema>;
 
 export const SubjectKnowledgeGraphGenerationInputSchema = z.object({
   description: z.string().min(10).max(4000),
