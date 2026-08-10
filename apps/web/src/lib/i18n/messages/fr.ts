@@ -258,6 +258,8 @@ export const frMessages = {
       coursesEyebrow: "Cours",
       coursesTitle: "Cours",
       emptyCourses: "Aucun cours n'est lié à cette matière pour le moment.",
+      descriptionEyebrow: "À propos de cette matière",
+      descriptionTitle: "Description",
       loadError: "Impossible de charger la matière."
     },
     knowledgeGraph: {

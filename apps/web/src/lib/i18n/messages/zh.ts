@@ -258,6 +258,8 @@ export const zhMessages = {
       coursesEyebrow: "课程",
       coursesTitle: "课程",
       emptyCourses: "此学科还没有关联课程。",
+      descriptionEyebrow: "关于此学科",
+      descriptionTitle: "描述",
       loadError: "无法加载学科。"
     },
     knowledgeGraph: {

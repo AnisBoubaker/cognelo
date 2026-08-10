@@ -258,6 +258,8 @@ export const enMessages = {
       coursesEyebrow: "Courses",
       coursesTitle: "Courses",
       emptyCourses: "No courses are linked to this subject yet.",
+      descriptionEyebrow: "About this subject",
+      descriptionTitle: "Description",
       loadError: "Unable to load subject."
     },
     knowledgeGraph: {

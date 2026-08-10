@@ -29,7 +29,6 @@ export default function SubjectDetailPage() {
           <div className="hero-meta">
             <p className="eyebrow">{t("subjectDetail.eyebrow")}</p>
             <h1>{subject?.title ?? t("subjectDetail.fallbackTitle")}</h1>
-            <p className="muted">{subject?.description || t("common.noDescription")}</p>
           </div>
           {subject ? (
             <div className="hero-actions">
@@ -95,6 +94,15 @@ export default function SubjectDetailPage() {
                 <p className="muted">{t("subjectDetail.emptyCourses")}</p>
               )}
             </div>
+          </section>
+          <section className="section stack subject-description-section">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">{t("subjectDetail.descriptionEyebrow")}</p>
+                <h2>{t("subjectDetail.descriptionTitle")}</h2>
+              </div>
+            </div>
+            <p className="muted subject-description-text">{subject.description || t("common.noDescription")}</p>
           </section>
           <SubjectKnowledgeGraph
             subjectId={subject.id}

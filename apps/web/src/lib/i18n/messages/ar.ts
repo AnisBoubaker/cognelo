@@ -138,6 +138,8 @@ export const arMessages = {
       coursesEyebrow: "المقررات",
       coursesTitle: "المقررات",
       emptyCourses: "لا توجد مقررات مرتبطة بهذه المادة بعد.",
+      descriptionEyebrow: "حول هذه المادة",
+      descriptionTitle: "الوصف",
       loadError: "تعذر تحميل المادة."
     },
     knowledgeGraph: {
