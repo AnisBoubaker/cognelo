@@ -227,6 +227,17 @@ export type ActivityBankInput = z.infer<typeof ActivityBankInputSchema>;
 export const ActivityBankUpdateSchema = ActivityBankInputSchema.omit({ subjectId: true }).partial();
 export type ActivityBankUpdate = z.infer<typeof ActivityBankUpdateSchema>;
 
+export const ActivityKnowledgeConceptSelectionSchema = z.object({
+  conceptId: RecordIdSchema,
+  selectsAllSkills: z.boolean(),
+  selectedSkills: z.array(z.string().trim().min(1).max(1000)).max(200).refine((skills) => new Set(skills).size === skills.length, {
+    message: "Selected skills must be unique."
+  })
+}).refine((selection) => selection.selectsAllSkills || selection.selectedSkills.length > 0, {
+  message: "A concept selection must select the concept or at least one skill."
+});
+export type ActivityKnowledgeConceptSelection = z.infer<typeof ActivityKnowledgeConceptSelectionSchema>;
+
 export const BankActivityInputSchema = z.object({
   activityTypeKey: z.string().min(2).max(80),
   title: z.string().min(2).max(180),
@@ -237,6 +248,10 @@ export const BankActivityInputSchema = z.object({
   knowledgeConceptIds: z.array(RecordIdSchema).max(200).refine((ids) => new Set(ids).size === ids.length, {
     message: "Knowledge concept identifiers must be unique."
   }).optional(),
+  knowledgeConceptSelections: z.array(ActivityKnowledgeConceptSelectionSchema).max(200).refine(
+    (selections) => new Set(selections.map((selection) => selection.conceptId)).size === selections.length,
+    { message: "Knowledge concept selections must be unique by concept." }
+  ).optional(),
   position: z.number().int().min(0).optional().default(0)
 });
 export type BankActivityInput = z.infer<typeof BankActivityInputSchema>;
@@ -332,6 +347,10 @@ export const ActivityInputSchema = z.object({
   knowledgeConceptIds: z.array(RecordIdSchema).max(200).refine((ids) => new Set(ids).size === ids.length, {
     message: "Knowledge concept identifiers must be unique."
   }).optional(),
+  knowledgeConceptSelections: z.array(ActivityKnowledgeConceptSelectionSchema).max(200).refine(
+    (selections) => new Set(selections.map((selection) => selection.conceptId)).size === selections.length,
+    { message: "Knowledge concept selections must be unique by concept." }
+  ).optional(),
   position: z.number().int().min(0).optional().default(0),
   contentPlacement: CourseContentPlacementInputSchema.optional()
 });

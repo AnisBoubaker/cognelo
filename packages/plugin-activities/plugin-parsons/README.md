@@ -17,6 +17,7 @@ Teachers can:
 - create line groups directly from the editor gutter
 - mark groups as strict or flexible
 - add precedence rules between groups
+- generate a prompt and solution with AI while using selected skills, suggesting catalog skills, or ignoring knowledge links
 
 Students can:
 
@@ -84,10 +85,13 @@ Current subroutes:
 ```text
 POST   /api/courses/:courseId/activities/:activityId/parsons/attempt
 PATCH  /api/courses/:courseId/activities/:activityId/parsons/attempt
+POST   /api/courses/:courseId/activities/:activityId/parsons/generate
 GET    /api/courses/:courseId/groups/:groupId/activities/assigned/:activityId/parsons/gradebook-attempts
 ```
 
 These are also available through group-scoped assigned activity dispatch for student work. They are mounted through the platform’s generic plugin dispatchers, not through Parsons-specific files in `apps/api`.
+
+The AI generator's `Use selected skills` mode constrains the generated problem. `Suggest skills` ignores the old selection and applies exact subject-catalog matches to the unsaved Concepts-tab draft after generation. `Ignore skills` neither reads nor changes the draft.
 
 The gradebook attempts route is teacher-only. It returns a participant's completed Parsons submissions by default and can include in-progress/abandoned attempts plus event history with `includeAttempts=true`; the course gradebook detailed-results page uses it for the Parsons "See answer" overlay.
 

@@ -16,6 +16,7 @@ import {
 } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
+import { assertValidConceptSelections, conceptSelectionCreates, selectionsFromLegacyIds, selectionsFromStoredLinks } from "./activity-knowledge-concepts";
 import { AppError, forbidden, notFound } from "./errors";
 import { isAdmin, isCourseManager, isTeacher } from "./authorization";
 import { assertActivityTypePluginEnabled } from "./plugins";
@@ -416,7 +417,7 @@ export async function listActivityBanks(user: CurrentUser, subjectId?: string) {
   return prisma.activityBank.findMany({
     where: subjectId ? { subjectId } : undefined,
     include: {
-      subject: true,
+      subject: { include: { knowledgeConcepts: { orderBy: { createdAt: "asc" } }, knowledgePrerequisites: { orderBy: { createdAt: "asc" } } } },
       owner: { select: { id: true, email: true, name: true } },
       activities: {
         include: { activityType: true, currentVersion: true },
@@ -432,7 +433,7 @@ export async function getActivityBank(user: CurrentUser, activityBankId: string)
   const bank = await prisma.activityBank.findUnique({
     where: { id: activityBankId },
     include: {
-      subject: true,
+      subject: { include: { knowledgeConcepts: { orderBy: { createdAt: "asc" } }, knowledgePrerequisites: { orderBy: { createdAt: "asc" } } } },
       owner: { select: { id: true, email: true, name: true } },
       activities: {
         include: {
@@ -465,7 +466,7 @@ export async function createActivityBank(user: CurrentUser, input: unknown) {
       metadata: data.metadata as Prisma.InputJsonValue
     },
     include: {
-      subject: true,
+      subject: { include: { knowledgeConcepts: { orderBy: { createdAt: "asc" } }, knowledgePrerequisites: { orderBy: { createdAt: "asc" } } } },
       owner: { select: { id: true, email: true, name: true } },
       activities: {
         include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } } },
@@ -494,7 +495,7 @@ export async function updateActivityBank(user: CurrentUser, activityBankId: stri
       metadata: data.metadata as Prisma.InputJsonValue | undefined
     },
     include: {
-      subject: true,
+      subject: { include: { knowledgeConcepts: { orderBy: { createdAt: "asc" } }, knowledgePrerequisites: { orderBy: { createdAt: "asc" } } } },
       owner: { select: { id: true, email: true, name: true } },
       activities: {
         include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } } },
@@ -523,11 +524,11 @@ export async function createBankActivity(user: CurrentUser, activityBankId: stri
   const data = BankActivityInputSchema.parse(input);
   const activityType = await resolveActivityType(data.activityTypeKey);
   const mergedConfig = validateActivityPayload(data.activityTypeKey, data.config, data.metadata);
-  const knowledgeConceptIds = data.knowledgeConceptIds ?? [];
-  if (knowledgeConceptIds.length) {
+  const knowledgeConceptSelections = data.knowledgeConceptSelections ?? selectionsFromLegacyIds(data.knowledgeConceptIds) ?? [];
+  if (knowledgeConceptSelections.length) {
     const bank = await prisma.activityBank.findUnique({ where: { id: activityBankId }, select: { subjectId: true } });
     if (!bank) throw notFound("Activity bank");
-    await assertKnowledgeConceptsBelongToSubject(knowledgeConceptIds, bank.subjectId);
+    await assertValidConceptSelections(knowledgeConceptSelections, bank.subjectId);
   }
 
   return prisma.$transaction(async (transaction) => {
@@ -542,7 +543,7 @@ export async function createBankActivity(user: CurrentUser, activityBankId: stri
         metadata: data.metadata as Prisma.InputJsonValue,
         position: data.position,
         createdById: user.id,
-        knowledgeConcepts: { create: knowledgeConceptIds.map((conceptId) => ({ conceptId })) }
+        knowledgeConcepts: { create: conceptSelectionCreates(knowledgeConceptSelections) }
       }
     });
 
@@ -557,7 +558,7 @@ export async function createBankActivity(user: CurrentUser, activityBankId: stri
         config: mergedConfig as Prisma.InputJsonValue,
         metadata: data.metadata as Prisma.InputJsonValue,
         createdById: user.id,
-        knowledgeConcepts: { create: knowledgeConceptIds.map((conceptId) => ({ conceptId })) }
+        knowledgeConcepts: { create: conceptSelectionCreates(knowledgeConceptSelections) }
       }
     });
 
@@ -595,9 +596,10 @@ export async function updateBankActivity(user: CurrentUser, bankActivityId: stri
   const nextDescription = data.description ?? bankActivity.description;
   const nextLifecycle = data.lifecycle ?? bankActivity.lifecycle;
   const nextMetadata = data.metadata ?? currentMetadata;
-  const nextKnowledgeConceptIds = data.knowledgeConceptIds ?? bankActivity.knowledgeConcepts?.map((link) => link.conceptId) ?? [];
-  if (data.knowledgeConceptIds?.length) {
-    await assertKnowledgeConceptsBelongToSubject(nextKnowledgeConceptIds, bankActivity.bank.subjectId);
+  const requestedKnowledgeConceptSelections = data.knowledgeConceptSelections ?? selectionsFromLegacyIds(data.knowledgeConceptIds);
+  const nextKnowledgeConceptSelections = requestedKnowledgeConceptSelections ?? selectionsFromStoredLinks(bankActivity.knowledgeConcepts);
+  if (requestedKnowledgeConceptSelections?.length) {
+    await assertValidConceptSelections(nextKnowledgeConceptSelections, bankActivity.bank.subjectId);
   }
 
   return prisma.$transaction(async (transaction) => {
@@ -612,7 +614,7 @@ export async function updateBankActivity(user: CurrentUser, bankActivityId: stri
         config: mergedConfig as Prisma.InputJsonValue,
         metadata: nextMetadata as Prisma.InputJsonValue,
         createdById: user.id,
-        knowledgeConcepts: { create: nextKnowledgeConceptIds.map((conceptId) => ({ conceptId })) }
+        knowledgeConcepts: { create: conceptSelectionCreates(nextKnowledgeConceptSelections) }
       }
     });
 
@@ -629,7 +631,7 @@ export async function updateBankActivity(user: CurrentUser, bankActivityId: stri
         currentVersionId: version.id,
         knowledgeConcepts: {
           deleteMany: {},
-          create: nextKnowledgeConceptIds.map((conceptId) => ({ conceptId }))
+          create: conceptSelectionCreates(nextKnowledgeConceptSelections)
         }
       },
       include: {
@@ -640,14 +642,6 @@ export async function updateBankActivity(user: CurrentUser, bankActivityId: stri
       }
     });
   });
-}
-
-async function assertKnowledgeConceptsBelongToSubject(conceptIds: string[], subjectId: string) {
-  if (conceptIds.length === 0) return;
-  const count = await prisma.subjectKnowledgeConcept.count({ where: { id: { in: conceptIds }, subjectId } });
-  if (count !== conceptIds.length) {
-    throw new AppError(400, "KNOWLEDGE_CONCEPT_SUBJECT_MISMATCH", "Every selected knowledge concept must belong to the activity's subject.");
-  }
 }
 
 export async function deleteBankActivity(user: CurrentUser, activityBankId: string, bankActivityId: string, input: unknown) {

@@ -18,6 +18,7 @@ import {
   ParsonsActivityView,
   ParsonsManualGradingPanel,
   type ParsonsAttemptRecord,
+  type ParsonsGenerationInput,
   type ParsonsGradebookAttemptRecord
 } from "@cognelo/plugin-parsons";
 import {
@@ -143,7 +144,7 @@ function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActi
     () =>
       activityProps.canManage && hasQuestionAuthoringAgent && courseId
         ? {
-            generate: (input: { description: string; language: string; locale: Locale }) =>
+            generate: (input: ParsonsGenerationInput) =>
               parsonsClient.generate(courseId, activityProps.activity.id, input)
           }
         : undefined,

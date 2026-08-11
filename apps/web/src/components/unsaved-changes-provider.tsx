@@ -14,6 +14,8 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
   const [saving, setSaving] = useState(false);
   const bypassNextNavigation = useRef(false);
   const currentHref = useRef("");
+  const guardsRef = useRef(guards);
+  guardsRef.current = guards;
 
   const dirtyGuards = useMemo(() => Object.values(guards).filter((guard) => guard.isDirty), [guards]);
   const hasDirtyGuards = dirtyGuards.length > 0;
@@ -36,7 +38,13 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
       return { ...current, [id]: guard };
     });
   }, []);
-  const contextValue = useMemo(() => ({ registerGuard, updateGuard }), [registerGuard, updateGuard]);
+  const saveDirtyGuards = useCallback(async (excludedIds: string[] = []) => {
+    const excluded = new Set(excludedIds);
+    const pending = Object.entries(guardsRef.current).filter(([id, guard]) => !excluded.has(id) && guard.isDirty);
+    for (const [, guard] of pending) await guard.onSave();
+    return pending.length;
+  }, []);
+  const contextValue = useMemo(() => ({ registerGuard, updateGuard, saveDirtyGuards }), [registerGuard, saveDirtyGuards, updateGuard]);
 
   useEffect(() => {
     currentHref.current = window.location.href;

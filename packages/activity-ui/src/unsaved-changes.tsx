@@ -11,6 +11,7 @@ export type UnsavedChangesGuard = {
 export type UnsavedChangesContextValue = {
   registerGuard: (id: string, guard: UnsavedChangesGuard) => () => void;
   updateGuard: (id: string, guard: UnsavedChangesGuard) => void;
+  saveDirtyGuards: (excludedIds?: string[]) => Promise<number>;
 };
 
 export const UnsavedChangesContext = createContext<UnsavedChangesContextValue | null>(null);
@@ -39,4 +40,10 @@ export function useUnsavedChangesGuard(guard: UnsavedChangesGuard) {
   useEffect(() => {
     context?.updateGuard(idRef.current, proxyRef.current);
   }, [context, guard.isDirty]);
+
+  return idRef.current;
+}
+
+export function useUnsavedChangesActions() {
+  return useContext(UnsavedChangesContext);
 }

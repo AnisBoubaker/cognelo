@@ -2,7 +2,7 @@
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
-import { CodeEditor, EditActionBar, MarkdownRenderer, MonacoCodeEditor, codeLanguageOptions, getEditActionBarCopy, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { CodeEditor, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   alignCodingExerciseStarterCodeToTemplate,
   buildCodingExerciseStudentTemplateProjectionFromSource,
@@ -118,12 +118,13 @@ type CodingExerciseClient = {
 };
 
 type CodingExerciseAiGenerationClient = {
-  generatePrompt: (input: { description: string; language: string; locale: CodingExercisesLocale }) => Promise<{ prompt: string; attempts: number }>;
+  generatePrompt: (input: { description: string; language: string; locale: CodingExercisesLocale; knowledge: ActivityKnowledgeGenerationRequest }) => Promise<{ prompt: string; attempts: number; knowledgeConceptSelections?: GeneratedKnowledgeSelection[] }>;
   generateSolution: (input: {
     description: string;
     prompt: string;
     language: string;
     locale: CodingExercisesLocale;
+    knowledge: ActivityKnowledgeGenerationRequest;
   }) => Promise<
     | {
         status?: "ok" | "warning";
@@ -133,6 +134,7 @@ type CodingExerciseAiGenerationClient = {
         templateSource: string;
         templateVisibleLineNumbers: number[];
         attempts: number;
+        knowledgeConceptSelections?: GeneratedKnowledgeSelection[];
       }
     | {
         status: "error";
@@ -148,6 +150,7 @@ type CodingExerciseAiGenerationClient = {
     referenceSolution: string;
     templateSource: string;
     templateVisibleLineNumbers: number[];
+    knowledge: ActivityKnowledgeGenerationRequest;
   }) => Promise<
     | {
         status?: "ok" | "warning";
@@ -156,6 +159,7 @@ type CodingExerciseAiGenerationClient = {
         hiddenTests: Array<Omit<HiddenTest, "orderIndex" | "metadata" | "createdAt" | "updatedAt">>;
         validationSummary: Record<string, unknown>;
         attempts: number;
+        knowledgeConceptSelections?: GeneratedKnowledgeSelection[];
       }
     | {
         status: "error";
@@ -207,6 +211,7 @@ export function CodingExerciseActivityView({
   const t = (key: Parameters<typeof formatCodingExercisesMessage>[1], values?: Record<string, string | number>) =>
     formatCodingExercisesMessage(pluginLocale, key, values);
   const notifications = useNotifications();
+  const knowledgeGeneration = useActivityKnowledgeGeneration();
   const aiGenerationDraftRef = useRef<{
     prompt: string;
     referenceSolution: string;
@@ -653,9 +658,11 @@ export function CodingExerciseActivityView({
       const result = await aiGenerationClient.generatePrompt({
         description,
         language: config.language,
-        locale: pluginLocale
+        locale: pluginLocale,
+        knowledge: knowledgeGeneration.request
       });
       setConfig((current) => ({ ...current, prompt: result.prompt }));
+      knowledgeGeneration.applySelections(result.knowledgeConceptSelections);
       notifications.success(result.attempts > 1 ? `${t("generatedPrompt")} (${result.attempts})` : t("generatedPrompt"));
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : t("generatePromptError"));
@@ -692,7 +699,8 @@ export function CodingExerciseActivityView({
         description,
         prompt: config.prompt,
         language: config.language,
-        locale: pluginLocale
+        locale: pluginLocale,
+        knowledge: knowledgeGeneration.request
       });
       if (result.status === "error") {
         notifications.error(result.message);
@@ -720,6 +728,7 @@ export function CodingExerciseActivityView({
         language: config.language
       };
       setReferenceValidationSummary(null);
+      knowledgeGeneration.applySelections(result.knowledgeConceptSelections);
       if (result.status === "warning" && result.warningMessage) {
         notifications.warning(result.warningMessage);
       }
@@ -774,7 +783,8 @@ export function CodingExerciseActivityView({
         locale: pluginLocale,
         referenceSolution: referenceSolutionForGeneration,
         templateSource: persistedPrivateConfig.templateSource,
-        templateVisibleLineNumbers: persistedPrivateConfig.templateVisibleLineNumbers
+        templateVisibleLineNumbers: persistedPrivateConfig.templateVisibleLineNumbers,
+        knowledge: knowledgeGeneration.request
       });
       if (result.status === "error") {
         notifications.error(result.message);
@@ -797,6 +807,7 @@ export function CodingExerciseActivityView({
       setReferenceValidationSummary(result.validationSummary);
       setExpandedSampleTestIds(result.sampleTests.map((test) => test.id));
       setExpandedHiddenTestIds(generatedHiddenTests.map((test) => test.id));
+      knowledgeGeneration.applySelections(result.knowledgeConceptSelections);
       if (result.status === "warning" && result.warningMessage) {
         notifications.warning(result.warningMessage);
       }
@@ -966,6 +977,8 @@ export function CodingExerciseActivityView({
           </div>
 
           {aiGenerationClient ? (
+            <div className="stack" style={{ gap: 8 }}>
+            <KnowledgeGenerationModeField locale={pluginLocale} />
             <button
               className="secondary"
               type="button"
@@ -974,6 +987,7 @@ export function CodingExerciseActivityView({
             >
               {generatingPrompt ? t("generatingPrompt") : t("generatePrompt")}
             </button>
+            </div>
           ) : null}
 
           <div className="field">

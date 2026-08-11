@@ -663,6 +663,8 @@ model Activity {
 model BankActivityKnowledgeConcept {
   bankActivityId String
   conceptId      String
+  selectsAllSkills Boolean @default(true)
+  selectedSkills Json @default("[]")
   bankActivity   BankActivity            @relation(fields: [bankActivityId], references: [id], onDelete: Cascade)
   concept        SubjectKnowledgeConcept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
 
@@ -673,6 +675,8 @@ model BankActivityKnowledgeConcept {
 model ActivityVersionKnowledgeConcept {
   activityVersionId String
   conceptId         String
+  selectsAllSkills  Boolean @default(true)
+  selectedSkills    Json @default("[]")
   activityVersion   ActivityVersion        @relation(fields: [activityVersionId], references: [id], onDelete: Cascade)
   concept           SubjectKnowledgeConcept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
 
@@ -683,6 +687,8 @@ model ActivityVersionKnowledgeConcept {
 model ActivityKnowledgeConcept {
   activityId String
   conceptId  String
+  selectsAllSkills Boolean @default(true)
+  selectedSkills Json @default("[]")
   activity   Activity                @relation(fields: [activityId], references: [id], onDelete: Cascade)
   concept    SubjectKnowledgeConcept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
 

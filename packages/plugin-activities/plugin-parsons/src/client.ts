@@ -1,10 +1,12 @@
 import type { ParsonsAttemptEvaluation, ParsonsAttemptState } from "./attempt-types";
+import type { ActivityKnowledgeGenerationRequest, GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import type { ParsonsAttemptRecord, ParsonsGradebookAttemptRecord } from "./attempts";
 
 export type ParsonsGenerationInput = {
   description: string;
   language: string;
   locale: "en" | "fr" | "zh" | "ar";
+  knowledge: ActivityKnowledgeGenerationRequest;
 };
 
 export type ParsonsGenerationResult =
@@ -14,6 +16,7 @@ export type ParsonsGenerationResult =
       prompt: string;
       solution: string;
       attempts: number;
+      knowledgeConceptSelections?: GeneratedKnowledgeSelection[];
     }
   | {
       status: "error";

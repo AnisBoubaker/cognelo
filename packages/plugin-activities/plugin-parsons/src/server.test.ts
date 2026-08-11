@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 const mockPrisma = vi.hoisted(() => ({
   pluginParsonsAttempt: {
@@ -11,6 +12,14 @@ vi.mock("./db-client", () => ({
 }));
 
 vi.mock("@cognelo/core", () => ({
+  activityGenerationKnowledgeSchema: z.discriminatedUnion("mode", [
+    z.object({ mode: z.literal("selected"), concepts: z.array(z.any()) }),
+    z.object({ mode: z.literal("suggest"), concepts: z.array(z.any()) }),
+    z.object({ mode: z.literal("ignore") })
+  ]),
+  generateQuestionAuthoringText: vi.fn(),
+  selectedSkillsGenerationPrompt: vi.fn(() => ""),
+  suggestActivityKnowledgeSelections: vi.fn(),
   AppError: class AppError extends Error {
     constructor(
       public readonly status: number,

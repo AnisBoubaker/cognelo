@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AppError, generateQuestionAuthoringText } from "@cognelo/core";
+import { activityGenerationKnowledgeSchema, AppError, generateQuestionAuthoringText, selectedSkillsGenerationPrompt, suggestActivityKnowledgeSelections, type ActivityGenerationKnowledge } from "@cognelo/core";
 import {
   codingExerciseHiddenTestSchema,
   codingExerciseTestInsertionToken,
@@ -19,14 +19,16 @@ type GenerationLocale = "en" | "fr" | "zh" | "ar";
 export const codingExercisePromptGenerationInputSchema = z.object({
   description: z.string().min(10).max(4000),
   language: z.string().min(1).max(40),
-  locale: z.enum(["en", "fr", "zh", "ar"]).default("en")
+  locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
+  knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
 });
 
 export const codingExerciseSolutionGenerationInputSchema = z.object({
   description: z.string().max(4000).default(""),
   prompt: z.string().min(10).max(12000),
   language: z.string().min(1).max(40),
-  locale: z.enum(["en", "fr", "zh", "ar"]).default("en")
+  locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
+  knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
 });
 
 export const codingExerciseTestsGenerationInputSchema = z.object({
@@ -36,7 +38,8 @@ export const codingExerciseTestsGenerationInputSchema = z.object({
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
   referenceSolution: z.string().min(1).max(60000),
   templateSource: z.string().min(1).max(120000),
-  templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([])
+  templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([]),
+  knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
 });
 
 const generatedImpossibleSchema = z.object({
@@ -85,6 +88,7 @@ export async function generateCodingExercisePrompt(input: {
   language: string;
   locale: GenerationLocale;
   subject: SubjectContext;
+  knowledge?: ActivityGenerationKnowledge;
 }) {
   const systemPrompt = buildPromptGenerationSystemPrompt(input);
   let userPrompt = [
@@ -105,7 +109,8 @@ export async function generateCodingExercisePrompt(input: {
     const issues = validateGeneratedPrompt(prompt);
 
     if (!issues.length) {
-      return { prompt, attempts: attempt };
+      const knowledgeConceptSelections = await suggestActivityKnowledgeSelections({ user: input.user, knowledge: input.knowledge ?? { mode: "ignore" }, generatedActivity: prompt });
+      return { prompt, attempts: attempt, knowledgeConceptSelections };
     }
 
     lastPrompt = prompt;
@@ -126,6 +131,7 @@ export async function generateCodingExerciseSolution(input: {
   language: string;
   locale: GenerationLocale;
   subject: SubjectContext;
+  knowledge?: ActivityGenerationKnowledge;
 }) {
   const systemPrompt = buildSolutionGenerationSystemPrompt(input);
   let userPrompt = buildSolutionInitialPrompt(input);
@@ -169,10 +175,16 @@ export async function generateCodingExerciseSolution(input: {
     });
 
     if (!validation.issues.length && validation.solution) {
+      const knowledgeConceptSelections = await suggestActivityKnowledgeSelections({
+        user: input.user,
+        knowledge: input.knowledge ?? { mode: "ignore" },
+        generatedActivity: `${input.prompt}\n\n${validation.solution.referenceSolution}`
+      });
       return {
         ...validation.solution,
         starterCode: "",
-        attempts: attempt
+        attempts: attempt,
+        knowledgeConceptSelections
       };
     }
 
@@ -197,6 +209,7 @@ export async function generateCodingExerciseTests(input: {
   referenceSolution: string;
   templateSource: string;
   templateVisibleLineNumbers: number[];
+  knowledge?: ActivityGenerationKnowledge;
 }) {
   const systemPrompt = buildTestsGenerationSystemPrompt(input);
   let userPrompt = buildTestsInitialPrompt(input);
@@ -236,10 +249,16 @@ export async function generateCodingExerciseTests(input: {
     });
 
     if (!validation.issues.length && validation.tests && validation.validationSummary) {
+      const knowledgeConceptSelections = await suggestActivityKnowledgeSelections({
+        user: input.user,
+        knowledge: input.knowledge ?? { mode: "ignore" },
+        generatedActivity: `${input.prompt}\n\n${input.referenceSolution}\n\n${JSON.stringify(validation.tests)}`
+      });
       return {
         ...validation.tests,
         validationSummary: validation.validationSummary,
-        attempts: attempt
+        attempts: attempt,
+        knowledgeConceptSelections
       };
     }
 
@@ -254,7 +273,7 @@ export async function generateCodingExerciseTests(input: {
   });
 }
 
-function buildPromptGenerationSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext }) {
+function buildPromptGenerationSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext; knowledge?: ActivityGenerationKnowledge }) {
   return [
     "You generate student-facing prompts for Cognelo coding exercises.",
     "Return only the prompt text. Do not return JSON, Markdown fences, starter code, solutions, or tests.",
@@ -271,11 +290,13 @@ function buildPromptGenerationSystemPrompt(input: { language: string; locale: Ge
     "",
     "Subject context:",
     `Title: ${input.subject.title}`,
-    `Description: ${input.subject.description || "No subject description provided."}`
+    `Description: ${input.subject.description || "No subject description provided."}`,
+    "",
+    selectedSkillsGenerationPrompt(input.knowledge ?? { mode: "ignore" })
   ].join("\n");
 }
 
-function buildSolutionGenerationSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext }) {
+function buildSolutionGenerationSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext; knowledge?: ActivityGenerationKnowledge }) {
   return [
     "You generate teacher-reviewable reference solutions for Cognelo coding exercises.",
     "Return only valid JSON. Do not wrap the JSON in Markdown fences. Do not add explanations.",
@@ -319,11 +340,13 @@ function buildSolutionGenerationSystemPrompt(input: { language: string; locale: 
     "",
     "Subject context:",
     `Title: ${input.subject.title}`,
-    `Description: ${input.subject.description || "No subject description provided."}`
+    `Description: ${input.subject.description || "No subject description provided."}`,
+    "",
+    selectedSkillsGenerationPrompt(input.knowledge ?? { mode: "ignore" })
   ].join("\n");
 }
 
-function buildTestsGenerationSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext }) {
+function buildTestsGenerationSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext; knowledge?: ActivityGenerationKnowledge }) {
   return [
     "You generate visible and hidden test cases for Cognelo coding exercises.",
     "Return only valid JSON. Do not wrap the JSON in Markdown fences. Do not add explanations.",
@@ -370,7 +393,9 @@ function buildTestsGenerationSystemPrompt(input: { language: string; locale: Gen
     "",
     "Subject context:",
     `Title: ${input.subject.title}`,
-    `Description: ${input.subject.description || "No subject description provided."}`
+    `Description: ${input.subject.description || "No subject description provided."}`,
+    "",
+    selectedSkillsGenerationPrompt(input.knowledge ?? { mode: "ignore" })
   ].join("\n");
 }
 

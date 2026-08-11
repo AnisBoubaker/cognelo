@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CodeEditor, CodeRenderer, EditActionBar, MarkdownRenderer, codeLanguageOptions, getEditActionBarCopy, normalizeCodeLanguage, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { CodeEditor, CodeRenderer, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, codeLanguageOptions, getEditActionBarCopy, normalizeCodeLanguage, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   createParsonsGroup,
   createParsonsPrecedenceRule,
@@ -95,13 +95,14 @@ type ParsonsActivityViewProps = {
   t: (key: string, vars?: Record<string, string | number>) => string;
   locale?: "en" | "fr" | "zh" | "ar";
   aiGenerationClient?: {
-    generate: (input: { description: string; language: string; locale: "en" | "fr" | "zh" | "ar" }) => Promise<
+    generate: (input: { description: string; language: string; locale: "en" | "fr" | "zh" | "ar"; knowledge: ActivityKnowledgeGenerationRequest }) => Promise<
       | {
           status?: "ok" | "warning";
           warningMessage?: string;
           prompt: string;
           solution: string;
           attempts: number;
+          knowledgeConceptSelections?: GeneratedKnowledgeSelection[];
         }
       | {
           status: "error";
@@ -139,6 +140,7 @@ export function ParsonsActivityView({
 }: ParsonsActivityViewProps) {
   const actionCopy = getEditActionBarCopy(locale);
   const notifications = useNotifications();
+  const knowledgeGeneration = useActivityKnowledgeGeneration();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -403,7 +405,8 @@ export function ParsonsActivityView({
       const result = await aiGenerationClient.generate({
         description,
         language,
-        locale
+        locale,
+        knowledge: knowledgeGeneration.request
       });
 
       if (result.status === "error") {
@@ -425,6 +428,7 @@ export function ParsonsActivityView({
           parseParsonsConfig({ prompt: result.prompt, solution: result.solution, language, stripIndentation, groups: [], precedenceRules: [] })
         )
       );
+      knowledgeGeneration.applySelections(result.knowledgeConceptSelections);
 
       if (result.status === "warning") {
         notifications.warning(result.warningMessage || t("parsons.generatedWithWarning"));
@@ -726,6 +730,7 @@ export function ParsonsActivityView({
             </div>
             {aiGenerationClient ? (
               <div className="stack" style={{ gap: 8 }}>
+                <KnowledgeGenerationModeField locale={locale} />
                 <button className="secondary" disabled={generating || description.trim().length < 10} type="button" onClick={requestParsonsGeneration}>
                   {generating ? t("parsons.generating") : t("parsons.generate")}
                 </button>

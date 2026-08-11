@@ -1,14 +1,18 @@
+import type { ActivityKnowledgeGenerationRequest, GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
+
 export type McqGenerationInput = {
   description: string;
   defaultCodeLanguage: string;
   instructions?: string;
   locale: "en" | "fr" | "zh" | "ar";
   questionCount: number;
+  knowledge: ActivityKnowledgeGenerationRequest;
 };
 
 export type McqGenerationResult = {
   source: string;
   attempts: number;
+  knowledgeConceptSelections?: GeneratedKnowledgeSelection[];
 };
 
 export type McqSubmission = {

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AppError, generateQuestionAuthoringText } from "@cognelo/core";
+import { activityGenerationKnowledgeSchema, AppError, generateQuestionAuthoringText, selectedSkillsGenerationPrompt, suggestActivityKnowledgeSelections, type ActivityGenerationKnowledge } from "@cognelo/core";
 
 type SubjectContext = {
   title: string;
@@ -11,7 +11,8 @@ type GenerationLocale = "en" | "fr" | "zh" | "ar";
 export const parsonsGenerationInputSchema = z.object({
   description: z.string().min(10).max(4000),
   language: z.string().min(1).max(40),
-  locale: z.enum(["en", "fr", "zh", "ar"]).default("en")
+  locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
+  knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
 });
 
 const generatedParsonsSchema = z
@@ -42,6 +43,7 @@ export async function generateParsonsProblem(input: {
   language: string;
   locale: GenerationLocale;
   subject: SubjectContext;
+  knowledge?: ActivityGenerationKnowledge;
 }) {
   const systemPrompt = buildSystemPrompt(input);
   let userPrompt = buildInitialUserPrompt(input);
@@ -73,9 +75,15 @@ export async function generateParsonsProblem(input: {
 
     const validated = validateGeneratedParsonsPayload(parsed.value);
     if (!validated.issues.length && validated.payload) {
+      const knowledgeConceptSelections = await suggestActivityKnowledgeSelections({
+        user: input.user,
+        knowledge: input.knowledge ?? { mode: "ignore" },
+        generatedActivity: `${validated.payload.prompt}\n\n${validated.payload.solution}`
+      });
       return {
         ...validated.payload,
-        attempts: attempt
+        attempts: attempt,
+        knowledgeConceptSelections
       };
     }
 
@@ -90,7 +98,7 @@ export async function generateParsonsProblem(input: {
   });
 }
 
-function buildSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext }) {
+function buildSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext; knowledge?: ActivityGenerationKnowledge }) {
   return [
     "You generate Parsons problem authoring content for Cognelo.",
     "Return only valid JSON. Do not wrap the JSON in Markdown fences. Do not add explanations.",
@@ -138,7 +146,9 @@ function buildSystemPrompt(input: { language: string; locale: GenerationLocale; 
     "",
     "Subject context:",
     `Title: ${input.subject.title}`,
-    `Description: ${input.subject.description || "No subject description provided."}`
+    `Description: ${input.subject.description || "No subject description provided."}`,
+    "",
+    selectedSkillsGenerationPrompt(input.knowledge ?? { mode: "ignore" })
   ].join("\n");
 }
 

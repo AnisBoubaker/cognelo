@@ -5,6 +5,7 @@ import type { CurrentUser } from "@cognelo/contracts";
 import { assertCanManageCourse, assertCanViewCourse } from "./authorization";
 import { AppError, notFound } from "./errors";
 import { assertActivityTypeAvailable, ensureCoreActivityTypes, getEnabledActivityPluginKeys } from "./plugins";
+import { assertValidConceptSelections, conceptSelectionCreates, selectionsFromLegacyIds, selectionsFromStoredLinks } from "./activity-knowledge-concepts";
 
 export async function listActivityTypes() {
   await ensureCoreActivityTypes();
@@ -54,11 +55,11 @@ export async function listActivities(user: CurrentUser, courseId: string) {
 export async function createActivity(user: CurrentUser, courseId: string, input: unknown) {
   await assertCanManageCourse(user, courseId);
   const data = ActivityInputSchema.parse(input);
-  const knowledgeConceptIds = data.knowledgeConceptIds ?? [];
-  if (knowledgeConceptIds.length) {
+  const knowledgeConceptSelections = data.knowledgeConceptSelections ?? selectionsFromLegacyIds(data.knowledgeConceptIds) ?? [];
+  if (knowledgeConceptSelections.length) {
     const course = await prisma.course.findUnique({ where: { id: courseId }, select: { subjectId: true } });
     if (!course) throw notFound("Course");
-    await assertKnowledgeConceptsBelongToSubject(knowledgeConceptIds, course.subjectId);
+    await assertValidConceptSelections(knowledgeConceptSelections, course.subjectId);
   }
   if (isCoreActivityType(data.activityTypeKey)) {
     throw new AppError(400, "CORE_ACTIVITY_CREATION_ROUTE_REQUIRED", "Create this core activity through its dedicated authoring flow.");
@@ -96,7 +97,7 @@ export async function createActivity(user: CurrentUser, courseId: string, input:
         metadata: data.metadata as Prisma.InputJsonValue,
         position: data.position,
         createdById: user.id,
-        knowledgeConcepts: { create: knowledgeConceptIds.map((conceptId) => ({ conceptId })) }
+        knowledgeConcepts: { create: conceptSelectionCreates(knowledgeConceptSelections) }
       },
       include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
     });
@@ -171,7 +172,7 @@ async function createCourseActivityFromBankVersion(
         } as Prisma.InputJsonValue,
         position: data.position,
         createdById: user.id,
-        knowledgeConcepts: { create: (version.knowledgeConcepts ?? []).map(({ conceptId }) => ({ conceptId })) }
+        knowledgeConcepts: { create: conceptSelectionCreates(selectionsFromStoredLinks(version.knowledgeConcepts)) }
       },
       include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
     });
@@ -233,11 +234,12 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
   const activityTypeId = data.activityTypeKey
     ? (await resolveEnabledActivityTypeId(data.activityTypeKey))
     : undefined;
-  const nextKnowledgeConceptIds = data.knowledgeConceptIds ?? activity.knowledgeConcepts?.map((link) => link.conceptId) ?? [];
-  if (data.knowledgeConceptIds?.length) {
+  const requestedKnowledgeConceptSelections = data.knowledgeConceptSelections ?? selectionsFromLegacyIds(data.knowledgeConceptIds);
+  const nextKnowledgeConceptSelections = requestedKnowledgeConceptSelections ?? selectionsFromStoredLinks(activity.knowledgeConcepts);
+  if (requestedKnowledgeConceptSelections?.length) {
     const course = await prisma.course.findUnique({ where: { id: courseId }, select: { subjectId: true } });
     if (!course) throw notFound("Course");
-    await assertKnowledgeConceptsBelongToSubject(nextKnowledgeConceptIds, course.subjectId);
+    await assertValidConceptSelections(nextKnowledgeConceptSelections, course.subjectId);
   }
 
   return prisma.$transaction(async (tx) => {
@@ -251,9 +253,9 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
         config: mergedConfig as Prisma.InputJsonValue | undefined,
         metadata: data.metadata as Prisma.InputJsonValue | undefined,
         position: data.position,
-        knowledgeConcepts: data.knowledgeConceptIds === undefined ? undefined : {
+        knowledgeConcepts: requestedKnowledgeConceptSelections === undefined ? undefined : {
           deleteMany: {},
-          create: nextKnowledgeConceptIds.map((conceptId) => ({ conceptId }))
+          create: conceptSelectionCreates(nextKnowledgeConceptSelections)
         }
       },
       include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
@@ -268,14 +270,6 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
 
     return updatedActivity;
   });
-}
-
-async function assertKnowledgeConceptsBelongToSubject(conceptIds: string[], subjectId: string) {
-  if (conceptIds.length === 0) return;
-  const count = await prisma.subjectKnowledgeConcept.count({ where: { id: { in: conceptIds }, subjectId } });
-  if (count !== conceptIds.length) {
-    throw new AppError(400, "KNOWLEDGE_CONCEPT_SUBJECT_MISMATCH", "Every selected knowledge concept must belong to the activity's subject.");
-  }
 }
 
 export async function assertActivityAuthoringMutable(courseId: string, activityId: string) {

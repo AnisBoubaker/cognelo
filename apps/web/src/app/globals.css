@@ -459,6 +459,126 @@ select:focus {
   display: none !important;
 }
 
+.activity-concept-selector {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(360px, 1.2fr);
+  height: clamp(430px, 64vh, 720px);
+  min-height: 430px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.activity-concept-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px;
+  border-inline-end: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 94%, var(--surface-3));
+}
+
+.activity-concept-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border-radius: 10px;
+  padding: 4px 8px;
+}
+
+.activity-concept-row + .activity-concept-row {
+  margin-top: 3px;
+}
+
+.activity-concept-row.is-active {
+  background: color-mix(in srgb, var(--brand-blue) 11%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--brand-blue);
+}
+
+.activity-concept-row > button {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  padding: 10px 4px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-align: start;
+  cursor: pointer;
+}
+
+.activity-concept-count {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: color-mix(in srgb, var(--brand-blue) 16%, var(--surface));
+  color: var(--brand-ink);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.activity-concept-skills {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.activity-skill-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.activity-skill-row span {
+  line-height: 1.35;
+}
+
+.activity-skill-row:has(input:checked) {
+  border-color: color-mix(in srgb, var(--brand-blue) 52%, var(--line));
+  background: color-mix(in srgb, var(--brand-blue) 7%, var(--surface));
+}
+
+.activity-concept-row input[type="checkbox"],
+.activity-skill-row input[type="checkbox"] {
+  appearance: auto;
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  margin: 0;
+  padding: 0;
+  border: initial;
+  border-radius: 4px;
+  box-shadow: none;
+  accent-color: var(--brand-blue);
+}
+
+@media (max-width: 760px) {
+  .activity-concept-selector {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .activity-concept-list {
+    max-height: 320px;
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
 .subject-language-field {
   max-width: 680px;
   padding: 16px;

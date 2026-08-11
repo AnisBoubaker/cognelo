@@ -4,6 +4,7 @@ export * from "./code-renderer";
 export * from "./confirmation-dialog";
 export * from "./edit-action-bar";
 export * from "./markdown-renderer";
+export * from "./knowledge-generation";
 export * from "./monaco-code-editor";
 export * from "./notifications";
 export * from "./rich-text-editor";
