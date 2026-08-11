@@ -16,7 +16,7 @@ services:
       retries: 10
 
   judge0-server:
-    image: judge0/judge0:latest
+    image: ${JUDGE0_IMAGE:-ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2}
     depends_on:
       - judge0-db
       - judge0-redis
@@ -28,7 +28,7 @@ services:
     restart: unless-stopped
 
   judge0-worker:
-    image: judge0/judge0:latest
+    image: ${JUDGE0_IMAGE:-ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2}
     command: ["./scripts/workers"]
     depends_on:
       - judge0-db

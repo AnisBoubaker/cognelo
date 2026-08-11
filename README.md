@@ -336,6 +336,8 @@ If you are developing the coding-exercises plugin, also start Judge0 locally:
 docker compose up -d judge0-db judge0-redis judge0-server judge0-worker
 ```
 
+Local Compose defaults to `ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2`, the Cognelo-tested Apple Silicon development image. Docker Desktop uses Judge0's per-process/thread limit fallback because it does not delegate a usable cgroup-v2 subtree; this is for trusted local development and is not equivalent to production cgroup isolation. The development worker pool is capped at two because Docker Desktop reports the host CPU count and a large automatically sized pool can collide over isolate boxes. Its C, C++, Go, Java, JavaScript, Python, Rust, and TypeScript runtimes have been validated with real compile/execute and stdin/stdout submissions. Set `JUDGE0_IMAGE` to override the image. The Ubuntu production runbook continues to use the official pinned Judge0 image on its supported Linux sandbox host. Cognelo stops AI test correction immediately when every reference run fails at compilation or with a Judge0 internal error, because changing generated tests cannot repair the execution environment.
+
 If you are developing the web-design-coding-exercises plugin, also start the Dockerized Playwright runner:
 
 ```bash
@@ -392,6 +394,7 @@ Judge0-related environment variables:
 
 ```text
 JUDGE0_BASE_URL=http://localhost:2358
+JUDGE0_IMAGE=ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2
 JUDGE0_AUTH_HEADER=X-Auth-Token
 JUDGE0_AUTH_TOKEN=dev-local-token
 JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS=true
