@@ -7,14 +7,15 @@ import { AppError, notFound } from "./errors";
 const courseInclude = {
   subject: {
     include: {
-      materials: { orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }] }
+      materials: { orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }] },
+      knowledgeConcepts: { orderBy: [{ createdAt: "asc" as const }] }
     }
   },
   memberships: { include: { user: { select: { id: true, email: true, name: true } } } },
   materials: { orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }] },
   activities: {
     where: { testItem: null },
-    include: { activityType: true, bankActivity: true, activityVersion: true },
+    include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } },
     orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }]
   },
   groups: {

@@ -232,6 +232,9 @@ export const BankActivityInputSchema = z.object({
   lifecycle: ActivityLifecycleSchema.optional().default("draft"),
   config: z.record(z.unknown()).optional().default({}),
   metadata: z.record(z.unknown()).optional().default({}),
+  knowledgeConceptIds: z.array(RecordIdSchema).max(200).refine((ids) => new Set(ids).size === ids.length, {
+    message: "Knowledge concept identifiers must be unique."
+  }).optional(),
   position: z.number().int().min(0).optional().default(0)
 });
 export type BankActivityInput = z.infer<typeof BankActivityInputSchema>;
@@ -324,6 +327,9 @@ export const ActivityInputSchema = z.object({
   lifecycle: ActivityLifecycleSchema.optional().default("draft"),
   config: z.record(z.unknown()).optional().default({}),
   metadata: z.record(z.unknown()).optional().default({}),
+  knowledgeConceptIds: z.array(RecordIdSchema).max(200).refine((ids) => new Set(ids).size === ids.length, {
+    message: "Knowledge concept identifiers must be unique."
+  }).optional(),
   position: z.number().int().min(0).optional().default(0),
   contentPlacement: CourseContentPlacementInputSchema.optional()
 });

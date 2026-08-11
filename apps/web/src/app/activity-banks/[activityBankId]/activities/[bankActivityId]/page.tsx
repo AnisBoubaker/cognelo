@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { ActivityEditorTabs } from "@/components/activity-editor-tabs";
 import { api, type ActivityBank, type ActivityDefinition, type ActivityType, type BankActivity } from "@/lib/api";
 import { bankActivityRenderers } from "@/lib/activity-renderers";
 import { useI18n } from "@/lib/i18n";
@@ -147,6 +148,12 @@ export default function BankActivityAuthoringPage() {
     );
   }
 
+  async function saveConcepts(knowledgeConceptIds: string[]) {
+    if (!activity) return;
+    const result = await api.updateBankActivity(activityBankId, activity.id, { knowledgeConceptIds });
+    setActivity(result.activity);
+  }
+
   return (
     <AppShell>
       <main className="page stack">
@@ -191,7 +198,17 @@ export default function BankActivityAuthoringPage() {
           ) : null}
         </section>
 
-        {renderAuthoring()}
+        {activity ? (
+          <ActivityEditorTabs
+            concepts={bank?.subject?.knowledgeConcepts ?? []}
+            selectedConceptIds={activity.knowledgeConcepts?.map((link) => link.conceptId) ?? []}
+            onSaveConcepts={saveConcepts}
+            t={t}
+            locale={locale}
+          >
+            {renderAuthoring()}
+          </ActivityEditorTabs>
+        ) : renderAuthoring()}
       </main>
     </AppShell>
   );

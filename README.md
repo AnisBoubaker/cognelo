@@ -54,6 +54,7 @@ docs/
 - Content resources: plugin-backed non-activity course content such as GitHub repos, uploaded files, and Markdown text
 - Materials: legacy generic typed course material records retained for compatibility while new content uses content type plugins
 - Activities: typed course-local activity copies with JSON config and research metadata
+- Activity knowledge links: every bank and course activity editor receives a core-owned Concepts tab for linking the activity to its subject knowledge graph
 - Activity types: enabled type listing plus SDK definitions
 
 ## Plugin Boundary
@@ -268,6 +269,8 @@ Subject
 ```
 
 Activity banks are reusable authoring libraries. A bank activity keeps a mutable current record plus immutable `ActivityVersion` snapshots. Saving in the bank creates a new version for future course use.
+
+Knowledge-concept selection is a mandatory platform capability rather than an activity-plugin option. The host application wraps every activity authoring surface in an Activity/Concepts tab set. Links are normalized core data: bank selections are snapshotted onto each `ActivityVersion`, copied when that version becomes a course activity, and then edited independently on the course copy. Teachers may leave the selection empty, but plugins cannot remove the Concepts tab.
 
 Adding a bank activity to a course creates a course-local `Activity` copy from the selected version. The copy keeps `bankActivityId` and `activityVersionId` for traceability, but it is not a live reference. Editing the course copy affects only that course and its students. Editing the bank later creates a new version and does not alter existing course copies.
 

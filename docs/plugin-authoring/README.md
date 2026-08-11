@@ -96,6 +96,7 @@ If you just want the shortest possible summary:
 7. Seed or sync its `ActivityPluginInstallation` manifest so admins can activate it and then enable or disable it from Settings
 8. If it exposes any authoring or settings form, register that form with `useUnsavedChangesGuard` from `@cognelo/activity-ui`
 9. If it has private bank-owned data, add a server hook to copy it into course-owned plugin tables when assigned. This is required for correct copy semantics.
+10. Do not implement or hide activity-to-knowledge-concept selection in the plugin. The host application supplies the mandatory Concepts tab to every activity authoring page and core owns its versioned links.
 
 For a content type plugin:
 

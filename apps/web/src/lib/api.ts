@@ -260,6 +260,12 @@ export type BankActivity = {
   activityType: ActivityType;
   currentVersion?: ActivityVersion | null;
   versions?: ActivityVersion[];
+  knowledgeConcepts?: ActivityKnowledgeConceptLink[];
+};
+
+export type ActivityKnowledgeConceptLink = {
+  conceptId: string;
+  concept: SubjectKnowledgeConcept;
 };
 
 export type ActivityVersion = {
@@ -415,6 +421,7 @@ export type Activity = {
   bankActivity?: BankActivity | null;
   activityVersion?: ActivityVersion | null;
   position: number;
+  knowledgeConcepts?: ActivityKnowledgeConceptLink[];
 };
 
 export type CourseTestSettings = {
