@@ -267,6 +267,8 @@ describe("shared contract schemas", () => {
       metadata: {},
       position: 0
     });
+    expect(BankActivityInputSchema.parse({ activityTypeKey: "mcq", title: "Quiz", knowledgeConceptIds: ["concept-1"] }).knowledgeConceptIds).toEqual(["concept-1"]);
+    expect(() => BankActivityInputSchema.parse({ activityTypeKey: "mcq", title: "Quiz", knowledgeConceptIds: ["concept-1", "concept-1"] })).toThrow();
     expect(CourseGroupInputSchema.parse({ title: "Group" })).toMatchObject({ title: "Group" });
     expect(CourseGroupActivityInputSchema.parse({ activityId: "activity-1" })).toMatchObject({
       activityId: "activity-1",

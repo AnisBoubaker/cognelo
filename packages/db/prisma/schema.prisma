@@ -276,6 +276,9 @@ model SubjectKnowledgeConcept {
   subject               Subject                        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   requiredPrerequisites SubjectKnowledgePrerequisite[] @relation("RequiringConcept")
   requiredByConcepts    SubjectKnowledgePrerequisite[] @relation("RequiredConcept")
+  bankActivityLinks     BankActivityKnowledgeConcept[]
+  activityVersionLinks  ActivityVersionKnowledgeConcept[]
+  activityLinks         ActivityKnowledgeConcept[]
 
   @@index([subjectId])
 }
@@ -589,6 +592,7 @@ model BankActivity {
   createdBy        User              @relation("BankActivityCreator", fields: [createdById], references: [id])
   versions         ActivityVersion[] @relation("BankActivityVersions")
   courseActivities Activity[]
+  knowledgeConcepts BankActivityKnowledgeConcept[]
 
   @@index([bankId, position])
   @@index([activityTypeId])
@@ -613,6 +617,7 @@ model ActivityVersion {
   createdBy                User              @relation("ActivityVersionCreator", fields: [createdById], references: [id])
   courseActivities         Activity[]
   activityAttempts         ActivityAttempt[]
+  knowledgeConcepts        ActivityVersionKnowledgeConcept[]
 
   @@unique([bankActivityId, versionNumber])
   @@index([bankActivityId, createdAt])
@@ -646,12 +651,43 @@ model Activity {
   contentItems      CourseContentItem[]
   testDefinition    Test?                 @relation("TestShellActivity")
   testItem          TestItem?             @relation("TestItemActivity")
+  knowledgeConcepts ActivityKnowledgeConcept[]
 
   @@index([courseId, position])
   @@index([bankActivityId])
   @@index([activityVersionId])
   @@index([activityTypeId])
   @@index([lifecycle])
+}
+
+model BankActivityKnowledgeConcept {
+  bankActivityId String
+  conceptId      String
+  bankActivity   BankActivity            @relation(fields: [bankActivityId], references: [id], onDelete: Cascade)
+  concept        SubjectKnowledgeConcept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  @@id([bankActivityId, conceptId])
+  @@index([conceptId])
+}
+
+model ActivityVersionKnowledgeConcept {
+  activityVersionId String
+  conceptId         String
+  activityVersion   ActivityVersion        @relation(fields: [activityVersionId], references: [id], onDelete: Cascade)
+  concept           SubjectKnowledgeConcept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  @@id([activityVersionId, conceptId])
+  @@index([conceptId])
+}
+
+model ActivityKnowledgeConcept {
+  activityId String
+  conceptId  String
+  activity   Activity                @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  concept    SubjectKnowledgeConcept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  @@id([activityId, conceptId])
+  @@index([conceptId])
 }
 
 model Test {

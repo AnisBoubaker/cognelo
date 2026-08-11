@@ -34,7 +34,7 @@ export async function getActivity(user: CurrentUser, courseId: string, activityI
   await assertCanViewCourse(user, courseId);
   const activity = await prisma.activity.findFirst({
     where: { id: activityId, courseId },
-    include: { activityType: true, bankActivity: true, activityVersion: true }
+    include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
   });
   if (!activity) {
     throw notFound("Activity");
@@ -46,7 +46,7 @@ export async function listActivities(user: CurrentUser, courseId: string) {
   await assertCanViewCourse(user, courseId);
   return prisma.activity.findMany({
     where: { courseId, testItem: null },
-    include: { activityType: true, bankActivity: true, activityVersion: true },
+    include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }]
   });
 }
@@ -54,6 +54,12 @@ export async function listActivities(user: CurrentUser, courseId: string) {
 export async function createActivity(user: CurrentUser, courseId: string, input: unknown) {
   await assertCanManageCourse(user, courseId);
   const data = ActivityInputSchema.parse(input);
+  const knowledgeConceptIds = data.knowledgeConceptIds ?? [];
+  if (knowledgeConceptIds.length) {
+    const course = await prisma.course.findUnique({ where: { id: courseId }, select: { subjectId: true } });
+    if (!course) throw notFound("Course");
+    await assertKnowledgeConceptsBelongToSubject(knowledgeConceptIds, course.subjectId);
+  }
   if (isCoreActivityType(data.activityTypeKey)) {
     throw new AppError(400, "CORE_ACTIVITY_CREATION_ROUTE_REQUIRED", "Create this core activity through its dedicated authoring flow.");
   }
@@ -89,9 +95,10 @@ export async function createActivity(user: CurrentUser, courseId: string, input:
         config: mergedConfig as Prisma.InputJsonValue,
         metadata: data.metadata as Prisma.InputJsonValue,
         position: data.position,
-        createdById: user.id
+        createdById: user.id,
+        knowledgeConcepts: { create: knowledgeConceptIds.map((conceptId) => ({ conceptId })) }
       },
-      include: { activityType: true, bankActivity: true, activityVersion: true }
+      include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
     });
 
     if (data.contentPlacement) {
@@ -120,7 +127,7 @@ async function createCourseActivityFromBankVersion(
   const version = data.activityVersionId
     ? await prisma.activityVersion.findUnique({
         where: { id: data.activityVersionId },
-        include: { bankActivity: { include: { bank: true } }, activityType: true }
+        include: { bankActivity: { include: { bank: true } }, activityType: true, knowledgeConcepts: true }
       })
     : data.bankActivityId
       ? (
@@ -129,7 +136,7 @@ async function createCourseActivityFromBankVersion(
             include: {
               bank: true,
               activityType: true,
-              currentVersion: { include: { activityType: true, bankActivity: { include: { bank: true } } } }
+              currentVersion: { include: { activityType: true, bankActivity: { include: { bank: true } }, knowledgeConcepts: true } }
             }
           })
         )?.currentVersion
@@ -163,9 +170,10 @@ async function createCourseActivityFromBankVersion(
           activityVersionNumber: version.versionNumber
         } as Prisma.InputJsonValue,
         position: data.position,
-        createdById: user.id
+        createdById: user.id,
+        knowledgeConcepts: { create: (version.knowledgeConcepts ?? []).map(({ conceptId }) => ({ conceptId })) }
       },
-      include: { activityType: true, bankActivity: true, activityVersion: true }
+      include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
     });
 
     if (data.contentPlacement) {
@@ -190,6 +198,7 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
       activityType: true,
       bankActivity: true,
       activityVersion: true,
+      knowledgeConcepts: true,
       testItem: { select: { test: { select: { activityId: true } } } }
     }
   });
@@ -224,6 +233,12 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
   const activityTypeId = data.activityTypeKey
     ? (await resolveEnabledActivityTypeId(data.activityTypeKey))
     : undefined;
+  const nextKnowledgeConceptIds = data.knowledgeConceptIds ?? activity.knowledgeConcepts?.map((link) => link.conceptId) ?? [];
+  if (data.knowledgeConceptIds?.length) {
+    const course = await prisma.course.findUnique({ where: { id: courseId }, select: { subjectId: true } });
+    if (!course) throw notFound("Course");
+    await assertKnowledgeConceptsBelongToSubject(nextKnowledgeConceptIds, course.subjectId);
+  }
 
   return prisma.$transaction(async (tx) => {
     const updatedActivity = await tx.activity.update({
@@ -235,9 +250,13 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
         lifecycle: data.lifecycle,
         config: mergedConfig as Prisma.InputJsonValue | undefined,
         metadata: data.metadata as Prisma.InputJsonValue | undefined,
-        position: data.position
+        position: data.position,
+        knowledgeConcepts: data.knowledgeConceptIds === undefined ? undefined : {
+          deleteMany: {},
+          create: nextKnowledgeConceptIds.map((conceptId) => ({ conceptId }))
+        }
       },
-      include: { activityType: true, bankActivity: true, activityVersion: true }
+      include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
     });
 
     if (data.title !== undefined) {
@@ -249,6 +268,14 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
 
     return updatedActivity;
   });
+}
+
+async function assertKnowledgeConceptsBelongToSubject(conceptIds: string[], subjectId: string) {
+  if (conceptIds.length === 0) return;
+  const count = await prisma.subjectKnowledgeConcept.count({ where: { id: { in: conceptIds }, subjectId } });
+  if (count !== conceptIds.length) {
+    throw new AppError(400, "KNOWLEDGE_CONCEPT_SUBJECT_MISMATCH", "Every selected knowledge concept must belong to the activity's subject.");
+  }
 }
 
 export async function assertActivityAuthoringMutable(courseId: string, activityId: string) {

@@ -56,18 +56,23 @@ Subject
     SubjectKnowledgePrerequisite (requiring concept -> required concept)
   ActivityBank
     BankActivity
+      BankActivityKnowledgeConcept
       ActivityVersion
+        ActivityVersionKnowledgeConcept
   Course
     CourseContentItem folder tree
     CourseContentResource
     CourseMaterial (legacy compatibility)
     Activity
+      ActivityKnowledgeConcept
     Section/CourseGroup
       participants
       assigned activities and availability windows
 ```
 
 Bank activities are authored in activity banks. Each bank save creates a new `ActivityVersion` and updates the bank activity's current version.
+
+Activity-to-concept links are a core, cross-plugin contract. All activity editors are host-wrapped with an Activity/Concepts tab set. Bank links are copied into immutable activity-version link rows and then into independent course-activity link rows during assignment; empty selections are valid, but no activity type may opt out of the capability.
 
 When a bank activity is added to a course, Cognelo copies the selected/latest version into a course-local `Activity`. The course activity stores `bankActivityId` and `activityVersionId` for provenance, but the course activity is not live-linked to the bank. Course edits affect only the course copy; bank edits create future versions and do not alter existing course copies.
 

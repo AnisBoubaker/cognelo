@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { ActivityEditorTabs } from "@/components/activity-editor-tabs";
 import { useAuth } from "@/components/auth-provider";
 import { api, Activity, ActivityDefinition, Course } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -53,6 +54,11 @@ export default function ActivityPage() {
     return result.activity;
   }
 
+  async function saveConcepts(knowledgeConceptIds: string[]) {
+    const result = await api.updateActivity(courseId, activityId, { knowledgeConceptIds });
+    setActivity(result.activity);
+  }
+
   function localizedActivityName() {
     if (!activity) {
       return t("common.loading");
@@ -81,7 +87,14 @@ export default function ActivityPage() {
 
         {error ? <p className="error">{error}</p> : null}
 
-        {activity && ActivityRenderer ? (
+        {activity && ActivityRenderer && canManage ? (
+          <ActivityEditorTabs
+            concepts={course?.subject?.knowledgeConcepts ?? []}
+            selectedConceptIds={activity.knowledgeConcepts?.map((link) => link.conceptId) ?? []}
+            onSaveConcepts={saveConcepts}
+            t={t}
+            locale={locale}
+          >
           <ActivityRenderer
             activity={activity}
             activityRouteCourseId={courseId}
@@ -92,6 +105,31 @@ export default function ActivityPage() {
             t={t}
             locale={locale}
           />
+          </ActivityEditorTabs>
+        ) : activity && ActivityRenderer ? (
+          <ActivityRenderer
+            activity={activity}
+            activityRouteCourseId={courseId}
+            canManage={false}
+            course={course}
+            hasQuestionAuthoringAgent={hasQuestionAuthoringAgent}
+            onSave={saveActivity}
+            t={t}
+            locale={locale}
+          />
+        ) : activity && canManage ? (
+          <ActivityEditorTabs
+            concepts={course?.subject?.knowledgeConcepts ?? []}
+            selectedConceptIds={activity.knowledgeConcepts?.map((link) => link.conceptId) ?? []}
+            onSaveConcepts={saveConcepts}
+            t={t}
+            locale={locale}
+          >
+            <section className="section stack">
+              <h2>{t("parsons.unsupportedTitle")}</h2>
+              <p className="muted">{t("parsons.unsupportedText")}</p>
+            </section>
+          </ActivityEditorTabs>
         ) : activity ? (
           <section className="section stack">
             <h2>{t("parsons.unsupportedTitle")}</h2>

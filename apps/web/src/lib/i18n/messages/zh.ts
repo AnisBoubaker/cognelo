@@ -388,6 +388,12 @@ export const zhMessages = {
       statusSaveError: "无法更新发布状态。",
       versionNote: "在这里保存的更改会更新活动库活动，并为之后的课程分配创建新版本。"
     },
+    activityConcepts: {
+      tabsLabel: "活动编辑器", activityTab: "活动", conceptsTab: "概念", title: "知识概念",
+      description: "选择此活动帮助学习者练习或展示的学科概念。", search: "搜索概念",
+      empty: "此学科尚无知识概念。请先在学科知识图谱中添加概念。", noMatches: "没有符合搜索条件的概念。",
+      saved: "知识概念链接已保存。", saveError: "无法保存知识概念链接。"
+    },
     courseForm: {
       subject: "学科",
       title: "标题",
