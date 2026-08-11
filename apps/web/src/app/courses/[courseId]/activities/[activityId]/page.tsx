@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import type { ActivityKnowledgeConceptSelection } from "@cognelo/contracts";
 import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ActivityEditorTabs } from "@/components/activity-editor-tabs";
 import { useAuth } from "@/components/auth-provider";
@@ -22,6 +23,8 @@ export default function ActivityPage() {
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [hasQuestionAuthoringAgent, setHasQuestionAuthoringAgent] = useState(false);
   const [error, setError] = useState("");
+  const conceptDraftRef = useRef<ActivityKnowledgeConceptSelection[]>([]);
+  const updateConceptDraft = useCallback((selections: ActivityKnowledgeConceptSelection[]) => { conceptDraftRef.current = selections; }, []);
 
   const canManage = user?.roles.includes("admin") || user?.roles.includes("teacher");
   const ActivityRenderer =
@@ -39,6 +42,7 @@ export default function ActivityPage() {
       ]);
       setCourse(courseResult.course);
       setActivity(activityResult.activity);
+      conceptDraftRef.current = activityResult.activity.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills })) ?? [];
       setActivityDefinitions(typeResult.registeredDefinitions);
       setHasQuestionAuthoringAgent(
         aiAgentResult.connections.some((connection) => connection.id === aiAgentResult.preferences.questionAuthoringAiAgentConnectionId && connection.isEnabled)
@@ -49,13 +53,14 @@ export default function ActivityPage() {
   }, [activityId, courseId, t]);
 
   async function saveActivity(input: { title: string; description: string; config: Record<string, unknown> }) {
-    const result = await api.updateActivity(courseId, activityId, input);
+    const result = await api.updateActivity(courseId, activityId, { ...input, knowledgeConceptSelections: conceptDraftRef.current });
     setActivity(result.activity);
     return result.activity;
   }
 
-  async function saveConcepts(knowledgeConceptIds: string[]) {
-    const result = await api.updateActivity(courseId, activityId, { knowledgeConceptIds });
+  async function saveConcepts(knowledgeConceptSelections: ActivityKnowledgeConceptSelection[]) {
+    conceptDraftRef.current = knowledgeConceptSelections;
+    const result = await api.updateActivity(courseId, activityId, { knowledgeConceptSelections });
     setActivity(result.activity);
   }
 
@@ -90,8 +95,10 @@ export default function ActivityPage() {
         {activity && ActivityRenderer && canManage ? (
           <ActivityEditorTabs
             concepts={course?.subject?.knowledgeConcepts ?? []}
-            selectedConceptIds={activity.knowledgeConcepts?.map((link) => link.conceptId) ?? []}
+            prerequisites={course?.subject?.knowledgePrerequisites ?? []}
+            selectedConcepts={activity.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills })) ?? []}
             onSaveConcepts={saveConcepts}
+            onConceptDraftChange={updateConceptDraft}
             t={t}
             locale={locale}
           >
@@ -120,8 +127,10 @@ export default function ActivityPage() {
         ) : activity && canManage ? (
           <ActivityEditorTabs
             concepts={course?.subject?.knowledgeConcepts ?? []}
-            selectedConceptIds={activity.knowledgeConcepts?.map((link) => link.conceptId) ?? []}
+            prerequisites={course?.subject?.knowledgePrerequisites ?? []}
+            selectedConcepts={activity.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills })) ?? []}
             onSaveConcepts={saveConcepts}
+            onConceptDraftChange={updateConceptDraft}
             t={t}
             locale={locale}
           >

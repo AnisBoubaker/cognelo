@@ -8,7 +8,8 @@ const courseInclude = {
   subject: {
     include: {
       materials: { orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }] },
-      knowledgeConcepts: { orderBy: [{ createdAt: "asc" as const }] }
+      knowledgeConcepts: { orderBy: [{ createdAt: "asc" as const }] },
+      knowledgePrerequisites: { orderBy: [{ createdAt: "asc" as const }] }
     }
   },
   memberships: { include: { user: { select: { id: true, email: true, name: true } } } },

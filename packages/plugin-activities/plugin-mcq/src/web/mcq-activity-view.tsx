@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { CodeEditor, EditActionBar, MarkdownRenderer, RichTextEditor, codeLanguageOptions, getEditActionBarCopy, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { CodeEditor, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, RichTextEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   parseMcqSource,
   type McqChoice,
@@ -49,7 +49,8 @@ type McqActivityViewProps = {
       instructions?: string;
       locale: "en" | "fr" | "zh" | "ar";
       questionCount: number;
-    }) => Promise<{ source: string; attempts: number }>;
+      knowledge: ActivityKnowledgeGenerationRequest;
+    }) => Promise<{ source: string; attempts: number; knowledgeConceptSelections?: GeneratedKnowledgeSelection[] }>;
   };
 };
 
@@ -253,6 +254,7 @@ export function McqActivityView({
     [copy.notProgrammingExercise]
   );
   const notifications = useNotifications();
+  const knowledgeGeneration = useActivityKnowledgeGeneration();
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);
   const [source, setSource] = useState(String(activity.config?.source ?? fallbackConfig.source));
@@ -503,9 +505,11 @@ export function McqActivityView({
         defaultCodeLanguage: generationCodeLanguage,
         instructions: aiInstructions,
         locale,
-        questionCount
+        questionCount,
+        knowledge: knowledgeGeneration.request
       });
       setSource(result.source);
+      knowledgeGeneration.applySelections(result.knowledgeConceptSelections);
       setStudentAnswers({});
       setSubmitted(false);
       notifications.success(result.attempts > 1 ? `${copy.generated} (${result.attempts})` : copy.generated);
@@ -605,6 +609,7 @@ export function McqActivityView({
           <details style={{ border: "1px solid rgba(13, 27, 71, 0.12)", borderRadius: 12, padding: "14px 16px" }}>
             <summary style={{ cursor: "pointer", fontWeight: 800 }}>{copy.generateSection}</summary>
             <div className="stack" style={{ marginTop: 16 }}>
+              <KnowledgeGenerationModeField locale={locale} />
               <div className="field">
                 <label htmlFor="mcq-ai-instructions">{copy.aiInstructions}</label>
                 <textarea

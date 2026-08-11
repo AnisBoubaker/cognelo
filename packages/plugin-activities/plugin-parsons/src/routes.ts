@@ -176,7 +176,8 @@ export const parsonsGenerateRoute: PluginRouteDefinition = {
         description: input.description,
         language: input.language,
         locale: input.locale,
-        subject
+        subject,
+        knowledge: input.knowledge
       });
     }
   }

@@ -120,15 +120,22 @@ export type CourseContentResource = {
   updatedAt: string;
 };
 
+export type ActivityKnowledgeGenerationRequest =
+  | { mode: "selected" | "suggest"; concepts: Array<{ id: string; title: string; skills: string[] }> }
+  | { mode: "ignore" };
+export type GeneratedKnowledgeSelection = { conceptId: string; selectsAllSkills: boolean; selectedSkills: string[] };
+
 export type CodingExercisePromptGenerationInput = {
   description: string;
   language: string;
   locale: "en" | "fr" | "zh" | "ar";
+  knowledge: ActivityKnowledgeGenerationRequest;
 };
 
 export type CodingExercisePromptGenerationResult = {
   prompt: string;
   attempts: number;
+  knowledgeConceptSelections?: GeneratedKnowledgeSelection[];
 };
 
 export type CodingExerciseGenerationBaseInput = {
@@ -136,6 +143,7 @@ export type CodingExerciseGenerationBaseInput = {
   prompt: string;
   language: string;
   locale: "en" | "fr" | "zh" | "ar";
+  knowledge: ActivityKnowledgeGenerationRequest;
 };
 
 export type CodingExerciseSolutionGenerationInput = CodingExerciseGenerationBaseInput;
@@ -155,11 +163,13 @@ export type CodingExerciseSolutionGenerationResult =
       templateSource: string;
       templateVisibleLineNumbers: number[];
       attempts: number;
+      knowledgeConceptSelections?: GeneratedKnowledgeSelection[];
     }
   | {
       status: "error";
       message: string;
       attempts: number;
+      knowledgeConceptSelections?: GeneratedKnowledgeSelection[];
     };
 
 export type CodingExerciseTestsGenerationResult =
@@ -265,6 +275,8 @@ export type BankActivity = {
 
 export type ActivityKnowledgeConceptLink = {
   conceptId: string;
+  selectsAllSkills: boolean;
+  selectedSkills: string[];
   concept: SubjectKnowledgeConcept;
 };
 

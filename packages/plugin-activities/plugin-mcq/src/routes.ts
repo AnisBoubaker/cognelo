@@ -2,9 +2,12 @@ import { z } from "zod";
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import {
   AppError,
+  activityGenerationKnowledgeSchema,
   assertCanManageActivityBank,
   assertCanManageCourse,
   generateQuestionAuthoringText,
+  selectedSkillsGenerationPrompt,
+  suggestActivityKnowledgeSelections,
   getActivityAttemptAvailability,
   recordActivityAttemptGradingResult,
   startActivityAttempt,
@@ -19,7 +22,8 @@ const mcqGenerateInputSchema = z.object({
   defaultCodeLanguage: z.string().min(1).max(40).default("none"),
   instructions: z.string().max(4000).default(""),
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
-  questionCount: z.number().int().min(1).max(20).default(5)
+  questionCount: z.number().int().min(1).max(20).default(5),
+  knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
 });
 
 const mcqSubmissionInputSchema = z.object({
@@ -54,7 +58,8 @@ export const mcqGenerateRoute: PluginRouteDefinition = {
         instructions: input.instructions,
         locale: input.locale,
         questionCount: input.questionCount,
-        subject
+        subject,
+        knowledge: input.knowledge
       });
 
       return generated;
@@ -302,6 +307,7 @@ async function generateValidMcqSource(input: {
   locale: "en" | "fr" | "zh" | "ar";
   questionCount: number;
   subject: SubjectContext;
+  knowledge: z.infer<typeof activityGenerationKnowledgeSchema>;
 }) {
   const systemPrompt = buildSystemPrompt(input);
   let userPrompt = buildInitialUserPrompt(input);
@@ -319,7 +325,12 @@ async function generateValidMcqSource(input: {
     const issues = collectMcqIssues(source, parsed, input.questionCount, input.defaultCodeLanguage);
 
     if (!issues.length) {
-      return { source, attempts: attempt };
+      const knowledgeConceptSelections = await suggestActivityKnowledgeSelections({
+        user: input.user,
+        knowledge: input.knowledge,
+        generatedActivity: source
+      });
+      return { source, attempts: attempt, knowledgeConceptSelections };
     }
 
     lastSource = source;
@@ -337,6 +348,7 @@ function buildSystemPrompt(input: {
   defaultCodeLanguage: string;
   locale: "en" | "fr" | "zh" | "ar";
   subject: SubjectContext;
+  knowledge: z.infer<typeof activityGenerationKnowledgeSchema>;
 }) {
   return [
     "You generate multiple-choice question activities for Cognelo.",
@@ -363,7 +375,9 @@ function buildSystemPrompt(input: {
     "",
     "Subject context:",
     `Title: ${input.subject.title}`,
-    `Description: ${input.subject.description || "No subject description provided."}`
+    `Description: ${input.subject.description || "No subject description provided."}`,
+    "",
+    selectedSkillsGenerationPrompt(input.knowledge)
   ].join("\n");
 }
 

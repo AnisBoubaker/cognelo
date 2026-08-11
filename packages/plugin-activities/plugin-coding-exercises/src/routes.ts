@@ -197,7 +197,8 @@ export const codingExerciseGeneratePromptRoute: PluginRouteDefinition = {
         description: input.description,
         language: input.language,
         locale: input.locale,
-        subject
+        subject,
+        knowledge: input.knowledge
       });
     }
   }
@@ -218,7 +219,8 @@ export const codingExerciseGenerateSolutionRoute: PluginRouteDefinition = {
         prompt: input.prompt,
         language: input.language,
         locale: input.locale,
-        subject
+        subject,
+        knowledge: input.knowledge
       });
     }
   }
@@ -242,7 +244,8 @@ export const codingExerciseGenerateTestsRoute: PluginRouteDefinition = {
         subject,
         referenceSolution: input.referenceSolution,
         templateSource: input.templateSource,
-        templateVisibleLineNumbers: input.templateVisibleLineNumbers
+        templateVisibleLineNumbers: input.templateVisibleLineNumbers,
+        knowledge: input.knowledge
       });
     }
   }

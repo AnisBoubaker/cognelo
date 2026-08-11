@@ -3,9 +3,10 @@
 import { useNotifications } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ActivityEditorTabs } from "@/components/activity-editor-tabs";
+import type { ActivityKnowledgeConceptSelection } from "@cognelo/contracts";
 import { api, type ActivityBank, type ActivityDefinition, type ActivityType, type BankActivity } from "@/lib/api";
 import { bankActivityRenderers } from "@/lib/activity-renderers";
 import { useI18n } from "@/lib/i18n";
@@ -34,6 +35,8 @@ export default function BankActivityAuthoringPage() {
   const [lifecycleDraft, setLifecycleDraft] = useState<ActivityLifecycle>("draft");
   const [savingLifecycle, setSavingLifecycle] = useState(false);
   const [error, setError] = useState("");
+  const conceptDraftRef = useRef<ActivityKnowledgeConceptSelection[]>([]);
+  const updateConceptDraft = useCallback((selections: ActivityKnowledgeConceptSelection[]) => { conceptDraftRef.current = selections; }, []);
 
   async function loadPage() {
     const [bankResult, typeResult, aiAgentResult] = await Promise.all([api.activityBank(activityBankId), api.activityTypes(), api.aiAgentConnections()]);
@@ -44,6 +47,7 @@ export default function BankActivityAuthoringPage() {
       aiAgentResult.connections.some((connection) => connection.id === aiAgentResult.preferences.questionAuthoringAiAgentConnectionId && connection.isEnabled)
     );
     setActivity(nextActivity);
+    conceptDraftRef.current = nextActivity?.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills })) ?? [];
     setLifecycleDraft((nextActivity?.lifecycle ?? "draft") as ActivityLifecycle);
     if (!nextActivity) {
       setError(t("bankActivityPage.notFound"));
@@ -77,7 +81,8 @@ export default function BankActivityAuthoringPage() {
       title: input.title,
       description: input.description,
       config: input.config,
-      activityTypeKey: activity.activityType.key
+      activityTypeKey: activity.activityType.key,
+      knowledgeConceptSelections: conceptDraftRef.current
     });
     setActivity(result.activity);
     setLifecycleDraft(result.activity.lifecycle as ActivityLifecycle);
@@ -148,9 +153,10 @@ export default function BankActivityAuthoringPage() {
     );
   }
 
-  async function saveConcepts(knowledgeConceptIds: string[]) {
+  async function saveConcepts(knowledgeConceptSelections: ActivityKnowledgeConceptSelection[]) {
     if (!activity) return;
-    const result = await api.updateBankActivity(activityBankId, activity.id, { knowledgeConceptIds });
+    conceptDraftRef.current = knowledgeConceptSelections;
+    const result = await api.updateBankActivity(activityBankId, activity.id, { knowledgeConceptSelections });
     setActivity(result.activity);
   }
 
@@ -201,8 +207,10 @@ export default function BankActivityAuthoringPage() {
         {activity ? (
           <ActivityEditorTabs
             concepts={bank?.subject?.knowledgeConcepts ?? []}
-            selectedConceptIds={activity.knowledgeConcepts?.map((link) => link.conceptId) ?? []}
+            prerequisites={bank?.subject?.knowledgePrerequisites ?? []}
+            selectedConcepts={activity.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills })) ?? []}
             onSaveConcepts={saveConcepts}
+            onConceptDraftChange={updateConceptDraft}
             t={t}
             locale={locale}
           >

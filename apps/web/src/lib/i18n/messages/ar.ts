@@ -277,7 +277,9 @@ export const arMessages = {
       tabsLabel: "محرر النشاط", activityTab: "النشاط", conceptsTab: "المفاهيم", title: "مفاهيم المعرفة",
       description: "اختر مفاهيم المادة التي يساعد هذا النشاط المتعلمين على ممارستها أو إظهارها.", search: "البحث في المفاهيم",
       empty: "لا تحتوي هذه المادة على مفاهيم معرفة بعد. أضف مفاهيم إلى رسم المعرفة أولاً.", noMatches: "لا توجد مفاهيم تطابق هذا البحث.",
-      saved: "تم حفظ روابط مفاهيم المعرفة.", saveError: "تعذر حفظ روابط مفاهيم المعرفة."
+      saved: "تم حفظ روابط مفاهيم المعرفة.", saveError: "تعذر حفظ روابط مفاهيم المعرفة.", conceptList: "المفاهيم المتاحة", skillsEyebrow: "المهارات",
+      noSkills: "لا توجد مهارات لهذا المفهوم بعد.", selectConceptHelp: "اختر مفهوماً لعرض مهاراته.", selectWholeConcept: "تحديد جميع مهارات {title}",
+      skillsSelected: "تم تحديد {count}"
     },
     courseForm: {
       subject: "المادة",

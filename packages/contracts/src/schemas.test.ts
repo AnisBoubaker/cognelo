@@ -275,6 +275,16 @@ describe("shared contract schemas", () => {
     });
     expect(BankActivityInputSchema.parse({ activityTypeKey: "mcq", title: "Quiz", knowledgeConceptIds: ["concept-1"] }).knowledgeConceptIds).toEqual(["concept-1"]);
     expect(() => BankActivityInputSchema.parse({ activityTypeKey: "mcq", title: "Quiz", knowledgeConceptIds: ["concept-1", "concept-1"] })).toThrow();
+    expect(BankActivityInputSchema.parse({
+      activityTypeKey: "mcq",
+      title: "Quiz",
+      knowledgeConceptSelections: [{ conceptId: "concept-1", selectsAllSkills: false, selectedSkills: ["Apply the rule"] }]
+    }).knowledgeConceptSelections).toHaveLength(1);
+    expect(() => BankActivityInputSchema.parse({
+      activityTypeKey: "mcq",
+      title: "Quiz",
+      knowledgeConceptSelections: [{ conceptId: "concept-1", selectsAllSkills: false, selectedSkills: [] }]
+    })).toThrow();
     expect(CourseGroupInputSchema.parse({ title: "Group" })).toMatchObject({ title: "Group" });
     expect(CourseGroupActivityInputSchema.parse({ activityId: "activity-1" })).toMatchObject({
       activityId: "activity-1",

@@ -397,7 +397,10 @@ export const frMessages = {
       tabsLabel: "Éditeur d’activité", activityTab: "Activité", conceptsTab: "Concepts", title: "Concepts de connaissances",
       description: "Sélectionnez les concepts de la matière que cette activité permet de pratiquer ou de démontrer.", search: "Rechercher des concepts",
       empty: "Cette matière ne contient encore aucun concept. Ajoutez-en d’abord au graphe de connaissances.",
-      noMatches: "Aucun concept ne correspond à cette recherche.", saved: "Liens vers les concepts enregistrés.", saveError: "Impossible d’enregistrer les liens vers les concepts."
+      noMatches: "Aucun concept ne correspond à cette recherche.", saved: "Liens vers les concepts enregistrés.", saveError: "Impossible d’enregistrer les liens vers les concepts.",
+      conceptList: "Concepts disponibles", skillsEyebrow: "Compétences", noSkills: "Ce concept ne contient pas encore de compétences.",
+      selectConceptHelp: "Choisissez un concept pour afficher ses compétences.", selectWholeConcept: "Sélectionner toutes les compétences de {title}",
+      skillsSelected: "{count} sélectionnées"
     },
     courseForm: {
       subject: "Matière",

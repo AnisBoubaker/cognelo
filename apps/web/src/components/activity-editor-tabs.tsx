@@ -1,38 +1,137 @@
 "use client";
 
-import { EditActionBar, getEditActionBarCopy, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
-import { useMemo, useState } from "react";
-import type { SubjectKnowledgeConcept } from "@/lib/api";
+import { ActivityKnowledgeGenerationProvider, EditActionBar, getEditActionBarCopy, useNotifications, useUnsavedChangesActions, useUnsavedChangesGuard, type ActivityKnowledgeGenerationMode, type ActivityKnowledgeGenerationRequest } from "@cognelo/activity-ui";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ActivityKnowledgeConceptSelection } from "@cognelo/contracts";
+import type { SubjectKnowledgeConcept, SubjectKnowledgePrerequisite } from "@/lib/api";
 
 type ActivityEditorTabsProps = {
   children: React.ReactNode;
   concepts: SubjectKnowledgeConcept[];
-  selectedConceptIds: string[];
-  onSaveConcepts: (conceptIds: string[]) => Promise<void>;
+  prerequisites: SubjectKnowledgePrerequisite[];
+  selectedConcepts: ActivityKnowledgeConceptSelection[];
+  onSaveConcepts: (selections: ActivityKnowledgeConceptSelection[]) => Promise<void>;
+  onConceptDraftChange?: (selections: ActivityKnowledgeConceptSelection[]) => void;
   t: (key: string, values?: Record<string, string | number>) => string;
   locale: string;
 };
 
-export function ActivityEditorTabs({ children, concepts, selectedConceptIds, onSaveConcepts, t, locale }: ActivityEditorTabsProps) {
+function conceptSkills(concept: SubjectKnowledgeConcept) {
+  return concept.skills.split(/\r?\n/).map((skill) => skill.trim()).filter(Boolean);
+}
+
+function canonicalSelections(selections: ActivityKnowledgeConceptSelection[]) {
+  return JSON.stringify(selections
+    .map((selection) => ({ ...selection, selectedSkills: [...selection.selectedSkills].sort() }))
+    .sort((left, right) => left.conceptId.localeCompare(right.conceptId)));
+}
+
+function ConceptCheckbox({ checked, partial, label, onChange }: { checked: boolean; partial: boolean; label: string; onChange: (checked: boolean) => void }) {
+  const ref = useRef<HTMLInputElement | null>(null);
+  useEffect(() => { if (ref.current) ref.current.indeterminate = partial; }, [partial]);
+  return <input ref={ref} type="checkbox" checked={checked} aria-label={label} onChange={(event) => onChange(event.target.checked)} />;
+}
+
+export function ActivityEditorTabs({ children, concepts, prerequisites, selectedConcepts, onSaveConcepts, onConceptDraftChange, t, locale }: ActivityEditorTabsProps) {
   const notifications = useNotifications();
+  const unsavedActions = useUnsavedChangesActions();
   const [activeTab, setActiveTab] = useState<"activity" | "concepts">("activity");
-  const [draftIds, setDraftIds] = useState(selectedConceptIds);
-  const [savedIds, setSavedIds] = useState(selectedConceptIds);
+  const [draftSelections, setDraftSelections] = useState(selectedConcepts);
+  const [savedSelections, setSavedSelections] = useState(selectedConcepts);
+  const [activeConceptId, setActiveConceptId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
-  const isDirty = [...draftIds].sort().join("|") !== [...savedIds].sort().join("|");
+  const [generationMode, setGenerationMode] = useState<ActivityKnowledgeGenerationMode>("selected");
+  const skillsPaneRef = useRef<HTMLDivElement | null>(null);
+  const selectedConceptsKeyRef = useRef(canonicalSelections(selectedConcepts));
+  const isDirty = canonicalSelections(draftSelections) !== canonicalSelections(savedSelections);
+
+  const orderedConcepts = useMemo(() => {
+    const directPrerequisites = new Map<string, string[]>();
+    for (const prerequisite of prerequisites) {
+      directPrerequisites.set(prerequisite.sourceConceptId, [...(directPrerequisites.get(prerequisite.sourceConceptId) ?? []), prerequisite.requiredConceptId]);
+    }
+    const transitiveCount = (conceptId: string) => {
+      const found = new Set<string>();
+      const pending = [...(directPrerequisites.get(conceptId) ?? [])];
+      while (pending.length) {
+        const next = pending.pop()!;
+        if (found.has(next)) continue;
+        found.add(next);
+        pending.push(...(directPrerequisites.get(next) ?? []));
+      }
+      return found.size;
+    };
+    return [...concepts].sort((left, right) =>
+      transitiveCount(left.id) - transitiveCount(right.id)
+      || (directPrerequisites.get(left.id)?.length ?? 0) - (directPrerequisites.get(right.id)?.length ?? 0)
+      || left.title.localeCompare(right.title, locale)
+    );
+  }, [concepts, locale, prerequisites]);
+
   const visibleConcepts = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
     return normalizedQuery
-      ? concepts.filter((concept) => `${concept.title} ${concept.skills}`.toLocaleLowerCase().includes(normalizedQuery))
-      : concepts;
-  }, [concepts, query]);
+      ? orderedConcepts.filter((concept) => `${concept.title} ${concept.skills}`.toLocaleLowerCase().includes(normalizedQuery))
+      : orderedConcepts;
+  }, [orderedConcepts, query]);
+  const activeConcept = concepts.find((concept) => concept.id === activeConceptId) ?? visibleConcepts[0] ?? null;
+  const generationRequest = useMemo<ActivityKnowledgeGenerationRequest>(() => {
+    if (generationMode === "ignore") return { mode: "ignore" };
+    if (generationMode === "suggest") {
+      return { mode: "suggest", concepts: concepts.map((concept) => ({ id: concept.id, title: concept.title, skills: conceptSkills(concept) })) };
+    }
+    return {
+      mode: "selected",
+      concepts: draftSelections.flatMap((selection) => {
+        const concept = concepts.find((candidate) => candidate.id === selection.conceptId);
+        return concept ? [{ id: concept.id, title: concept.title, skills: selection.selectsAllSkills ? conceptSkills(concept) : selection.selectedSkills }] : [];
+      })
+    };
+  }, [concepts, draftSelections, generationMode]);
 
-  async function save() {
+  useEffect(() => {
+    skillsPaneRef.current?.scrollTo({ top: 0 });
+  }, [activeConcept?.id]);
+
+  useEffect(() => { onConceptDraftChange?.(draftSelections); }, [draftSelections, onConceptDraftChange]);
+
+  useEffect(() => {
+    const nextKey = canonicalSelections(selectedConcepts);
+    if (nextKey === selectedConceptsKeyRef.current) return;
+    selectedConceptsKeyRef.current = nextKey;
+    setSavedSelections(selectedConcepts);
+    setDraftSelections(selectedConcepts);
+  }, [selectedConcepts]);
+
+  function selectionFor(conceptId: string) {
+    return draftSelections.find((selection) => selection.conceptId === conceptId);
+  }
+
+  function setWholeConcept(concept: SubjectKnowledgeConcept, checked: boolean) {
+    setDraftSelections((current) => checked
+      ? [...current.filter((selection) => selection.conceptId !== concept.id), { conceptId: concept.id, selectsAllSkills: true, selectedSkills: [] }]
+      : current.filter((selection) => selection.conceptId !== concept.id));
+  }
+
+  function setSkill(concept: SubjectKnowledgeConcept, skill: string, checked: boolean) {
+    const skills = conceptSkills(concept);
+    setDraftSelections((current) => {
+      const existing = current.find((selection) => selection.conceptId === concept.id);
+      const selected = existing?.selectsAllSkills ? skills : (existing?.selectedSkills ?? []);
+      const nextSkills = checked ? [...new Set([...selected, skill])] : selected.filter((candidate) => candidate !== skill);
+      const withoutConcept = current.filter((selection) => selection.conceptId !== concept.id);
+      return nextSkills.length
+        ? [...withoutConcept, { conceptId: concept.id, selectsAllSkills: false, selectedSkills: nextSkills }]
+        : withoutConcept;
+    });
+  }
+
+  async function saveConceptsOnly() {
     setSaving(true);
     try {
-      await onSaveConcepts(draftIds);
-      setSavedIds(draftIds);
+      await onSaveConcepts(draftSelections);
+      setSavedSelections(draftSelections);
       notifications.success(t("activityConcepts.saved"));
     } catch (error) {
       notifications.error(error instanceof Error ? error.message : t("activityConcepts.saveError"));
@@ -42,74 +141,90 @@ export function ActivityEditorTabs({ children, concepts, selectedConceptIds, onS
     }
   }
 
-  useUnsavedChangesGuard({
-    isDirty,
-    onSave: save,
-    onDiscard: () => setDraftIds(savedIds)
-  });
+  const conceptGuardId = useUnsavedChangesGuard({ isDirty, onSave: saveConceptsOnly, onDiscard: () => setDraftSelections(savedSelections) });
+
+  async function saveAll() {
+    const activitySaveCount = await unsavedActions?.saveDirtyGuards([conceptGuardId]) ?? 0;
+    if (!activitySaveCount) {
+      await saveConceptsOnly();
+      return;
+    }
+    setSavedSelections(draftSelections);
+    notifications.success(t("activityConcepts.saved"));
+  }
 
   return (
+    <ActivityKnowledgeGenerationProvider value={{
+      mode: generationMode,
+      setMode: setGenerationMode,
+      request: generationRequest,
+      applySelections: (selections) => { if (selections) setDraftSelections(selections); }
+    }}>
     <div className="stack">
       <div className="tab-strip" role="tablist" aria-label={t("activityConcepts.tabsLabel")}>
-        <button type="button" role="tab" aria-selected={activeTab === "activity"} onClick={() => setActiveTab("activity")}>
-          {t("activityConcepts.activityTab")}
-        </button>
+        <button type="button" role="tab" aria-selected={activeTab === "activity"} onClick={() => setActiveTab("activity")}>{t("activityConcepts.activityTab")}</button>
         <button type="button" role="tab" aria-selected={activeTab === "concepts"} onClick={() => setActiveTab("concepts")}>
-          {t("activityConcepts.conceptsTab")}
-          {savedIds.length ? ` (${savedIds.length})` : ""}
+          {t("activityConcepts.conceptsTab")}{savedSelections.length ? ` (${savedSelections.length})` : ""}
         </button>
       </div>
 
-      <div role="tabpanel" hidden={activeTab !== "activity"}>{activeTab === "activity" ? children : null}</div>
+      <div role="tabpanel" hidden={activeTab !== "activity"}>{children}</div>
       <div role="tabpanel" hidden={activeTab !== "concepts"}>
-        {activeTab === "concepts" ? (
+        {(
           <section className="section stack">
-            <div>
-              <h2>{t("activityConcepts.title")}</h2>
-              <p className="muted">{t("activityConcepts.description")}</p>
-            </div>
+            <div><h2>{t("activityConcepts.title")}</h2><p className="muted">{t("activityConcepts.description")}</p></div>
             {concepts.length ? (
               <>
                 <div className="field">
                   <label htmlFor="activity-concept-search">{t("activityConcepts.search")}</label>
                   <input id="activity-concept-search" value={query} onChange={(event) => setQuery(event.target.value)} />
                 </div>
-                <div className="stack" style={{ gap: 8 }}>
-                  {visibleConcepts.map((concept) => (
-                    <label className="panel" key={concept.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", cursor: "pointer" }}>
-                      <input
-                        type="checkbox"
-                        checked={draftIds.includes(concept.id)}
-                        onChange={(event) => setDraftIds((current) => event.target.checked ? [...current, concept.id] : current.filter((id) => id !== concept.id))}
-                      />
-                      <span>
-                        <strong>{concept.title}</strong>
-                        {concept.skills ? (
-                          <ul className="muted" style={{ margin: "6px 0 0", paddingInlineStart: 20 }}>
-                            {concept.skills.split(/\r?\n/).filter((skill) => skill.trim()).map((skill, index) => <li key={`${concept.id}-skill-${index}`}>{skill.trim()}</li>)}
-                          </ul>
-                        ) : null}
-                      </span>
-                    </label>
-                  ))}
-                  {!visibleConcepts.length ? <p className="muted">{t("activityConcepts.noMatches")}</p> : null}
+                <div className="activity-concept-selector">
+                  <div className="activity-concept-list" role="list" aria-label={t("activityConcepts.conceptList")}>
+                    {visibleConcepts.map((concept) => {
+                      const selection = selectionFor(concept.id);
+                      const selectedCount = selection?.selectsAllSkills ? conceptSkills(concept).length : selection?.selectedSkills.length ?? 0;
+                      return (
+                        <div className={`activity-concept-row${activeConcept?.id === concept.id ? " is-active" : ""}`} key={concept.id} role="listitem">
+                          <ConceptCheckbox
+                            checked={selection?.selectsAllSkills ?? false}
+                            partial={Boolean(selection && !selection.selectsAllSkills)}
+                            label={t("activityConcepts.selectWholeConcept", { title: concept.title })}
+                            onChange={(checked) => setWholeConcept(concept, checked)}
+                          />
+                          <button type="button" onClick={() => setActiveConceptId(concept.id)}>
+                            <span>{concept.title}</span>
+                            {selectedCount ? <span className="activity-concept-count">{t("activityConcepts.skillsSelected", { count: selectedCount })}</span> : null}
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {!visibleConcepts.length ? <p className="muted">{t("activityConcepts.noMatches")}</p> : null}
+                  </div>
+                  <div className="activity-concept-skills" ref={skillsPaneRef}>
+                    {activeConcept ? (
+                      <>
+                        <div><p className="eyebrow">{t("activityConcepts.skillsEyebrow")}</p><h3>{activeConcept.title}</h3></div>
+                        {conceptSkills(activeConcept).length ? conceptSkills(activeConcept).map((skill) => {
+                          const selection = selectionFor(activeConcept.id);
+                          const checked = selection?.selectsAllSkills || selection?.selectedSkills.includes(skill) || false;
+                          return <label className="activity-skill-row" key={skill}><input type="checkbox" checked={checked} onChange={(event) => setSkill(activeConcept, skill, event.target.checked)} /><span>{skill}</span></label>;
+                        }) : <p className="muted">{t("activityConcepts.noSkills")}</p>}
+                      </>
+                    ) : <p className="muted">{t("activityConcepts.selectConceptHelp")}</p>}
+                  </div>
                 </div>
                 <EditActionBar
-                  isDirty={isDirty}
-                  isSaving={saving}
-                  onSave={() => void save()}
-                  onCancel={() => setDraftIds(savedIds)}
-                  savedLabel={getEditActionBarCopy(locale).saved}
-                  unsavedLabel={getEditActionBarCopy(locale).unsaved}
-                  saveLabel={getEditActionBarCopy(locale).save}
-                  savingLabel={getEditActionBarCopy(locale).saving}
-                  cancelLabel={getEditActionBarCopy(locale).cancel}
+                  isDirty={isDirty} isSaving={saving} onSave={() => void saveAll()} onCancel={() => setDraftSelections(savedSelections)}
+                  savedLabel={getEditActionBarCopy(locale).saved} unsavedLabel={getEditActionBarCopy(locale).unsaved}
+                  saveLabel={getEditActionBarCopy(locale).save} savingLabel={getEditActionBarCopy(locale).saving} cancelLabel={getEditActionBarCopy(locale).cancel}
                 />
               </>
             ) : <p className="muted">{t("activityConcepts.empty")}</p>}
           </section>
-        ) : null}
+        )}
       </div>
     </div>
+    </ActivityKnowledgeGenerationProvider>
   );
 }

@@ -397,7 +397,10 @@ export const enMessages = {
       tabsLabel: "Activity editor", activityTab: "Activity", conceptsTab: "Concepts", title: "Knowledge concepts",
       description: "Select the subject concepts this activity helps learners practice or demonstrate.", search: "Search concepts",
       empty: "This subject does not have any knowledge concepts yet. Add concepts to the subject knowledge graph first.",
-      noMatches: "No concepts match this search.", saved: "Knowledge concept links saved.", saveError: "Unable to save knowledge concept links."
+      noMatches: "No concepts match this search.", saved: "Knowledge concept links saved.", saveError: "Unable to save knowledge concept links.",
+      conceptList: "Available concepts", skillsEyebrow: "Skills", noSkills: "This concept does not have any skills yet.",
+      selectConceptHelp: "Choose a concept to see its skills.", selectWholeConcept: "Select all skills for {title}",
+      skillsSelected: "{count} selected"
     },
     courseForm: {
       subject: "Subject",

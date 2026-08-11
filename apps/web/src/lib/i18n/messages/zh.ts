@@ -397,7 +397,9 @@ export const zhMessages = {
       tabsLabel: "活动编辑器", activityTab: "活动", conceptsTab: "概念", title: "知识概念",
       description: "选择此活动帮助学习者练习或展示的学科概念。", search: "搜索概念",
       empty: "此学科尚无知识概念。请先在学科知识图谱中添加概念。", noMatches: "没有符合搜索条件的概念。",
-      saved: "知识概念链接已保存。", saveError: "无法保存知识概念链接。"
+      saved: "知识概念链接已保存。", saveError: "无法保存知识概念链接。", conceptList: "可用概念", skillsEyebrow: "技能",
+      noSkills: "此概念尚无技能。", selectConceptHelp: "选择一个概念以查看其技能。", selectWholeConcept: "选择 {title} 的所有技能",
+      skillsSelected: "已选 {count} 项"
     },
     courseForm: {
       subject: "学科",

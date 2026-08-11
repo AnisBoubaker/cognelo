@@ -38,6 +38,7 @@ Shared cross-plugin frontend primitives live in `packages/activity-ui`. In addit
 - **Authorization** maps global roles, course memberships, section participants, and activity-bank ownership into permissions.
 - **Users/Roles** support many-to-many global roles and future additional roles.
 - **Subjects** own reusable curriculum context, a supported teaching-language locale used by subject AI generation, subject-level material, and a subject-scoped prerequisite knowledge graph.
+- **Activity AI authoring** receives knowledge alignment through a host-owned shared context: generators consume the live unsaved skill draft, request catalog-constrained skill suggestions for their generated draft, or opt out without reading or mutating knowledge selections. The host keeps both tab panels mounted and combines activity content with knowledge selections at the persistence boundary.
 - **Activity banks** own reusable activity authoring and version history for a subject.
 - **Courses** own course lifecycle, course-local material, and course-local copies of bank activities.
 - **Course content resources** are plugin-backed non-activity resources such as GitHub repos, files, and text notes.
@@ -75,6 +76,8 @@ Subject
 Bank activities are authored in activity banks. Each bank save creates a new `ActivityVersion` and updates the bank activity's current version.
 
 Activity-to-concept links are a core, cross-plugin contract. All activity editors are host-wrapped with an Activity/Concepts tab set. Bank links are copied into immutable activity-version link rows and then into independent course-activity link rows during assignment; empty selections are valid, but no activity type may opt out of the capability.
+
+Each bank, version, and course activity concept link stores `selectsAllSkills` plus `selectedSkills`. A whole-concept selection uses `selectsAllSkills = true`; an explicit selection of every skill still uses `false` with the exact skill strings. This distinction is intentional because later skills added to a concept must not silently become selected for an activity that only chose the former complete list. Reconciliation behavior for renamed/removed concepts or changed skill lines is deferred to the dedicated change-handling iteration.
 
 When a bank activity is added to a course, Cognelo copies the selected/latest version into a course-local `Activity`. The course activity stores `bankActivityId` and `activityVersionId` for provenance, but the course activity is not live-linked to the bank. Course edits affect only the course copy; bank edits create future versions and do not alter existing course copies.
 
