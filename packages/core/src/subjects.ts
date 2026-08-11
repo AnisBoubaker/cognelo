@@ -21,7 +21,7 @@ import { isAdmin, isCourseManager, isTeacher } from "./authorization";
 import { assertActivityTypePluginEnabled } from "./plugins";
 import { generateQuestionAuthoringText } from "./ai-agents";
 
-type GeneratedKnowledgeConcept = { key: string; title: string; description: string };
+type GeneratedKnowledgeConcept = { key: string; title: string; skills: string };
 type GeneratedKnowledgePrerequisite = { sourceKey: string; requiredKey: string };
 type GeneratedKnowledgeGraph = { concepts: GeneratedKnowledgeConcept[]; prerequisites: GeneratedKnowledgePrerequisite[] };
 
@@ -111,7 +111,7 @@ export async function updateSubject(user: CurrentUser, subjectId: string, input:
         data: {
           subjectId,
           title: concept.title,
-          description: concept.description,
+          skills: concept.skills,
           positionX: concept.positionX,
           positionY: concept.positionY
         }
@@ -211,7 +211,7 @@ export async function generateSubjectKnowledgeGraph(user: CurrentUser, subjectId
     maxConcepts: data.maxConcepts,
     mode: data.mode,
     existingGraph: data.mode === "iterate" && data.existingGraph ? {
-      concepts: data.existingGraph.concepts.map((concept) => ({ key: concept.id, title: concept.title, description: concept.description })),
+      concepts: data.existingGraph.concepts.map((concept) => ({ key: concept.id, title: concept.title, skills: concept.skills })),
       prerequisites: data.existingGraph.prerequisites.map((edge) => ({
         sourceKey: edge.sourceConceptId,
         requiredKey: edge.requiredConceptId
@@ -225,7 +225,7 @@ export async function generateSubjectKnowledgeGraph(user: CurrentUser, subjectId
       id: `generated-concept-${index}-${concept.key}`.slice(0, 160),
       subjectId,
       title: concept.title,
-      description: concept.description,
+      skills: concept.skills,
       positionX: position.x,
       positionY: position.y
     };
@@ -291,9 +291,12 @@ async function generateValidSubjectKnowledgeGraph(input: {
       systemPrompt: [
         "You design concise prerequisite knowledge graphs for educators.",
         "Return JSON only, with no Markdown fences or commentary.",
-        `Write concept titles and descriptions in locale '${input.locale}'.`,
+        `Write concept titles and skills in locale '${input.locale}'.`,
+        "For each concept, skills is a newline-delimited string, with exactly one skill per non-empty line.",
+        "A skill is something the learner can perform or an observable learning goal. Write each skill as a concise, assessable action—not as a topic summary, definition, or vague statement such as 'understand'.",
+        "Every concept must include at least one skill.",
         `Use no more than ${input.maxConcepts} concepts; fewer concepts are preferred when sufficient.`,
-        "The required shape is: {\"concepts\":[{\"key\":\"stable-short-key\",\"title\":\"...\",\"description\":\"...\"}],\"prerequisites\":[{\"sourceKey\":\"concept-that-requires\",\"requiredKey\":\"required-concept\"}]}.",
+        "The required shape is: {\"concepts\":[{\"key\":\"stable-short-key\",\"title\":\"...\",\"skills\":\"perform observable skill one\\nperform observable skill two\"}],\"prerequisites\":[{\"sourceKey\":\"concept-that-requires\",\"requiredKey\":\"required-concept\"}]}.",
         "Every prerequisite must point from the concept that requires knowledge to the required concept.",
         "Do not create cycles, self-links, duplicate concepts, or duplicate prerequisites.",
         input.mode === "iterate"
@@ -337,7 +340,7 @@ function parseGeneratedKnowledgeGraph(response: string): GeneratedKnowledgeGraph
       return {
         key: String(concept.key ?? "").trim(),
         title: String(concept.title ?? "").trim(),
-        description: String(concept.description ?? "").trim()
+        skills: String(concept.skills ?? "").split(/\r?\n/).map((skill) => skill.trim()).filter(Boolean).join("\n")
       };
     }),
     prerequisites: value.prerequisites.map((entry) => {
@@ -357,7 +360,8 @@ function validateGeneratedKnowledgeGraph(graph: GeneratedKnowledgeGraph, maxConc
   const keys = new Set<string>();
   for (const concept of graph.concepts) {
     if (!concept.key || !concept.title) issues.push("Every concept needs a key and title");
-    if (concept.title.length > 160 || concept.description.length > 4000) issues.push(`Concept '${concept.key}' is too long`);
+    if (!concept.skills.split(/\r?\n/).some((skill) => skill.trim())) issues.push(`Concept '${concept.key}' needs at least one observable skill`);
+    if (concept.title.length > 160 || concept.skills.length > 4000) issues.push(`Concept '${concept.key}' is too long`);
     if (keys.has(concept.key)) issues.push(`Duplicate concept key '${concept.key}'`);
     keys.add(concept.key);
   }

@@ -244,19 +244,25 @@ describe("shared contract schemas", () => {
       description: "A detailed mathematics curriculum.",
       mode: "iterate",
       existingGraph: {
-        concepts: [{ id: "variables", title: "Variables", description: "", positionX: 0, positionY: 0 }],
+        concepts: [{ id: "variables", title: "Variables", skills: "Declare a variable", positionX: 0, positionY: 0 }],
         prerequisites: []
       }
     }).mode).toBe("iterate");
     expect(SubjectUpdateSchema.parse({
       knowledgeGraph: {
         concepts: [
-          { id: "variables", title: "Variables", description: "Stored values", positionX: 10, positionY: 20 },
-          { id: "loops", title: "Loops", description: "Repeated execution", positionX: 40, positionY: 80 }
+          { id: "variables", title: "Variables", skills: "Declare a variable", positionX: 10, positionY: 20 },
+          { id: "loops", title: "Loops", skills: "Write a counted loop", positionX: 40, positionY: 80 }
         ],
         prerequisites: [{ id: "loops-variables", sourceConceptId: "loops", requiredConceptId: "variables" }]
       }
     }).knowledgeGraph?.concepts).toHaveLength(2);
+    expect(SubjectUpdateSchema.parse({
+      knowledgeGraph: {
+        concepts: [{ id: "variables", title: "Variables", skills: "  Declare a variable  \n\nAssign a value  ", positionX: 0, positionY: 0 }],
+        prerequisites: []
+      }
+    }).knowledgeGraph?.concepts[0]?.skills).toBe("Declare a variable\nAssign a value");
     expect(ActivityBankInputSchema.parse({ subjectId: "subject-1", title: "Bank" })).toMatchObject({
       description: "",
       metadata: {}

@@ -161,7 +161,9 @@ export type SubjectInput = z.infer<typeof SubjectInputSchema>;
 
 export const SubjectKnowledgeConceptInputSchema = z.object({
   title: z.string().trim().min(1).max(160),
-  description: z.string().max(4000).optional().default(""),
+  skills: z.string().max(4000).optional().default("").transform((value) =>
+    value.split(/\r?\n/).map((skill) => skill.trim()).filter(Boolean).join("\n")
+  ),
   positionX: z.number().finite().optional().default(0),
   positionY: z.number().finite().optional().default(0)
 });

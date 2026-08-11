@@ -70,6 +70,8 @@ Subject
       assigned activities and availability windows
 ```
 
+`SubjectKnowledgeConcept.skills` is a normalized newline-delimited skill set. Each non-empty line is one skill: something the learner can perform or an observable learning goal. The former `description` column was renamed with a data-preserving migration.
+
 Bank activities are authored in activity banks. Each bank save creates a new `ActivityVersion` and updates the bank activity's current version.
 
 Activity-to-concept links are a core, cross-plugin contract. All activity editors are host-wrapped with an Activity/Concepts tab set. Bank links are copied into immutable activity-version link rows and then into independent course-activity link rows during assignment; empty selections are valid, but no activity type may opt out of the capability.

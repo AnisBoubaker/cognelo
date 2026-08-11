@@ -21,7 +21,7 @@ import {
   useNodesState
 } from "@xyflow/react";
 import { useNotifications } from "@cognelo/activity-ui";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   api,
   type SubjectKnowledgeConcept,
@@ -40,6 +40,7 @@ type Props = {
   aiGenerationEnabled?: boolean;
   subjectDescription?: string;
   teachingLanguage?: "en" | "fr" | "zh" | "ar";
+  isVisible?: boolean;
   onChange?: (graph: SubjectKnowledgeGraphDraft) => void;
 };
 
@@ -175,6 +176,7 @@ export function SubjectKnowledgeGraph({
   aiGenerationEnabled = false,
   subjectDescription = "",
   teachingLanguage = "en",
+  isVisible = true,
   onChange
 }: Props) {
   const { t } = useI18n();
@@ -186,7 +188,7 @@ export function SubjectKnowledgeGraph({
   const [newTitle, setNewTitle] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
-  const [editDescription, setEditDescription] = useState("");
+  const [editSkills, setEditSkills] = useState("");
   const [aiDirections, setAiDirections] = useState("");
   const [maxConcepts, setMaxConcepts] = useState(12);
   const [generating, setGenerating] = useState(false);
@@ -195,6 +197,22 @@ export function SubjectKnowledgeGraph({
   const [layoutPreset, setLayoutPreset] = useState<LayoutPreset>("hierarchical");
   const [arranging, setArranging] = useState(false);
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance<ConceptNode, Edge> | null>(null);
+  const [inspectorWidth, setInspectorWidth] = useState(360);
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const hasFittedMeasuredLayoutRef = useRef(false);
+
+  const inspectorWidthLimits = useCallback(() => {
+    const workspaceWidth = workspaceRef.current?.getBoundingClientRect().width ?? 960;
+    return { min: 280, max: Math.max(280, workspaceWidth - 360) };
+  }, []);
+
+  const resizeInspectorFromPointer = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const workspace = workspaceRef.current;
+    if (!workspace) return;
+    const { min, max } = inspectorWidthLimits();
+    const nextWidth = workspace.getBoundingClientRect().right - event.clientX;
+    setInspectorWidth(Math.min(max, Math.max(min, nextWidth)));
+  }, [inspectorWidthLimits]);
 
   useEffect(() => {
     setConcepts(initialConcepts);
@@ -202,6 +220,21 @@ export function SubjectKnowledgeGraph({
     setNodes(initialConcepts.map(toNode));
     setEdges(toEdges(initialPrerequisites));
   }, [initialConcepts, initialPrerequisites, setEdges, setNodes]);
+
+  useEffect(() => {
+    if (!isVisible || !flowInstance || !nodes.length || hasFittedMeasuredLayoutRef.current) return;
+    hasFittedMeasuredLayoutRef.current = true;
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        void flowInstance.fitView({ padding: readOnly ? 0.3 : 0.1 });
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [flowInstance, isVisible, nodes.length, readOnly]);
 
   const selectedConcept = concepts.find((concept) => concept.id === selectedId) ?? null;
 
@@ -213,7 +246,7 @@ export function SubjectKnowledgeGraph({
     const nextSelectedId = concept?.id ?? null;
     setSelectedId(nextSelectedId);
     setEditTitle(concept?.title ?? "");
-    setEditDescription(concept?.description ?? "");
+    setEditSkills(concept?.skills ?? "");
     setNodes((current) => highlightConceptNodes(current, prerequisites, nextSelectedId));
     setEdges((current) => highlightEdges(current, nextSelectedId));
   }, [prerequisites, setEdges, setNodes]);
@@ -224,7 +257,7 @@ export function SubjectKnowledgeGraph({
     setNodes(highlightConceptNodes(nextConcepts.map(toNode), nextPrerequisites, selectedId));
     setEdges(highlightEdges(toEdges(nextPrerequisites), selectedId));
     onChange?.({
-      concepts: nextConcepts.map(({ id, title, description, positionX, positionY }) => ({ id, title, description, positionX, positionY })),
+      concepts: nextConcepts.map(({ id, title, skills, positionX, positionY }) => ({ id, title, skills, positionX, positionY })),
       prerequisites: nextPrerequisites.map(({ id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle }) => ({
         id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle
       }))
@@ -240,7 +273,7 @@ export function SubjectKnowledgeGraph({
       id: crypto.randomUUID(),
       subjectId,
       title,
-      description: "",
+      skills: "",
       positionX: 80 + (index % 4) * 220,
       positionY: 80 + Math.floor(index / 4) * 140
     };
@@ -317,8 +350,9 @@ export function SubjectKnowledgeGraph({
   function saveConcept(event: FormEvent) {
     event.preventDefault();
     if (!selectedConcept || !editTitle.trim()) return;
+    const normalizedSkills = editSkills.split(/\r?\n/).map((skill) => skill.trim()).filter(Boolean).join("\n");
     const next = concepts.map((concept) => concept.id === selectedConcept.id
-      ? { ...concept, title: editTitle.trim(), description: editDescription }
+      ? { ...concept, title: editTitle.trim(), skills: normalizedSkills }
       : concept);
     applyGraph(next, prerequisites);
     selectConcept(next.find((concept) => concept.id === selectedConcept.id) ?? null);
@@ -361,7 +395,7 @@ export function SubjectKnowledgeGraph({
         teachingLanguage,
         mode: generationMode,
         existingGraph: generationMode === "iterate" ? {
-          concepts: concepts.map(({ id, title, description, positionX, positionY }) => ({ id, title, description, positionX, positionY })),
+          concepts: concepts.map(({ id, title, skills, positionX, positionY }) => ({ id, title, skills, positionX, positionY })),
           prerequisites: prerequisites.map(({ id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle }) => ({
             id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle
           }))
@@ -540,7 +574,11 @@ export function SubjectKnowledgeGraph({
       </div> : null}
 
       {readOnly && !nodes.length ? <p className="muted">{t("knowledgeGraph.empty")}</p> : (
-      <div className="knowledge-graph-workspace">
+      <div
+        className="knowledge-graph-workspace"
+        ref={workspaceRef}
+        style={{ "--knowledge-inspector-width": `${inspectorWidth}px` } as CSSProperties}
+      >
         <div className="knowledge-graph-canvas">
           <ReactFlow
             nodes={nodes}
@@ -593,6 +631,36 @@ export function SubjectKnowledgeGraph({
           </ReactFlow>
         </div>
 
+        {!readOnly ? (
+          <div
+            className="knowledge-graph-splitter"
+            role="separator"
+            aria-label={t("knowledgeGraph.resizeInspector")}
+            aria-orientation="vertical"
+            aria-valuemin={inspectorWidthLimits().min}
+            aria-valuemax={inspectorWidthLimits().max}
+            aria-valuenow={Math.round(inspectorWidth)}
+            tabIndex={0}
+            onDoubleClick={() => setInspectorWidth(360)}
+            onPointerDown={(event) => {
+              event.currentTarget.setPointerCapture(event.pointerId);
+              resizeInspectorFromPointer(event);
+            }}
+            onPointerMove={(event) => {
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) resizeInspectorFromPointer(event);
+            }}
+            onKeyDown={(event) => {
+              const { min, max } = inspectorWidthLimits();
+              if (event.key === "ArrowLeft") setInspectorWidth((width) => Math.min(max, width + 24));
+              else if (event.key === "ArrowRight") setInspectorWidth((width) => Math.max(min, width - 24));
+              else if (event.key === "Home") setInspectorWidth(min);
+              else if (event.key === "End") setInspectorWidth(max);
+              else return;
+              event.preventDefault();
+            }}
+          />
+        ) : null}
+
         {!readOnly ? <aside className="knowledge-graph-inspector">
           {selectedConcept ? (
             <form className="stack" onSubmit={saveConcept}>
@@ -605,8 +673,9 @@ export function SubjectKnowledgeGraph({
                 <input id="concept-title" value={editTitle} onChange={(event) => setEditTitle(event.target.value)} />
               </div>
               <div className="field">
-                <label htmlFor="concept-description">{t("knowledgeGraph.conceptDescription")}</label>
-                <textarea id="concept-description" rows={5} value={editDescription} onChange={(event) => setEditDescription(event.target.value)} />
+                <label htmlFor="concept-skills">{t("knowledgeGraph.conceptSkills")}</label>
+                <textarea id="concept-skills" rows={7} value={editSkills} onChange={(event) => setEditSkills(event.target.value)} />
+                <span className="muted">{t("knowledgeGraph.conceptSkillsHelp")}</span>
               </div>
               <button className="button" disabled={!editTitle.trim()} type="submit">{t("knowledgeGraph.applyConcept")}</button>
               <button className="button danger" onClick={deleteConcept} type="button">{t("knowledgeGraph.deleteConcept")}</button>
