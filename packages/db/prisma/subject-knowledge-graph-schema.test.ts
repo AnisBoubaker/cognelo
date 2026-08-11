@@ -10,6 +10,10 @@ const edgeHandleMigration = readFileSync(
   new URL("./migrations/202608100002_subject_knowledge_edge_handles/migration.sql", import.meta.url),
   "utf8"
 );
+const skillsMigration = readFileSync(
+  new URL("./migrations/202608110002_rename_concept_description_to_skills/migration.sql", import.meta.url),
+  "utf8"
+);
 
 describe("subject knowledge graph schema", () => {
   it("stores subject-scoped concepts and directed prerequisites", () => {
@@ -32,6 +36,11 @@ describe("subject knowledge graph schema", () => {
   it("persists manually arranged edge endpoints", () => {
     expect(edgeHandleMigration).toContain('ADD COLUMN "sourceHandle" TEXT');
     expect(edgeHandleMigration).toContain('ADD COLUMN "targetHandle" TEXT');
+  });
+
+  it("stores newline-delimited concept skills under the canonical field name", () => {
+    expect(schema).toContain("skills                String");
+    expect(skillsMigration).toContain('RENAME COLUMN "description" TO "skills"');
   });
 
 });

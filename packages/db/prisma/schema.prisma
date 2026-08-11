@@ -268,7 +268,7 @@ model SubjectKnowledgeConcept {
   id                    String                         @id @default(cuid())
   subjectId             String
   title                 String
-  description           String                         @default("")
+  skills                String                         @default("")
   positionX             Float                          @default(0)
   positionY             Float                          @default(0)
   createdAt             DateTime                       @default(now())

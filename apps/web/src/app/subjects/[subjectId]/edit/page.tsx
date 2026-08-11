@@ -29,6 +29,7 @@ export default function EditSubjectPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [aiGenerationEnabled, setAiGenerationEnabled] = useState(false);
+  const [activeTab, setActiveTab] = useState<"information" | "knowledge-graph">("information");
 
   useEffect(() => {
     api
@@ -77,8 +78,8 @@ export default function EditSubjectPage() {
     setError("");
     try {
       const knowledgeGraph: SubjectKnowledgeGraphDraft = {
-        concepts: graphConcepts.map(({ id, title: conceptTitle, description: conceptDescription, positionX, positionY }) => ({
-          id, title: conceptTitle, description: conceptDescription, positionX, positionY
+        concepts: graphConcepts.map(({ id, title: conceptTitle, skills, positionX, positionY }) => ({
+          id, title: conceptTitle, skills, positionX, positionY
         })),
         prerequisites: graphPrerequisites.map(({ id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle }) => ({
           id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle
@@ -126,7 +127,16 @@ export default function EditSubjectPage() {
 
         {subject ? (
           <>
-            <section className="section stack subject-details-section">
+            <div className="tab-strip" role="tablist" aria-label={t("editSubject.tabsLabel")}>
+              <button type="button" role="tab" aria-selected={activeTab === "information"} aria-controls="subject-information-panel" onClick={() => setActiveTab("information")}>
+                {t("editSubject.informationTab")}
+              </button>
+              <button type="button" role="tab" aria-selected={activeTab === "knowledge-graph"} aria-controls="subject-knowledge-graph-panel" onClick={() => setActiveTab("knowledge-graph")}>
+                {t("editSubject.knowledgeGraphTab")}
+              </button>
+            </div>
+
+            <section className="section stack subject-details-section subject-editor-tab-panel" id="subject-information-panel" role="tabpanel" hidden={activeTab !== "information"}>
               <div className="section-heading">
                 <div>
                   <p className="eyebrow">{t("editSubject.detailsEyebrow")}</p>
@@ -159,20 +169,23 @@ export default function EditSubjectPage() {
                 </div>
               </form>
             </section>
-            <SubjectKnowledgeGraph
-              aiGenerationEnabled={aiGenerationEnabled}
-              subjectId={subject.id}
-              subjectDescription={description}
-              teachingLanguage={teachingLanguage}
-              initialConcepts={graphConcepts}
-              initialPrerequisites={graphPrerequisites}
-              savedConcepts={savedSnapshot.concepts}
-              savedPrerequisites={savedSnapshot.prerequisites}
-              onChange={(graph) => {
-                setGraphConcepts(graph.concepts.map((concept) => ({ ...concept, subjectId })));
-                setGraphPrerequisites(graph.prerequisites.map((prerequisite) => ({ ...prerequisite, subjectId })));
-              }}
-            />
+            <div className="subject-editor-tab-panel" id="subject-knowledge-graph-panel" role="tabpanel" hidden={activeTab !== "knowledge-graph"}>
+              <SubjectKnowledgeGraph
+                aiGenerationEnabled={aiGenerationEnabled}
+                subjectId={subject.id}
+                subjectDescription={description}
+                teachingLanguage={teachingLanguage}
+                isVisible={activeTab === "knowledge-graph"}
+                initialConcepts={graphConcepts}
+                initialPrerequisites={graphPrerequisites}
+                savedConcepts={savedSnapshot.concepts}
+                savedPrerequisites={savedSnapshot.prerequisites}
+                onChange={(graph) => {
+                  setGraphConcepts(graph.concepts.map((concept) => ({ ...concept, subjectId })));
+                  setGraphPrerequisites(graph.prerequisites.map((prerequisite) => ({ ...prerequisite, subjectId })));
+                }}
+              />
+            </div>
             <EditActionBar
               isDirty={hasUnsavedChanges}
               isSaving={saving}
@@ -182,7 +195,7 @@ export default function EditSubjectPage() {
               savingLabel={t("common.saving")}
               cancelLabel={t("common.cancel")}
               cancelHref={`/subjects/${subject.id}`}
-              form="subject-metadata-form"
+              onSave={() => void saveSubjectChanges()}
             />
           </>
         ) : null}

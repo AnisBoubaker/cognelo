@@ -455,6 +455,10 @@ select:focus {
   min-height: 180px;
 }
 
+.subject-editor-tab-panel[hidden] {
+  display: none !important;
+}
+
 .subject-language-field {
   max-width: 680px;
   padding: 16px;
@@ -542,7 +546,7 @@ select:focus {
 
 .knowledge-graph-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-columns: minmax(320px, 1fr) 10px minmax(280px, var(--knowledge-inspector-width, 360px));
   min-height: 500px;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -698,8 +702,35 @@ select:focus {
 
 .knowledge-graph-inspector {
   padding: 1rem;
-  border-left: 1px solid var(--line);
   background: var(--surface);
+  min-width: 0;
+}
+
+.knowledge-graph-splitter {
+  position: relative;
+  z-index: 5;
+  background: color-mix(in srgb, var(--line) 72%, transparent);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.knowledge-graph-splitter::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  border-radius: 999px;
+  background: transparent;
+  transition: background 120ms ease;
+}
+
+.knowledge-graph-splitter:hover::after,
+.knowledge-graph-splitter:focus-visible::after {
+  background: var(--brand-blue);
+}
+
+.knowledge-graph-splitter:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand-blue) 45%, transparent);
+  outline-offset: -2px;
 }
 
 .knowledge-graph-empty {
@@ -732,6 +763,10 @@ select:focus {
 
   .knowledge-graph-workspace {
     grid-template-columns: 1fr;
+  }
+
+  .knowledge-graph-splitter {
+    display: none;
   }
 
   .knowledge-graph-layout-controls {

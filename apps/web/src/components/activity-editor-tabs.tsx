@@ -24,7 +24,7 @@ export function ActivityEditorTabs({ children, concepts, selectedConceptIds, onS
   const visibleConcepts = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
     return normalizedQuery
-      ? concepts.filter((concept) => `${concept.title} ${concept.description}`.toLocaleLowerCase().includes(normalizedQuery))
+      ? concepts.filter((concept) => `${concept.title} ${concept.skills}`.toLocaleLowerCase().includes(normalizedQuery))
       : concepts;
   }, [concepts, query]);
 
@@ -82,7 +82,14 @@ export function ActivityEditorTabs({ children, concepts, selectedConceptIds, onS
                         checked={draftIds.includes(concept.id)}
                         onChange={(event) => setDraftIds((current) => event.target.checked ? [...current, concept.id] : current.filter((id) => id !== concept.id))}
                       />
-                      <span><strong>{concept.title}</strong>{concept.description ? <span className="muted" style={{ display: "block" }}>{concept.description}</span> : null}</span>
+                      <span>
+                        <strong>{concept.title}</strong>
+                        {concept.skills ? (
+                          <ul className="muted" style={{ margin: "6px 0 0", paddingInlineStart: 20 }}>
+                            {concept.skills.split(/\r?\n/).filter((skill) => skill.trim()).map((skill, index) => <li key={`${concept.id}-skill-${index}`}>{skill.trim()}</li>)}
+                          </ul>
+                        ) : null}
+                      </span>
                     </label>
                   ))}
                   {!visibleConcepts.length ? <p className="muted">{t("activityConcepts.noMatches")}</p> : null}
