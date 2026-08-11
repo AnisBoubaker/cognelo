@@ -1,6 +1,8 @@
 # Cognelo
 
-Cognelo is a modular ITS foundation for programming education. This root README covers the platform itself: core architecture, shared services, setup, and conventions for adding plugins.
+Cognelo is a modular intelligent tutoring system (ITS) for programming education. This root README covers the platform itself: core architecture, shared services, setup, and conventions for adding plugins.
+
+For a public overview of Cognelo, its educational approach, and the project, visit the [official Cognelo website](https://cognelo.org/).
 
 Plugin-specific behavior, routes, persistence, and UX notes belong in each plugin package under `packages/plugin-activities/*` for activities and `packages/plugin-content-types/*` for non-activity course content.
 
