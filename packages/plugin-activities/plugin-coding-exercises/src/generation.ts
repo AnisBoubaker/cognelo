@@ -190,7 +190,7 @@ export async function generateCodingExerciseSolution(input: {
 
     lastPayload = parsed.value;
     lastIssues = validation.issues;
-    userPrompt = buildCorrectionPrompt("JSON payload", JSON.stringify(parsed.value, null, 2), validation.issues);
+    userPrompt = buildTestCorrectionPrompt(JSON.stringify(parsed.value, null, 2), validation.issues);
   }
 
   throw new AppError(422, "CODING_EXERCISE_SOLUTION_GENERATION_INVALID", "The AI agent could not generate a valid coding exercise solution.", {
@@ -247,6 +247,11 @@ export async function generateCodingExerciseTests(input: {
       templateSource: input.templateSource,
       templateVisibleLineNumbers: input.templateVisibleLineNumbers
     });
+    if (validation.fatalError) {
+      throw new AppError(validation.fatalError.status, validation.fatalError.code, validation.fatalError.message, {
+        issues: validation.issues
+      });
+    }
 
     if (!validation.issues.length && validation.tests && validation.validationSummary) {
       const knowledgeConceptSelections = await suggestActivityKnowledgeSelections({
@@ -381,6 +386,8 @@ function buildTestsGenerationSystemPrompt(input: { language: string; locale: Gen
     "- IDs must be stable, lowercase, and unique.",
     "- The reference solution must pass every generated sample and hidden test.",
     "- Compute every expected output from the reference solution logic. Do not guess.",
+    "- Choose only inputs for which the provided reference solution terminates successfully with exit code 0. Do not test invalid-input branches that intentionally return a non-zero exit code.",
+    "- For floating-point comparisons, do not use mathematically exact threshold values unless you have accounted for the language's binary floating-point behavior. Prefer values safely inside or outside the threshold so the observed branch is unambiguous.",
     `- If the template contains ${codingExerciseTestInsertionToken}, every sample and hidden test must include non-empty testCode, and testCode must run the reference/student code and print the expected output.`,
     `- If the template does not contain ${codingExerciseTestInsertionToken}, every testCode field must be empty and tests must use stdin plus expected output only.`,
     "- For full-program tests, put input in input/stdin and expected printed output in output/expectedOutput.",
@@ -547,6 +554,10 @@ async function validateGeneratedTests(input: {
     })),
     privateConfig
   });
+  const fatalError = getFatalReferenceValidationError(validationSummary);
+  if (fatalError) {
+    return { issues: collectValidationIssues(validationSummary), fatalError };
+  }
 
   if (!validationSummary.accepted) {
     const repairedTests = repairTestExpectedOutputsFromValidation(tests, validationSummary);
@@ -643,6 +654,30 @@ function collectValidationIssues(validationSummary: Record<string, unknown>) {
     }
   }
   return issues;
+}
+
+function getFatalReferenceValidationError(validationSummary: Record<string, unknown>) {
+  const results = [
+    ...getValidationTests(validationSummary.sampleTests),
+    ...getValidationTests(validationSummary.hiddenTests)
+  ];
+  const failed = results.filter((test) => test.passed === false);
+  if (!failed.length) return null;
+  if (failed.every((test) => String(test.statusLabel ?? "").toLowerCase().includes("compilation error"))) {
+    return {
+      status: 422,
+      code: "REFERENCE_SOLUTION_COMPILATION_FAILED",
+      message: "Judge0 could not compile the reviewed reference solution. Test generation cannot correct a compiler or sandbox failure; verify the reference solution and Judge0 runtime."
+    };
+  }
+  if (failed.every((test) => String(test.statusLabel ?? "").toLowerCase().includes("internal error"))) {
+    return {
+      status: 503,
+      code: "JUDGE0_EXECUTION_UNAVAILABLE",
+      message: "Judge0 could not execute the reference solution because its sandbox returned an internal error. Check the Judge0 server and worker logs."
+    };
+  }
+  return null;
 }
 
 function repairTestExpectedOutputsFromValidation(
@@ -772,6 +807,22 @@ function buildCorrectionPrompt(label: string, previous: string, issues: string[]
     ...issues.map((issue) => `- ${issue}`),
     "",
     `Previous ${label}:`,
+    previous
+  ].join("\n");
+}
+
+function buildTestCorrectionPrompt(previous: string, issues: string[]) {
+  return [
+    "The previous JSON payload failed execution validation. Return the full corrected JSON payload only.",
+    "Replace or remove every failing test; do not merely repeat its mathematically expected result.",
+    "Do not include inputs for which the reference solution exits with a non-zero status.",
+    "Avoid floating-point values exactly on a comparison threshold when binary representation can change the branch.",
+    "Expected output must match the reference solution's actual stdout byte for byte.",
+    "",
+    "Validation issues:",
+    ...issues.map((issue) => `- ${issue}`),
+    "",
+    "Previous JSON payload:",
     previous
   ].join("\n");
 }

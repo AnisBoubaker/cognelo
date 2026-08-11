@@ -111,6 +111,8 @@ describe("coding exercise AI generation", () => {
         templateVisibleLineNumbers: []
       })
     ).resolves.toMatchObject({ attempts: 1, hiddenTests: [{ id: "hidden-1" }] });
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("exit code 0");
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("floating-point comparisons");
 
     mocks.validateReferenceSolutionAgainstHiddenTests.mockResolvedValue({ accepted: false, sampleTests: { tests: [] }, hiddenTests: { tests: [] } });
     mocks.generateQuestionAuthoringText.mockResolvedValue(JSON.stringify({ sampleTests: [], hiddenTests: [] }));
@@ -127,5 +129,30 @@ describe("coding exercise AI generation", () => {
         templateVisibleLineNumbers: []
       })
     ).rejects.toMatchObject({ status: 422, code: "CODING_EXERCISE_TEST_GENERATION_INVALID" });
+  });
+
+  it("stops retrying when Judge0 cannot compile the reviewed reference solution", async () => {
+    mocks.generateQuestionAuthoringText.mockResolvedValue(JSON.stringify({
+      sampleTests: [{ id: "sample-1", title: "Sample", input: "1", output: "1" }],
+      hiddenTests: [{ id: "hidden-1", name: "Hidden", stdin: "1", expectedOutput: "1" }]
+    }));
+    mocks.validateReferenceSolutionAgainstHiddenTests.mockResolvedValue({
+      accepted: false,
+      sampleTests: { tests: [{ id: "sample-1", name: "Sample", passed: false, statusLabel: "Compilation Error" }] },
+      hiddenTests: { tests: [{ id: "hidden-1", name: "Hidden", passed: false, statusLabel: "Compilation Error" }] }
+    });
+
+    await expect(generateCodingExerciseTests({
+      user,
+      description: "Compile a C program",
+      prompt: "Read and print one number.",
+      language: "c",
+      locale: "en",
+      subject,
+      referenceSolution: "int main(void) { return 0; }",
+      templateSource: "{{ STUDENT_CODE }}",
+      templateVisibleLineNumbers: []
+    })).rejects.toMatchObject({ status: 422, code: "REFERENCE_SOLUTION_COMPILATION_FAILED" });
+    expect(mocks.generateQuestionAuthoringText).toHaveBeenCalledTimes(1);
   });
 });

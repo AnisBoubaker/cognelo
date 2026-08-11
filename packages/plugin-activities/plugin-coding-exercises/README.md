@@ -100,6 +100,8 @@ AI-generated templates use one of two portable execution shapes:
 
 AI-generated hidden tests are capped at 15.
 
+Generated full-program tests must use inputs for which the reviewed reference solution exits successfully. The generator is explicitly told not to exercise invalid-input branches that return a non-zero status and to avoid ambiguous floating-point threshold values; execution-validation retries repeat those constraints when correcting a rejected suite.
+
 ## Judge0 Integration
 
 The browser should never call Judge0 directly.
@@ -136,7 +138,7 @@ Behavior:
 - Judge0 source is assembled server-side from the private template plus student code, then per-test harness code is injected at `{{ TEST_CODE }}` when present
 - enabled hidden tests are validated against the teacher reference solution before they are saved
 
-For development, Judge0 runs locally in Docker on `http://localhost:2358`.
+For development, Judge0 runs locally in Docker on `http://localhost:2358`. Compose defaults to the pinned Apple Silicon image `ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2`; override `JUDGE0_IMAGE` when another architecture or approved build is required. The image exposes Cognelo's C, C++, Go, Java, JavaScript, Python, Rust, and TypeScript runtimes and has been validated with real submissions.
 
 For production, `JUDGE0_BASE_URL` should point to the dedicated physical Judge0 host, ideally on a private network segment with an auth token and host-level access controls.
 
