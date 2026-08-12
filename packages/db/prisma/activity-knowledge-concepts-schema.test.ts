@@ -10,6 +10,10 @@ const skillSelectionMigration = readFileSync(
   new URL("./migrations/202608110003_activity_concept_skill_selections/migration.sql", import.meta.url),
   "utf8"
 );
+const stableSkillsMigration = readFileSync(
+  new URL("./migrations/202608120001_stable_subject_skills/migration.sql", import.meta.url),
+  "utf8"
+);
 
 describe("activity knowledge concept links", () => {
   it("models current bank, immutable version, and course-copy links", () => {
@@ -30,5 +34,10 @@ describe("activity knowledge concept links", () => {
     expect(schema.match(/selectedSkills/g)).toHaveLength(3);
     expect(skillSelectionMigration.match(/ADD COLUMN "selectsAllSkills"/g)).toHaveLength(3);
     expect(skillSelectionMigration.match(/ADD COLUMN "selectedSkills"/g)).toHaveLength(3);
+  });
+
+  it("stores stable skill identifiers beside title snapshots", () => {
+    expect(schema.match(/selectedSkillIds/g)).toHaveLength(3);
+    expect(stableSkillsMigration.match(/ADD COLUMN "selectedSkillIds"/g)).toHaveLength(3);
   });
 });

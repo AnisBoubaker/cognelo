@@ -8,7 +8,7 @@ import { activityKnowledgeGenerationPrompt, suggestActivityKnowledgeSelections }
 const user = { id: "teacher-1" } as Parameters<typeof suggestActivityKnowledgeSelections>[0]["user"];
 const catalog = {
   mode: "suggest" as const,
-  concepts: [{ id: "loops", title: "Loops", skills: ["Trace a loop", "Write a counted loop"] }]
+  concepts: [{ id: "loops", title: "Loops", skills: ["Trace a loop", "Write a counted loop"], skillIds: ["trace-loop", "write-loop"] }]
 };
 
 describe("activity knowledge generation", () => {
@@ -18,10 +18,10 @@ describe("activity knowledge generation", () => {
     const prompt = activityKnowledgeGenerationPrompt({
       mode: "selected",
       concepts: [
-        { id: "loops", title: "Loops", skills: ["Trace a loop", "Write a counted loop"] },
-        { id: "arrays", title: "Arrays", skills: ["Index an array"] }
+        { id: "loops", title: "Loops", skills: ["Trace a loop", "Write a counted loop"], skillIds: ["trace-loop", "write-loop"] },
+        { id: "arrays", title: "Arrays", skills: ["Index an array"], skillIds: ["index-array"] }
       ],
-      selectedConcepts: [{ id: "loops", title: "Loops", skills: ["Trace a loop"] }]
+      selectedConcepts: [{ id: "loops", title: "Loops", skills: ["Trace a loop"], skillIds: ["trace-loop"] }]
     });
     expect(prompt).toContain("defines the intended subject boundary");
     expect(prompt).toContain("- Index an array");
@@ -34,7 +34,7 @@ describe("activity knowledge generation", () => {
     for (const mode of ["suggest", "ignore"] as const) {
       const prompt = activityKnowledgeGenerationPrompt({
         mode,
-        concepts: [{ id: "loops", title: "Loops", skills: ["Trace a loop"] }]
+        concepts: [{ id: "loops", title: "Loops", skills: ["Trace a loop"], skillIds: ["trace-loop"] }]
       });
       expect(prompt).toContain("defines the intended subject boundary");
       expect(prompt).toContain("- Trace a loop");
@@ -54,7 +54,8 @@ describe("activity knowledge generation", () => {
     await expect(suggestActivityKnowledgeSelections({ user, knowledge: catalog, generatedActivity: "A loop exercise" })).resolves.toEqual([{
       conceptId: "loops",
       selectsAllSkills: false,
-      selectedSkills: ["Trace a loop", "Write a counted loop"]
+      selectedSkills: ["Trace a loop", "Write a counted loop"],
+      selectedSkillIds: ["trace-loop", "write-loop"]
     }]);
   });
 

@@ -159,18 +159,33 @@ export const SubjectInputSchema = z.object({
 });
 export type SubjectInput = z.infer<typeof SubjectInputSchema>;
 
+export const SubjectKnowledgeSkillInputSchema = z.object({
+  id: z.string().min(1).max(160),
+  title: z.string().trim().min(1).max(1000),
+  position: z.number().int().min(0).max(9999),
+  active: z.boolean().optional().default(true)
+});
+export type SubjectKnowledgeSkillInput = z.infer<typeof SubjectKnowledgeSkillInputSchema>;
+
 export const SubjectKnowledgeConceptInputSchema = z.object({
   title: z.string().trim().min(1).max(160),
   skills: z.string().max(4000).optional().default("").transform((value) =>
     value.split(/\r?\n/).map((skill) => skill.trim()).filter(Boolean).join("\n")
   ),
   positionX: z.number().finite().optional().default(0),
-  positionY: z.number().finite().optional().default(0)
+  positionY: z.number().finite().optional().default(0),
+  skillRecords: z.array(SubjectKnowledgeSkillInputSchema).max(200).optional()
 });
 export type SubjectKnowledgeConceptInput = z.infer<typeof SubjectKnowledgeConceptInputSchema>;
 
 export const SubjectKnowledgeConceptUpdateSchema = SubjectKnowledgeConceptInputSchema.partial();
 export type SubjectKnowledgeConceptUpdate = z.infer<typeof SubjectKnowledgeConceptUpdateSchema>;
+
+export const SubjectKnowledgeSkillDeletionSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("remove") }),
+  z.object({ mode: z.literal("replace"), replacementSkillId: RecordIdSchema })
+]);
+export type SubjectKnowledgeSkillDeletion = z.infer<typeof SubjectKnowledgeSkillDeletionSchema>;
 
 export const SubjectKnowledgeHandleSchema = z.enum(["top", "right", "bottom", "left"]);
 
@@ -232,8 +247,11 @@ export const ActivityKnowledgeConceptSelectionSchema = z.object({
   selectsAllSkills: z.boolean(),
   selectedSkills: z.array(z.string().trim().min(1).max(1000)).max(200).refine((skills) => new Set(skills).size === skills.length, {
     message: "Selected skills must be unique."
-  })
-}).refine((selection) => selection.selectsAllSkills || selection.selectedSkills.length > 0, {
+  }),
+  selectedSkillIds: z.array(RecordIdSchema).max(200).refine((ids) => new Set(ids).size === ids.length, {
+    message: "Selected skill identifiers must be unique."
+  }).optional()
+}).refine((selection) => selection.selectsAllSkills || (selection.selectedSkillIds?.length ?? 0) > 0 || selection.selectedSkills.length > 0, {
   message: "A concept selection must select the concept or at least one skill."
 });
 export type ActivityKnowledgeConceptSelection = z.infer<typeof ActivityKnowledgeConceptSelectionSchema>;

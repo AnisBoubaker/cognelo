@@ -826,6 +826,83 @@ select:focus {
   min-width: 0;
 }
 
+.knowledge-skill-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.knowledge-skill-add {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.knowledge-skill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.knowledge-skill-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 7px;
+  padding: 7px 9px 7px 11px;
+  border: 1px solid color-mix(in srgb, var(--brand-blue), white 62%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-blue), white 91%);
+  font-size: 0.9rem;
+}
+
+.knowledge-skill-chip > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.knowledge-skill-actions {
+  display: inline-flex;
+  gap: 3px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.knowledge-skill-chip:hover .knowledge-skill-actions,
+.knowledge-skill-chip:focus-within .knowledge-skill-actions {
+  opacity: 1;
+}
+
+.knowledge-skill-actions button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--brand-ink);
+  font-size: 0.85rem;
+}
+
+.knowledge-skill-actions button:last-child {
+  color: var(--danger);
+}
+
+.knowledge-delete-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.knowledge-delete-option input {
+  width: auto;
+  margin-top: 3px;
+}
+
 .knowledge-graph-splitter {
   position: relative;
   z-index: 5;

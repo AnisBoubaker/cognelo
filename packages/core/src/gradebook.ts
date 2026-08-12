@@ -153,7 +153,22 @@ export async function startActivityAttempt(user: CurrentUser, input: StartActivi
         pluginKey: input.pluginKey,
         pluginVersion: input.pluginVersion,
         pluginAttemptRef: input.pluginAttemptRef ?? null,
-        metadata: (input.metadata ?? {}) as JsonInput
+        metadata: {
+          ...(asJsonObject(input.metadata) ?? {}),
+          knowledgeSkillSnapshot: (context.groupActivity.activity.knowledgeConcepts ?? []).flatMap((link) => {
+            const selectedIds = new Set(stringArray(link.selectedSkillIds));
+            const selectedTitles = new Set(stringArray(link.selectedSkills));
+            const skills = link.selectsAllSkills
+              ? link.concept.skillRecords
+              : link.concept.skillRecords.filter((skill) => selectedIds.has(skill.id) || selectedTitles.has(skill.title));
+            return skills.map((skill) => ({
+              conceptId: link.conceptId,
+              conceptTitle: link.concept.title,
+              skillId: skill.id,
+              skillTitle: skill.title
+            }));
+          })
+        } as JsonInput
       }
     });
   });
@@ -1135,7 +1150,21 @@ async function resolveAssignedActivityAttemptContext(user: CurrentUser, input: S
       activity: {
         select: {
           id: true,
-          activityVersionId: true
+          activityVersionId: true,
+          knowledgeConcepts: {
+            select: {
+              conceptId: true,
+              selectsAllSkills: true,
+              selectedSkillIds: true,
+              selectedSkills: true,
+              concept: {
+                select: {
+                  title: true,
+                  skillRecords: { where: { active: true }, orderBy: { position: "asc" }, select: { id: true, title: true } }
+                }
+              }
+            }
+          }
         }
       },
       gradebookItem: true
@@ -1755,6 +1784,10 @@ function clamp(value: number, min: number, max: number) {
 
 function asJsonObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function stringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 function asNumber(value: unknown) {
