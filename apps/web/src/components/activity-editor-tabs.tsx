@@ -77,13 +77,15 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
   }, [orderedConcepts, query]);
   const activeConcept = concepts.find((concept) => concept.id === activeConceptId) ?? visibleConcepts[0] ?? null;
   const generationRequest = useMemo<ActivityKnowledgeGenerationRequest>(() => {
-    if (generationMode === "ignore") return { mode: "ignore" };
+    const catalog = concepts.map((concept) => ({ id: concept.id, title: concept.title, skills: conceptSkills(concept) }));
+    if (generationMode === "ignore") return { mode: "ignore", concepts: catalog };
     if (generationMode === "suggest") {
-      return { mode: "suggest", concepts: concepts.map((concept) => ({ id: concept.id, title: concept.title, skills: conceptSkills(concept) })) };
+      return { mode: "suggest", concepts: catalog };
     }
     return {
       mode: "selected",
-      concepts: draftSelections.flatMap((selection) => {
+      concepts: catalog,
+      selectedConcepts: draftSelections.flatMap((selection) => {
         const concept = concepts.find((candidate) => candidate.id === selection.conceptId);
         return concept ? [{ id: concept.id, title: concept.title, skills: selection.selectsAllSkills ? conceptSkills(concept) : selection.selectedSkills }] : [];
       })

@@ -91,7 +91,7 @@ GET    /api/courses/:courseId/groups/:groupId/activities/assigned/:activityId/pa
 
 These are also available through group-scoped assigned activity dispatch for student work. They are mounted through the platform’s generic plugin dispatchers, not through Parsons-specific files in `apps/api`.
 
-The AI generator's `Use selected skills` mode constrains the generated problem. `Suggest skills` ignores the old selection and applies exact subject-catalog matches to the unsaved Concepts-tab draft after generation. `Ignore skills` neither reads nor changes the draft.
+Every knowledge mode provides the complete subject catalog to the generation model as a curriculum boundary. `Use selected skills` additionally constrains the generated problem with the current draft selection. `Suggest skills` ignores the old selection and applies exact subject-catalog matches to the unsaved Concepts-tab draft after generation. `Ignore skills` neither reads nor changes the draft and performs no suggestion pass.
 
 The gradebook attempts route is teacher-only. It returns a participant's completed Parsons submissions by default and can include in-progress/abandoned attempts plus event history with `includeAttempts=true`; the course gradebook detailed-results page uses it for the Parsons "See answer" overlay.
 

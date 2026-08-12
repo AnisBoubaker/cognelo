@@ -9,26 +9,42 @@ const knowledgeConceptSchema = z.object({
   skills: z.array(z.string().min(1).max(1000)).max(100)
 });
 
+const knowledgeCatalogSchema = z.array(knowledgeConceptSchema).max(500).default([]);
+
 export const activityGenerationKnowledgeSchema = z.discriminatedUnion("mode", [
-  z.object({ mode: z.literal("selected"), concepts: z.array(knowledgeConceptSchema).max(500) }),
-  z.object({ mode: z.literal("suggest"), concepts: z.array(knowledgeConceptSchema).max(500) }),
-  z.object({ mode: z.literal("ignore") })
+  z.object({ mode: z.literal("selected"), concepts: knowledgeCatalogSchema, selectedConcepts: knowledgeCatalogSchema }),
+  z.object({ mode: z.literal("suggest"), concepts: knowledgeCatalogSchema }),
+  z.object({ mode: z.literal("ignore"), concepts: knowledgeCatalogSchema })
 ]);
 
 export type ActivityGenerationKnowledge = z.infer<typeof activityGenerationKnowledgeSchema>;
 
-export function selectedSkillsGenerationPrompt(knowledge: ActivityGenerationKnowledge) {
-  if (knowledge.mode !== "selected") return "";
-  if (!knowledge.concepts.length) {
-    return "No knowledge skills are currently selected. Do not infer additional skills as generation constraints.";
-  }
-  return [
-    "The generated activity must assess or practice these selected learning skills:",
-    ...knowledge.concepts.flatMap((concept) => [
+export function activityKnowledgeGenerationPrompt(knowledge: ActivityGenerationKnowledge) {
+  const boundary = knowledge.concepts.length
+    ? [
+        "The following knowledge catalog defines the intended subject boundary.",
+        "Keep the generated activity within this catalog unless the teacher explicitly requests otherwise.",
+        "Do not treat every catalog skill as a required target for this activity.",
+        ...knowledge.concepts.flatMap((concept) => [
+          `Concept: ${concept.title}`,
+          ...concept.skills.map((skill) => `- ${skill}`)
+        ])
+      ]
+    : ["No knowledge catalog is available. Use the subject title, description, and teacher instructions as the boundary."];
+
+  if (knowledge.mode !== "selected") return boundary.join("\n");
+
+  const selected = knowledge.selectedConcepts.length
+    ? [
+        "The generated activity must specifically assess or practice these selected learning skills:",
+        ...knowledge.selectedConcepts.flatMap((concept) => [
       `Concept: ${concept.title}`,
       ...concept.skills.map((skill) => `- ${skill}`)
-    ])
-  ].join("\n");
+        ])
+      ]
+    : ["No knowledge skills are currently selected. Do not infer additional skills as specific generation targets."];
+
+  return [...boundary, "", ...selected].join("\n");
 }
 
 const suggestionSchema = z.object({

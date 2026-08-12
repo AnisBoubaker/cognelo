@@ -121,8 +121,8 @@ export type CourseContentResource = {
 };
 
 export type ActivityKnowledgeGenerationRequest =
-  | { mode: "selected" | "suggest"; concepts: Array<{ id: string; title: string; skills: string[] }> }
-  | { mode: "ignore" };
+  | { mode: "selected"; concepts: Array<{ id: string; title: string; skills: string[] }>; selectedConcepts: Array<{ id: string; title: string; skills: string[] }> }
+  | { mode: "suggest" | "ignore"; concepts: Array<{ id: string; title: string; skills: string[] }> };
 export type GeneratedKnowledgeSelection = { conceptId: string; selectsAllSkills: boolean; selectedSkills: string[] };
 
 export type CodingExercisePromptGenerationInput = {

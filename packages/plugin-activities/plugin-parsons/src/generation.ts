@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { activityGenerationKnowledgeSchema, AppError, generateQuestionAuthoringText, selectedSkillsGenerationPrompt, suggestActivityKnowledgeSelections, type ActivityGenerationKnowledge } from "@cognelo/core";
+import { activityGenerationKnowledgeSchema, activityKnowledgeGenerationPrompt, AppError, generateQuestionAuthoringText, suggestActivityKnowledgeSelections, type ActivityGenerationKnowledge } from "@cognelo/core";
 
 type SubjectContext = {
   title: string;
@@ -77,7 +77,7 @@ export async function generateParsonsProblem(input: {
     if (!validated.issues.length && validated.payload) {
       const knowledgeConceptSelections = await suggestActivityKnowledgeSelections({
         user: input.user,
-        knowledge: input.knowledge ?? { mode: "ignore" },
+        knowledge: input.knowledge ?? { mode: "ignore", concepts: [] },
         generatedActivity: `${validated.payload.prompt}\n\n${validated.payload.solution}`
       });
       return {
@@ -148,7 +148,7 @@ function buildSystemPrompt(input: { language: string; locale: GenerationLocale; 
     `Title: ${input.subject.title}`,
     `Description: ${input.subject.description || "No subject description provided."}`,
     "",
-    selectedSkillsGenerationPrompt(input.knowledge ?? { mode: "ignore" })
+    activityKnowledgeGenerationPrompt(input.knowledge ?? { mode: "ignore", concepts: [] })
   ].join("\n");
 }
 
