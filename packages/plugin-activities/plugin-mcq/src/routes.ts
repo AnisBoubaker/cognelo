@@ -6,7 +6,7 @@ import {
   assertCanManageActivityBank,
   assertCanManageCourse,
   generateQuestionAuthoringText,
-  selectedSkillsGenerationPrompt,
+  activityKnowledgeGenerationPrompt,
   suggestActivityKnowledgeSelections,
   getActivityAttemptAvailability,
   recordActivityAttemptGradingResult,
@@ -377,7 +377,7 @@ function buildSystemPrompt(input: {
     `Title: ${input.subject.title}`,
     `Description: ${input.subject.description || "No subject description provided."}`,
     "",
-    selectedSkillsGenerationPrompt(input.knowledge)
+    activityKnowledgeGenerationPrompt(input.knowledge)
   ].join("\n");
 }
 

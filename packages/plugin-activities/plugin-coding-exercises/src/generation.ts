@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { activityGenerationKnowledgeSchema, AppError, generateQuestionAuthoringText, selectedSkillsGenerationPrompt, suggestActivityKnowledgeSelections, type ActivityGenerationKnowledge } from "@cognelo/core";
+import { activityGenerationKnowledgeSchema, activityKnowledgeGenerationPrompt, AppError, generateQuestionAuthoringText, suggestActivityKnowledgeSelections, type ActivityGenerationKnowledge } from "@cognelo/core";
 import {
   codingExerciseHiddenTestSchema,
   codingExerciseTestInsertionToken,
@@ -109,7 +109,7 @@ export async function generateCodingExercisePrompt(input: {
     const issues = validateGeneratedPrompt(prompt);
 
     if (!issues.length) {
-      const knowledgeConceptSelections = await suggestActivityKnowledgeSelections({ user: input.user, knowledge: input.knowledge ?? { mode: "ignore" }, generatedActivity: prompt });
+      const knowledgeConceptSelections = await suggestActivityKnowledgeSelections({ user: input.user, knowledge: input.knowledge ?? { mode: "ignore", concepts: [] }, generatedActivity: prompt });
       return { prompt, attempts: attempt, knowledgeConceptSelections };
     }
 
@@ -177,7 +177,7 @@ export async function generateCodingExerciseSolution(input: {
     if (!validation.issues.length && validation.solution) {
       const knowledgeConceptSelections = await suggestActivityKnowledgeSelections({
         user: input.user,
-        knowledge: input.knowledge ?? { mode: "ignore" },
+        knowledge: input.knowledge ?? { mode: "ignore", concepts: [] },
         generatedActivity: `${input.prompt}\n\n${validation.solution.referenceSolution}`
       });
       return {
@@ -256,7 +256,7 @@ export async function generateCodingExerciseTests(input: {
     if (!validation.issues.length && validation.tests && validation.validationSummary) {
       const knowledgeConceptSelections = await suggestActivityKnowledgeSelections({
         user: input.user,
-        knowledge: input.knowledge ?? { mode: "ignore" },
+        knowledge: input.knowledge ?? { mode: "ignore", concepts: [] },
         generatedActivity: `${input.prompt}\n\n${input.referenceSolution}\n\n${JSON.stringify(validation.tests)}`
       });
       return {
@@ -297,7 +297,7 @@ function buildPromptGenerationSystemPrompt(input: { language: string; locale: Ge
     `Title: ${input.subject.title}`,
     `Description: ${input.subject.description || "No subject description provided."}`,
     "",
-    selectedSkillsGenerationPrompt(input.knowledge ?? { mode: "ignore" })
+    activityKnowledgeGenerationPrompt(input.knowledge ?? { mode: "ignore", concepts: [] })
   ].join("\n");
 }
 
@@ -347,7 +347,7 @@ function buildSolutionGenerationSystemPrompt(input: { language: string; locale: 
     `Title: ${input.subject.title}`,
     `Description: ${input.subject.description || "No subject description provided."}`,
     "",
-    selectedSkillsGenerationPrompt(input.knowledge ?? { mode: "ignore" })
+    activityKnowledgeGenerationPrompt(input.knowledge ?? { mode: "ignore", concepts: [] })
   ].join("\n");
 }
 
@@ -402,7 +402,7 @@ function buildTestsGenerationSystemPrompt(input: { language: string; locale: Gen
     `Title: ${input.subject.title}`,
     `Description: ${input.subject.description || "No subject description provided."}`,
     "",
-    selectedSkillsGenerationPrompt(input.knowledge ?? { mode: "ignore" })
+    activityKnowledgeGenerationPrompt(input.knowledge ?? { mode: "ignore", concepts: [] })
   ].join("\n");
 }
 

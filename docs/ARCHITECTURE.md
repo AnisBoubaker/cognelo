@@ -38,7 +38,7 @@ Shared cross-plugin frontend primitives live in `packages/activity-ui`. In addit
 - **Authorization** maps global roles, course memberships, section participants, and activity-bank ownership into permissions.
 - **Users/Roles** support many-to-many global roles and future additional roles.
 - **Subjects** own reusable curriculum context, a supported teaching-language locale used by subject AI generation, subject-level material, and a subject-scoped prerequisite knowledge graph.
-- **Activity AI authoring** receives knowledge alignment through a host-owned shared context: generators consume the live unsaved skill draft, request catalog-constrained skill suggestions for their generated draft, or opt out without reading or mutating knowledge selections. The host keeps both tab panels mounted and combines activity content with knowledge selections at the persistence boundary.
+- **Activity AI authoring** receives knowledge alignment through a host-owned shared context. Every generation mode receives the complete subject concept/skill catalog as a curriculum boundary. Generators can additionally consume the live unsaved skill draft as specific targets, request catalog-constrained skill suggestions for their generated draft, or ignore the selection draft without reading or mutating it. The host keeps both tab panels mounted and combines activity content with knowledge selections at the persistence boundary.
 - **Activity banks** own reusable activity authoring and version history for a subject.
 - **Courses** own course lifecycle, course-local material, and course-local copies of bank activities.
 - **Course content resources** are plugin-backed non-activity resources such as GitHub repos, files, and text notes.

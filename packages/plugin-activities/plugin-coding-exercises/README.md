@@ -86,7 +86,7 @@ The teacher authoring UI is a form surface and must stay registered with the sha
 
 When a teacher has selected an enabled question-authoring AI agent in global settings, the authoring UI can generate the student-facing prompt from the activity description, language, and subject context.
 
-Prompt, solution, and test generation all use the shared knowledge-alignment choice: `Use selected skills` adds the activity's current skills as constraints, `Suggest skills` replaces the unsaved host Concepts-tab draft with exact catalog skills inferred from the generated artifact, and `Ignore skills` leaves knowledge links unread and unchanged.
+Prompt, solution, and test generation all use the shared knowledge-alignment choice. Every mode provides the complete subject catalog as a curriculum boundary. `Use selected skills` additionally adds the activity's current draft skills as specific constraints, `Suggest skills` replaces the unsaved host Concepts-tab draft with exact catalog skills inferred from the generated artifact, and `Ignore skills` neither reads nor changes that draft and performs no suggestion pass.
 
 AI-assisted solution and test generation is intentionally staged:
 
