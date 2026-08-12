@@ -121,9 +121,9 @@ export type CourseContentResource = {
 };
 
 export type ActivityKnowledgeGenerationRequest =
-  | { mode: "selected"; concepts: Array<{ id: string; title: string; skills: string[] }>; selectedConcepts: Array<{ id: string; title: string; skills: string[] }> }
-  | { mode: "suggest" | "ignore"; concepts: Array<{ id: string; title: string; skills: string[] }> };
-export type GeneratedKnowledgeSelection = { conceptId: string; selectsAllSkills: boolean; selectedSkills: string[] };
+  | { mode: "selected"; concepts: Array<{ id: string; title: string; skills: string[]; skillIds: string[] }>; selectedConcepts: Array<{ id: string; title: string; skills: string[]; skillIds: string[] }> }
+  | { mode: "suggest" | "ignore"; concepts: Array<{ id: string; title: string; skills: string[]; skillIds: string[] }> };
+export type GeneratedKnowledgeSelection = { conceptId: string; selectsAllSkills: boolean; selectedSkills: string[]; selectedSkillIds: string[] };
 
 export type CodingExercisePromptGenerationInput = {
   description: string;
@@ -227,8 +227,35 @@ export type SubjectKnowledgeConcept = {
   subjectId: string;
   title: string;
   skills: string;
+  active?: boolean;
+  skillRecords: SubjectKnowledgeSkill[];
   positionX: number;
   positionY: number;
+};
+
+export type SubjectKnowledgeSkill = {
+  id: string;
+  subjectId: string;
+  conceptId: string;
+  title: string;
+  position: number;
+  active: boolean;
+};
+
+export type KnowledgeDeletionImpact = {
+  bankActivityCount: number;
+  courseActivityCount: number;
+  historicalVersionCount: number;
+};
+
+export type SkillDeletionImpact = KnowledgeDeletionImpact & {
+  skill: { id: string; title: string };
+  replacementSkills: Array<{ id: string; title: string }>;
+};
+
+export type ConceptDeletionImpact = KnowledgeDeletionImpact & {
+  conceptId: string;
+  skillCount: number;
 };
 
 export type SubjectKnowledgePrerequisite = {
@@ -277,6 +304,7 @@ export type ActivityKnowledgeConceptLink = {
   conceptId: string;
   selectsAllSkills: boolean;
   selectedSkills: string[];
+  selectedSkillIds: string[];
   concept: SubjectKnowledgeConcept;
 };
 
@@ -936,7 +964,16 @@ export const api = {
       body: JSON.stringify(input)
     }),
   deleteSubjectKnowledgeConcept: (subjectId: string, conceptId: string) =>
-    request<{ ok: true }>(`/subjects/${subjectId}/concepts/${conceptId}`, { method: "DELETE" }),
+    request<{ ok: true; impact: ConceptDeletionImpact }>(`/subjects/${subjectId}/concepts/${conceptId}`, { method: "DELETE" }),
+  subjectKnowledgeConceptDeletionImpact: (subjectId: string, conceptId: string) =>
+    request<{ impact: ConceptDeletionImpact }>(`/subjects/${subjectId}/concepts/${conceptId}`),
+  subjectKnowledgeSkillDeletionImpact: (subjectId: string, conceptId: string, skillId: string) =>
+    request<{ impact: SkillDeletionImpact }>(`/subjects/${subjectId}/concepts/${conceptId}/skills/${skillId}`),
+  deleteSubjectKnowledgeSkill: (subjectId: string, conceptId: string, skillId: string, input: { mode: "remove" } | { mode: "replace"; replacementSkillId: string }) =>
+    request<{ ok: true; impact: SkillDeletionImpact }>(`/subjects/${subjectId}/concepts/${conceptId}/skills/${skillId}`, {
+      method: "DELETE",
+      body: JSON.stringify(input)
+    }),
   createSubjectKnowledgePrerequisite: (subjectId: string, input: SubjectKnowledgePrerequisiteInput) =>
     request<{ prerequisite: SubjectKnowledgePrerequisite }>(`/subjects/${subjectId}/prerequisites`, {
       method: "POST",

@@ -14,6 +14,10 @@ const skillsMigration = readFileSync(
   new URL("./migrations/202608110002_rename_concept_description_to_skills/migration.sql", import.meta.url),
   "utf8"
 );
+const stableSkillsMigration = readFileSync(
+  new URL("./migrations/202608120001_stable_subject_skills/migration.sql", import.meta.url),
+  "utf8"
+);
 
 describe("subject knowledge graph schema", () => {
   it("stores subject-scoped concepts and directed prerequisites", () => {
@@ -41,6 +45,13 @@ describe("subject knowledge graph schema", () => {
   it("stores newline-delimited concept skills under the canonical field name", () => {
     expect(schema).toContain("skills                String");
     expect(skillsMigration).toContain('RENAME COLUMN "description" TO "skills"');
+  });
+
+  it("normalizes skills to stable identities while retaining the compatibility text projection", () => {
+    expect(schema).toContain("model SubjectKnowledgeSkill");
+    expect(schema).toContain("skillRecords          SubjectKnowledgeSkill[]");
+    expect(stableSkillsMigration).toContain('CREATE TABLE "SubjectKnowledgeSkill"');
+    expect(stableSkillsMigration).toContain('INSERT INTO "SubjectKnowledgeSkill"');
   });
 
 });

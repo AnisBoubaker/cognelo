@@ -17,12 +17,12 @@ type ActivityEditorTabsProps = {
 };
 
 function conceptSkills(concept: SubjectKnowledgeConcept) {
-  return concept.skills.split(/\r?\n/).map((skill) => skill.trim()).filter(Boolean);
+  return concept.skillRecords?.length ? concept.skillRecords.map((skill) => skill.title) : concept.skills.split(/\r?\n/).map((skill) => skill.trim()).filter(Boolean);
 }
 
 function canonicalSelections(selections: ActivityKnowledgeConceptSelection[]) {
   return JSON.stringify(selections
-    .map((selection) => ({ ...selection, selectedSkills: [...selection.selectedSkills].sort() }))
+    .map((selection) => ({ ...selection, selectedSkills: [...selection.selectedSkills].sort(), selectedSkillIds: [...(selection.selectedSkillIds ?? [])].sort() }))
     .sort((left, right) => left.conceptId.localeCompare(right.conceptId)));
 }
 
@@ -77,7 +77,7 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
   }, [orderedConcepts, query]);
   const activeConcept = concepts.find((concept) => concept.id === activeConceptId) ?? visibleConcepts[0] ?? null;
   const generationRequest = useMemo<ActivityKnowledgeGenerationRequest>(() => {
-    const catalog = concepts.map((concept) => ({ id: concept.id, title: concept.title, skills: conceptSkills(concept) }));
+    const catalog = concepts.map((concept) => ({ id: concept.id, title: concept.title, skills: conceptSkills(concept), skillIds: concept.skillRecords.map((skill) => skill.id) }));
     if (generationMode === "ignore") return { mode: "ignore", concepts: catalog };
     if (generationMode === "suggest") {
       return { mode: "suggest", concepts: catalog };
@@ -87,7 +87,12 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
       concepts: catalog,
       selectedConcepts: draftSelections.flatMap((selection) => {
         const concept = concepts.find((candidate) => candidate.id === selection.conceptId);
-        return concept ? [{ id: concept.id, title: concept.title, skills: selection.selectsAllSkills ? conceptSkills(concept) : selection.selectedSkills }] : [];
+        return concept ? [{
+          id: concept.id,
+          title: concept.title,
+          skills: selection.selectsAllSkills ? conceptSkills(concept) : selection.selectedSkills,
+          skillIds: selection.selectsAllSkills ? concept.skillRecords.map((skill) => skill.id) : (selection.selectedSkillIds ?? [])
+        }] : [];
       })
     };
   }, [concepts, draftSelections, generationMode]);
@@ -112,7 +117,7 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
 
   function setWholeConcept(concept: SubjectKnowledgeConcept, checked: boolean) {
     setDraftSelections((current) => checked
-      ? [...current.filter((selection) => selection.conceptId !== concept.id), { conceptId: concept.id, selectsAllSkills: true, selectedSkills: [] }]
+      ? [...current.filter((selection) => selection.conceptId !== concept.id), { conceptId: concept.id, selectsAllSkills: true, selectedSkills: conceptSkills(concept), selectedSkillIds: concept.skillRecords.map((skill) => skill.id) }]
       : current.filter((selection) => selection.conceptId !== concept.id));
   }
 
@@ -122,9 +127,10 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
       const existing = current.find((selection) => selection.conceptId === concept.id);
       const selected = existing?.selectsAllSkills ? skills : (existing?.selectedSkills ?? []);
       const nextSkills = checked ? [...new Set([...selected, skill])] : selected.filter((candidate) => candidate !== skill);
+      const nextSkillIds = concept.skillRecords.filter((candidate) => nextSkills.includes(candidate.title)).map((candidate) => candidate.id);
       const withoutConcept = current.filter((selection) => selection.conceptId !== concept.id);
       return nextSkills.length
-        ? [...withoutConcept, { conceptId: concept.id, selectsAllSkills: false, selectedSkills: nextSkills }]
+        ? [...withoutConcept, { conceptId: concept.id, selectsAllSkills: false, selectedSkills: nextSkills, selectedSkillIds: nextSkillIds }]
         : withoutConcept;
     });
   }

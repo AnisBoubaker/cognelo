@@ -3,12 +3,12 @@
 import { createContext, useContext, type ReactNode } from "react";
 
 export type ActivityKnowledgeGenerationMode = "selected" | "suggest" | "ignore";
-export type ActivityKnowledgeGenerationConcept = { id: string; title: string; skills: string[] };
+export type ActivityKnowledgeGenerationConcept = { id: string; title: string; skills: string[]; skillIds: string[] };
 export type ActivityKnowledgeGenerationRequest =
   | { mode: "selected"; concepts: ActivityKnowledgeGenerationConcept[]; selectedConcepts: ActivityKnowledgeGenerationConcept[] }
   | { mode: "suggest"; concepts: ActivityKnowledgeGenerationConcept[] }
   | { mode: "ignore"; concepts: ActivityKnowledgeGenerationConcept[] };
-export type GeneratedKnowledgeSelection = { conceptId: string; selectsAllSkills: boolean; selectedSkills: string[] };
+export type GeneratedKnowledgeSelection = { conceptId: string; selectsAllSkills: boolean; selectedSkills: string[]; selectedSkillIds: string[] };
 
 type KnowledgeGenerationContextValue = {
   mode: ActivityKnowledgeGenerationMode;

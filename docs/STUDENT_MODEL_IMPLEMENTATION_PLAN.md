@@ -639,14 +639,14 @@ Model changes must create a new `modelVersion` and allow side-by-side/rebuild ev
 - Confirm inference configuration storage: code-owned versioned constants initially versus a database model.
 - Confirm privacy/visibility behavior for the first teacher-only release.
 
-### Phase 1: Stable Skill Identity
+### Phase 1: Stable Skill Identity - Completed
 
-- Add `SubjectKnowledgeSkill` and migrations.
-- Migrate current concept skill lines.
-- Update subject contracts/services/editor to preserve skill IDs.
-- Add bank, activity-version, course-activity, and attempt mapping/snapshot support.
-- Update AI authoring knowledge contracts to use stable skill IDs while still sending titles as model context.
-- Update all affected root/plugin documentation and tests.
+- Completed: added `SubjectKnowledgeSkill`, active/retired state, and a data-preserving migration from concept skill lines.
+- Completed: updated the subject contracts/services/editor to preserve skill IDs and render chip-based add/edit/delete controls.
+- Completed: added immediate transactional deletion impact analysis. Skills can be replaced within the same concept or removed from current mappings; concept deletion removes current mappings and graph edges; immutable activity versions remain unchanged.
+- Completed: added stable IDs plus title snapshots to bank, activity-version, and course-activity mappings, and snapshots resolved skills into attempt metadata at attempt start.
+- Completed: updated AI authoring knowledge contracts to carry stable skill IDs while continuing to send titles as model context.
+- Completed: updated affected root documentation and automated tests.
 
 ### Phase 2: Evidence Foundation
 
@@ -799,4 +799,3 @@ Every phase must review and update, where affected:
 - `docs/GRADEBOOK_IMPLEMENTATION_PLAN.md` when grading/evidence boundaries change;
 - `docs/plugin-authoring/` for the learning-evidence SDK contract;
 - each affected activity plugin's `README.md` and `PROJECT_MEMORY.md`.
-

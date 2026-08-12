@@ -71,13 +71,13 @@ Subject
       assigned activities and availability windows
 ```
 
-`SubjectKnowledgeConcept.skills` is a normalized newline-delimited skill set. Each non-empty line is one skill: something the learner can perform or an observable learning goal. The former `description` column was renamed with a data-preserving migration.
+`SubjectKnowledgeSkill` gives every observable skill a stable subject/concept-scoped identity, title, position, and active/retired state. `SubjectKnowledgeConcept.skills` remains a synchronized newline-delimited compatibility projection for older contracts and AI graph generation. Renaming or reordering a skill preserves its ID. Confirmed deletion retires the row, updates current mappings, and preserves immutable historical snapshots.
 
 Bank activities are authored in activity banks. Each bank save creates a new `ActivityVersion` and updates the bank activity's current version.
 
 Activity-to-concept links are a core, cross-plugin contract. All activity editors are host-wrapped with an Activity/Concepts tab set. Bank links are copied into immutable activity-version link rows and then into independent course-activity link rows during assignment; empty selections are valid, but no activity type may opt out of the capability.
 
-Each bank, version, and course activity concept link stores `selectsAllSkills` plus `selectedSkills`. A whole-concept selection uses `selectsAllSkills = true`; an explicit selection of every skill still uses `false` with the exact skill strings. This distinction is intentional because later skills added to a concept must not silently become selected for an activity that only chose the former complete list. Reconciliation behavior for renamed/removed concepts or changed skill lines is deferred to the dedicated change-handling iteration.
+Each bank, version, and course activity concept link stores `selectsAllSkills`, stable `selectedSkillIds`, and `selectedSkills` title snapshots. A whole-concept selection uses `selectsAllSkills = true`; an explicit selection of every skill still uses `false`. Immutable activity versions snapshot concrete skill IDs/titles. Deleting a skill can replace it with another active skill in the same concept or remove it from current bank/course activities; deleting a concept removes its current mappings. Historical activity-version snapshots are never rewritten. Attempts snapshot their resolved skill mapping at start.
 
 When a bank activity is added to a course, Cognelo copies the selected/latest version into a course-local `Activity`. The course activity stores `bankActivityId` and `activityVersionId` for provenance, but the course activity is not live-linked to the bank. Course edits affect only the course copy; bank edits create future versions and do not alter existing course copies.
 

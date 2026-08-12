@@ -20,13 +20,16 @@ import {
   useEdgesState,
   useNodesState
 } from "@xyflow/react";
-import { useNotifications } from "@cognelo/activity-ui";
+import { ConfirmationDialog, useNotifications } from "@cognelo/activity-ui";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   api,
   type SubjectKnowledgeConcept,
   type SubjectKnowledgeGraphDraft,
-  type SubjectKnowledgePrerequisite
+  type SubjectKnowledgePrerequisite,
+  type SubjectKnowledgeSkill,
+  type SkillDeletionImpact,
+  type ConceptDeletionImpact
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
@@ -42,6 +45,7 @@ type Props = {
   teachingLanguage?: "en" | "fr" | "zh" | "ar";
   isVisible?: boolean;
   onChange?: (graph: SubjectKnowledgeGraphDraft) => void;
+  onPersistedDeletion?: (deletion: { conceptId: string; skillId?: string }) => void;
 };
 
 type ConceptNode = Node<{ label: string }>;
@@ -177,7 +181,8 @@ export function SubjectKnowledgeGraph({
   subjectDescription = "",
   teachingLanguage = "en",
   isVisible = true,
-  onChange
+  onChange,
+  onPersistedDeletion
 }: Props) {
   const { t } = useI18n();
   const { notify } = useNotifications();
@@ -188,7 +193,13 @@ export function SubjectKnowledgeGraph({
   const [newTitle, setNewTitle] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
-  const [editSkills, setEditSkills] = useState("");
+  const [skillDialog, setSkillDialog] = useState<{ mode: "add" | "edit"; skillId?: string } | null>(null);
+  const [skillDraft, setSkillDraft] = useState("");
+  const [skillDeleteImpact, setSkillDeleteImpact] = useState<SkillDeletionImpact | null>(null);
+  const [conceptDeleteImpact, setConceptDeleteImpact] = useState<ConceptDeletionImpact | null>(null);
+  const [replacementSkillId, setReplacementSkillId] = useState("");
+  const [deleteMode, setDeleteMode] = useState<"remove" | "replace">("remove");
+  const [dialogBusy, setDialogBusy] = useState(false);
   const [aiDirections, setAiDirections] = useState("");
   const [maxConcepts, setMaxConcepts] = useState(12);
   const [generating, setGenerating] = useState(false);
@@ -246,7 +257,6 @@ export function SubjectKnowledgeGraph({
     const nextSelectedId = concept?.id ?? null;
     setSelectedId(nextSelectedId);
     setEditTitle(concept?.title ?? "");
-    setEditSkills(concept?.skills ?? "");
     setNodes((current) => highlightConceptNodes(current, prerequisites, nextSelectedId));
     setEdges((current) => highlightEdges(current, nextSelectedId));
   }, [prerequisites, setEdges, setNodes]);
@@ -257,7 +267,7 @@ export function SubjectKnowledgeGraph({
     setNodes(highlightConceptNodes(nextConcepts.map(toNode), nextPrerequisites, selectedId));
     setEdges(highlightEdges(toEdges(nextPrerequisites), selectedId));
     onChange?.({
-      concepts: nextConcepts.map(({ id, title, skills, positionX, positionY }) => ({ id, title, skills, positionX, positionY })),
+      concepts: nextConcepts.map(({ id, title, skills, skillRecords, positionX, positionY }) => ({ id, title, skills, skillRecords, positionX, positionY })),
       prerequisites: nextPrerequisites.map(({ id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle }) => ({
         id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle
       }))
@@ -274,6 +284,8 @@ export function SubjectKnowledgeGraph({
       subjectId,
       title,
       skills: "",
+      active: true,
+      skillRecords: [],
       positionX: 80 + (index % 4) * 220,
       positionY: 80 + Math.floor(index / 4) * 140
     };
@@ -350,21 +362,107 @@ export function SubjectKnowledgeGraph({
   function saveConcept(event: FormEvent) {
     event.preventDefault();
     if (!selectedConcept || !editTitle.trim()) return;
-    const normalizedSkills = editSkills.split(/\r?\n/).map((skill) => skill.trim()).filter(Boolean).join("\n");
     const next = concepts.map((concept) => concept.id === selectedConcept.id
-      ? { ...concept, title: editTitle.trim(), skills: normalizedSkills }
+      ? { ...concept, title: editTitle.trim() }
       : concept);
     applyGraph(next, prerequisites);
     selectConcept(next.find((concept) => concept.id === selectedConcept.id) ?? null);
   }
 
-  function deleteConcept() {
+  async function requestDeleteConcept() {
     if (!selectedConcept) return;
-    applyGraph(
-      concepts.filter((concept) => concept.id !== selectedConcept.id),
-      prerequisites.filter((edge) => edge.sourceConceptId !== selectedConcept.id && edge.requiredConceptId !== selectedConcept.id)
-    );
-    selectConcept(null);
+    const persisted = savedConcepts.some((concept) => concept.id === selectedConcept.id);
+    if (!persisted) {
+      setConceptDeleteImpact({ conceptId: selectedConcept.id, skillCount: selectedConcept.skillRecords.length, bankActivityCount: 0, courseActivityCount: 0, historicalVersionCount: 0 });
+      return;
+    }
+    try {
+      setConceptDeleteImpact((await api.subjectKnowledgeConceptDeletionImpact(subjectId, selectedConcept.id)).impact);
+    } catch (error) {
+      notify({ variant: "error", message: error instanceof Error ? error.message : t("knowledgeGraph.deleteError") });
+    }
+  }
+
+  function openSkillDialog(mode: "add" | "edit", skill?: SubjectKnowledgeSkill) {
+    setSkillDraft(skill?.title ?? "");
+    setSkillDialog({ mode, skillId: skill?.id });
+  }
+
+  function applySkillDialog() {
+    if (!selectedConcept || !skillDraft.trim()) return;
+    const currentSkills = selectedConcept.skillRecords ?? [];
+    const nextSkills = skillDialog?.mode === "edit"
+      ? currentSkills.map((skill) => skill.id === skillDialog.skillId ? { ...skill, title: skillDraft.trim() } : skill)
+      : [...currentSkills, {
+          id: crypto.randomUUID(), subjectId, conceptId: selectedConcept.id, title: skillDraft.trim(), position: currentSkills.length, active: true
+        }];
+    const nextConcept = { ...selectedConcept, skillRecords: nextSkills, skills: nextSkills.map((skill) => skill.title).join("\n") };
+    applyGraph(concepts.map((concept) => concept.id === selectedConcept.id ? nextConcept : concept), prerequisites);
+    selectConcept(nextConcept);
+    setSkillDialog(null);
+  }
+
+  async function requestDeleteSkill(skill: SubjectKnowledgeSkill) {
+    if (!selectedConcept) return;
+    const persisted = savedConcepts.some((concept) => concept.skillRecords.some((candidate) => candidate.id === skill.id));
+    if (!persisted) {
+      setSkillDeleteImpact({ skill: { id: skill.id, title: skill.title }, replacementSkills: selectedConcept.skillRecords.filter((candidate) => candidate.id !== skill.id), bankActivityCount: 0, courseActivityCount: 0, historicalVersionCount: 0 });
+      return;
+    }
+    try {
+      const impact = (await api.subjectKnowledgeSkillDeletionImpact(subjectId, selectedConcept.id, skill.id)).impact;
+      setDeleteMode(impact.bankActivityCount + impact.courseActivityCount > 0 && impact.replacementSkills.length ? "replace" : "remove");
+      setReplacementSkillId(impact.replacementSkills[0]?.id ?? "");
+      setSkillDeleteImpact(impact);
+    } catch (error) {
+      notify({ variant: "error", message: error instanceof Error ? error.message : t("knowledgeGraph.deleteError") });
+    }
+  }
+
+  async function confirmSkillDeletion() {
+    if (!selectedConcept || !skillDeleteImpact) return;
+    const persisted = savedConcepts.some((concept) => concept.skillRecords.some((skill) => skill.id === skillDeleteImpact.skill.id));
+    setDialogBusy(true);
+    try {
+      if (persisted) {
+        await api.deleteSubjectKnowledgeSkill(subjectId, selectedConcept.id, skillDeleteImpact.skill.id,
+          deleteMode === "replace" ? { mode: "replace", replacementSkillId } : { mode: "remove" });
+        onPersistedDeletion?.({ conceptId: selectedConcept.id, skillId: skillDeleteImpact.skill.id });
+      }
+      const nextSkills = selectedConcept.skillRecords.filter((skill) => skill.id !== skillDeleteImpact.skill.id);
+      const nextConcept = { ...selectedConcept, skillRecords: nextSkills, skills: nextSkills.map((skill) => skill.title).join("\n") };
+      applyGraph(concepts.map((concept) => concept.id === selectedConcept.id ? nextConcept : concept), prerequisites);
+      selectConcept(nextConcept);
+      setSkillDeleteImpact(null);
+      notify({ variant: "success", message: t("knowledgeGraph.skillDeleted") });
+    } catch (error) {
+      notify({ variant: "error", message: error instanceof Error ? error.message : t("knowledgeGraph.deleteError") });
+    } finally {
+      setDialogBusy(false);
+    }
+  }
+
+  async function confirmConceptDeletion() {
+    if (!selectedConcept || !conceptDeleteImpact) return;
+    const persisted = savedConcepts.some((concept) => concept.id === selectedConcept.id);
+    setDialogBusy(true);
+    try {
+      if (persisted) {
+        await api.deleteSubjectKnowledgeConcept(subjectId, selectedConcept.id);
+        onPersistedDeletion?.({ conceptId: selectedConcept.id });
+      }
+      applyGraph(
+        concepts.filter((concept) => concept.id !== selectedConcept.id),
+        prerequisites.filter((edge) => edge.sourceConceptId !== selectedConcept.id && edge.requiredConceptId !== selectedConcept.id)
+      );
+      selectConcept(null);
+      setConceptDeleteImpact(null);
+      notify({ variant: "success", message: t("knowledgeGraph.conceptDeleted") });
+    } catch (error) {
+      notify({ variant: "error", message: error instanceof Error ? error.message : t("knowledgeGraph.deleteError") });
+    } finally {
+      setDialogBusy(false);
+    }
   }
 
   function deleteEdges(deleted: Edge[]) {
@@ -673,12 +771,25 @@ export function SubjectKnowledgeGraph({
                 <input id="concept-title" value={editTitle} onChange={(event) => setEditTitle(event.target.value)} />
               </div>
               <div className="field">
-                <label htmlFor="concept-skills">{t("knowledgeGraph.conceptSkills")}</label>
-                <textarea id="concept-skills" rows={7} value={editSkills} onChange={(event) => setEditSkills(event.target.value)} />
+                <div className="knowledge-skill-heading">
+                  <label>{t("knowledgeGraph.conceptSkills")}</label>
+                  <button className="knowledge-skill-add" type="button" aria-label={t("knowledgeGraph.addSkill")} title={t("knowledgeGraph.addSkill")} onClick={() => openSkillDialog("add")}>+</button>
+                </div>
+                <div className="knowledge-skill-list">
+                  {selectedConcept.skillRecords.length ? selectedConcept.skillRecords.map((skill) => (
+                    <div className="knowledge-skill-chip" key={skill.id}>
+                      <span>{skill.title}</span>
+                      <span className="knowledge-skill-actions">
+                        <button type="button" aria-label={t("knowledgeGraph.editSkill")} title={t("knowledgeGraph.editSkill")} onClick={() => openSkillDialog("edit", skill)}>✎</button>
+                        <button type="button" aria-label={t("knowledgeGraph.deleteSkill")} title={t("knowledgeGraph.deleteSkill")} onClick={() => void requestDeleteSkill(skill)}>⌫</button>
+                      </span>
+                    </div>
+                  )) : <p className="muted">{t("knowledgeGraph.noSkills")}</p>}
+                </div>
                 <span className="muted">{t("knowledgeGraph.conceptSkillsHelp")}</span>
               </div>
               <button className="button" disabled={!editTitle.trim()} type="submit">{t("knowledgeGraph.applyConcept")}</button>
-              <button className="button danger" onClick={deleteConcept} type="button">{t("knowledgeGraph.deleteConcept")}</button>
+              <button className="button danger" onClick={() => void requestDeleteConcept()} type="button">{t("knowledgeGraph.deleteConcept")}</button>
             </form>
           ) : (
             <div className="knowledge-graph-empty stack">
@@ -709,6 +820,56 @@ export function SubjectKnowledgeGraph({
           </div>
         </div>
       ) : null}
+
+      <ConfirmationDialog
+        open={Boolean(skillDialog)}
+        eyebrow={t("knowledgeGraph.conceptSkills")}
+        title={t(skillDialog?.mode === "edit" ? "knowledgeGraph.editSkill" : "knowledgeGraph.addSkill")}
+        message={<div className="field"><label htmlFor="knowledge-skill-title">{t("knowledgeGraph.skillDescription")}</label><input id="knowledge-skill-title" autoFocus maxLength={1000} value={skillDraft} onChange={(event) => setSkillDraft(event.target.value)} /></div>}
+        confirmLabel={t("common.save")}
+        cancelLabel={t("common.cancel")}
+        onCancel={() => setSkillDialog(null)}
+        onConfirm={applySkillDialog}
+      />
+
+      <ConfirmationDialog
+        open={Boolean(skillDeleteImpact)}
+        eyebrow={t("knowledgeGraph.conceptSkills")}
+        title={t("knowledgeGraph.deleteSkillTitle")}
+        message={skillDeleteImpact ? <div className="stack">
+          <p>{t("knowledgeGraph.deleteSkillMessage", { skill: skillDeleteImpact.skill.title })}</p>
+          <p>{t("knowledgeGraph.activityReferenceCount", { count: skillDeleteImpact.bankActivityCount + skillDeleteImpact.courseActivityCount })}</p>
+          {skillDeleteImpact.historicalVersionCount ? <p>{t("knowledgeGraph.historicalReferenceCount", { count: skillDeleteImpact.historicalVersionCount })}</p> : null}
+          {skillDeleteImpact.bankActivityCount + skillDeleteImpact.courseActivityCount > 0 ? <>
+            {skillDeleteImpact.replacementSkills.length ? <label className="knowledge-delete-option"><input checked={deleteMode === "replace"} name="skill-delete-mode" type="radio" onChange={() => setDeleteMode("replace")} />{t("knowledgeGraph.deleteAndReplace")}</label> : null}
+            {deleteMode === "replace" && skillDeleteImpact.replacementSkills.length ? <select value={replacementSkillId} onChange={(event) => setReplacementSkillId(event.target.value)}>{skillDeleteImpact.replacementSkills.map((skill) => <option key={skill.id} value={skill.id}>{skill.title}</option>)}</select> : null}
+            <label className="knowledge-delete-option"><input checked={deleteMode === "remove"} name="skill-delete-mode" type="radio" onChange={() => setDeleteMode("remove")} />{t("knowledgeGraph.deleteAndRemove")}</label>
+          </> : null}
+        </div> : null}
+        confirmLabel={t("knowledgeGraph.confirmDeleteSkill")}
+        cancelLabel={t("common.cancel")}
+        confirmVariant="danger"
+        isConfirming={dialogBusy}
+        onCancel={() => setSkillDeleteImpact(null)}
+        onConfirm={confirmSkillDeletion}
+      />
+
+      <ConfirmationDialog
+        open={Boolean(conceptDeleteImpact)}
+        eyebrow={t("knowledgeGraph.title")}
+        title={t("knowledgeGraph.deleteConceptTitle")}
+        message={conceptDeleteImpact ? <div className="stack">
+          <p>{t("knowledgeGraph.deleteConceptMessage", { count: conceptDeleteImpact.skillCount })}</p>
+          <p>{t("knowledgeGraph.activityReferenceCount", { count: conceptDeleteImpact.bankActivityCount + conceptDeleteImpact.courseActivityCount })}</p>
+          {conceptDeleteImpact.historicalVersionCount ? <p>{t("knowledgeGraph.historicalReferenceCount", { count: conceptDeleteImpact.historicalVersionCount })}</p> : null}
+        </div> : null}
+        confirmLabel={t("knowledgeGraph.confirmDeleteConcept")}
+        cancelLabel={t("common.cancel")}
+        confirmVariant="danger"
+        isConfirming={dialogBusy}
+        onCancel={() => setConceptDeleteImpact(null)}
+        onConfirm={confirmConceptDeletion}
+      />
     </section>
   );
 }

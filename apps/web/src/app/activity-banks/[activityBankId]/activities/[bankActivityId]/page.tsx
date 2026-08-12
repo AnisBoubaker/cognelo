@@ -47,7 +47,7 @@ export default function BankActivityAuthoringPage() {
       aiAgentResult.connections.some((connection) => connection.id === aiAgentResult.preferences.questionAuthoringAiAgentConnectionId && connection.isEnabled)
     );
     setActivity(nextActivity);
-    conceptDraftRef.current = nextActivity?.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills })) ?? [];
+    conceptDraftRef.current = nextActivity?.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills, selectedSkillIds: link.selectedSkillIds })) ?? [];
     setLifecycleDraft((nextActivity?.lifecycle ?? "draft") as ActivityLifecycle);
     if (!nextActivity) {
       setError(t("bankActivityPage.notFound"));
@@ -208,7 +208,7 @@ export default function BankActivityAuthoringPage() {
           <ActivityEditorTabs
             concepts={bank?.subject?.knowledgeConcepts ?? []}
             prerequisites={bank?.subject?.knowledgePrerequisites ?? []}
-            selectedConcepts={activity.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills })) ?? []}
+            selectedConcepts={activity.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills, selectedSkillIds: link.selectedSkillIds })) ?? []}
             onSaveConcepts={saveConcepts}
             onConceptDraftChange={updateConceptDraft}
             t={t}

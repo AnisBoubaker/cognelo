@@ -78,8 +78,8 @@ export default function EditSubjectPage() {
     setError("");
     try {
       const knowledgeGraph: SubjectKnowledgeGraphDraft = {
-        concepts: graphConcepts.map(({ id, title: conceptTitle, skills, positionX, positionY }) => ({
-          id, title: conceptTitle, skills, positionX, positionY
+        concepts: graphConcepts.map(({ id, title: conceptTitle, skills, skillRecords, positionX, positionY }) => ({
+          id, title: conceptTitle, skills, skillRecords, positionX, positionY
         })),
         prerequisites: graphPrerequisites.map(({ id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle }) => ({
           id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle
@@ -181,8 +181,19 @@ export default function EditSubjectPage() {
                 savedConcepts={savedSnapshot.concepts}
                 savedPrerequisites={savedSnapshot.prerequisites}
                 onChange={(graph) => {
-                  setGraphConcepts(graph.concepts.map((concept) => ({ ...concept, subjectId })));
+                  setGraphConcepts(graph.concepts.map((concept) => ({ ...concept, subjectId, skillRecords: (concept.skillRecords ?? []).map((skill) => ({ ...skill, subjectId, conceptId: concept.id })) })));
                   setGraphPrerequisites(graph.prerequisites.map((prerequisite) => ({ ...prerequisite, subjectId })));
+                }}
+                onPersistedDeletion={({ conceptId, skillId }) => {
+                  setSavedSnapshot((current) => ({
+                    ...current,
+                    concepts: skillId
+                      ? current.concepts.map((concept) => concept.id === conceptId
+                        ? { ...concept, skillRecords: concept.skillRecords.filter((skill) => skill.id !== skillId), skills: concept.skillRecords.filter((skill) => skill.id !== skillId).map((skill) => skill.title).join("\n") }
+                        : concept)
+                      : current.concepts.filter((concept) => concept.id !== conceptId),
+                    prerequisites: skillId ? current.prerequisites : current.prerequisites.filter((edge) => edge.sourceConceptId !== conceptId && edge.requiredConceptId !== conceptId)
+                  }));
                 }}
               />
             </div>

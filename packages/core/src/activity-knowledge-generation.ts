@@ -6,7 +6,8 @@ import { generateQuestionAuthoringText } from "./ai-agents";
 const knowledgeConceptSchema = z.object({
   id: z.string().min(1).max(120),
   title: z.string().min(1).max(500),
-  skills: z.array(z.string().min(1).max(1000)).max(100)
+  skills: z.array(z.string().min(1).max(1000)).max(100),
+  skillIds: z.array(z.string().min(1).max(160)).max(100).optional()
 });
 
 const knowledgeCatalogSchema = z.array(knowledgeConceptSchema).max(500).default([]);
@@ -99,11 +100,16 @@ export async function suggestActivityKnowledgeSelections(input: {
         selection.skills.filter((skill) => available.has(skill)).forEach((skill) => selected.add(skill));
         if (selected.size) selectedByConcept.set(selection.conceptId, selected);
       }
-      return [...selectedByConcept].map(([conceptId, skills]) => ({
-        conceptId,
-        selectsAllSkills: false,
-        selectedSkills: [...skills]
-      }));
+      return [...selectedByConcept].map(([conceptId, skills]) => {
+        const concept = input.knowledge.concepts.find((candidate) => candidate.id === conceptId)!;
+        const selectedSkills = [...skills];
+        return {
+          conceptId,
+          selectsAllSkills: false,
+          selectedSkills,
+          selectedSkillIds: selectedSkills.map((skill) => concept.skillIds?.[concept.skills.indexOf(skill)]).filter((skillId): skillId is string => Boolean(skillId))
+        };
+      });
     }
     userPrompt = `The previous response was invalid. Return the requested JSON only.\n\nPrevious response:\n${raw}`;
   }
