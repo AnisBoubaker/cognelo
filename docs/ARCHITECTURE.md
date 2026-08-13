@@ -10,6 +10,12 @@ Cognelo is a modular intelligent tutoring system for programming education.
 - **Zod contracts** shared between frontend and backend for DTO validation and stable API expectations.
 - **Activity and content type registry packages** for plugin-style registration without coupling activity or non-activity content behavior to subjects, banks, courses, or the content tree.
 
+## Production Topology
+
+The production reference is a two-host deployment. The application VPS runs Apache/TLS, the Next.js web and API services, background jobs, PostgreSQL, and durable uploaded storage. A separate disposable sandbox VPS runs the privileged Judge0 stack and the constrained Playwright runner, with no Cognelo database credentials, JWT secret, application deploy key, or mounted application storage.
+
+The hosts communicate through an instance-specific WireGuard point-to-point network. Judge0 and Playwright bind only to the sandbox WireGuard address, never its public interface, and firewall rules admit their ports only from the matching application WireGuard peer. The API systemd unit orders itself after WireGuard with `Wants` rather than `Requires`; a sandbox or tunnel outage may disable execution-backed activities but must not prevent the rest of Cognelo from starting. PostgreSQL remains loopback-only on the application host. The complete operational procedure and initial capacity guidance live in `docs/DEPLOYMENT_UBUNTU_APACHE.md`.
+
 ## Monorepo Layout
 
 ```text

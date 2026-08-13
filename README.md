@@ -393,7 +393,7 @@ Web design runner (dev): http://localhost:3456
 
 ## Production Deployment
 
-The step-by-step production runbook is [docs/DEPLOYMENT_UBUNTU_APACHE.md](docs/DEPLOYMENT_UBUNTU_APACHE.md). It covers a bare Ubuntu host, host-managed PostgreSQL, Apache and TLS, isolated systemd services, persistent uploads, production administrator bootstrap, backups, upgrades, optional sandbox services, and multiple Cognelo instances on one server.
+The step-by-step production runbook is [docs/DEPLOYMENT_UBUNTU_APACHE.md](docs/DEPLOYMENT_UBUNTU_APACHE.md). Its production reference uses two VPSs: an application/database host with Apache, TLS, isolated systemd services, PostgreSQL, and persistent uploads, plus a dedicated Judge0/Playwright sandbox host connected only through a WireGuard point-to-point network. It also covers production administrator bootstrap, backups, upgrades, capacity guidance, and additional isolated Cognelo instances.
 
 Judge0-related environment variables:
 
