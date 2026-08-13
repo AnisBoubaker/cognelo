@@ -1,19 +1,21 @@
 # Deploying Cognelo on Ubuntu with Apache
 
-This guide deploys one or more production Cognelo instances on a bare Ubuntu server. It uses:
+This guide deploys a production Cognelo instance across two Ubuntu VPSs. It uses:
 
 - Apache as the public TLS reverse proxy;
 - PostgreSQL installed directly on the host;
 - two systemd-managed Node.js processes per Cognelo instance;
 - one database, Unix account, storage directory, environment file, and port pair per instance;
-- Docker only for the Judge0 and Playwright code-execution sandboxes, preferably on a separate server or VM.
+- a dedicated application VPS for Apache, Cognelo, PostgreSQL, and durable uploaded files;
+- a dedicated sandbox VPS for Dockerized Judge0 and Playwright execution; and
+- a WireGuard point-to-point network between the two VPSs.
 
-The examples use `instance1.cognelo.org` and the instance key `instance1`. Every example hostname, account, database, path, and port is a placeholder and must be replaced with values assigned to the target installation.
+The examples use `app1.cognelo.org` and the instance key `instance1`. Every example hostname, address, account, database, path, and port is a placeholder and must be replaced with values assigned to the target installation.
 
 ## 1. Recommended topology
 
 ```text
-Application host
+Application VPS (recommended start: 4 vCPU, 8 GB RAM)
 Internet
    |
    v
@@ -24,15 +26,25 @@ Apache :80/:443
 Cognelo API
    |-- 127.0.0.1:5432/cognelo_instance1  host PostgreSQL
    |-- /srv/cognelo/instance1/shared/storage
-   |-- 127.0.0.1:2358 --\
-   `-- 127.0.0.1:3456 ---+-- systemd SSH tunnel --> Sandbox host
-                                                   |-- Judge0 containers
-                                                   `-- Playwright runner container
+   |-- 10.80.0.2:2358  --\
+   `-- 10.80.0.2:3456  ---+-- WireGuard wg0 --> Sandbox VPS
+                                             |-- Judge0 containers
+                                             `-- Playwright runner container
+
+WireGuard point-to-point network
+   application wg0: 10.80.0.1/30
+   sandbox wg0:     10.80.0.2/30
+
+Sandbox VPS (recommended start: 4 vCPU, 8 GB RAM)
+   public interface: SSH administration and WireGuard UDP only
+   wg0: Judge0 :2358 and Playwright :3456, reachable only from 10.80.0.1
 ```
 
 Apache is the reference reverse proxy for this runbook. It provides the required HTTP reverse proxying, path-based routing, TLS termination, and upload handling. Nginx and Caddy can satisfy the same application requirements, but their configuration is outside the scope of this document. Next.js recommends placing a reverse proxy in front of a self-hosted Node server, and its Node deployment retains all framework features: [Next.js self-hosting](https://nextjs.org/docs/app/guides/self-hosting) and [Next.js deployment modes](https://nextjs.org/docs/app/getting-started/deploying).
 
-PostgreSQL should run on the application host for this topology. Docker remains appropriate for untrusted-code sandboxes because their dependency and isolation requirements are materially different from the web application. The reference deployment binds both sandbox APIs to loopback on the sandbox host and carries them through a restricted SSH tunnel; neither API receives a public or private-network listener.
+PostgreSQL should run on the application VPS for this topology. Docker remains appropriate for untrusted-code sandboxes because their dependency and isolation requirements are materially different from the web application. The reference deployment binds both sandbox APIs only to the sandbox VPS's WireGuard address. Their ports are never published on its public interface, and WireGuard accepts the application VPS as the only peer.
+
+For one class of approximately 40 students, start with 4 vCPU, 8 GB RAM, and at least 75 GB NVMe on each VPS. The supplied sandbox configuration has two Judge0 workers and one Playwright runner limited to 2 vCPU/2 GB. This is intended for ordinary classroom use with intermittent submissions, not an assurance that 40 simultaneous browser or code executions will complete without queueing. Load-test the real activities before a synchronized assessment; the sandbox VPS is the first host to scale when queue latency or browser failures become unacceptable.
 
 Sections 3–13 produce a working Cognelo instance without code execution. Section 14 completes the deployment with Judge0 and the Playwright runner. Keep the dependent plugins disabled until Section 14's smoke tests pass.
 
@@ -42,26 +54,30 @@ Keep a private inventory like this before starting:
 
 | Setting | First instance | Second example |
 |---|---:|---:|
-| FQDN | `instance1.cognelo.org` | `instance2.cognelo.org` |
+| Application FQDN | `app1.cognelo.org` | `app2.cognelo.org` |
 | Instance key | `instance1` | `instance2` |
-| Unix account | `cognelo-instance1` | `cognelo-instance2` |
+| Unix account | `app1` | `app2` |
 | Web port | `3100` | `3200` |
 | API port | `3101` | `3201` |
 | Database | `cognelo_instance1` | `cognelo_instance2` |
 | Database role | `cognelo_instance1` | `cognelo_instance2` |
 | Installation root | `/srv/cognelo/instance1` | `/srv/cognelo/instance2` |
-| Local Judge0 tunnel port | `2358` | `2359` |
-| Local Playwright tunnel port | `3456` | `3457` |
-| Sandbox Compose project | `cognelo-instance1-sandbox` | `cognelo-instance2-sandbox` |
+| Application WireGuard IP | `10.80.0.1` | `10.80.0.5` |
+| Sandbox WireGuard IP | `10.80.0.2` | `10.80.0.6` |
+| WireGuard subnet | `10.80.0.0/30` | `10.80.0.4/30` |
+| Sandbox WireGuard UDP port | `51820` | `51821` |
+| Judge0 port | `2358` | `2359` |
+| Playwright port | `3456` | `3457` |
+| Sandbox Compose project | `app1-sandbox` | `app2-sandbox` |
 
-Every instance needs a different web/API port pair, sandbox tunnel port pair, database, database role, JWT secret, environment file, and storage directory. Do not reuse a web build between hostnames: `NEXT_PUBLIC_API_URL` is embedded when the web application is built.
+Every instance needs a different web/API port pair, WireGuard subnet and keys, sandbox service ports, database, database role, JWT secret, environment file, and storage directory. Do not reuse a web build between hostnames: `NEXT_PUBLIC_API_URL` is embedded when the web application is built.
 
 ## 3. Configure DNS
 
 At the authoritative DNS server for `cognelo.org`, create:
 
 ```text
-instance1.cognelo.org.  A     PUBLIC_IPV4_OF_UBUNTU_SERVER
+app1.cognelo.org.  A     APPLICATION_PUBLIC_IPV4
 ```
 
 Create an `AAAA` record only if the Ubuntu server has working public IPv6 and its firewall permits ports 80 and 443 over IPv6. The DNS server does not need to run on the Cognelo host.
@@ -69,11 +85,13 @@ Create an `AAAA` record only if the Ubuntu server has working public IPv6 and it
 Verify propagation from another machine:
 
 ```bash
-dig +short A instance1.cognelo.org
-dig +short AAAA instance1.cognelo.org
+dig +short A app1.cognelo.org
+dig +short AAAA app1.cognelo.org
 ```
 
 Do not request a TLS certificate until the `A`/`AAAA` answers point to the new server and inbound port 80 works.
+
+The sandbox does not need a public application hostname. A name such as `runner1.cognelo.org` may be kept for operator convenience, but Cognelo must not call it and no Apache/Nginx virtual host should expose Judge0 or Playwright there. WireGuard uses the sandbox's fixed public IPv4 endpoint, and Cognelo uses its private WireGuard address.
 
 ## 4. Prepare Ubuntu
 
@@ -158,9 +176,9 @@ sudo ss -ltnp | grep 5432
 sudo useradd --system --create-home \
   --home-dir /srv/cognelo/instance1 \
   --shell /usr/sbin/nologin \
-  cognelo-instance1
+  app1
 
-sudo install -d -m 0750 -o cognelo-instance1 -g cognelo-instance1 \
+sudo install -d -m 0750 -o app1 -g app1 \
   /srv/cognelo/instance1/deployments \
   /srv/cognelo/instance1/shared \
   /srv/cognelo/instance1/shared/storage
@@ -173,7 +191,7 @@ The service account must not be shared by other Cognelo instances.
 Create the file with restrictive permissions:
 
 ```bash
-sudo install -m 0640 -o cognelo-instance1 -g cognelo-instance1 \
+sudo install -m 0640 -o app1 -g app1 \
   /dev/null /srv/cognelo/instance1/shared/.env
 sudo nano /srv/cognelo/instance1/shared/.env
 ```
@@ -190,28 +208,28 @@ Use this environment template. Replace every placeholder and keep the public URL
 NODE_ENV=production
 DATABASE_URL="postgresql://cognelo_instance1:DATABASE_PASSWORD@127.0.0.1:5432/cognelo_instance1?schema=public&connection_limit=10&pool_timeout=10"
 JWT_SECRET="PASTE_96_CHARACTER_HEX_SECRET"
-NEXT_PUBLIC_API_URL="https://instance1.cognelo.org"
-CORS_ORIGIN="https://instance1.cognelo.org"
+NEXT_PUBLIC_API_URL="https://app1.cognelo.org"
+CORS_ORIGIN="https://app1.cognelo.org"
 
 COGNELO_BACKGROUND_JOBS_DISABLED=false
 COGNELO_BACKGROUND_JOBS_CONCURRENCY=1
 COGNELO_BACKGROUND_JOBS_INTERVAL_MS=1000
 COGNELO_BACKGROUND_JOBS_WORKER_ID="instance1-api-worker"
 
-JUDGE0_BASE_URL="http://127.0.0.1:2358"
+JUDGE0_BASE_URL="http://10.80.0.2:2358"
 JUDGE0_AUTH_HEADER="X-Auth-Token"
 JUDGE0_AUTH_TOKEN="REPLACE_IF_CODING_EXERCISES_ARE_ENABLED"
 JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS=true
 
-WEB_DESIGN_RUNNER_URL="http://127.0.0.1:3456"
+WEB_DESIGN_RUNNER_URL="http://10.80.0.2:3456"
 ```
 
-These loopback URLs are correct for the SSH-tunnel deployment in Section 14. For a second co-located instance, use its allocated tunnel ports instead. Leave the corresponding activity plugin disabled until that dependency is secured and reachable.
+These addresses use the WireGuard inventory in Section 2. For another instance, use its allocated WireGuard subnet and sandbox ports. Leave the corresponding activity plugin disabled until that dependency is secured and reachable.
 
 Check permissions:
 
 ```bash
-sudo chown cognelo-instance1:cognelo-instance1 /srv/cognelo/instance1/shared/.env
+sudo chown app1:app1 /srv/cognelo/instance1/shared/.env
 sudo chmod 0640 /srv/cognelo/instance1/shared/.env
 ```
 
@@ -220,34 +238,34 @@ sudo chmod 0640 /srv/cognelo/instance1/shared/.env
 Use a deployment key with read-only repository access if the repository is private. Clone the complete repository once for the instance; do not use `--depth 1`. The local history and tags are useful for verifying deployments, comparing versions, and preparing a rollback without depending on a fresh clone.
 
 ```bash
-sudo -u cognelo-instance1 git clone \
+sudo -u app1 git clone \
   REPOSITORY_URL \
   /srv/cognelo/instance1/repository
 
-sudo -u cognelo-instance1 git -C /srv/cognelo/instance1/repository \
+sudo -u app1 git -C /srv/cognelo/instance1/repository \
   fetch --prune --tags
-sudo -u cognelo-instance1 git -C /srv/cognelo/instance1/repository \
-  rev-parse --verify 'refs/tags/v0.1.0^{commit}'
-sudo -u cognelo-instance1 git -C /srv/cognelo/instance1/repository \
+sudo -u app1 git -C /srv/cognelo/instance1/repository \
+  rev-parse --verify 'refs/tags/cognelo-0.5.0^{commit}'
+sudo -u app1 git -C /srv/cognelo/instance1/repository \
   worktree add --detach \
-  /srv/cognelo/instance1/deployments/v0.1.0 \
-  refs/tags/v0.1.0
+  /srv/cognelo/instance1/deployments/cognelo-0.5.0 \
+  refs/tags/cognelo-0.5.0
 
-sudo -u cognelo-instance1 ln -s ../../shared/.env \
-  /srv/cognelo/instance1/deployments/v0.1.0/.env
-sudo -u cognelo-instance1 ln -s ../../shared/storage \
-  /srv/cognelo/instance1/deployments/v0.1.0/storage
+sudo -u app1 ln -s ../../shared/.env \
+  /srv/cognelo/instance1/deployments/cognelo-0.5.0/.env
+sudo -u app1 ln -s ../../shared/storage \
+  /srv/cognelo/instance1/deployments/cognelo-0.5.0/storage
 ```
 
-`v0.1.0` represents the immutable tag selected for deployment. Annotated, signed tags are recommended and can be verified with `git verify-tag v0.1.0` when signing is configured. Production tags must not be moved or reused; every deployment candidate receives a new tag.
+`cognelo-0.5.0` is the immutable tag selected for this deployment. Annotated, signed tags are recommended and can be verified with `git verify-tag cognelo-0.5.0` when signing is configured. Production tags must not be moved or reused; every deployment candidate receives a new tag.
 
 The `deployments/` directories are filesystem deployment slots, not GitHub Releases. Each one is a detached Git worktree at an exact tag. The storage symlink is mandatory: uploaded course files and homework artifacts currently live below the repository-level `storage/` path, and without the symlink they would be lost when an old deployment is removed.
 
 Install dependencies, generate Prisma clients, verify, and build as the service account:
 
 ```bash
-sudo -u cognelo-instance1 /bin/bash -c '
-  cd /srv/cognelo/instance1/deployments/v0.1.0 &&
+sudo -u app1 /bin/bash -c '
+  cd /srv/cognelo/instance1/deployments/cognelo-0.5.0 &&
   set -a && . ./.env && set +a &&
   npm ci &&
   npm run db:generate &&
@@ -262,8 +280,8 @@ Builds may report the known Turbopack file-tracing warning caused by plugin Pris
 Apply all core and plugin migrations from the new deployment:
 
 ```bash
-sudo -u cognelo-instance1 /bin/bash -c '
-  cd /srv/cognelo/instance1/deployments/v0.1.0 &&
+sudo -u app1 /bin/bash -c '
+  cd /srv/cognelo/instance1/deployments/cognelo-0.5.0 &&
   npm run db:migrate:all
 '
 ```
@@ -273,8 +291,8 @@ Do not run `npm run db:seed` in production. It creates demonstration users, cour
 Point `current` at the tagged deployment:
 
 ```bash
-sudo ln -sfn /srv/cognelo/instance1/deployments/v0.1.0 /srv/cognelo/instance1/current
-sudo chown -h cognelo-instance1:cognelo-instance1 /srv/cognelo/instance1/current
+sudo ln -sfn /srv/cognelo/instance1/deployments/cognelo-0.5.0 /srv/cognelo/instance1/current
+sudo chown -h app1:app1 /srv/cognelo/instance1/current
 ```
 
 ## 9. Create the first administrator
@@ -288,7 +306,7 @@ read -rsp "Initial administrator password: " COGNELO_INITIAL_ADMIN_PASSWORD
 echo
 
 cd /srv/cognelo/instance1/current
-sudo -u cognelo-instance1 env \
+sudo -u app1 env \
   COGNELO_ADMIN_EMAIL="admin@example.org" \
   COGNELO_ADMIN_FIRST_NAME="Ada" \
   COGNELO_ADMIN_LAST_NAME="Admin" \
@@ -302,7 +320,7 @@ The bootstrap password must contain at least 12 characters. If the email already
 
 ## 10. Create systemd services
 
-Create `/etc/systemd/system/cognelo-instance1-api.service`:
+Create `/etc/systemd/system/app1-api.service`:
 
 ```ini
 [Unit]
@@ -313,8 +331,8 @@ Requires=postgresql.service
 
 [Service]
 Type=simple
-User=cognelo-instance1
-Group=cognelo-instance1
+User=app1
+Group=app1
 WorkingDirectory=/srv/cognelo/instance1/current/apps/api
 EnvironmentFile=/srv/cognelo/instance1/shared/.env
 Environment=NODE_ENV=production
@@ -334,18 +352,18 @@ LimitNOFILE=65535
 WantedBy=multi-user.target
 ```
 
-Create `/etc/systemd/system/cognelo-instance1-web.service`:
+Create `/etc/systemd/system/app1-web.service`:
 
 ```ini
 [Unit]
 Description=Cognelo instance1 web
-After=network-online.target cognelo-instance1-api.service
+After=network-online.target app1-api.service
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=cognelo-instance1
-Group=cognelo-instance1
+User=app1
+Group=app1
 WorkingDirectory=/srv/cognelo/instance1/current/apps/web
 EnvironmentFile=/srv/cognelo/instance1/shared/.env
 Environment=NODE_ENV=production
@@ -369,9 +387,9 @@ Load and start them:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now cognelo-instance1-api cognelo-instance1-web
-sudo systemctl status cognelo-instance1-api --no-pager
-sudo systemctl status cognelo-instance1-web --no-pager
+sudo systemctl enable --now app1-api app1-web
+sudo systemctl status app1-api --no-pager
+sudo systemctl status app1-web --no-pager
 ```
 
 Verify the private listeners and health endpoint:
@@ -386,11 +404,11 @@ The health endpoint returns `{"ok":true}` only when the API can query PostgreSQL
 
 ## 11. Configure Apache
 
-Create `/etc/apache2/sites-available/instance1.cognelo.org.conf`:
+Create `/etc/apache2/sites-available/app1.cognelo.org.conf`:
 
 ```apache
 <VirtualHost *:80>
-    ServerName instance1.cognelo.org
+    ServerName app1.cognelo.org
 
     ProxyRequests Off
     ProxyPreserveHost On
@@ -416,11 +434,11 @@ Apache's `ProxyPass` and `ProxyPassReverse` behavior is documented in the [Apach
 Enable and test the site:
 
 ```bash
-sudo a2ensite instance1.cognelo.org.conf
+sudo a2ensite app1.cognelo.org.conf
 sudo apachectl configtest
 sudo systemctl reload apache2
-curl --head http://instance1.cognelo.org/
-curl --fail http://instance1.cognelo.org/api/health
+curl --head http://app1.cognelo.org/
+curl --fail http://app1.cognelo.org/api/health
 ```
 
 ## 12. Enable HTTPS
@@ -433,7 +451,7 @@ sudo snap install core
 sudo snap refresh core
 sudo snap install --classic certbot
 sudo ln -s /snap/bin/certbot /usr/local/bin/certbot
-sudo certbot --apache -d instance1.cognelo.org
+sudo certbot --apache -d app1.cognelo.org
 sudo certbot renew --dry-run
 ```
 
@@ -452,12 +470,12 @@ Recheck:
 ```bash
 sudo apachectl configtest
 sudo systemctl reload apache2
-curl --fail https://instance1.cognelo.org/api/health
+curl --fail https://app1.cognelo.org/api/health
 ```
 
 ## 13. First login and plugin activation
 
-1. Open `https://instance1.cognelo.org/login`.
+1. Open `https://app1.cognelo.org/login`.
 2. Sign in with the bootstrap administrator.
 3. Open **Settings → Plugins**.
 4. Activate and enable only the plugins needed by this instance.
@@ -498,7 +516,7 @@ Install only the tools needed there:
 ```bash
 sudo apt update
 sudo apt full-upgrade -y
-sudo apt install -y ca-certificates curl git openssl ufw
+sudo apt install -y ca-certificates curl git openssl ufw wireguard
 ```
 
 Preserve any existing kernel arguments and add `systemd.unified_cgroup_hierarchy=0` inside `GRUB_CMDLINE_LINUX` in `/etc/default/grub`:
@@ -542,13 +560,7 @@ sudo docker version
 sudo docker compose version
 ```
 
-This follows Docker's maintained [Ubuntu installation procedure](https://docs.docker.com/engine/install/ubuntu/). Configure UFW so the sandbox host exposes SSH only; the container APIs will bind to loopback:
-
-```bash
-sudo ufw allow OpenSSH
-sudo ufw enable
-sudo ufw status verbose
-```
+This follows Docker's maintained [Ubuntu installation procedure](https://docs.docker.com/engine/install/ubuntu/). Do not enable UFW yet; Section 14.6 adds WireGuard and applies the complete sandbox firewall policy before the execution APIs are made reachable.
 
 Create a system account and directories for the first instance:
 
@@ -567,7 +579,7 @@ sudo install -d -m 0750 \
 
 ### 14.2 Check out the same application tag
 
-The runner source and its Playwright dependency belong to the Cognelo tag being deployed. Clone the complete repository and check out that same immutable tag; the example continues to use `v0.1.0`:
+The runner source and its Playwright dependency belong to the Cognelo tag being deployed. Clone the complete repository and check out that same immutable tag; the example continues to use `cognelo-0.5.0`:
 
 ```bash
 sudo -u cognelo-sandbox-instance1 git clone \
@@ -579,23 +591,23 @@ sudo -u cognelo-sandbox-instance1 git \
   fetch --prune --tags
 sudo -u cognelo-sandbox-instance1 git \
   -C /srv/cognelo-sandboxes/instance1/repository/source \
-  rev-parse --verify 'refs/tags/v0.1.0^{commit}'
+  rev-parse --verify 'refs/tags/cognelo-0.5.0^{commit}'
 sudo -u cognelo-sandbox-instance1 git \
   -C /srv/cognelo-sandboxes/instance1/repository/source \
   worktree add --detach \
-  /srv/cognelo-sandboxes/instance1/deployments/v0.1.0 \
-  refs/tags/v0.1.0
+  /srv/cognelo-sandboxes/instance1/deployments/cognelo-0.5.0 \
+  refs/tags/cognelo-0.5.0
 ```
 
 Copy the versioned runtime templates into the instance's persistent runtime directory:
 
 ```bash
 sudo install -m 0644 \
-  /srv/cognelo-sandboxes/instance1/deployments/v0.1.0/infra/production/sandbox.compose.yml \
+  /srv/cognelo-sandboxes/instance1/deployments/cognelo-0.5.0/infra/production/sandbox.compose.yml \
   /srv/cognelo-sandboxes/instance1/runtime/sandbox.compose.yml
 
 sudo install -m 0600 \
-  /srv/cognelo-sandboxes/instance1/deployments/v0.1.0/infra/production/judge0.conf.example \
+  /srv/cognelo-sandboxes/instance1/deployments/cognelo-0.5.0/infra/production/judge0.conf.example \
   /srv/cognelo-sandboxes/instance1/runtime/judge0.conf
 ```
 
@@ -616,7 +628,7 @@ sudo grep -n 'REPLACE_' /srv/cognelo-sandboxes/instance1/runtime/judge0.conf
 The final `grep` must print nothing. Preserve the Judge0 authentication token in the application host's `/srv/cognelo/instance1/shared/.env`:
 
 ```dotenv
-JUDGE0_BASE_URL="http://127.0.0.1:2358"
+JUDGE0_BASE_URL="http://10.80.0.2:2358"
 JUDGE0_AUTH_HEADER="X-Auth-Token"
 JUDGE0_AUTH_TOKEN="PASTE_THE_SAME_AUTHN_TOKEN"
 JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS=true
@@ -631,12 +643,12 @@ The repository currently depends on `@playwright/test` `1.59.1`, so the producti
 Build a local immutable image from the selected Cognelo tag:
 
 ```bash
-cd /srv/cognelo-sandboxes/instance1/deployments/v0.1.0
+cd /srv/cognelo-sandboxes/instance1/deployments/cognelo-0.5.0
 sudo docker build \
   --file infra/production/web-design-runner.Dockerfile \
-  --tag cognelo/web-design-runner:v0.1.0 \
+  --tag cognelo/web-design-runner:cognelo-0.5.0 \
   .
-sudo docker image inspect cognelo/web-design-runner:v0.1.0 \
+sudo docker image inspect cognelo/web-design-runner:cognelo-0.5.0 \
   --format '{{.Id}}'
 ```
 
@@ -651,17 +663,17 @@ sha256sum /srv/cognelo-sandboxes/instance1/runtime/seccomp_profile.json
 
 Microsoft's image includes browser binaries and system dependencies but not the Node package. The Cognelo image adds the locked runner package, switches to `pwuser`, and starts only the runner. The Compose service adds the Chromium seccomp profile, drops Linux capabilities, makes the root filesystem read-only, gives Chromium bounded temporary storage, and applies CPU, memory, and PID limits. The official image alone is not a complete security boundary for untrusted content; the dedicated host and blocked outbound network are also required. See [Playwright's Docker security notes](https://playwright.dev/docs/docker#run-the-image).
 
-### 14.5 Configure and start the sandbox stack
+### 14.5 Configure the sandbox stack
 
 Create `/srv/cognelo-sandboxes/instance1/runtime/.env`:
 
 ```dotenv
-COMPOSE_PROJECT_NAME=cognelo-instance1-sandbox
-SANDBOX_BIND_ADDRESS=127.0.0.1
+COMPOSE_PROJECT_NAME=app1-sandbox
+SANDBOX_BIND_ADDRESS=10.80.0.2
 JUDGE0_PORT=2358
 WEB_DESIGN_RUNNER_PORT=3456
 JUDGE0_IMAGE=judge0/judge0:1.13.1
-WEB_DESIGN_RUNNER_IMAGE=cognelo/web-design-runner:v0.1.0
+WEB_DESIGN_RUNNER_IMAGE=cognelo/web-design-runner:cognelo-0.5.0
 PLAYWRIGHT_SECCOMP_PROFILE=/srv/cognelo-sandboxes/instance1/runtime/seccomp_profile.json
 ```
 
@@ -678,9 +690,132 @@ sudo docker compose --env-file .env -f sandbox.compose.yml \
 
 `judge0/judge0:1.13.1`, `postgres:16.2`, `redis:7.2.4`, and the Playwright base image are pinned rather than `latest`. For even stricter supply-chain control, replace each tag with the image digest printed by `docker image inspect --format '{{index .RepoDigests 0}}' IMAGE` after the first approved pull.
 
-Start Judge0's data services first, inspect them, and then start the complete stack:
+Do not start the stack until the sandbox WireGuard address exists in Section 14.6; Docker cannot bind `10.80.0.2` before that interface is up.
+
+### 14.6 Create the WireGuard point-to-point network
+
+WireGuard gives the two VPSs stable private addresses over their fixed public IPs. The application VPS initiates the tunnel to the sandbox VPS. Judge0 and Playwright bind only to the sandbox WireGuard address, and the sandbox firewall admits those ports only from the application WireGuard address.
+
+Ubuntu documents `wg-quick@INTERFACE` as the systemd-managed mechanism for bringing a permanent WireGuard interface back after reboot: [Ubuntu WireGuard common tasks](https://ubuntu.com/server/docs/how-to/wireguard-vpn/common-tasks/) and [site-to-site configuration](https://documentation.ubuntu.com/server/how-to/wireguard-vpn/site-to-site/).
+
+Install WireGuard on the **application host**; it was installed on the sandbox host in Section 14.1:
 
 ```bash
+sudo apt update
+sudo apt install -y wireguard
+```
+
+On **each host**, generate an independent private key and print only its derived public key for exchange:
+
+```bash
+sudo install -d -m 0700 /etc/wireguard
+sudo sh -c 'umask 077; wg genkey > /etc/wireguard/private.key'
+sudo sh -c 'wg pubkey < /etc/wireguard/private.key'
+```
+
+Record which public key belongs to which host. Never copy either `private.key` off its host or include it in documentation, backups without encryption, shell history, or support messages.
+
+Create `/etc/wireguard/wg0.conf` on the **application host**:
+
+```ini
+[Interface]
+Address = 10.80.0.1/30
+PostUp = wg set %i private-key /etc/wireguard/private.key
+
+[Peer]
+PublicKey = SANDBOX_WIREGUARD_PUBLIC_KEY
+AllowedIPs = 10.80.0.2/32
+Endpoint = SANDBOX_PUBLIC_IPV4:51820
+PersistentKeepalive = 25
+```
+
+Create `/etc/wireguard/wg0.conf` on the **sandbox host**:
+
+```ini
+[Interface]
+Address = 10.80.0.2/30
+ListenPort = 51820
+PostUp = wg set %i private-key /etc/wireguard/private.key
+
+[Peer]
+PublicKey = APPLICATION_WIREGUARD_PUBLIC_KEY
+AllowedIPs = 10.80.0.1/32
+```
+
+Protect both configuration files:
+
+```bash
+sudo chmod 0600 /etc/wireguard/wg0.conf /etc/wireguard/private.key
+```
+
+Configure the **sandbox host** firewall. Replace `APPLICATION_PUBLIC_IPV4` and `ADMIN_CIDR` before running these commands. `ADMIN_CIDR` should be the smallest stable source range from which administrators connect; do not lock out the current SSH session before validating it:
+
+```bash
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow from ADMIN_CIDR to any port 22 proto tcp
+sudo ufw allow from APPLICATION_PUBLIC_IPV4 to any port 51820 proto udp
+sudo ufw allow in on wg0 from 10.80.0.1 to 10.80.0.2 port 2358 proto tcp
+sudo ufw allow in on wg0 from 10.80.0.1 to 10.80.0.2 port 3456 proto tcp
+sudo ufw enable
+sudo ufw status verbose
+```
+
+Do not add public-interface rules for `2358` or `3456`. Docker-published ports must still bind specifically to `10.80.0.2`; firewall rules are defense in depth, not a substitute for interface-specific binding.
+
+Enable WireGuard first on the sandbox host and then on the application host:
+
+```bash
+sudo systemctl enable --now wg-quick@wg0
+sudo systemctl status wg-quick@wg0 --no-pager
+sudo wg show wg0
+```
+
+Because Docker publishes the sandbox APIs specifically on `10.80.0.2`, make the dedicated sandbox host's Docker service depend on that address existing after every reboot. On the sandbox host, create `/etc/systemd/system/docker.service.d/wireguard.conf`:
+
+```ini
+[Unit]
+After=wg-quick@wg0.service
+Requires=wg-quick@wg0.service
+```
+
+This sandbox VPS is dedicated to workloads that require `wg0`, so preventing Docker from starting when WireGuard configuration is broken is safer than starting containers with failed port bindings. Load the dependency now; restarting Docker is safe here because the sandbox stack has not been started yet:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+sudo systemctl status docker --no-pager
+```
+
+From the application host, verify that the peer has completed an authenticated handshake:
+
+```bash
+sudo wg show wg0
+```
+
+`PersistentKeepalive` should produce a recent handshake within approximately 25 seconds even before the sandbox services start. If it does not, verify both public keys, `AllowedIPs`, the sandbox endpoint address, UDP `51820`, and the sandbox UFW rule. Section 14.7 verifies actual TCP service traffic after the containers start.
+
+Make the Cognelo API start after WireGuard without making the whole application unavailable when the sandbox is down. Create `/etc/systemd/system/app1-api.service.d/sandbox.conf` on the application host:
+
+```ini
+[Unit]
+After=wg-quick@wg0.service
+Wants=wg-quick@wg0.service
+```
+
+`Wants`, rather than `Requires`, is intentional: MCQ, Parsons, content, administration, and other non-sandbox features should still start if the sandbox VPS is temporarily unavailable.
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart app1-api
+```
+
+### 14.7 Run end-to-end sandbox smoke tests
+
+On the sandbox host, start Judge0's data services first, inspect them, and then start the complete stack:
+
+```bash
+cd /srv/cognelo-sandboxes/instance1/runtime
 sudo docker compose --env-file .env -f sandbox.compose.yml \
   up -d judge0-db judge0-redis
 sudo docker compose --env-file .env -f sandbox.compose.yml ps
@@ -690,138 +825,13 @@ sudo docker compose --env-file .env -f sandbox.compose.yml \
 sudo docker compose --env-file .env -f sandbox.compose.yml up -d
 sudo docker compose --env-file .env -f sandbox.compose.yml ps
 sudo docker compose --env-file .env -f sandbox.compose.yml logs --tail=200
-sudo ss -ltnp | grep -E '127\.0\.0\.1:(2358|3456)\b'
+sudo ss -ltnp | grep -E '10\.80\.0\.2:(2358|3456)\b'
+curl --fail http://10.80.0.2:3456/health
 ```
 
-Both published ports must show `127.0.0.1`, never `0.0.0.0`, `[::]`, a private LAN address, or a public address. The Compose network is marked `internal`, so neither learner code nor Chromium can make outbound requests. Consequently, web-design exercises must include the required HTML, CSS, and JavaScript instead of loading CDN assets.
+Both published ports must show only `10.80.0.2`, never `0.0.0.0`, `[::]`, or the sandbox public address. The Compose network is marked `internal`, so neither learner code nor Chromium can make outbound requests. Consequently, web-design exercises must include required HTML, CSS, JavaScript, and other assets rather than loading them from CDNs.
 
-Check the runner locally on the sandbox host:
-
-```bash
-curl --fail http://127.0.0.1:3456/health
-```
-
-Judge0 requires its token even on loopback. Read it without adding it to shell history, then verify the language list:
-
-```bash
-read -rsp "Judge0 AUTHN_TOKEN: " JUDGE0_SMOKE_TOKEN
-echo
-curl --fail \
-  --header "X-Auth-Token: ${JUDGE0_SMOKE_TOKEN}" \
-  http://127.0.0.1:2358/languages
-unset JUDGE0_SMOKE_TOKEN
-```
-
-### 14.6 Create the restricted SSH tunnel
-
-The sandbox APIs have no network listener, so the application host reaches them through a persistent local-forwarding SSH connection.
-
-On the **application host**, generate a dedicated key as the instance service account:
-
-```bash
-sudo -u cognelo-instance1 ssh-keygen \
-  -t ed25519 -N '' \
-  -f /srv/cognelo/instance1/shared/sandbox_tunnel_ed25519
-sudo cat /srv/cognelo/instance1/shared/sandbox_tunnel_ed25519.pub
-```
-
-On the **sandbox host**, create a tunnel-only account and its authorized-keys file:
-
-```bash
-sudo useradd --system --create-home \
-  --home-dir /srv/cognelo-tunnels/instance1 \
-  --shell /usr/sbin/nologin \
-  cognelo-tunnel-instance1
-sudo install -d -m 0700 \
-  -o cognelo-tunnel-instance1 -g cognelo-tunnel-instance1 \
-  /srv/cognelo-tunnels/instance1/.ssh
-sudo install -m 0600 \
-  -o cognelo-tunnel-instance1 -g cognelo-tunnel-instance1 \
-  /dev/null /srv/cognelo-tunnels/instance1/.ssh/authorized_keys
-sudo nano /srv/cognelo-tunnels/instance1/.ssh/authorized_keys
-```
-
-Insert the public key on one line, preceded by restrictions exactly like this:
-
-```text
-restrict,port-forwarding,permitopen="127.0.0.1:2358",permitopen="127.0.0.1:3456" ssh-ed25519 PASTE_PUBLIC_KEY cognelo-instance1
-```
-
-This key cannot allocate a terminal, use agent/X11 forwarding, or forward arbitrary destinations. Confirm that `/etc/ssh/sshd_config` does not globally disable TCP forwarding, then reload SSH after any change:
-
-```bash
-sudo sshd -t
-sudo systemctl reload ssh
-sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
-```
-
-Record the displayed sandbox-host fingerprint through the server console or another trusted channel. On the **application host**, collect the host key and verify that its fingerprint matches before continuing:
-
-```bash
-sudo -u cognelo-instance1 ssh-keyscan -H SANDBOX_PRIVATE_IP_OR_NAME \
-  | sudo tee /srv/cognelo/instance1/shared/sandbox_known_hosts >/dev/null
-sudo chown cognelo-instance1:cognelo-instance1 \
-  /srv/cognelo/instance1/shared/sandbox_known_hosts
-sudo chmod 0644 /srv/cognelo/instance1/shared/sandbox_known_hosts
-sudo ssh-keygen -lf /srv/cognelo/instance1/shared/sandbox_known_hosts
-```
-
-Create `/etc/systemd/system/cognelo-instance1-sandbox-tunnel.service` on the application host:
-
-```ini
-[Unit]
-Description=Cognelo instance1 sandbox SSH tunnel
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=cognelo-instance1
-Group=cognelo-instance1
-ExecStart=/usr/bin/ssh -NT \
-  -o BatchMode=yes \
-  -o ExitOnForwardFailure=yes \
-  -o ServerAliveInterval=30 \
-  -o ServerAliveCountMax=3 \
-  -o StrictHostKeyChecking=yes \
-  -o UserKnownHostsFile=/srv/cognelo/instance1/shared/sandbox_known_hosts \
-  -i /srv/cognelo/instance1/shared/sandbox_tunnel_ed25519 \
-  -L 127.0.0.1:2358:127.0.0.1:2358 \
-  -L 127.0.0.1:3456:127.0.0.1:3456 \
-  cognelo-tunnel-instance1@SANDBOX_PRIVATE_IP_OR_NAME
-Restart=always
-RestartSec=5
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Make the API start after the tunnel by creating `/etc/systemd/system/cognelo-instance1-api.service.d/sandbox.conf`:
-
-```ini
-[Unit]
-After=cognelo-instance1-sandbox-tunnel.service
-Wants=cognelo-instance1-sandbox-tunnel.service
-```
-
-Enable the tunnel and verify the local forwards:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now cognelo-instance1-sandbox-tunnel
-sudo systemctl restart cognelo-instance1-api
-sudo systemctl status cognelo-instance1-sandbox-tunnel --no-pager
-sudo ss -ltnp | grep -E '127\.0\.0\.1:(2358|3456)\b'
-curl --fail http://127.0.0.1:3456/health
-```
-
-### 14.7 Run end-to-end sandbox smoke tests
-
-On the application host, verify an actual Judge0 compilation/execution. This example discovers the installed Python 3 language ID instead of hard-coding one:
+On the application host, verify an actual Judge0 compilation/execution over WireGuard. This example discovers the installed Python 3 language ID instead of hard-coding one:
 
 ```bash
 sudo apt install -y jq
@@ -831,7 +841,7 @@ echo
 PYTHON_LANGUAGE_ID=$(
   curl --fail --silent --show-error \
     --header "X-Auth-Token: ${JUDGE0_SMOKE_TOKEN}" \
-    http://127.0.0.1:2358/languages \
+    http://10.80.0.2:2358/languages \
   | jq -r '[.[] | select(.name | startswith("Python (3"))][0].id'
 )
 test -n "${PYTHON_LANGUAGE_ID}" && test "${PYTHON_LANGUAGE_ID}" != "null"
@@ -841,7 +851,7 @@ curl --fail --silent --show-error \
   --header "Content-Type: application/json" \
   --header "X-Auth-Token: ${JUDGE0_SMOKE_TOKEN}" \
   --data "{\"language_id\":${PYTHON_LANGUAGE_ID},\"source_code\":\"print(2 + 3)\",\"expected_output\":\"5\"}" \
-  'http://127.0.0.1:2358/submissions?base64_encoded=false&wait=true' \
+  'http://10.80.0.2:2358/submissions?base64_encoded=false&wait=true' \
   | jq
 
 unset JUDGE0_SMOKE_TOKEN PYTHON_LANGUAGE_ID
@@ -874,7 +884,7 @@ JSON
 curl --fail --silent --show-error \
   --header 'Content-Type: application/json' \
   --data-binary @/tmp/cognelo-runner-smoke.json \
-  http://127.0.0.1:3456/run \
+  http://10.80.0.2:3456/run \
   | jq
 rm /tmp/cognelo-runner-smoke.json
 ```
@@ -882,14 +892,14 @@ rm /tmp/cognelo-runner-smoke.json
 The runner result must report `status: "completed"`, `score: 1`, and `maxScore: 1`. Finally:
 
 1. restart the sandbox host and application host separately;
-2. confirm the Compose stack and SSH tunnel return automatically;
+2. confirm the Compose stack and both `wg-quick@wg0` units return automatically;
 3. activate the required plugins under **Settings → Plugins**;
 4. submit one small coding exercise and one web-design exercise through the Cognelo UI;
 5. confirm both results reach the gradebook.
 
 ### 14.8 Same-host fallback
 
-For a small installation with only one Ubuntu server, the same Compose project can run there with `SANDBOX_BIND_ADDRESS=127.0.0.1`; omit the SSH tunnel and retain the loopback URLs in Cognelo's `.env`. This is operationally simpler, but Judge0's server and worker containers are privileged. A container escape or kernel vulnerability would then place Cognelo, PostgreSQL, uploaded files, and every co-located instance in the same failure domain. The dedicated sandbox VM is therefore the production reference, not merely a performance optimization.
+For a small non-production installation with only one Ubuntu server, the same Compose project can run there with `SANDBOX_BIND_ADDRESS=127.0.0.1`; omit WireGuard and use loopback URLs in Cognelo's `.env`. This is operationally simpler, but Judge0's server and worker containers are privileged. A container escape or kernel vulnerability would then place Cognelo, PostgreSQL, uploaded files, and every co-located instance in the same failure domain. The two-VPS deployment is therefore the production reference, not merely a performance optimization.
 
 ## 15. Add another Cognelo instance
 
@@ -905,29 +915,29 @@ Repeat Sections 3–14 with a new inventory row. In particular:
 8. create a separate Apache virtual host and certificate;
 9. create a separate administrator;
 10. verify that the storage symlink points to that instance's own shared storage;
-11. create a separate sandbox Compose project, Judge0 database volume, Judge0 token, and tunnel account;
-12. assign unused Judge0 and runner ports at both ends of the tunnel.
+11. create a separate sandbox Compose project, Judge0 database volume, and Judge0 token;
+12. assign an unused WireGuard interface/subnet and unused Judge0 and runner ports.
 
 For example, keep `instance1` on Judge0 `2358` and runner `3456`, then use `2359` and `3457` for `instance2`. Its sandbox `runtime/.env` contains:
 
 ```dotenv
-COMPOSE_PROJECT_NAME=cognelo-instance2-sandbox
-SANDBOX_BIND_ADDRESS=127.0.0.1
+COMPOSE_PROJECT_NAME=app2-sandbox
+SANDBOX_BIND_ADDRESS=10.80.0.6
 JUDGE0_PORT=2359
 WEB_DESIGN_RUNNER_PORT=3457
 JUDGE0_IMAGE=judge0/judge0:1.13.1
-WEB_DESIGN_RUNNER_IMAGE=cognelo/web-design-runner:v0.1.0
+WEB_DESIGN_RUNNER_IMAGE=cognelo/web-design-runner:cognelo-0.5.0
 PLAYWRIGHT_SECCOMP_PROFILE=/srv/cognelo-sandboxes/instance2/runtime/seccomp_profile.json
 ```
 
-Its tunnel uses:
+Use a separate WireGuard interface such as `wg1` with application address `10.80.0.5/30`, sandbox address `10.80.0.6/30`, and sandbox UDP port `51821`. Extend the sandbox firewall with only that peer and those instance-specific service ports. Its application `.env` uses:
 
-```text
--L 127.0.0.1:2359:127.0.0.1:2359
--L 127.0.0.1:3457:127.0.0.1:3457
+```dotenv
+JUDGE0_BASE_URL="http://10.80.0.6:2359"
+WEB_DESIGN_RUNNER_URL="http://10.80.0.6:3457"
 ```
 
-and its application `.env` uses `http://127.0.0.1:2359` and `http://127.0.0.1:3457`. Do not share a Judge0 token or Compose project between instances. Separate projects avoid cross-instance database, queue, capacity, and lifecycle coupling. The same locally built runner image may be reused only when both instances run the exact same Cognelo tag.
+Do not share a Judge0 token, Compose project, WireGuard keys, or WireGuard subnet between instances. Separate projects avoid cross-instance database, queue, capacity, and lifecycle coupling. The same locally built runner image may be reused only when both instances run the exact same Cognelo tag.
 
 Useful collision checks:
 
@@ -940,7 +950,7 @@ sudo apachectl -S
 sudo docker ps --format 'table {{.Names}}\t{{.Ports}}'
 ```
 
-Multiple instances may share the application host's PostgreSQL service and Apache process and may use the same dedicated sandbox VM, but they do not share databases, files, sessions, service accounts, Node processes, Compose projects, Judge0 state, or tunnel credentials.
+Multiple instances may share the application host's PostgreSQL service and Apache process and may use the same dedicated sandbox VM, but they do not share databases, files, sessions, service accounts, Node processes, Compose projects, Judge0 state, WireGuard subnets, or WireGuard keys.
 
 ## 16. Backups
 
@@ -964,12 +974,12 @@ sudo tar -C /srv/cognelo/instance1/shared \
 Copy backups to encrypted off-host storage, define retention, and test restores regularly. For a strict point-in-time pair, briefly stop the API while taking both backups:
 
 ```bash
-sudo systemctl stop cognelo-instance1-api
+sudo systemctl stop app1-api
 # Run pg_dump and the storage archive.
-sudo systemctl start cognelo-instance1-api
+sudo systemctl start app1-api
 ```
 
-The Playwright runner is stateless and is rebuilt from a Cognelo tag. Preserve the sandbox `runtime/.env`, `judge0.conf`, SSH authorized keys, image digests, and seccomp checksum in the protected configuration backup. Cognelo stores grading outcomes in its own database, so Judge0's submission database is not part of the authoritative Cognelo backup. If an organization nevertheless requires Judge0 submission retention, dump its container database separately:
+The Playwright runner is stateless and is rebuilt from a Cognelo tag. Preserve the sandbox `runtime/.env`, `judge0.conf`, encrypted WireGuard configuration/key backups, image digests, and seccomp checksum in the protected configuration backup. Cognelo stores grading outcomes in its own database, so Judge0's submission database is not part of the authoritative Cognelo backup. If an organization nevertheless requires Judge0 submission retention, dump its container database separately:
 
 ```bash
 cd /srv/cognelo-sandboxes/instance1/runtime
@@ -1014,13 +1024,13 @@ When the tag changes `packages/web-design-runner`, its dependencies, or `infra/p
 5. run `docker compose config --quiet`, recreate the runner, and repeat both sandbox smoke tests;
 6. deploy the application tag only after the matching runner passes.
 
-Example runner update for `v0.2.0` on the sandbox host:
+Example runner update for a future `cognelo-0.6.0` tag on the sandbox host:
 
 ```bash
-cd /srv/cognelo-sandboxes/instance1/deployments/v0.2.0
+cd /srv/cognelo-sandboxes/instance1/deployments/cognelo-0.6.0
 sudo docker build \
   --file infra/production/web-design-runner.Dockerfile \
-  --tag cognelo/web-design-runner:v0.2.0 \
+  --tag cognelo/web-design-runner:cognelo-0.6.0 \
   .
 
 sudo nano /srv/cognelo-sandboxes/instance1/runtime/.env
@@ -1028,30 +1038,30 @@ cd /srv/cognelo-sandboxes/instance1/runtime
 sudo docker compose --env-file .env -f sandbox.compose.yml config --quiet
 sudo docker compose --env-file .env -f sandbox.compose.yml \
   up -d --no-deps web-design-runner
-curl --fail http://127.0.0.1:3456/health
+curl --fail http://10.80.0.2:3456/health
 ```
 
 Judge0, PostgreSQL, Redis, and Playwright base-image upgrades are separate dependency upgrades, not routine restarts. Change a pinned version in a reviewed Cognelo tag, read its upstream migration notes, back up any retained Judge0 data, pull/build it, run the smoke tests, and then roll it into production. Never use an unattended `docker compose pull` against mutable tags.
 
-Example update to tag `v0.2.0`:
+Example update to a future `cognelo-0.6.0` tag:
 
 ```bash
-sudo -u cognelo-instance1 git -C /srv/cognelo/instance1/repository \
+sudo -u app1 git -C /srv/cognelo/instance1/repository \
   fetch --prune --tags
-sudo -u cognelo-instance1 git -C /srv/cognelo/instance1/repository \
-  rev-parse --verify 'refs/tags/v0.2.0^{commit}'
-sudo -u cognelo-instance1 git -C /srv/cognelo/instance1/repository \
+sudo -u app1 git -C /srv/cognelo/instance1/repository \
+  rev-parse --verify 'refs/tags/cognelo-0.6.0^{commit}'
+sudo -u app1 git -C /srv/cognelo/instance1/repository \
   worktree add --detach \
-  /srv/cognelo/instance1/deployments/v0.2.0 \
-  refs/tags/v0.2.0
+  /srv/cognelo/instance1/deployments/cognelo-0.6.0 \
+  refs/tags/cognelo-0.6.0
 
-sudo -u cognelo-instance1 ln -s ../../shared/.env \
-  /srv/cognelo/instance1/deployments/v0.2.0/.env
-sudo -u cognelo-instance1 ln -s ../../shared/storage \
-  /srv/cognelo/instance1/deployments/v0.2.0/storage
+sudo -u app1 ln -s ../../shared/.env \
+  /srv/cognelo/instance1/deployments/cognelo-0.6.0/.env
+sudo -u app1 ln -s ../../shared/storage \
+  /srv/cognelo/instance1/deployments/cognelo-0.6.0/storage
 
-sudo -u cognelo-instance1 /bin/bash -c '
-  cd /srv/cognelo/instance1/deployments/v0.2.0 &&
+sudo -u app1 /bin/bash -c '
+  cd /srv/cognelo/instance1/deployments/cognelo-0.6.0 &&
   set -a && . ./.env && set +a &&
   npm ci &&
   npm run db:generate &&
@@ -1060,15 +1070,15 @@ sudo -u cognelo-instance1 /bin/bash -c '
   npm run build
 '
 
-sudo systemctl stop cognelo-instance1-api
-sudo -u cognelo-instance1 /bin/bash -c '
-  cd /srv/cognelo/instance1/deployments/v0.2.0 && npm run db:migrate:all
+sudo systemctl stop app1-api
+sudo -u app1 /bin/bash -c '
+  cd /srv/cognelo/instance1/deployments/cognelo-0.6.0 && npm run db:migrate:all
 '
-sudo ln -sfn /srv/cognelo/instance1/deployments/v0.2.0 /srv/cognelo/instance1/current
-sudo chown -h cognelo-instance1:cognelo-instance1 /srv/cognelo/instance1/current
-sudo systemctl restart cognelo-instance1-api cognelo-instance1-web
+sudo ln -sfn /srv/cognelo/instance1/deployments/cognelo-0.6.0 /srv/cognelo/instance1/current
+sudo chown -h app1:app1 /srv/cognelo/instance1/current
+sudo systemctl restart app1-api app1-web
 curl --fail http://127.0.0.1:3101/api/health
-curl --fail https://instance1.cognelo.org/api/health
+curl --fail https://app1.cognelo.org/api/health
 ```
 
 Code rollback is a symlink switch to a previous tag only when the new database migrations are backward-compatible. Otherwise restore the pre-deployment database and storage backups before starting the previous tagged deployment.
@@ -1076,9 +1086,9 @@ Code rollback is a symlink switch to a previous tag only when the new database m
 After a deployment is accepted and no longer needed for rollback, remove its worktree through Git rather than deleting it by hand:
 
 ```bash
-sudo -u cognelo-instance1 git -C /srv/cognelo/instance1/repository \
-  worktree remove /srv/cognelo/instance1/deployments/v0.1.0
-sudo -u cognelo-instance1 git -C /srv/cognelo/instance1/repository \
+sudo -u app1 git -C /srv/cognelo/instance1/repository \
+  worktree remove /srv/cognelo/instance1/deployments/cognelo-0.5.0
+sudo -u app1 git -C /srv/cognelo/instance1/repository \
   worktree prune
 ```
 
@@ -1086,9 +1096,9 @@ sudo -u cognelo-instance1 git -C /srv/cognelo/instance1/repository \
 
 ```bash
 # Node services
-sudo journalctl -u cognelo-instance1-api -n 200 --no-pager
-sudo journalctl -u cognelo-instance1-web -n 200 --no-pager
-sudo journalctl -u cognelo-instance1-api -f
+sudo journalctl -u app1-api -n 200 --no-pager
+sudo journalctl -u app1-web -n 200 --no-pager
+sudo journalctl -u app1-api -f
 
 # Apache
 sudo tail -f /var/log/apache2/instance1-cognelo-error.log
@@ -1097,9 +1107,10 @@ sudo tail -f /var/log/apache2/instance1-cognelo-access.log
 # PostgreSQL
 sudo journalctl -u postgresql -n 200 --no-pager
 
-# SSH tunnel on the application host
-sudo journalctl -u cognelo-instance1-sandbox-tunnel -n 200 --no-pager
-sudo systemctl status cognelo-instance1-sandbox-tunnel --no-pager
+# WireGuard on both hosts
+sudo journalctl -u wg-quick@wg0 -n 200 --no-pager
+sudo systemctl status wg-quick@wg0 --no-pager
+sudo wg show wg0
 
 # Configuration and listeners
 sudo apachectl configtest
@@ -1107,9 +1118,9 @@ sudo apachectl -S
 sudo ss -ltnp
 
 # Service and application health
-systemctl is-active cognelo-instance1-api cognelo-instance1-web apache2 postgresql
+systemctl is-active app1-api app1-web apache2 postgresql
 curl --fail http://127.0.0.1:3101/api/health
-curl --fail https://instance1.cognelo.org/api/health
+curl --fail https://app1.cognelo.org/api/health
 ```
 
 On the sandbox host:
@@ -1121,8 +1132,8 @@ sudo docker compose --env-file .env -f sandbox.compose.yml logs --tail=200
 sudo docker compose --env-file .env -f sandbox.compose.yml logs -f judge0-server judge0-workers
 sudo docker compose --env-file .env -f sandbox.compose.yml logs -f web-design-runner
 sudo docker stats
-sudo ss -ltnp | grep -E '127\.0\.0\.1:(2358|3456)\b'
-curl --fail http://127.0.0.1:3456/health
+sudo ss -ltnp | grep -E '10\.80\.0\.2:(2358|3456)\b'
+curl --fail http://10.80.0.2:3456/health
 ```
 
 Common failure causes:
@@ -1133,7 +1144,7 @@ Common failure causes:
 - Upload succeeds but files disappear after deployment: the deployment's `storage` symlink is missing or points to the wrong instance.
 - A plugin is absent from the picker: activate and enable it in administrator settings; also verify its external dependency when applicable.
 - Browser calls the wrong hostname: rebuild the web application after correcting `NEXT_PUBLIC_API_URL`; changing it only at runtime is insufficient.
-- `ECONNREFUSED` for Judge0 or the runner: check the tunnel unit on the application host, then `docker compose ps` and logs on the sandbox host.
+- `ECONNREFUSED` for Judge0 or the runner: check the latest handshake with `wg show wg0` on the application host, then the WireGuard/UFW configuration and `docker compose ps` and logs on the sandbox host.
 - Judge0 returns `401 Unauthorized`: ensure `AUTHN_TOKEN` in `judge0.conf` exactly matches `JUDGE0_AUTH_TOKEN` in the instance `.env`, then restart the API after correcting it.
 - Judge0 returns a limit validation error: compare the limits sent by the coding-exercise plugin with `MAX_*` and `ALLOW_ENABLE_*` in `judge0.conf`.
 - Chromium fails to launch: verify the runner image version matches `@playwright/test`, the official seccomp profile is readable, and the container is running as `pwuser`; inspect runner logs before changing security options.
@@ -1143,7 +1154,7 @@ Common failure causes:
 
 - Use SSH keys and restrict SSH source addresses where practical.
 - Keep Ubuntu, Node.js, Apache, PostgreSQL, and sandbox images patched.
-- On the application host expose only 22, 80, and 443; on the sandbox host expose only 22. Restrict SSH source addresses where possible.
+- On the application host expose only 22, 80, and 443. On the sandbox host expose only restricted SSH and WireGuard UDP from the application public IP. Restrict SSH source addresses where possible.
 - Keep PostgreSQL and Node listeners on loopback.
 - Use a unique JWT secret and database credentials per instance.
 - Protect `.env`, backups, and deploy keys; never commit them.
@@ -1151,8 +1162,8 @@ Common failure causes:
 - Do not use the development seed in production.
 - Do not deploy the development runner Compose configuration as production.
 - Keep untrusted code execution off the database/application host when possible.
-- Bind sandbox APIs to loopback, restrict the SSH key with `permitopen`, and verify the SSH host fingerprint.
-- Keep each instance's sandbox Compose project, Judge0 token, ports, volume, and tunnel key separate.
+- Bind sandbox APIs only to their sandbox WireGuard address, never to the public interface; allow those ports on `wg0` only from the matching application WireGuard address.
+- Keep each instance's sandbox Compose project, Judge0 token, ports, volume, WireGuard subnet, and WireGuard keys separate.
 - Run the Playwright runner as `pwuser` with the checked-in resource limits and the matching official seccomp profile.
 - Keep the sandbox Compose network internal; do not grant learner executions outbound access without a separately reviewed proxy policy.
 - Pin sandbox images and record approved image digests; do not deploy `latest`.
@@ -1164,15 +1175,15 @@ Common failure causes:
 
 - [ ] DNS resolves only to intended addresses.
 - [ ] UFW exposes only approved public ports.
-- [ ] PostgreSQL, web, API, Judge0, and the Playwright runner are not publicly reachable.
+- [ ] PostgreSQL, direct Node web/API listeners, Judge0, and the Playwright runner are not publicly reachable; only Apache exposes Cognelo over HTTPS.
 - [ ] Core and plugin migrations complete without errors.
 - [ ] `/api/health` succeeds locally and through HTTPS.
 - [ ] The administrator can sign in and change their password.
 - [ ] Required plugins are activated and enabled; unused plugins remain disabled.
 - [ ] An uploaded file survives a service restart and deployment switch.
 - [ ] A representative student submission reaches the gradebook.
-- [ ] Sandbox containers bind only to sandbox-host loopback and have no outbound network.
-- [ ] The restricted SSH tunnel restarts automatically and exposes only instance-specific application-host loopback ports.
+- [ ] Sandbox containers bind only to the sandbox WireGuard address and have no outbound network.
+- [ ] Both WireGuard interfaces return automatically after reboot, show a recent handshake, and expose no sandbox API on the public interface.
 - [ ] Judge0 authentication rejects a missing/incorrect token and accepts the configured token.
 - [ ] The Judge0 Python execution smoke test returns `Accepted` and `5`.
 - [ ] The Playwright runner smoke test reports `completed`, `1 / 1`.
