@@ -1946,6 +1946,49 @@ a.card:hover,
   grid-template-columns: minmax(160px, 1fr) minmax(180px, 0.8fr);
 }
 
+.user-filter-form {
+  align-items: end;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+}
+
+.table-row-users {
+  grid-template-columns: minmax(150px, 1fr) minmax(210px, 1.4fr) minmax(220px, 1.4fr) auto;
+}
+
+.role-fieldset {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.pagination-bar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.pagination-controls,
+.pagination-size {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.pagination-page { min-width: 40px; }
+.pagination-page.is-active { cursor: default; }
+.pagination-ellipsis { color: var(--muted); padding: 0 2px; }
+.pagination-size { color: var(--muted); font-size: 14px; font-weight: 700; }
+.pagination-size select { min-height: 38px; width: auto; }
+
+@media (max-width: 980px) {
+  .user-filter-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .table-row-users { grid-template-columns: 1fr; }
+  .table-row-users.table-head { display: none; }
+}
+
 .answer-overlay {
   display: grid;
   gap: 16px;

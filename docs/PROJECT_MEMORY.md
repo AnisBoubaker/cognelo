@@ -36,8 +36,9 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 ## Implemented Platform Foundations
 
 - Authentication uses JWT stored in HttpOnly cookies.
-- Global authorization supports many-to-many user roles (`admin`, `teacher`, `student`) and is designed for more roles later.
+- Global authorization supports many-to-many user roles (`admin`, `course_manager`, `teacher`, `student`) and is designed for more roles later.
 - Users have account-wide profile settings with editable first and last name fields. Email changes are intentionally admin-only.
+- Administrators manage users under `/settings/users`. The admin-only API supports filters for role, first name, last name, and email plus server-side page/page-size pagination (10 rows by default; supported sizes 10, 25, 50, and 100); creates active accounts with an initial password; and edits first name, last name, email, and one-or-many global roles. An administrator cannot remove their own admin role.
 - AI agent/model connection settings are account-wide. Personal connections are owned by a user; global connections have no owner and are admin-managed for later teacher/course use.
 - Core exposes course-scoped AI helpers for server-side plugin work. `Course.metadata.aiSettings.studentSupportAiAgentConnectionId` remains the course student-support setting. Coding Homework Grader challenge generation resolves a course teacher/owner's question-authoring AI preference for student-triggered generation instead of using a student-owned or local student-support connection.
 - Accounts can be activated on first login when a person was pre-added to a group participant list by email and no user record existed yet.
