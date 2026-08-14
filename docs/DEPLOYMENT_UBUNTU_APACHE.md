@@ -10,7 +10,7 @@ This guide deploys a production Cognelo instance across two Ubuntu VPSs. It uses
 - a dedicated sandbox VPS for Dockerized Judge0 and Playwright execution; and
 - a WireGuard point-to-point network between the two VPSs.
 
-The examples use `app1.cognelo.org` and the instance key `instance1`. Every example hostname, address, account, database, path, and port is a placeholder and must be replaced with values assigned to the target installation.
+The examples use `app1.cognelo.org` and the instance key `app1`. Every example hostname, address, account, database, path, and port is a placeholder and must be replaced with values assigned to the target installation.
 
 ## 1. Recommended topology
 
@@ -24,8 +24,8 @@ Apache :80/:443
    `-- /*      --> 127.0.0.1:3100  Cognelo web (systemd)
 
 Cognelo API
-   |-- 127.0.0.1:5432/cognelo_instance1  host PostgreSQL
-   |-- /srv/cognelo/instance1/shared/storage
+   |-- 127.0.0.1:5432/cognelo_app1  host PostgreSQL
+   |-- /srv/cognelo/app1/shared/storage
    |-- 10.80.0.2:2358  --\
    `-- 10.80.0.2:3456  ---+-- WireGuard wg0 --> Sandbox VPS
                                              |-- Judge0 containers
@@ -52,23 +52,23 @@ Sections 3–13 produce a working Cognelo instance without code execution. Secti
 
 Keep a private inventory like this before starting:
 
-| Setting | First instance | Second example |
-|---|---:|---:|
-| Application FQDN | `app1.cognelo.org` | `app2.cognelo.org` |
-| Instance key | `instance1` | `instance2` |
-| Unix account | `app1` | `app2` |
-| Web port | `3100` | `3200` |
-| API port | `3101` | `3201` |
-| Database | `cognelo_instance1` | `cognelo_instance2` |
-| Database role | `cognelo_instance1` | `cognelo_instance2` |
-| Installation root | `/srv/cognelo/instance1` | `/srv/cognelo/instance2` |
-| Application WireGuard IP | `10.80.0.1` | `10.80.0.5` |
-| Sandbox WireGuard IP | `10.80.0.2` | `10.80.0.6` |
-| WireGuard subnet | `10.80.0.0/30` | `10.80.0.4/30` |
-| Sandbox WireGuard UDP port | `51820` | `51821` |
-| Judge0 port | `2358` | `2359` |
-| Playwright port | `3456` | `3457` |
-| Sandbox Compose project | `app1-sandbox` | `app2-sandbox` |
+| Setting                    |             First instance |             Second example |
+| -------------------------- | -------------------------: | -------------------------: |
+| Application FQDN           |       `app1.cognelo.org` |       `app2.cognelo.org` |
+| Instance key               |                   `app1` |                   `app2` |
+| Unix account               |                   `app1` |                   `app2` |
+| Web port                   |                   `3100` |                   `3200` |
+| API port                   |                   `3101` |                   `3201` |
+| Database                   |          `cognelo_app1` |          `cognelo_app2` |
+| Database role              |          `cognelo_app1` |          `cognelo_app2` |
+| Installation root          |     `/srv/cognelo/app1` |     `/srv/cognelo/app2` |
+| Application WireGuard IP   |              `10.80.0.1` |              `10.80.0.5` |
+| Sandbox WireGuard IP       |              `10.80.0.2` |              `10.80.0.6` |
+| WireGuard subnet           |           `10.80.0.0/30` |           `10.80.0.4/30` |
+| Sandbox WireGuard UDP port |                  `51820` |                  `51821` |
+| Judge0 port                |                   `2358` |                   `2359` |
+| Playwright port            |                   `3456` |                   `3457` |
+| Sandbox Compose project    |           `app1-sandbox` |           `app2-sandbox` |
 
 Every instance needs a different web/API port pair, WireGuard subnet and keys, sandbox service ports, database, database role, JWT secret, environment file, and storage directory. Do not reuse a web build between hostnames: `NEXT_PUBLIC_API_URL` is embedded when the web application is built.
 
@@ -151,11 +151,11 @@ sudo -u postgres psql
 Run the following SQL, replacing `PASTE_DATABASE_PASSWORD`:
 
 ```sql
-CREATE ROLE cognelo_instance1 LOGIN PASSWORD 'PASTE_DATABASE_PASSWORD';
-CREATE DATABASE cognelo_instance1 OWNER cognelo_instance1 ENCODING 'UTF8';
-REVOKE ALL ON DATABASE cognelo_instance1 FROM PUBLIC;
-\connect cognelo_instance1
-GRANT USAGE, CREATE ON SCHEMA public TO cognelo_instance1;
+CREATE ROLE cognelo_app1 LOGIN PASSWORD 'PASTE_DATABASE_PASSWORD';
+CREATE DATABASE cognelo_app1 OWNER cognelo_app1 ENCODING 'UTF8';
+REVOKE ALL ON DATABASE cognelo_app1 FROM PUBLIC;
+\connect cognelo_app1
+GRANT USAGE, CREATE ON SCHEMA public TO cognelo_app1;
 \q
 ```
 
@@ -174,14 +174,14 @@ sudo ss -ltnp | grep 5432
 
 ```bash
 sudo useradd --system --create-home \
-  --home-dir /srv/cognelo/instance1 \
+  --home-dir /srv/cognelo/app1 \
   --shell /usr/sbin/nologin \
   app1
 
 sudo install -d -m 0750 -o app1 -g app1 \
-  /srv/cognelo/instance1/deployments \
-  /srv/cognelo/instance1/shared \
-  /srv/cognelo/instance1/shared/storage
+  /srv/cognelo/app1/deployments \
+  /srv/cognelo/app1/shared \
+  /srv/cognelo/app1/shared/storage
 ```
 
 The service account must not be shared by other Cognelo instances.
@@ -192,8 +192,8 @@ Create the file with restrictive permissions:
 
 ```bash
 sudo install -m 0640 -o app1 -g app1 \
-  /dev/null /srv/cognelo/instance1/shared/.env
-sudo nano /srv/cognelo/instance1/shared/.env
+  /dev/null /srv/cognelo/app1/shared/.env
+sudo nano /srv/cognelo/app1/shared/.env
 ```
 
 Generate a JWT secret separately:
@@ -206,7 +206,7 @@ Use this environment template. Replace every placeholder and keep the public URL
 
 ```dotenv
 NODE_ENV=production
-DATABASE_URL="postgresql://cognelo_instance1:DATABASE_PASSWORD@127.0.0.1:5432/cognelo_instance1?schema=public&connection_limit=10&pool_timeout=10"
+DATABASE_URL="postgresql://cognelo_app1:DATABASE_PASSWORD@127.0.0.1:5432/cognelo_app1?schema=public&connection_limit=10&pool_timeout=10"
 JWT_SECRET="PASTE_96_CHARACTER_HEX_SECRET"
 NEXT_PUBLIC_API_URL="https://app1.cognelo.org"
 CORS_ORIGIN="https://app1.cognelo.org"
@@ -214,7 +214,7 @@ CORS_ORIGIN="https://app1.cognelo.org"
 COGNELO_BACKGROUND_JOBS_DISABLED=false
 COGNELO_BACKGROUND_JOBS_CONCURRENCY=1
 COGNELO_BACKGROUND_JOBS_INTERVAL_MS=1000
-COGNELO_BACKGROUND_JOBS_WORKER_ID="instance1-api-worker"
+COGNELO_BACKGROUND_JOBS_WORKER_ID="app1-api-worker"
 
 JUDGE0_BASE_URL="http://10.80.0.2:2358"
 JUDGE0_AUTH_HEADER="X-Auth-Token"
@@ -229,8 +229,8 @@ These addresses use the WireGuard inventory in Section 2. For another instance, 
 Check permissions:
 
 ```bash
-sudo chown app1:app1 /srv/cognelo/instance1/shared/.env
-sudo chmod 0640 /srv/cognelo/instance1/shared/.env
+sudo chown app1:app1 /srv/cognelo/app1/shared/.env
+sudo chmod 0640 /srv/cognelo/app1/shared/.env
 ```
 
 ## 8. Deploy a Git tag
@@ -239,22 +239,22 @@ Use a deployment key with read-only repository access if the repository is priva
 
 ```bash
 sudo -u app1 git clone \
-  REPOSITORY_URL \
-  /srv/cognelo/instance1/repository
+  https://github.com/AnisBoubaker/cognelo.git \
+  /srv/cognelo/app1/repository
 
-sudo -u app1 git -C /srv/cognelo/instance1/repository \
+sudo -u app1 git -C /srv/cognelo/app1/repository \
   fetch --prune --tags
-sudo -u app1 git -C /srv/cognelo/instance1/repository \
+sudo -u app1 git -C /srv/cognelo/app1/repository \
   rev-parse --verify 'refs/tags/cognelo-0.5.0^{commit}'
-sudo -u app1 git -C /srv/cognelo/instance1/repository \
+sudo -u app1 git -C /srv/cognelo/app1/repository \
   worktree add --detach \
-  /srv/cognelo/instance1/deployments/cognelo-0.5.0 \
+  /srv/cognelo/app1/deployments/cognelo-0.5.0 \
   refs/tags/cognelo-0.5.0
 
 sudo -u app1 ln -s ../../shared/.env \
-  /srv/cognelo/instance1/deployments/cognelo-0.5.0/.env
+  /srv/cognelo/app1/deployments/cognelo-0.5.0/.env
 sudo -u app1 ln -s ../../shared/storage \
-  /srv/cognelo/instance1/deployments/cognelo-0.5.0/storage
+  /srv/cognelo/app1/deployments/cognelo-0.5.0/storage
 ```
 
 `cognelo-0.5.0` is the immutable tag selected for this deployment. Annotated, signed tags are recommended and can be verified with `git verify-tag cognelo-0.5.0` when signing is configured. Production tags must not be moved or reused; every deployment candidate receives a new tag.
@@ -265,15 +265,17 @@ Install dependencies, generate Prisma clients, verify, and build as the service 
 
 ```bash
 sudo -u app1 /bin/bash -c '
-  cd /srv/cognelo/instance1/deployments/cognelo-0.5.0 &&
+  cd /srv/cognelo/app1/deployments/cognelo-0.5.0 &&
   set -a && . ./.env && set +a &&
-  npm ci &&
+  npm ci --include=dev &&
   npm run db:generate &&
   npm run typecheck &&
-  npm test &&
+  NEXT_PUBLIC_API_URL="http://localhost:3001" npm test &&
   npm run build
 '
 ```
+
+`--include=dev` is required even though the loaded environment sets `NODE_ENV=production`: TypeScript, Vitest, and other build-time tools are development dependencies. The inline localhost URL applies only to the mocked test process so URL-specific tests remain deterministic; the following build still embeds the production `NEXT_PUBLIC_API_URL` from `.env`.
 
 Builds may report the known Turbopack file-tracing warning caused by plugin Prisma clients. A successful build still ends with both the API and web route summaries.
 
@@ -281,18 +283,21 @@ Apply all core and plugin migrations from the new deployment:
 
 ```bash
 sudo -u app1 /bin/bash -c '
-  cd /srv/cognelo/instance1/deployments/cognelo-0.5.0 &&
-  npm run db:migrate:all
+  cd /srv/cognelo/app1/deployments/cognelo-0.5.0 &&
+  set -a && . ./.env && set +a &&
+  DATABASE_URL="${DATABASE_URL%%\?*}" node ./scripts/db-migrate-all.mjs
 '
 ```
+
+The `cognelo-0.5.0` migration helper incorrectly leaves Prisma-only query parameters in the URL passed to `psql`; the scoped override removes the query string for this migration process without changing `.env`. Newer source revisions normalize those parameters inside the helper, so future tagged releases can return to `npm run db:migrate:all` directly.
 
 Do not run `npm run db:seed` in production. It creates demonstration users, courses, and content.
 
 Point `current` at the tagged deployment:
 
 ```bash
-sudo ln -sfn /srv/cognelo/instance1/deployments/cognelo-0.5.0 /srv/cognelo/instance1/current
-sudo chown -h app1:app1 /srv/cognelo/instance1/current
+sudo ln -sfn /srv/cognelo/app1/deployments/cognelo-0.5.0 /srv/cognelo/app1/current
+sudo chown -h app1:app1 /srv/cognelo/app1/current
 ```
 
 ## 9. Create the first administrator
@@ -305,13 +310,12 @@ Read the password without storing it in shell history:
 read -rsp "Initial administrator password: " COGNELO_INITIAL_ADMIN_PASSWORD
 echo
 
-cd /srv/cognelo/instance1/current
 sudo -u app1 env \
-  COGNELO_ADMIN_EMAIL="admin@example.org" \
-  COGNELO_ADMIN_FIRST_NAME="Ada" \
-  COGNELO_ADMIN_LAST_NAME="Admin" \
+  COGNELO_ADMIN_EMAIL="contact@cognelo.org" \
+  COGNELO_ADMIN_FIRST_NAME="Anis" \
+  COGNELO_ADMIN_LAST_NAME="Boubaker" \
   COGNELO_ADMIN_PASSWORD="$COGNELO_INITIAL_ADMIN_PASSWORD" \
-  npm run production:bootstrap
+  npm --prefix /srv/cognelo/app1/current run production:bootstrap
 
 unset COGNELO_INITIAL_ADMIN_PASSWORD
 ```
@@ -324,7 +328,7 @@ Create `/etc/systemd/system/app1-api.service`:
 
 ```ini
 [Unit]
-Description=Cognelo instance1 API
+Description=Cognelo app1 API
 After=network-online.target postgresql.service
 Wants=network-online.target
 Requires=postgresql.service
@@ -333,10 +337,10 @@ Requires=postgresql.service
 Type=simple
 User=app1
 Group=app1
-WorkingDirectory=/srv/cognelo/instance1/current/apps/api
-EnvironmentFile=/srv/cognelo/instance1/shared/.env
+WorkingDirectory=/srv/cognelo/app1/current/apps/api
+EnvironmentFile=/srv/cognelo/app1/shared/.env
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/node /srv/cognelo/instance1/current/node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3101
+ExecStart=/usr/bin/node /srv/cognelo/app1/current/node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3101
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
@@ -356,7 +360,7 @@ Create `/etc/systemd/system/app1-web.service`:
 
 ```ini
 [Unit]
-Description=Cognelo instance1 web
+Description=Cognelo app1 web
 After=network-online.target app1-api.service
 Wants=network-online.target
 
@@ -364,10 +368,10 @@ Wants=network-online.target
 Type=simple
 User=app1
 Group=app1
-WorkingDirectory=/srv/cognelo/instance1/current/apps/web
-EnvironmentFile=/srv/cognelo/instance1/shared/.env
+WorkingDirectory=/srv/cognelo/app1/current/apps/web
+EnvironmentFile=/srv/cognelo/app1/shared/.env
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/node /srv/cognelo/instance1/current/node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3100
+ExecStart=/usr/bin/node /srv/cognelo/app1/current/node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3100
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
@@ -424,8 +428,8 @@ Create `/etc/apache2/sites-available/app1.cognelo.org.conf`:
     # Cognelo accepts files up to 25 MiB. Leave room for multipart overhead.
     LimitRequestBody 33554432
 
-    ErrorLog ${APACHE_LOG_DIR}/instance1-cognelo-error.log
-    CustomLog ${APACHE_LOG_DIR}/instance1-cognelo-access.log combined
+    ErrorLog ${APACHE_LOG_DIR}/app1-cognelo-error.log
+    CustomLog ${APACHE_LOG_DIR}/app1-cognelo-access.log combined
 </VirtualHost>
 ```
 
@@ -486,10 +490,10 @@ curl --fail https://app1.cognelo.org/api/health
 
 This section is required when the corresponding plugins are enabled:
 
-| Dependency | Cognelo feature | Required application setting |
-|---|---|---|
-| Judge0 | Coding exercises | `JUDGE0_BASE_URL`, header, and token |
-| Cognelo Playwright runner | Web-design coding exercises and screenshots | `WEB_DESIGN_RUNNER_URL` |
+| Dependency                | Cognelo feature                             | Required application setting           |
+| ------------------------- | ------------------------------------------- | -------------------------------------- |
+| Judge0                    | Coding exercises                            | `JUDGE0_BASE_URL`, header, and token |
+| Cognelo Playwright runner | Web-design coding exercises and screenshots | `WEB_DESIGN_RUNNER_URL`              |
 
 MCQ, Parsons problems, tests composed only of those activities, and ordinary course materials do not use either service.
 
@@ -566,15 +570,15 @@ Create a system account and directories for the first instance:
 
 ```bash
 sudo useradd --system --create-home \
-  --home-dir /srv/cognelo-sandboxes/instance1 \
+  --home-dir /srv/cognelo-sandboxes/app1 \
   --shell /usr/sbin/nologin \
-  cognelo-sandbox-instance1
+  cognelo-sandbox-app1
 
 sudo install -d -m 0750 \
-  -o cognelo-sandbox-instance1 -g cognelo-sandbox-instance1 \
-  /srv/cognelo-sandboxes/instance1/repository \
-  /srv/cognelo-sandboxes/instance1/deployments \
-  /srv/cognelo-sandboxes/instance1/runtime
+  -o cognelo-sandbox-app1 -g cognelo-sandbox-app1 \
+  /srv/cognelo-sandboxes/app1/repository \
+  /srv/cognelo-sandboxes/app1/deployments \
+  /srv/cognelo-sandboxes/app1/runtime
 ```
 
 ### 14.2 Check out the same application tag
@@ -582,20 +586,20 @@ sudo install -d -m 0750 \
 The runner source and its Playwright dependency belong to the Cognelo tag being deployed. Clone the complete repository and check out that same immutable tag; the example continues to use `cognelo-0.5.0`:
 
 ```bash
-sudo -u cognelo-sandbox-instance1 git clone \
-  REPOSITORY_URL \
-  /srv/cognelo-sandboxes/instance1/repository/source
+sudo -u cognelo-sandbox-app1 git clone \
+  https://github.com/AnisBoubaker/cognelo.git \
+  /srv/cognelo-sandboxes/app1/repository/source
 
-sudo -u cognelo-sandbox-instance1 git \
-  -C /srv/cognelo-sandboxes/instance1/repository/source \
+sudo -u cognelo-sandbox-app1 git \
+  -C /srv/cognelo-sandboxes/app1/repository/source \
   fetch --prune --tags
-sudo -u cognelo-sandbox-instance1 git \
-  -C /srv/cognelo-sandboxes/instance1/repository/source \
+sudo -u cognelo-sandbox-app1 git \
+  -C /srv/cognelo-sandboxes/app1/repository/source \
   rev-parse --verify 'refs/tags/cognelo-0.5.0^{commit}'
-sudo -u cognelo-sandbox-instance1 git \
-  -C /srv/cognelo-sandboxes/instance1/repository/source \
+sudo -u cognelo-sandbox-app1 git \
+  -C /srv/cognelo-sandboxes/app1/repository/source \
   worktree add --detach \
-  /srv/cognelo-sandboxes/instance1/deployments/cognelo-0.5.0 \
+  /srv/cognelo-sandboxes/app1/deployments/cognelo-0.5.0 \
   refs/tags/cognelo-0.5.0
 ```
 
@@ -603,12 +607,12 @@ Copy the versioned runtime templates into the instance's persistent runtime dire
 
 ```bash
 sudo install -m 0644 \
-  /srv/cognelo-sandboxes/instance1/deployments/cognelo-0.5.0/infra/production/sandbox.compose.yml \
-  /srv/cognelo-sandboxes/instance1/runtime/sandbox.compose.yml
+  /srv/cognelo-sandboxes/app1/deployments/cognelo-0.5.0/infra/production/sandbox.compose.yml \
+  /srv/cognelo-sandboxes/app1/runtime/sandbox.compose.yml
 
 sudo install -m 0600 \
-  /srv/cognelo-sandboxes/instance1/deployments/cognelo-0.5.0/infra/production/judge0.conf.example \
-  /srv/cognelo-sandboxes/instance1/runtime/judge0.conf
+  /srv/cognelo-sandboxes/app1/deployments/cognelo-0.5.0/infra/production/judge0.conf.example \
+  /srv/cognelo-sandboxes/app1/runtime/judge0.conf
 ```
 
 ### 14.3 Configure Judge0 secrets and limits
@@ -621,11 +625,11 @@ openssl rand -hex 32  # REDIS_PASSWORD
 openssl rand -hex 32  # POSTGRES_PASSWORD
 openssl rand -hex 64  # SECRET_KEY_BASE
 
-sudo nano /srv/cognelo-sandboxes/instance1/runtime/judge0.conf
-sudo grep -n 'REPLACE_' /srv/cognelo-sandboxes/instance1/runtime/judge0.conf
+sudo nano /srv/cognelo-sandboxes/app1/runtime/judge0.conf
+sudo grep -n 'REPLACE_' /srv/cognelo-sandboxes/app1/runtime/judge0.conf
 ```
 
-The final `grep` must print nothing. Preserve the Judge0 authentication token in the application host's `/srv/cognelo/instance1/shared/.env`:
+The final `grep` must print nothing. Preserve the Judge0 authentication token in the application host's `/srv/cognelo/app1/shared/.env`:
 
 ```dotenv
 JUDGE0_BASE_URL="http://10.80.0.2:2358"
@@ -643,7 +647,7 @@ The repository currently depends on `@playwright/test` `1.59.1`, so the producti
 Build a local immutable image from the selected Cognelo tag:
 
 ```bash
-cd /srv/cognelo-sandboxes/instance1/deployments/cognelo-0.5.0
+cd /srv/cognelo-sandboxes/app1/deployments/cognelo-0.5.0
 sudo docker build \
   --file infra/production/web-design-runner.Dockerfile \
   --tag cognelo/web-design-runner:cognelo-0.5.0 \
@@ -655,17 +659,17 @@ sudo docker image inspect cognelo/web-design-runner:cognelo-0.5.0 \
 Download the seccomp profile from the same Playwright release and record its checksum:
 
 ```bash
-sudo curl -fsSLo /srv/cognelo-sandboxes/instance1/runtime/seccomp_profile.json \
+sudo curl -fsSLo /srv/cognelo-sandboxes/app1/runtime/seccomp_profile.json \
   https://raw.githubusercontent.com/microsoft/playwright/v1.59.1/utils/docker/seccomp_profile.json
-sudo chmod 0644 /srv/cognelo-sandboxes/instance1/runtime/seccomp_profile.json
-sha256sum /srv/cognelo-sandboxes/instance1/runtime/seccomp_profile.json
+sudo chmod 0644 /srv/cognelo-sandboxes/app1/runtime/seccomp_profile.json
+sha256sum /srv/cognelo-sandboxes/app1/runtime/seccomp_profile.json
 ```
 
 Microsoft's image includes browser binaries and system dependencies but not the Node package. The Cognelo image adds the locked runner package, switches to `pwuser`, and starts only the runner. The Compose service adds the Chromium seccomp profile, drops Linux capabilities, makes the root filesystem read-only, gives Chromium bounded temporary storage, and applies CPU, memory, and PID limits. The official image alone is not a complete security boundary for untrusted content; the dedicated host and blocked outbound network are also required. See [Playwright's Docker security notes](https://playwright.dev/docs/docker#run-the-image).
 
 ### 14.5 Configure the sandbox stack
 
-Create `/srv/cognelo-sandboxes/instance1/runtime/.env`:
+Create `/srv/cognelo-sandboxes/app1/runtime/.env`:
 
 ```dotenv
 COMPOSE_PROJECT_NAME=app1-sandbox
@@ -674,14 +678,14 @@ JUDGE0_PORT=2358
 WEB_DESIGN_RUNNER_PORT=3456
 JUDGE0_IMAGE=judge0/judge0:1.13.1
 WEB_DESIGN_RUNNER_IMAGE=cognelo/web-design-runner:cognelo-0.5.0
-PLAYWRIGHT_SECCOMP_PROFILE=/srv/cognelo-sandboxes/instance1/runtime/seccomp_profile.json
+PLAYWRIGHT_SECCOMP_PROFILE=/srv/cognelo-sandboxes/app1/runtime/seccomp_profile.json
 ```
 
 Set restrictive permissions, validate the resolved Compose model, and pull the pinned upstream images:
 
 ```bash
-sudo chmod 0600 /srv/cognelo-sandboxes/instance1/runtime/.env
-cd /srv/cognelo-sandboxes/instance1/runtime
+sudo chmod 0600 /srv/cognelo-sandboxes/app1/runtime/.env
+cd /srv/cognelo-sandboxes/app1/runtime
 
 sudo docker compose --env-file .env -f sandbox.compose.yml config --quiet
 sudo docker compose --env-file .env -f sandbox.compose.yml \
@@ -815,7 +819,7 @@ sudo systemctl restart app1-api
 On the sandbox host, start Judge0's data services first, inspect them, and then start the complete stack:
 
 ```bash
-cd /srv/cognelo-sandboxes/instance1/runtime
+cd /srv/cognelo-sandboxes/app1/runtime
 sudo docker compose --env-file .env -f sandbox.compose.yml \
   up -d judge0-db judge0-redis
 sudo docker compose --env-file .env -f sandbox.compose.yml ps
@@ -918,7 +922,7 @@ Repeat Sections 3–14 with a new inventory row. In particular:
 11. create a separate sandbox Compose project, Judge0 database volume, and Judge0 token;
 12. assign an unused WireGuard interface/subnet and unused Judge0 and runner ports.
 
-For example, keep `instance1` on Judge0 `2358` and runner `3456`, then use `2359` and `3457` for `instance2`. Its sandbox `runtime/.env` contains:
+For example, keep `app1` on Judge0 `2358` and runner `3456`, then use `2359` and `3457` for `app2`. Its sandbox `runtime/.env` contains:
 
 ```dotenv
 COMPOSE_PROJECT_NAME=app2-sandbox
@@ -927,7 +931,7 @@ JUDGE0_PORT=2359
 WEB_DESIGN_RUNNER_PORT=3457
 JUDGE0_IMAGE=judge0/judge0:1.13.1
 WEB_DESIGN_RUNNER_IMAGE=cognelo/web-design-runner:cognelo-0.5.0
-PLAYWRIGHT_SECCOMP_PROFILE=/srv/cognelo-sandboxes/instance2/runtime/seccomp_profile.json
+PLAYWRIGHT_SECCOMP_PROFILE=/srv/cognelo-sandboxes/app2/runtime/seccomp_profile.json
 ```
 
 Use a separate WireGuard interface such as `wg1` with application address `10.80.0.5/30`, sandbox address `10.80.0.6/30`, and sandbox UDP port `51821`. Extend the sandbox firewall with only that peer and those instance-specific service ports. Its application `.env` uses:
@@ -959,15 +963,15 @@ Back up both PostgreSQL and `shared/storage`. A database-only backup is incomple
 Example manual backup:
 
 ```bash
-sudo install -d -m 0700 /var/backups/cognelo/instance1
+sudo install -d -m 0700 /var/backups/cognelo/app1
 
 sudo -u postgres pg_dump \
   --format=custom \
-  --file=/var/backups/cognelo/instance1/database-$(date +%F-%H%M%S).dump \
-  cognelo_instance1
+  --file=/var/backups/cognelo/app1/database-$(date +%F-%H%M%S).dump \
+  cognelo_app1
 
-sudo tar -C /srv/cognelo/instance1/shared \
-  -czf /var/backups/cognelo/instance1/storage-$(date +%F-%H%M%S).tar.gz \
+sudo tar -C /srv/cognelo/app1/shared \
+  -czf /var/backups/cognelo/app1/storage-$(date +%F-%H%M%S).tar.gz \
   storage
 ```
 
@@ -982,10 +986,10 @@ sudo systemctl start app1-api
 The Playwright runner is stateless and is rebuilt from a Cognelo tag. Preserve the sandbox `runtime/.env`, `judge0.conf`, encrypted WireGuard configuration/key backups, image digests, and seccomp checksum in the protected configuration backup. Cognelo stores grading outcomes in its own database, so Judge0's submission database is not part of the authoritative Cognelo backup. If an organization nevertheless requires Judge0 submission retention, dump its container database separately:
 
 ```bash
-cd /srv/cognelo-sandboxes/instance1/runtime
+cd /srv/cognelo-sandboxes/app1/runtime
 sudo docker compose --env-file .env -f sandbox.compose.yml \
   exec -T judge0-db pg_dump -U judge0 -Fc judge0 \
-  > /var/backups/cognelo/instance1/judge0-$(date +%F-%H%M%S).dump
+  > /var/backups/cognelo/app1/judge0-$(date +%F-%H%M%S).dump
 ```
 
 Basic restore sequence:
@@ -1006,7 +1010,7 @@ Never build over the active deployment and never deploy a mutable branch head su
 2. Fetch and resolve that tag in the instance repository.
 3. Create a detached worktree in `deployments/<tag>`.
 4. Link its `.env` and `storage` to `shared`.
-5. Run `npm ci`, Prisma generation, typecheck, tests, and build.
+5. Run `npm ci --include=dev`, Prisma generation, typecheck, tests with the deterministic localhost API URL, and the production build.
 6. Back up the database and storage.
 7. Stop the API for the migration window.
 8. Run `npm run db:migrate:all` from the new tagged deployment.
@@ -1027,14 +1031,14 @@ When the tag changes `packages/web-design-runner`, its dependencies, or `infra/p
 Example runner update for a future `cognelo-0.6.0` tag on the sandbox host:
 
 ```bash
-cd /srv/cognelo-sandboxes/instance1/deployments/cognelo-0.6.0
+cd /srv/cognelo-sandboxes/app1/deployments/cognelo-0.6.0
 sudo docker build \
   --file infra/production/web-design-runner.Dockerfile \
   --tag cognelo/web-design-runner:cognelo-0.6.0 \
   .
 
-sudo nano /srv/cognelo-sandboxes/instance1/runtime/.env
-cd /srv/cognelo-sandboxes/instance1/runtime
+sudo nano /srv/cognelo-sandboxes/app1/runtime/.env
+cd /srv/cognelo-sandboxes/app1/runtime
 sudo docker compose --env-file .env -f sandbox.compose.yml config --quiet
 sudo docker compose --env-file .env -f sandbox.compose.yml \
   up -d --no-deps web-design-runner
@@ -1046,36 +1050,37 @@ Judge0, PostgreSQL, Redis, and Playwright base-image upgrades are separate depen
 Example update to a future `cognelo-0.6.0` tag:
 
 ```bash
-sudo -u app1 git -C /srv/cognelo/instance1/repository \
+sudo -u app1 git -C /srv/cognelo/app1/repository \
   fetch --prune --tags
-sudo -u app1 git -C /srv/cognelo/instance1/repository \
+sudo -u app1 git -C /srv/cognelo/app1/repository \
   rev-parse --verify 'refs/tags/cognelo-0.6.0^{commit}'
-sudo -u app1 git -C /srv/cognelo/instance1/repository \
+sudo -u app1 git -C /srv/cognelo/app1/repository \
   worktree add --detach \
-  /srv/cognelo/instance1/deployments/cognelo-0.6.0 \
+  /srv/cognelo/app1/deployments/cognelo-0.6.0 \
   refs/tags/cognelo-0.6.0
 
 sudo -u app1 ln -s ../../shared/.env \
-  /srv/cognelo/instance1/deployments/cognelo-0.6.0/.env
+  /srv/cognelo/app1/deployments/cognelo-0.6.0/.env
 sudo -u app1 ln -s ../../shared/storage \
-  /srv/cognelo/instance1/deployments/cognelo-0.6.0/storage
+  /srv/cognelo/app1/deployments/cognelo-0.6.0/storage
 
 sudo -u app1 /bin/bash -c '
-  cd /srv/cognelo/instance1/deployments/cognelo-0.6.0 &&
+  cd /srv/cognelo/app1/deployments/cognelo-0.6.0 &&
   set -a && . ./.env && set +a &&
-  npm ci &&
+  npm ci --include=dev &&
   npm run db:generate &&
   npm run typecheck &&
-  npm test &&
+  NEXT_PUBLIC_API_URL="http://localhost:3001" npm test &&
   npm run build
 '
 
 sudo systemctl stop app1-api
 sudo -u app1 /bin/bash -c '
-  cd /srv/cognelo/instance1/deployments/cognelo-0.6.0 && npm run db:migrate:all
+  cd /srv/cognelo/app1/deployments/cognelo-0.6.0 &&
+  npm run db:migrate:all
 '
-sudo ln -sfn /srv/cognelo/instance1/deployments/cognelo-0.6.0 /srv/cognelo/instance1/current
-sudo chown -h app1:app1 /srv/cognelo/instance1/current
+sudo ln -sfn /srv/cognelo/app1/deployments/cognelo-0.6.0 /srv/cognelo/app1/current
+sudo chown -h app1:app1 /srv/cognelo/app1/current
 sudo systemctl restart app1-api app1-web
 curl --fail http://127.0.0.1:3101/api/health
 curl --fail https://app1.cognelo.org/api/health
@@ -1086,9 +1091,9 @@ Code rollback is a symlink switch to a previous tag only when the new database m
 After a deployment is accepted and no longer needed for rollback, remove its worktree through Git rather than deleting it by hand:
 
 ```bash
-sudo -u app1 git -C /srv/cognelo/instance1/repository \
-  worktree remove /srv/cognelo/instance1/deployments/cognelo-0.5.0
-sudo -u app1 git -C /srv/cognelo/instance1/repository \
+sudo -u app1 git -C /srv/cognelo/app1/repository \
+  worktree remove /srv/cognelo/app1/deployments/cognelo-0.5.0
+sudo -u app1 git -C /srv/cognelo/app1/repository \
   worktree prune
 ```
 
@@ -1101,8 +1106,8 @@ sudo journalctl -u app1-web -n 200 --no-pager
 sudo journalctl -u app1-api -f
 
 # Apache
-sudo tail -f /var/log/apache2/instance1-cognelo-error.log
-sudo tail -f /var/log/apache2/instance1-cognelo-access.log
+sudo tail -f /var/log/apache2/app1-cognelo-error.log
+sudo tail -f /var/log/apache2/app1-cognelo-access.log
 
 # PostgreSQL
 sudo journalctl -u postgresql -n 200 --no-pager
@@ -1126,7 +1131,7 @@ curl --fail https://app1.cognelo.org/api/health
 On the sandbox host:
 
 ```bash
-cd /srv/cognelo-sandboxes/instance1/runtime
+cd /srv/cognelo-sandboxes/app1/runtime
 sudo docker compose --env-file .env -f sandbox.compose.yml ps
 sudo docker compose --env-file .env -f sandbox.compose.yml logs --tail=200
 sudo docker compose --env-file .env -f sandbox.compose.yml logs -f judge0-server judge0-workers

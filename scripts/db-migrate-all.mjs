@@ -38,8 +38,20 @@ export function pluginSchemas(options = {}) {
     .sort();
 }
 
+export function psqlDatabaseUrl(value) {
+  if (!value) {
+    return undefined;
+  }
+
+  const url = new URL(value);
+  url.searchParams.delete("schema");
+  url.searchParams.delete("connection_limit");
+  url.searchParams.delete("pool_timeout");
+  return url.toString();
+}
+
 function psql(args, options = {}) {
-  const databaseUrl = process.env.DATABASE_URL?.replace(/[?&]schema=[^&]+/, "");
+  const databaseUrl = psqlDatabaseUrl(process.env.DATABASE_URL);
   if (!databaseUrl) {
     console.error("DATABASE_URL is required.");
     process.exit(1);

@@ -2,9 +2,17 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { coreMigrations, pluginSchemas, runAll } from "./db-migrate-all.mjs";
+import { coreMigrations, pluginSchemas, psqlDatabaseUrl, runAll } from "./db-migrate-all.mjs";
 
 describe("db:migrate:all script helpers", () => {
+  it("removes Prisma-only query parameters without corrupting the database name", () => {
+    expect(
+      psqlDatabaseUrl(
+        "postgresql://cognelo_app1:secret@127.0.0.1:5432/cognelo_app1?schema=public&connection_limit=10&pool_timeout=10&sslmode=require"
+      )
+    ).toBe("postgresql://cognelo_app1:secret@127.0.0.1:5432/cognelo_app1?sslmode=require");
+  });
+
   it("discovers only plugins that have Prisma schemas", () => {
     const root = mkdtempSync(join(tmpdir(), "cognelo-migrate-"));
     const pluginsDir = join(root, "packages/plugin-activities");

@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, API_UNAUTHORIZED_EVENT } from "./api";
 
 describe("web API client", () => {
+  const expectedApiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
   });
@@ -20,7 +22,7 @@ describe("web API client", () => {
 
     await expect(api.login("teacher@example.test", "secret")).resolves.toEqual({ user: { id: "user-1" } });
     expect(fetch).toHaveBeenCalledWith(
-      "http://localhost:3001/api/auth/login",
+      `${expectedApiUrl}/api/auth/login`,
       expect.objectContaining({
         method: "POST",
         credentials: "include",
@@ -71,7 +73,7 @@ describe("web API client", () => {
 
     await expect(api.changeMyPassword(input)).resolves.toEqual({ ok: true });
     expect(fetch).toHaveBeenCalledWith(
-      "http://localhost:3001/api/users/me/password",
+      `${expectedApiUrl}/api/users/me/password`,
       expect.objectContaining({ method: "PUT", body: JSON.stringify(input) })
     );
   });
