@@ -52,23 +52,23 @@ Sections 3–13 produce a working Cognelo instance without code execution. Secti
 
 Keep a private inventory like this before starting:
 
-| Setting | First instance | Second example |
-|---|---:|---:|
-| Application FQDN | `instance1.example.com` | `instance2.example.com` |
-| Instance key | `instance1` | `instance2` |
-| Unix account | `instance1` | `instance2` |
-| Web port | `3100` | `3200` |
-| API port | `3101` | `3201` |
-| Database | `cognelo_instance1` | `cognelo_instance2` |
-| Database role | `cognelo_instance1` | `cognelo_instance2` |
-| Installation root | `/srv/cognelo/instance1` | `/srv/cognelo/instance2` |
-| Application WireGuard IP | `10.80.0.1` | `10.80.0.5` |
-| Sandbox WireGuard IP | `10.80.0.2` | `10.80.0.6` |
-| WireGuard subnet | `10.80.0.0/30` | `10.80.0.4/30` |
-| Sandbox WireGuard UDP port | `51820` | `51821` |
-| Judge0 port | `2358` | `2359` |
-| Playwright port | `3456` | `3457` |
-| Sandbox Compose project | `instance1-sandbox` | `instance2-sandbox` |
+| Setting                    |             First instance |             Second example |
+| -------------------------- | -------------------------: | -------------------------: |
+| Application FQDN           |       `instance1.example.com` |       `instance2.example.com` |
+| Instance key               |                   `instance1` |                   `instance2` |
+| Unix account               |                   `instance1` |                   `instance2` |
+| Web port                   |                   `3100` |                   `3200` |
+| API port                   |                   `3101` |                   `3201` |
+| Database                   |          `cognelo_instance1` |          `cognelo_instance2` |
+| Database role              |          `cognelo_instance1` |          `cognelo_instance2` |
+| Installation root          |     `/srv/cognelo/instance1` |     `/srv/cognelo/instance2` |
+| Application WireGuard IP   |              `10.80.0.1` |              `10.80.0.5` |
+| Sandbox WireGuard IP       |              `10.80.0.2` |              `10.80.0.6` |
+| WireGuard subnet           |           `10.80.0.0/30` |           `10.80.0.4/30` |
+| Sandbox WireGuard UDP port |                  `51820` |                  `51821` |
+| Judge0 port                |                   `2358` |                   `2359` |
+| Playwright port            |                   `3456` |                   `3457` |
+| Sandbox Compose project    |           `instance1-sandbox` |           `instance2-sandbox` |
 
 Every instance needs a different web/API port pair, WireGuard subnet and keys, sandbox service ports, database, database role, JWT secret, environment file, and storage directory. Do not reuse a web build between hostnames: `NEXT_PUBLIC_API_URL` is embedded when the web application is built.
 
@@ -239,7 +239,7 @@ Use a deployment key with read-only repository access if the repository is priva
 
 ```bash
 sudo -u instance1 git clone \
-  REPOSITORY_URL \
+  https://github.com/AnisBoubaker/cognelo.git \
   /srv/cognelo/instance1/repository
 
 sudo -u instance1 git -C /srv/cognelo/instance1/repository \
@@ -267,13 +267,15 @@ Install dependencies, generate Prisma clients, verify, and build as the service 
 sudo -u instance1 /bin/bash -c '
   cd /srv/cognelo/instance1/deployments/cognelo-0.5.0 &&
   set -a && . ./.env && set +a &&
-  npm ci &&
+  npm ci --include=dev &&
   npm run db:generate &&
   npm run typecheck &&
-  npm test &&
+  NEXT_PUBLIC_API_URL="http://localhost:3001" npm test &&
   npm run build
 '
 ```
+
+`--include=dev` is required even though the loaded environment sets `NODE_ENV=production`: TypeScript, Vitest, and other build-time tools are development dependencies. The inline localhost URL applies only to the mocked test process so URL-specific tests remain deterministic; the following build still embeds the production `NEXT_PUBLIC_API_URL` from `.env`.
 
 Builds may report the known Turbopack file-tracing warning caused by plugin Prisma clients. A successful build still ends with both the API and web route summaries.
 
@@ -282,9 +284,12 @@ Apply all core and plugin migrations from the new deployment:
 ```bash
 sudo -u instance1 /bin/bash -c '
   cd /srv/cognelo/instance1/deployments/cognelo-0.5.0 &&
-  npm run db:migrate:all
+  set -a && . ./.env && set +a &&
+  DATABASE_URL="${DATABASE_URL%%\?*}" node ./scripts/db-migrate-all.mjs
 '
 ```
+
+The `cognelo-0.5.0` migration helper incorrectly leaves Prisma-only query parameters in the URL passed to `psql`; the scoped override removes the query string for this migration process without changing `.env`. Newer source revisions normalize those parameters inside the helper, so future tagged releases can return to `npm run db:migrate:all` directly.
 
 Do not run `npm run db:seed` in production. It creates demonstration users, courses, and content.
 
@@ -305,13 +310,12 @@ Read the password without storing it in shell history:
 read -rsp "Initial administrator password: " COGNELO_INITIAL_ADMIN_PASSWORD
 echo
 
-cd /srv/cognelo/instance1/current
 sudo -u instance1 env \
-  COGNELO_ADMIN_EMAIL="admin@example.org" \
-  COGNELO_ADMIN_FIRST_NAME="Ada" \
-  COGNELO_ADMIN_LAST_NAME="Admin" \
+  COGNELO_ADMIN_EMAIL="contact@cognelo.org" \
+  COGNELO_ADMIN_FIRST_NAME="Anis" \
+  COGNELO_ADMIN_LAST_NAME="Boubaker" \
   COGNELO_ADMIN_PASSWORD="$COGNELO_INITIAL_ADMIN_PASSWORD" \
-  npm run production:bootstrap
+  npm --prefix /srv/cognelo/instance1/current run production:bootstrap
 
 unset COGNELO_INITIAL_ADMIN_PASSWORD
 ```
@@ -486,10 +490,10 @@ curl --fail https://instance1.example.com/api/health
 
 This section is required when the corresponding plugins are enabled:
 
-| Dependency | Cognelo feature | Required application setting |
-|---|---|---|
-| Judge0 | Coding exercises | `JUDGE0_BASE_URL`, header, and token |
-| Cognelo Playwright runner | Web-design coding exercises and screenshots | `WEB_DESIGN_RUNNER_URL` |
+| Dependency                | Cognelo feature                             | Required application setting           |
+| ------------------------- | ------------------------------------------- | -------------------------------------- |
+| Judge0                    | Coding exercises                            | `JUDGE0_BASE_URL`, header, and token |
+| Cognelo Playwright runner | Web-design coding exercises and screenshots | `WEB_DESIGN_RUNNER_URL`              |
 
 MCQ, Parsons problems, tests composed only of those activities, and ordinary course materials do not use either service.
 
@@ -583,7 +587,7 @@ The runner source and its Playwright dependency belong to the Cognelo tag being 
 
 ```bash
 sudo -u cognelo-sandbox-instance1 git clone \
-  REPOSITORY_URL \
+  https://github.com/AnisBoubaker/cognelo.git \
   /srv/cognelo-sandboxes/instance1/repository/source
 
 sudo -u cognelo-sandbox-instance1 git \
@@ -1006,7 +1010,7 @@ Never build over the active deployment and never deploy a mutable branch head su
 2. Fetch and resolve that tag in the instance repository.
 3. Create a detached worktree in `deployments/<tag>`.
 4. Link its `.env` and `storage` to `shared`.
-5. Run `npm ci`, Prisma generation, typecheck, tests, and build.
+5. Run `npm ci --include=dev`, Prisma generation, typecheck, tests with the deterministic localhost API URL, and the production build.
 6. Back up the database and storage.
 7. Stop the API for the migration window.
 8. Run `npm run db:migrate:all` from the new tagged deployment.
@@ -1063,16 +1067,17 @@ sudo -u instance1 ln -s ../../shared/storage \
 sudo -u instance1 /bin/bash -c '
   cd /srv/cognelo/instance1/deployments/cognelo-0.6.0 &&
   set -a && . ./.env && set +a &&
-  npm ci &&
+  npm ci --include=dev &&
   npm run db:generate &&
   npm run typecheck &&
-  npm test &&
+  NEXT_PUBLIC_API_URL="http://localhost:3001" npm test &&
   npm run build
 '
 
 sudo systemctl stop instance1-api
 sudo -u instance1 /bin/bash -c '
-  cd /srv/cognelo/instance1/deployments/cognelo-0.6.0 && npm run db:migrate:all
+  cd /srv/cognelo/instance1/deployments/cognelo-0.6.0 &&
+  npm run db:migrate:all
 '
 sudo ln -sfn /srv/cognelo/instance1/deployments/cognelo-0.6.0 /srv/cognelo/instance1/current
 sudo chown -h instance1:instance1 /srv/cognelo/instance1/current
