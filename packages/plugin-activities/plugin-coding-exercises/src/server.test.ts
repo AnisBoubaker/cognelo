@@ -21,6 +21,7 @@ vi.mock("./routes", () => ({
   codingExerciseGenerateTestsRoute: { path: "generate-tests", methods: {} },
   codingExerciseHiddenTestsRoute: { path: "hidden-tests", methods: {} },
   codingExerciseRunRoute: { path: "run", methods: {} },
+  codingExerciseReviewAllRoute: { path: "review-all", methods: {} },
   codingExerciseSubmitRoute: { path: "submit", methods: {} }
 }));
 

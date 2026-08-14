@@ -111,6 +111,8 @@ Summative submissions do not show correctness feedback during the activity. When
 
 ## Contributor Workflow
 
+Standalone activity **Review all** loads each participant's latest completed attempt and shows the reference solution, an error-count distribution, and a grade distribution. Hovering a bar identifies the students in that bucket.
+
 When changing this plugin, update:
 
 - `packages/plugin-activities/plugin-parsons/README.md`

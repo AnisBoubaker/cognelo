@@ -3,6 +3,7 @@ import { AppError, assertCanManageActivityBank, assertCanManageCourse } from "@c
 import {
   codingExerciseRunInputSchema,
   codingExerciseSubmitInputSchema,
+  listCodingExerciseReviewExecutions,
   listRecentCodingExerciseExecutions,
   runCodingExercise,
   submitCodingExercise
@@ -40,6 +41,24 @@ function requireActivityBankId(activityBankId: string | undefined) {
 type SubjectContext = {
   title: string;
   description: string;
+};
+
+export const codingExerciseReviewAllRoute: PluginRouteDefinition = {
+  path: "coding-exercises/review-all",
+  activityTypeKeys: ["coding-exercise"],
+  methods: {
+    GET: async ({ context }) => {
+      const courseId = requireCourseId(context.courseId);
+      await assertCanManageCourse(context.user, courseId);
+      const participants = await prisma.courseGroupParticipant.findMany({
+        where: { group: { courseId }, role: "student", userId: { not: null } },
+        select: { id: true, userId: true }
+      });
+      const executions = await listCodingExerciseReviewExecutions({ activityId: context.activity.id, userIds: participants.flatMap((participant) => participant.userId ? [participant.userId] : []) });
+      const byUserId = new Map(executions.map((execution) => [execution.userId, execution]));
+      return { submissions: participants.flatMap((participant) => participant.userId && byUserId.has(participant.userId) ? [{ participantId: participant.id, execution: byUserId.get(participant.userId) }] : []) };
+    }
+  }
 };
 
 async function resolveSubjectContext(activityBankId: string | undefined, courseId: string | undefined): Promise<SubjectContext> {

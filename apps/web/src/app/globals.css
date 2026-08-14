@@ -2149,6 +2149,15 @@ a.card:hover,
   z-index: 120;
 }
 
+.aggregate-stacked-bar { display: flex; min-height: 54px; overflow: hidden; border-radius: 10px; }
+.aggregate-stacked-segment { align-items: center; color: white; cursor: help; display: flex; font-weight: 800; justify-content: center; min-width: 90px; padding: 12px; }
+.aggregate-stacked-segment.is-pass { background: #15803d; }
+.aggregate-stacked-segment.is-fail { background: #dc2626; }
+.aggregate-bars { align-items: end; display: flex; gap: 14px; min-height: 190px; overflow-x: auto; padding: 12px 4px 0; }
+.aggregate-bar-column { align-items: center; display: grid; flex: 1 0 72px; gap: 6px; justify-items: center; }
+.aggregate-bar { background: var(--brand-blue); border-radius: 7px 7px 2px 2px; cursor: help; max-width: 90px; min-width: 38px; width: 70%; }
+.aggregate-bar-value { font-weight: 800; }
+
 .answer-meta {
   align-items: center;
   display: flex;

@@ -21,6 +21,8 @@ This file is for Parsons-specific memory only.
 
 ## Persistence Decisions
 
+- Standalone gradebook **Review all** uses the latest completed attempt per participant, displays the authored solution, and derives hoverable misplaced-block and grade distributions without exposing student answers individually.
+
 - Parsons attempts are stored in:
   - `PluginParsonsAttempt`
   - `PluginParsonsAttemptEvent`

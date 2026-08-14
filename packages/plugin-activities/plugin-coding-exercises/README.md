@@ -154,6 +154,8 @@ As this plugin grows, expect to add:
 
 ## Contributor Workflow
 
+Standalone gradebook **Review all** loads the private teacher reference solution and latest student submissions through teacher-authorized routes, then shows one green/red pass/fail bar per enabled hidden test. Hover text lists the students in each result segment.
+
 When changing this plugin, update:
 
 - `packages/plugin-activities/plugin-coding-exercises/README.md`

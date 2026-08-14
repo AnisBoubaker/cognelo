@@ -51,6 +51,8 @@ The authoring form uses the shared responsive `EditActionBar` to display saved/u
 
 ## Contributor Workflow
 
+Standalone MCQ gradebook results expose **Review all** and reuse the Test aggregate report: correct choices, response counts, exact-answer accuracy, score statistics, and hoverable respondent names per choice.
+
 When changing this plugin, update:
 
 - `packages/plugin-activities/plugin-mcq/README.md`

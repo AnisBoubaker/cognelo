@@ -116,6 +116,8 @@ Teacher authoring uses the shared responsive `EditActionBar` across its tabs. Sa
 
 ## Contributor Workflow
 
+Standalone gradebook **Review all** loads the private reference bundle and latest student submissions through teacher-authorized routes. It shows one green/red pass/fail bar per enabled hidden Playwright test, and hovering either segment lists the students in it.
+
 When changing this plugin, update:
 
 - `packages/plugin-activities/plugin-web-design-coding-exercises/README.md`

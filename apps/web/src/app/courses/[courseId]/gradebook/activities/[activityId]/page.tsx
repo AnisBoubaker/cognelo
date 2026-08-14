@@ -9,6 +9,7 @@ import { createMcqClient, type McqSubmission } from "@cognelo/plugin-mcq";
 import { createParsonsClient, type ParsonsGradebookAttemptRecord } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
 import { TestReviewAllPanel } from "@/components/test-review-all-panel";
+import { ActivityReviewAllPanel, toActivityReviewResponse, type ActivityReviewResponse } from "@/components/activity-review-all-panel";
 import {
   api,
   apiRequest,
@@ -52,6 +53,12 @@ export default function GradebookActivityResultsPage() {
     loading: boolean;
     error: string;
     submissions: TestReviewAllSubmission[];
+    activityTypeKey?: string;
+    config?: Record<string, unknown>;
+    responses?: ActivityReviewResponse[];
+    solution?: unknown;
+    tests?: Array<{ id: string; name: string }>;
+    mcqContext?: Parameters<typeof renderTestReviewAllItem>[0];
   } | null>(null);
 
   async function refresh() {
@@ -80,6 +87,58 @@ export default function GradebookActivityResultsPage() {
   async function openReviewAll() {
     setReviewAll({ loading: true, error: "", submissions: [] });
     try {
+      const activityTypeKey = rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? "";
+      if (activityTypeKey !== "test") {
+        const activityResult = await api.activity(courseId, activityId);
+        let solution: unknown = null;
+        let tests: Array<{ id: string; name: string }> = [];
+        let aggregateResults = new Map<string, Array<{ testId: string; name: string; passed: boolean }>>();
+        if (activityTypeKey === "coding-exercise") {
+          const [definition, review] = await Promise.all([api.codingExerciseHiddenTests(courseId, activityId), api.codingExerciseReviewAll(courseId, activityId)]);
+          solution = definition.referenceSolution?.sourceCode ?? null;
+          tests = definition.tests.filter((test) => test.isEnabled).map((test) => ({ id: test.id, name: test.name }));
+          aggregateResults = new Map(review.submissions.map(({ participantId, execution }) => [participantId, normalizeCodingTestResults(execution.resultSummary.tests)]));
+        }
+        if (activityTypeKey === "web-design-coding-exercise") {
+          const [definition, review] = await Promise.all([api.webDesignExerciseTests(courseId, activityId), api.webDesignExerciseReviewAll(courseId, activityId)]);
+          solution = definition.referenceBundle?.files ?? null;
+          tests = definition.tests.filter((test) => test.isEnabled && test.kind === "hidden").map((test) => ({ id: test.id, name: test.name }));
+          aggregateResults = new Map(review.submissions.map(({ participantId, submission }) => [participantId, submission.testResults.flatMap((result) => result.testId ? [{ testId: result.testId, name: result.name, passed: result.status === "completed" && (result.score ?? 0) >= result.weight }] : [])]));
+        }
+        const loaded = await Promise.all(rows.map(async (row) => {
+          if (activityTypeKey === "mcq") {
+            const result = await mcqClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, { participantId: row.participantId });
+            return { row, state: result.attempts[0] ? { answers: result.attempts[0].answers } : null };
+          }
+          if (activityTypeKey === "parsons-problem") {
+            const result = await parsonsClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, { participantId: row.participantId });
+            return { row, state: result.attempts[0]?.latestState ?? null };
+          }
+          return { row, state: null };
+        }));
+        const responses = loaded.map(({ row, state }) => ({ ...toActivityReviewResponse(row, state), testResults: aggregateResults.get(row.participantId) }));
+        let mcqContext: Parameters<typeof renderTestReviewAllItem>[0] | undefined;
+        if (activityTypeKey === "mcq") {
+          const makeItem = (response?: ActivityReviewResponse) => ({
+            testItemId: activityId,
+            title: activityTitle,
+            activityTypeKey,
+            activity: activityResult.activity,
+            itemAttempt: {
+              state: response?.state ?? {},
+              normalizedScore: response?.score ?? null,
+              normalizedMaxScore: response?.maxScore ?? null
+            }
+          });
+          mcqContext = {
+            item: makeItem(responses[0]),
+            responses: responses.map((response) => ({ participantId: response.participantId, participantName: response.participantName, groupTitle: response.groupTitle, item: makeItem(response) })),
+            t
+          } as Parameters<typeof renderTestReviewAllItem>[0];
+        }
+        setReviewAll({ loading: false, error: "", submissions: [], activityTypeKey, config: activityResult.activity.config ?? {}, responses, solution, tests, mcqContext });
+        return;
+      }
       const reviewTargets = rows.flatMap((row) => {
         const attempt = latestCompletedTestAttempt(row);
         return attempt ? [{ row, attempt }] : [];
@@ -374,11 +433,9 @@ export default function GradebookActivityResultsPage() {
               <h2>{t("courseDetail.studentResultsTitle")}</h2>
             </div>
             <div className="row wrap">
-              {isTest ? (
-                <button className="button secondary" disabled={!hasRowsWithSubmittedAttempts} type="button" onClick={() => void openReviewAll()}>
-                  {t("courseDetail.reviewAll")}
-                </button>
-              ) : null}
+              <button className="button secondary" type="button" onClick={() => void openReviewAll()}>
+                {t("courseDetail.reviewAll")}
+              </button>
               <button className="button secondary" disabled={savingGradeKey === "__all:regrade"} type="button" onClick={() => void regradeAllRows()}>
                 {savingGradeKey === "__all:regrade" ? t("common.saving") : t("courseDetail.regradeAll")}
               </button>
@@ -469,7 +526,7 @@ export default function GradebookActivityResultsPage() {
               if (event.target === event.currentTarget) setReviewAll(null);
             }}
           >
-            <TestReviewAllPanel
+            {isTest ? <TestReviewAllPanel
               activityTitle={activityTitle}
               participantCount={rows.length}
               submissions={reviewAll.submissions}
@@ -478,7 +535,19 @@ export default function GradebookActivityResultsPage() {
               onClose={() => setReviewAll(null)}
               renderItem={renderTestReviewAllItem}
               t={t}
-            />
+            /> : <ActivityReviewAllPanel
+              activityTypeKey={reviewAll.activityTypeKey ?? rows[0]?.activityTypeKey ?? ""}
+              activityTitle={activityTitle}
+              config={reviewAll.config ?? {}}
+              responses={reviewAll.responses ?? []}
+              solution={reviewAll.solution}
+              tests={reviewAll.tests}
+              mcqReport={reviewAll.mcqContext ? renderTestReviewAllItem(reviewAll.mcqContext) : null}
+              loading={reviewAll.loading}
+              error={reviewAll.error}
+              onClose={() => setReviewAll(null)}
+              t={t}
+            />}
           </div>
         ) : null}
       </main>
@@ -542,6 +611,17 @@ function GradebookStudentRow({
       </div>
     </div>
   );
+}
+
+function normalizeCodingTestResults(value: unknown): Array<{ testId: string; name: string; passed: boolean }> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+    const result = entry as Record<string, unknown>;
+    return typeof result.id === "string" && typeof result.name === "string" && typeof result.passed === "boolean"
+      ? [{ testId: result.id, name: result.name, passed: result.passed }]
+      : [];
+  });
 }
 
 function hasSubmittedAttempt(row: CourseGradebookRow) {
