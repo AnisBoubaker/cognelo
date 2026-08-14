@@ -584,13 +584,19 @@ export async function listContentItems(user: CurrentUser, courseId: string, opti
     },
     orderBy: [{ parentId: "asc" }, { position: "asc" }, { createdAt: "asc" }]
   });
-  const scopedItems = removeCourseActivityPlacementsShadowedByGroupAssignments(items, scope.groupId);
-  const withVisibility = addEffectiveVisibility(scopedItems);
-  return options.visibleOnly ? withVisibility.filter((item) => item.effectiveVisibility === "visible") : withVisibility;
+  const withVisibility = addEffectiveVisibility(items);
+  const scopedItems = removeCourseActivityPlacementsShadowedByGroupAssignments(withVisibility, scope.groupId);
+  return options.visibleOnly ? scopedItems.filter((item) => item.effectiveVisibility === "visible") : scopedItems;
 }
 
 function removeCourseActivityPlacementsShadowedByGroupAssignments<
-  T extends { activityId: string | null; courseGroupActivityId: string | null; groupId: string | null; kind: string }
+  T extends {
+    activityId: string | null;
+    courseGroupActivityId: string | null;
+    effectiveVisibility: EffectiveContentVisibility;
+    groupId: string | null;
+    kind: string;
+  }
 >(items: T[], groupId: string | null) {
   if (!groupId) {
     return items;
@@ -605,10 +611,37 @@ function removeCourseActivityPlacementsShadowedByGroupAssignments<
       .map((item) => item.activityId as string)
   );
 
-  return items.filter(
-    (item) =>
-      !(item.groupId === null && item.kind === "activity" && typeof item.activityId === "string" && assignedActivityIds.has(item.activityId))
+  const hiddenCourseActivityPlacements = new Map(
+    items
+      .filter(
+        (item) =>
+          item.groupId === null &&
+          item.kind === "activity" &&
+          typeof item.activityId === "string" &&
+          item.effectiveVisibility !== "visible"
+      )
+      .map((item) => [item.activityId as string, item.effectiveVisibility] as const)
   );
+
+  return items
+    .filter(
+      (item) =>
+        !(item.groupId === null && item.kind === "activity" && typeof item.activityId === "string" && assignedActivityIds.has(item.activityId))
+    )
+    .map((item) => {
+      if (
+        item.groupId === groupId &&
+        item.kind === "activity" &&
+        item.courseGroupActivityId &&
+        typeof item.activityId === "string"
+      ) {
+        const inheritedVisibility = hiddenCourseActivityPlacements.get(item.activityId);
+        if (inheritedVisibility) {
+          return { ...item, effectiveVisibility: inheritedVisibility };
+        }
+      }
+      return item;
+    });
 }
 
 export async function deleteContentItem(user: CurrentUser, courseId: string, contentItemId: string, scope: ContentScope = {}) {

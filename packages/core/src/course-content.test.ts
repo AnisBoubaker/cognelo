@@ -676,6 +676,40 @@ describe("course content services", () => {
     expect(result.map((item) => item.id)).toEqual(["week-1", "group-activity-1", "course-activity-2"]);
   });
 
+  it("keeps an assigned group activity hidden when its shared placement is inside a hidden folder", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1" });
+    mockPrisma.courseContentItem.findMany.mockResolvedValue([
+      { id: "hidden-folder", parentId: null, isVisible: false, groupId: null, kind: "folder", activityId: null, courseGroupActivityId: null },
+      {
+        id: "course-activity-1",
+        parentId: "hidden-folder",
+        isVisible: true,
+        groupId: null,
+        kind: "activity",
+        activityId: "activity-1",
+        courseGroupActivityId: null
+      },
+      {
+        id: "group-activity-1",
+        parentId: null,
+        isVisible: true,
+        groupId: "group-1",
+        kind: "activity",
+        activityId: "activity-1",
+        courseGroupActivityId: "assignment-1"
+      }
+    ]);
+
+    const teacherResult = await listContentItems(teacherUser, "course-1", { groupId: "group-1" });
+    expect(teacherResult).toMatchObject([
+      { id: "hidden-folder", effectiveVisibility: "hidden" },
+      { id: "group-activity-1", effectiveVisibility: "hidden_by_parent" }
+    ]);
+
+    const studentResult = await listContentItems(teacherUser, "course-1", { groupId: "group-1", visibleOnly: true });
+    expect(studentResult).toEqual([]);
+  });
+
   it("deletes only content items belonging to the course", async () => {
     mockPrisma.courseContentItem.findFirst.mockResolvedValue({ id: "item-1", courseId: "course-1" });
 
