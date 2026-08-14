@@ -397,7 +397,7 @@ Web design runner (dev): http://localhost:3456
 
 ## Production Deployment
 
-The step-by-step production runbook is [docs/DEPLOYMENT_UBUNTU_APACHE.md](docs/DEPLOYMENT_UBUNTU_APACHE.md). Its production reference uses two VPSs: an application/database host with Apache, TLS, isolated systemd services, PostgreSQL, and persistent uploads, plus a dedicated Judge0/Playwright sandbox host connected only through a WireGuard point-to-point network. It also covers production administrator bootstrap, backups, upgrades, capacity guidance, and additional isolated Cognelo instances.
+The initial production runbook is [docs/DEPLOYMENT_UBUNTU_APACHE.md](docs/DEPLOYMENT_UBUNTU_APACHE.md). Its production reference uses two VPSs: an application/database host with Apache, TLS, isolated systemd services, PostgreSQL, and persistent uploads, plus a dedicated Judge0/Playwright sandbox host connected only through a WireGuard point-to-point network. It also covers production administrator bootstrap, backups, capacity guidance, and additional isolated Cognelo instances. For the concise tagged-release procedure—including a database backup, optional sandbox update, migration, activation, smoke test, and rollback—use [docs/DEPLOYMENT_UPGRADE_UBUNTU_APACHE.md](docs/DEPLOYMENT_UPGRADE_UBUNTU_APACHE.md). Every production GitHub Release must include the explicit upgrade section defined by [docs/RELEASE_NOTES_TEMPLATE.md](docs/RELEASE_NOTES_TEMPLATE.md); operators are not expected to infer manual actions from code diffs.
 
 Judge0-related environment variables:
 
