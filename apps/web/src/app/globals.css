@@ -1514,6 +1514,10 @@ a.card:hover,
   width: 100%;
 }
 
+.activity-bank-activities-table {
+  overflow: visible;
+}
+
 .table-row {
   align-items: center;
   background: var(--surface);
@@ -2127,6 +2131,10 @@ a.card:hover,
   min-height: 30px;
   min-width: 30px;
   padding: 4px 9px;
+}
+
+.test-review-choice-count.is-incorrect {
+  background: #dc2626;
 }
 
 .test-review-choice-students {

@@ -784,6 +784,7 @@ function McqTestReviewAll({ item, responses, t }: TestReviewAllItemContext) {
                   <span style={{ flex: 1, minWidth: 0 }}><MarkdownBlocksView blocks={choice.blocks} compact /></span>
                   {students.length ? (
                     <TestReviewChoiceBadge
+                      incorrect={!choice.isCorrect}
                       students={students}
                       studentNames={studentNames}
                       ariaLabel={t("courseDetail.choiceSelectedBy", { count: students.length, names: studentNames.join(", ") })}
@@ -818,10 +819,12 @@ function formatReportDecimal(value: number) {
 }
 
 function TestReviewChoiceBadge({
+  incorrect,
   students,
   studentNames,
   ariaLabel
 }: {
+  incorrect: boolean;
   students: TestReviewAllItemContext["responses"];
   studentNames: string[];
   ariaLabel: string;
@@ -866,7 +869,7 @@ function TestReviewChoiceBadge({
     <>
       <span
         aria-label={ariaLabel}
-        className="test-review-choice-count"
+        className={`test-review-choice-count${incorrect ? " is-incorrect" : ""}`}
         ref={anchorRef}
         tabIndex={0}
         onBlur={() => setOpen(false)}
