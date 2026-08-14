@@ -278,10 +278,12 @@ export const ActivityKnowledgeConceptSelectionSchema = z.object({
 });
 export type ActivityKnowledgeConceptSelection = z.infer<typeof ActivityKnowledgeConceptSelectionSchema>;
 
+const ActivityDescriptionSchema = z.string().max(30000);
+
 export const BankActivityInputSchema = z.object({
   activityTypeKey: z.string().min(2).max(80),
   title: z.string().min(2).max(180),
-  description: z.string().max(4000).optional().default(""),
+  description: ActivityDescriptionSchema.optional().default(""),
   lifecycle: ActivityLifecycleSchema.optional().default("draft"),
   config: z.record(z.unknown()).optional().default({}),
   metadata: z.record(z.unknown()).optional().default({}),
@@ -380,7 +382,7 @@ export const ActivityInputSchema = z.object({
   activityVersionId: RecordIdSchema.optional(),
   activityTypeKey: z.string().min(2).max(80),
   title: z.string().min(2).max(180),
-  description: z.string().max(4000).optional().default(""),
+  description: ActivityDescriptionSchema.optional().default(""),
   lifecycle: ActivityLifecycleSchema.optional().default("draft"),
   config: z.record(z.unknown()).optional().default({}),
   metadata: z.record(z.unknown()).optional().default({}),

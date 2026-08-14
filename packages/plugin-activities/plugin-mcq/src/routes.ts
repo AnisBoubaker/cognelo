@@ -18,7 +18,7 @@ import { buildMcqGradingResultFromConfig } from "./grading";
 import { parseMcqSource, type McqAnswerState, type McqParseError } from "./mcq";
 
 const mcqGenerateInputSchema = z.object({
-  description: z.string().min(10).max(4000),
+  description: z.string().min(10).max(30000),
   defaultCodeLanguage: z.string().min(1).max(40).default("none"),
   instructions: z.string().max(4000).default(""),
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),

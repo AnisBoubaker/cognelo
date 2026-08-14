@@ -14,6 +14,8 @@ During authoring, the complete source editor and rendered preview appear side by
 
 The student prompt uses the shared Markdown-backed `RichTextEditor` from `@cognelo/activity-ui`. Teachers can edit visually or switch to the always-available Markdown source mode; the stored activity description remains Markdown.
 
+Student prompts may contain long reading passages up to 30,000 characters. The MCQ generation route accepts the same limit so a passage can be used as generation context.
+
 ## Authoring Model
 
 The main MCQ source is written as text.
