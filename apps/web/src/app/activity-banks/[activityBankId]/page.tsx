@@ -251,7 +251,7 @@ export default function ActivityBankDetailPage() {
           </div>
 
           {bank?.activities?.length ? (
-            <div className="table-list">
+            <div className="table-list activity-bank-activities-table">
               <div className="table-row table-head" aria-hidden="true">
                 <span>{t("activityBankDetail.titleHeader")}</span>
                 <span>{t("activityBankDetail.typeHeader")}</span>
