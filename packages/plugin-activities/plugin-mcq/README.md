@@ -19,6 +19,8 @@ The student prompt uses the shared Markdown-backed `RichTextEditor` from `@cogne
 The main MCQ source is written as text.
 
 - `##` headings define questions
+- `#` headings define introductory or between-question sections; Markdown following such a heading is rendered before the next question
+- `---` starts an untitled between-question section; Markdown following it is rendered before the next question
 - `- [x]` defines a correct answer
 - `- [ ]` defines an incorrect answer
 - fenced code blocks are syntax-highlighted in the rendered student view

@@ -2,6 +2,8 @@ This file is for MCQ plugin memory only.
 
 - MCQ is intentionally text-first: the main authoring surface is a code-like editor, not a click-heavy form builder.
 - The source format is a Markdown-inspired grammar with `##` question headings and task-list style choice markers.
+- Single-`#` headings are content-section boundaries. They and the Markdown that follows render before the next `##` question, allowing passages, directions, and part titles between question groups without attaching that content to the preceding answer choice.
+- A standalone `---` is the explicit boundary for an untitled between-question section. It is not rendered; the Markdown after it renders before the next `##` question. Plain trailing text without `#` or `---` remains part of the preceding choice so multiline choices stay unambiguous.
 - Choices may contain Markdown blocks, including fenced code blocks for code alternatives. Code-only choices can use a bare `- [ ]` or `- [x]` marker followed by a fenced code block.
 - MCQ config supports `randomizeChoices`; rendering shuffles displayed choices while preserving choice IDs for scoring.
 - The MCQ authoring form registers with the shared unsaved-change guard so navigating away can save, discard, or continue editing. Future MCQ authoring options/settings must keep using `useUnsavedChangesGuard` rather than adding plugin-local navigation prompts.

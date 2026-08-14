@@ -926,23 +926,25 @@ function McqStudentView({
         const questionMaxScore = releasedMaxScore && parsedMcq.questions.length ? releasedMaxScore / parsedMcq.questions.length : 1;
 
         return (
-          <McqQuestionCard
-            key={question.id}
-            question={question}
-            index={index}
-            selected={selected}
-            submitted={submitted}
-            showFeedback={showFeedback}
-            questionLabel={questionLabel}
-            correctLabel={correctLabel}
-            incorrectLabel={incorrectLabel}
-            missedCorrectAnswerLabel={missedCorrectAnswerLabel}
-            pointsLabel={pointsLabel}
-            questionMaxScore={questionMaxScore}
-            onSingleChoice={onSingleChoice}
-            onMultipleChoice={onMultipleChoice}
-            disabled={disabled}
-          />
+          <div className="stack" key={question.id}>
+            {question.leadingBlocks.length ? <MarkdownBlocksView blocks={question.leadingBlocks} /> : null}
+            <McqQuestionCard
+              question={question}
+              index={index}
+              selected={selected}
+              submitted={submitted}
+              showFeedback={showFeedback}
+              questionLabel={questionLabel}
+              correctLabel={correctLabel}
+              incorrectLabel={incorrectLabel}
+              missedCorrectAnswerLabel={missedCorrectAnswerLabel}
+              pointsLabel={pointsLabel}
+              questionMaxScore={questionMaxScore}
+              onSingleChoice={onSingleChoice}
+              onMultipleChoice={onMultipleChoice}
+              disabled={disabled}
+            />
+          </div>
         );
       })}
 

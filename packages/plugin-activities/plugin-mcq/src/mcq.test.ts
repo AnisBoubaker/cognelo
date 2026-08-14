@@ -30,6 +30,70 @@ Choose the capital.
     expect(parsed.questions[1]).toMatchObject({ title: "Prime numbers", mode: "multiple" });
   });
 
+  it("renders a single-hash section and its text between questions instead of appending it to a choice", () => {
+    const parsed = parseMcqSource(
+      `# Reading comprehension
+
+## Question 1
+
+- [x] First correct answer
+- [ ] First incorrect answer
+
+# Part 2
+
+Read the following short passage.
+
+## Question 2
+Which statement is supported?
+
+- [x] Second correct answer
+- [ ] Second incorrect answer`,
+      "none"
+    );
+
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.introBlocks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "heading", text: "Reading comprehension" })
+    ]));
+    expect(parsed.questions[0].choices[1].blocks).toEqual([
+      expect.objectContaining({ type: "paragraph", text: "First incorrect answer" })
+    ]);
+    expect(parsed.questions[1].leadingBlocks).toEqual([
+      expect.objectContaining({ type: "heading", text: "Part 2" }),
+      expect.objectContaining({ type: "paragraph", text: "Read the following short passage." })
+    ]);
+  });
+
+  it("renders untitled directions after an interstitial separator before the next question", () => {
+    const parsed = parseMcqSource(
+      `## Question 1
+
+- [x] First correct answer
+- [ ] First incorrect answer
+
+---
+
+Read the following passage before answering.
+
+The passage can contain multiple paragraphs.
+
+## Question 2
+
+- [x] Second correct answer
+- [ ] Second incorrect answer`,
+      "none"
+    );
+
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.questions[0].choices[1].blocks).toEqual([
+      expect.objectContaining({ type: "paragraph", text: "First incorrect answer" })
+    ]);
+    expect(parsed.questions[1].leadingBlocks).toEqual([
+      expect.objectContaining({ type: "paragraph", text: "Read the following passage before answering." }),
+      expect.objectContaining({ type: "paragraph", text: "The passage can contain multiple paragraphs." })
+    ]);
+  });
+
   it("reports malformed questions without throwing", () => {
     const parsed = parseMcqSource(
       `## Missing correct answer
