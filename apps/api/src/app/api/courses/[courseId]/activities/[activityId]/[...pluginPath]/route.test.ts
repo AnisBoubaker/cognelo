@@ -4,6 +4,7 @@ const routeHandler = vi.hoisted(() => vi.fn());
 
 const mocks = vi.hoisted(() => ({
   assertActivityTypePluginEnabled: vi.fn(),
+  assertCanManageCourse: vi.fn(),
   getActivity: vi.fn(),
   requireUser: vi.fn(),
   resolvePluginRoute: vi.fn()
@@ -21,6 +22,7 @@ vi.mock("@cognelo/core", () => ({
     }
   },
   assertActivityTypePluginEnabled: mocks.assertActivityTypePluginEnabled,
+  assertCanManageCourse: mocks.assertCanManageCourse,
   getActivity: mocks.getActivity
 }));
 
@@ -89,5 +91,16 @@ describe("course activity plugin dispatch route", () => {
         params: Promise.resolve({ courseId: "course-1", activityId: "activity-1", pluginPath: ["run"] })
       })
     ).rejects.toMatchObject({ status: 405, code: "METHOD_NOT_ALLOWED" });
+  });
+
+  it("fails before plugin resolution when the user cannot manage the course", async () => {
+    mocks.assertCanManageCourse.mockRejectedValueOnce(new Error("forbidden"));
+    await expect(
+      POST(new Request("http://test.local", { method: "POST" }) as never, {
+        params: Promise.resolve({ courseId: "course-1", activityId: "activity-1", pluginPath: ["fake", "run"] })
+      })
+    ).rejects.toThrow("forbidden");
+    expect(mocks.getActivity).not.toHaveBeenCalled();
+    expect(mocks.resolvePluginRoute).not.toHaveBeenCalled();
   });
 });

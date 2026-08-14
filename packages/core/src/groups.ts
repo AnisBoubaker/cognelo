@@ -15,6 +15,7 @@ import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { assertCanManageCourse, assertCanViewCourse, canManageCourse, isAdmin } from "./authorization";
+import { listContentItems } from "./course-content";
 import { AppError, notFound } from "./errors";
 
 type StudentAccessDb = Pick<typeof prisma, "role" | "userRole" | "courseMembership">;
@@ -92,8 +93,18 @@ export async function getCourseGroup(user: CurrentUser, courseId: string, groupI
   if (!group) {
     throw notFound("Course group");
   }
+  const visibleAssignmentIds = isManager
+    ? null
+    : new Set(
+        (await listContentItems(user, courseId, { groupId, visibleOnly: true }))
+          .map((item) => item.courseGroupActivityId)
+          .filter((id): id is string => typeof id === "string")
+      );
   return {
     ...group,
+    activities: visibleAssignmentIds
+      ? group.activities.filter((assignment) => visibleAssignmentIds.has(assignment.id))
+      : group.activities,
     participants: isManager ? group.participants : group.participants.filter((participant) => participant.userId === user.id),
     hiddenCourseMaterialIds: group.hiddenCourseMaterials.map((entry) => entry.courseMaterialId)
   };
@@ -473,6 +484,11 @@ export async function getGroupAssignedActivity(user: CurrentUser, courseId: stri
       (assignment.availableFrom && assignment.availableFrom > now)
     ) {
       throw new AppError(403, "GROUP_ACTIVITY_NOT_AVAILABLE", "This activity is not currently available in the group.");
+    }
+
+    const visibleContentItems = await listContentItems(user, courseId, { groupId, visibleOnly: true });
+    if (!visibleContentItems.some((item) => item.courseGroupActivityId === assignment.id)) {
+      throw new AppError(403, "GROUP_ACTIVITY_HIDDEN", "This activity is hidden in the group workspace.");
     }
   }
 

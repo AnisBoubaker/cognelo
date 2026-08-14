@@ -158,6 +158,8 @@ Do not add plugin-specific route files under `apps/api`. The API app owns generi
 
 If the same route must work in both course-copy and bank-authoring contexts, branch on `context.courseId` and `context.activityBankId`.
 
+Always declare `activityTypeKeys`; registrations without an explicit supported-type list fail closed. Use the course dispatcher only for manager authoring, the bank dispatcher only for bank authoring, and the assigned section/group dispatcher for learner work. Even inside the assigned dispatcher, validate operation-specific roles and participant ownership before reading private attempts, tests, answers, or grades.
+
 ## Step 5: Add Client-Side API Helpers
 
 If your plugin route is called from the browser, add a helper in:

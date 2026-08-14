@@ -3,8 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { getServerEnv } from "@cognelo/config";
 import { AppError, verifyAuthToken } from "@cognelo/core";
+export { AUTH_COOKIE, validateCsrfOrigin } from "./csrf";
+import { AUTH_COOKIE } from "./csrf";
 
-export const AUTH_COOKIE = "cognelo_session";
 
 export async function requireUser() {
   const env = getServerEnv();

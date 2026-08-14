@@ -78,9 +78,16 @@ and is consumed by the API route:
 What this gives you:
 
 - auth is already enforced
+- course activity authoring routes require course-management permission
+- activity-bank routes require bank-management permission
+- assigned section/group routes validate access to the concrete assignment
 - the activity is already loaded
 - the route is matched by activity type and path
 - your handler receives a clean context object
+
+Route matching is fail-closed: every `PluginRouteDefinition` must explicitly list `activityTypeKeys`. Omitting that list makes the route undispatchable. Handlers must still enforce operation-specific rules, such as requiring a student participant for submission or a manager for gradebook review.
+
+Cookie-authenticated unsafe requests are protected centrally by an exact `Origin`/`CORS_ORIGIN` match, including JSON and multipart plugin mutations. Do not bypass the generic dispatcher or invent a weaker plugin-local CORS/CSRF path.
 
 That context includes:
 

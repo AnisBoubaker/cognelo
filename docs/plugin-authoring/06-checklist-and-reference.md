@@ -81,6 +81,10 @@ Check that:
 - invalid config is rejected
 - plugin routes respond correctly
 - unauthorized access is rejected
+- every server route explicitly declares its supported activity/content type keys
+- course/bank authoring routes reject non-managers before plugin code runs
+- assigned learner routes validate the participant or teacher-only operation inside the handler
+- unsafe content-plugin routes are manager-only while safe visible-resource GET routes remain available to authorized learners
 - any plugin tables receive the expected records, including both bank-owned and copied course-owned rows where applicable
 - content type plugins appear under the Content type plugins settings tab
 - enabled content type plugins appear in the course picker

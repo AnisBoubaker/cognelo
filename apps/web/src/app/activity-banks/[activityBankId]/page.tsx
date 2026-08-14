@@ -6,6 +6,7 @@ import {
   listActivityCategories,
   type ActivityCategoryId
 } from "@cognelo/activity-sdk/categories";
+import { ConfirmationDialog } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
@@ -20,6 +21,8 @@ type EditingActivityState = {
   lifecycle: "draft" | "published" | "paused" | "archived";
   activityTypeKey: string;
 };
+
+type DeleteActivityState = { activity: BankActivity; courseCount: number | null };
 
 const activityCategories = listActivityCategories();
 
@@ -36,6 +39,8 @@ export default function ActivityBankDetailPage() {
   const [savingActivity, setSavingActivity] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [deletingActivityId, setDeletingActivityId] = useState<string | null>(null);
+  const [activityActionMenuId, setActivityActionMenuId] = useState<string | null>(null);
+  const [deleteActivityState, setDeleteActivityState] = useState<DeleteActivityState | null>(null);
   const [showActivityPicker, setShowActivityPicker] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<ActivityCategoryId>("generic");
 
@@ -70,6 +75,27 @@ export default function ActivityBankDetailPage() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [showActivityPicker]);
+
+  useEffect(() => {
+    if (!activityActionMenuId) {
+      return;
+    }
+    function closeActivityActions(event: MouseEvent | KeyboardEvent) {
+      if (event instanceof KeyboardEvent && event.key !== "Escape") {
+        return;
+      }
+      if (event instanceof MouseEvent && event.target instanceof Element && event.target.closest("[data-activity-actions]")) {
+        return;
+      }
+      setActivityActionMenuId(null);
+    }
+    document.addEventListener("mousedown", closeActivityActions);
+    document.addEventListener("keydown", closeActivityActions);
+    return () => {
+      document.removeEventListener("mousedown", closeActivityActions);
+      document.removeEventListener("keydown", closeActivityActions);
+    };
+  }, [activityActionMenuId]);
 
   async function createBankActivity(selectedActivityTypeKey: string) {
     if (!bank) {
@@ -132,38 +158,20 @@ export default function ActivityBankDetailPage() {
     }
   }
 
-  async function deleteActivity(activity: BankActivity) {
-    if (!bank) {
+  async function confirmDeleteActivity() {
+    if (!bank || !deleteActivityState) {
       return;
     }
-    const confirmed = window.confirm(t("activityBankDetail.deleteActivityConfirm", { title: activity.title }));
-    if (!confirmed) {
-      return;
-    }
-
+    const { activity, courseCount } = deleteActivityState;
     setDeletingActivityId(activity.id);
     setError("");
     try {
-      await api.deleteBankActivity(bank.id, activity.id);
+      await api.deleteBankActivity(bank.id, activity.id, courseCount === null ? undefined : { force: true });
+      setDeleteActivityState(null);
       await loadPage();
     } catch (err) {
-      if (err instanceof ApiError && err.code === "BANK_ACTIVITY_IN_USE") {
-        const courseCount = getCourseCountFromDeleteError(err.details);
-        const forceConfirmed = window.confirm(
-          t("activityBankDetail.deleteActivityInUseConfirm", {
-            title: activity.title,
-            count: courseCount
-          })
-        );
-        if (forceConfirmed) {
-          try {
-            await api.deleteBankActivity(bank.id, activity.id, { force: true });
-            await loadPage();
-          } catch (forceErr) {
-            setError(forceErr instanceof Error ? forceErr.message : t("activityBankDetail.deleteActivityError"));
-          }
-          return;
-        }
+      if (courseCount === null && err instanceof ApiError && err.code === "BANK_ACTIVITY_IN_USE") {
+        setDeleteActivityState({ activity, courseCount: getCourseCountFromDeleteError(err.details) });
         return;
       }
 
@@ -262,23 +270,40 @@ export default function ActivityBankDetailPage() {
                   <span className="table-meta muted">{t(`activityLifecycle.${activity.lifecycle}`)}</span>
                   <div className="table-actions">
                     <span className="table-meta muted">v{activity.currentVersion?.versionNumber ?? 1}</span>
-                    <Link
-                      className="button secondary icon-button"
-                      href={`/activity-banks/${bank.id}/activities/${activity.id}`}
-                      title={t("common.edit")}
-                    >
-                      <EditIcon />
-                    </Link>
-                    <button
-                      aria-label={t("activityBankDetail.deleteActivity", { title: activity.title })}
-                      className="danger icon-button"
-                      disabled={deletingActivityId === activity.id}
-                      onClick={() => deleteActivity(activity)}
-                      title={t("common.remove")}
-                      type="button"
-                    >
-                      <RemoveIcon />
-                    </button>
+                    <div className="content-header-actions" data-activity-actions>
+                      <button
+                        aria-expanded={activityActionMenuId === activity.id}
+                        aria-haspopup="menu"
+                        aria-label={t("activityBankDetail.activityActions", { title: activity.title })}
+                        className="secondary icon-button"
+                        onClick={() => setActivityActionMenuId((current) => current === activity.id ? null : activity.id)}
+                        title={t("activityBankDetail.activityActionsTitle")}
+                        type="button"
+                      >
+                        <span aria-hidden="true">•••</span>
+                      </button>
+                      {activityActionMenuId === activity.id ? (
+                        <div className="content-header-menu content-context-menu" role="menu">
+                          <Link className="content-context-menu-item" href={`/activity-banks/${bank.id}/activities/${activity.id}`} role="menuitem">
+                            <EditIcon />
+                            <span>{t("common.edit")}</span>
+                          </Link>
+                          <button
+                            className="content-context-menu-item is-danger"
+                            disabled={deletingActivityId === activity.id}
+                            onClick={() => {
+                              setActivityActionMenuId(null);
+                              setDeleteActivityState({ activity, courseCount: null });
+                            }}
+                            role="menuitem"
+                            type="button"
+                          >
+                            <RemoveIcon />
+                            <span>{t("common.remove")}</span>
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -287,6 +312,24 @@ export default function ActivityBankDetailPage() {
             <p className="muted">{t("activityBankDetail.noActivities")}</p>
           )}
         </section>
+
+        <ConfirmationDialog
+          open={Boolean(deleteActivityState)}
+          eyebrow={t("activityBankDetail.deleteActivityEyebrow")}
+          title={t("activityBankDetail.deleteActivityDialogTitle")}
+          message={deleteActivityState?.courseCount === null
+            ? t("activityBankDetail.deleteActivityConfirm", { title: deleteActivityState?.activity.title ?? "" })
+            : t("activityBankDetail.deleteActivityInUseConfirm", {
+                title: deleteActivityState?.activity.title ?? "",
+                count: deleteActivityState?.courseCount ?? 0
+              })}
+          confirmLabel={deleteActivityState?.courseCount === null ? t("common.remove") : t("activityBankDetail.removeAndPreserveCopies")}
+          cancelLabel={t("common.cancel")}
+          confirmVariant="danger"
+          isConfirming={Boolean(deletingActivityId)}
+          onCancel={() => setDeleteActivityState(null)}
+          onConfirm={confirmDeleteActivity}
+        />
 
         {showActivityPicker ? (
           <div className="dialog-backdrop" role="presentation">
