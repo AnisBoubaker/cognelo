@@ -16,6 +16,7 @@ export type McqChoice = {
 export type McqQuestion = {
   id: string;
   title: string;
+  leadingBlocks: McqBlock[];
   promptBlocks: McqBlock[];
   choices: McqChoice[];
   mode: "single" | "multiple";
@@ -53,6 +54,7 @@ export type McqGradingResult = {
 type Section = {
   heading: string | null;
   headingLine: number;
+  leadingLines: Array<{ number: number; text: string }>;
   lines: Array<{ number: number; text: string }>;
 };
 
@@ -68,7 +70,7 @@ export function parseMcqSource(source: string, defaultCodeLanguage: string): Par
   const sections = splitSections(lines);
   const errors: McqParseError[] = [];
 
-  const introSection = sections.find((section) => section.heading === null) ?? { heading: null, headingLine: 1, lines: [] };
+  const introSection = sections.find((section) => section.heading === null) ?? { heading: null, headingLine: 1, leadingLines: [], lines: [] };
   const introBlocks = parseMarkdownBlocks(
     introSection.lines.map((line) => line.text),
     defaultCodeLanguage
@@ -165,7 +167,9 @@ function normalizeMcqCodeLanguage(language: string) {
 
 function splitSections(lines: string[]): Section[] {
   const sections: Section[] = [];
-  let current: Section = { heading: null, headingLine: 1, lines: [] };
+  let current: Section = { heading: null, headingLine: 1, leadingLines: [], lines: [] };
+  let pendingLeadingLines: Array<{ number: number; text: string }> = [];
+  let collectingInterlude = false;
   let inFence = false;
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -181,8 +185,25 @@ function splitSections(lines: string[]): Section[] {
       current = {
         heading: line.replace(/^##\s+/, "").trim(),
         headingLine: index + 1,
+        leadingLines: pendingLeadingLines,
         lines: []
       };
+      pendingLeadingLines = [];
+      collectingInterlude = false;
+      continue;
+    }
+
+    if (!inFence && current.heading !== null && /^#\s+/.test(line)) {
+      collectingInterlude = true;
+    }
+
+    if (!inFence && current.heading !== null && /^---+\s*$/.test(line)) {
+      collectingInterlude = true;
+      continue;
+    }
+
+    if (collectingInterlude) {
+      pendingLeadingLines.push({ number: index + 1, text: line });
       continue;
     }
 
@@ -320,6 +341,7 @@ function parseQuestionSection(
   return {
     id: `question-${index + 1}`,
     title: section.heading,
+    leadingBlocks: parseMarkdownBlocks(section.leadingLines.map((line) => line.text), defaultCodeLanguage),
     promptBlocks: parseMarkdownBlocks(promptLines, defaultCodeLanguage),
     choices: choices.map((choice, choiceIndex) => ({
       id: `question-${index + 1}-choice-${choiceIndex + 1}`,
