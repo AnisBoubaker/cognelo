@@ -71,6 +71,21 @@ describe("shared contract schemas", () => {
     });
   });
 
+  it("accepts long student prompts for bank and course activities", () => {
+    const description = "Long passage. ".repeat(500);
+
+    expect(BankActivityInputSchema.parse({
+      activityTypeKey: "mcq",
+      title: "Reading comprehension",
+      description
+    }).description).toBe(description);
+    expect(ActivityInputSchema.parse({
+      activityTypeKey: "mcq",
+      title: "Reading comprehension",
+      description
+    }).description).toBe(description);
+  });
+
   it("accepts optional course content placement for activities and assignments", () => {
     expect(
       ActivityInputSchema.parse({

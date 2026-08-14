@@ -470,9 +470,9 @@ export function McqActivityView({
     )
   );
 
-  async function saveMcq(event: FormEvent) {
+  function saveMcq(event: FormEvent) {
     event.preventDefault();
-    await saveMcqChanges();
+    void saveMcqChanges().catch(() => undefined);
   }
 
   function requestMcqGeneration() {
