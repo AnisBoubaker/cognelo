@@ -4,6 +4,7 @@ const routeHandler = vi.hoisted(() => vi.fn());
 
 const mocks = vi.hoisted(() => ({
   assertActivityTypePluginEnabled: vi.fn(),
+  assertCanManageActivityBank: vi.fn(),
   getActivityBank: vi.fn(),
   requireUser: vi.fn(),
   resolvePluginRoute: vi.fn()
@@ -21,6 +22,7 @@ vi.mock("@cognelo/core", () => ({
     }
   },
   assertActivityTypePluginEnabled: mocks.assertActivityTypePluginEnabled,
+  assertCanManageActivityBank: mocks.assertCanManageActivityBank,
   getActivityBank: mocks.getActivityBank
 }));
 
@@ -87,6 +89,17 @@ describe("bank activity plugin dispatch route", () => {
       })
     ).rejects.toMatchObject({ status: 404, code: "BANK_ACTIVITY_NOT_FOUND" });
 
+    expect(mocks.resolvePluginRoute).not.toHaveBeenCalled();
+  });
+
+  it("fails before loading private plugin data when the user cannot manage the bank", async () => {
+    mocks.assertCanManageActivityBank.mockRejectedValueOnce(new Error("forbidden"));
+    await expect(
+      POST(new Request("http://test.local", { method: "POST" }) as never, {
+        params: Promise.resolve({ activityBankId: "bank-1", bankActivityId: "bank-activity-1", pluginPath: ["fake", "run"] })
+      })
+    ).rejects.toThrow("forbidden");
+    expect(mocks.getActivityBank).not.toHaveBeenCalled();
     expect(mocks.resolvePluginRoute).not.toHaveBeenCalled();
   });
 });

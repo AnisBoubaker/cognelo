@@ -73,6 +73,7 @@ describe("server activity SDK", () => {
 
   it("lists registered plugin routes for API dispatch introspection", () => {
     const routes = listPluginRoutes();
+    expect(routes.every((route) => route.activityTypeKeys.length > 0)).toBe(true);
     expect(routes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

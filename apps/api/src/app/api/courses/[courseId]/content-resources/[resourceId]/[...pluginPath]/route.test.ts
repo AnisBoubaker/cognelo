@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const routeHandler = vi.hoisted(() => vi.fn());
 
 const mocks = vi.hoisted(() => ({
+  assertCanManageCourse: vi.fn(),
   getContentResourceForPluginRoute: vi.fn(),
   requireUser: vi.fn(),
   resolveContentTypePluginRoute: vi.fn()
@@ -19,6 +20,7 @@ vi.mock("@cognelo/core", () => ({
       super(message);
     }
   },
+  assertCanManageCourse: mocks.assertCanManageCourse,
   getContentResourceForPluginRoute: mocks.getContentResourceForPluginRoute
 }));
 
@@ -38,7 +40,7 @@ const { GET, POST } = await import("./route");
 describe("course content resource plugin dispatch route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.requireUser.mockResolvedValue({ id: "user-1", roles: ["student"] });
+    mocks.requireUser.mockResolvedValue({ id: "user-1", roles: ["teacher"] });
     mocks.getContentResourceForPluginRoute.mockResolvedValue({
       id: "resource-1",
       courseId: "course-1",
@@ -58,7 +60,8 @@ describe("course content resource plugin dispatch route", () => {
     });
 
     await expect(response.json()).resolves.toEqual({ ok: true });
-    expect(mocks.getContentResourceForPluginRoute).toHaveBeenCalledWith({ id: "user-1", roles: ["student"] }, "course-1", "resource-1", {
+    expect(mocks.assertCanManageCourse).toHaveBeenCalledWith({ id: "user-1", roles: ["teacher"] }, "course-1");
+    expect(mocks.getContentResourceForPluginRoute).toHaveBeenCalledWith({ id: "user-1", roles: ["teacher"] }, "course-1", "resource-1", {
       groupId: undefined
     });
     expect(mocks.resolveContentTypePluginRoute).toHaveBeenCalledWith("github-repo-content", "github-repo", ["sync"]);
@@ -79,6 +82,7 @@ describe("course content resource plugin dispatch route", () => {
   });
 
   it("uses core visibility enforcement for plugin routes and rejects unsupported methods", async () => {
+    mocks.requireUser.mockResolvedValue({ id: "user-1", roles: ["student"] });
     mocks.resolveContentTypePluginRoute.mockReturnValue({ methods: { POST: routeHandler } });
 
     await expect(
@@ -89,5 +93,17 @@ describe("course content resource plugin dispatch route", () => {
     expect(mocks.getContentResourceForPluginRoute).toHaveBeenCalledWith({ id: "user-1", roles: ["student"] }, "course-1", "resource-1", {
       groupId: undefined
     });
+    expect(mocks.assertCanManageCourse).not.toHaveBeenCalled();
+  });
+
+  it("blocks content plugin mutations before resource loading when the user cannot manage the course", async () => {
+    mocks.assertCanManageCourse.mockRejectedValueOnce(new Error("forbidden"));
+    await expect(
+      POST(new Request("http://test.local", { method: "POST" }) as never, {
+        params: Promise.resolve({ courseId: "course-1", resourceId: "resource-1", pluginPath: ["sync"] })
+      })
+    ).rejects.toThrow("forbidden");
+    expect(mocks.getContentResourceForPluginRoute).not.toHaveBeenCalled();
+    expect(mocks.resolveContentTypePluginRoute).not.toHaveBeenCalled();
   });
 });

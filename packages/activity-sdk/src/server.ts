@@ -188,7 +188,7 @@ export function resolvePluginRoute(activityTypeKey: string, path: readonly strin
       if (normalizePath(route.path) !== normalizedPath) {
         continue;
       }
-      if (route.activityTypeKeys && !route.activityTypeKeys.includes(activityTypeKey)) {
+      if (!route.activityTypeKeys?.includes(activityTypeKey)) {
         continue;
       }
       return route;

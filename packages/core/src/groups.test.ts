@@ -22,6 +22,7 @@ const tx = vi.hoisted(() => ({
     count: vi.fn(),
     create: vi.fn(),
     findFirst: vi.fn(),
+    findMany: vi.fn(),
     update: vi.fn()
   },
   gradebookItem: {
@@ -65,6 +66,9 @@ const mockPrisma = vi.hoisted(() => ({
     findMany: vi.fn(),
     update: vi.fn(),
     upsert: vi.fn()
+  },
+  courseContentItem: {
+    findMany: vi.fn()
   },
   courseGroupHiddenCourseMaterial: {
     deleteMany: vi.fn(),
@@ -119,6 +123,7 @@ const {
   assignActivityToGroup,
   createCourseGroup,
   createGroupMaterial,
+  getCourseGroup,
   getCourseMaterialForGroupDownload,
   getGroupAssignedActivity,
   hideCourseMaterialForGroup,
@@ -623,6 +628,145 @@ describe("group services", () => {
     await expect(getGroupAssignedActivity(studentUser, "course-1", "group-1", "activity-1")).rejects.toMatchObject({
       status: 403,
       code: "GROUP_ACTIVITY_NOT_AVAILABLE"
+    });
+  });
+
+  it("omits hidden assignments from student group details", async () => {
+    authMocks.canManageCourse.mockResolvedValue(false);
+    mockPrisma.courseGroup.findFirst
+      .mockResolvedValueOnce({
+        id: "group-1",
+        courseId: "course-1",
+        status: "published",
+        availableFrom: null,
+        availableUntil: null
+      })
+      .mockResolvedValueOnce({
+        id: "group-1",
+        courseId: "course-1",
+        activities: [{ id: "visible-assignment" }, { id: "hidden-assignment" }],
+        participants: [{ id: "participant-1", userId: "student-1" }],
+        hiddenCourseMaterials: []
+      })
+      .mockResolvedValueOnce({ id: "group-1" });
+    mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue({ id: "participant-1", userId: "student-1" });
+    mockPrisma.courseContentItem.findMany.mockResolvedValue([
+      {
+        id: "visible-item",
+        parentId: null,
+        isVisible: true,
+        groupId: "group-1",
+        kind: "activity",
+        activityId: "activity-1",
+        courseGroupActivityId: "visible-assignment"
+      },
+      {
+        id: "hidden-item",
+        parentId: null,
+        isVisible: false,
+        groupId: "group-1",
+        kind: "activity",
+        activityId: "activity-2",
+        courseGroupActivityId: "hidden-assignment"
+      }
+    ]);
+
+    await expect(getCourseGroup(studentUser, "course-1", "group-1")).resolves.toMatchObject({
+      activities: [{ id: "visible-assignment" }]
+    });
+  });
+
+  it("rejects assigned activities hidden by their own content placement", async () => {
+    authMocks.canManageCourse.mockResolvedValue(false);
+    mockPrisma.courseGroup.findFirst
+      .mockResolvedValueOnce({
+        id: "group-1",
+        courseId: "course-1",
+        status: "published",
+        availableFrom: null,
+        availableUntil: null
+      })
+      .mockResolvedValueOnce({ id: "group-1" });
+    mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue({ id: "participant-1", userId: "student-1" });
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({
+      id: "assignment-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      availableFrom: null,
+      availableUntil: null,
+      activity: { id: "activity-1" }
+    });
+    mockPrisma.courseContentItem.findMany.mockResolvedValue([
+      {
+        id: "group-activity-1",
+        parentId: null,
+        isVisible: false,
+        groupId: "group-1",
+        kind: "activity",
+        activityId: "activity-1",
+        courseGroupActivityId: "assignment-1"
+      }
+    ]);
+
+    await expect(getGroupAssignedActivity(studentUser, "course-1", "group-1", "activity-1")).rejects.toMatchObject({
+      status: 403,
+      code: "GROUP_ACTIVITY_HIDDEN"
+    });
+  });
+
+  it("rejects assigned activities inherited from a hidden course folder", async () => {
+    authMocks.canManageCourse.mockResolvedValue(false);
+    mockPrisma.courseGroup.findFirst
+      .mockResolvedValueOnce({
+        id: "group-1",
+        courseId: "course-1",
+        status: "published",
+        availableFrom: null,
+        availableUntil: null
+      })
+      .mockResolvedValueOnce({ id: "group-1" });
+    mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue({ id: "participant-1", userId: "student-1" });
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({
+      id: "assignment-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      availableFrom: null,
+      availableUntil: null,
+      activity: { id: "activity-1" }
+    });
+    mockPrisma.courseContentItem.findMany.mockResolvedValue([
+      {
+        id: "hidden-folder",
+        parentId: null,
+        isVisible: false,
+        groupId: null,
+        kind: "folder",
+        activityId: null,
+        courseGroupActivityId: null
+      },
+      {
+        id: "course-activity-1",
+        parentId: "hidden-folder",
+        isVisible: true,
+        groupId: null,
+        kind: "activity",
+        activityId: "activity-1",
+        courseGroupActivityId: null
+      },
+      {
+        id: "group-activity-1",
+        parentId: null,
+        isVisible: true,
+        groupId: "group-1",
+        kind: "activity",
+        activityId: "activity-1",
+        courseGroupActivityId: "assignment-1"
+      }
+    ]);
+
+    await expect(getGroupAssignedActivity(studentUser, "course-1", "group-1", "activity-1")).rejects.toMatchObject({
+      status: 403,
+      code: "GROUP_ACTIVITY_HIDDEN"
     });
   });
 

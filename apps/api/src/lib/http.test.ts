@@ -9,9 +9,22 @@ vi.mock("@cognelo/config", () => ({
 }));
 
 const { AppError } = await import("@cognelo/core");
-const { handleRoute, json, options, readJson } = await import("./http");
+const { AUTH_COOKIE, handleRoute, json, options, readJson, validateCsrfOrigin } = await import("./http");
 
 describe("API HTTP helpers", () => {
+  it("rejects unsafe authenticated requests from missing or foreign origins", () => {
+    const request = (method: string, origin?: string, authenticated = true) => ({
+      method,
+      headers: new Headers(origin ? { origin } : {}),
+      cookies: { get: (name: string) => name === AUTH_COOKIE && authenticated ? { value: "session" } : undefined }
+    });
+
+    expect(validateCsrfOrigin(request("POST", "http://localhost:3000") as never, "http://localhost:3000")).toBe(true);
+    expect(validateCsrfOrigin(request("POST", "https://attacker.test") as never, "http://localhost:3000")).toBe(false);
+    expect(validateCsrfOrigin(request("DELETE") as never, "http://localhost:3000")).toBe(false);
+    expect(validateCsrfOrigin(request("POST", undefined, false) as never, "http://localhost:3000")).toBe(true);
+    expect(validateCsrfOrigin(request("GET", "https://attacker.test") as never, "http://localhost:3000")).toBe(true);
+  });
   it("adds CORS and no-store headers to JSON responses", async () => {
     const response = json({ ok: true }, { status: 201 });
 

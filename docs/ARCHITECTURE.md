@@ -38,6 +38,8 @@ docs/
 
 Shared cross-plugin frontend primitives live in `packages/activity-ui`. In addition to editors, renderers, notifications, and unsaved-navigation guards, it owns the responsive `EditActionBar` used by guarded edit drafts. The bar is presentational and receives the owning form's dirty, saving, save, and discard state; it does not merge persistence boundaries or infer whether unrelated immediate mutations are saved.
 
+The API applies centralized Origin-based CSRF protection to every unsafe request carrying the HttpOnly session cookie. Generic plugin dispatch is also an authorization boundary: course and bank authoring dispatchers require management permission, assigned group dispatch validates group assignment access, unsafe content-resource plugin methods require course management, and registrations without explicit supported type keys fail closed.
+
 ## Core Modules
 
 - **Auth** owns password hashing, JWT creation, login/logout, and current-user lookup.
@@ -115,6 +117,8 @@ Core owns:
 - `CourseContentResource` for the generic resource row
 - `ContentTypePluginInstallation` and `ContentTypePluginTableBackup` for activation, enablement, and backup state
 - generic course/group content resource API routes and plugin dispatch
+
+Effective content visibility is also an authorization input. Student content listings omit hidden items and descendants of hidden folders, and non-manager assigned-activity resolution applies the same rule before serving the activity or dispatching any activity plugin route.
 
 Content type plugins own:
 

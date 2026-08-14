@@ -209,7 +209,7 @@ export function createServerContentTypeRegistry(registryPlugins: readonly Server
         if (normalizePath(route.path) !== normalizedPath) {
           continue;
         }
-        if (route.contentTypeKeys && !route.contentTypeKeys.includes(contentTypeKey)) {
+        if (!route.contentTypeKeys?.includes(contentTypeKey)) {
           continue;
         }
         return route;

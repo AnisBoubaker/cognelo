@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { resolvePluginRoute } from "@cognelo/activity-sdk/server";
-import { AppError, assertActivityTypePluginEnabled, getActivityBank } from "@cognelo/core";
+import { AppError, assertActivityTypePluginEnabled, assertCanManageActivityBank, getActivityBank } from "@cognelo/core";
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ activityBankId: string; bankActivityId: string; pluginPath: string[] }> };
@@ -14,6 +14,7 @@ export function OPTIONS() {
 async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params["params"]>) {
   const user = await requireUser();
   const { activityBankId, bankActivityId, pluginPath } = params;
+  await assertCanManageActivityBank(user, activityBankId);
   const bank = await getActivityBank(user, activityBankId);
   const activity = bank.activities.find((candidate) => candidate.id === bankActivityId);
 

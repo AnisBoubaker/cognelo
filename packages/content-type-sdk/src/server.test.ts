@@ -4,6 +4,7 @@ import {
   buildContentVectorIndex,
   searchContentVectorIndex,
   getServerContentTypePlugin,
+  listContentTypePluginRoutes,
   type ContentEmbeddingDocumentsResult,
   type ContentEmbeddingSource,
   type ServerContentTypePlugin
@@ -35,6 +36,7 @@ describe("server content type SDK registry", () => {
     expect(getServerContentTypePlugin("github-repo-content")).toBeTruthy();
     expect(getServerContentTypePlugin("file-content")).toBeTruthy();
     expect(getServerContentTypePlugin("text-content")).toBeTruthy();
+    expect(listContentTypePluginRoutes().every((route) => route.contentTypeKeys.length > 0)).toBe(true);
   });
 
   it("resolves content type plugin routes by normalized path and content type key", () => {
@@ -43,7 +45,7 @@ describe("server content type SDK registry", () => {
     expect(registry.resolveContentTypePluginRoute("fake-content", "fake-document", ["preview"])?.methods.GET).toBe(handler);
     expect(registry.resolveContentTypePluginRoute("fake-content", "other-document", ["preview"])).toBeNull();
     expect(registry.resolveContentTypePluginRoute("other-content", "fake-document", ["preview"])).toBeNull();
-    expect(registry.resolveContentTypePluginRoute("fake-content", "other-document", ["shared", "action"])?.methods.POST).toBe(handler);
+    expect(registry.resolveContentTypePluginRoute("fake-content", "other-document", ["shared", "action"])).toBeNull();
   });
 
   it("lists registered server plugins and routes", () => {

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { resolveContentTypePluginRoute } from "@cognelo/content-type-sdk/server";
-import { AppError, getContentResourceForPluginRoute } from "@cognelo/core";
+import { AppError, assertCanManageCourse, getContentResourceForPluginRoute } from "@cognelo/core";
 import { json, requireUser } from "./http";
 
 type DispatchParams = {
@@ -12,6 +12,9 @@ type DispatchParams = {
 
 export async function dispatchContentTypePluginRoute(request: NextRequest, params: DispatchParams) {
   const user = await requireUser();
+  if (!["GET", "HEAD", "OPTIONS"].includes(request.method.toUpperCase())) {
+    await assertCanManageCourse(user, params.courseId);
+  }
   const resource = await getContentResourceForPluginRoute(user, params.courseId, params.resourceId, {
     groupId: params.groupId
   });
