@@ -1194,6 +1194,10 @@ export const api = {
     request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
       `/courses/${courseId}/activities/${activityId}/coding-exercises/hidden-tests`
     ),
+  codingExerciseReviewAll: (courseId: string, activityId: string) =>
+    request<{ submissions: Array<{ participantId: string; execution: CodingExerciseExecution }> }>(
+      `/courses/${courseId}/activities/${activityId}/coding-exercises/review-all`
+    ),
   saveCodingExerciseHiddenTests: (
     courseId: string,
     activityId: string,
@@ -1296,6 +1300,10 @@ export const api = {
   webDesignExerciseTests: (courseId: string, activityId: string) =>
     request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
       `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/tests`
+    ),
+  webDesignExerciseReviewAll: (courseId: string, activityId: string) =>
+    request<{ submissions: Array<{ participantId: string; submission: WebDesignExerciseSubmission }> }>(
+      `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/review-all`
     ),
   bankWebDesignExerciseTests: (activityBankId: string, bankActivityId: string) =>
     request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(

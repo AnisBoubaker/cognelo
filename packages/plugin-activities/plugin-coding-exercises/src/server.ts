@@ -5,6 +5,7 @@ import {
   codingExerciseGenerateTestsRoute,
   codingExerciseHiddenTestsRoute,
   codingExerciseRunRoute,
+  codingExerciseReviewAllRoute,
   codingExerciseSubmitRoute
 } from "./routes";
 import { copyBankCodingExerciseDataToCourseActivity, copyCourseCodingExerciseData, deleteBankCodingExerciseData, deleteCourseCodingExerciseData } from "./hidden-tests";
@@ -20,6 +21,7 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
   key: "coding-exercises",
   routes: [
     codingExerciseRunRoute,
+    codingExerciseReviewAllRoute,
     codingExerciseSubmitRoute,
     codingExerciseHiddenTestsRoute,
     codingExerciseGeneratePromptRoute,

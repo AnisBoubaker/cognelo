@@ -2,6 +2,7 @@ import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import { AppError, assertCanManageCourse } from "@cognelo/core";
 import {
   listRecentWebDesignExerciseSubmissions,
+  listWebDesignExerciseReviewSubmissions,
   runWebDesignExercise,
   submitWebDesignExercise,
   webDesignExerciseRunInputSchema
@@ -14,6 +15,7 @@ import {
   replaceBankWebDesignExerciseTests,
   replaceWebDesignExerciseTests
 } from "./tests";
+import { prisma } from "@cognelo/db";
 
 export const webDesignExerciseTestsRoute: PluginRouteDefinition = {
   path: "web-design-coding-exercises/tests",
@@ -124,6 +126,24 @@ export const webDesignExerciseSubmitRoute: PluginRouteDefinition = {
       });
 
       return { submission };
+    }
+  }
+};
+
+export const webDesignExerciseReviewAllRoute: PluginRouteDefinition = {
+  path: "web-design-coding-exercises/review-all",
+  activityTypeKeys: ["web-design-coding-exercise"],
+  methods: {
+    GET: async ({ context }) => {
+      if (!context.courseId) throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "This plugin route requires a course context.");
+      await assertCanManageCourse(context.user, context.courseId);
+      const participants = await prisma.courseGroupParticipant.findMany({
+        where: { group: { courseId: context.courseId }, role: "student", userId: { not: null } },
+        select: { id: true, userId: true }
+      });
+      const submissions = await listWebDesignExerciseReviewSubmissions({ activityId: context.activity.id, userIds: participants.flatMap((participant) => participant.userId ? [participant.userId] : []) });
+      const byUserId = new Map(submissions.map((submission) => [submission.userId, submission]));
+      return { submissions: participants.flatMap((participant) => participant.userId && byUserId.has(participant.userId) ? [{ participantId: participant.id, submission: byUserId.get(participant.userId) }] : []) };
     }
   }
 };

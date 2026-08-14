@@ -17,6 +17,7 @@ vi.mock("./executions", () => executionMocks);
 vi.mock("./routes", () => ({
   webDesignExerciseExpectedResultRoute: { path: "expected-result", methods: {} },
   webDesignExerciseRunRoute: { path: "run", methods: {} },
+  webDesignExerciseReviewAllRoute: { path: "review-all", methods: {} },
   webDesignExerciseSubmitRoute: { path: "submit", methods: {} },
   webDesignExerciseTestsRoute: { path: "tests", methods: {} }
 }));

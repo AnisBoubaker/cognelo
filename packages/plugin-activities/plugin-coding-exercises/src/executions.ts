@@ -233,6 +233,20 @@ export async function listRecentCodingExerciseExecutions(params: {
   return executions.map((execution) => toCodingExerciseExecutionRecord(execution));
 }
 
+export async function listCodingExerciseReviewExecutions(params: { activityId: string; userIds: string[] }) {
+  if (!params.userIds.length) return [];
+  const executions = await codingExerciseExecutionClient.pluginCodingExerciseExecution.findMany({
+    where: { activityId: params.activityId, userId: { in: params.userIds }, kind: "submit" },
+    orderBy: [{ createdAt: "desc" }]
+  });
+  const seen = new Set<string>();
+  return executions.flatMap((execution) => {
+    if (seen.has(execution.userId)) return [];
+    seen.add(execution.userId);
+    return [toCodingExerciseExecutionRecord(execution)];
+  });
+}
+
 export async function submitCodingExercise(params: {
   activityId: string;
   userId: string;

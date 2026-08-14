@@ -1,12 +1,12 @@
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
-import { webDesignExerciseExpectedResultRoute, webDesignExerciseRunRoute, webDesignExerciseSubmitRoute, webDesignExerciseTestsRoute } from "./routes";
+import { webDesignExerciseExpectedResultRoute, webDesignExerciseReviewAllRoute, webDesignExerciseRunRoute, webDesignExerciseSubmitRoute, webDesignExerciseTestsRoute } from "./routes";
 import { copyBankWebDesignExerciseTestsToCourseActivity, copyCourseWebDesignExerciseData, deleteBankWebDesignExerciseData, deleteCourseWebDesignExerciseData } from "./tests";
 import { submitWebDesignExercise, runWebDesignExercise, webDesignExerciseRunInputSchema } from "./executions";
 import { AppError } from "@cognelo/core";
 
 export const webDesignCodingExercisesServerPlugin: ServerActivityPlugin = {
   key: "web-design-coding-exercises",
-  routes: [webDesignExerciseTestsRoute, webDesignExerciseExpectedResultRoute, webDesignExerciseRunRoute, webDesignExerciseSubmitRoute],
+  routes: [webDesignExerciseTestsRoute, webDesignExerciseExpectedResultRoute, webDesignExerciseRunRoute, webDesignExerciseSubmitRoute, webDesignExerciseReviewAllRoute],
   compositeExecution: {
     activityTypeKeys: ["web-design-coding-exercise"],
     actions: {

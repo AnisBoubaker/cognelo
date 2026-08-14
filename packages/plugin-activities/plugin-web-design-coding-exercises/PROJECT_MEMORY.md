@@ -26,6 +26,8 @@ This file is for web-design-coding-exercises-specific memory only.
 
 ## Current Implementation Slice
 
+- Standalone gradebook **Review all** is teacher-only, renders the private reference bundle, and summarizes every enabled hidden Playwright test in its own hoverable pass/fail bar; the private bundle remains unavailable through student routes.
+
 - Current implementation provides public config parsing for student starter files, activity registration, bank and course authoring support, tabbed solution/starter authoring UI, separate collapsible sample/hidden Playwright test authoring with validation badges and inline failure cards, expected-result screenshot generation for `{{ EXPECTED_RESULT }}` and cropped screenshot generation for `{{ EXPECTED_RESULT_CROPPED }}`, student file editing, sandboxed iframe preview, preview console capture, modal support, improved runtime error reporting, student full-screen/focus mode, and plugin-owned persistence tables for bank reference bundles/tests, course reference bundles/tests, submissions, and per-test results.
 - Teacher authoring registers with the shared unsaved-change guard so navigation can save, discard, or continue editing. Future web-design authoring tabs/settings must keep using `useUnsavedChangesGuard`.
 - The shared responsive `EditActionBar` remains visible below the tabbed authoring draft and uses the same combined snapshot; it must not report saved until all owned save operations finish successfully.

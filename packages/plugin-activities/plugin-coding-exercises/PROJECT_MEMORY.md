@@ -19,6 +19,7 @@ This file is for coding-exercises-specific memory only.
 - Enabled hidden tests must validate against the private reference solution before they are saved.
 - Graded submissions are handled separately from sample runs through `coding-exercises/submit`.
 - Teacher authoring separates student-facing starter code from a private reference solution; the reference solution must never be stored in public activity config.
+- Standalone gradebook **Review all** may load that reference solution and latest submission test results only through teacher-authorized private routes; it pairs the solution with one hoverable pass/fail bar per enabled hidden test and never exposes private solution data to students.
 - Coding exercises use a single template-based authoring model; older `program` and `function` configs should be normalized forward rather than preserved as separate modes.
 - Non-student-visible composition pieces such as the hidden template scaffold are stored in plugin-owned private data and assembled server-side before Judge0 execution.
 - Template-mode authoring uses a single hidden scaffold editor with a `{{ STUDENT_CODE }}` insertion marker and optional `{{ TEST_CODE }}` hook; older prefix/suffix data should remain readable for backward compatibility.
