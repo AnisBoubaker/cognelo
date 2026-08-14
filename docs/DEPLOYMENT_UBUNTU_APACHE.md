@@ -1004,6 +1004,10 @@ Basic restore sequence:
 
 ## 17. Deploy an update
 
+For the practical tagged-release procedure, including a database backup, optional sandbox coordination, migration, smoke testing, and rollback, follow [DEPLOYMENT_UPGRADE_UBUNTU_APACHE.md](DEPLOYMENT_UPGRADE_UBUNTU_APACHE.md). It keeps the shared storage in place rather than copying it for every routine upgrade. The steps below are only a concise summary.
+
+Do not begin an upgrade unless that tag's GitHub Release includes the complete **Upgrade from the previous release** section defined by [RELEASE_NOTES_TEMPLATE.md](RELEASE_NOTES_TEMPLATE.md). Release authors must identify all manual and compatibility requirements; production operators are not expected to derive them from changed files.
+
 Never build over the active deployment and never deploy a mutable branch head such as `main` directly.
 
 1. Create and push a new immutable Git tag for the version being deployed.
