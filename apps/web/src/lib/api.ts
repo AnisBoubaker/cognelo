@@ -1,5 +1,7 @@
 import type {
   ActivateAccountInput,
+  AdminUserCreate,
+  AdminUserUpdate,
   ActivityPluginInstallationUpdate,
   AiAgentConnectionInput,
   AiAgentConnectionUpdate,
@@ -36,6 +38,21 @@ import type {
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 
 export type { MaterialKind, SubjectKnowledgeGraphDraft };
+
+export type AdminRole = { id: string; key: "admin" | "course_manager" | "teacher" | "student"; name: string; description: string | null };
+export type AdminUser = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  name: string | null;
+  isActive: boolean;
+  roles: Array<{ key: AdminRole["key"]; name: string }>;
+  createdAt: string;
+  updatedAt: string;
+};
+export type AdminUserFilters = { role?: string; firstName?: string; lastName?: string; email?: string };
+export type Pagination = { page: number; pageSize: number; total: number; totalPages: number };
 
 export type AiAgentConnection = {
   id: string;
@@ -909,6 +926,17 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(input)
     }),
+  users: (filters: AdminUserFilters = {}, pagination: { page?: number; pageSize?: number } = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => { if (value) params.set(key, value); });
+    if (pagination.page) params.set("page", String(pagination.page));
+    if (pagination.pageSize) params.set("pageSize", String(pagination.pageSize));
+    return request<{ users: AdminUser[]; roles: AdminRole[]; pagination: Pagination }>(`/users${params.size ? `?${params.toString()}` : ""}`);
+  },
+  createUser: (input: AdminUserCreate) =>
+    request<{ user: AdminUser }>("/users", { method: "POST", body: JSON.stringify(input) }),
+  updateUser: (userId: string, input: AdminUserUpdate) =>
+    request<{ user: AdminUser }>(`/users/${userId}`, { method: "PATCH", body: JSON.stringify(input) }),
   aiAgentConnections: () => request<{ connections: AiAgentConnection[]; preferences: AiAgentPreferences }>("/ai-agents"),
   updateAiAgentPreferences: (input: AiAgentPreferences) =>
     request<{ preferences: AiAgentPreferences }>("/ai-agents/preferences", {

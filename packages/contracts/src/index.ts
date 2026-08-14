@@ -70,6 +70,28 @@ export const UserProfileUpdateSchema = z.object({
 });
 export type UserProfileUpdate = z.infer<typeof UserProfileUpdateSchema>;
 
+export const AdminUserCreateSchema = z.object({
+  email: z.string().trim().email().max(320),
+  firstName: z.string().trim().min(1).max(120),
+  lastName: z.string().trim().min(1).max(120),
+  password: z.string().min(8).max(200),
+  roles: z.array(RoleKeySchema).min(1).max(RoleKeySchema.options.length)
+});
+export type AdminUserCreate = z.infer<typeof AdminUserCreateSchema>;
+
+export const AdminUserUpdateSchema = AdminUserCreateSchema.omit({ password: true });
+export type AdminUserUpdate = z.infer<typeof AdminUserUpdateSchema>;
+
+export const AdminUserFiltersSchema = z.object({
+  role: RoleKeySchema.optional(),
+  firstName: z.string().trim().max(120).optional(),
+  lastName: z.string().trim().max(120).optional(),
+  email: z.string().trim().max(320).optional(),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  pageSize: z.coerce.number().int().refine((value) => [10, 25, 50, 100].includes(value), "Page size must be 10, 25, 50, or 100.").optional().default(10)
+});
+export type AdminUserFilters = z.infer<typeof AdminUserFiltersSchema>;
+
 export const UserPasswordChangeSchema = z
   .object({
     currentPassword: z.string().min(8).max(200),

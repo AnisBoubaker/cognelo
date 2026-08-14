@@ -23,7 +23,11 @@ export function SettingsNav() {
   const { t } = useI18n();
   const { user } = useAuth();
   const visibleItems = user?.roles.includes("admin")
-    ? [...settingsItems, { href: "/settings/plugins", labelKey: "settings.pluginsNav", textKey: "settings.pluginsNavText" }]
+    ? [
+        ...settingsItems,
+        { href: "/settings/users", labelKey: "settings.usersNav", textKey: "settings.usersNavText" },
+        { href: "/settings/plugins", labelKey: "settings.pluginsNav", textKey: "settings.pluginsNavText" }
+      ]
     : settingsItems;
 
   return <SettingsSectionNav
