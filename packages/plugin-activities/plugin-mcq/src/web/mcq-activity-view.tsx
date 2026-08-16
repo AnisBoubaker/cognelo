@@ -8,6 +8,7 @@ import {
   type McqQuestion,
   type ParsedMcq
 } from "../mcq";
+import { deriveMcqStudentAttemptState } from "../client";
 import { MarkdownBlocksView } from "./markdown-blocks-view";
 
 type ActivityLike = {
@@ -351,16 +352,17 @@ export function McqActivityView({
         }
         setSubmissionAvailability(status.availability);
         onNewAttemptAvailabilityChange?.(status.availability.canStart);
-        const isCompletedSubmission = status.submission?.lifecycle !== "started" && Boolean(status.submission);
+        const attemptState = deriveMcqStudentAttemptState(status);
+        const isCompletedSubmission = attemptState.completedSubmission;
         onPreviousSubmissionsAvailabilityChange?.(isCompletedSubmission);
+        setStudentAnswers(attemptState.answers);
+        setSubmitted(attemptState.submitted);
         if (status.submission) {
-          setStudentAnswers(status.submission.answers);
           if (isCompletedSubmission) {
             setLatestSubmissionReview({
               answers: status.submission.answers,
               grade: status.grade ?? null
             });
-            setSubmitted(true);
           } else {
             setLatestSubmissionReview(null);
           }
