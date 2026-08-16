@@ -18,6 +18,17 @@ You need:
 
 Never build over `current`, deploy a branch such as `main`, run `npm run db:seed`, or remove the previous release until the new release has been accepted.
 
+## Mandatory pre-production release gate
+
+Do not create or deploy a production release until the exact candidate commit has passed a pre-production upgrade rehearsal and the designated approver has explicitly accepted it. The rehearsal must:
+
+1. restore a fresh, protected dump of the currently deployed production database into an isolated pre-production database;
+2. run the candidate's complete `npm run db:migrate:all` path, including core and plugin migrations, without errors;
+3. start the candidate against that migrated clone and pass health checks; and
+4. receive manual visual and workflow testing by the designated approver.
+
+Never reuse a database that was migrated by an earlier candidate: restore the original production dump before every rehearsal. A successful CI run, an empty migration set, or automated smoke tests do not replace manual approval. Record the source production version, candidate commit, migration log, test date, and approver in the release record. If the candidate changes after approval, repeat the complete rehearsal and obtain approval again.
+
 Check the current release and service health:
 
 ```bash
@@ -457,6 +468,8 @@ Never remove `/srv/cognelo/app1/shared`, its `.env`, or its `storage` directory 
 
 ## Quick checklist
 
+- [ ] The exact candidate commit passed migrations against a fresh clone of the current production database.
+- [ ] The candidate passed manual pre-production testing and the designated approver explicitly approved release.
 - [ ] Current tag and health are confirmed.
 - [ ] New immutable tag is fetched and verified.
 - [ ] Release changes, migrations, and environment additions are reviewed.
