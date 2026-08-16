@@ -21,6 +21,7 @@ This file is for MCQ plugin memory only.
 - Since there is no private plugin-owned authoring data yet, bank-to-course copying relies only on the platform's generic config copy.
 - Explicit course/bank synchronization likewise needs no MCQ hook; core synchronizes generic authoring fields/concepts and locks both directions after any attempt.
 - Historical bank-version comparison is complete for MCQ through core's semantic and recursive generic-config diff; no plugin diff UI is needed.
+- MCQ bank config follows the platform publication boundary: draft saves mutate `BankActivity` only; a changed save explicitly kept Published creates the next immutable version, and an unchanged publish reuses the latest version.
 - The MCQ authoring view is available from activity bank activity editing pages as well as course activity management pages.
 - AI-assisted MCQ source generation is available only when the teacher has selected an enabled question-authoring AI agent in `/settings/ai-agents`.
 - AI-assisted generation lives in a collapsed teacher-only "Generate questions with AI" section. It accepts private optional model instructions, a requested question count, and a generation-only default code language, and asks for confirmation before replacing a non-empty MCQ source field.

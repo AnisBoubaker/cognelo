@@ -379,14 +379,23 @@ export async function syncCourseActivityWithBank(user: CurrentUser, courseId: st
 
   if (data.action === "publish_to_bank") {
     await assertCanManageActivityBank(user, source.bankActivity!.bankId);
-    const latest = await prisma.activityVersion.findFirst({
-      where: { bankActivityId: source.bankActivityId! },
-      orderBy: { versionNumber: "desc" },
-      select: { versionNumber: true }
-    });
+    const [latest, latestPublished] = await Promise.all([
+      prisma.activityVersion.findFirst({
+        where: { bankActivityId: source.bankActivityId! },
+        orderBy: { versionNumber: "desc" },
+        select: { versionNumber: true }
+      }),
+      prisma.activityVersion.findFirst({
+        where: { bankActivityId: source.bankActivityId!, lifecycle: "published" },
+        orderBy: { versionNumber: "desc" },
+        include: { activityType: true, knowledgeConcepts: true }
+      })
+    ]);
     return prisma.$transaction(async (tx) => {
       const selections = selectionsFromStoredLinks(source.knowledgeConcepts);
-      const version = await tx.activityVersion.create({
+      const version = latestPublished && activityMatchesVersion(source, latestPublished)
+        ? latestPublished
+        : await tx.activityVersion.create({
         data: {
           bankActivityId: source.bankActivityId!,
           versionNumber: (latest?.versionNumber ?? 0) + 1,
@@ -474,11 +483,16 @@ async function loadSyncSource(courseId: string, activityId: string) {
 }
 
 function activityMatchesVersion(activity: Awaited<ReturnType<typeof loadSyncSource>>, version: NonNullable<Awaited<ReturnType<typeof loadSyncSource>>["activityVersion"]>) {
-  return activity.title === version.title
+  return activity.activityTypeId === version.activityTypeId
+    && activity.title === version.title
     && activity.description === version.description
     && stableJson(activity.config) === stableJson(version.config)
     && stableJson(syncMetadata(activity.metadata)) === stableJson(syncMetadata(version.metadata))
-    && stableJson(selectionsFromStoredLinks(activity.knowledgeConcepts)) === stableJson(selectionsFromStoredLinks(version.knowledgeConcepts));
+    && stableJson(normalizeConceptSelections(selectionsFromStoredLinks(activity.knowledgeConcepts))) === stableJson(normalizeConceptSelections(selectionsFromStoredLinks(version.knowledgeConcepts)));
+}
+
+function normalizeConceptSelections(selections: ReturnType<typeof selectionsFromStoredLinks>) {
+  return [...selections].sort((left, right) => stableJson(left).localeCompare(stableJson(right)));
 }
 
 function syncMetadata(value: unknown) {
@@ -489,7 +503,7 @@ function syncMetadata(value: unknown) {
 }
 
 function stableJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableJson).sort().join(",")}]`;
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
   if (value && typeof value === "object") return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, nested]) => `${JSON.stringify(key)}:${stableJson(nested)}`).join(",")}}`;
   return JSON.stringify(value);
 }

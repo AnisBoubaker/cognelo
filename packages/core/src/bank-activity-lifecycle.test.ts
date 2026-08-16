@@ -24,7 +24,7 @@ describe("bank activity lifecycle", () => {
     mockPrisma.$transaction.mockImplementation(async (handler: (client: typeof transaction) => unknown) => handler(transaction));
   });
 
-  it("duplicates into a new independent version-one activity at the end of the bank", async () => {
+  it("duplicates into a new independent unpublished draft at the end of the bank", async () => {
     mockPrisma.activityBank.findUnique.mockResolvedValue({ id: "bank-1", ownerId: "owner-1" });
     mockPrisma.bankActivity.findUnique.mockResolvedValue({
       id: "activity-1", bankId: "bank-1", activityTypeId: "type-1", title: "Loops", description: "Practice", lifecycle: "draft",
@@ -33,13 +33,12 @@ describe("bank activity lifecycle", () => {
     });
     mockPrisma.bankActivity.findFirst.mockResolvedValue({ position: 3 });
     transaction.bankActivity.create.mockResolvedValue({ id: "activity-2", title: "Loops (copy)", description: "Practice", lifecycle: "draft", config: {}, metadata: {} });
-    transaction.activityVersion.create.mockResolvedValue({ id: "version-2" });
     transaction.bankActivity.update.mockResolvedValue({ id: "activity-2", activityType: { key: "mcq" } });
 
     await expect(duplicateBankActivity(admin, "bank-1", "activity-1", { title: "Loops (copy)" })).resolves.toMatchObject({ id: "activity-2" });
     expect(transaction.bankActivity.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ title: "Loops (copy)", position: 4 }) }));
-    expect(transaction.activityVersion.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ bankActivityId: "activity-2", versionNumber: 1 }) }));
-    expect(transaction.bankActivity.update).toHaveBeenCalledWith(expect.objectContaining({ data: { currentVersionId: "version-2" } }));
+    expect(transaction.activityVersion.create).not.toHaveBeenCalled();
+    expect(transaction.bankActivity.update).toHaveBeenCalledWith(expect.objectContaining({ data: {} }));
   });
 
   it("moves an activity only to a writable bank under the same subject", async () => {

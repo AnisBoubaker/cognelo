@@ -22,6 +22,9 @@ const mockPrisma = vi.hoisted(() => ({
   activityType: {
     findUnique: vi.fn()
   },
+  activityVersion: {
+    findFirst: vi.fn()
+  },
   bankActivity: {
     count: vi.fn(),
     findMany: vi.fn(),
@@ -163,11 +166,10 @@ describe("subject and activity bank services", () => {
     }));
   });
 
-  it("creates bank activities with a first version and merged default config", async () => {
+  it("creates mutable draft bank activities without a version", async () => {
     mockPrisma.activityBank.findUnique.mockResolvedValue({ id: "bank-1", ownerId: "teacher-1" });
     mockPrisma.activityType.findUnique.mockResolvedValue({ id: "type-1", key: "coding-exercise", isEnabled: true });
     tx.bankActivity.create.mockResolvedValue({ id: "bank-activity-1" });
-    tx.activityVersion.create.mockResolvedValue({ id: "version-1" });
     tx.bankActivity.update.mockResolvedValue({ id: "bank-activity-1" });
 
     await createBankActivity(teacherUser, "bank-1", {
@@ -183,14 +185,11 @@ describe("subject and activity bank services", () => {
         })
       })
     );
-    expect(tx.activityVersion.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ versionNumber: 1 })
-      })
-    );
+    expect(tx.activityVersion.create).not.toHaveBeenCalled();
+    expect(tx.bankActivity.update).toHaveBeenCalledWith(expect.objectContaining({ data: {} }));
   });
 
-  it("updates bank activities by creating a next version", async () => {
+  it("creates the next immutable version when changed content is saved as published", async () => {
     mockPrisma.bankActivity.findUnique.mockResolvedValue({
       id: "bank-activity-1",
       bankId: "bank-1",
@@ -200,15 +199,20 @@ describe("subject and activity bank services", () => {
       config: { old: true },
       metadata: { source: "bank" },
       activityType: { id: "type-1", key: "coding-exercise" },
+      knowledgeConcepts: [],
       versions: [{ versionNumber: 2 }]
     });
     mockPrisma.activityBank.findUnique.mockResolvedValue({ id: "bank-1", ownerId: "teacher-1" });
+    mockPrisma.activityVersion.findFirst.mockResolvedValue({
+      id: "version-2", versionNumber: 2, activityTypeId: "type-1", title: "Old", description: "", config: { old: true }, metadata: { source: "bank" }, knowledgeConcepts: []
+    });
     tx.activityVersion.create.mockResolvedValue({ id: "version-3" });
     tx.bankActivity.update.mockResolvedValue({ id: "bank-activity-1" });
 
     await updateBankActivity(teacherUser, "bank-activity-1", {
       title: "New",
-      config: { next: true }
+      config: { next: true },
+      lifecycle: "published"
     });
 
     expect(tx.activityVersion.create).toHaveBeenCalledWith(
@@ -222,6 +226,25 @@ describe("subject and activity bank services", () => {
     );
   });
 
+  it("reuses the latest published version when publishing unchanged authored content", async () => {
+    const snapshot = {
+      id: "version-2", versionNumber: 2, activityTypeId: "type-1", title: "Same", description: "",
+      config: { difficulty: "easy" }, metadata: {}, knowledgeConcepts: []
+    };
+    mockPrisma.bankActivity.findUnique.mockResolvedValue({
+      id: "bank-activity-1", bankId: "bank-1", title: "Same", description: "", lifecycle: "draft",
+      config: { difficulty: "easy" }, metadata: {}, activityType: { id: "type-1", key: "coding-exercise" }, knowledgeConcepts: [], versions: [{ versionNumber: 2 }]
+    });
+    mockPrisma.activityBank.findUnique.mockResolvedValue({ id: "bank-1", ownerId: "teacher-1" });
+    mockPrisma.activityVersion.findFirst.mockResolvedValue(snapshot);
+    tx.bankActivity.update.mockResolvedValue({ id: "bank-activity-1" });
+
+    await updateBankActivity(teacherUser, "bank-activity-1", { lifecycle: "published" });
+
+    expect(tx.activityVersion.create).not.toHaveBeenCalled();
+    expect(tx.bankActivity.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ lifecycle: "published", currentVersionId: "version-2" }) }));
+  });
+
   it("gets activity banks and lists bank activities with versions", async () => {
     mockPrisma.activityBank.findUnique.mockResolvedValue({ id: "bank-1", ownerId: "teacher-1", activities: [] });
     await expect(getActivityBank(teacherUser, "bank-1")).resolves.toMatchObject({ id: "bank-1" });
@@ -232,7 +255,7 @@ describe("subject and activity bank services", () => {
       expect.objectContaining({
         include: expect.objectContaining({
           currentVersion: true,
-          versions: { orderBy: { versionNumber: "desc" } }
+          versions: { where: { lifecycle: "published" }, orderBy: { versionNumber: "desc" } }
         })
       })
     );

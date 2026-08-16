@@ -64,6 +64,8 @@ Explicit synchronization replaces private reference bundles/tests through plugin
 
 Bank-version comparison currently covers generic student-facing configuration only. Private reference bundles and Playwright tests are excluded because their bank rows are not immutable per-version snapshots.
 
+Draft saves update mutable public/private bank authoring without creating a version. A changed Published save creates the next immutable generic snapshot; private rows remain unversioned.
+
 Duplicating a web-design activity inside a bank copies its private bank reference bundle and tests through the platform bank-duplication hook. Moving the activity retains its ID and therefore retains those private rows without migration.
 
 ## Authoring UX

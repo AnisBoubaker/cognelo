@@ -65,6 +65,8 @@ Authored Parsons content remains in generic activity config, so explicit course/
 
 The shared bank-version visualizer can therefore compare the complete Parsons authoring configuration without a plugin-specific diff.
 
+Parsons versions are publication milestones: draft saves create no version, while changed Published saves create the next immutable snapshot.
+
 Current plugin-owned tables:
 
 - `PluginParsonsAttempt`

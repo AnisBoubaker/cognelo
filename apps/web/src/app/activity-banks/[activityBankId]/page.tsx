@@ -333,7 +333,10 @@ export default function ActivityBankDetailPage() {
                 <span>{t("activityBankDetail.versionHeader")}</span>
               </div>
               {bank.activities.map((activity) => (
-                <div className="table-row activity-bank-activity-row" key={activity.id}>
+                <div
+                  className={`table-row activity-bank-activity-row${activityActionMenuId === activity.id ? " has-open-actions" : ""}`}
+                  key={activity.id}
+                >
                   <Link
                     aria-label={t("activityBankDetail.editActivityLink", { title: activity.title })}
                     className="activity-bank-activity-row-link"
@@ -348,7 +351,11 @@ export default function ActivityBankDetailPage() {
                   <span className="eyebrow">{activityTypeLabel(activity.activityType.key)}</span>
                   <span className="table-meta muted">{t(`activityLifecycle.${activity.lifecycle}`)}</span>
                   <div className="table-actions">
-                    <span className="table-meta muted">v{activity.currentVersion?.versionNumber ?? 1}</span>
+                    <span className="table-meta muted">{activity.currentVersion
+                      ? activity.lifecycle === "draft"
+                        ? t("activityBankDetail.unpublishedChanges", { version: activity.currentVersion.versionNumber })
+                        : `v${activity.currentVersion.versionNumber}`
+                      : t("activityBankDetail.notPublished")}</span>
                     <div className="content-header-actions" data-activity-actions>
                       <button
                         aria-expanded={activityActionMenuId === activity.id}

@@ -15,7 +15,7 @@ export async function compareBankActivityVersions(
     throw new AppError(400, "ACTIVITY_VERSION_DIFF_SAME_VERSION", "Choose two different activity versions to compare.");
   }
   const versions = await prisma.activityVersion.findMany({
-    where: { id: { in: [fromVersionId, toVersionId] }, bankActivityId },
+    where: { id: { in: [fromVersionId, toVersionId] }, bankActivityId, lifecycle: "published" },
     include: { activityType: true, knowledgeConcepts: { include: { concept: true } } }
   });
   const from = versions.find((version) => version.id === fromVersionId);

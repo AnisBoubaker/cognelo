@@ -128,12 +128,12 @@ So beginners do not need to create a brand-new top-level API route for every plu
 
 ## How Activity Banks Relate To Courses
 
-Activity banks are reusable authoring spaces. A bank activity has versions. When a teacher adds a bank activity to a course, Cognelo copies the selected/latest version into a course-local activity.
+Activity banks are reusable authoring spaces. A bank activity is a mutable draft with immutable published versions. Draft saves do not create versions; saving changed authored content while explicitly Published creates the next version, while publishing unchanged content reuses the latest published snapshot. When a teacher adds a bank activity to a course, Cognelo copies a published version into a course-local activity.
 
 After copying:
 
 - course edits affect only the course activity copy
-- bank edits create a new version for future assignments
+- published bank edits create a new version for future assignments; draft edits remain unpublished
 - existing course copies do not change
 - plugins that own private bank-owned data must copy it into course-owned plugin tables with a server hook
 

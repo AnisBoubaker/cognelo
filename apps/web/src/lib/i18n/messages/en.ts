@@ -409,6 +409,8 @@ export const enMessages = {
       typeHeader: "Type",
       statusHeader: "Status",
       versionHeader: "Version",
+      notPublished: "Not published",
+      unpublishedChanges: "Unpublished changes · latest v{version}",
       noActivities: "No activities in this bank yet.",
       editActivityTitle: "Edit activity",
       editActivityLink: "Edit {title}",
@@ -459,7 +461,8 @@ export const enMessages = {
       versionDiffSectionActivity: "Activity", versionDiffSectionConfig: "Activity configuration", versionDiffSectionMetadata: "Authoring metadata",
       versionDiffFieldTitle: "Title", versionDiffFieldDescription: "Description", versionDiffFieldLifecycle: "Lifecycle", versionDiffFieldType: "Activity type", versionDiffFieldConcepts: "Concepts and skills",
       versionDiffAdded: "Added", versionDiffRemoved: "Removed", versionDiffChanged: "Changed",
-      versionNote: "Changes saved here update the activity bank activity and create a new activity version for future course assignments."
+      unpublishedChanges: "Draft changes are not published · latest published version v{version}.",
+      versionNote: "Draft saves update the mutable activity without creating a version. Saving while Published creates a new version only when authored content changed."
     },
     activityConcepts: {
       tabsLabel: "Activity editor", activityTab: "Activity", conceptsTab: "Concepts", title: "Knowledge concepts",
