@@ -478,10 +478,11 @@ First plugin integration target:
 
 - Completed: add student grade view for released grades in the section/group workspace.
 - Completed: show released graded scores in the student assigned-activity list and on the assigned activity page itself.
-- Completed: hide unreleased gradebook items from students.
-- Completed: keep student grade responses limited to normalized grade summaries, without raw plugin grading payloads, hidden test details, or attempt history.
+- Completed: hide unreleased single-attempt gradebook items from students. For repeatable summative items (`unlimited`, `until_due`, or `max_attempts > 1`), show the latest provisional normalized attempt result before release so it can guide another attempt.
+- Completed: treat release as publication of the final grade selected by the configured grade strategy and prevent further attempts after release.
+- Completed: keep student grade responses limited to normalized summaries and plugin-supported reviews of the authenticated student’s own attempts, without raw plugin grading payloads or hidden Test details.
 - Completed: released Parsons grades include sanitized deterministic feedback and a grading breakdown, using the same order/indentation messages that formative checks show, without exposing raw plugin payloads or grading timestamps.
-- Completed: do not expose attempt history in the first student grade view.
+- Completed: the generic Grades view does not expose detailed attempt history; activity plugins may provide an authorized own-attempt review surface for repeatable assessments.
 - Completed: add teacher release/hide controls for each gradebook item in course and group gradebook views.
 - Completed: record release/hide audit events per student participant on the gradebook item.
 

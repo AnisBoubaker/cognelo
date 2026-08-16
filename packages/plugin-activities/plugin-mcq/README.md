@@ -37,6 +37,8 @@ The plugin stores authored content in generic bank/course activity config and ow
 
 For summative activities that permit another attempt, the **New attempt** tab starts with an empty editable response even when a completed submission exists. Completed answers remain under **Previous submissions**, where the student can select any of their own submissions by timestamp; an unfinished attempt still resumes its saved answers.
 
+Before the teacher releases the final grade, this repeatable-assessment review shows the student each attempt’s provisional score and MCQ feedback so it can inform the next attempt. Grade release publishes the final grade selected by the gradebook strategy and closes further attempts; single-attempt summative results remain hidden until release.
+
 Submitted-answer review uses a green row for a missed correct choice so the correct answer remains visually recognizable, while retaining the orange exclamation icon that distinguishes it from a correctly selected answer.
 
 MCQ declares composite-execution support for core Tests. The Test runtime embeds the existing MCQ student view through the web activity-renderer registry and autosaves answer state into a generic `TestItemAttempt`. Embedded MCQs have no individual Submit button: the Test's single final submission sends every saved MCQ state to the MCQ server adapter for deterministic grading. Core Test orchestration does not import MCQ schemas; future activity plugins opt in with their own capability plus server and web adapters.
