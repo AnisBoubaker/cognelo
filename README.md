@@ -84,7 +84,7 @@ The intended boundary is:
 Plugin packages can export:
 
 - activity definitions
-- default picker metadata such as category membership and generic icon name
+- default picker metadata such as category membership and a semantic icon name rendered through the app-wide Tabler icon system
 - localized metadata and UI strings
 - database manifests
 - plugin-local Prisma schemas, migrations, and generated clients

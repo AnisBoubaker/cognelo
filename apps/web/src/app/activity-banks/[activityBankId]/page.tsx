@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { ActivityTypeIcon, AppIcon } from "@/components/app-icon";
 import { api, ApiError, type ActivityBank, type ActivityDefinition, type ActivityType, type BankActivity } from "@/lib/api";
 import { defaultDuplicateBankActivityTitle } from "@/lib/activity-bank-titles";
 import { useI18n } from "@/lib/i18n";
@@ -637,102 +638,25 @@ function versionDiffLabels(t: I18nTranslate) {
 }
 
 function EditIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
-      <path d="M12 20h9" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-      <path
-        d="m16.5 3.5 4 4L8 20H4v-4L16.5 3.5Z"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-      />
-    </svg>
-  );
+  return <AppIcon name="edit" />;
 }
 
 function RemoveIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
-      <path d="M6 7h12" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-      <path d="M9 7V5h6v2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-      <path d="M10 11v6M14 11v6" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-      <path d="M8 7l1 13h6l1-13" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-    </svg>
-  );
+  return <AppIcon name="remove" />;
 }
 
 function DuplicateIcon() {
-  return <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18"><rect height="12" rx="1" stroke="currentColor" strokeWidth="2" width="12" x="8" y="8" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" stroke="currentColor" strokeWidth="2" /></svg>;
+  return <AppIcon name="duplicate" />;
 }
 
 function MoveIcon() {
-  return <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18"><path d="M5 12h13M14 8l4 4-4 4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /><path d="M5 6v12" stroke="currentColor" strokeLinecap="round" strokeWidth="2" /></svg>;
+  return <AppIcon name="move" />;
 }
 
 function CompareIcon() {
-  return <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18"><path d="M8 5h11M8 12h8M8 19h11M5 3v4M3 5h4M5 10v4M3 12h4M5 17v4M3 19h4" stroke="currentColor" strokeLinecap="round" strokeWidth="2" /></svg>;
+  return <AppIcon name="compare" />;
 }
 
 function CloseIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
-      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-    </svg>
-  );
-}
-
-function ActivityTypeIcon({ iconName }: { iconName: NonNullable<ActivityDefinition["icon"]> }) {
-  if (iconName === "checklist") {
-    return (
-      <span className="activity-type-icon" aria-hidden="true">
-        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
-          <path d="M8 9h5M8 16h5M8 23h5M17 9h7M17 16h7M17 23h7" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-          <path d="M5 6h22v20H5z" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (iconName === "list-check") {
-    return (
-      <span className="activity-type-icon" aria-hidden="true">
-        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
-          <path d="M7 8h18M7 14h13M7 20h18M7 26h10" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-          <path d="M5 5h22v22H5z" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (iconName === "code") {
-    return (
-      <span className="activity-type-icon" aria-hidden="true">
-        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
-          <path d="m13 10-6 6 6 6M19 10l6 6-6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-          <path d="M5 5h22v22H5z" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (iconName === "document-check") {
-    return (
-      <span className="activity-type-icon" aria-hidden="true">
-        <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
-          <path d="M10 17l4 4 8-10" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-          <path d="M7 5h18v22H7z" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      </span>
-    );
-  }
-
-  return (
-    <span className="activity-type-icon" aria-hidden="true">
-      <svg fill="none" height="28" viewBox="0 0 32 32" width="28">
-        <path d="M8 8h16v16H8z" stroke="currentColor" strokeWidth="2" />
-        <path d="M12 16h8M16 12v8" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-      </svg>
-    </span>
-  );
+  return <AppIcon name="close" />;
 }

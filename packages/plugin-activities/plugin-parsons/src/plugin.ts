@@ -69,7 +69,7 @@ export const parsonsPlugin: ActivityPlugin = {
       name: "Parsons problem",
       description: "Reorder scrambled code blocks and optionally restore indentation to rebuild a working program.",
       defaultCategoryIds: ["programming"],
-      icon: "list-check",
+      icon: "tornado",
       grading: {
         supportsAttempts: true,
         supportsAutoGrading: true,

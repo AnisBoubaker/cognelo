@@ -122,6 +122,8 @@ The runner listens on port `3456`. The API reads `WEB_DESIGN_RUNNER_URL`, which 
 
 Teacher authoring uses the shared responsive `EditActionBar` across its tabs. Saved/unsaved status covers the combined activity, file, solution, and test draft, and Cancel restores the last complete saved snapshot.
 
+The activity definition uses the semantic `browser-code` icon rendered by the platform's shared Tabler icon layer.
+
 ## Contributor Workflow
 
 Standalone gradebook **Review all** loads the private reference bundle and latest student submissions through teacher-authorized routes. It shows one green/red pass/fail bar per enabled hidden Playwright test, and hovering either segment lists the students in it.

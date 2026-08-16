@@ -127,7 +127,7 @@ Effective content visibility is also an authorization input. Student content lis
 
 Content type plugins own:
 
-- picker metadata, localized labels, icons, and default titles
+- picker metadata, localized labels, semantic icon names rendered by the web app's centralized Tabler icon layer, and default titles
 - create/update/delete validation
 - settings and viewer components registered by renderer key
 - plugin routes such as file upload/download

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { CSSProperties, FocusEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { ActivityTypeIcon, AppIcon, FolderContentIcon as SharedFolderContentIcon } from "@/components/app-icon";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
@@ -328,7 +329,7 @@ export default function CourseGroupPage() {
             </button>
           ) : item.kind !== "folder" ? (
             <span className="content-item-icon">
-              {item.kind === "activity" ? <ActivityContentIcon /> : <MaterialTypeIcon iconName={contentItemMaterialIconName(item)} />}
+              {item.kind === "activity" ? <ActivityTypeIcon iconName={activityDefinitions.find((definition) => definition.key === activityTypeKey)?.icon ?? "placeholder"} /> : <MaterialTypeIcon iconName={contentItemMaterialIconName(item)} mimeType={contentItemMaterialMimeType(item)} />}
             </span>
           ) : null}
           <strong>
@@ -732,6 +733,11 @@ export default function CourseGroupPage() {
       return (resource ? contentTypeByKey.get(resource.contentTypeKey)?.icon : null) ?? "file";
     }
     return "file" as const;
+  }
+
+  function contentItemMaterialMimeType(item: CourseContentItem) {
+    const mimeType = item.contentResourceId ? contentResourceById.get(item.contentResourceId)?.metadata?.mimeType : null;
+    return typeof mimeType === "string" ? mimeType : null;
   }
 
   function toggleContentFolder(folderId: string) {
@@ -1612,9 +1618,9 @@ export default function CourseGroupPage() {
                                   ) : (
                                     <span className="content-item-icon">
                                       {item.kind === "activity" ? (
-                                        <ActivityContentIcon />
+                                        <ActivityTypeIcon iconName={activityDefinitions.find((definition) => definition.key === activityTypeKey)?.icon ?? "placeholder"} />
                                       ) : (
-                                        <MaterialTypeIcon iconName={contentItemMaterialIconName(item)} />
+                                        <MaterialTypeIcon iconName={contentItemMaterialIconName(item)} mimeType={contentItemMaterialMimeType(item)} />
                                       )}
                                     </span>
                                   )}
@@ -2586,30 +2592,8 @@ function isContentDescendant(contentItems: CourseContentItem[], possibleChildId:
   return false;
 }
 
-function ActivityContentIcon() {
-  return (
-    <span className="activity-type-icon activity-content-icon" aria-hidden="true">
-      <svg fill="none" height="28" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 32 32" width="28">
-        <path d="M9 6h14l3 3v17H6V6h3z" />
-        <path d="M22 6v5h5" />
-        <path d="M11 15h10" />
-        <path d="M11 20h7" />
-        <path d="M11 25h5" />
-      </svg>
-    </span>
-  );
-}
-
 function FolderContentIcon({ collapsed }: { collapsed: boolean }) {
-  return (
-    <span className="activity-type-icon folder-content-icon" aria-hidden="true">
-      <svg fill="none" height="28" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 32 32" width="28">
-        <path d="M4 9h9l3 4h12v13H4z" />
-        <path d="M4 9v17" />
-        <path d={collapsed ? "m18 17 4 3-4 3" : "m18 18 3 4 3-4"} />
-      </svg>
-    </span>
-  );
+  return <SharedFolderContentIcon collapsed={collapsed} />;
 }
 
 function MaterialActionIcon({
@@ -2706,8 +2690,6 @@ function MaterialActionIcon({
   } as const;
 
   return (
-    <svg aria-hidden="true" fill="none" height="18" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24" width="18">
-      {paths[name]}
-    </svg>
+    <AppIcon name={name} />
   );
 }

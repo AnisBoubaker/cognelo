@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { activityDefinitionBelongsToCategory, activityDefinitionCreatesCategory, listActivityCategories, type ActivityCategoryId } from "@cognelo/activity-sdk/categories";
 import { type ActivityBank, type ActivityDefinition, type ActivityType, type BankActivity } from "@/lib/api";
 import { type Locale, useI18n } from "@/lib/i18n";
+import { ActivityTypeIcon, AppIcon } from "@/components/app-icon";
 
 type PickerTabId = "activity-banks" | ActivityCategoryId | "material";
 
@@ -227,18 +228,5 @@ function iconFor(definitions: ActivityDefinition[], key: string): NonNullable<Ac
 }
 
 function CloseIcon() {
-  return <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeLinecap="round" strokeWidth="2" /></svg>;
-}
-
-export function ActivityTypeIcon({ iconName }: { iconName: NonNullable<ActivityDefinition["icon"]> }) {
-  const paths = iconName === "checklist"
-    ? <><path d="M8 9h5M8 16h5M8 23h5M17 9h7M17 16h7M17 23h7" stroke="currentColor" strokeLinecap="round" strokeWidth="2" /><path d="M5 6h22v20H5z" stroke="currentColor" strokeWidth="2" /></>
-    : iconName === "list-check"
-      ? <><path d="M7 8h18M7 14h13M7 20h18M7 26h10" stroke="currentColor" strokeLinecap="round" strokeWidth="2" /><path d="M5 5h22v22H5z" stroke="currentColor" strokeWidth="2" /></>
-      : iconName === "code"
-        ? <><path d="m13 10-6 6 6 6M19 10l6 6-6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /><path d="M5 5h22v22H5z" stroke="currentColor" strokeWidth="2" /></>
-        : iconName === "document-check"
-          ? <><path d="M10 17l4 4 8-10" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /><path d="M7 5h18v22H7z" stroke="currentColor" strokeWidth="2" /></>
-          : <><path d="M8 8h16v16H8z" stroke="currentColor" strokeWidth="2" /><path d="M12 16h8M16 12v8" stroke="currentColor" strokeLinecap="round" strokeWidth="2" /></>;
-  return <span className="activity-type-icon" aria-hidden="true"><svg fill="none" height="28" viewBox="0 0 32 32" width="28">{paths}</svg></span>;
+  return <AppIcon name="close" />;
 }

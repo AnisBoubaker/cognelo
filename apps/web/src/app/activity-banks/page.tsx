@@ -4,6 +4,7 @@ import { ConfirmationDialog } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { AppIcon } from "@/components/app-icon";
 import { api, type ActivityBank, type Subject } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
@@ -156,7 +157,7 @@ export default function ActivityBanksPage() {
   );
 }
 
-function MoreIcon() { return <svg aria-hidden="true" fill="currentColor" height="20" viewBox="0 0 24 24" width="20"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>; }
-function EditIcon() { return <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18"><path d="M12 20h9M16.5 3.5l4 4L8 20H4v-4L16.5 3.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>; }
-function RemoveIcon() { return <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18"><path d="M6 7h12M9 7V5h6v2M10 11v6M14 11v6M8 7l1 13h6l1-13" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>; }
-function CloseIcon() { return <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeLinecap="round" strokeWidth="2" /></svg>; }
+function MoreIcon() { return <AppIcon name="more" size={20} />; }
+function EditIcon() { return <AppIcon name="edit" />; }
+function RemoveIcon() { return <AppIcon name="remove" />; }
+function CloseIcon() { return <AppIcon name="close" />; }

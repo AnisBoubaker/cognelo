@@ -51,6 +51,7 @@ This file is for Parsons-specific memory only.
 The plugin is being built to support:
 
 - Teacher authoring uses the shared responsive `EditActionBar`, driven by the same draft snapshot as `useUnsavedChangesGuard`.
+- Parsons declares the semantic `tornado` activity icon; the platform's centralized Tabler icon layer owns its rendering.
 
 - teacher-facing flags when students may be lost
 - research on student behavior

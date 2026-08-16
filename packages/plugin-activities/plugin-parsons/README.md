@@ -67,6 +67,8 @@ The shared bank-version visualizer can therefore compare the complete Parsons au
 
 Parsons versions are publication milestones: draft saves create no version, while changed Published saves create the next immutable snapshot.
 
+The activity definition uses the semantic `tornado` icon name, rendered by the platform's shared Tabler icon layer.
+
 Current plugin-owned tables:
 
 - `PluginParsonsAttempt`

@@ -15,6 +15,7 @@ import {
 } from "@cognelo/plugin-mcq";
 import { createParsonsClient, type ParsonsAttemptEvaluation, type ParsonsGradebookAttemptRecord } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
+import { AppIcon } from "@/components/app-icon";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { api, apiRequest, Course, CourseGradebook, CourseGradebookRow } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -671,13 +672,9 @@ function CorrectnessIcon({ correct, copy }: { correct: boolean; copy: ReturnType
       }}
     >
       {correct ? (
-        <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15">
-          <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-        </svg>
+        <AppIcon name="check" size={15} stroke={3} />
       ) : (
-        <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15">
-          <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-        </svg>
+        <AppIcon name="close" size={15} stroke={3} />
       )}
     </span>
   );
@@ -701,10 +698,7 @@ function MissedAnswerIcon({ copy }: { copy: ReturnType<typeof getMcqManualGradin
         width: 24
       }}
     >
-      <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15">
-        <path d="M12 7v6" stroke="currentColor" strokeLinecap="round" strokeWidth="3" />
-        <path d="M12 17h.01" stroke="currentColor" strokeLinecap="round" strokeWidth="3" />
-      </svg>
+      <AppIcon name="alert" size={15} stroke={2.5} />
     </span>
   );
 }
