@@ -1,6 +1,7 @@
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import {
   ActivityBankInputSchema,
+  ActivityBankDeleteSchema,
   ActivityBankUpdateSchema,
   BankActivityDeleteSchema,
   BankActivityInputSchema,
@@ -574,7 +575,7 @@ function layoutGeneratedKnowledgeGraph(graph: GeneratedKnowledgeGraph) {
 
 export async function listActivityBanks(user: CurrentUser, subjectId?: string) {
   await assertCanViewSubjects(user);
-  return prisma.activityBank.findMany({
+  const banks = await prisma.activityBank.findMany({
     where: subjectId ? { subjectId } : undefined,
     include: {
       subject: { include: { knowledgeConcepts: { where: { active: true }, include: { skillRecords: { where: { active: true }, orderBy: { position: "asc" } } }, orderBy: { createdAt: "asc" } }, knowledgePrerequisites: { orderBy: { createdAt: "asc" } } } },
@@ -586,6 +587,7 @@ export async function listActivityBanks(user: CurrentUser, subjectId?: string) {
     },
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }]
   });
+  return banks.map((bank) => ({ ...bank, canManage: isAdmin(user) || bank.ownerId === user.id }));
 }
 
 export async function getActivityBank(user: CurrentUser, activityBankId: string) {
@@ -609,7 +611,7 @@ export async function getActivityBank(user: CurrentUser, activityBankId: string)
   if (!bank) {
     throw notFound("Activity bank");
   }
-  return bank;
+  return { ...bank, canManage: isAdmin(user) || bank.ownerId === user.id };
 }
 
 export async function createActivityBank(user: CurrentUser, input: unknown) {
@@ -646,9 +648,18 @@ export async function updateActivityBank(user: CurrentUser, activityBankId: stri
   }
 
   const data = ActivityBankUpdateSchema.parse(input);
+  if (data.subjectId && data.subjectId !== bank.subjectId) {
+    const activityCount = await prisma.bankActivity.count({ where: { bankId: activityBankId } });
+    if (activityCount) {
+      throw new AppError(409, "ACTIVITY_BANK_SUBJECT_LOCKED", "The subject cannot be changed while the activity bank contains activities.", {
+        activityCount
+      });
+    }
+  }
   return prisma.activityBank.update({
     where: { id: activityBankId },
     data: {
+      subjectId: data.subjectId,
       title: data.title,
       description: data.description,
       ownerId: isAdmin(user) ? data.ownerId : undefined,
@@ -663,6 +674,69 @@ export async function updateActivityBank(user: CurrentUser, activityBankId: stri
       }
     }
   });
+}
+
+export async function deleteActivityBank(user: CurrentUser, activityBankId: string, input: unknown) {
+  const data = ActivityBankDeleteSchema.parse(input);
+  const bank = await prisma.activityBank.findUnique({
+    where: { id: activityBankId },
+    include: {
+      activities: {
+        select: { id: true, position: true, activityType: { select: { key: true } } },
+        orderBy: [{ position: "asc" }, { createdAt: "asc" }]
+      }
+    }
+  });
+  if (!bank) throw notFound("Activity bank");
+  await assertCanManageActivityBank(user, activityBankId);
+
+  if (data.action === "delete" && bank.activities.length && !data.force) {
+    throw new AppError(
+      409,
+      "ACTIVITY_BANK_NOT_EMPTY",
+      "This activity bank contains activities. Confirm again to delete the bank and all its contents.",
+      { activityCount: bank.activities.length }
+    );
+  }
+
+  if (data.action === "move") {
+    if (data.targetActivityBankId === activityBankId) {
+      throw new AppError(400, "INVALID_ACTIVITY_BANK_DESTINATION", "Choose a different destination activity bank.");
+    }
+    const destination = await prisma.activityBank.findUnique({ where: { id: data.targetActivityBankId! } });
+    if (!destination) throw notFound("Destination activity bank");
+    await assertCanManageActivityBank(user, destination.id);
+    if (destination.subjectId !== bank.subjectId) {
+      throw new AppError(400, "ACTIVITY_BANK_SUBJECT_MISMATCH", "Activities can only be moved to a bank under the same subject.");
+    }
+
+    await prisma.$transaction(async (transaction) => {
+      const lastActivity = await transaction.bankActivity.findFirst({
+        where: { bankId: destination.id },
+        orderBy: [{ position: "desc" }, { createdAt: "desc" }],
+        select: { position: true }
+      });
+      const startingPosition = (lastActivity?.position ?? -1) + 1;
+      for (const [index, activity] of bank.activities.entries()) {
+        await transaction.bankActivity.update({
+          where: { id: activity.id },
+          data: { bankId: destination.id, position: startingPosition + index }
+        });
+      }
+      await transaction.activityBank.delete({ where: { id: activityBankId } });
+    });
+
+    return { activityCount: bank.activities.length, deletedActivities: [] };
+  }
+
+  await prisma.activityBank.delete({ where: { id: activityBankId } });
+  return {
+    activityCount: bank.activities.length,
+    deletedActivities: bank.activities.map((activity) => ({
+      bankActivityId: activity.id,
+      activityTypeKey: activity.activityType.key
+    }))
+  };
 }
 
 export async function listBankActivities(user: CurrentUser, activityBankId: string) {

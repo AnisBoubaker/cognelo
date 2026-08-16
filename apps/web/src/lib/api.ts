@@ -290,6 +290,7 @@ export type ActivityBank = {
   title: string;
   description: string;
   ownerId: string;
+  canManage?: boolean;
   metadata?: Record<string, unknown>;
   subject?: Subject;
   owner?: {
@@ -1025,6 +1026,11 @@ export const api = {
   updateActivityBank: (activityBankId: string, input: ActivityBankUpdate) =>
     request<{ activityBank: ActivityBank }>(`/activity-banks/${activityBankId}`, {
       method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  deleteActivityBank: (activityBankId: string, input: { action: "move" | "delete"; targetActivityBankId?: string; force?: boolean }) =>
+    request<{ ok: true; activityCount: number }>(`/activity-banks/${activityBankId}`, {
+      method: "DELETE",
       body: JSON.stringify(input)
     }),
   bankActivities: (activityBankId: string) =>

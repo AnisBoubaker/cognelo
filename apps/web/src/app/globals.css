@@ -1473,6 +1473,14 @@ a.card:hover,
   cursor: default;
 }
 
+.field-readonly select:disabled {
+  background: linear-gradient(180deg, rgba(238, 244, 251, 0.96), rgba(245, 248, 252, 0.96));
+  border-color: color-mix(in srgb, var(--brand-blue), white 72%);
+  color: var(--muted);
+  cursor: default;
+  opacity: 1;
+}
+
 .field-locked input[readonly] {
   background: linear-gradient(180deg, rgba(238, 244, 251, 0.96), rgba(245, 248, 252, 0.96));
   border-color: color-mix(in srgb, var(--brand-blue), white 72%);
@@ -1543,6 +1551,26 @@ a.card:hover,
 .table-row-link {
   color: inherit;
   text-decoration: none;
+}
+
+.activity-bank-list-row {
+  grid-template-columns: minmax(0, 1fr) max-content;
+  padding: 0 12px 0 0;
+}
+
+.activity-bank-row-link {
+  align-items: center;
+  color: inherit;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(180px, 1.1fr) 130px minmax(0, 1.4fr);
+  min-height: 58px;
+  padding: 10px 12px;
+  text-decoration: none;
+}
+
+.activity-bank-list-row:hover {
+  background: color-mix(in srgb, var(--accent), white 88%);
 }
 
 .table-row-subject {
@@ -3740,6 +3768,15 @@ a.card:hover,
 
   .table-row {
     align-items: start;
+    grid-template-columns: 1fr;
+  }
+
+  .activity-bank-list-row {
+    align-items: center;
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+
+  .activity-bank-row-link {
     grid-template-columns: 1fr;
   }
 
