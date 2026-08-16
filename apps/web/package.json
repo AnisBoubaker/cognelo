@@ -16,6 +16,7 @@
     "@cognelo/plugin-mcq": "0.1.0",
     "@cognelo/plugin-parsons": "0.1.0",
     "@cognelo/plugin-web-design-coding-exercises": "0.1.0",
+    "@tabler/icons-react": "^3.46.0",
     "@xyflow/react": "^12.11.2",
     "elkjs": "^0.12.0",
     "katex": "^0.16.45",

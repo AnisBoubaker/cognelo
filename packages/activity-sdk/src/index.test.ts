@@ -31,6 +31,10 @@ describe("activity SDK registry", () => {
     expect(getActivityPlugin("coding-exercises")?.packageName).toBe("@cognelo/plugin-coding-exercises");
     expect(getActivityPluginForActivityType("coding-exercise")?.key).toBe("coding-exercises");
     expect(getActivityDefinition("coding-exercise")?.icon).toBe("code");
+    expect(getActivityDefinition("web-design-coding-exercise")?.icon).toBe("browser-code");
+    expect(getActivityDefinition("coding-homework-grader")?.icon).toBe("file-code");
+    expect(getActivityDefinition("test")?.icon).toBe("clipboard-check");
+    expect(getActivityDefinition("parsons-problem")?.icon).toBe("tornado");
   });
 
   it("distinguishes core activity definitions from plugin-backed definitions", () => {

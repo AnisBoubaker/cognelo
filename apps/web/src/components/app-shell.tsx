@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { BrandLogo } from "@/components/brand-logo";
+import { AppIcon } from "@/components/app-icon";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { useI18n } from "@/lib/i18n";
 import { getPrimaryLandingPath } from "@/lib/navigation";
@@ -123,15 +124,5 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 function ChevronIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
-      <path
-        d="m6 9 6 6 6-6"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-      />
-    </svg>
-  );
+  return <AppIcon name="chevronDown" size={16} />;
 }

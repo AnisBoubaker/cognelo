@@ -18,7 +18,7 @@ export const codingHomeworkGraderPlugin: ActivityPlugin = {
       name: "Coding Homework Grader",
       description: "Programming assignment submission and grading workflow.",
       defaultCategoryIds: ["programming"],
-      icon: "document-check",
+      icon: "file-code",
       grading: {
         supportsAttempts: true,
         supportsManualGrading: true,

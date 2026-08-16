@@ -16,7 +16,7 @@ export type ActivityMessages = {
   defaultTitle?: string;
 };
 
-export type ActivityIconName = "code" | "checklist" | "document-check" | "list-check" | "placeholder";
+export type ActivityIconName = "browser-code" | "checklist" | "clipboard-check" | "code" | "document-check" | "file-code" | "list-check" | "placeholder" | "tornado";
 
 export type ActivityGradingCapability = {
   supportsAttempts?: boolean;
@@ -128,7 +128,7 @@ const coreDefinitions: ActivityDefinition[] = [
     creationScopes: ["course"],
     defaultCategoryIds: ["generic"],
     isEnabledByDefault: true,
-    icon: "document-check",
+    icon: "clipboard-check",
     grading: {
       supportsAttempts: true,
       supportsAutoGrading: true,

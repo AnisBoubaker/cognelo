@@ -16,6 +16,7 @@ import {
 } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
+import { ActivityTypeIcon, AppIcon, FolderContentIcon as SharedFolderContentIcon } from "@/components/app-icon";
 import { useAuth } from "@/components/auth-provider";
 import { CourseSettingsPanel, type CourseSettingsSection } from "@/components/course-settings-panel";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
@@ -1329,6 +1330,11 @@ export default function CourseDetailPage() {
     return "file" as const;
   }
 
+  function contentItemMaterialMimeType(item: CourseContentItem) {
+    const mimeType = item.contentResourceId ? contentResourceById.get(item.contentResourceId)?.metadata?.mimeType : null;
+    return typeof mimeType === "string" ? mimeType : null;
+  }
+
   function toggleContentFolder(folderId: string) {
     setCollapsedContentFolderIds((current) => {
       const next = new Set(current);
@@ -1505,9 +1511,9 @@ export default function CourseDetailPage() {
                                   ) : (
                                     <span className="content-item-icon">
                                       {item.kind === "activity" ? (
-                                        <ActivityContentIcon />
+                                        <ActivityTypeIcon iconName={activityDefinitions.find((definition) => definition.key === activity?.activityType.key)?.icon ?? "placeholder"} />
                                       ) : (
-                                        <MaterialTypeIcon iconName={contentItemMaterialIconName(item)} />
+                                        <MaterialTypeIcon iconName={contentItemMaterialIconName(item)} mimeType={contentItemMaterialMimeType(item)} />
                                       )}
                                     </span>
                                   )}
@@ -2689,37 +2695,11 @@ function isContentDescendant(contentItems: CourseContentItem[], possibleChildId:
 }
 
 function CloseIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
-      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-    </svg>
-  );
-}
-
-function ActivityContentIcon() {
-  return (
-    <span className="activity-type-icon activity-content-icon" aria-hidden="true">
-      <svg fill="none" height="28" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 32 32" width="28">
-        <path d="M9 6h14l3 3v17H6V6h3z" />
-        <path d="M22 6v5h5" />
-        <path d="M11 15h10" />
-        <path d="M11 20h7" />
-        <path d="M11 25h5" />
-      </svg>
-    </span>
-  );
+  return <AppIcon name="close" />;
 }
 
 function FolderContentIcon({ collapsed }: { collapsed: boolean }) {
-  return (
-    <span className="activity-type-icon folder-content-icon" aria-hidden="true">
-      <svg fill="none" height="28" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 32 32" width="28">
-        <path d="M4 9h9l3 4h12v13H4z" />
-        <path d="M4 9v17" />
-        <path d={collapsed ? "m18 17 4 3-4 3" : "m18 18 3 4 3-4"} />
-      </svg>
-    </span>
-  );
+  return <SharedFolderContentIcon collapsed={collapsed} />;
 }
 
 function MaterialActionIcon({
@@ -2870,8 +2850,6 @@ function MaterialActionIcon({
   };
 
   return (
-    <svg aria-hidden="true" fill="none" height="18" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="18">
-      {paths[name]}
-    </svg>
+    <AppIcon name={name} />
   );
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ContentTypeIcon, resolveContentTypeRenderer, resolveContentTypeSettingsRenderer } from "./content-type-renderers";
+import { fileIconKindForMimeType } from "../components/app-icon";
 
 describe("content type renderer registry", () => {
   it("returns null for unregistered renderer keys", () => {
@@ -22,5 +23,14 @@ describe("content type renderer registry", () => {
         className: "activity-type-icon"
       }
     });
+  });
+
+  it("selects file icons from normalized MIME types", () => {
+    expect(fileIconKindForMimeType("application/pdf")).toBe("pdf");
+    expect(fileIconKindForMimeType("image/png")).toBe("image");
+    expect(fileIconKindForMimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).toBe("spreadsheet");
+    expect(fileIconKindForMimeType("application/vnd.openxmlformats-officedocument.presentationml.presentation")).toBe("presentation");
+    expect(fileIconKindForMimeType("application/json; charset=utf-8")).toBe("code");
+    expect(fileIconKindForMimeType("application/octet-stream")).toBe("file");
   });
 });
