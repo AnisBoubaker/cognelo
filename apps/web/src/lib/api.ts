@@ -1045,6 +1045,16 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(input)
     }),
+  duplicateBankActivity: (activityBankId: string, bankActivityId: string, title: string) =>
+    request<{ activity: BankActivity }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/duplicate`, {
+      method: "POST",
+      body: JSON.stringify({ title })
+    }),
+  moveBankActivity: (activityBankId: string, bankActivityId: string, targetActivityBankId: string) =>
+    request<{ activity: BankActivity }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/move`, {
+      method: "POST",
+      body: JSON.stringify({ targetActivityBankId })
+    }),
   deleteBankActivity: (activityBankId: string, bankActivityId: string, input?: { force?: boolean }) =>
     request<{ ok: true; courseCount: number }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}`, {
       method: "DELETE",

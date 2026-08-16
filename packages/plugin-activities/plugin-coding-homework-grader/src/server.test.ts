@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authoringMocks = vi.hoisted(() => ({
+  copyBankCodingHomeworkAuthoring: vi.fn(),
   copyBankCodingHomeworkAuthoringToCourseActivity: vi.fn(),
   copyCourseCodingHomeworkAuthoring: vi.fn(),
   deleteCourseCodingHomeworkData: vi.fn(),
@@ -70,6 +71,11 @@ describe("coding homework grader server plugin lifecycle hooks", () => {
     expect(authoringMocks.deleteBankCodingHomeworkAuthoring).toHaveBeenCalledWith({
       bankActivityId: "bank-activity-1"
     });
+  });
+
+  it("copies private bank authoring data when a bank activity is duplicated", async () => {
+    await codingHomeworkGraderServerPlugin.hooks?.onBankActivityDuplicated?.({ user: testUser(), activityBankId: "bank-1", sourceBankActivityId: "source-1", bankActivityId: "copy-1", activityTypeKey: "coding-homework-grader" });
+    expect(authoringMocks.copyBankCodingHomeworkAuthoring).toHaveBeenCalledWith({ sourceBankActivityId: "source-1", bankActivityId: "copy-1" });
   });
 
   it("ignores lifecycle hooks for other activity types", async () => {

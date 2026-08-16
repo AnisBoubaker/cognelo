@@ -67,6 +67,14 @@ export type BankActivityDeletedHook = (input: {
   activityTypeKey: string;
 }) => Promise<void>;
 
+export type BankActivityDuplicatedHook = (input: {
+  user: CurrentUser;
+  activityBankId: string;
+  sourceBankActivityId: string;
+  bankActivityId: string;
+  activityTypeKey: string;
+}) => Promise<void>;
+
 export type CourseActivityDeletedHook = (input: {
   user: CurrentUser;
   courseId: string;
@@ -150,6 +158,7 @@ export type ServerActivityPlugin = {
     onCourseActivityDeleted?: CourseActivityDeletedHook;
     onCourseActivityDuplicated?: CourseActivityDuplicatedHook;
     onBankActivityDeleted?: BankActivityDeletedHook;
+    onBankActivityDuplicated?: BankActivityDuplicatedHook;
     onActivityAttemptDeleted?: ActivityAttemptDeletedHook;
   };
 };
@@ -306,6 +315,19 @@ export async function runBankActivityDeletedHooksForPlugins(
 ) {
   for (const plugin of plugins) {
     await plugin.hooks?.onBankActivityDeleted?.(input);
+  }
+}
+
+export async function runBankActivityDuplicatedHooks(input: Parameters<BankActivityDuplicatedHook>[0]) {
+  return runBankActivityDuplicatedHooksForPlugins(serverPlugins, input);
+}
+
+export async function runBankActivityDuplicatedHooksForPlugins(
+  plugins: readonly ServerActivityPlugin[],
+  input: Parameters<BankActivityDuplicatedHook>[0]
+) {
+  for (const plugin of plugins) {
+    await plugin.hooks?.onBankActivityDuplicated?.(input);
   }
 }
 

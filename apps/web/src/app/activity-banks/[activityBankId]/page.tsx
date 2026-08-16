@@ -12,6 +12,7 @@ import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { api, ApiError, type ActivityBank, type ActivityDefinition, type ActivityType, type BankActivity } from "@/lib/api";
+import { defaultDuplicateBankActivityTitle } from "@/lib/activity-bank-titles";
 import { useI18n } from "@/lib/i18n";
 
 type EditingActivityState = {
@@ -32,6 +33,7 @@ export default function ActivityBankDetailPage() {
   const activityBankId = params.activityBankId;
   const { locale, t } = useI18n();
   const [bank, setBank] = useState<ActivityBank | null>(null);
+  const [activityBanks, setActivityBanks] = useState<ActivityBank[]>([]);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [editingActivity, setEditingActivity] = useState<EditingActivityState | null>(null);
@@ -39,14 +41,20 @@ export default function ActivityBankDetailPage() {
   const [savingActivity, setSavingActivity] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [deletingActivityId, setDeletingActivityId] = useState<string | null>(null);
+  const [duplicatingActivityId, setDuplicatingActivityId] = useState<string | null>(null);
+  const [duplicatingActivity, setDuplicatingActivity] = useState<BankActivity | null>(null);
+  const [duplicateTitle, setDuplicateTitle] = useState("");
+  const [movingActivity, setMovingActivity] = useState<BankActivity | null>(null);
+  const [moveTargetBankId, setMoveTargetBankId] = useState("");
   const [activityActionMenuId, setActivityActionMenuId] = useState<string | null>(null);
   const [deleteActivityState, setDeleteActivityState] = useState<DeleteActivityState | null>(null);
   const [showActivityPicker, setShowActivityPicker] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<ActivityCategoryId>("generic");
 
   async function loadPage() {
-    const [bankResult, typesResult] = await Promise.all([api.activityBank(activityBankId), api.activityTypes()]);
+    const [bankResult, typesResult, banksResult] = await Promise.all([api.activityBank(activityBankId), api.activityTypes(), api.activityBanks()]);
     setBank(bankResult.activityBank);
+    setActivityBanks(banksResult.activityBanks);
     setActivityTypes(typesResult.activityTypes);
     setActivityDefinitions(typesResult.registeredDefinitions);
   }
@@ -181,6 +189,40 @@ export default function ActivityBankDetailPage() {
     }
   }
 
+  async function duplicateActivity(event: FormEvent) {
+    event.preventDefault();
+    if (!bank || !duplicatingActivity) return;
+    setDuplicatingActivityId(duplicatingActivity.id);
+    setError("");
+    try {
+      await api.duplicateBankActivity(bank.id, duplicatingActivity.id, duplicateTitle);
+      setDuplicatingActivity(null);
+      setDuplicateTitle("");
+      await loadPage();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("activityBankDetail.duplicateActivityError"));
+    } finally {
+      setDuplicatingActivityId(null);
+    }
+  }
+
+  async function moveActivity(event: FormEvent) {
+    event.preventDefault();
+    if (!bank || !movingActivity || !moveTargetBankId) return;
+    setSavingEdit(true);
+    setError("");
+    try {
+      await api.moveBankActivity(bank.id, movingActivity.id, moveTargetBankId);
+      setMovingActivity(null);
+      setMoveTargetBankId("");
+      await loadPage();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("activityBankDetail.moveActivityError"));
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   function activityTypeLabel(activityTypeKey: string) {
     const definition = activityDefinitions.find((candidate) => candidate.key === activityTypeKey);
     const localized = definition?.i18n?.[locale];
@@ -259,7 +301,12 @@ export default function ActivityBankDetailPage() {
                 <span>{t("activityBankDetail.versionHeader")}</span>
               </div>
               {bank.activities.map((activity) => (
-                <div className="table-row" key={activity.id}>
+                <div className="table-row activity-bank-activity-row" key={activity.id}>
+                  <Link
+                    aria-label={t("activityBankDetail.editActivityLink", { title: activity.title })}
+                    className="activity-bank-activity-row-link"
+                    href={`/activity-banks/${bank.id}/activities/${activity.id}`}
+                  />
                   <div className="table-main table-main-stack">
                     <strong>{activity.title}</strong>
                     {activity.activityType.key !== "mcq" ? (
@@ -288,6 +335,14 @@ export default function ActivityBankDetailPage() {
                             <EditIcon />
                             <span>{t("common.edit")}</span>
                           </Link>
+                          <button className="content-context-menu-item" disabled={duplicatingActivityId === activity.id} onClick={() => { setActivityActionMenuId(null); setDuplicatingActivity(activity); setDuplicateTitle(defaultDuplicateBankActivityTitle(activity.title)); }} role="menuitem" type="button">
+                            <DuplicateIcon />
+                            <span>{t("activityBankDetail.duplicateActivity")}</span>
+                          </button>
+                          <button className="content-context-menu-item" onClick={() => { setActivityActionMenuId(null); setMovingActivity(activity); setMoveTargetBankId(""); }} role="menuitem" type="button">
+                            <MoveIcon />
+                            <span>{t("activityBankDetail.moveActivity")}</span>
+                          </button>
                           <button
                             className="content-context-menu-item is-danger"
                             disabled={deletingActivityId === activity.id}
@@ -330,6 +385,44 @@ export default function ActivityBankDetailPage() {
           onCancel={() => setDeleteActivityState(null)}
           onConfirm={confirmDeleteActivity}
         />
+
+        {duplicatingActivity ? (
+          <div className="dialog-backdrop" role="presentation">
+            <section aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="duplicate-bank-activity-title">
+              <div className="section-heading">
+                <div><p className="eyebrow">{t("activityBankDetail.duplicateActivityEyebrow")}</p><h2 id="duplicate-bank-activity-title">{t("activityBankDetail.duplicateActivityTitle")}</h2></div>
+                <button className="secondary icon-button" type="button" onClick={() => setDuplicatingActivity(null)} title={t("common.close")}><CloseIcon /></button>
+              </div>
+              <form className="form" onSubmit={duplicateActivity}>
+                <div className="field"><label htmlFor="duplicate-bank-activity-name">{t("activityBankDetail.duplicateActivityTitleLabel")}</label><input id="duplicate-bank-activity-name" minLength={2} maxLength={160} required autoFocus value={duplicateTitle} onChange={(event) => setDuplicateTitle(event.target.value)} /></div>
+                <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setDuplicatingActivity(null)}>{t("common.cancel")}</button><button disabled={Boolean(duplicatingActivityId) || duplicateTitle.trim().length < 2} type="submit">{duplicatingActivityId ? t("common.saving") : t("activityBankDetail.duplicateActivity")}</button></div>
+              </form>
+            </section>
+          </div>
+        ) : null}
+
+        {movingActivity && bank ? (
+          <div className="dialog-backdrop" role="presentation">
+            <section aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="move-bank-activity-title">
+              <div className="section-heading">
+                <div><p className="eyebrow">{t("activityBankDetail.moveActivityEyebrow")}</p><h2 id="move-bank-activity-title">{t("activityBankDetail.moveActivityTitle")}</h2></div>
+                <button className="secondary icon-button" type="button" onClick={() => setMovingActivity(null)} title={t("common.close")}><CloseIcon /></button>
+              </div>
+              <p>{t("activityBankDetail.moveActivityMessage", { title: movingActivity.title })}</p>
+              <form className="form" onSubmit={moveActivity}>
+                <div className="field">
+                  <label htmlFor="move-bank-activity-target">{t("activityBankDetail.moveActivityDestination")}</label>
+                  <select id="move-bank-activity-target" required value={moveTargetBankId} onChange={(event) => setMoveTargetBankId(event.target.value)}>
+                    <option value="">{t("activityBankDetail.chooseMoveDestination")}</option>
+                    {activityBanks.filter((candidate) => candidate.id !== bank.id && candidate.subjectId === bank.subjectId && candidate.canManage).map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title}</option>)}
+                  </select>
+                  {!activityBanks.some((candidate) => candidate.id !== bank.id && candidate.subjectId === bank.subjectId && candidate.canManage) ? <p className="muted">{t("activityBankDetail.noMoveDestinations")}</p> : null}
+                </div>
+                <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setMovingActivity(null)}>{t("common.cancel")}</button><button disabled={savingEdit || !moveTargetBankId} type="submit">{savingEdit ? t("common.saving") : t("activityBankDetail.moveActivity")}</button></div>
+              </form>
+            </section>
+          </div>
+        ) : null}
 
         {showActivityPicker ? (
           <div className="dialog-backdrop" role="presentation">
@@ -484,6 +577,14 @@ function RemoveIcon() {
       <path d="M8 7l1 13h6l1-13" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
     </svg>
   );
+}
+
+function DuplicateIcon() {
+  return <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18"><rect height="12" rx="1" stroke="currentColor" strokeWidth="2" width="12" x="8" y="8" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" stroke="currentColor" strokeWidth="2" /></svg>;
+}
+
+function MoveIcon() {
+  return <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18"><path d="M5 12h13M14 8l4 4-4 4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /><path d="M5 6v12" stroke="currentColor" strokeLinecap="round" strokeWidth="2" /></svg>;
 }
 
 function CloseIcon() {

@@ -129,6 +129,42 @@ export async function copyBankWebDesignExerciseTestsToCourseActivity(params: { b
   });
 }
 
+export async function copyBankWebDesignExerciseData(params: { sourceBankActivityId: string; bankActivityId: string }) {
+  const [referenceBundle, tests] = await Promise.all([
+    prisma.pluginBankWebDesignExerciseReferenceBundle.findUnique({ where: { bankActivityId: params.sourceBankActivityId } }),
+    prisma.pluginBankWebDesignExerciseTest.findMany({
+      where: { bankActivityId: params.sourceBankActivityId },
+      orderBy: [{ kind: "asc" }, { orderIndex: "asc" }, { createdAt: "asc" }]
+    })
+  ]);
+  await prisma.$transaction(async (transaction) => {
+    if (referenceBundle) {
+      await transaction.pluginBankWebDesignExerciseReferenceBundle.create({
+        data: {
+          bankActivityId: params.bankActivityId,
+          files: referenceBundle.files as Prisma.InputJsonValue,
+          validationSummary: referenceBundle.validationSummary as Prisma.InputJsonValue
+        }
+      });
+    }
+    if (tests.length) {
+      await transaction.pluginBankWebDesignExerciseTest.createMany({
+        data: tests.map((test) => ({
+          bankActivityId: params.bankActivityId,
+          name: test.name,
+          kind: test.kind,
+          testCode: test.testCode,
+          orderIndex: test.orderIndex,
+          isEnabled: test.isEnabled,
+          weight: test.weight,
+          metadata: test.metadata as Prisma.InputJsonValue,
+          validationSummary: test.validationSummary as Prisma.InputJsonValue
+        }))
+      });
+    }
+  });
+}
+
 export async function copyCourseWebDesignExerciseData(params: { sourceActivityId: string; activityId: string }) {
   const [referenceBundle, tests] = await Promise.all([
     prisma.pluginWebDesignExerciseReferenceBundle.findUnique({ where: { activityId: params.sourceActivityId } }),
