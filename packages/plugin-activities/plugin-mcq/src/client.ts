@@ -41,6 +41,20 @@ export type McqSubmissionAvailability = {
   attemptsRemaining: number | null;
 };
 
+export function deriveMcqStudentAttemptState(input: {
+  submission: { answers: McqSubmission["answers"]; lifecycle?: McqSubmission["lifecycle"] } | null;
+  availability: Pick<McqSubmissionAvailability, "canStart">;
+}) {
+  const completedSubmission = input.submission?.lifecycle !== "started" && Boolean(input.submission);
+  const startsFreshAttempt = completedSubmission && input.availability.canStart;
+
+  return {
+    answers: startsFreshAttempt ? {} : input.submission?.answers ?? {},
+    submitted: completedSubmission && !startsFreshAttempt,
+    completedSubmission
+  };
+}
+
 export type McqPluginRequest = <T>(path: string, init?: RequestInit) => Promise<T>;
 
 export function createMcqClient(request: McqPluginRequest) {

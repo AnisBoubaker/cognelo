@@ -2,6 +2,31 @@ import { describe, expect, it } from "vitest";
 import { gradeMcqAnswers, parseMcqSource, renderInlineMarkdown } from "./mcq";
 import { mcqPlugin } from "./plugin";
 import { mcqServerPlugin } from "./server";
+import { deriveMcqStudentAttemptState } from "./client";
+
+describe("MCQ student attempt state", () => {
+  it("starts an unlimited new attempt empty after a completed submission", () => {
+    expect(deriveMcqStudentAttemptState({
+      submission: { lifecycle: "graded", answers: { "question-1": ["choice-1"] } },
+      availability: { canStart: true }
+    })).toEqual({
+      answers: {},
+      submitted: false,
+      completedSubmission: true
+    });
+  });
+
+  it("resumes a started attempt with its saved answers", () => {
+    expect(deriveMcqStudentAttemptState({
+      submission: { lifecycle: "started", answers: { "question-1": ["choice-1"] } },
+      availability: { canStart: true }
+    })).toEqual({
+      answers: { "question-1": ["choice-1"] },
+      submitted: false,
+      completedSubmission: false
+    });
+  });
+});
 
 describe("MCQ source parser", () => {
   it("parses single and multiple answer questions from markdown", () => {
