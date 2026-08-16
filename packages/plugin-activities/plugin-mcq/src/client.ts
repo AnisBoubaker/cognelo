@@ -78,7 +78,12 @@ export function createMcqClient(request: McqPluginRequest) {
         }
       ),
     groupSubmissionStatus: (courseId: string, groupId: string, activityId: string) =>
-      request<{ submission: McqSubmission | null; grade: McqSubmissionGrade | null; availability: McqSubmissionAvailability }>(
+      request<{
+        submission: McqSubmission | null;
+        grade: McqSubmissionGrade | null;
+        attempts: Array<{ submission: McqSubmission; grade: McqSubmissionGrade }>;
+        availability: McqSubmissionAvailability;
+      }>(
         `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/mcq/submission`
       ),
     groupGradebookAttempts: (courseId: string, groupId: string, activityId: string, input: { participantId: string }) => {

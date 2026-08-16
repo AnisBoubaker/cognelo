@@ -79,23 +79,20 @@ export const mcqSubmissionRoute: PluginRouteDefinition = {
       if (!participant) {
         throw new AppError(403, "PARTICIPANT_REQUIRED", "Only enrolled students can submit this activity.");
       }
-      const submission = await findLatestMcqSubmission({
+      const submissions = await findMcqSubmissions({
         courseId: context.courseId,
         groupId: context.groupId,
         activityId: context.activity.id,
         participantId: participant.id
       });
-      const gradingResult = submission ? buildMcqGradingResultFromConfig(context.activity.config, submission.answers) : null;
-      return {
+      const attempts = submissions.map((submission) => ({
         submission,
-        grade: gradingResult
-          ? {
-              rawScore: gradingResult.rawScore,
-              rawMaxScore: gradingResult.rawMaxScore,
-              normalizedScore: gradingResult.rawScore,
-              normalizedMaxScore: gradingResult.rawMaxScore
-            }
-          : null,
+        grade: toMcqSubmissionGrade(buildMcqGradingResultFromConfig(context.activity.config, submission.answers))
+      }));
+      return {
+        submission: attempts[0]?.submission ?? null,
+        grade: attempts[0]?.grade ?? null,
+        attempts,
         availability: await getActivityAttemptAvailability(context.user, {
           courseId: context.courseId,
           groupId: context.groupId,
@@ -218,8 +215,8 @@ async function findStudentParticipant(groupId: string, userId: string) {
   });
 }
 
-async function findLatestMcqSubmission(input: { courseId: string; groupId: string; activityId: string; participantId: string }) {
-  const attempt = await prisma.activityAttempt.findFirst({
+async function findMcqSubmissions(input: { courseId: string; groupId: string; activityId: string; participantId: string }) {
+  const attempts = await prisma.activityAttempt.findMany({
     where: {
       courseId: input.courseId,
       groupId: input.groupId,
@@ -230,7 +227,16 @@ async function findLatestMcqSubmission(input: { courseId: string; groupId: strin
     },
     orderBy: [{ attemptNumber: "desc" }]
   });
-  return attempt ? toMcqSubmissionRecord(attempt.metadata, attempt) : null;
+  return attempts.map((attempt) => toMcqSubmissionRecord(attempt.metadata, attempt));
+}
+
+function toMcqSubmissionGrade(gradingResult: ReturnType<typeof buildMcqGradingResultFromConfig>) {
+  return {
+    rawScore: gradingResult.rawScore,
+    rawMaxScore: gradingResult.rawMaxScore,
+    normalizedScore: gradingResult.rawScore,
+    normalizedMaxScore: gradingResult.rawMaxScore
+  };
 }
 
 export function submittedAnswersFromMetadata(metadata: unknown): McqAnswerState {

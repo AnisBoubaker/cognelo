@@ -35,7 +35,9 @@ The main MCQ source is written as text.
 
 The plugin stores authored content in generic bank/course activity config and owns no private plugin tables. Assigning from an activity bank therefore uses the platform's generic config copy. Summative student submissions are persisted as core `ActivityAttempt` records and graded through the shared gradebook workflow; formative checks remain client-side.
 
-For summative activities that permit another attempt, the **New attempt** tab starts with an empty editable response even when a completed submission exists. The completed answers remain available only under **Previous submissions**; an unfinished attempt still resumes its saved answers.
+For summative activities that permit another attempt, the **New attempt** tab starts with an empty editable response even when a completed submission exists. Completed answers remain under **Previous submissions**, where the student can select any of their own submissions by timestamp; an unfinished attempt still resumes its saved answers.
+
+Submitted-answer review uses a green row for a missed correct choice so the correct answer remains visually recognizable, while retaining the orange exclamation icon that distinguishes it from a correctly selected answer.
 
 MCQ declares composite-execution support for core Tests. The Test runtime embeds the existing MCQ student view through the web activity-renderer registry and autosaves answer state into a generic `TestItemAttempt`. Embedded MCQs have no individual Submit button: the Test's single final submission sends every saved MCQ state to the MCQ server adapter for deterministic grading. Core Test orchestration does not import MCQ schemas; future activity plugins opt in with their own capability plus server and web adapters.
 
