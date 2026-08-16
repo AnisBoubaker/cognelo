@@ -1528,6 +1528,26 @@ a.card:hover,
   overflow: visible;
 }
 
+.activity-bank-activity-row {
+  cursor: pointer;
+  position: relative;
+}
+
+.activity-bank-activity-row:hover {
+  background: color-mix(in srgb, var(--accent), white 88%);
+}
+
+.activity-bank-activity-row-link {
+  inset: 0;
+  position: absolute;
+  z-index: 1;
+}
+
+.activity-bank-activity-row .table-actions {
+  position: relative;
+  z-index: 2;
+}
+
 .table-row {
   align-items: center;
   background: var(--surface);

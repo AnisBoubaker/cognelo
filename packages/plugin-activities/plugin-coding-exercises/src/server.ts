@@ -8,7 +8,7 @@ import {
   codingExerciseReviewAllRoute,
   codingExerciseSubmitRoute
 } from "./routes";
-import { copyBankCodingExerciseDataToCourseActivity, copyCourseCodingExerciseData, deleteBankCodingExerciseData, deleteCourseCodingExerciseData } from "./hidden-tests";
+import { copyBankCodingExerciseData, copyBankCodingExerciseDataToCourseActivity, copyCourseCodingExerciseData, deleteBankCodingExerciseData, deleteCourseCodingExerciseData } from "./hidden-tests";
 import {
   codingExerciseRunInputSchema,
   codingExerciseSubmitInputSchema,
@@ -86,6 +86,11 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
       }
 
       await deleteBankCodingExerciseData({ bankActivityId });
+    },
+    onBankActivityDuplicated: async ({ activityTypeKey, sourceBankActivityId, bankActivityId }) => {
+      if (activityTypeKey === "coding-exercise") {
+        await copyBankCodingExerciseData({ sourceBankActivityId, bankActivityId });
+      }
     },
     onCourseActivityDeleted: async ({ activityTypeKey, activityId }) => {
       if (activityTypeKey === "coding-exercise") {

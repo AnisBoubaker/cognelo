@@ -261,6 +261,43 @@ export async function copyBankCodingExerciseDataToCourseActivity(params: { bankA
   });
 }
 
+export async function copyBankCodingExerciseData(params: { sourceBankActivityId: string; bankActivityId: string }) {
+  assertBankCodingExerciseStorageAvailable();
+  const [tests, referenceSolution] = await Promise.all([
+    prisma.pluginBankCodingExerciseHiddenTest.findMany({
+      where: { bankActivityId: params.sourceBankActivityId },
+      orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }]
+    }),
+    prisma.pluginBankCodingExerciseReferenceSolution.findUnique({ where: { bankActivityId: params.sourceBankActivityId } })
+  ]);
+  await prisma.$transaction(async (transaction) => {
+    if (tests.length) {
+      await transaction.pluginBankCodingExerciseHiddenTest.createMany({
+        data: tests.map((test) => ({
+          bankActivityId: params.bankActivityId,
+          name: test.name,
+          stdin: test.stdin,
+          expectedOutput: test.expectedOutput,
+          orderIndex: test.orderIndex,
+          isEnabled: test.isEnabled,
+          weight: test.weight,
+          metadata: test.metadata as Prisma.InputJsonValue
+        }))
+      });
+    }
+    if (referenceSolution) {
+      await transaction.pluginBankCodingExerciseReferenceSolution.create({
+        data: {
+          bankActivityId: params.bankActivityId,
+          sourceCode: referenceSolution.sourceCode,
+          privateConfig: referenceSolution.privateConfig as Prisma.InputJsonValue,
+          validationSummary: referenceSolution.validationSummary as Prisma.InputJsonValue
+        }
+      });
+    }
+  });
+}
+
 export async function copyCourseCodingExerciseData(params: { sourceActivityId: string; activityId: string }) {
   const [tests, referenceSolution] = await Promise.all([
     prisma.pluginCodingExerciseHiddenTest.findMany({

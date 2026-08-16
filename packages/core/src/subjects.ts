@@ -4,7 +4,9 @@ import {
   ActivityBankDeleteSchema,
   ActivityBankUpdateSchema,
   BankActivityDeleteSchema,
+  BankActivityDuplicateSchema,
   BankActivityInputSchema,
+  BankActivityMoveSchema,
   BankActivityUpdateSchema,
   SubjectInputSchema,
   SubjectKnowledgeConceptInputSchema,
@@ -913,6 +915,101 @@ export async function deleteBankActivity(user: CurrentUser, activityBankId: stri
     activityTypeKey: deleted.activityType.key,
     courseCount: courseUsages.length
   };
+}
+
+export async function duplicateBankActivity(user: CurrentUser, activityBankId: string, bankActivityId: string, input: unknown) {
+  const data = BankActivityDuplicateSchema.parse(input);
+  await assertCanManageActivityBank(user, activityBankId);
+  const source = await prisma.bankActivity.findUnique({
+    where: { id: bankActivityId },
+    include: {
+      activityType: true,
+      knowledgeConcepts: true
+    }
+  });
+  if (!source || source.bankId !== activityBankId) throw notFound("Bank activity");
+
+  const lastActivity = await prisma.bankActivity.findFirst({
+    where: { bankId: activityBankId },
+    orderBy: [{ position: "desc" }, { createdAt: "desc" }],
+    select: { position: true }
+  });
+
+  return prisma.$transaction(async (transaction) => {
+    const duplicate = await transaction.bankActivity.create({
+      data: {
+        bankId: activityBankId,
+        activityTypeId: source.activityTypeId,
+        title: data.title,
+        description: source.description,
+        lifecycle: source.lifecycle,
+        config: source.config as Prisma.InputJsonValue,
+        metadata: source.metadata as Prisma.InputJsonValue,
+        position: (lastActivity?.position ?? -1) + 1,
+        createdById: user.id,
+        knowledgeConcepts: {
+          create: source.knowledgeConcepts.map((selection) => ({
+            conceptId: selection.conceptId,
+            selectsAllSkills: selection.selectsAllSkills,
+            selectedSkills: selection.selectedSkills as Prisma.InputJsonValue,
+            selectedSkillIds: selection.selectedSkillIds as Prisma.InputJsonValue
+          }))
+        }
+      }
+    });
+    const version = await transaction.activityVersion.create({
+      data: {
+        bankActivityId: duplicate.id,
+        versionNumber: 1,
+        activityTypeId: source.activityTypeId,
+        title: duplicate.title,
+        description: duplicate.description,
+        lifecycle: duplicate.lifecycle,
+        config: duplicate.config as Prisma.InputJsonValue,
+        metadata: duplicate.metadata as Prisma.InputJsonValue,
+        createdById: user.id,
+        knowledgeConcepts: {
+          create: source.knowledgeConcepts.map((selection) => ({
+            conceptId: selection.conceptId,
+            selectsAllSkills: selection.selectsAllSkills,
+            selectedSkills: selection.selectedSkills as Prisma.InputJsonValue,
+            selectedSkillIds: selection.selectedSkillIds as Prisma.InputJsonValue
+          }))
+        }
+      }
+    });
+    return transaction.bankActivity.update({
+      where: { id: duplicate.id },
+      data: { currentVersionId: version.id },
+      include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } }, versions: true }
+    });
+  });
+}
+
+export async function moveBankActivity(user: CurrentUser, activityBankId: string, bankActivityId: string, input: unknown) {
+  const data = BankActivityMoveSchema.parse(input);
+  const source = await prisma.bankActivity.findUnique({ where: { id: bankActivityId }, include: { bank: true } });
+  if (!source || source.bankId !== activityBankId) throw notFound("Bank activity");
+  await assertCanManageActivityBank(user, activityBankId);
+  if (data.targetActivityBankId === activityBankId) {
+    throw new AppError(400, "INVALID_ACTIVITY_BANK_DESTINATION", "Choose a different destination activity bank.");
+  }
+  const destination = await prisma.activityBank.findUnique({ where: { id: data.targetActivityBankId } });
+  if (!destination) throw notFound("Destination activity bank");
+  await assertCanManageActivityBank(user, destination.id);
+  if (destination.subjectId !== source.bank.subjectId) {
+    throw new AppError(400, "ACTIVITY_BANK_SUBJECT_MISMATCH", "Activities can only be moved to a bank under the same subject.");
+  }
+  const lastActivity = await prisma.bankActivity.findFirst({
+    where: { bankId: destination.id },
+    orderBy: [{ position: "desc" }, { createdAt: "desc" }],
+    select: { position: true }
+  });
+  return prisma.bankActivity.update({
+    where: { id: bankActivityId },
+    data: { bankId: destination.id, position: (lastActivity?.position ?? -1) + 1 },
+    include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } }, versions: true }
+  });
 }
 
 async function assertCanViewSubjects(user: CurrentUser) {

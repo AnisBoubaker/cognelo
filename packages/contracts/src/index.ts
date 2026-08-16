@@ -316,6 +316,16 @@ export type BankActivityInput = z.infer<typeof BankActivityInputSchema>;
 export const BankActivityUpdateSchema = BankActivityInputSchema.partial();
 export type BankActivityUpdate = z.infer<typeof BankActivityUpdateSchema>;
 
+export const BankActivityMoveSchema = z.object({
+  targetActivityBankId: RecordIdSchema
+});
+export type BankActivityMove = z.infer<typeof BankActivityMoveSchema>;
+
+export const BankActivityDuplicateSchema = z.object({
+  title: z.string().trim().min(2).max(160)
+});
+export type BankActivityDuplicate = z.infer<typeof BankActivityDuplicateSchema>;
+
 export const BankActivityDeleteSchema = z.object({
   force: z.boolean().optional().default(false)
 });

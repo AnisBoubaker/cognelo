@@ -60,6 +60,8 @@ These tables are modeled in this plugin's local Prisma schema under `prisma/sche
 
 When a web-design bank activity is copied into a course, the plugin's server hook copies the bank reference bundle and tests into the course-owned plugin tables. After that, course edits and bank edits are independent.
 
+Duplicating a web-design activity inside a bank copies its private bank reference bundle and tests through the platform bank-duplication hook. Moving the activity retains its ID and therefore retains those private rows without migration.
+
 ## Authoring UX
 
 The teacher authoring UI is tabbed, but it still behaves as one guarded form. Keep it registered with `useUnsavedChangesGuard` from `@cognelo/activity-ui`, and register any future web-design authoring/settings panels with the same dirty/save/discard pattern.

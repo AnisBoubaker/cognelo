@@ -80,6 +80,8 @@ These tables are modeled in this plugin's local Prisma schema under `prisma/sche
 
 Activity-bank authoring persists the same private reference solution, hidden template data, and tests in bank-owned plugin tables. When a bank activity is assigned to a course, the plugin hook copies that private data into course-owned plugin tables so future bank edits and course edits diverge safely.
 
+Duplicating a coding exercise inside an activity bank invokes the platform bank-duplication hook and copies its bank-owned reference solution and hidden tests to the new independent bank activity. Moving a bank activity keeps its ID, so its plugin-owned rows move with it without copying.
+
 ## Authoring UX
 
 The teacher authoring UI is a form surface and must stay registered with the shared `useUnsavedChangesGuard` hook from `@cognelo/activity-ui`. Any future coding-exercise authoring tabs or settings panels should do the same so navigation can offer continue editing, save and leave, or discard and leave.

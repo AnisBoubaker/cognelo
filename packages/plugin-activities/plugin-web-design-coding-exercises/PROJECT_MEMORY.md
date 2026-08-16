@@ -34,6 +34,7 @@ This file is for web-design-coding-exercises-specific memory only.
 - Teacher/admin test management uses the plugin route `web-design-coding-exercises/tests` to persist a private reference file bundle plus sample/hidden Playwright test code. The same plugin route path works in course context and activity-bank context through generic API dispatchers.
 - `copyBankWebDesignExerciseTestsToCourseActivity` is invoked through the server plugin hook when a bank web-design activity version becomes a course activity copy.
 - Any future web-design bank-owned private table must be included in that bank-to-course copy hook and the bank-activity delete cleanup hook, then manually verified by publishing a bank activity, adding it to a course, checking the course-owned plugin rows, and deleting the bank activity.
+- Bank duplication copies the private reference bundle and tests through `onBankActivityDuplicated`; bank moves preserve the bank activity ID and need no plugin-row migration. Future bank-owned tables must also participate in duplication.
 - Student run/submit routes use the Docker-backed `packages/web-design-runner` service through `WEB_DESIGN_RUNNER_URL`; sample tests are used for run and hidden tests are used for submit.
 - Reference validation executes enabled teacher tests against the reference bundle before saving and stores per-test validation summaries for passed or skipped tests.
 
