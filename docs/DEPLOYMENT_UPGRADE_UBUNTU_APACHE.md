@@ -20,14 +20,16 @@ Never build over `current`, deploy a branch such as `main`, run `npm run db:seed
 
 ## Mandatory pre-production release gate
 
-Do not create or deploy a production release until the exact candidate commit has passed a pre-production upgrade rehearsal and the designated approver has explicitly accepted it. The rehearsal must:
+Do not create a tag or production release until the exact current commit has passed a pre-production upgrade rehearsal and the designated approver has explicitly accepted it. The release process is:
 
-1. restore a fresh, protected dump of the currently deployed production database into an isolated pre-production database;
-2. run the candidate's complete `npm run db:migrate:all` path, including core and plugin migrations, without errors;
-3. start the candidate against that migrated clone and pass health checks; and
-4. receive manual visual and workflow testing by the designated approver.
+1. the designated approver supplies a fresh, protected dump of the currently deployed production database;
+2. restore that dump into an isolated pre-production database;
+3. deploy the exact current commit to pre-production and run its complete `npm run db:migrate:all` path, including core and plugin migrations, without errors;
+4. pass automated tests, production builds, service health checks, and migration-log review;
+5. receive manual visual and workflow testing by the designated approver; and
+6. only after explicit approval, create the immutable tag and GitHub Release from that unchanged commit.
 
-Never reuse a database that was migrated by an earlier candidate: restore the original production dump before every rehearsal. A successful CI run, an empty migration set, or automated smoke tests do not replace manual approval. Record the source production version, candidate commit, migration log, test date, and approver in the release record. If the candidate changes after approval, repeat the complete rehearsal and obtain approval again.
+Never reuse a database that was migrated by an earlier candidate: restore the supplied production dump before every rehearsal. A successful CI run, an empty migration set, or automated smoke tests do not replace manual approval. Record the source production version, candidate commit, migration log, test date, and approver in the release record. The release tag must resolve to the approved commit. If the commit changes after approval, repeat the complete rehearsal with a fresh restore and obtain approval again.
 
 Check the current release and service health:
 
@@ -468,8 +470,10 @@ Never remove `/srv/cognelo/app1/shared`, its `.env`, or its `storage` directory 
 
 ## Quick checklist
 
-- [ ] The exact candidate commit passed migrations against a fresh clone of the current production database.
+- [ ] The supplied current-production dump was freshly restored into isolated pre-production.
+- [ ] The exact current commit passed all core and plugin migrations and automated checks against that clone.
 - [ ] The candidate passed manual pre-production testing and the designated approver explicitly approved release.
+- [ ] The immutable tag resolves to the approved, unchanged commit.
 - [ ] Current tag and health are confirmed.
 - [ ] New immutable tag is fetched and verified.
 - [ ] Release changes, migrations, and environment additions are reviewed.
