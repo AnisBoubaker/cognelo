@@ -35,6 +35,7 @@ This file is for web-design-coding-exercises-specific memory only.
 - `copyBankWebDesignExerciseTestsToCourseActivity` is invoked through the server plugin hook when a bank web-design activity version becomes a course activity copy.
 - Any future web-design bank-owned private table must be included in that bank-to-course copy hook and the bank-activity delete cleanup hook, then manually verified by publishing a bank activity, adding it to a course, checking the course-owned plugin rows, and deleting the bank activity.
 - Bank duplication copies the private reference bundle and tests through `onBankActivityDuplicated`; bank moves preserve the bank activity ID and need no plugin-row migration. Future bank-owned tables must also participate in duplication.
+- Course/bank sync reuses `onCourseActivityCreatedFromBankVersion` for bank-to-course replacement and `onCourseActivityPublishedToBank` for course-to-bank replacement of private bundle/test rows. Core owns versions, permissions, and the attempt lock.
 - Student run/submit routes use the Docker-backed `packages/web-design-runner` service through `WEB_DESIGN_RUNNER_URL`; sample tests are used for run and hidden tests are used for submit.
 - Reference validation executes enabled teacher tests against the reference bundle before saving and stores per-test validation summaries for passed or skipped tests.
 

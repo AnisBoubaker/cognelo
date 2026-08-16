@@ -61,6 +61,8 @@ The activity config currently includes:
 
 Parsons owns plugin-specific persistence for student attempts.
 
+Authored Parsons content remains in generic activity config, so explicit course/bank synchronization is core-owned and needs no private authoring hook. Any existing core attempt prevents synchronization.
+
 Current plugin-owned tables:
 
 - `PluginParsonsAttempt`

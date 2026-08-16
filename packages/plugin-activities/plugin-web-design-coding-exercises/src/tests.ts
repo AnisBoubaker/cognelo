@@ -201,6 +201,26 @@ export async function copyCourseWebDesignExerciseData(params: { sourceActivityId
   });
 }
 
+export async function copyCourseWebDesignExerciseDataToBankActivity(params: { activityId: string; bankActivityId: string }) {
+  const [referenceBundle, tests] = await Promise.all([
+    prisma.pluginWebDesignExerciseReferenceBundle.findUnique({ where: { activityId: params.activityId } }),
+    prisma.pluginWebDesignExerciseTest.findMany({ where: { activityId: params.activityId }, orderBy: [{ kind: "asc" }, { orderIndex: "asc" }, { createdAt: "asc" }] })
+  ]);
+  await prisma.$transaction(async (transaction) => {
+    await transaction.pluginBankWebDesignExerciseTest.deleteMany({ where: { bankActivityId: params.bankActivityId } });
+    await transaction.pluginBankWebDesignExerciseReferenceBundle.deleteMany({ where: { bankActivityId: params.bankActivityId } });
+    if (referenceBundle) await transaction.pluginBankWebDesignExerciseReferenceBundle.create({ data: {
+      bankActivityId: params.bankActivityId, files: referenceBundle.files as Prisma.InputJsonValue,
+      validationSummary: referenceBundle.validationSummary as Prisma.InputJsonValue
+    } });
+    if (tests.length) await transaction.pluginBankWebDesignExerciseTest.createMany({ data: tests.map((test) => ({
+      bankActivityId: params.bankActivityId, name: test.name, kind: test.kind, testCode: test.testCode,
+      orderIndex: test.orderIndex, isEnabled: test.isEnabled, weight: test.weight,
+      metadata: test.metadata as Prisma.InputJsonValue, validationSummary: test.validationSummary as Prisma.InputJsonValue
+    })) });
+  });
+}
+
 export async function deleteBankWebDesignExerciseData(params: { bankActivityId: string }) {
   await prisma.$transaction(async (transaction) => {
     await transaction.pluginBankWebDesignExerciseTest.deleteMany({

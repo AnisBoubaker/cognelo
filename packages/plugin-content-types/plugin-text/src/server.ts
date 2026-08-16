@@ -18,6 +18,10 @@ const EMBEDDING_INDEX_KEY = "embeddingIndex";
 export const textContentServerPlugin: ServerContentTypePlugin = {
   key: "text-content",
   handlers: {
+    async duplicate(input) {
+      const { embeddingIndex: _embeddingIndex, ...metadata } = input.resource.metadata ?? {};
+      return { title: input.title, metadata };
+    },
     async create(input) {
       const parsed = textPayloadSchema.parse(input.payload);
       return {

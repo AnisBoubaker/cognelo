@@ -1,8 +1,9 @@
 import { getActivityDefinition, getActivityPluginForActivityType, isCoreActivityType, listActivityDefinitions } from "@cognelo/activity-sdk";
-import { ActivityInputSchema, ActivityUpdateSchema } from "@cognelo/contracts";
+import { ActivityInputSchema, ActivityUpdateSchema, CourseActivityBankSyncSchema, CourseActivityDuplicateSchema } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 import { assertCanManageCourse, assertCanViewCourse } from "./authorization";
+import { assertCanManageActivityBank } from "./subjects";
 import { AppError, notFound } from "./errors";
 import { assertActivityTypeAvailable, ensureCoreActivityTypes, getEnabledActivityPluginKeys } from "./plugins";
 import { assertValidConceptSelections, conceptSelectionCreates, selectionsFromLegacyIds, selectionsFromStoredLinks } from "./activity-knowledge-concepts";
@@ -270,6 +271,227 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
 
     return updatedActivity;
   });
+}
+
+export async function duplicateCourseActivity(user: CurrentUser, courseId: string, activityId: string, input: unknown) {
+  await assertCanManageCourse(user, courseId);
+  const data = CourseActivityDuplicateSchema.parse(input);
+  const source = await prisma.activity.findFirst({
+    where: { id: activityId, courseId },
+    include: { activityType: true, knowledgeConcepts: true, testDefinition: { select: { id: true } } }
+  });
+  if (!source) throw notFound("Activity");
+  if (source.testDefinition) {
+    throw new AppError(409, "TEST_DUPLICATE_ROUTE_REQUIRED", "Duplicate this Test through its dedicated duplicate action.");
+  }
+  const sourceContentItem = await prisma.courseContentItem.findFirst({
+    where: { id: data.contentItemId, courseId, groupId: null, activityId },
+    select: { parentId: true, isVisible: true, metadata: true }
+  });
+  if (!sourceContentItem) throw notFound("Course content item");
+  const [lastActivity, contentPosition] = await Promise.all([
+    prisma.activity.findFirst({ where: { courseId }, orderBy: [{ position: "desc" }, { createdAt: "desc" }], select: { position: true } }),
+    prisma.courseContentItem.count({ where: { courseId, groupId: null, parentId: sourceContentItem.parentId } })
+  ]);
+  const sourceMetadata = (source.metadata as Record<string, unknown> | null) ?? {};
+  const { allGroupsAssignment: _assignment, ...metadata } = sourceMetadata;
+
+  return prisma.$transaction(async (transaction) => {
+    const activity = await transaction.activity.create({
+      data: {
+        courseId,
+        bankActivityId: source.bankActivityId,
+        activityVersionId: source.activityVersionId,
+        activityTypeId: source.activityTypeId,
+        title: data.title,
+        description: source.description,
+        lifecycle: "draft",
+        config: source.config as Prisma.InputJsonValue,
+        metadata: metadata as Prisma.InputJsonValue,
+        position: (lastActivity?.position ?? -1) + 1,
+        createdById: user.id,
+        knowledgeConcepts: {
+          create: source.knowledgeConcepts.map((selection) => ({
+            conceptId: selection.conceptId,
+            selectsAllSkills: selection.selectsAllSkills,
+            selectedSkills: selection.selectedSkills as Prisma.InputJsonValue,
+            selectedSkillIds: selection.selectedSkillIds as Prisma.InputJsonValue
+          }))
+        }
+      },
+      include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
+    });
+    await transaction.courseContentItem.create({
+      data: {
+        courseId,
+        parentId: sourceContentItem.parentId,
+        kind: "activity",
+        titleSnapshot: data.title,
+        position: contentPosition,
+        isVisible: sourceContentItem.isVisible,
+        activityId: activity.id,
+        metadata: sourceContentItem.metadata as Prisma.InputJsonValue
+      }
+    });
+    return activity;
+  });
+}
+
+type ActivityBankSyncStatus = "in_sync" | "course_ahead" | "bank_ahead" | "diverged";
+
+export async function getCourseActivityBankSyncStatus(user: CurrentUser, courseId: string, activityId: string) {
+  await assertCanManageCourse(user, courseId);
+  const source = await loadSyncSource(courseId, activityId);
+  const latestVersion = await prisma.activityVersion.findFirst({
+    where: { bankActivityId: source.bankActivityId!, lifecycle: "published" },
+    orderBy: { versionNumber: "desc" },
+    include: { knowledgeConcepts: true }
+  });
+  if (!latestVersion) throw notFound("Published bank activity version");
+  const courseChanged = !activityMatchesVersion(source, source.activityVersion!);
+  const bankChanged = latestVersion.id !== source.activityVersionId;
+  const status: ActivityBankSyncStatus = courseChanged && bankChanged
+    ? "diverged"
+    : courseChanged
+      ? "course_ahead"
+      : bankChanged
+        ? "bank_ahead"
+        : "in_sync";
+  const attemptCount = await prisma.activityAttempt.count({ where: { activityId } });
+  return {
+    status,
+    attemptCount,
+    mutationsAllowed: attemptCount === 0,
+    canWriteToBank: user.roles.includes("admin") || source.bankActivity!.bank.ownerId === user.id,
+    originalVersion: { id: source.activityVersion!.id, versionNumber: source.activityVersion!.versionNumber },
+    latestVersion: { id: latestVersion.id, versionNumber: latestVersion.versionNumber }
+  };
+}
+
+export async function syncCourseActivityWithBank(user: CurrentUser, courseId: string, activityId: string, input: unknown) {
+  await assertCanManageCourse(user, courseId);
+  const data = CourseActivityBankSyncSchema.parse(input);
+  const source = await loadSyncSource(courseId, activityId);
+  const attemptCount = await prisma.activityAttempt.count({ where: { activityId } });
+  if (attemptCount > 0) {
+    throw new AppError(409, "ACTIVITY_BANK_SYNC_ATTEMPTS_LOCKED", "This activity cannot be synchronized after an attempt has been created.", { attemptCount });
+  }
+
+  if (data.action === "publish_to_bank") {
+    await assertCanManageActivityBank(user, source.bankActivity!.bankId);
+    const latest = await prisma.activityVersion.findFirst({
+      where: { bankActivityId: source.bankActivityId! },
+      orderBy: { versionNumber: "desc" },
+      select: { versionNumber: true }
+    });
+    return prisma.$transaction(async (tx) => {
+      const selections = selectionsFromStoredLinks(source.knowledgeConcepts);
+      const version = await tx.activityVersion.create({
+        data: {
+          bankActivityId: source.bankActivityId!,
+          versionNumber: (latest?.versionNumber ?? 0) + 1,
+          activityTypeId: source.activityTypeId,
+          title: source.title,
+          description: source.description,
+          lifecycle: "published",
+          config: source.config as Prisma.InputJsonValue,
+          metadata: syncMetadata(source.metadata) as Prisma.InputJsonValue,
+          createdById: user.id,
+          knowledgeConcepts: { create: conceptSelectionCreates(selections) }
+        },
+        include: { activityType: true }
+      });
+      await tx.bankActivity.update({
+        where: { id: source.bankActivityId! },
+        data: {
+          activityTypeId: source.activityTypeId,
+          title: source.title,
+          description: source.description,
+          lifecycle: "published",
+          config: source.config as Prisma.InputJsonValue,
+          metadata: syncMetadata(source.metadata) as Prisma.InputJsonValue,
+          currentVersionId: version.id,
+          knowledgeConcepts: { deleteMany: {}, create: conceptSelectionCreates(selections) }
+        }
+      });
+      const activity = await tx.activity.update({
+        where: { id: activityId },
+        data: { activityVersionId: version.id, metadata: { ...syncMetadata(source.metadata), activityVersionNumber: version.versionNumber } as Prisma.InputJsonValue },
+        include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
+      });
+      return { action: data.action, activity, version };
+    });
+  }
+
+  if (data.action === "retrieve_original") {
+    const latestPublished = await prisma.activityVersion.findFirst({
+      where: { bankActivityId: source.bankActivityId!, lifecycle: "published" },
+      orderBy: { versionNumber: "desc" },
+      select: { id: true }
+    });
+    if (latestPublished?.id !== source.activityVersionId) {
+      throw new AppError(409, "ORIGINAL_BANK_VERSION_NOT_CURRENT", "The bank has changed; retrieve its latest version instead.");
+    }
+  }
+
+  const targetVersion = data.action === "retrieve_original"
+    ? source.activityVersion!
+    : await prisma.activityVersion.findFirst({
+        where: { bankActivityId: source.bankActivityId!, lifecycle: "published" },
+        orderBy: { versionNumber: "desc" },
+        include: { knowledgeConcepts: true }
+      });
+  if (!targetVersion) throw notFound("Published bank activity version");
+  const activity = await prisma.activity.update({
+    where: { id: activityId },
+    data: {
+      activityVersionId: targetVersion.id,
+      activityTypeId: targetVersion.activityTypeId,
+      title: targetVersion.title,
+      description: targetVersion.description,
+      config: targetVersion.config as Prisma.InputJsonValue,
+      metadata: { ...syncMetadata(targetVersion.metadata), activityVersionNumber: targetVersion.versionNumber } as Prisma.InputJsonValue,
+      knowledgeConcepts: { deleteMany: {}, create: conceptSelectionCreates(selectionsFromStoredLinks(targetVersion.knowledgeConcepts)) }
+    },
+    include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
+  });
+  await prisma.gradebookItem.updateMany({ where: { courseId, activityId }, data: { titleSnapshot: activity.title } });
+  return { action: data.action, activity, version: targetVersion };
+}
+
+async function loadSyncSource(courseId: string, activityId: string) {
+  const activity = await prisma.activity.findFirst({
+    where: { id: activityId, courseId, bankActivityId: { not: null }, activityVersionId: { not: null } },
+    include: {
+      activityType: true,
+      bankActivity: { include: { bank: true } },
+      activityVersion: { include: { knowledgeConcepts: true } },
+      knowledgeConcepts: true
+    }
+  });
+  if (!activity?.bankActivity || !activity.activityVersion) throw notFound("Linked bank activity");
+  return activity;
+}
+
+function activityMatchesVersion(activity: Awaited<ReturnType<typeof loadSyncSource>>, version: NonNullable<Awaited<ReturnType<typeof loadSyncSource>>["activityVersion"]>) {
+  return activity.title === version.title
+    && activity.description === version.description
+    && stableJson(activity.config) === stableJson(version.config)
+    && stableJson(syncMetadata(activity.metadata)) === stableJson(syncMetadata(version.metadata))
+    && stableJson(selectionsFromStoredLinks(activity.knowledgeConcepts)) === stableJson(selectionsFromStoredLinks(version.knowledgeConcepts));
+}
+
+function syncMetadata(value: unknown) {
+  const metadata = value && typeof value === "object" && !Array.isArray(value) ? { ...(value as Record<string, unknown>) } : {};
+  delete metadata.activityVersionNumber;
+  delete metadata.allGroupsAssignment;
+  return metadata;
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).sort().join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, nested]) => `${JSON.stringify(key)}:${stableJson(nested)}`).join(",")}}`;
+  return JSON.stringify(value);
 }
 
 export async function assertActivityAuthoringMutable(courseId: string, activityId: string) {

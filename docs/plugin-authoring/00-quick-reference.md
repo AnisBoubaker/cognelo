@@ -260,6 +260,7 @@ type ServerActivityPlugin = {
   routes?: readonly PluginRouteDefinition[];
   hooks?: {
     onCourseActivityCreatedFromBankVersion?: CourseActivityCreatedFromBankVersionHook;
+    onCourseActivityPublishedToBank?: CourseActivityPublishedToBankHook;
   };
 };
 ```
@@ -487,6 +488,7 @@ Copy rule for plugin-owned data:
 - Core creates the course-local `Activity` copy and preserves `bankActivityId` / `activityVersionId`.
 - Core does not copy plugin-owned tables.
 - If a plugin stores private bank-owned rows, the plugin must implement `onCourseActivityCreatedFromBankVersion` in its server plugin and copy those rows into course-owned plugin tables keyed by the new `activity.id`.
+- If private authoring data can be edited in a course copy, also implement `onCourseActivityPublishedToBank` to replace the corresponding bank-owned rows when core publishes that course copy as a new immutable bank version. Do not copy attempts, submissions, grades, or other course-only/student data.
 - The copied course rows must be independent snapshots. Later bank edits must not mutate existing course activity copies.
 - Any new plugin-owned bank table should be reviewed together with the hook and a manual test that assigns a bank activity to a course.
 

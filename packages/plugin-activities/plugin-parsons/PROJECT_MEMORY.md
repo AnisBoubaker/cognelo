@@ -21,6 +21,8 @@ This file is for Parsons-specific memory only.
 
 ## Persistence Decisions
 
+- Parsons authoring uses generic activity fields/config for course/bank synchronization. Core performs the copy and permanently locks synchronization once any attempt exists; attempt/event rows are never synchronized.
+
 - Standalone gradebook **Review all** uses the latest completed attempt per participant, displays the authored solution, and derives hoverable misplaced-block and grade distributions without exposing student answers individually.
 
 - Parsons attempts are stored in:

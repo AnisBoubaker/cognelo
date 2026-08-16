@@ -28,6 +28,10 @@ function readUrl(metadata: Record<string, unknown> | undefined) {
 export const githubRepoContentServerPlugin: ServerContentTypePlugin = {
   key: "github-repo-content",
   handlers: {
+    async duplicate(input) {
+      const { embeddingIndex: _embeddingIndex, ...metadata } = input.resource.metadata ?? {};
+      return { title: input.title, metadata };
+    },
     async create(input) {
       const parsed = parseGithubRepoPayload(input.payload);
       return {

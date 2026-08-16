@@ -20,6 +20,8 @@ This plugin currently uses generic `CourseContentResource.metadata` for its sour
 
 No plugin-owned tables are required yet.
 
+Course content duplication copies the normalized repository metadata and removes any derived embedding index so the new resource can be indexed independently.
+
 Repository cloning and source extraction are owned by this plugin. The current implementation exposes the repository URL as an external-reference document, stores a deterministic development vector index in resource metadata, and reports repository indexing as deferred through the shared content type server extraction interface.
 
 ## Contributor Workflow

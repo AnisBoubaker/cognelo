@@ -397,6 +397,7 @@ Material-specific actions:
 - edit material metadata
 - open/download material
 - remove material from content tree
+- duplicate plugin-backed or compatibility material content into the same folder using the owning content type's duplication semantics
 
 Activity-specific actions:
 
@@ -407,6 +408,9 @@ Activity-specific actions:
 - edit assessment mode and gradebook policy
 - open gradebook results where relevant
 - remove activity from content tree or assignment according to the existing assignment rules
+- duplicate an activity as an unassigned draft in the same folder, retaining bank/version traceability and plugin-owned authoring data while excluding assignment policy; compound Tests use their dedicated deep-copy lifecycle
+- synchronize a linked activity with its bank source, showing in-sync/course-ahead/bank-ahead/diverged state and allowing original/latest retrieval or publication as a new immutable bank version according to permissions; preserve placement/assignments and block every mutation after any attempt
+- require a second action-specific confirmation before synchronization: retrieving warns that discarded course-local authoring cannot be recovered, while publishing explains that prior bank versions remain in version history
 
 ## Student UI
 

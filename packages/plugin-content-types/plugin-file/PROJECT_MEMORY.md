@@ -7,3 +7,4 @@
 - The server plugin implements `getEmbeddingDocuments` and owns file-specific extraction. It currently supports text/source-like files and a basic local PDF text extractor, returning diagnostics instead of throwing for unsupported file types.
 - The server plugin implements `indexEmbeddingDocuments` and `searchEmbeddingDocuments`. The current dev index is stored in resource metadata under `embeddingIndex`; future pgvector/plugin-owned table storage should stay behind those handlers.
 - No plugin-owned table is used yet; future extraction/indexing state should add plugin-owned persistence.
+- The server `duplicate` handler copies safe metadata and shares the immutable `storedName` file reference, but removes `embeddingIndex`. A future mutable/object-storage backend must replace this with explicit reference counting or physical copy semantics.

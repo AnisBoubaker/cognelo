@@ -10,3 +10,4 @@ This file is for placeholder-plugin memory only.
 - If it ever grows custom authoring or settings forms, those forms must use the shared unsaved-change guard.
 - It includes two dummy plugin-owned tables, `PluginPlaceholderDummyRecord` and `PluginPlaceholderDummyAudit`, only so platform plugin activation/deactivation backup and restore flows can be tested. They are modeled through the plugin-local Prisma schema/client rather than the core Prisma schema.
 - It currently needs no real plugin-owned persistence or bank-to-course copy hook because generic bank/course activity config is enough.
+- It also needs no explicit synchronization hook: core copies its generic authoring state and enforces the attempt lock and bank permissions.

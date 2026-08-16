@@ -75,6 +75,16 @@ export async function duplicateTest(user: CurrentUser, courseId: string, activit
   const data = TestDuplicateSchema.parse(input);
   const source = await prisma.test.findFirst({ where: { courseId, activityId }, include: testInclude });
   if (!source) throw notFound("Test");
+  const sourceContentItem = data.contentItemId
+    ? await prisma.courseContentItem.findFirst({
+        where: { id: data.contentItemId, courseId, groupId: null, activityId },
+        select: { parentId: true, isVisible: true, metadata: true }
+      })
+    : null;
+  if (data.contentItemId && !sourceContentItem) throw notFound("Course content item");
+  const contentPosition = sourceContentItem
+    ? await prisma.courseContentItem.count({ where: { courseId, groupId: null, parentId: sourceContentItem.parentId } })
+    : null;
   return prisma.$transaction(async (tx) => {
     const shell = await tx.activity.create({
       data: {
@@ -92,6 +102,20 @@ export async function duplicateTest(user: CurrentUser, courseId: string, activit
     const duplicated = await tx.test.create({
       data: { courseId, activityId: shell.id, settings: source.settings as Prisma.InputJsonValue }
     });
+    if (sourceContentItem && contentPosition !== null) {
+      await tx.courseContentItem.create({
+        data: {
+          courseId,
+          parentId: sourceContentItem.parentId,
+          kind: "activity",
+          titleSnapshot: shell.title,
+          position: contentPosition,
+          isVisible: sourceContentItem.isVisible,
+          activityId: shell.id,
+          metadata: sourceContentItem.metadata as Prisma.InputJsonValue
+        }
+      });
+    }
     const activityCopies = [];
     for (const sourceItem of source.items) {
       const child = await tx.activity.create({
