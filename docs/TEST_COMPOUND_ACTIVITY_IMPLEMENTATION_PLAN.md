@@ -355,6 +355,8 @@ The Test opens as one assigned activity. The shell provides:
 - read-only submitted state;
 - released overall grade and permitted item feedback.
 
+When a new attempt is blocked by grade release, the due date, or the attempt limit, the student Test shell remains visible with a disabled start action and a localized explanation. The assigned-activity tab shell must not hide the Test renderer merely because attempt availability is false.
+
 No child activity should expose standalone submit, attempt-limit, grade-release, or assignment controls.
 
 ## Version and Edit Safety
@@ -455,6 +457,8 @@ Implemented in Phase 5:
 The first Phase 6 slice adds Parsons without introducing Parsons-specific fields into the Test schema or orchestration. The embedded renderer persists the initial randomized block arrangement, autosaves subsequent moves through the shared execution host, and suppresses the child submit action. The one **Submit Test** operation evaluates the saved arrangement through the server adapter. Teacher review uses plugin-registered individual and aggregate renderers.
 
 Timed attempts now expose a server-derived deadline in the Test runtime. Child reads and writes reject expired attempts, while final submission is explicitly allowed to grade the last saved state after expiry. The student shell displays a live localized countdown and automatically finalizes once pending saves have drained. Repeating the same final-submit request returns the already-completed runtime instead of producing an active-attempt error.
+
+Autosaves that race with final submission are also idempotent. Once the parent Test or child item has been submitted/graded, a trailing child-state save returns the stored item attempt without changing its graded state or surfacing a false active-attempt error to the student.
 
 Coding exercise and web-design coding exercise now opt into composite execution without introducing type-specific branches in core. They load and autosave through the shared execution host, expose only registered safe preview/run actions, suppress child submission, and run hidden tests only when the parent Test is submitted. The coding homework grader remains intentionally excluded because its ZIP/preflight/manual-review workflow does not yet satisfy the autosaved-state and automatic-finalization contract.
 

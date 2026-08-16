@@ -70,6 +70,9 @@ const mockPrisma = vi.hoisted(() => ({
   courseContentItem: {
     findMany: vi.fn()
   },
+  courseGroupContentVisibilityOverride: {
+    findMany: vi.fn()
+  },
   courseGroupHiddenCourseMaterial: {
     deleteMany: vi.fn(),
     findMany: vi.fn(),
@@ -169,6 +172,7 @@ describe("group services", () => {
     );
     tx.courseContentItem.count.mockResolvedValue(0);
     tx.courseContentItem.findFirst.mockResolvedValue(null);
+    mockPrisma.courseGroupContentVisibilityOverride.findMany.mockResolvedValue([]);
     tx.gradebookItem.upsert.mockResolvedValue({ id: "gradebook-item-1" });
     authMocks.canManageCourse.mockResolvedValue(true);
     authMocks.isAdmin.mockReturnValue(false);

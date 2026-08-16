@@ -93,7 +93,7 @@ type ListContentOptions = ContentScope & {
 
 type CourseContentDb = Pick<
   typeof prisma,
-  "activity" | "courseContentItem" | "courseContentResource" | "courseGroup" | "courseGroupActivity" | "courseMaterial"
+  "activity" | "courseContentItem" | "courseContentResource" | "courseGroup" | "courseGroupActivity" | "courseGroupContentVisibilityOverride" | "courseMaterial"
 >;
 
 export type EffectiveContentVisibility = "visible" | "hidden" | "hidden_by_parent";
@@ -569,6 +569,52 @@ export async function updateContentItem(
   });
 }
 
+export async function updateGroupContentItem(
+  user: CurrentUser,
+  courseId: string,
+  groupId: string,
+  contentItemId: string,
+  input: UpdateContentItemInput
+) {
+  await assertCanManageCourse(user, courseId);
+  await assertValidScope(prisma, courseId, groupId);
+  const item = await prisma.courseContentItem.findFirst({
+    where: {
+      id: contentItemId,
+      courseId,
+      OR: [{ groupId }, { groupId: null, kind: "folder" }]
+    }
+  });
+  if (!item) {
+    throw notFound("Course content item");
+  }
+
+  if (item.groupId === groupId) {
+    return updateContentItem(user, courseId, contentItemId, input, { groupId });
+  }
+
+  const hasNonVisibilityUpdate = Object.entries(input).some(([key, value]) => key !== "isVisible" && value !== undefined);
+  if (input.isVisible === undefined || hasNonVisibilityUpdate) {
+    throw new AppError(
+      400,
+      "GROUP_SHARED_FOLDER_VISIBILITY_ONLY",
+      "A group can only override the visibility of a shared course folder."
+    );
+  }
+
+  if (input.isVisible === item.isVisible) {
+    await prisma.courseGroupContentVisibilityOverride.deleteMany({ where: { groupId, contentItemId } });
+  } else {
+    await prisma.courseGroupContentVisibilityOverride.upsert({
+      where: { groupId_contentItemId: { groupId, contentItemId } },
+      create: { groupId, contentItemId, isVisible: input.isVisible },
+      update: { isVisible: input.isVisible }
+    });
+  }
+
+  return { ...item, isVisible: input.isVisible };
+}
+
 export async function listContentItems(user: CurrentUser, courseId: string, options: ListContentOptions = {}) {
   await assertCanViewCourse(user, courseId);
   const scope = normalizeScope(options);
@@ -584,9 +630,25 @@ export async function listContentItems(user: CurrentUser, courseId: string, opti
     },
     orderBy: [{ parentId: "asc" }, { position: "asc" }, { createdAt: "asc" }]
   });
-  const withVisibility = addEffectiveVisibility(items);
+  const overrides = scope.groupId
+    ? await prisma.courseGroupContentVisibilityOverride.findMany({ where: { groupId: scope.groupId } })
+    : [];
+  const withVisibility = addEffectiveVisibility(applyGroupVisibilityOverrides(items, overrides));
   const scopedItems = removeCourseActivityPlacementsShadowedByGroupAssignments(withVisibility, scope.groupId);
   return options.visibleOnly ? scopedItems.filter((item) => item.effectiveVisibility === "visible") : scopedItems;
+}
+
+function applyGroupVisibilityOverrides<T extends { id: string; isVisible: boolean }>(
+  items: T[],
+  overrides: Array<{ contentItemId: string; isVisible: boolean }>
+) {
+  if (!overrides.length) {
+    return items;
+  }
+  const visibilityByItemId = new Map(overrides.map((override) => [override.contentItemId, override.isVisible]));
+  return items.map((item) => visibilityByItemId.has(item.id)
+    ? { ...item, isVisible: visibilityByItemId.get(item.id) as boolean }
+    : item);
 }
 
 function removeCourseActivityPlacementsShadowedByGroupAssignments<
@@ -825,7 +887,10 @@ async function getVisibleContentResourceIds(courseId: string, groupId: string | 
     },
     orderBy: [{ parentId: "asc" }, { position: "asc" }, { createdAt: "asc" }]
   });
-  const visibleItems = addEffectiveVisibility(items);
+  const overrides = groupId
+    ? await prisma.courseGroupContentVisibilityOverride.findMany({ where: { groupId } })
+    : [];
+  const visibleItems = addEffectiveVisibility(applyGroupVisibilityOverrides(items, overrides));
   return new Set(
     visibleItems
       .filter((item) => item.contentResourceId && item.effectiveVisibility === "visible")

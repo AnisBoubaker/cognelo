@@ -54,6 +54,7 @@ docs/
 - Course settings: course-level AI agent selection for student support
 - Memberships: basic course membership creation
 - Course content tree: shared placement, ordering, folder nesting, and visibility for folders, legacy materials, plugin-backed content resources, and activities
+- Section-specific folder visibility overrides preserve the shared course folder structure while allowing each section to hide or show a folder independently
 - Content resources: plugin-backed non-activity course content such as GitHub repos, uploaded files, and Markdown text
 - Materials: legacy generic typed course material records retained for compatibility while new content uses content type plugins
 - Activities: typed course-local activity copies with JSON config and research metadata

@@ -223,6 +223,46 @@ describe("compound Test execution", () => {
     }));
   });
 
+  it("treats a trailing autosave after Test submission as an idempotent read", async () => {
+    const gradedItemAttempt = {
+      id: "item-attempt-1",
+      lifecycle: "graded",
+      result: { state: { answers: { "question-1": ["choice-1"] } } }
+    };
+    db.activityAttempt.findFirst.mockResolvedValue(parentAttempt({ lifecycle: "graded" }));
+    db.testItemAttempt.findUnique.mockResolvedValue(gradedItemAttempt);
+
+    await expect(saveTestItemAttemptState(
+      student,
+      "course-1",
+      "group-1",
+      "test-activity-1",
+      "parent-attempt-1",
+      "item-1",
+      { answers: { "question-1": ["late-change"] } }
+    )).resolves.toBe(gradedItemAttempt);
+
+    expect(db.testItemAttempt.upsert).not.toHaveBeenCalled();
+  });
+
+  it("does not overwrite an item already graded by concurrent final submission", async () => {
+    const gradedItemAttempt = { id: "item-attempt-1", lifecycle: "graded", result: { state: {} } };
+    db.activityAttempt.findFirst.mockResolvedValue(parentAttempt());
+    db.testItemAttempt.findUnique.mockResolvedValue(gradedItemAttempt);
+
+    await expect(saveTestItemAttemptState(
+      student,
+      "course-1",
+      "group-1",
+      "test-activity-1",
+      "parent-attempt-1",
+      "item-1",
+      { answers: {} }
+    )).resolves.toBe(gradedItemAttempt);
+
+    expect(db.testItemAttempt.upsert).not.toHaveBeenCalled();
+  });
+
   it("permits read-only child loading from a submitted parent attempt", async () => {
     db.activityAttempt.findFirst.mockResolvedValue(parentAttempt({ lifecycle: "submitted" }));
     db.testItemAttempt.findUnique.mockResolvedValue({ id: "item-attempt-1", lifecycle: "graded" });

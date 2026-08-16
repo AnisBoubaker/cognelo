@@ -421,6 +421,7 @@ model CourseGroup {
   activityAttempts      ActivityAttempt[]
   contentItems          CourseContentItem[]
   contentResources      CourseContentResource[]
+  contentVisibilityOverrides CourseGroupContentVisibilityOverride[]
 
   @@index([courseId, updatedAt])
   @@index([status, availableFrom, availableUntil])
@@ -832,6 +833,7 @@ model CourseContentItem {
   parent                CourseContentItem?     @relation("CourseContentTree", fields: [parentId], references: [id], onDelete: Cascade)
   children              CourseContentItem[]    @relation("CourseContentTree")
   contentResource       CourseContentResource? @relation(fields: [contentResourceId], references: [id], onDelete: Cascade)
+  groupVisibilityOverrides CourseGroupContentVisibilityOverride[]
   material              CourseMaterial?        @relation(fields: [materialId], references: [id], onDelete: Cascade)
   activity              Activity?              @relation(fields: [activityId], references: [id], onDelete: Cascade)
   groupActivity         CourseGroupActivity?   @relation(fields: [courseGroupActivityId], references: [id], onDelete: Cascade)
@@ -846,6 +848,19 @@ model CourseContentItem {
   @@index([materialId])
   @@index([activityId])
   @@index([courseGroupActivityId])
+}
+
+model CourseGroupContentVisibilityOverride {
+  groupId       String
+  contentItemId String
+  isVisible     Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  group         CourseGroup       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  contentItem   CourseContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, contentItemId])
+  @@index([contentItemId])
 }
 
 model GradebookItem {

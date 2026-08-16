@@ -164,11 +164,21 @@ export async function saveTestItemAttemptState(
     testActivityId,
     parentAttemptId,
     testItemId,
-    { sessionId: options.sessionId }
+    {
+      allowCompletedParent: true,
+      allowExpiredParent: true,
+      allowResumePolicyBypass: true,
+      sessionId: options.sessionId
+    }
   );
-  if (context.itemAttempt && context.itemAttempt.lifecycle !== "started") {
-    throw new AppError(409, "TEST_ITEM_ALREADY_SUBMITTED", "This Test item has already been submitted.");
+  if (context.parentAttempt.lifecycle !== "started" || (context.itemAttempt && context.itemAttempt.lifecycle !== "started")) {
+    if (context.itemAttempt) {
+      return context.itemAttempt;
+    }
+    throw notFound("Test item attempt");
   }
+  assertTestAttemptWithinTime(context.parentAttempt);
+  assertTestAttemptResumePolicy(context.parentAttempt, options.sessionId);
   return prisma.testItemAttempt.upsert({
     where: { parentAttemptId_testItemId: { parentAttemptId, testItemId } },
     update: { result: { state } as Prisma.InputJsonValue },
