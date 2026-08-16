@@ -106,6 +106,8 @@ In addition to the standard upgrade guide:
 
 - [ ] Full automated test suite passed.
 - [ ] Production builds passed.
-- [ ] Upgrade was tested from the stated previous tag using representative data.
+- [ ] The exact candidate commit was tested against a fresh clone of the current production database.
+- [ ] All core and plugin migrations completed successfully in pre-production; the migration log is retained.
+- [ ] The designated approver manually tested the migrated pre-production environment and explicitly approved this release.
 - [ ] Rollback behavior was tested or explicitly documented.
 - [ ] Upgrade instructions were reviewed by someone other than their author.
