@@ -318,6 +318,7 @@ Plugin-owned tables are documented in the owning plugin package rather than in t
 All seeded accounts use `Password123!`.
 
 The application does not prefill the sign-in form. Browsers and password managers may offer saved credentials through the standard username and password autocomplete fields.
+The login submit control uses an explicit non-native appearance so Safari autofill cannot repaint its gradient away while retaining white text.
 
 ```text
 admin@cognelo.local
@@ -421,11 +422,12 @@ WEB_DESIGN_RUNNER_URL=http://localhost:3456
 
 ## Frontend Notes
 
-- Login, dashboard, settings, subjects, activity banks, courses, course detail, and edit flows are translated in English, French, and Chinese.
+- Login, settings, subjects, activity banks, courses, course detail, and edit flows are translated in English, French, and Chinese.
 - Locale selection is client-side and persisted in `localStorage`.
 - The header and login page use the Cognelo logo from the repo's brand assets.
 - The favicon/app icon uses the square Cognelo icon asset served from `apps/web/src/app/icon.png`.
 - The top navigation separates primary app routes from the account dropdown.
+- Dashboard is temporarily removed from primary navigation. Authentication, the logo, `/`, and legacy `/dashboard` visits use the first role-available primary route: Subjects for administrators/course managers/teachers, otherwise Courses.
 - Account-wide configuration lives under `/settings`, with the current profile and security editor at `/settings/profile`.
 - Administrators manage accounts under `/settings/users`, including server-side filters and conventional paged results (10 per page by default, with selectable page sizes), account creation with an initial password, and one-or-many global role assignments. Administrators cannot remove their own admin role.
 - Users can update their first and last name and change their password after confirming the current password; email changes are reserved for administrators.

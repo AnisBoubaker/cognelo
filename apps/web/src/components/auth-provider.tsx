@@ -7,8 +7,8 @@ import { api, API_UNAUTHORIZED_EVENT } from "@/lib/api";
 type AuthState = {
   user: CurrentUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  activateAccount: (input: { email: string; password: string; confirmPassword: string }) => Promise<void>;
+  login: (email: string, password: string) => Promise<CurrentUser>;
+  activateAccount: (input: { email: string; password: string; confirmPassword: string }) => Promise<CurrentUser>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -81,10 +81,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login: async (email, password) => {
         const result = await api.login(email, password);
         setUser(result.user);
+        return result.user;
       },
       activateAccount: async (input) => {
         const result = await api.activateAccount(input);
         setUser(result.user);
+        return result.user;
       },
       logout: async () => {
         await api.logout();

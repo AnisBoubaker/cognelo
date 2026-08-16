@@ -7,6 +7,7 @@ import { LocaleSwitcher } from "@/components/locale-switcher";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { getPrimaryLandingPath } from "@/lib/navigation";
 
 export default function LoginPage() {
   const { login, activateAccount } = useAuth();
@@ -24,8 +25,8 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
-      router.replace("/dashboard");
+      const user = await login(email, password);
+      router.replace(getPrimaryLandingPath(user));
     } catch (err) {
       if (err instanceof ApiError && err.code === "PENDING_ACCOUNT_SETUP") {
         setMode("activate");
@@ -41,8 +42,8 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await activateAccount({ email, password, confirmPassword });
-      router.replace("/dashboard");
+      const user = await activateAccount({ email, password, confirmPassword });
+      router.replace(getPrimaryLandingPath(user));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("login.activationError"));
     } finally {
@@ -117,7 +118,7 @@ export default function LoginPage() {
               </div>
             ) : null}
             {error ? <p className="error">{error}</p> : null}
-            <button type="submit" disabled={loading}>
+            <button className="login-submit-button" type="submit" disabled={loading}>
               {loading ? t("login.submitting") : mode === "login" ? t("login.submit") : t("login.activateSubmit")}
             </button>
           </form>
