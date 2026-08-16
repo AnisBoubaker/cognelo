@@ -13,8 +13,8 @@ export default function LoginPage() {
   const router = useRouter();
   const { t } = useI18n();
   const [mode, setMode] = useState<"login" | "activate">("login");
-  const [email, setEmail] = useState("teacher@cognelo.local");
-  const [password, setPassword] = useState("Password123!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -90,13 +90,14 @@ export default function LoginPage() {
           <form className="form" onSubmit={mode === "login" ? handleLogin : handleActivate}>
             <div className="field">
               <label htmlFor="email">{t("login.email")}</label>
-              <input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+              <input id="email" type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required />
             </div>
             <div className="field">
               <label htmlFor="password">{t("login.password")}</label>
               <input
                 id="password"
                 type="password"
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
@@ -108,6 +109,7 @@ export default function LoginPage() {
                 <input
                   id="confirmPassword"
                   type="password"
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   required

@@ -317,6 +317,8 @@ Plugin-owned tables are documented in the owning plugin package rather than in t
 
 All seeded accounts use `Password123!`.
 
+The application does not prefill the sign-in form. Browsers and password managers may offer saved credentials through the standard username and password autocomplete fields.
+
 ```text
 admin@cognelo.local
 teacher@cognelo.local
