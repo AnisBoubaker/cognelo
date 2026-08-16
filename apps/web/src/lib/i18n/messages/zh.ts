@@ -453,6 +453,12 @@ export const zhMessages = {
       statusLabel: "发布状态",
       statusSaved: "发布状态已更新。",
       statusSaveError: "无法更新发布状态。",
+      compareVersions: "比较版本", compareVersionsTitle: "比较活动版本", versionHistory: "版本历史",
+      versionDiffFrom: "较早版本", versionDiffTo: "较新版本", versionDiffChooseDifferent: "请选择两个不同版本。", versionDiffError: "无法比较这些版本。",
+      versionDiffBefore: "较早版本", versionDiffAfter: "较新版本", versionDiffSummary: "{count} 项更改", versionDiffNoChanges: "这些版本包含相同的编写内容。",
+      versionDiffSectionActivity: "活动", versionDiffSectionConfig: "活动配置", versionDiffSectionMetadata: "编写元数据",
+      versionDiffFieldTitle: "标题", versionDiffFieldDescription: "描述", versionDiffFieldLifecycle: "生命周期", versionDiffFieldType: "活动类型", versionDiffFieldConcepts: "概念与技能",
+      versionDiffAdded: "已添加", versionDiffRemoved: "已删除", versionDiffChanged: "已更改",
       versionNote: "在这里保存的更改会更新活动库活动，并为之后的课程分配创建新版本。"
     },
     activityConcepts: {

@@ -35,6 +35,7 @@ import type {
   UserPasswordChange,
   UserProfileUpdate
 } from "@cognelo/contracts";
+import type { ActivityVersionDiff } from "@cognelo/contracts";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 
 export type { MaterialKind, SubjectKnowledgeGraphDraft };
@@ -1054,6 +1055,8 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(input)
     }),
+  compareBankActivityVersions: (activityBankId: string, bankActivityId: string, fromVersionId: string, toVersionId: string) =>
+    request<{ diff: ActivityVersionDiff }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/versions/diff?${new URLSearchParams({ fromVersionId, toVersionId })}`),
   duplicateBankActivity: (activityBankId: string, bankActivityId: string, title: string) =>
     request<{ activity: BankActivity }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/duplicate`, {
       method: "POST",

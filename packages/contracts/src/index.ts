@@ -434,6 +434,31 @@ export const CourseActivityBankSyncSchema = z.object({
 });
 export type CourseActivityBankSync = z.infer<typeof CourseActivityBankSyncSchema>;
 
+export type ActivityVersionDiffChange = {
+  path: string;
+  kind: "added" | "removed" | "changed";
+  before?: unknown;
+  after?: unknown;
+};
+
+export type ActivityVersionDiffField =
+  | { kind: "text"; key: string; label: string; before: string; after: string }
+  | { kind: "list"; key: string; label: string; before: string[]; after: string[] }
+  | { kind: "structured"; key: string; label: string; changes: ActivityVersionDiffChange[] };
+
+export type ActivityVersionDiffSection = {
+  key: string;
+  title: string;
+  fields: ActivityVersionDiffField[];
+};
+
+export type ActivityVersionDiff = {
+  fromVersion: { id: string; versionNumber: number; createdAt: string };
+  toVersion: { id: string; versionNumber: number; createdAt: string };
+  sections: ActivityVersionDiffSection[];
+  changeCount: number;
+};
+
 export const CourseContentDuplicateSchema = z.object({
   title: z.string().trim().min(1).max(180)
 });

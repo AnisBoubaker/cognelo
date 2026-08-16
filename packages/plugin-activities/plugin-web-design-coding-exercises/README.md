@@ -62,6 +62,8 @@ When a web-design bank activity is copied into a course, the plugin's server hoo
 
 Explicit synchronization replaces private reference bundles/tests through plugin hooks: retrieval refreshes course-owned rows, while publishing refreshes bank-owned rows after core creates a new immutable bank version. Core disallows synchronization after any attempt.
 
+Bank-version comparison currently covers generic student-facing configuration only. Private reference bundles and Playwright tests are excluded because their bank rows are not immutable per-version snapshots.
+
 Duplicating a web-design activity inside a bank copies its private bank reference bundle and tests through the platform bank-duplication hook. Moving the activity retains its ID and therefore retains those private rows without migration.
 
 ## Authoring UX

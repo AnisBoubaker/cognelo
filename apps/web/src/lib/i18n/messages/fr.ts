@@ -453,6 +453,12 @@ export const frMessages = {
       statusLabel: "Statut de publication",
       statusSaved: "Statut de publication mis à jour.",
       statusSaveError: "Impossible de mettre à jour le statut de publication.",
+      compareVersions: "Comparer les versions", compareVersionsTitle: "Comparer les versions de l'activité", versionHistory: "Historique des versions",
+      versionDiffFrom: "Version antérieure", versionDiffTo: "Version ultérieure", versionDiffChooseDifferent: "Choisissez deux versions différentes.", versionDiffError: "Impossible de comparer ces versions.",
+      versionDiffBefore: "Version antérieure", versionDiffAfter: "Version ultérieure", versionDiffSummary: "{count} changement(s)", versionDiffNoChanges: "Ces versions contiennent le même contenu rédigé.",
+      versionDiffSectionActivity: "Activité", versionDiffSectionConfig: "Configuration de l'activité", versionDiffSectionMetadata: "Métadonnées de rédaction",
+      versionDiffFieldTitle: "Titre", versionDiffFieldDescription: "Description", versionDiffFieldLifecycle: "Cycle de vie", versionDiffFieldType: "Type d'activité", versionDiffFieldConcepts: "Concepts et compétences",
+      versionDiffAdded: "Ajouté", versionDiffRemoved: "Supprimé", versionDiffChanged: "Modifié",
       versionNote: "Les changements enregistrés ici mettent à jour l'activité de la banque et créent une nouvelle version pour les prochaines assignations aux cours."
     },
     activityConcepts: {
