@@ -334,6 +334,26 @@ export async function copyCourseCodingExerciseData(params: { sourceActivityId: s
   });
 }
 
+export async function copyCourseCodingExerciseDataToBankActivity(params: { activityId: string; bankActivityId: string }) {
+  const [tests, referenceSolution] = await Promise.all([
+    prisma.pluginCodingExerciseHiddenTest.findMany({ where: { activityId: params.activityId }, orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }] }),
+    prisma.pluginCodingExerciseReferenceSolution.findUnique({ where: { activityId: params.activityId } })
+  ]);
+  await prisma.$transaction(async (transaction) => {
+    await transaction.pluginBankCodingExerciseHiddenTest.deleteMany({ where: { bankActivityId: params.bankActivityId } });
+    await transaction.pluginBankCodingExerciseReferenceSolution.deleteMany({ where: { bankActivityId: params.bankActivityId } });
+    if (tests.length) await transaction.pluginBankCodingExerciseHiddenTest.createMany({ data: tests.map((test) => ({
+      bankActivityId: params.bankActivityId, name: test.name, stdin: test.stdin, expectedOutput: test.expectedOutput,
+      orderIndex: test.orderIndex, isEnabled: test.isEnabled, weight: test.weight, metadata: test.metadata as Prisma.InputJsonValue
+    })) });
+    if (referenceSolution) await transaction.pluginBankCodingExerciseReferenceSolution.create({ data: {
+      bankActivityId: params.bankActivityId, sourceCode: referenceSolution.sourceCode,
+      privateConfig: referenceSolution.privateConfig as Prisma.InputJsonValue,
+      validationSummary: referenceSolution.validationSummary as Prisma.InputJsonValue
+    } });
+  });
+}
+
 export async function deleteBankCodingExerciseData(params: { bankActivityId: string }) {
   assertBankCodingExerciseStorageAvailable();
   await prisma.$transaction(async (transaction) => {

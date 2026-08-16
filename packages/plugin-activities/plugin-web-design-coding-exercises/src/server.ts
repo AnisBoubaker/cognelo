@@ -1,6 +1,6 @@
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import { webDesignExerciseExpectedResultRoute, webDesignExerciseReviewAllRoute, webDesignExerciseRunRoute, webDesignExerciseSubmitRoute, webDesignExerciseTestsRoute } from "./routes";
-import { copyBankWebDesignExerciseData, copyBankWebDesignExerciseTestsToCourseActivity, copyCourseWebDesignExerciseData, deleteBankWebDesignExerciseData, deleteCourseWebDesignExerciseData } from "./tests";
+import { copyBankWebDesignExerciseData, copyBankWebDesignExerciseTestsToCourseActivity, copyCourseWebDesignExerciseData, copyCourseWebDesignExerciseDataToBankActivity, deleteBankWebDesignExerciseData, deleteCourseWebDesignExerciseData } from "./tests";
 import { submitWebDesignExercise, runWebDesignExercise, webDesignExerciseRunInputSchema } from "./executions";
 import { AppError } from "@cognelo/core";
 
@@ -36,6 +36,9 @@ export const webDesignCodingExercisesServerPlugin: ServerActivityPlugin = {
     }
   },
   hooks: {
+    onCourseActivityPublishedToBank: async ({ activity, bankActivityId }) => {
+      if (activity.activityType.key === "web-design-coding-exercise") await copyCourseWebDesignExerciseDataToBankActivity({ activityId: activity.id, bankActivityId });
+    },
     onCourseActivityDuplicated: async ({ sourceActivityId, activity }) => {
       if (activity.activityType.key === "web-design-coding-exercise") {
         await copyCourseWebDesignExerciseData({ sourceActivityId, activityId: activity.id });

@@ -482,6 +482,15 @@ export type Activity = {
   knowledgeConcepts?: ActivityKnowledgeConceptLink[];
 };
 
+export type ActivityBankSyncStatus = {
+  status: "in_sync" | "course_ahead" | "bank_ahead" | "diverged";
+  attemptCount: number;
+  mutationsAllowed: boolean;
+  canWriteToBank: boolean;
+  originalVersion: { id: string; versionNumber: number };
+  latestVersion: { id: string; versionNumber: number };
+};
+
 export type CourseTestSettings = {
   timeLimitMinutes: number | null;
   navigationMode: "free" | "sequential";
@@ -1394,6 +1403,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input)
     }),
+  duplicateCourseActivity: (courseId: string, activityId: string, input: { title: string; contentItemId: string }) =>
+    request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}/duplicate`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  courseActivityBankSyncStatus: (courseId: string, activityId: string) =>
+    request<{ sync: ActivityBankSyncStatus }>(`/courses/${courseId}/activities/${activityId}/bank-sync`),
+  syncCourseActivityWithBank: (courseId: string, activityId: string, action: "retrieve_original" | "retrieve_latest" | "publish_to_bank") =>
+    request<{ activity: Activity; version: ActivityVersion }>(`/courses/${courseId}/activities/${activityId}/bank-sync`, {
+      method: "POST",
+      body: JSON.stringify({ action })
+    }),
   createTest: (courseId: string, input: {
     title: string;
     description?: string;
@@ -1410,7 +1431,7 @@ export const api = {
     lifecycle?: "draft" | "published" | "archived";
     settings?: Partial<CourseTestSettings>;
   }) => request<{ test: CourseTest }>(`/courses/${courseId}/activities/${activityId}/test`, { method: "PATCH", body: JSON.stringify(input) }),
-  duplicateTest: (courseId: string, activityId: string, input: { title?: string } = {}) =>
+  duplicateTest: (courseId: string, activityId: string, input: { title?: string; contentItemId?: string } = {}) =>
     request<{ test: CourseTest }>(`/courses/${courseId}/activities/${activityId}/test/duplicate`, {
       method: "POST",
       body: JSON.stringify(input)
@@ -1475,6 +1496,11 @@ export const api = {
     const query = params.toString();
     return request<{ contentItems: CourseContentItem[] }>(`/courses/${courseId}/content${query ? `?${query}` : ""}`);
   },
+  duplicateCourseContentItem: (courseId: string, contentItemId: string, title: string) =>
+    request<{ contentItem: CourseContentItem }>(`/courses/${courseId}/content/${contentItemId}/duplicate`, {
+      method: "POST",
+      body: JSON.stringify({ title })
+    }),
   courseContentTypes: (courseId: string) =>
     request<{ contentTypes: ContentTypeDefinition[]; activeContentTypes?: ContentTypeDefinition[] }>(`/courses/${courseId}/content-types`),
   courseContentResources: (courseId: string) =>

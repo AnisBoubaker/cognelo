@@ -2864,6 +2864,14 @@ a.card:hover,
   color: #9f1239;
 }
 
+.content-context-menu .content-context-menu-item,
+.content-context-menu .content-context-menu-item:hover,
+.content-context-menu .content-context-menu-item:focus-visible {
+  box-shadow: none;
+  transform: none;
+  width: 100%;
+}
+
 .icon-button {
   height: 36px;
   min-height: 36px;

@@ -20,6 +20,8 @@ The placeholder plugin exists as a minimal activity shell while a real pedagogic
 
 This plugin intentionally relies only on core bank/course activity records for real activity behavior.
 
+Its linked course copies therefore use the platform's generic bank synchronization without a plugin hook, subject to the core attempt lock and bank-write permission rules.
+
 It also declares two dummy plugin-owned tables, `PluginPlaceholderDummyRecord` and `PluginPlaceholderDummyAudit`, so the platform plugin activation/deactivation backup and restore flow can be tested with a low-risk plugin. Those tables live in this plugin's local Prisma schema and migration manifest.
 
 If this placeholder ever grows custom authoring or settings UI, that form should register with `useUnsavedChangesGuard` from `@cognelo/activity-ui`.

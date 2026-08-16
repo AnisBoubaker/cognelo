@@ -82,6 +82,12 @@ export type ContentTypeDeleteHandler = (input: {
   resource: ServerContentResourceRecord;
 }) => Promise<void>;
 
+export type ContentTypeDuplicateHandler = (input: {
+  user: CurrentUser;
+  resource: ServerContentResourceRecord;
+  title: string;
+}) => Promise<{ title: string; metadata?: Record<string, unknown> }>;
+
 export type ContentTypeOpenAction = {
   kind: "download" | "external_url" | "plugin_route" | "viewer" | "none";
   href?: string;
@@ -158,6 +164,7 @@ export type ServerContentTypePlugin = {
     create?: ContentTypeCreateHandler;
     update?: ContentTypeUpdateHandler;
     delete?: ContentTypeDeleteHandler;
+    duplicate?: ContentTypeDuplicateHandler;
     resolveOpenAction?: ContentTypeOpenActionHandler;
     getEmbeddingSource?: ContentTypeEmbeddingSourceHandler;
     getEmbeddingDocuments?: ContentTypeEmbeddingDocumentsHandler;

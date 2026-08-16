@@ -23,6 +23,7 @@ import { WorkspaceTabs } from "@/components/workspace-tabs";
 import {
   api,
   ActivityBank,
+  ActivityBankSyncStatus,
   ActivityDefinition,
   ActivityType,
   AiAgentConnection,
@@ -37,6 +38,7 @@ import {
   Subject
 } from "@/lib/api";
 import { ContentTypeIcon as MaterialTypeIcon, resolveContentTypeSettingsRenderer } from "@/lib/content-type-renderers";
+import { defaultDuplicateActivityTitle } from "@/lib/activity-bank-titles";
 import { useI18n } from "@/lib/i18n";
 
 type ContentDropPlacement = "after" | "before" | "inside";
@@ -46,6 +48,7 @@ type ContentContextMenu = {
   x: number;
   y: number;
 };
+type BankSyncAction = "retrieve_original" | "retrieve_latest" | "publish_to_bank";
 
 const contentDragActivationDistance = 8;
 
@@ -112,6 +115,15 @@ export default function CourseDetailPage() {
   const [contentContextMenu, setContentContextMenu] = useState<ContentContextMenu | null>(null);
   const [pickerFolderMenuOpen, setPickerFolderMenuOpen] = useState(false);
   const [contentHeaderMenuOpen, setContentHeaderMenuOpen] = useState(false);
+  const [duplicatingCourseActivity, setDuplicatingCourseActivity] = useState<
+    { kind: "activity"; activityId: string; contentItemId: string; isTest: boolean } | { kind: "content"; contentItemId: string } | null
+  >(null);
+  const [duplicateCourseActivityTitle, setDuplicateCourseActivityTitle] = useState("");
+  const [isDuplicatingCourseActivity, setIsDuplicatingCourseActivity] = useState(false);
+  const [bankSyncDialog, setBankSyncDialog] = useState<{ activityId: string; title: string; sync: ActivityBankSyncStatus } | null>(null);
+  const [bankSyncLoading, setBankSyncLoading] = useState(false);
+  const [bankSyncError, setBankSyncError] = useState("");
+  const [bankSyncConfirmation, setBankSyncConfirmation] = useState<BankSyncAction | null>(null);
   const folderTitleInputRef = useRef<HTMLInputElement | null>(null);
   const cancelFolderEditRef = useRef(false);
   const skipFolderBlurRef = useRef(false);
@@ -939,6 +951,60 @@ export default function CourseDetailPage() {
     }
   }
 
+  async function duplicateContentActivity(event: FormEvent) {
+    event.preventDefault();
+    if (!duplicatingCourseActivity) return;
+    setIsDuplicatingCourseActivity(true);
+    setMaterialActionError("");
+    try {
+      if (duplicatingCourseActivity.kind === "content") {
+        await api.duplicateCourseContentItem(courseId, duplicatingCourseActivity.contentItemId, duplicateCourseActivityTitle);
+      } else {
+        const input = { title: duplicateCourseActivityTitle, contentItemId: duplicatingCourseActivity.contentItemId };
+        if (duplicatingCourseActivity.isTest) await api.duplicateTest(courseId, duplicatingCourseActivity.activityId, input);
+        else await api.duplicateCourseActivity(courseId, duplicatingCourseActivity.activityId, input);
+      }
+      setDuplicatingCourseActivity(null);
+      setDuplicateCourseActivityTitle("");
+      await refresh();
+    } catch (err) {
+      setMaterialActionError(err instanceof Error ? err.message : t("courseDetail.duplicateActivityError"));
+    } finally {
+      setIsDuplicatingCourseActivity(false);
+    }
+  }
+
+  async function openBankSync(activityId: string, title: string) {
+    setContentContextMenu(null);
+    setBankSyncLoading(true);
+    setBankSyncError("");
+    setBankSyncConfirmation(null);
+    try {
+      const result = await api.courseActivityBankSyncStatus(courseId, activityId);
+      setBankSyncDialog({ activityId, title, sync: result.sync });
+    } catch (err) {
+      setMaterialActionError(err instanceof Error ? err.message : t("courseDetail.bankSyncError"));
+    } finally {
+      setBankSyncLoading(false);
+    }
+  }
+
+  async function performBankSync(action: BankSyncAction) {
+    if (!bankSyncDialog) return;
+    setBankSyncLoading(true);
+    setBankSyncError("");
+    try {
+      await api.syncCourseActivityWithBank(courseId, bankSyncDialog.activityId, action);
+      setBankSyncDialog(null);
+      setBankSyncConfirmation(null);
+      await refresh();
+    } catch (err) {
+      setBankSyncError(err instanceof Error ? err.message : t("courseDetail.bankSyncError"));
+    } finally {
+      setBankSyncLoading(false);
+    }
+  }
+
   function openContentSettings(item: CourseContentItem) {
     setSettingsContentItemId(item.id);
     setSettingsError("");
@@ -1585,6 +1651,42 @@ export default function CourseDetailPage() {
                                         </button>
                                       </>
                                     ) : null}
+                                    {item.kind === "activity" && activity ? (
+                                      <><button
+                                        className="content-context-menu-item"
+                                        role="menuitem"
+                                        type="button"
+                                        onClick={() => {
+                                          setContentContextMenu(null);
+                                          setDuplicatingCourseActivity({ kind: "activity", activityId: activity.id, contentItemId: item.id, isTest: activity.activityType.key === "test" });
+                                          setDuplicateCourseActivityTitle(defaultDuplicateActivityTitle(activity.title));
+                                        }}
+                                      >
+                                        <MaterialActionIcon name="duplicate" />
+                                        <span>{t("courseDetail.duplicateActivity")}</span>
+                                      </button>
+                                      {activity.bankActivityId && activity.activityVersionId ? (
+                                        <button className="content-context-menu-item" disabled={bankSyncLoading} role="menuitem" type="button" onClick={() => void openBankSync(activity.id, activity.title)}>
+                                          <MaterialActionIcon name="sync" />
+                                          <span>{t("courseDetail.bankSyncAction")}</span>
+                                        </button>
+                                      ) : null}</>
+                                    ) : null}
+                                    {item.kind === "content" && (contentResource || material) ? (
+                                      <button
+                                        className="content-context-menu-item"
+                                        role="menuitem"
+                                        type="button"
+                                        onClick={() => {
+                                          setContentContextMenu(null);
+                                          setDuplicatingCourseActivity({ kind: "content", contentItemId: item.id });
+                                          setDuplicateCourseActivityTitle(defaultDuplicateActivityTitle(title));
+                                        }}
+                                      >
+                                        <MaterialActionIcon name="duplicate" />
+                                        <span>{t("courseDetail.duplicateActivity")}</span>
+                                      </button>
+                                    ) : null}
                                     <button
                                       className="content-context-menu-item"
                                       role="menuitem"
@@ -1914,6 +2016,66 @@ export default function CourseDetailPage() {
             {dragPreview ? (
               <div className="drag-preview" style={{ left: dragPreview.x + 14, top: dragPreview.y + 14 }}>
                 {dragPreview.title}
+              </div>
+            ) : null}
+            {duplicatingCourseActivity ? (
+              <div className="dialog-backdrop" role="presentation">
+                <section aria-labelledby="duplicate-course-activity-title" aria-modal="true" className="dialog-panel" role="dialog">
+                  <div className="section-heading">
+                    <div><p className="eyebrow">{t("courseDetail.duplicateActivityEyebrow")}</p><h2 id="duplicate-course-activity-title">{t(duplicatingCourseActivity.kind === "content" ? "courseDetail.duplicateContentTitle" : "courseDetail.duplicateActivityTitle")}</h2></div>
+                    <button className="secondary icon-button" type="button" onClick={() => setDuplicatingCourseActivity(null)} title={t("common.close")}><CloseIcon /></button>
+                  </div>
+                  <form className="form" onSubmit={duplicateContentActivity}>
+                    <div className="field"><label htmlFor="duplicate-course-activity-name">{t("courseDetail.duplicateContentTitleLabel")}</label><input id="duplicate-course-activity-name" autoFocus minLength={2} maxLength={180} required value={duplicateCourseActivityTitle} onChange={(event) => setDuplicateCourseActivityTitle(event.target.value)} /></div>
+                    <p className="muted">{t("courseDetail.duplicateActivityLocationHelp")}</p>
+                    <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setDuplicatingCourseActivity(null)}>{t("common.cancel")}</button><button disabled={isDuplicatingCourseActivity || duplicateCourseActivityTitle.trim().length < 2} type="submit">{isDuplicatingCourseActivity ? t("common.saving") : t("courseDetail.duplicateActivity")}</button></div>
+                  </form>
+                </section>
+              </div>
+            ) : null}
+            {bankSyncDialog && !bankSyncConfirmation ? (
+              <div className="dialog-backdrop" role="presentation">
+                <section aria-labelledby="bank-sync-title" aria-modal="true" className="dialog-panel" role="dialog">
+                  <div className="section-heading">
+                    <div><p className="eyebrow">{t("courseDetail.bankSyncEyebrow")}</p><h2 id="bank-sync-title">{bankSyncDialog.title}</h2></div>
+                    <button className="secondary icon-button" disabled={bankSyncLoading} type="button" onClick={() => setBankSyncDialog(null)} title={t("common.close")}><CloseIcon /></button>
+                  </div>
+                  <div className="form">
+                    <p><strong>{t(`courseDetail.bankSyncStatus.${bankSyncDialog.sync.status}`)}</strong></p>
+                    <p className="muted">{t("courseDetail.bankSyncVersions", { original: bankSyncDialog.sync.originalVersion.versionNumber, latest: bankSyncDialog.sync.latestVersion.versionNumber })}</p>
+                    {!bankSyncDialog.sync.mutationsAllowed ? <p className="error">{t("courseDetail.bankSyncAttemptsLocked", { count: bankSyncDialog.sync.attemptCount })}</p> : null}
+                    {bankSyncError ? <p className="error">{bankSyncError}</p> : null}
+                    <div className="dialog-actions">
+                      <button className="secondary" disabled={bankSyncLoading} type="button" onClick={() => setBankSyncDialog(null)}>{t("common.cancel")}</button>
+                      {bankSyncDialog.sync.status === "course_ahead" ? <button disabled={bankSyncLoading || !bankSyncDialog.sync.mutationsAllowed} type="button" onClick={() => setBankSyncConfirmation("retrieve_original")}>{t("courseDetail.bankSyncRestoreOriginal", { version: bankSyncDialog.sync.originalVersion.versionNumber })}</button> : null}
+                      {(bankSyncDialog.sync.status === "bank_ahead" || bankSyncDialog.sync.status === "diverged") ? <button disabled={bankSyncLoading || !bankSyncDialog.sync.mutationsAllowed} type="button" onClick={() => setBankSyncConfirmation("retrieve_latest")}>{t("courseDetail.bankSyncRetrieveLatest", { version: bankSyncDialog.sync.latestVersion.versionNumber })}</button> : null}
+                      {(bankSyncDialog.sync.status === "course_ahead" || bankSyncDialog.sync.status === "diverged") && bankSyncDialog.sync.canWriteToBank ? <button disabled={bankSyncLoading || !bankSyncDialog.sync.mutationsAllowed} type="button" onClick={() => setBankSyncConfirmation("publish_to_bank")}>{t("courseDetail.bankSyncPublish")}</button> : null}
+                    </div>
+                  </div>
+                </section>
+              </div>
+            ) : null}
+            {bankSyncDialog && bankSyncConfirmation ? (
+              <div className="dialog-backdrop" role="presentation">
+                <section aria-labelledby="bank-sync-confirm-title" aria-modal="true" className="dialog-panel" role="alertdialog">
+                  <div className="section-heading">
+                    <div><p className="eyebrow">{t("courseDetail.bankSyncConfirmEyebrow")}</p><h2 id="bank-sync-confirm-title">{t(`courseDetail.bankSyncConfirmTitle.${bankSyncConfirmation}`)}</h2></div>
+                    <button className="secondary icon-button" disabled={bankSyncLoading} type="button" onClick={() => setBankSyncConfirmation(null)} title={t("common.close")}><CloseIcon /></button>
+                  </div>
+                  <div className="form">
+                    <p>{t(`courseDetail.bankSyncConfirmDescription.${bankSyncConfirmation}`, {
+                      original: bankSyncDialog.sync.originalVersion.versionNumber,
+                      latest: bankSyncDialog.sync.latestVersion.versionNumber
+                    })}</p>
+                    {bankSyncConfirmation !== "publish_to_bank" ? <p className="error">{t("courseDetail.bankSyncConfirmCourseIrreversible")}</p> : <p className="muted">{t("courseDetail.bankSyncConfirmBankRecoverable")}</p>}
+                    <p className="muted">{t("courseDetail.bankSyncConfirmPreserved")}</p>
+                    {bankSyncError ? <p className="error">{bankSyncError}</p> : null}
+                    <div className="dialog-actions">
+                      <button className="secondary" disabled={bankSyncLoading} type="button" onClick={() => setBankSyncConfirmation(null)}>{t("common.back")}</button>
+                      <button disabled={bankSyncLoading} type="button" onClick={() => void performBankSync(bankSyncConfirmation)}>{bankSyncLoading ? t("common.saving") : t("courseDetail.bankSyncConfirmAction")}</button>
+                    </div>
+                  </div>
+                </section>
               </div>
             ) : null}
             {settingsContentItem ? (
@@ -2568,6 +2730,7 @@ function MaterialActionIcon({
     | "add"
     | "assign"
     | "download"
+    | "duplicate"
     | "down"
     | "drag"
     | "edit"
@@ -2577,6 +2740,7 @@ function MaterialActionIcon({
     | "more"
     | "open"
     | "remove"
+    | "sync"
     | "up"
     | "visible";
 }) {
@@ -2608,6 +2772,20 @@ function MaterialActionIcon({
         <path d="M12 3v10" />
         <path d="m8 9 4 4 4-4" />
         <path d="M5 19h14" />
+      </>
+    ),
+    duplicate: (
+      <>
+        <rect height="11" rx="1" width="11" x="9" y="9" />
+        <path d="M15 9V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h4" />
+      </>
+    ),
+    sync: (
+      <>
+        <path d="M20 7v5h-5" />
+        <path d="M4 17v-5h5" />
+        <path d="M6.1 8.2A7 7 0 0 1 18.7 7L20 12" />
+        <path d="M17.9 15.8A7 7 0 0 1 5.3 17L4 12" />
       </>
     ),
     down: (

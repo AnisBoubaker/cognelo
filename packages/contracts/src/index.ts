@@ -423,6 +423,22 @@ export const ActivityInputSchema = z.object({
 });
 export type ActivityInput = z.infer<typeof ActivityInputSchema>;
 
+export const CourseActivityDuplicateSchema = z.object({
+  title: z.string().trim().min(2).max(180),
+  contentItemId: RecordIdSchema
+});
+export type CourseActivityDuplicate = z.infer<typeof CourseActivityDuplicateSchema>;
+
+export const CourseActivityBankSyncSchema = z.object({
+  action: z.enum(["retrieve_original", "retrieve_latest", "publish_to_bank"])
+});
+export type CourseActivityBankSync = z.infer<typeof CourseActivityBankSyncSchema>;
+
+export const CourseContentDuplicateSchema = z.object({
+  title: z.string().trim().min(1).max(180)
+});
+export type CourseContentDuplicate = z.infer<typeof CourseContentDuplicateSchema>;
+
 export const ActivityUpdateSchema = ActivityInputSchema.partial();
 export type ActivityUpdate = z.infer<typeof ActivityUpdateSchema>;
 
@@ -453,7 +469,8 @@ export const TestUpdateSchema = z.object({
 export type TestUpdate = z.infer<typeof TestUpdateSchema>;
 
 export const TestDuplicateSchema = z.object({
-  title: z.string().trim().min(2).max(180).optional()
+  title: z.string().trim().min(2).max(180).optional(),
+  contentItemId: RecordIdSchema.optional()
 });
 export type TestDuplicate = z.infer<typeof TestDuplicateSchema>;
 

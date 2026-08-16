@@ -80,6 +80,8 @@ These tables are modeled in this plugin's local Prisma schema under `prisma/sche
 
 Activity-bank authoring persists the same private reference solution, hidden template data, and tests in bank-owned plugin tables. When a bank activity is assigned to a course, the plugin hook copies that private data into course-owned plugin tables so future bank edits and course edits diverge safely.
 
+Explicit course/bank synchronization replaces private authoring data through plugin hooks in either direction. Retrieval refreshes course-owned reference/test rows; publishing refreshes bank-owned rows while core creates the new immutable generic version. Core blocks both operations after any attempt.
+
 Duplicating a coding exercise inside an activity bank invokes the platform bank-duplication hook and copies its bank-owned reference solution and hidden tests to the new independent bank activity. Moving a bank activity keeps its ID, so its plugin-owned rows move with it without copying.
 
 ## Authoring UX

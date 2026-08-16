@@ -5,6 +5,7 @@ import {
   copyBankCodingHomeworkAuthoringToCourseActivity,
   copyBankCodingHomeworkAuthoring,
   copyCourseCodingHomeworkAuthoring,
+  copyCourseCodingHomeworkAuthoringToBankActivity,
   deleteBankCodingHomeworkAuthoring,
   deleteCourseCodingHomeworkData
 } from "./authoring";
@@ -88,6 +89,9 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
     }
   },
   hooks: {
+    onCourseActivityPublishedToBank: async ({ activity, bankActivityId }) => {
+      if (activity.activityType.key === "coding-homework-grader") await copyCourseCodingHomeworkAuthoringToBankActivity({ activityId: activity.id, bankActivityId });
+    },
     onCourseActivityDuplicated: async ({ sourceActivityId, activity }) => {
       if (activity.activityType.key === "coding-homework-grader") {
         await copyCourseCodingHomeworkAuthoring({ sourceActivityId, activityId: activity.id });

@@ -8,7 +8,7 @@ import {
   type ContentVectorIndexResult,
   type ContentVectorSearchMatch
 } from "@cognelo/content-type-sdk/server";
-import type { CurrentUser } from "@cognelo/contracts";
+import { CourseContentDuplicateSchema, type CurrentUser } from "@cognelo/contracts";
 import { assertCanManageCourse, assertCanViewCourse, canManageCourse } from "./authorization";
 import { AppError, notFound } from "./errors";
 import { assertContentResourcePluginActive, assertContentTypePluginEnabled } from "./plugins";
@@ -226,6 +226,69 @@ export async function deleteContentResource(user: CurrentUser, courseId: string,
   }
   await prisma.courseContentResource.delete({ where: { id: contentResourceId } });
   return { ok: true };
+}
+
+export async function duplicateCourseContentItem(user: CurrentUser, courseId: string, contentItemId: string, input: unknown) {
+  await assertCanManageCourse(user, courseId);
+  const data = CourseContentDuplicateSchema.parse(input);
+  const source = await prisma.courseContentItem.findFirst({
+    where: { id: contentItemId, courseId, groupId: null, kind: "content" },
+    include: { contentResource: true, material: true }
+  });
+  if (!source || (!source.contentResource && !source.material)) throw notFound("Course content item");
+  const position = await prisma.courseContentItem.count({ where: { courseId, groupId: null, parentId: source.parentId } });
+
+  let resourceCopy: { title: string; metadata?: Record<string, unknown> } | null = null;
+  if (source.contentResource) {
+    const plugin = getServerContentTypePlugin(source.contentResource.pluginKey);
+    if (!plugin?.handlers?.duplicate) {
+      throw new AppError(400, "CONTENT_TYPE_DUPLICATE_UNAVAILABLE", "This content type does not support duplication.");
+    }
+    resourceCopy = await plugin.handlers.duplicate({
+      user,
+      resource: toServerResourceRecord(source.contentResource),
+      title: data.title
+    });
+  }
+
+  return prisma.$transaction(async (transaction) => {
+    const contentResource = source.contentResource && resourceCopy
+      ? await transaction.courseContentResource.create({ data: {
+          courseId,
+          groupId: null,
+          contentTypeKey: source.contentResource.contentTypeKey,
+          pluginKey: source.contentResource.pluginKey,
+          title: assertTitle(resourceCopy.title),
+          metadata: toJson(resourceCopy.metadata)
+        } })
+      : null;
+    const material = source.material
+      ? await transaction.courseMaterial.create({ data: {
+          courseId,
+          parentId: source.material.parentId,
+          title: data.title,
+          kind: source.material.kind,
+          body: source.material.body,
+          url: source.material.url,
+          metadata: source.material.metadata as Prisma.InputJsonValue,
+          position: source.material.position + 1,
+          createdById: user.id
+        } })
+      : null;
+    const contentItem = await transaction.courseContentItem.create({ data: {
+      courseId,
+      groupId: null,
+      parentId: source.parentId,
+      kind: "content",
+      titleSnapshot: data.title,
+      position,
+      isVisible: source.isVisible,
+      contentResourceId: contentResource?.id,
+      materialId: material?.id,
+      metadata: source.metadata as Prisma.InputJsonValue
+    } });
+    return { contentItem, contentResource, material };
+  });
 }
 
 export async function createContentResourceContentItem(user: CurrentUser, courseId: string, input: CreateContentResourceContentItemInput) {

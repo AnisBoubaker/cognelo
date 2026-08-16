@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultDuplicateBankActivityTitle } from "./activity-bank-titles";
+import { defaultDuplicateActivityTitle, defaultDuplicateBankActivityTitle } from "./activity-bank-titles";
 
 describe("defaultDuplicateBankActivityTitle", () => {
   it("adds and increments the copy suffix", () => {
@@ -14,5 +14,6 @@ describe("defaultDuplicateBankActivityTitle", () => {
 
   it("keeps the suggested title within the activity title limit", () => {
     expect(defaultDuplicateBankActivityTitle("A".repeat(160))).toHaveLength(160);
+    expect(defaultDuplicateActivityTitle("A".repeat(180))).toHaveLength(180);
   });
 });

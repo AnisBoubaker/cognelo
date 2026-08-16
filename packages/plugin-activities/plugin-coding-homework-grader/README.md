@@ -122,6 +122,8 @@ Prompt versioning starts with:
 
 Teacher authoring uses the shared responsive `EditActionBar`. Its saved/unsaved status covers the activity and plugin-owned grading configuration, while independently persisted uploads and processing actions retain their local feedback.
 
+Explicit course/bank synchronization replaces assignment, requirement, and authoring-attachment rows through plugin hooks in either direction. Publishing retains shared immutable stored files while replacing bank-owned records; core creates the immutable version and blocks synchronization after any attempt.
+
 ## Contributor Workflow
 
 When changing this plugin, update:

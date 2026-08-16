@@ -103,6 +103,10 @@ export const fileContentServerPlugin: ServerContentTypePlugin = {
     }
   ],
   handlers: {
+    async duplicate(input) {
+      const { embeddingIndex: _embeddingIndex, ...metadata } = input.resource.metadata ?? {};
+      return { title: input.title, metadata };
+    },
     async create(input) {
       const parsed = filePayloadSchema.parse(input.payload);
       return {

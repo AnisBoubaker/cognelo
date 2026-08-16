@@ -59,6 +59,8 @@ When an activity is created from an activity bank, the core service copies the s
 
 Plugins that store private bank-owned data must use `ServerActivityPlugin.hooks.onCourseActivityCreatedFromBankVersion` to copy that data into course-owned plugin tables.
 
+Explicit synchronization uses that same hook to replace course-owned private authoring data during bank retrieval. Plugins whose course copies have private editable authoring data must also implement `ServerActivityPlugin.hooks.onCourseActivityPublishedToBank` to replace bank-owned authoring rows. Core creates the new immutable version, checks bank write access, and blocks synchronization after any attempt; plugins must never publish attempts, submissions, grades, or course-only runtime artifacts.
+
 Core only creates the generic course-local `Activity` row and copies selected `ActivityVersion` fields. It does not know the schema or semantics of plugin-owned tables. If your plugin has bank-owned private rows, the hook is required. The hook should create independent course-owned rows keyed by the new `activity.id`, so future bank edits do not alter existing course activities.
 
 Plugins that store private bank-owned data must also use `ServerActivityPlugin.hooks.onBankActivityDeleted` to remove bank-owned private rows when a bank activity is deleted. This cleanup must leave copied course-owned rows alone, because existing course activities become course-local copies after their bank links are cleared.
