@@ -2,15 +2,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getActivityBank: vi.fn(),
+  deleteActivityBank: vi.fn(),
+  runBankActivityDeletedHooks: vi.fn(),
   readJson: vi.fn(),
   requireUser: vi.fn(),
   updateActivityBank: vi.fn()
 }));
 
 vi.mock("@cognelo/core", () => ({
+  deleteActivityBank: mocks.deleteActivityBank,
   getActivityBank: mocks.getActivityBank,
   updateActivityBank: mocks.updateActivityBank
 }));
+
+vi.mock("@cognelo/activity-sdk/server", () => ({ runBankActivityDeletedHooks: mocks.runBankActivityDeletedHooks }));
 
 vi.mock("@/lib/http", () => ({
   handleRoute: async (handler: () => Promise<Response>) => handler(),
@@ -20,7 +25,7 @@ vi.mock("@/lib/http", () => ({
   requireUser: mocks.requireUser
 }));
 
-const { GET, PATCH } = await import("./route");
+const { DELETE, GET, PATCH } = await import("./route");
 
 describe("activity bank detail route", () => {
   beforeEach(() => {
@@ -29,6 +34,23 @@ describe("activity bank detail route", () => {
     mocks.getActivityBank.mockResolvedValue({ id: "bank-1", title: "Programming" });
     mocks.readJson.mockResolvedValue({ title: "Programming updated" });
     mocks.updateActivityBank.mockResolvedValue({ id: "bank-1", title: "Programming updated" });
+    mocks.deleteActivityBank.mockResolvedValue({ activityCount: 1, deletedActivities: [{ bankActivityId: "activity-1", activityTypeKey: "mcq" }] });
+  });
+
+  it("deletes a bank and runs cleanup hooks for deleted activity contents", async () => {
+    mocks.readJson.mockResolvedValue({ action: "delete", force: true });
+    const response = await DELETE(new Request("http://test.local", { method: "DELETE" }) as never, {
+      params: Promise.resolve({ activityBankId: "bank-1" })
+    });
+
+    await expect(response.json()).resolves.toEqual({ ok: true, activityCount: 1 });
+    expect(mocks.deleteActivityBank).toHaveBeenCalledWith({ id: "teacher-1", roles: ["teacher"] }, "bank-1", { action: "delete", force: true });
+    expect(mocks.runBankActivityDeletedHooks).toHaveBeenCalledWith({
+      user: { id: "teacher-1", roles: ["teacher"] },
+      activityBankId: "bank-1",
+      bankActivityId: "activity-1",
+      activityTypeKey: "mcq"
+    });
   });
 
   it("returns one activity bank", async () => {

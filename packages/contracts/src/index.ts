@@ -261,8 +261,23 @@ export const ActivityBankInputSchema = z.object({
 });
 export type ActivityBankInput = z.infer<typeof ActivityBankInputSchema>;
 
-export const ActivityBankUpdateSchema = ActivityBankInputSchema.omit({ subjectId: true }).partial();
+export const ActivityBankUpdateSchema = ActivityBankInputSchema.partial();
 export type ActivityBankUpdate = z.infer<typeof ActivityBankUpdateSchema>;
+
+export const ActivityBankDeleteSchema = z.object({
+  action: z.enum(["move", "delete"]),
+  targetActivityBankId: RecordIdSchema.optional(),
+  force: z.boolean().optional().default(false)
+}).superRefine((value, context) => {
+  if (value.action === "move" && !value.targetActivityBankId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["targetActivityBankId"],
+      message: "A destination activity bank is required when moving activities."
+    });
+  }
+});
+export type ActivityBankDelete = z.infer<typeof ActivityBankDeleteSchema>;
 
 export const ActivityKnowledgeConceptSelectionSchema = z.object({
   conceptId: RecordIdSchema,

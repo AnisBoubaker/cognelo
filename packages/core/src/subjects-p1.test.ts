@@ -23,6 +23,7 @@ const mockPrisma = vi.hoisted(() => ({
     findUnique: vi.fn()
   },
   bankActivity: {
+    count: vi.fn(),
     findMany: vi.fn(),
     findUnique: vi.fn()
   },
@@ -142,6 +143,24 @@ describe("subject and activity bank services", () => {
         data: expect.objectContaining({ title: "Mine", ownerId: undefined })
       })
     );
+  });
+
+  it("only changes a bank subject when the bank is empty", async () => {
+    mockPrisma.activityBank.findUnique.mockResolvedValue({ id: "bank-1", ownerId: "teacher-1", subjectId: "subject-1" });
+    mockPrisma.bankActivity.count.mockResolvedValue(1);
+
+    await expect(updateActivityBank(teacherUser, "bank-1", { subjectId: "subject-2" })).rejects.toMatchObject({
+      status: 409,
+      code: "ACTIVITY_BANK_SUBJECT_LOCKED"
+    });
+    expect(mockPrisma.activityBank.update).not.toHaveBeenCalled();
+
+    mockPrisma.bankActivity.count.mockResolvedValue(0);
+    mockPrisma.activityBank.update.mockResolvedValue({ id: "bank-1", subjectId: "subject-2" });
+    await updateActivityBank(teacherUser, "bank-1", { subjectId: "subject-2" });
+    expect(mockPrisma.activityBank.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ subjectId: "subject-2" })
+    }));
   });
 
   it("creates bank activities with a first version and merged default config", async () => {

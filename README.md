@@ -139,6 +139,7 @@ GET    /api/activity-banks
 POST   /api/activity-banks
 GET    /api/activity-banks/:activityBankId
 PATCH  /api/activity-banks/:activityBankId
+DELETE /api/activity-banks/:activityBankId
 GET    /api/activity-banks/:activityBankId/activities
 POST   /api/activity-banks/:activityBankId/activities
 PATCH  /api/activity-banks/:activityBankId/activities/:bankActivityId
@@ -280,6 +281,8 @@ Subject
 ```
 
 Activity banks are reusable authoring libraries. A bank activity keeps a mutable current record plus immutable `ActivityVersion` snapshots. Saving in the bank creates a new version for future course use.
+
+The activity-bank list exposes creation plus owner/admin edit and delete actions while preserving row navigation into each bank. Title and description are editable; subject is editable only while the bank is empty. Deleting a populated bank either moves its activities, in order, to another writable bank under the same subject or requires a second confirmation to delete all bank contents. Existing course-local activity copies survive destructive bank deletion with their bank/version traceability links cleared.
 
 Knowledge-concept selection is a mandatory platform capability rather than an activity-plugin option. The host application wraps every activity authoring surface in an Activity/Concepts tab set. The Concepts tab orders prerequisite foundations first, then uses prerequisite count and localized title as deterministic tie-breakers. Its two-column selector shows concepts on the left and the active concept's skills on the right. Teachers can select a whole concept or exact skill lines; whole-concept selection is deliberately distinct from selecting every current skill individually. Links are normalized core data: bank selections are snapshotted onto each `ActivityVersion`, copied when that version becomes a course activity, and then edited independently on the course copy. Teachers may leave the selection empty, but plugins cannot remove the Concepts tab.
 
