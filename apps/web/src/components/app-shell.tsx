@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth-provider";
 import { BrandLogo } from "@/components/brand-logo";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { useI18n } from "@/lib/i18n";
+import { getPrimaryLandingPath } from "@/lib/navigation";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, loading, logout } = useAuth();
@@ -44,7 +45,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const canCreateCourses =
     user.roles.includes("course_manager") || user.roles.includes("teacher") || user.roles.includes("admin");
   const navItems = [
-    { href: "/dashboard", label: t("nav.dashboard") },
     ...(canCreateCourses ? [{ href: "/subjects", label: t("nav.subjects") }] : []),
     ...(canCreateCourses ? [{ href: "/activity-banks", label: t("nav.activityBanks") }] : []),
     { href: "/courses", label: t("nav.courses") },
@@ -54,11 +54,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <BrandLogo href="/dashboard" />
+        <BrandLogo href={getPrimaryLandingPath(user)} />
         <div className="topbar-actions">
           <nav aria-label="Primary" className="nav nav-primary">
             {navItems.map((item) => {
-              const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+              const isActive = pathname === item.href || pathname.startsWith(item.href);
               return (
                 <Link key={item.href} className={isActive ? "is-active" : undefined} href={item.href}>
                   {item.label}

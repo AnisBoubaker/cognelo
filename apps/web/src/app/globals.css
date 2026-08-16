@@ -76,6 +76,8 @@ select {
 
 button,
 .button {
+  appearance: none;
+  -webkit-appearance: none;
   align-items: center;
   background: linear-gradient(135deg, var(--brand-teal), var(--brand-blue));
   border: 1px solid color-mix(in srgb, var(--brand-blue), white 18%);
@@ -3620,6 +3622,22 @@ a.card:hover,
 
 .login-mode-toggle button.is-active {
   background: linear-gradient(135deg, var(--brand-blue), var(--brand-violet));
+  color: #fff;
+}
+
+.login-panel .login-submit-button,
+.login-panel .login-submit-button:hover,
+.login-panel .login-submit-button:focus,
+.login-panel .login-submit-button:active {
+  background-color: var(--brand-blue);
+  background-image: linear-gradient(135deg, var(--brand-teal), var(--brand-blue));
+  color: #fff;
+  width: 100%;
+}
+
+.login-panel .login-submit-button:disabled {
+  background-color: var(--brand-blue);
+  background-image: linear-gradient(135deg, var(--brand-teal), var(--brand-blue));
   color: #fff;
 }
 
