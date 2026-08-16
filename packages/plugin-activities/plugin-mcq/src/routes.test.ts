@@ -242,6 +242,54 @@ describe("MCQ generation route", () => {
     );
   });
 
+  it("lists every completed submission for the authenticated student in newest-first order", async () => {
+    mocks.prisma.activityAttempt.findMany.mockResolvedValueOnce([
+      {
+        id: "core-attempt-2",
+        attemptNumber: 2,
+        lifecycle: "graded",
+        submittedAt: new Date("2026-05-22T13:00:00.000Z"),
+        gradedAt: new Date("2026-05-22T13:00:01.000Z"),
+        metadata: { submittedAnswers: { "question-1": ["question-1-choice-2"] } }
+      },
+      {
+        id: "core-attempt-1",
+        attemptNumber: 1,
+        lifecycle: "graded",
+        submittedAt: new Date("2026-05-22T12:00:00.000Z"),
+        gradedAt: new Date("2026-05-22T12:00:01.000Z"),
+        metadata: { submittedAnswers: { "question-1": ["question-1-choice-1"] } }
+      }
+    ]);
+
+    await expect(
+      mcqSubmissionRoute.methods.GET?.({
+        request: new Request("http://test.local"),
+        context: {
+          ...context,
+          user: { ...context.user, id: "student-1", roles: ["student" as const] },
+          groupId: "group-1",
+          activity: {
+            ...context.activity,
+            config: { source: "## Question\n\n- [x] Correct\n- [ ] Wrong" }
+          }
+        },
+        readJson: async () => ({})
+      })
+    ).resolves.toMatchObject({
+      submission: { id: "core-attempt-2", attemptNumber: 2 },
+      attempts: [
+        { submission: { id: "core-attempt-2", attemptNumber: 2, submittedAt: "2026-05-22T13:00:00.000Z" } },
+        { submission: { id: "core-attempt-1", attemptNumber: 1, submittedAt: "2026-05-22T12:00:00.000Z" } }
+      ]
+    });
+
+    expect(mocks.prisma.activityAttempt.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ participantId: "participant-1", pluginKey: "mcq" }),
+      orderBy: [{ attemptNumber: "desc" }]
+    }));
+  });
+
   it("lists MCQ gradebook attempts for teachers", async () => {
     mocks.prisma.activityAttempt.findMany.mockResolvedValueOnce([
       {

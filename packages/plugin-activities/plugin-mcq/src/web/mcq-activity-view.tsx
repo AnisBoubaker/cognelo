@@ -30,6 +30,10 @@ type McqActivityViewProps = {
     getStatus?: (activityId: string) => Promise<{
       submission: { answers: StudentAnswerState; lifecycle?: string } | null;
       grade?: { rawScore: number; rawMaxScore: number; normalizedScore?: number; normalizedMaxScore?: number } | null;
+      attempts?: Array<{
+        submission: { id: string; attemptNumber: number; submittedAt: string | null; answers: StudentAnswerState; lifecycle?: string };
+        grade: { rawScore: number; rawMaxScore: number; normalizedScore?: number; normalizedMaxScore?: number };
+      }>;
       availability: { attemptsRemaining: number | null; canStart: boolean; reason: string | null; gradesReleased?: boolean };
     }>;
     save?: (activityId: string, answers: StudentAnswerState) => Promise<void>;
@@ -116,8 +120,10 @@ const copyByLocale = {
     submitConfirmUnlimited: "This activity allows unlimited submissions.",
     keepWorking: "Keep working",
     confirmSubmit: "Submit answers",
-    latestSubmission: "Latest submission",
-    latestGrade: "Latest grade",
+    latestSubmission: "Submission",
+    latestGrade: "Grade",
+    submissionHistory: "Submission timestamp",
+    attempt: "Attempt",
     submitted: "Submitted.",
     submitError: "Unable to submit answers.",
     reset: "Reset",
@@ -167,8 +173,10 @@ const copyByLocale = {
     submitConfirmUnlimited: "Cette activite autorise un nombre illimite de soumissions.",
     keepWorking: "Continuer",
     confirmSubmit: "Soumettre",
-    latestSubmission: "Derniere soumission",
-    latestGrade: "Derniere note",
+    latestSubmission: "Soumission",
+    latestGrade: "Note",
+    submissionHistory: "Date et heure de soumission",
+    attempt: "Tentative",
     submitted: "Soumis.",
     submitError: "Impossible de soumettre les reponses.",
     reset: "Reinitialiser",
@@ -218,8 +226,10 @@ const copyByLocale = {
     submitConfirmUnlimited: "此活动允许无限次提交。",
     keepWorking: "继续作答",
     confirmSubmit: "提交答案",
-    latestSubmission: "最新提交",
-    latestGrade: "最新成绩",
+    latestSubmission: "提交",
+    latestGrade: "成绩",
+    submissionHistory: "提交时间",
+    attempt: "尝试",
     submitted: "已提交。",
     submitError: "暂时无法提交答案。",
     reset: "重置",
@@ -269,10 +279,14 @@ export function McqActivityView({
   const [showReplaceGenerationDialog, setShowReplaceGenerationDialog] = useState(false);
   const [showSubmitConfirmDialog, setShowSubmitConfirmDialog] = useState(false);
   const [submissionAvailability, setSubmissionAvailability] = useState<{ attemptsRemaining: number | null; canStart: boolean; reason: string | null; gradesReleased?: boolean } | null>(null);
-  const [latestSubmissionReview, setLatestSubmissionReview] = useState<{
+  const [submissionReviews, setSubmissionReviews] = useState<Array<{
+    id: string;
+    attemptNumber: number;
+    submittedAt: string | null;
     answers: StudentAnswerState;
     grade: { rawScore: number; rawMaxScore: number; normalizedScore?: number; normalizedMaxScore?: number } | null;
-  } | null>(null);
+  }>>([]);
+  const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
   const [loadingSubmissionStatus, setLoadingSubmissionStatus] = useState(false);
   const [submissionStatusReady, setSubmissionStatusReady] = useState(false);
   const [error, setError] = useState("");
@@ -295,7 +309,8 @@ export function McqActivityView({
     setShowReplaceGenerationDialog(false);
     setShowSubmitConfirmDialog(false);
     setSubmissionAvailability(null);
-    setLatestSubmissionReview(null);
+    setSubmissionReviews([]);
+    setSelectedSubmissionId(null);
     setLoadingSubmissionStatus(false);
     setSubmissionStatusReady(false);
     setAiInstructions(String(activity.config?.aiGenerationInstructions ?? fallbackConfig.aiGenerationInstructions));
@@ -357,18 +372,21 @@ export function McqActivityView({
         onPreviousSubmissionsAvailabilityChange?.(isCompletedSubmission);
         setStudentAnswers(attemptState.answers);
         setSubmitted(attemptState.submitted);
-        if (status.submission) {
-          if (isCompletedSubmission) {
-            setLatestSubmissionReview({
-              answers: status.submission.answers,
-              grade: status.grade ?? null
-            });
-          } else {
-            setLatestSubmissionReview(null);
-          }
-        } else {
-          setLatestSubmissionReview(null);
-        }
+        const reviews = status.attempts?.map((attempt) => ({
+          id: attempt.submission.id,
+          attemptNumber: attempt.submission.attemptNumber,
+          submittedAt: attempt.submission.submittedAt,
+          answers: attempt.submission.answers,
+          grade: attempt.grade
+        })) ?? (isCompletedSubmission && status.submission ? [{
+          id: "latest",
+          attemptNumber: 1,
+          submittedAt: null,
+          answers: status.submission.answers,
+          grade: status.grade ?? null
+        }] : []);
+        setSubmissionReviews(reviews);
+        setSelectedSubmissionId((current) => reviews.some((review) => review.id === current) ? current : reviews[0]?.id ?? null);
       })
       .catch((err) => {
         if (!cancelled) {
@@ -394,6 +412,8 @@ export function McqActivityView({
     onPreviousSubmissionsAvailabilityChange,
     submissionClient
   ]);
+
+  const selectedSubmissionReview = submissionReviews.find((review) => review.id === selectedSubmissionId) ?? submissionReviews[0] ?? null;
 
   useEffect(() => {
     if (!isSummativeStudentSession || !submissionClient?.save || !submissionStatusReady || submitted) {
@@ -767,22 +787,34 @@ export function McqActivityView({
 
   return (
     <section className="section stack">
-      {latestSubmissionReview && studentViewMode === "previous" ? (
+      {selectedSubmissionReview && studentViewMode === "previous" ? (
         <section className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 18 }}>
           <div className="row" style={{ justifyContent: "space-between" }}>
             <h2 style={{ margin: 0 }}>{copy.latestSubmission}</h2>
-            {latestSubmissionReview.grade ? (
+            {selectedSubmissionReview.grade ? (
               <span className="participant-status is-graded">
                 {copy.latestGrade}:{" "}
-                {formatPoints(formatDisplayGradeScore(latestSubmissionReview.grade, releasedMaxScore))} /{" "}
-                {formatPoints(releasedMaxScore ?? latestSubmissionReview.grade.normalizedMaxScore ?? latestSubmissionReview.grade.rawMaxScore)}
+                {formatPoints(formatDisplayGradeScore(selectedSubmissionReview.grade, releasedMaxScore))} /{" "}
+                {formatPoints(releasedMaxScore ?? selectedSubmissionReview.grade.normalizedMaxScore ?? selectedSubmissionReview.grade.rawMaxScore)}
               </span>
             ) : null}
           </div>
+          {submissionReviews.length > 1 ? (
+            <div className="field">
+              <label htmlFor="mcq-submission-history">{copy.submissionHistory}</label>
+              <select id="mcq-submission-history" value={selectedSubmissionReview.id} onChange={(event) => setSelectedSubmissionId(event.target.value)}>
+                {submissionReviews.map((review) => (
+                  <option key={review.id} value={review.id}>
+                    {formatSubmissionTimestamp(review.submittedAt, locale)} · {copy.attempt} {review.attemptNumber}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <McqStudentView
             studentPrompt={description}
             parsedMcq={parsedMcq}
-            studentAnswers={latestSubmissionReview.answers}
+            studentAnswers={selectedSubmissionReview.answers}
             submitted
             showFeedback
             score={null}
@@ -801,7 +833,7 @@ export function McqActivityView({
             correctLabel={copy.correct}
             incorrectLabel={copy.incorrect}
             missedCorrectAnswerLabel={copy.missedCorrectAnswer}
-            releasedMaxScore={releasedMaxScore ?? latestSubmissionReview.grade?.normalizedMaxScore}
+            releasedMaxScore={releasedMaxScore ?? selectedSubmissionReview.grade?.normalizedMaxScore}
             randomizeChoices={false}
           />
         </section>
@@ -1061,14 +1093,14 @@ function McqQuestionCard({
                   : isWrongSelectedChoice
                     ? "rgba(220, 38, 38, 0.06)"
                     : isMissedCorrectChoice
-                      ? "rgba(251, 146, 60, 0.08)"
+                      ? "rgba(34, 197, 94, 0.08)"
                       : undefined,
                 border: isRightSelectedChoice
                   ? "1px solid rgba(22, 163, 74, 0.28)"
                   : isWrongSelectedChoice
                     ? "1px solid rgba(220, 38, 38, 0.24)"
                     : isMissedCorrectChoice
-                      ? "1px solid rgba(251, 146, 60, 0.32)"
+                      ? "1px solid rgba(22, 163, 74, 0.28)"
                       : "1px solid rgba(13, 27, 71, 0.12)",
                 borderRadius: 10,
                 cursor: disabled ? "default" : "pointer",
@@ -1275,6 +1307,13 @@ function formatSubmissionAvailability(
     remaining,
     after: Math.max(0, remaining - 1)
   });
+}
+
+function formatSubmissionTimestamp(value: string | null, locale: "en" | "fr" | "zh" | "ar") {
+  if (!value) {
+    return "—";
+  }
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 function formatCopy(message: string, vars: Record<string, string | number>) {
