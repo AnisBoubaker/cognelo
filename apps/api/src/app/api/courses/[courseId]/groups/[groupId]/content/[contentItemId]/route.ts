@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { deleteContentItem, updateContentItem } from "@cognelo/core";
+import { deleteContentItem, updateGroupContentItem } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; groupId: string; contentItemId: string }> };
@@ -12,7 +12,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, groupId, contentItemId } = await params;
-    return json({ contentItem: await updateContentItem(user, courseId, contentItemId, await readJson(request), { groupId }) });
+    return json({ contentItem: await updateGroupContentItem(user, courseId, groupId, contentItemId, await readJson(request)) });
   });
 }
 

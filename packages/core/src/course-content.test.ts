@@ -27,6 +27,11 @@ const mockPrisma = vi.hoisted(() => ({
   courseGroupActivity: {
     findFirst: vi.fn()
   },
+  courseGroupContentVisibilityOverride: {
+    deleteMany: vi.fn(),
+    findMany: vi.fn(),
+    upsert: vi.fn()
+  },
   courseMaterial: {
     findFirst: vi.fn()
   }
@@ -89,7 +94,8 @@ const {
   searchContentResourceEmbeddingDocuments,
   updatePluginContentResource,
   updateContentResource,
-  updateContentItem
+  updateContentItem,
+  updateGroupContentItem
 } = await import("./course-content");
 
 const teacherUser: CurrentUser = {
@@ -106,6 +112,7 @@ describe("course content services", () => {
     vi.clearAllMocks();
     mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof mockPrisma) => unknown) => handler(mockPrisma));
     mockPrisma.courseContentItem.count.mockResolvedValue(0);
+    mockPrisma.courseGroupContentVisibilityOverride.findMany.mockResolvedValue([]);
     authMocks.canManageCourse.mockResolvedValue(true);
     pluginMocks.assertContentResourcePluginActive.mockResolvedValue(undefined);
     pluginMocks.assertContentTypePluginEnabled.mockResolvedValue(undefined);
@@ -635,6 +642,59 @@ describe("course content services", () => {
         OR: [{ groupId: null }, { groupId: "group-1" }]
       },
       orderBy: [{ parentId: "asc" }, { position: "asc" }, { createdAt: "asc" }]
+    });
+  });
+
+  it("applies a group visibility override without changing the shared folder", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1" });
+    mockPrisma.courseContentItem.findMany.mockResolvedValue([
+      { id: "week-1", parentId: null, isVisible: true, groupId: null, kind: "folder", activityId: null, courseGroupActivityId: null },
+      { id: "activity-1", parentId: "week-1", isVisible: true, groupId: "group-1", kind: "activity", activityId: "activity-1", courseGroupActivityId: "assignment-1" }
+    ]);
+    mockPrisma.courseGroupContentVisibilityOverride.findMany.mockResolvedValue([
+      { groupId: "group-1", contentItemId: "week-1", isVisible: false }
+    ]);
+
+    await expect(listContentItems(teacherUser, "course-1", { groupId: "group-1" })).resolves.toMatchObject([
+      { id: "week-1", isVisible: false, effectiveVisibility: "hidden" },
+      { id: "activity-1", isVisible: true, effectiveVisibility: "hidden_by_parent" }
+    ]);
+  });
+
+  it("stores a group-only visibility override for a shared folder", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1" });
+    mockPrisma.courseContentItem.findFirst.mockResolvedValue({
+      id: "week-1",
+      courseId: "course-1",
+      groupId: null,
+      kind: "folder",
+      isVisible: true
+    });
+
+    await updateGroupContentItem(teacherUser, "course-1", "group-1", "week-1", { isVisible: false });
+
+    expect(mockPrisma.courseGroupContentVisibilityOverride.upsert).toHaveBeenCalledWith({
+      where: { groupId_contentItemId: { groupId: "group-1", contentItemId: "week-1" } },
+      create: { groupId: "group-1", contentItemId: "week-1", isVisible: false },
+      update: { isVisible: false }
+    });
+    expect(mockPrisma.courseContentItem.update).not.toHaveBeenCalled();
+  });
+
+  it("removes a redundant group visibility override when restoring the shared value", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1" });
+    mockPrisma.courseContentItem.findFirst.mockResolvedValue({
+      id: "week-1",
+      courseId: "course-1",
+      groupId: null,
+      kind: "folder",
+      isVisible: true
+    });
+
+    await updateGroupContentItem(teacherUser, "course-1", "group-1", "week-1", { isVisible: true });
+
+    expect(mockPrisma.courseGroupContentVisibilityOverride.deleteMany).toHaveBeenCalledWith({
+      where: { groupId: "group-1", contentItemId: "week-1" }
     });
   });
 

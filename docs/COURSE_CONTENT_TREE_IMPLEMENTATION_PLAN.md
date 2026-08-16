@@ -36,6 +36,8 @@ Week 2 hidden
 
 Folders are generic course content folders. They are not material-only folders.
 
+Folder structure remains course-scoped, while each section may override a shared folder's visibility without mutating the course default or another section's view. Section listings apply those overrides before computing inherited effective visibility for descendants.
+
 The content tree controls:
 
 - nesting

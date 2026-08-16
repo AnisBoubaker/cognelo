@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   listContentItems: vi.fn(),
   readJson: vi.fn(),
   requireUser: vi.fn(),
-  updateContentItem: vi.fn()
+  updateGroupContentItem: vi.fn()
 }));
 
 vi.mock("@cognelo/core", () => ({
@@ -17,7 +17,7 @@ vi.mock("@cognelo/core", () => ({
   createMaterialContentItem: mocks.createMaterialContentItem,
   deleteContentItem: mocks.deleteContentItem,
   listContentItems: mocks.listContentItems,
-  updateContentItem: mocks.updateContentItem
+  updateGroupContentItem: mocks.updateGroupContentItem
 }));
 
 vi.mock("@/lib/http", () => ({
@@ -44,7 +44,7 @@ describe("group content routes", () => {
     mocks.createContentFolder.mockResolvedValue({ id: "folder-1" });
     mocks.createMaterialContentItem.mockResolvedValue({ id: "material-item-1" });
     mocks.createActivityContentItem.mockResolvedValue({ id: "activity-item-1" });
-    mocks.updateContentItem.mockResolvedValue({ id: "item-1", isVisible: false });
+    mocks.updateGroupContentItem.mockResolvedValue({ id: "item-1", isVisible: false });
     mocks.deleteContentItem.mockResolvedValue({ ok: true });
   });
 
@@ -92,12 +92,12 @@ describe("group content routes", () => {
     await itemRoute.PATCH(new Request("http://test.local") as never, itemParams);
     await itemRoute.DELETE(new Request("http://test.local") as never, itemParams);
 
-    expect(mocks.updateContentItem).toHaveBeenCalledWith(
+    expect(mocks.updateGroupContentItem).toHaveBeenCalledWith(
       { id: "teacher-1", roles: ["teacher"] },
       "course-1",
+      "group-1",
       "item-1",
-      { isVisible: false },
-      { groupId: "group-1" }
+      { isVisible: false }
     );
     expect(mocks.deleteContentItem).toHaveBeenCalledWith(
       { id: "teacher-1", roles: ["teacher"] },

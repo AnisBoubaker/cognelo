@@ -532,6 +532,7 @@ function TestStudentRuntime({
   const isReadOnly = !attemptStarted;
 
   if (!runtime.attempt) {
+    const unavailableMessageKey = testAvailabilityMessageKey(runtime.availability.reason);
     return (
       <section className="section stack">
         <div>
@@ -547,7 +548,12 @@ function TestStudentRuntime({
         <button className="button" disabled={busy || !runtime.availability.canStart} type="button" onClick={() => setShowStartConfirmation(true)}>
           {t("courseDetail.testStart")}
         </button>
-        {!runtime.availability.canStart && runtime.availability.reason ? <p className="error">{runtime.availability.reason}</p> : null}
+        {!runtime.availability.canStart ? (
+          <div className="inline-panel stack stack-tight" role="status">
+            <strong>{t("courseDetail.testUnavailableTitle")}</strong>
+            <p className="muted">{t(unavailableMessageKey)}</p>
+          </div>
+        ) : null}
         <ConfirmationDialog
           open={showStartConfirmation}
           eyebrow={t("courseDetail.testStart")}
@@ -655,6 +661,19 @@ function TestStudentRuntime({
       />
     </div>
   );
+}
+
+function testAvailabilityMessageKey(reason: string | null) {
+  switch (reason) {
+    case "GRADES_RELEASED":
+      return "courseDetail.testUnavailableGradesReleased";
+    case "ATTEMPT_DUE_DATE_PASSED":
+      return "courseDetail.testUnavailableDueDatePassed";
+    case "ATTEMPT_LIMIT_REACHED":
+      return "courseDetail.testUnavailableAttemptLimitReached";
+    default:
+      return "courseDetail.testUnavailableGeneric";
+  }
 }
 
 function formatRemainingTime(totalSeconds: number) {

@@ -793,7 +793,7 @@ export default function CourseGroupPage() {
   async function toggleContentVisibility(item: CourseContentItem) {
     setContentActionError("");
     try {
-      await updateContentInScope(item, { isVisible: !item.isVisible });
+      await api.updateGroupContentItem(courseId, groupId, item.id, { isVisible: !item.isVisible });
       await refresh();
     } catch (err) {
       setContentActionError(err instanceof Error ? err.message : t("courseDetail.contentUpdateError"));

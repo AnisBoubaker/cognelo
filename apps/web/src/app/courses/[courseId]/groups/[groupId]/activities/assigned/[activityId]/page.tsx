@@ -215,7 +215,11 @@ export default function GroupActivityPage() {
           </div>
         ) : null}
 
-        {!isActivityUnavailable && ((selectedTab === "attempt" && canStartNewAttempt !== false) || selectedTab === "previous") ? (
+        {!isActivityUnavailable && (
+          (selectedTab === "attempt" && (
+            canStartNewAttempt !== false || activity?.activityType.key === "test"
+          )) || selectedTab === "previous"
+        ) ? (
           activity && ActivityRenderer ? (
             <ActivityRenderer
               activity={activity}

@@ -10,6 +10,10 @@ const placementMigration = readFileSync(
   new URL("./migrations/202608090001_inherit_course_wide_activity_placement/migration.sql", import.meta.url),
   "utf8"
 );
+const groupVisibilityMigration = readFileSync(
+  new URL("./migrations/202608160001_group_content_visibility_overrides/migration.sql", import.meta.url),
+  "utf8"
+);
 
 describe("course content tree schema foundation", () => {
   it("declares the shared course content item model and kind enum", () => {
@@ -49,5 +53,13 @@ describe("course content tree schema foundation", () => {
     expect(placementMigration).toContain("metadata\"->>'assignmentScope' = 'course_all_groups'");
     expect(placementMigration).toContain('"parentId" = "courseItem"."parentId"');
     expect(placementMigration).toContain('"position" = "courseItem"."position"');
+  });
+
+  it("stores section-specific visibility overrides for shared content folders", () => {
+    expect(schema).toContain("model CourseGroupContentVisibilityOverride");
+    expect(schema).toContain("@@id([groupId, contentItemId])");
+    expect(groupVisibilityMigration).toContain('CREATE TABLE "CourseGroupContentVisibilityOverride"');
+    expect(groupVisibilityMigration).toContain('CourseGroupContentVisibilityOverride_groupId_fkey');
+    expect(groupVisibilityMigration).toContain('CourseGroupContentVisibilityOverride_contentItemId_fkey');
   });
 });
