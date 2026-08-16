@@ -143,6 +143,7 @@ PATCH  /api/activity-banks/:activityBankId
 DELETE /api/activity-banks/:activityBankId
 GET    /api/activity-banks/:activityBankId/activities
 POST   /api/activity-banks/:activityBankId/activities
+GET    /api/activity-banks/:activityBankId/activities/:bankActivityId/versions/diff
 PATCH  /api/activity-banks/:activityBankId/activities/:bankActivityId
 DELETE /api/activity-banks/:activityBankId/activities/:bankActivityId
 POST   /api/activity-banks/:activityBankId/activities/:bankActivityId/duplicate
@@ -291,6 +292,8 @@ Activity banks are reusable authoring libraries. A bank activity keeps a mutable
 The activity-bank list exposes creation plus owner/admin edit and delete actions while preserving row navigation into each bank. Title and description are editable; subject is editable only while the bank is empty. Deleting a populated bank either moves its activities, in order, to another writable bank under the same subject or requires a second confirmation to delete all bank contents. Existing course-local activity copies survive destructive bank deletion with their bank/version traceability links cleared.
 
 Bank activity row actions can duplicate an activity as a new independent version-1 record, including plugin-owned private authoring data, or move the existing activity and its complete history to another writable bank under the same subject. The duplicate dialog defaults the editable title to the source title plus ` (copy)` and increments an existing terminal suffix as ` (copy #2)`, ` (copy #3)`, and so on. Both actions append the resulting activity at the end of its bank.
+
+Each bank activity row with at least two versions exposes **Compare versions** in its actions menu, opening a shared diff visualizer without crowding the activity editor. Core provides semantic comparisons for title, description, lifecycle, activity type, and concept/skill selections, plus recursive structured diffs for generic activity config and metadata. Multiline changes preserve line breaks, show only nearby contextual hunks, highlight exact changed characters, and expand Markdown `##` question changes to the containing question. Unchanged fields are omitted. Plugin-private authoring rows are not included because they are not currently snapshotted per `ActivityVersion`.
 
 Course content activity actions can similarly duplicate an activity with an editable, sequence-aware copy title. The copy is an unassigned draft placed in the same content folder with the same local visibility, retains the source `bankActivityId` and `activityVersionId` traceability when present, copies knowledge selections and plugin-owned private course authoring data, and deliberately omits the source all-groups assignment policy. Compound Tests use their dedicated deep-copy service so their child activities are duplicated too.
 

@@ -453,6 +453,12 @@ export const enMessages = {
       statusLabel: "Publication status",
       statusSaved: "Publication status updated.",
       statusSaveError: "Unable to update publication status.",
+      compareVersions: "Compare versions", compareVersionsTitle: "Compare activity versions", versionHistory: "Version history",
+      versionDiffFrom: "Earlier version", versionDiffTo: "Later version", versionDiffChooseDifferent: "Choose two different versions.", versionDiffError: "Unable to compare these versions.",
+      versionDiffBefore: "Earlier version", versionDiffAfter: "Later version", versionDiffSummary: "{count} change(s)", versionDiffNoChanges: "These versions contain the same authored content.",
+      versionDiffSectionActivity: "Activity", versionDiffSectionConfig: "Activity configuration", versionDiffSectionMetadata: "Authoring metadata",
+      versionDiffFieldTitle: "Title", versionDiffFieldDescription: "Description", versionDiffFieldLifecycle: "Lifecycle", versionDiffFieldType: "Activity type", versionDiffFieldConcepts: "Concepts and skills",
+      versionDiffAdded: "Added", versionDiffRemoved: "Removed", versionDiffChanged: "Changed",
       versionNote: "Changes saved here update the activity bank activity and create a new activity version for future course assignments."
     },
     activityConcepts: {

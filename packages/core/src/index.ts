@@ -1,5 +1,6 @@
 export * from "./activities";
 export * from "./activity-knowledge-generation";
+export * from "./activity-version-diff";
 export * from "./ai-agents";
 export * from "./auth";
 export * from "./authorization";

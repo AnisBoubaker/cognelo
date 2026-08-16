@@ -2872,6 +2872,164 @@ a.card:hover,
   width: 100%;
 }
 
+.version-comparison-controls {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.activity-version-diff-dialog {
+  width: min(1100px, calc(100vw - 2rem));
+  max-width: 1100px;
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+}
+
+.activity-version-diff-section {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+.activity-version-diff-section h3,
+.activity-version-diff-field h4 {
+  margin: 0;
+}
+
+.activity-version-diff-field + .activity-version-diff-field {
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+
+.activity-version-diff-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.activity-version-diff-side {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.activity-version-diff-side > strong {
+  display: block;
+  padding: 0.45rem 0.7rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.activity-version-diff-side > div {
+  padding: 0.7rem;
+}
+
+.activity-version-diff-side.is-before {
+  background: color-mix(in srgb, #b91c1c 6%, var(--surface));
+}
+
+.activity-version-diff-side.is-after {
+  background: color-mix(in srgb, #15803d 7%, var(--surface));
+}
+
+.activity-version-diff-side pre,
+.activity-version-diff-side ul {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.activity-version-diff-structured {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.activity-version-diff-change {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.activity-version-diff-path {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.activity-version-diff-path code {
+  overflow-wrap: anywhere;
+}
+
+.activity-version-text-diff {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.activity-version-text-hunk + .activity-version-text-hunk {
+  border-top: 1px solid var(--line);
+}
+
+.activity-version-text-line {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  min-height: 1.8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.activity-version-text-line.is-removed {
+  background: color-mix(in srgb, #dc2626 10%, var(--surface));
+}
+
+.activity-version-text-line.is-added {
+  background: color-mix(in srgb, #16a34a 11%, var(--surface));
+}
+
+.activity-version-text-marker {
+  display: grid;
+  place-items: start center;
+  padding-top: 0.25rem;
+  color: var(--muted);
+  user-select: none;
+}
+
+.activity-version-text-line code {
+  display: block;
+  padding: 0.25rem 0.6rem;
+  border-left: 1px solid var(--line);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.activity-version-text-line mark {
+  color: inherit;
+  background: color-mix(in srgb, #facc15 58%, transparent);
+  border-radius: 2px;
+}
+
+.activity-version-text-line.is-removed mark {
+  background: color-mix(in srgb, #ef4444 34%, #fde68a);
+}
+
+.activity-version-text-line.is-added mark {
+  background: color-mix(in srgb, #22c55e 35%, #fef08a);
+}
+
+.activity-version-text-gap {
+  padding: 0.2rem 0.75rem;
+  border-top: 1px dashed var(--line);
+  border-bottom: 1px dashed var(--line);
+  color: var(--muted);
+  text-align: center;
+  letter-spacing: 0.2em;
+}
+
+@media (max-width: 720px) {
+  .version-comparison-controls,
+  .activity-version-diff-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
 .icon-button {
   height: 36px;
   min-height: 36px;

@@ -6,7 +6,8 @@ import {
   listActivityCategories,
   type ActivityCategoryId
 } from "@cognelo/activity-sdk/categories";
-import { ConfirmationDialog } from "@cognelo/activity-ui";
+import { ActivityVersionDiffView, ConfirmationDialog } from "@cognelo/activity-ui";
+import type { ActivityVersionDiff } from "@cognelo/contracts";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
@@ -26,6 +27,7 @@ type EditingActivityState = {
 type DeleteActivityState = { activity: BankActivity; courseCount: number | null };
 
 const activityCategories = listActivityCategories();
+type I18nTranslate = ReturnType<typeof useI18n>["t"];
 
 export default function ActivityBankDetailPage() {
   const params = useParams<{ activityBankId: string }>();
@@ -50,6 +52,12 @@ export default function ActivityBankDetailPage() {
   const [deleteActivityState, setDeleteActivityState] = useState<DeleteActivityState | null>(null);
   const [showActivityPicker, setShowActivityPicker] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<ActivityCategoryId>("generic");
+  const [comparingActivity, setComparingActivity] = useState<BankActivity | null>(null);
+  const [fromVersionId, setFromVersionId] = useState("");
+  const [toVersionId, setToVersionId] = useState("");
+  const [versionDiff, setVersionDiff] = useState<ActivityVersionDiff | null>(null);
+  const [versionDiffLoading, setVersionDiffLoading] = useState(false);
+  const [versionDiffError, setVersionDiffError] = useState("");
 
   async function loadPage() {
     const [bankResult, typesResult, banksResult] = await Promise.all([api.activityBank(activityBankId), api.activityTypes(), api.activityBanks()]);
@@ -223,6 +231,30 @@ export default function ActivityBankDetailPage() {
     }
   }
 
+  function openVersionComparison(activity: BankActivity) {
+    const versions = activity.versions ?? [];
+    setActivityActionMenuId(null);
+    setComparingActivity(activity);
+    setFromVersionId(versions[1]?.id ?? "");
+    setToVersionId(versions[0]?.id ?? "");
+    setVersionDiff(null);
+    setVersionDiffError("");
+  }
+
+  async function compareVersions() {
+    if (!comparingActivity || !fromVersionId || !toVersionId || fromVersionId === toVersionId) return;
+    setVersionDiffLoading(true);
+    setVersionDiffError("");
+    try {
+      const result = await api.compareBankActivityVersions(activityBankId, comparingActivity.id, fromVersionId, toVersionId);
+      setVersionDiff(result.diff);
+    } catch (err) {
+      setVersionDiffError(err instanceof Error ? err.message : t("bankActivityPage.versionDiffError"));
+    } finally {
+      setVersionDiffLoading(false);
+    }
+  }
+
   function activityTypeLabel(activityTypeKey: string) {
     const definition = activityDefinitions.find((candidate) => candidate.key === activityTypeKey);
     const localized = definition?.i18n?.[locale];
@@ -343,6 +375,12 @@ export default function ActivityBankDetailPage() {
                             <MoveIcon />
                             <span>{t("activityBankDetail.moveActivity")}</span>
                           </button>
+                          {(activity.versions?.length ?? 0) >= 2 ? (
+                            <button className="content-context-menu-item" onClick={() => openVersionComparison(activity)} role="menuitem" type="button">
+                              <CompareIcon />
+                              <span>{t("bankActivityPage.compareVersions")}</span>
+                            </button>
+                          ) : null}
                           <button
                             className="content-context-menu-item is-danger"
                             disabled={deletingActivityId === activity.id}
@@ -420,6 +458,29 @@ export default function ActivityBankDetailPage() {
                 </div>
                 <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setMovingActivity(null)}>{t("common.cancel")}</button><button disabled={savingEdit || !moveTargetBankId} type="submit">{savingEdit ? t("common.saving") : t("activityBankDetail.moveActivity")}</button></div>
               </form>
+            </section>
+          </div>
+        ) : null}
+
+        {comparingActivity ? (
+          <div className="dialog-backdrop" role="presentation">
+            <section aria-modal="true" className="dialog-panel activity-version-diff-dialog" role="dialog" aria-labelledby="version-comparison-title">
+              <div className="section-heading">
+                <div><p className="eyebrow">{t("bankActivityPage.versionHistory")}</p><h2 id="version-comparison-title">{comparingActivity.title}</h2></div>
+                <button className="secondary icon-button" type="button" onClick={() => setComparingActivity(null)} title={t("common.close")}><CloseIcon /></button>
+              </div>
+              <div className="grid compact-form-grid version-comparison-controls">
+                <div className="field"><label htmlFor="version-diff-from">{t("bankActivityPage.versionDiffFrom")}</label><select id="version-diff-from" value={fromVersionId} onChange={(event) => { setFromVersionId(event.target.value); setVersionDiff(null); }}>
+                  {comparingActivity.versions?.map((version) => <option key={version.id} value={version.id}>{versionOptionLabel(version.versionNumber, version.createdAt, locale)}</option>)}
+                </select></div>
+                <div className="field"><label htmlFor="version-diff-to">{t("bankActivityPage.versionDiffTo")}</label><select id="version-diff-to" value={toVersionId} onChange={(event) => { setToVersionId(event.target.value); setVersionDiff(null); }}>
+                  {comparingActivity.versions?.map((version) => <option key={version.id} value={version.id}>{versionOptionLabel(version.versionNumber, version.createdAt, locale)}</option>)}
+                </select></div>
+              </div>
+              {fromVersionId === toVersionId ? <p className="error">{t("bankActivityPage.versionDiffChooseDifferent")}</p> : null}
+              <div><button disabled={versionDiffLoading || !fromVersionId || !toVersionId || fromVersionId === toVersionId} type="button" onClick={() => void compareVersions()}>{versionDiffLoading ? t("common.loading") : t("bankActivityPage.compareVersions")}</button></div>
+              {versionDiffError ? <p className="error">{versionDiffError}</p> : null}
+              {versionDiff ? <ActivityVersionDiffView diff={versionDiff} labels={versionDiffLabels(t)} /> : null}
             </section>
           </div>
         ) : null}
@@ -553,6 +614,21 @@ function getCourseCountFromDeleteError(details: unknown) {
   return 0;
 }
 
+function versionOptionLabel(versionNumber: number, createdAt: string, locale: string) {
+  return `v${versionNumber} · ${new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(createdAt))}`;
+}
+
+function versionDiffLabels(t: I18nTranslate) {
+  return {
+    before: t("bankActivityPage.versionDiffBefore"), after: t("bankActivityPage.versionDiffAfter"),
+    summary: t("bankActivityPage.versionDiffSummary"), noChanges: t("bankActivityPage.versionDiffNoChanges"),
+    "section.core": t("bankActivityPage.versionDiffSectionActivity"), "section.config": t("bankActivityPage.versionDiffSectionConfig"), "section.metadata": t("bankActivityPage.versionDiffSectionMetadata"),
+    "field.config": t("bankActivityPage.versionDiffSectionConfig"), "field.metadata": t("bankActivityPage.versionDiffSectionMetadata"),
+    "field.title": t("bankActivityPage.versionDiffFieldTitle"), "field.description": t("bankActivityPage.versionDiffFieldDescription"), "field.lifecycle": t("bankActivityPage.versionDiffFieldLifecycle"), "field.activityType": t("bankActivityPage.versionDiffFieldType"), "field.knowledgeConcepts": t("bankActivityPage.versionDiffFieldConcepts"),
+    "change.added": t("bankActivityPage.versionDiffAdded"), "change.removed": t("bankActivityPage.versionDiffRemoved"), "change.changed": t("bankActivityPage.versionDiffChanged")
+  };
+}
+
 function EditIcon() {
   return (
     <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
@@ -585,6 +661,10 @@ function DuplicateIcon() {
 
 function MoveIcon() {
   return <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18"><path d="M5 12h13M14 8l4 4-4 4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /><path d="M5 6v12" stroke="currentColor" strokeLinecap="round" strokeWidth="2" /></svg>;
+}
+
+function CompareIcon() {
+  return <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18"><path d="M8 5h11M8 12h8M8 19h11M5 3v4M3 5h4M5 10v4M3 12h4M5 17v4M3 19h4" stroke="currentColor" strokeLinecap="round" strokeWidth="2" /></svg>;
 }
 
 function CloseIcon() {

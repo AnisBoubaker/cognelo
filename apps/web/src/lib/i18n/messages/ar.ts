@@ -326,6 +326,12 @@ export const arMessages = {
       statusLabel: "حالة النشر",
       statusSaved: "تم تحديث حالة النشر.",
       statusSaveError: "تعذر تحديث حالة النشر.",
+      compareVersions: "مقارنة الإصدارات", compareVersionsTitle: "مقارنة إصدارات النشاط", versionHistory: "سجل الإصدارات",
+      versionDiffFrom: "الإصدار السابق", versionDiffTo: "الإصدار اللاحق", versionDiffChooseDifferent: "اختر إصدارين مختلفين.", versionDiffError: "تعذرت مقارنة هذين الإصدارين.",
+      versionDiffBefore: "الإصدار السابق", versionDiffAfter: "الإصدار اللاحق", versionDiffSummary: "عدد التغييرات: {count}", versionDiffNoChanges: "يحتوي الإصداران على المحتوى المؤلف نفسه.",
+      versionDiffSectionActivity: "النشاط", versionDiffSectionConfig: "إعدادات النشاط", versionDiffSectionMetadata: "بيانات التأليف الوصفية",
+      versionDiffFieldTitle: "العنوان", versionDiffFieldDescription: "الوصف", versionDiffFieldLifecycle: "دورة الحياة", versionDiffFieldType: "نوع النشاط", versionDiffFieldConcepts: "المفاهيم والمهارات",
+      versionDiffAdded: "مضاف", versionDiffRemoved: "محذوف", versionDiffChanged: "معدّل",
       versionNote: "تحدّث التغييرات المحفوظة هنا نشاط البنك وتنشئ إصدارا جديدا للتعيينات المستقبلية في المقررات."
     },
     activityConcepts: {

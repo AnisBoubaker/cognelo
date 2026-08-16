@@ -37,6 +37,8 @@ The plugin stores authored content in generic bank/course activity config and ow
 
 Explicit course/bank synchronization also relies entirely on the platform's generic title, description, config, metadata, and concept copying. Core blocks synchronization after any attempt.
 
+Bank version comparison is fully covered by the shared core diff because MCQ authoring lives in generic versioned config.
+
 For summative activities that permit another attempt, the **New attempt** tab starts with an empty editable response even when a completed submission exists. Completed answers remain under **Previous submissions**, where the student can select any of their own submissions by timestamp; an unfinished attempt still resumes its saved answers.
 
 Before the teacher releases the final grade, this repeatable-assessment review shows the student each attempt’s provisional score and MCQ feedback so it can inform the next attempt. Grade release publishes the final grade selected by the gradebook strategy and closes further attempts; single-attempt summative results remain hidden until release.

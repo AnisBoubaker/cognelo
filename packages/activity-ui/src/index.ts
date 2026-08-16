@@ -1,4 +1,5 @@
 export * from "./code-editor";
+export * from "./activity-version-diff-view";
 export * from "./code-language";
 export * from "./code-renderer";
 export * from "./confirmation-dialog";

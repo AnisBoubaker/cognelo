@@ -18,6 +18,7 @@ This file is for coding-exercises-specific memory only.
 - Any future coding-exercise bank-owned private table must be added to the bank-to-course copy hook and the bank-activity delete cleanup hook, then manually verified by publishing a bank activity, adding it to a course, checking the course-owned plugin rows, and deleting the bank activity.
 - Bank activity duplication uses `onBankActivityDuplicated` to copy private bank reference/test rows to the new activity; moves retain the bank activity ID and require no plugin-row migration. Future bank-owned tables must also be added to the duplication hook.
 - Course/bank sync uses `onCourseActivityCreatedFromBankVersion` for bank-to-course replacement and `onCourseActivityPublishedToBank` for course-to-bank replacement of private reference/test rows. Core owns immutable version creation, permissions, and the permanent attempt lock.
+- Core bank-version comparison includes public coding-exercise config only. Private reference/template/test rows are current bank state rather than immutable per-version snapshots and must not be presented as historical diffs.
 - Enabled hidden tests must validate against the private reference solution before they are saved.
 - Graded submissions are handled separately from sample runs through `coding-exercises/submit`.
 - Teacher authoring separates student-facing starter code from a private reference solution; the reference solution must never be stored in public activity config.

@@ -24,7 +24,7 @@ const linkedActivity = {
 };
 
 describe("course activity bank sync", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it("reports divergence when both copies changed", async () => {
     mockPrisma.activity.findFirst.mockResolvedValue({ ...linkedActivity, title: "Local quiz" });

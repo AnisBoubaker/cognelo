@@ -82,6 +82,8 @@ Activity-bank authoring persists the same private reference solution, hidden tem
 
 Explicit course/bank synchronization replaces private authoring data through plugin hooks in either direction. Retrieval refreshes course-owned reference/test rows; publishing refreshes bank-owned rows while core creates the new immutable generic version. Core blocks both operations after any attempt.
 
+Bank-version comparison currently shows public generic configuration but not private reference solutions, hidden templates, or hidden tests, because those bank-owned rows are not snapshotted per immutable activity version.
+
 Duplicating a coding exercise inside an activity bank invokes the platform bank-duplication hook and copies its bank-owned reference solution and hidden tests to the new independent bank activity. Moving a bank activity keeps its ID, so its plugin-owned rows move with it without copying.
 
 ## Authoring UX
