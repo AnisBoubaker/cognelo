@@ -126,6 +126,8 @@ Explicit course/bank synchronization replaces assignment, requirement, and autho
 
 Bank-version comparison currently covers generic activity config and metadata only. Private assignments, requirements, and attachments are excluded because they are not snapshotted by activity version.
 
+Draft saves update mutable generic/private bank authoring without creating a version. Changed Published saves create immutable generic snapshots; private authoring remains unversioned.
+
 ## Contributor Workflow
 
 When changing this plugin, update:

@@ -84,6 +84,8 @@ Explicit course/bank synchronization replaces private authoring data through plu
 
 Bank-version comparison currently shows public generic configuration but not private reference solutions, hidden templates, or hidden tests, because those bank-owned rows are not snapshotted per immutable activity version.
 
+Generic versions are created only for changed Published saves. Draft saves update mutable public and private bank authoring without creating a version; private rows remain outside immutable snapshots.
+
 Duplicating a coding exercise inside an activity bank invokes the platform bank-duplication hook and copies its bank-owned reference solution and hidden tests to the new independent bank activity. Moving a bank activity keeps its ID, so its plugin-owned rows move with it without copying.
 
 ## Authoring UX

@@ -409,6 +409,8 @@ export const zhMessages = {
       typeHeader: "类型",
       statusHeader: "状态",
       versionHeader: "版本",
+      notPublished: "尚未发布",
+      unpublishedChanges: "未发布更改 · 最新 v{version}",
       noActivities: "这个活动库还没有活动。",
       editActivityTitle: "编辑活动",
       editActivityLink: "编辑 {title}",
@@ -459,7 +461,8 @@ export const zhMessages = {
       versionDiffSectionActivity: "活动", versionDiffSectionConfig: "活动配置", versionDiffSectionMetadata: "编写元数据",
       versionDiffFieldTitle: "标题", versionDiffFieldDescription: "描述", versionDiffFieldLifecycle: "生命周期", versionDiffFieldType: "活动类型", versionDiffFieldConcepts: "概念与技能",
       versionDiffAdded: "已添加", versionDiffRemoved: "已删除", versionDiffChanged: "已更改",
-      versionNote: "在这里保存的更改会更新活动库活动，并为之后的课程分配创建新版本。"
+      unpublishedChanges: "草稿更改尚未发布 · 最新发布版本 v{version}。",
+      versionNote: "保存草稿只更新可变活动，不创建版本。以“已发布”状态保存时，仅在编写内容发生变化后创建新版本。"
     },
     activityConcepts: {
       tabsLabel: "活动编辑器", activityTab: "活动", conceptsTab: "概念", title: "知识概念",

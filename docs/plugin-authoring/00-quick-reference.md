@@ -462,6 +462,8 @@ Use `Activity.config` for:
 
 Use `BankActivity.config` / `ActivityVersion.config` for reusable bank authoring state. When a bank activity is assigned to a course, this generic config is copied into the course `Activity.config`.
 
+`BankActivity.config` is the mutable draft. `ActivityVersion.config` is created only at a changed Published save (or first publish). Draft saves and lifecycle-only pause/archive changes create no version, and publishing an unchanged snapshot reuses the latest published version.
+
 Use `Activity.metadata` for:
 
 - research tags

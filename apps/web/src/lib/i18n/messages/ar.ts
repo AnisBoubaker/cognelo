@@ -282,6 +282,8 @@ export const arMessages = {
       typeHeader: "النوع",
       statusHeader: "الحالة",
       versionHeader: "الإصدار",
+      notPublished: "غير منشور",
+      unpublishedChanges: "تغييرات غير منشورة · أحدث إصدار v{version}",
       noActivities: "لا توجد أنشطة في هذا البنك بعد.",
       editActivityTitle: "تعديل النشاط",
       editActivityLink: "تعديل {title}",
@@ -332,7 +334,8 @@ export const arMessages = {
       versionDiffSectionActivity: "النشاط", versionDiffSectionConfig: "إعدادات النشاط", versionDiffSectionMetadata: "بيانات التأليف الوصفية",
       versionDiffFieldTitle: "العنوان", versionDiffFieldDescription: "الوصف", versionDiffFieldLifecycle: "دورة الحياة", versionDiffFieldType: "نوع النشاط", versionDiffFieldConcepts: "المفاهيم والمهارات",
       versionDiffAdded: "مضاف", versionDiffRemoved: "محذوف", versionDiffChanged: "معدّل",
-      versionNote: "تحدّث التغييرات المحفوظة هنا نشاط البنك وتنشئ إصدارا جديدا للتعيينات المستقبلية في المقررات."
+      unpublishedChanges: "تغييرات المسودة غير منشورة · أحدث إصدار منشور v{version}.",
+      versionNote: "يحدّث حفظ المسودة النشاط القابل للتعديل دون إنشاء إصدار. ينشئ الحفظ بحالة منشور إصدارًا جديدًا فقط إذا تغيّر المحتوى المؤلف."
     },
     activityConcepts: {
       tabsLabel: "محرر النشاط", activityTab: "النشاط", conceptsTab: "المفاهيم", title: "مفاهيم المعرفة",

@@ -37,6 +37,7 @@ This file is for web-design-coding-exercises-specific memory only.
 - Bank duplication copies the private reference bundle and tests through `onBankActivityDuplicated`; bank moves preserve the bank activity ID and need no plugin-row migration. Future bank-owned tables must also participate in duplication.
 - Course/bank sync reuses `onCourseActivityCreatedFromBankVersion` for bank-to-course replacement and `onCourseActivityPublishedToBank` for course-to-bank replacement of private bundle/test rows. Core owns versions, permissions, and the attempt lock.
 - Core bank-version comparison must exclude private bundles/tests until they have immutable per-version snapshots; current bank-owned rows cannot accurately represent historical versions.
+- Generic web-design bank versions are publication milestones. Draft saves update mutable public/private authoring; only a changed Published save creates an immutable generic version, and private rows remain unversioned.
 - Student run/submit routes use the Docker-backed `packages/web-design-runner` service through `WEB_DESIGN_RUNNER_URL`; sample tests are used for run and hidden tests are used for submit.
 - Reference validation executes enabled teacher tests against the reference bundle before saving and stores per-test validation summaries for passed or skipped tests.
 

@@ -81,6 +81,7 @@ export default function BankActivityAuthoringPage() {
       title: input.title,
       description: input.description,
       config: input.config,
+      lifecycle: lifecycleDraft,
       activityTypeKey: activity.activityType.key,
       knowledgeConceptSelections: conceptDraftRef.current
     });
@@ -156,7 +157,7 @@ export default function BankActivityAuthoringPage() {
   async function saveConcepts(knowledgeConceptSelections: ActivityKnowledgeConceptSelection[]) {
     if (!activity) return;
     conceptDraftRef.current = knowledgeConceptSelections;
-    const result = await api.updateBankActivity(activityBankId, activity.id, { knowledgeConceptSelections });
+    const result = await api.updateBankActivity(activityBankId, activity.id, { knowledgeConceptSelections, lifecycle: lifecycleDraft });
     setActivity(result.activity);
   }
 
@@ -172,6 +173,7 @@ export default function BankActivityAuthoringPage() {
               {activity ? ` · ${t(`activityLifecycle.${activity.lifecycle}`)}` : ""}
               {activity?.currentVersion ? ` · v${activity.currentVersion.versionNumber}` : ""}
             </p>
+            {activity?.lifecycle === "draft" && activity.currentVersion ? <p className="muted">{t("bankActivityPage.unpublishedChanges", { version: activity.currentVersion.versionNumber })}</p> : null}
           </div>
           <div className="hero-actions">
             <Link className="button secondary" href={`/activity-banks/${activityBankId}`}>

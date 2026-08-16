@@ -12,3 +12,4 @@ This file is for placeholder-plugin memory only.
 - It currently needs no real plugin-owned persistence or bank-to-course copy hook because generic bank/course activity config is enough.
 - It also needs no explicit synchronization hook: core copies its generic authoring state and enforces the attempt lock and bank permissions.
 - It needs no bank-version diff extension; the shared core visualizer covers its generic version snapshots.
+- Its bank drafts follow core publication versioning: only a changed Published save creates an immutable version.

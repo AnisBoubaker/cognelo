@@ -604,7 +604,7 @@ export async function getActivityBank(user: CurrentUser, activityBankId: string)
           activityType: true,
           currentVersion: true,
           knowledgeConcepts: { include: { concept: true } },
-          versions: { orderBy: { versionNumber: "desc" } }
+          versions: { where: { lifecycle: "published" }, orderBy: { versionNumber: "desc" } }
         },
         orderBy: [{ position: "asc" }, { createdAt: "asc" }]
       }
@@ -749,7 +749,7 @@ export async function listBankActivities(user: CurrentUser, activityBankId: stri
       activityType: true,
       currentVersion: true,
       knowledgeConcepts: { include: { concept: true } },
-      versions: { orderBy: { versionNumber: "desc" } }
+      versions: { where: { lifecycle: "published" }, orderBy: { versionNumber: "desc" } }
     },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }]
   });
@@ -783,29 +783,29 @@ export async function createBankActivity(user: CurrentUser, activityBankId: stri
       }
     });
 
-    const version = await transaction.activityVersion.create({
+    const version = data.lifecycle === "published" ? await transaction.activityVersion.create({
       data: {
         bankActivityId: bankActivity.id,
         versionNumber: 1,
         activityTypeId: activityType.id,
         title: data.title,
         description: data.description,
-        lifecycle: data.lifecycle,
+        lifecycle: "published",
         config: mergedConfig as Prisma.InputJsonValue,
         metadata: data.metadata as Prisma.InputJsonValue,
         createdById: user.id,
         knowledgeConcepts: { create: conceptSelectionCreates(knowledgeConceptSelections) }
       }
-    });
+    }) : null;
 
     return transaction.bankActivity.update({
       where: { id: bankActivity.id },
-      data: { currentVersionId: version.id },
+      data: version ? { currentVersionId: version.id } : {},
       include: {
         activityType: true,
         currentVersion: true,
         knowledgeConcepts: { include: { concept: true } },
-        versions: { orderBy: { versionNumber: "desc" } }
+        versions: { where: { lifecycle: "published" }, orderBy: { versionNumber: "desc" } }
       }
     });
   });
@@ -830,7 +830,6 @@ export async function updateBankActivity(user: CurrentUser, bankActivityId: stri
   const nextVersionNumber = (bankActivity.versions[0]?.versionNumber ?? 0) + 1;
   const nextTitle = data.title ?? bankActivity.title;
   const nextDescription = data.description ?? bankActivity.description;
-  const nextLifecycle = data.lifecycle ?? bankActivity.lifecycle;
   const nextMetadata = data.metadata ?? currentMetadata;
   const requestedKnowledgeConceptSelections = data.knowledgeConceptSelections ?? selectionsFromLegacyIds(data.knowledgeConceptIds);
   const nextKnowledgeConceptSelections = requestedKnowledgeConceptSelections ?? selectionsFromStoredLinks(bankActivity.knowledgeConcepts);
@@ -838,21 +837,58 @@ export async function updateBankActivity(user: CurrentUser, bankActivityId: stri
     await assertValidConceptSelections(nextKnowledgeConceptSelections, bankActivity.bank.subjectId);
   }
 
+  const latestPublishedVersion = await prisma.activityVersion.findFirst({
+    where: { bankActivityId, lifecycle: "published" },
+    orderBy: { versionNumber: "desc" },
+    include: { knowledgeConcepts: true }
+  });
+  const authoredChangedFromDraft = !authoredSnapshotEqual(
+    {
+      activityTypeId: bankActivity.activityType.id,
+      title: bankActivity.title,
+      description: bankActivity.description,
+      config: bankActivity.config,
+      metadata: bankActivity.metadata,
+      knowledgeConcepts: selectionsFromStoredLinks(bankActivity.knowledgeConcepts)
+    },
+    {
+      activityTypeId: activityType.id,
+      title: nextTitle,
+      description: nextDescription,
+      config: mergedConfig,
+      metadata: nextMetadata,
+      knowledgeConcepts: nextKnowledgeConceptSelections
+    }
+  );
+  const nextLifecycle = data.lifecycle === "published"
+    ? "published"
+    : authoredChangedFromDraft
+      ? "draft"
+      : data.lifecycle ?? bankActivity.lifecycle;
+  const shouldCreateVersion = nextLifecycle === "published" && !latestPublishedVersionMatches(latestPublishedVersion, {
+    activityTypeId: activityType.id,
+    title: nextTitle,
+    description: nextDescription,
+    config: mergedConfig,
+    metadata: nextMetadata,
+    knowledgeConcepts: nextKnowledgeConceptSelections
+  });
+
   return prisma.$transaction(async (transaction) => {
-    const version = await transaction.activityVersion.create({
+    const version = shouldCreateVersion ? await transaction.activityVersion.create({
       data: {
         bankActivityId,
         versionNumber: nextVersionNumber,
         activityTypeId: activityType.id,
         title: nextTitle,
         description: nextDescription,
-        lifecycle: nextLifecycle,
+        lifecycle: "published",
         config: mergedConfig as Prisma.InputJsonValue,
         metadata: nextMetadata as Prisma.InputJsonValue,
         createdById: user.id,
         knowledgeConcepts: { create: conceptSelectionCreates(nextKnowledgeConceptSelections) }
       }
-    });
+    }) : null;
 
     return transaction.bankActivity.update({
       where: { id: bankActivityId },
@@ -864,7 +900,7 @@ export async function updateBankActivity(user: CurrentUser, bankActivityId: stri
         config: mergedConfig as Prisma.InputJsonValue,
         metadata: nextMetadata as Prisma.InputJsonValue,
         position: data.position,
-        currentVersionId: version.id,
+        currentVersionId: version?.id ?? latestPublishedVersion?.id,
         knowledgeConcepts: {
           deleteMany: {},
           create: conceptSelectionCreates(nextKnowledgeConceptSelections)
@@ -874,7 +910,7 @@ export async function updateBankActivity(user: CurrentUser, bankActivityId: stri
         activityType: true,
         currentVersion: true,
         knowledgeConcepts: { include: { concept: true } },
-        versions: { orderBy: { versionNumber: "desc" } }
+        versions: { where: { lifecycle: "published" }, orderBy: { versionNumber: "desc" } }
       }
     });
   });
@@ -942,7 +978,7 @@ export async function duplicateBankActivity(user: CurrentUser, activityBankId: s
         activityTypeId: source.activityTypeId,
         title: data.title,
         description: source.description,
-        lifecycle: source.lifecycle,
+        lifecycle: "draft",
         config: source.config as Prisma.InputJsonValue,
         metadata: source.metadata as Prisma.InputJsonValue,
         position: (lastActivity?.position ?? -1) + 1,
@@ -957,33 +993,50 @@ export async function duplicateBankActivity(user: CurrentUser, activityBankId: s
         }
       }
     });
-    const version = await transaction.activityVersion.create({
-      data: {
-        bankActivityId: duplicate.id,
-        versionNumber: 1,
-        activityTypeId: source.activityTypeId,
-        title: duplicate.title,
-        description: duplicate.description,
-        lifecycle: duplicate.lifecycle,
-        config: duplicate.config as Prisma.InputJsonValue,
-        metadata: duplicate.metadata as Prisma.InputJsonValue,
-        createdById: user.id,
-        knowledgeConcepts: {
-          create: source.knowledgeConcepts.map((selection) => ({
-            conceptId: selection.conceptId,
-            selectsAllSkills: selection.selectsAllSkills,
-            selectedSkills: selection.selectedSkills as Prisma.InputJsonValue,
-            selectedSkillIds: selection.selectedSkillIds as Prisma.InputJsonValue
-          }))
-        }
-      }
-    });
     return transaction.bankActivity.update({
       where: { id: duplicate.id },
-      data: { currentVersionId: version.id },
-      include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } }, versions: true }
+      data: {},
+      include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } }, versions: { where: { lifecycle: "published" }, orderBy: { versionNumber: "desc" } } }
     });
   });
+}
+
+type AuthoredSnapshot = {
+  activityTypeId: string;
+  title: string;
+  description: string;
+  config: unknown;
+  metadata: unknown;
+  knowledgeConcepts: unknown;
+};
+
+function latestPublishedVersionMatches(version: ({ activityTypeId: string; title: string; description: string; config: unknown; metadata: unknown; knowledgeConcepts: unknown } | null), snapshot: AuthoredSnapshot) {
+  if (!version) return false;
+  return authoredSnapshotEqual({
+    activityTypeId: version.activityTypeId,
+    title: version.title,
+    description: version.description,
+    config: version.config,
+    metadata: version.metadata,
+    knowledgeConcepts: selectionsFromStoredLinks(version.knowledgeConcepts as Parameters<typeof selectionsFromStoredLinks>[0])
+  }, snapshot);
+}
+
+function authoredSnapshotEqual(left: AuthoredSnapshot, right: AuthoredSnapshot) {
+  return stableSnapshotValue(normalizeAuthoredSnapshot(left)) === stableSnapshotValue(normalizeAuthoredSnapshot(right));
+}
+
+function normalizeAuthoredSnapshot(snapshot: AuthoredSnapshot) {
+  const knowledgeConcepts = Array.isArray(snapshot.knowledgeConcepts)
+    ? [...snapshot.knowledgeConcepts].sort((left, right) => stableSnapshotValue(left).localeCompare(stableSnapshotValue(right)))
+    : snapshot.knowledgeConcepts;
+  return { ...snapshot, knowledgeConcepts };
+}
+
+function stableSnapshotValue(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableSnapshotValue).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right)).map(([key, nested]) => `${JSON.stringify(key)}:${stableSnapshotValue(nested)}`).join(",")}}`;
+  return JSON.stringify(value);
 }
 
 export async function moveBankActivity(user: CurrentUser, activityBankId: string, bankActivityId: string, input: unknown) {
@@ -1008,7 +1061,7 @@ export async function moveBankActivity(user: CurrentUser, activityBankId: string
   return prisma.bankActivity.update({
     where: { id: bankActivityId },
     data: { bankId: destination.id, position: (lastActivity?.position ?? -1) + 1 },
-    include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } }, versions: true }
+    include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } }, versions: { where: { lifecycle: "published" }, orderBy: { versionNumber: "desc" } } }
   });
 }
 

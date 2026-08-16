@@ -24,6 +24,8 @@ Its linked course copies therefore use the platform's generic bank synchronizati
 
 Its immutable bank versions are also compared entirely by the shared core diff visualizer.
 
+Draft saves create no version; a changed save explicitly marked Published creates the next immutable snapshot.
+
 It also declares two dummy plugin-owned tables, `PluginPlaceholderDummyRecord` and `PluginPlaceholderDummyAudit`, so the platform plugin activation/deactivation backup and restore flow can be tested with a low-risk plugin. Those tables live in this plugin's local Prisma schema and migration manifest.
 
 If this placeholder ever grows custom authoring or settings UI, that form should register with `useUnsavedChangesGuard` from `@cognelo/activity-ui`.

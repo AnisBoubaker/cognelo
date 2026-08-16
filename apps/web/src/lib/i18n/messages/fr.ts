@@ -409,6 +409,8 @@ export const frMessages = {
       typeHeader: "Type",
       statusHeader: "Statut",
       versionHeader: "Version",
+      notPublished: "Non publiée",
+      unpublishedChanges: "Modifications non publiées · dernière v{version}",
       noActivities: "Aucune activité dans cette banque pour le moment.",
       editActivityTitle: "Modifier l'activité",
       editActivityLink: "Modifier {title}",
@@ -459,7 +461,8 @@ export const frMessages = {
       versionDiffSectionActivity: "Activité", versionDiffSectionConfig: "Configuration de l'activité", versionDiffSectionMetadata: "Métadonnées de rédaction",
       versionDiffFieldTitle: "Titre", versionDiffFieldDescription: "Description", versionDiffFieldLifecycle: "Cycle de vie", versionDiffFieldType: "Type d'activité", versionDiffFieldConcepts: "Concepts et compétences",
       versionDiffAdded: "Ajouté", versionDiffRemoved: "Supprimé", versionDiffChanged: "Modifié",
-      versionNote: "Les changements enregistrés ici mettent à jour l'activité de la banque et créent une nouvelle version pour les prochaines assignations aux cours."
+      unpublishedChanges: "Les modifications du brouillon ne sont pas publiées · dernière version publiée v{version}.",
+      versionNote: "L'enregistrement d'un brouillon met à jour l'activité modifiable sans créer de version. Un enregistrement avec le statut Publié crée une version seulement si le contenu rédigé a changé."
     },
     activityConcepts: {
       tabsLabel: "Éditeur d’activité", activityTab: "Activité", conceptsTab: "Concepts", title: "Concepts de connaissances",
