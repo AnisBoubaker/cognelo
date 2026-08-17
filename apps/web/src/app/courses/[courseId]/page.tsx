@@ -1,6 +1,6 @@
 "use client";
 
-import { MarkdownRenderer } from "@cognelo/activity-ui";
+import { ConfirmationDialog, MarkdownRenderer } from "@cognelo/activity-ui";
 import { resolveLocalizedText, type ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -50,6 +50,13 @@ type ContentContextMenu = {
   y: number;
 };
 type BankSyncAction = "retrieve_original" | "retrieve_latest" | "publish_to_bank";
+type GroupDeleteState = {
+  group: NonNullable<Course["groups"]>[number];
+  participants: NonNullable<Awaited<ReturnType<typeof api.group>>["group"]["participants"]>;
+  step: "options" | "confirm-empty" | "confirm-permanent";
+  mode: "move" | "delete";
+  targetGroupId: string;
+};
 
 const contentDragActivationDistance = 8;
 
@@ -101,6 +108,9 @@ export default function CourseDetailPage() {
   const [assignAllSavingActivityId, setAssignAllSavingActivityId] = useState<string | null>(null);
   const [groupTitle, setGroupTitle] = useState("");
   const [isAddingGroup, setIsAddingGroup] = useState(false);
+  const [groupActionMenuId, setGroupActionMenuId] = useState<string | null>(null);
+  const [groupDeleteState, setGroupDeleteState] = useState<GroupDeleteState | null>(null);
+  const [isDeletingGroup, setIsDeletingGroup] = useState(false);
   const [settingsContentItemId, setSettingsContentItemId] = useState<string | null>(null);
   const [settingsMaterialTitle, setSettingsMaterialTitle] = useState("");
   const [settingsMaterialUrl, setSettingsMaterialUrl] = useState("");
@@ -506,6 +516,44 @@ export default function CourseDetailPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : t("courseDetail.createGroupError"));
     }
+  }
+
+  async function openGroupDelete(group: NonNullable<Course["groups"]>[number]) {
+    setGroupActionMenuId(null);
+    setError("");
+    try {
+      const result = await api.group(courseId, group.id);
+      const participants = result.group.participants ?? [];
+      const hasLearners = participants.some((participant) => participant.role === "student");
+      setGroupDeleteState({ group, participants, step: hasLearners ? "options" : "confirm-empty", mode: "move", targetGroupId: "" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.deleteGroupError"));
+    }
+  }
+
+  async function deleteGroup(input: { action: "move"; targetGroupId: string } | { action: "delete"; confirmParticipantDeletion?: boolean }) {
+    if (!groupDeleteState) return;
+    setIsDeletingGroup(true);
+    setError("");
+    try {
+      await api.deleteGroup(courseId, groupDeleteState.group.id, input);
+      setGroupDeleteState(null);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("courseDetail.deleteGroupError"));
+    } finally {
+      setIsDeletingGroup(false);
+    }
+  }
+
+  function submitGroupDeleteOptions(event: FormEvent) {
+    event.preventDefault();
+    if (!groupDeleteState) return;
+    if (groupDeleteState.mode === "delete") {
+      setGroupDeleteState({ ...groupDeleteState, step: "confirm-permanent" });
+      return;
+    }
+    void deleteGroup({ action: "move", targetGroupId: groupDeleteState.targetGroupId });
   }
 
   async function removeActivity(activity: NonNullable<Course["activities"]>[number]) {
@@ -1793,7 +1841,7 @@ export default function CourseDetailPage() {
                             <span>{t("courseDetail.actionsHeader")}</span>
                           </div>
                           {course.groups.map((group) => (
-                            <div className="table-row table-row-groups" key={group.id}>
+                            <div className={`table-row table-row-groups${groupActionMenuId === group.id ? " has-open-actions" : ""}`} key={group.id}>
                               <div className="table-main">
                                 <strong>
                                   <Link href={`/courses/${course.id}/groups/${group.id}`}>{group.title}</Link>
@@ -1802,14 +1850,15 @@ export default function CourseDetailPage() {
                               <span className="table-meta muted">{formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</span>
                               <span className="table-meta muted">{group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}</span>
                               <div className="table-actions">
-                                <Link
-                                  aria-label={t("courseDetail.openGroup")}
-                                  className="button secondary icon-button"
-                                  href={`/courses/${course.id}/groups/${group.id}`}
-                                  title={t("courseDetail.openGroup")}
-                                >
-                                  <MaterialActionIcon name="open" />
-                                </Link>
+                                <div className="content-header-actions">
+                                  <button aria-expanded={groupActionMenuId === group.id} aria-haspopup="menu" aria-label={t("courseDetail.groupActions", { title: group.title })} className="secondary icon-button" type="button" onClick={() => setGroupActionMenuId((current) => current === group.id ? null : group.id)}><AppIcon name="more" size={20} /></button>
+                                  {groupActionMenuId === group.id ? (
+                                    <div className="content-header-menu content-context-menu" role="menu">
+                                      <Link className="content-context-menu-item" href={`/courses/${course.id}/groups/${group.id}`} role="menuitem"><AppIcon name="open" /><span>{t("common.open")}</span></Link>
+                                      <button className="content-context-menu-item is-danger" disabled={(course.groups?.length ?? 0) <= 1} title={(course.groups?.length ?? 0) <= 1 ? t("courseDetail.deleteLastGroupHelp") : undefined} role="menuitem" type="button" onClick={() => void openGroupDelete(group)}><AppIcon name="remove" /><span>{t("courseDetail.deleteGroupAction")}</span></button>
+                                    </div>
+                                  ) : null}
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -2329,6 +2378,20 @@ export default function CourseDetailPage() {
                 </section>
               </div>
             ) : null}
+            {groupDeleteState?.step === "options" ? (
+              <div className="dialog-backdrop" role="presentation"><section aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="group-delete-options-title">
+                <div><p className="eyebrow">{t("courseDetail.deleteGroupEyebrow")}</p><h2 id="group-delete-options-title">{t("courseDetail.deleteGroupTitle")}</h2></div>
+                <p>{t("courseDetail.deleteGroupParticipantsMessage", { title: groupDeleteState.group.title, count: groupDeleteState.participants.length })}</p>
+                <form className="form" onSubmit={submitGroupDeleteOptions}>
+                  <label className="checkbox-row"><input type="radio" name="group-delete-mode" checked={groupDeleteState.mode === "move"} onChange={() => setGroupDeleteState({ ...groupDeleteState, mode: "move" })} /><span>{t("courseDetail.moveGroupParticipants")}</span></label>
+                  {groupDeleteState.mode === "move" ? <div className="field"><label htmlFor="destination-group">{t("courseDetail.destinationGroup")}</label><select id="destination-group" required value={groupDeleteState.targetGroupId} onChange={(event) => setGroupDeleteState({ ...groupDeleteState, targetGroupId: event.target.value })}><option value="">{t("courseDetail.chooseDestinationGroup")}</option>{course.groups?.filter((group) => group.id !== groupDeleteState.group.id).map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}</select><p className="muted">{t("courseDetail.moveGroupParticipantsHelp")}</p></div> : null}
+                  <label className="checkbox-row"><input type="radio" name="group-delete-mode" checked={groupDeleteState.mode === "delete"} onChange={() => setGroupDeleteState({ ...groupDeleteState, mode: "delete" })} /><span>{t("courseDetail.deleteGroupParticipants")}</span></label>
+                  <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setGroupDeleteState(null)}>{t("common.cancel")}</button><button className={groupDeleteState.mode === "delete" ? "danger" : ""} disabled={isDeletingGroup || (groupDeleteState.mode === "move" && !groupDeleteState.targetGroupId)} type="submit">{isDeletingGroup ? t("common.saving") : t("courseDetail.continueGroupDeletion")}</button></div>
+                </form>
+              </section></div>
+            ) : null}
+            <ConfirmationDialog open={groupDeleteState?.step === "confirm-empty"} eyebrow={t("courseDetail.deleteGroupEyebrow")} title={t("courseDetail.deleteGroupTitle")} message={t("courseDetail.deleteEmptyGroupConfirm", { title: groupDeleteState?.group.title ?? "" })} confirmLabel={t("courseDetail.deleteGroupAction")} cancelLabel={t("common.cancel")} confirmVariant="danger" isConfirming={isDeletingGroup} onCancel={() => setGroupDeleteState(null)} onConfirm={() => void deleteGroup({ action: "delete" })} />
+            <ConfirmationDialog open={groupDeleteState?.step === "confirm-permanent"} eyebrow={t("courseDetail.deleteGroupPermanentEyebrow")} title={t("courseDetail.deleteGroupPermanentTitle")} message={t("courseDetail.deleteGroupPermanentConfirm", { title: groupDeleteState?.group.title ?? "", count: groupDeleteState?.participants.length ?? 0 })} confirmLabel={t("courseDetail.deleteGroupPermanently")} cancelLabel={t("common.cancel")} confirmVariant="danger" isConfirming={isDeletingGroup} onCancel={() => setGroupDeleteState(null)} onConfirm={() => void deleteGroup({ action: "delete", confirmParticipantDeletion: true })} />
             {showActivityPicker ? (
               <ActivityPickerDialog
                 activityTypes={activityTypes}

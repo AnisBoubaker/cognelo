@@ -405,6 +405,7 @@ These are implementation details rather than product-level blockers:
 - Completed: handle course-wide all-groups assignments by creating one gradebook item per materialized `CourseGroupActivity`.
 - Completed: preserve gradebook items when all-groups policy is removed.
 - Completed: group activity assignment removal is handled by the `CourseGroupActivity` relation lifecycle.
+- Completed: guarded group deletion cascades group-scoped gradebook items, attempts, grades, and audit events; participant transfer creates deduplicated destination enrollments before deleting the source group, while permanent learner removal requires explicit confirmation.
 - Deferred until grade editing services exist: block grade editing after course archive.
 
 ### Phase 3: Attempt Service Contract - Completed

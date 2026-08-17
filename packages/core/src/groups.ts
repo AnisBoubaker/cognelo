@@ -3,6 +3,7 @@ import {
   CourseGroupStatus,
   CourseGroupActivityInputSchema,
   CourseGroupActivityUpdateSchema,
+  CourseGroupDeleteInputSchema,
   CourseGroupInputSchema,
   CourseGroupParticipantInputSchema,
   GradebookItemSettingsInputSchema,
@@ -300,11 +301,58 @@ export async function updateCourseGroup(user: CurrentUser, courseId: string, gro
   });
 }
 
-export async function deleteCourseGroup(user: CurrentUser, courseId: string, groupId: string) {
+export async function deleteCourseGroup(user: CurrentUser, courseId: string, groupId: string, input: unknown) {
   await assertCanManageCourse(user, courseId);
-  await assertGroupBelongsToCourse(courseId, groupId);
-  await prisma.courseGroup.delete({ where: { id: groupId } });
-  return { ok: true };
+  const data = CourseGroupDeleteInputSchema.parse(input);
+  return prisma.$transaction(async (tx) => {
+    const groups = await tx.courseGroup.findMany({
+      where: { courseId },
+      select: { id: true },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }]
+    });
+    if (!groups.some((group) => group.id === groupId)) throw notFound("Course group");
+    if (groups.length <= 1) {
+      throw new AppError(400, "COURSE_LAST_GROUP_DELETE_FORBIDDEN", "The last group in a course cannot be deleted.");
+    }
+
+    const participants = await tx.courseGroupParticipant.findMany({ where: { groupId } });
+    const learnerParticipants = participants.filter((participant) => participant.role === "student");
+
+    if (data.action === "move") {
+      if (data.targetGroupId === groupId) {
+        throw new AppError(400, "GROUP_MOVE_TARGET_SAME", "Participants must be moved to a different group.");
+      }
+      const targetExists = groups.some((group) => group.id === data.targetGroupId);
+      if (!targetExists) throw new AppError(400, "GROUP_MOVE_TARGET_INVALID", "The destination group must belong to this course.");
+      const targetParticipants = await tx.courseGroupParticipant.findMany({ where: { groupId: data.targetGroupId } });
+      const targetEmails = new Set(targetParticipants.map((participant) => participant.email.toLowerCase()));
+      const participantsToCreate = participants.filter((participant) => !targetEmails.has(participant.email.toLowerCase()));
+      if (participantsToCreate.length) {
+        await tx.courseGroupParticipant.createMany({
+          data: participantsToCreate.map(({ userId, role, firstName, lastName, email, externalId }) => ({
+            groupId: data.targetGroupId, userId, role, firstName, lastName, email, externalId
+          }))
+        });
+      }
+      await tx.courseGroup.delete({ where: { id: groupId } });
+      return { ok: true as const, movedParticipantCount: participantsToCreate.length, skippedDuplicateCount: participants.length - participantsToCreate.length };
+    }
+
+    if (learnerParticipants.length && !data.confirmParticipantDeletion) {
+      throw new AppError(400, "GROUP_PARTICIPANT_DELETE_CONFIRMATION_REQUIRED", "Permanent participant deletion requires explicit confirmation.");
+    }
+    const studentUserIds = [...new Set(learnerParticipants.map((participant) => participant.userId).filter((id): id is string => Boolean(id)))];
+    await tx.courseGroup.delete({ where: { id: groupId } });
+    for (const userId of studentUserIds) {
+      const otherStudentParticipant = await tx.courseGroupParticipant.findMany({
+        where: { userId, role: "student", group: { courseId } }, select: { id: true }, take: 1
+      });
+      if (!otherStudentParticipant.length) {
+        await tx.courseMembership.deleteMany({ where: { courseId, userId, role: "student" } });
+      }
+    }
+    return { ok: true as const, deletedParticipantCount: participants.length };
+  });
 }
 
 export async function listGroupMaterials(user: CurrentUser, courseId: string, groupId: string) {

@@ -587,6 +587,12 @@ export const CourseGroupParticipantInputSchema = z.object({
 });
 export type CourseGroupParticipantInput = z.infer<typeof CourseGroupParticipantInputSchema>;
 
+export const CourseGroupDeleteInputSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("move"), targetGroupId: RecordIdSchema }),
+  z.object({ action: z.literal("delete"), confirmParticipantDeletion: z.boolean().optional().default(false) })
+]);
+export type CourseGroupDeleteInput = z.infer<typeof CourseGroupDeleteInputSchema>;
+
 export const EnrollmentInputSchema = z.object({
   userId: RecordIdSchema,
   role: CourseMembershipRoleSchema,
