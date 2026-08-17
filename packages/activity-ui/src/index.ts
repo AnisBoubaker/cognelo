@@ -3,6 +3,7 @@ export * from "./activity-version-diff-view";
 export * from "./code-language";
 export * from "./code-renderer";
 export * from "./confirmation-dialog";
+export * from "./context-menu";
 export * from "./edit-action-bar";
 export * from "./markdown-renderer";
 export * from "./knowledge-generation";

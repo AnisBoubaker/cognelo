@@ -1,6 +1,6 @@
 "use client";
 
-import { ConfirmationDialog, MarkdownRenderer } from "@cognelo/activity-ui";
+import { ConfirmationDialog, ContextMenu, MarkdownRenderer } from "@cognelo/activity-ui";
 import { resolveLocalizedText, type ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -46,8 +46,7 @@ type ContentDropPlacement = "after" | "before" | "inside";
 type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
 type ContentContextMenu = {
   itemId: string;
-  x: number;
-  y: number;
+  point?: { x: number; y: number };
 };
 type BankSyncAction = "retrieve_original" | "retrieve_latest" | "publish_to_bank";
 type GroupDeleteState = {
@@ -109,6 +108,7 @@ export default function CourseDetailPage() {
   const [groupTitle, setGroupTitle] = useState("");
   const [isAddingGroup, setIsAddingGroup] = useState(false);
   const [groupActionMenuId, setGroupActionMenuId] = useState<string | null>(null);
+  const [groupActionMenuAnchor, setGroupActionMenuAnchor] = useState<HTMLButtonElement | null>(null);
   const [groupDeleteState, setGroupDeleteState] = useState<GroupDeleteState | null>(null);
   const [isDeletingGroup, setIsDeletingGroup] = useState(false);
   const [settingsContentItemId, setSettingsContentItemId] = useState<string | null>(null);
@@ -124,8 +124,10 @@ export default function CourseDetailPage() {
   const [error, setError] = useState("");
   const [materialActionError, setMaterialActionError] = useState("");
   const [contentContextMenu, setContentContextMenu] = useState<ContentContextMenu | null>(null);
+  const [contentContextMenuAnchor, setContentContextMenuAnchor] = useState<HTMLButtonElement | null>(null);
   const [pickerFolderMenuOpen, setPickerFolderMenuOpen] = useState(false);
   const [contentHeaderMenuOpen, setContentHeaderMenuOpen] = useState(false);
+  const [contentHeaderMenuAnchor, setContentHeaderMenuAnchor] = useState<HTMLButtonElement | null>(null);
   const [duplicatingCourseActivity, setDuplicatingCourseActivity] = useState<
     { kind: "activity"; activityId: string; contentItemId: string; isTest: boolean } | { kind: "content"; contentItemId: string } | null
   >(null);
@@ -299,31 +301,6 @@ export default function CourseDetailPage() {
   }, [showActivityPicker]);
 
   useEffect(() => {
-    if (!contentContextMenu) {
-      return;
-    }
-
-    function closeMenu() {
-      setContentContextMenu(null);
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setContentContextMenu(null);
-      }
-    }
-
-    window.addEventListener("click", closeMenu);
-    window.addEventListener("scroll", closeMenu, true);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("click", closeMenu);
-      window.removeEventListener("scroll", closeMenu, true);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [contentContextMenu]);
-
-  useEffect(() => {
     if (!pickerFolderMenuOpen) {
       return;
     }
@@ -345,30 +322,6 @@ export default function CourseDetailPage() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [pickerFolderMenuOpen]);
-
-  useEffect(() => {
-    if (!contentHeaderMenuOpen) {
-      return;
-    }
-
-    function closeMenu() {
-      setContentHeaderMenuOpen(false);
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setContentHeaderMenuOpen(false);
-      }
-    }
-
-    window.addEventListener("click", closeMenu);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("click", closeMenu);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [contentHeaderMenuOpen]);
-
 
   async function createLocalActivity(selectedActivityTypeKey: string) {
     setError("");
@@ -520,6 +473,7 @@ export default function CourseDetailPage() {
 
   async function openGroupDelete(group: NonNullable<Course["groups"]>[number]) {
     setGroupActionMenuId(null);
+    setGroupActionMenuAnchor(null);
     setError("");
     try {
       const result = await api.group(courseId, group.id);
@@ -885,10 +839,10 @@ export default function CourseDetailPage() {
   function openContentContextMenu(item: CourseContentItem, event: ReactMouseEvent<HTMLElement>) {
     event.preventDefault();
     event.stopPropagation();
+    setContentContextMenuAnchor(null);
     setContentContextMenu({
       itemId: item.id,
-      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 240)),
-      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 280))
+      point: { x: event.clientX, y: event.clientY }
     });
   }
 
@@ -897,14 +851,11 @@ export default function CourseDetailPage() {
     event.stopPropagation();
     if (contentContextMenu?.itemId === item.id) {
       setContentContextMenu(null);
+      setContentContextMenuAnchor(null);
       return;
     }
-    const rect = event.currentTarget.getBoundingClientRect();
-    setContentContextMenu({
-      itemId: item.id,
-      x: Math.max(8, Math.min(rect.right - 220, window.innerWidth - 240)),
-      y: Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - 280))
-    });
+    setContentContextMenuAnchor(event.currentTarget);
+    setContentContextMenu({ itemId: item.id });
   }
 
   function startEditingFolder(item: CourseContentItem, selectAll: boolean) {
@@ -1438,13 +1389,21 @@ export default function CourseDetailPage() {
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
+                              setContentHeaderMenuAnchor(event.currentTarget);
                               setContentHeaderMenuOpen((current) => !current);
                             }}
                           >
                             <MaterialActionIcon name="more" />
                           </button>
-                          {contentHeaderMenuOpen ? (
-                            <div className="content-header-menu content-context-menu" role="menu" onClick={(event) => event.stopPropagation()}>
+                          <ContextMenu
+                            anchor={contentHeaderMenuAnchor}
+                            className="content-header-menu content-context-menu"
+                            open={contentHeaderMenuOpen}
+                            onClose={() => {
+                              setContentHeaderMenuOpen(false);
+                              setContentHeaderMenuAnchor(null);
+                            }}
+                          >
                               <button
                                 className="content-context-menu-item"
                                 disabled={isAddingActivity}
@@ -1487,8 +1446,7 @@ export default function CourseDetailPage() {
                                 <MaterialActionIcon name="up" />
                                 <span>{t("courseDetail.collapseAllFolders")}</span>
                               </button>
-                            </div>
-                          ) : null}
+                          </ContextMenu>
                         </div>
                       </div>
 
@@ -1638,13 +1596,15 @@ export default function CourseDetailPage() {
                                     <MaterialActionIcon name="more" />
                                   </button>
                                 </div>
-                                {contentContextMenu?.itemId === item.id ? (
-                                  <div
+                                <ContextMenu
+                                    anchor={contentContextMenu?.itemId === item.id ? contentContextMenuAnchor : null}
                                     className="content-context-menu"
-                                    role="menu"
-                                    style={{ left: contentContextMenu.x, top: contentContextMenu.y } as CSSProperties}
-                                    onClick={(event) => event.stopPropagation()}
-                                    onContextMenu={(event) => event.preventDefault()}
+                                    open={contentContextMenu?.itemId === item.id}
+                                    point={contentContextMenu?.itemId === item.id ? contentContextMenu.point : null}
+                                    onClose={() => {
+                                      setContentContextMenu(null);
+                                      setContentContextMenuAnchor(null);
+                                    }}
                                   >
                                     {href ? (
                                       material ? (
@@ -1777,8 +1737,7 @@ export default function CourseDetailPage() {
                                       <MaterialActionIcon name="remove" />
                                       <span>{t("common.remove")}</span>
                                     </button>
-                                  </div>
-                                ) : null}
+                                </ContextMenu>
                               </div>
                             );
                           })}
@@ -1841,7 +1800,7 @@ export default function CourseDetailPage() {
                             <span>{t("courseDetail.actionsHeader")}</span>
                           </div>
                           {course.groups.map((group) => (
-                            <div className={`table-row table-row-groups${groupActionMenuId === group.id ? " has-open-actions" : ""}`} key={group.id}>
+                            <div className="table-row table-row-groups" key={group.id}>
                               <div className="table-main">
                                 <strong>
                                   <Link href={`/courses/${course.id}/groups/${group.id}`}>{group.title}</Link>
@@ -1851,13 +1810,11 @@ export default function CourseDetailPage() {
                               <span className="table-meta muted">{group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}</span>
                               <div className="table-actions">
                                 <div className="content-header-actions">
-                                  <button aria-expanded={groupActionMenuId === group.id} aria-haspopup="menu" aria-label={t("courseDetail.groupActions", { title: group.title })} className="secondary icon-button" type="button" onClick={() => setGroupActionMenuId((current) => current === group.id ? null : group.id)}><AppIcon name="more" size={20} /></button>
-                                  {groupActionMenuId === group.id ? (
-                                    <div className="content-header-menu content-context-menu" role="menu">
+                                  <button aria-expanded={groupActionMenuId === group.id} aria-haspopup="menu" aria-label={t("courseDetail.groupActions", { title: group.title })} className="secondary icon-button" type="button" onClick={(event) => { const opening = groupActionMenuId !== group.id; setGroupActionMenuId(opening ? group.id : null); setGroupActionMenuAnchor(opening ? event.currentTarget : null); }}><AppIcon name="more" size={20} /></button>
+                                  <ContextMenu anchor={groupActionMenuAnchor} className="content-context-menu" open={groupActionMenuId === group.id} onClose={() => { setGroupActionMenuId(null); setGroupActionMenuAnchor(null); }}>
                                       <Link className="content-context-menu-item" href={`/courses/${course.id}/groups/${group.id}`} role="menuitem"><AppIcon name="open" /><span>{t("common.open")}</span></Link>
                                       <button className="content-context-menu-item is-danger" disabled={(course.groups?.length ?? 0) <= 1} title={(course.groups?.length ?? 0) <= 1 ? t("courseDetail.deleteLastGroupHelp") : undefined} role="menuitem" type="button" onClick={() => void openGroupDelete(group)}><AppIcon name="remove" /><span>{t("courseDetail.deleteGroupAction")}</span></button>
-                                    </div>
-                                  ) : null}
+                                  </ContextMenu>
                                 </div>
                               </div>
                             </div>

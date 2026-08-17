@@ -36,7 +36,7 @@ docs/
   ARCHITECTURE.md      Architecture memory for future sessions
 ```
 
-Shared cross-plugin frontend primitives live in `packages/activity-ui`. In addition to editors, renderers, notifications, and unsaved-navigation guards, it owns the responsive `EditActionBar` used by guarded edit drafts. The bar is presentational and receives the owning form's dirty, saving, save, and discard state; it does not merge persistence boundaries or infer whether unrelated immediate mutations are saved.
+Shared cross-plugin frontend primitives live in `packages/activity-ui`. In addition to editors, renderers, notifications, and unsaved-navigation guards, it owns the responsive `EditActionBar` used by guarded edit drafts and the portal-based `ContextMenu` used by row/action menus. `ContextMenu` renders outside clipping containers, flips and clamps to the viewport, and centralizes dismissal behavior; new contextual menus must use it instead of page-local absolute positioning. The action bar is presentational and receives the owning form's dirty, saving, save, and discard state; it does not merge persistence boundaries or infer whether unrelated immediate mutations are saved.
 
 The API applies centralized Origin-based CSRF protection to every unsafe request carrying the HttpOnly session cookie. Generic plugin dispatch is also an authorization boundary: course and bank authoring dispatchers require management permission, assigned group dispatch validates group assignment access, unsafe content-resource plugin methods require course management, and registrations without explicit supported type keys fail closed.
 
