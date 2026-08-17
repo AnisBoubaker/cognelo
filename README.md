@@ -159,6 +159,7 @@ GET    /api/courses/:courseId/groups
 POST   /api/courses/:courseId/groups
 GET    /api/courses/:courseId/groups/:groupId
 PATCH  /api/courses/:courseId/groups/:groupId
+DELETE /api/courses/:courseId/groups/:groupId
 GET    /api/courses/:courseId/groups/:groupId/participants
 POST   /api/courses/:courseId/groups/:groupId/participants
 GET    /api/courses/:courseId/groups/:groupId/activities
@@ -304,6 +305,8 @@ Knowledge-concept selection is a mandatory platform capability rather than an ac
 Adding a bank activity to a course creates a course-local `Activity` copy from the selected version. The copy keeps `bankActivityId` and `activityVersionId` for traceability, but it is not a live reference. Editing the course copy affects only that course and its students. Editing the bank later creates a new version and does not alter existing course copies.
 
 Course activities can be assigned to every group from the course page. This stores an all-groups policy on the course activity metadata and creates or updates real `CourseGroupActivity` rows for every existing group; future groups inherit those rows at group creation. The policy can enable per-group settings, which preserves existing group availability dates and lets teachers edit dates inside a group. When per-group settings are disabled, course-level availability replaces group dates and group-local date edits are blocked. Assignments also carry an assessment mode: formative activities record plugin checks/events for analytics without gradebook submissions, while summative activities expose plugin submission flows and create gradebook attempts/grades. Summative assignment forms also configure the gradebook item policy, including points, pass/fail thresholds, attempt limits, and grade selection strategy. These course-wide group assignments remain group-related for grading. Removing the all-groups policy leaves the existing group assignment rows in place and converts them back to group-managed assignments.
+
+Course group rows expose Open/Delete actions. The last group cannot be deleted. A group with no learners uses one confirmation; when learners exist, teachers either transfer all participant records to another group (deduplicated by normalized email) or pass a second permanent confirmation that deletes the group-scoped participant, attempt, grade, and grade-event records. Students with no remaining group enrollment are removed from the course student membership.
 
 Each `CourseGroupActivity` assignment has one corresponding `GradebookItem`, created when the assignment is materialized directly, through an all-groups course policy, or by future-group inheritance.
 

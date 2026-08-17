@@ -1612,6 +1612,15 @@ a.card:hover,
   grid-template-columns: minmax(240px, 1.6fr) minmax(190px, 0.95fr) 110px max-content;
 }
 
+.table-row-groups {
+  position: relative;
+  z-index: 0;
+}
+
+.table-row-groups.has-open-actions {
+  z-index: 10;
+}
+
 .table-row-activities {
   grid-template-columns: minmax(260px, 1.5fr) minmax(180px, 0.7fr) 110px max-content;
 }

@@ -56,7 +56,7 @@ The API applies centralized Origin-based CSRF protection to every unsafe request
 - **Courses** own course lifecycle, course-local material, and course-local copies of bank activities.
 - **Course content resources** are plugin-backed non-activity resources such as GitHub repos, files, and text notes.
 - **Course materials** are legacy generic records retained for compatibility while new non-activity content moves to content type plugins.
-- **Sections** are currently implemented by `CourseGroup` records and own participants plus activity availability windows. The product language should move toward "section"; the generic word "group" is reserved for future concepts.
+- **Sections** are currently implemented by `CourseGroup` records and own participants plus activity availability windows. Group deletion is transactional and cannot remove the final course group; participants can be deduplicated into another group, or permanently removed with their group-scoped gradebook records after explicit confirmation. The product language should move toward "section"; the generic word "group" is reserved for future concepts.
 - **Activities** are typed course-local activity copies. Most delegate behavior to installed plugins; core-backed compound activities may use the same generic activity, assignment, content, attempt, and gradebook infrastructure without participating in plugin installation lifecycle.
 
 ## Content Model

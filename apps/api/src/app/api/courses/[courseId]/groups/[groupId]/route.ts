@@ -24,10 +24,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   });
 }
 
-export async function DELETE(_request: NextRequest, { params }: Params) {
+export async function DELETE(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, groupId } = await params;
-    return json(await deleteCourseGroup(user, courseId, groupId));
+    return json(await deleteCourseGroup(user, courseId, groupId, await readJson(request)));
   });
 }

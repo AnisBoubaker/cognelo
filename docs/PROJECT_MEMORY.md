@@ -108,6 +108,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 ## Group Participant Decisions
 
 - Course sections/groups have explicit participant records separate from platform users.
+- Course group list rows expose Open/Delete menus. The final course group is protected in both UI and core. A group with no student participants needs one confirmation; otherwise deletion requires either a destination group, with participant emails deduplicated, or a second permanent confirmation that cascades group-scoped attempts/grades and removes student course membership only when the learner belongs to no other course group.
 - Section/group participants support roles `student`, `ta`, and `teacher`.
 - Adding a participant by email links immediately to an existing user when the email already exists.
 - When the participant email matches an existing user, first name, last name, and external ID are treated as locked/read-only in the add-participant UI.

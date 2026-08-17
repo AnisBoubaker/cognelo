@@ -1187,9 +1187,10 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(input)
     }),
-  deleteGroup: (courseId: string, groupId: string) =>
+  deleteGroup: (courseId: string, groupId: string, input: { action: "move"; targetGroupId: string } | { action: "delete"; confirmParticipantDeletion?: boolean }) =>
     request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}`, {
-      method: "DELETE"
+      method: "DELETE",
+      body: JSON.stringify(input)
     }),
   addGroupParticipant: (courseId: string, groupId: string, input: CourseGroupParticipantInput) =>
     request<{ participant: GroupParticipant }>(`/courses/${courseId}/groups/${groupId}/participants`, {

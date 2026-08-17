@@ -9,6 +9,8 @@ const tx = vi.hoisted(() => ({
   },
   courseGroup: {
     create: vi.fn(),
+    delete: vi.fn(),
+    findFirst: vi.fn(),
     findMany: vi.fn()
   },
   courseGroupActivity: {
@@ -30,6 +32,7 @@ const tx = vi.hoisted(() => ({
   },
   courseGroupParticipant: {
     create: vi.fn(),
+    createMany: vi.fn(),
     delete: vi.fn(),
     findMany: vi.fn()
   },
@@ -125,6 +128,7 @@ const {
   assignActivityToAllCourseGroups,
   assignActivityToGroup,
   createCourseGroup,
+  deleteCourseGroup,
   createGroupMaterial,
   getCourseGroup,
   getCourseMaterialForGroupDownload,
@@ -204,6 +208,55 @@ describe("group services", () => {
         }
       })
     });
+  });
+
+  it("blocks deletion of the last course group", async () => {
+    tx.courseGroup.findMany.mockResolvedValue([{ id: "group-1" }]);
+
+    await expect(deleteCourseGroup(teacherUser, "course-1", "group-1", { action: "delete" })).rejects.toMatchObject({
+      code: "COURSE_LAST_GROUP_DELETE_FORBIDDEN"
+    });
+    expect(tx.courseGroup.delete).not.toHaveBeenCalled();
+  });
+
+  it("deletes a group without learner participants after one confirmation", async () => {
+    tx.courseGroup.findMany.mockResolvedValue([{ id: "group-1" }, { id: "group-2" }]);
+    tx.courseGroupParticipant.findMany.mockResolvedValueOnce([{ id: "teacher-participant", groupId: "group-1", userId: "teacher-1", role: "teacher", firstName: "Ada", lastName: "Teacher", email: "teacher@example.test", externalId: null }]);
+
+    await expect(deleteCourseGroup(teacherUser, "course-1", "group-1", { action: "delete" })).resolves.toMatchObject({ ok: true });
+    expect(tx.courseGroup.delete).toHaveBeenCalledWith({ where: { id: "group-1" } });
+  });
+
+  it("requires explicit permanent confirmation when deleting learner participants", async () => {
+    tx.courseGroup.findMany.mockResolvedValue([{ id: "group-1" }, { id: "group-2" }]);
+    tx.courseGroupParticipant.findMany.mockResolvedValueOnce([{ id: "student-participant", groupId: "group-1", userId: "student-1", role: "student", firstName: "Student", lastName: "One", email: "student@example.test", externalId: null }]);
+
+    await expect(deleteCourseGroup(teacherUser, "course-1", "group-1", { action: "delete" })).rejects.toMatchObject({
+      code: "GROUP_PARTICIPANT_DELETE_CONFIRMATION_REQUIRED"
+    });
+    expect(tx.courseGroup.delete).not.toHaveBeenCalled();
+  });
+
+  it("moves participants without duplicating people already in the destination group", async () => {
+    tx.courseGroup.findMany.mockResolvedValue([{ id: "group-1" }, { id: "group-2" }]);
+    tx.courseGroupParticipant.findMany
+      .mockResolvedValueOnce([
+        { id: "teacher-source", groupId: "group-1", userId: "teacher-1", role: "teacher", firstName: "Ada", lastName: "Teacher", email: "teacher@example.test", externalId: null },
+        { id: "student-source", groupId: "group-1", userId: "student-1", role: "student", firstName: "Student", lastName: "One", email: "student@example.test", externalId: "S-1" }
+      ])
+      .mockResolvedValueOnce([
+        { id: "teacher-target", groupId: "group-2", userId: "teacher-1", role: "teacher", firstName: "Ada", lastName: "Teacher", email: "teacher@example.test", externalId: null }
+      ]);
+
+    await expect(deleteCourseGroup(teacherUser, "course-1", "group-1", { action: "move", targetGroupId: "group-2" })).resolves.toEqual({
+      ok: true,
+      movedParticipantCount: 1,
+      skippedDuplicateCount: 1
+    });
+    expect(tx.courseGroupParticipant.createMany).toHaveBeenCalledWith({
+      data: [{ groupId: "group-2", userId: "student-1", role: "student", firstName: "Student", lastName: "One", email: "student@example.test", externalId: "S-1" }]
+    });
+    expect(tx.courseGroup.delete).toHaveBeenCalledWith({ where: { id: "group-1" } });
   });
 
   it("creates gradebook items for course-wide assignments inherited by a new group", async () => {
