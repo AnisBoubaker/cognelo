@@ -1,6 +1,6 @@
 "use client";
 
-import { ConfirmationDialog } from "@cognelo/activity-ui";
+import { ConfirmationDialog, ContextMenu } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
@@ -18,6 +18,7 @@ export default function ActivityBanksPage() {
   const [editorBank, setEditorBank] = useState<ActivityBank | null | undefined>(undefined);
   const [draft, setDraft] = useState<BankDraft>({ subjectId: "", title: "", description: "" });
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+  const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLButtonElement | null>(null);
   const [deleteState, setDeleteState] = useState<DeleteState | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -45,6 +46,7 @@ export default function ActivityBanksPage() {
 
   function openEdit(bank: ActivityBank) {
     setActionMenuId(null);
+    setActionMenuAnchor(null);
     setError("");
     setDraft({ subjectId: bank.subjectId, title: bank.title, description: bank.description });
     setEditorBank(bank);
@@ -68,6 +70,7 @@ export default function ActivityBanksPage() {
 
   function openDelete(bank: ActivityBank) {
     setActionMenuId(null);
+    setActionMenuAnchor(null);
     const populated = (bank.activities?.length ?? 0) > 0;
     setDeleteState({ bank, step: populated ? "options" : "confirm-delete", mode: populated ? "move" : "delete", targetId: "" });
   }
@@ -116,8 +119,8 @@ export default function ActivityBanksPage() {
                   </Link>
                   {bank.canManage ? (
                     <div className="content-header-actions">
-                      <button aria-expanded={actionMenuId === bank.id} aria-haspopup="menu" aria-label={t("activityBanks.actions", { title: bank.title })} className="secondary icon-button" type="button" onClick={() => setActionMenuId((current) => current === bank.id ? null : bank.id)}><MoreIcon /></button>
-                      {actionMenuId === bank.id ? <div className="content-header-menu content-context-menu" role="menu"><button className="content-context-menu-item" role="menuitem" type="button" onClick={() => openEdit(bank)}><EditIcon /><span>{t("common.edit")}</span></button><button className="content-context-menu-item is-danger" role="menuitem" type="button" onClick={() => openDelete(bank)}><RemoveIcon /><span>{t("common.remove")}</span></button></div> : null}
+                      <button aria-expanded={actionMenuId === bank.id} aria-haspopup="menu" aria-label={t("activityBanks.actions", { title: bank.title })} className="secondary icon-button" type="button" onClick={(event) => { const opening = actionMenuId !== bank.id; setActionMenuId(opening ? bank.id : null); setActionMenuAnchor(opening ? event.currentTarget : null); }}><MoreIcon /></button>
+                      <ContextMenu anchor={actionMenuAnchor} className="content-context-menu" open={actionMenuId === bank.id} onClose={() => { setActionMenuId(null); setActionMenuAnchor(null); }}><button className="content-context-menu-item" role="menuitem" type="button" onClick={() => openEdit(bank)}><EditIcon /><span>{t("common.edit")}</span></button><button className="content-context-menu-item is-danger" role="menuitem" type="button" onClick={() => openDelete(bank)}><RemoveIcon /><span>{t("common.remove")}</span></button></ContextMenu>
                     </div>
                   ) : <span />}
                 </div>

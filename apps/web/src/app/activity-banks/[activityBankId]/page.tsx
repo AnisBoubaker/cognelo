@@ -6,7 +6,7 @@ import {
   listActivityCategories,
   type ActivityCategoryId
 } from "@cognelo/activity-sdk/categories";
-import { ActivityVersionDiffView, ConfirmationDialog } from "@cognelo/activity-ui";
+import { ActivityVersionDiffView, ConfirmationDialog, ContextMenu } from "@cognelo/activity-ui";
 import type { ActivityVersionDiff } from "@cognelo/contracts";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -50,6 +50,7 @@ export default function ActivityBankDetailPage() {
   const [movingActivity, setMovingActivity] = useState<BankActivity | null>(null);
   const [moveTargetBankId, setMoveTargetBankId] = useState("");
   const [activityActionMenuId, setActivityActionMenuId] = useState<string | null>(null);
+  const [activityActionMenuAnchor, setActivityActionMenuAnchor] = useState<HTMLButtonElement | null>(null);
   const [deleteActivityState, setDeleteActivityState] = useState<DeleteActivityState | null>(null);
   const [showActivityPicker, setShowActivityPicker] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<ActivityCategoryId>("generic");
@@ -92,27 +93,6 @@ export default function ActivityBankDetailPage() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [showActivityPicker]);
-
-  useEffect(() => {
-    if (!activityActionMenuId) {
-      return;
-    }
-    function closeActivityActions(event: MouseEvent | KeyboardEvent) {
-      if (event instanceof KeyboardEvent && event.key !== "Escape") {
-        return;
-      }
-      if (event instanceof MouseEvent && event.target instanceof Element && event.target.closest("[data-activity-actions]")) {
-        return;
-      }
-      setActivityActionMenuId(null);
-    }
-    document.addEventListener("mousedown", closeActivityActions);
-    document.addEventListener("keydown", closeActivityActions);
-    return () => {
-      document.removeEventListener("mousedown", closeActivityActions);
-      document.removeEventListener("keydown", closeActivityActions);
-    };
-  }, [activityActionMenuId]);
 
   async function createBankActivity(selectedActivityTypeKey: string) {
     if (!bank) {
@@ -335,7 +315,7 @@ export default function ActivityBankDetailPage() {
               </div>
               {bank.activities.map((activity) => (
                 <div
-                  className={`table-row activity-bank-activity-row${activityActionMenuId === activity.id ? " has-open-actions" : ""}`}
+                  className="table-row activity-bank-activity-row"
                   key={activity.id}
                 >
                   <Link
@@ -363,14 +343,13 @@ export default function ActivityBankDetailPage() {
                         aria-haspopup="menu"
                         aria-label={t("activityBankDetail.activityActions", { title: activity.title })}
                         className="secondary icon-button"
-                        onClick={() => setActivityActionMenuId((current) => current === activity.id ? null : activity.id)}
+                        onClick={(event) => { const opening = activityActionMenuId !== activity.id; setActivityActionMenuId(opening ? activity.id : null); setActivityActionMenuAnchor(opening ? event.currentTarget : null); }}
                         title={t("activityBankDetail.activityActionsTitle")}
                         type="button"
                       >
                         <span aria-hidden="true">•••</span>
                       </button>
-                      {activityActionMenuId === activity.id ? (
-                        <div className="content-header-menu content-context-menu" role="menu">
+                      <ContextMenu anchor={activityActionMenuAnchor} className="content-context-menu" open={activityActionMenuId === activity.id} onClose={() => { setActivityActionMenuId(null); setActivityActionMenuAnchor(null); }}>
                           <Link className="content-context-menu-item" href={`/activity-banks/${bank.id}/activities/${activity.id}`} role="menuitem">
                             <EditIcon />
                             <span>{t("common.edit")}</span>
@@ -402,8 +381,7 @@ export default function ActivityBankDetailPage() {
                             <RemoveIcon />
                             <span>{t("common.remove")}</span>
                           </button>
-                        </div>
-                      ) : null}
+                      </ContextMenu>
                     </div>
                   </div>
                 </div>

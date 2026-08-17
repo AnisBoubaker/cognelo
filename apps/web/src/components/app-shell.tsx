@@ -1,8 +1,9 @@
 "use client";
 
+import { ContextMenu } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { BrandLogo } from "@/components/brand-logo";
 import { AppIcon } from "@/components/app-icon";
@@ -16,18 +17,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { t } = useI18n();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
-  const accountMenuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    function handlePointerDown(event: PointerEvent) {
-      if (!accountMenuRef.current?.contains(event.target as Node)) {
-        setIsAccountMenuOpen(false);
-      }
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    return () => window.removeEventListener("pointerdown", handlePointerDown);
-  }, []);
+  const [accountMenuAnchor, setAccountMenuAnchor] = useState<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -67,14 +57,17 @@ export function AppShell({ children }: { children: ReactNode }) {
               );
             })}
           </nav>
-          <div className="account-menu" ref={accountMenuRef}>
+          <div className="account-menu">
             <button
               aria-expanded={isAccountMenuOpen}
               aria-haspopup="menu"
               aria-label={t("nav.accountMenu")}
               className="secondary account-trigger"
               type="button"
-              onClick={() => setIsAccountMenuOpen((current) => !current)}
+              onClick={(event) => {
+                setAccountMenuAnchor(event.currentTarget);
+                setIsAccountMenuOpen((current) => !current);
+              }}
             >
               <span className="account-trigger-label">
                 <span className="account-trigger-title">{t("nav.account")}</span>
@@ -84,8 +77,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <ChevronIcon />
               </span>
             </button>
-            {isAccountMenuOpen ? (
-              <div className="account-popover" role="menu">
+            <ContextMenu
+              anchor={accountMenuAnchor}
+              className="account-popover"
+              open={isAccountMenuOpen}
+              onClose={() => {
+                setIsAccountMenuOpen(false);
+                setAccountMenuAnchor(null);
+              }}
+            >
                 <div className="account-popover-header">
                   <strong>{user.email}</strong>
                 </div>
@@ -113,8 +113,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     {t("common.logout")}
                   </button>
                 </div>
-              </div>
-            ) : null}
+            </ContextMenu>
           </div>
         </div>
       </header>

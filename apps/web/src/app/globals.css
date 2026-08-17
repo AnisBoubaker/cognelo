@@ -1112,10 +1112,6 @@ a.card:hover,
   width: 22px;
 }
 
-.content-header-actions {
-  position: relative;
-}
-
 .content-header-menu {
   min-width: 210px;
 }
@@ -1531,11 +1527,6 @@ a.card:hover,
 .activity-bank-activity-row {
   cursor: pointer;
   position: relative;
-  z-index: 0;
-}
-
-.activity-bank-activity-row.has-open-actions {
-  z-index: 10;
 }
 
 .activity-bank-activity-row:hover {
@@ -1610,15 +1601,6 @@ a.card:hover,
 
 .table-row-groups {
   grid-template-columns: minmax(240px, 1.6fr) minmax(190px, 0.95fr) 110px max-content;
-}
-
-.table-row-groups {
-  position: relative;
-  z-index: 0;
-}
-
-.table-row-groups.has-open-actions {
-  z-index: 10;
 }
 
 .table-row-activities {
@@ -2827,13 +2809,6 @@ a.card:hover,
   padding: 5px;
   position: fixed;
   z-index: 80;
-}
-
-.content-header-actions .content-header-menu {
-  left: auto;
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
 }
 
 .content-context-menu-item {
