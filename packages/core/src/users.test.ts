@@ -24,7 +24,7 @@ vi.mock("bcryptjs", () => ({
   default: bcryptMocks
 }));
 
-const { changeMyPassword, createUser, listUsers, updateMyProfile, updateUser } = await import("./users");
+const { changeMyPassword, createUser, listUsers, resetUserPassword, updateMyProfile, updateUser } = await import("./users");
 
 const admin = { id: "admin-1", email: "admin@example.test", name: "Admin", firstName: "Ada", lastName: "Admin", roles: ["admin" as const] };
 
@@ -97,8 +97,36 @@ describe("user services", () => {
     expect(bcryptMocks.hash).toHaveBeenCalledWith("NewPassword456!", 12);
     expect(mockPrisma.user.update).toHaveBeenCalledWith({
       where: { id: "user-1" },
-      data: { passwordHash: "new-hash" }
+      data: { passwordHash: "new-hash", mustChangePassword: false }
     });
+  });
+
+  it("lets an administrator set a temporary password and invalidate existing sessions", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ id: "user-1" });
+    bcryptMocks.hash.mockResolvedValue("temporary-hash");
+    mockPrisma.user.update.mockResolvedValue({ id: "user-1" });
+
+    await expect(resetUserPassword(admin, "user-1", {
+      password: "Temporary123!",
+      confirmPassword: "Temporary123!"
+    })).resolves.toEqual({ ok: true });
+
+    expect(mockPrisma.user.update).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      data: {
+        passwordHash: "temporary-hash",
+        mustChangePassword: true,
+        authVersion: { increment: 1 }
+      }
+    });
+  });
+
+  it("does not let an administrator reset their own password", async () => {
+    await expect(resetUserPassword(admin, admin.id, {
+      password: "Temporary123!",
+      confirmPassword: "Temporary123!"
+    })).rejects.toMatchObject({ code: "CANNOT_RESET_OWN_PASSWORD", status: 400 });
+    expect(mockPrisma.user.update).not.toHaveBeenCalled();
   });
 
   it("rejects an incorrect current password without updating the account", async () => {

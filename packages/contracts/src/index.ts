@@ -82,6 +82,22 @@ export type AdminUserCreate = z.infer<typeof AdminUserCreateSchema>;
 export const AdminUserUpdateSchema = AdminUserCreateSchema.omit({ password: true });
 export type AdminUserUpdate = z.infer<typeof AdminUserUpdateSchema>;
 
+export const AdminUserPasswordResetSchema = z
+  .object({
+    password: z.string().min(8).max(200),
+    confirmPassword: z.string().min(8).max(200)
+  })
+  .superRefine((value, context) => {
+    if (value.password !== value.confirmPassword) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "Passwords must match."
+      });
+    }
+  });
+export type AdminUserPasswordReset = z.infer<typeof AdminUserPasswordResetSchema>;
+
 export const AdminUserFiltersSchema = z.object({
   role: RoleKeySchema.optional(),
   firstName: z.string().trim().max(120).optional(),
@@ -615,4 +631,5 @@ export type CurrentUser = {
   firstName: string | null;
   lastName: string | null;
   roles: RoleKey[];
+  mustChangePassword?: boolean;
 };

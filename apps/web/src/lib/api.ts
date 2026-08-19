@@ -1,6 +1,7 @@
 import type {
   ActivateAccountInput,
   AdminUserCreate,
+  AdminUserPasswordReset,
   AdminUserUpdate,
   ActivityPluginInstallationUpdate,
   AiAgentConnectionInput,
@@ -48,6 +49,7 @@ export type AdminUser = {
   lastName: string | null;
   name: string | null;
   isActive: boolean;
+  mustChangePassword: boolean;
   roles: Array<{ key: AdminRole["key"]; name: string }>;
   createdAt: string;
   updatedAt: string;
@@ -948,6 +950,8 @@ export const api = {
     request<{ user: AdminUser }>("/users", { method: "POST", body: JSON.stringify(input) }),
   updateUser: (userId: string, input: AdminUserUpdate) =>
     request<{ user: AdminUser }>(`/users/${userId}`, { method: "PATCH", body: JSON.stringify(input) }),
+  resetUserPassword: (userId: string, input: AdminUserPasswordReset) =>
+    request<{ ok: true }>(`/users/${userId}/password`, { method: "PUT", body: JSON.stringify(input) }),
   aiAgentConnections: () => request<{ connections: AiAgentConnection[]; preferences: AiAgentPreferences }>("/ai-agents"),
   updateAiAgentPreferences: (input: AiAgentPreferences) =>
     request<{ preferences: AiAgentPreferences }>("/ai-agents/preferences", {

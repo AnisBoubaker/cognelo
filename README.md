@@ -45,7 +45,7 @@ docs/
 
 - Auth: login, logout, current-user token verification
 - Users: `/users/me` plus account-wide profile settings
-- Admin user management: list/filter accounts by role, first name, last name, or email; create accounts; and edit account names, emails, and multi-role assignments
+- Admin user management: list/filter accounts by role, first name, last name, or email; create accounts; edit account names, emails, and multi-role assignments; and issue forced-change temporary passwords
 - AI agent connections: account-wide model/provider connection records, with admin-managed global entries
 - Authorization: global roles plus course memberships and activity-bank ownership
 - Subjects: shared curriculum containers with an explicit teaching language, subject-level material, activity banks, and subject-scoped knowledge graphs with draggable nodes and reconnectable arrow endpoints
@@ -119,6 +119,7 @@ PUT    /api/users/me/password
 GET    /api/users
 POST   /api/users
 PATCH  /api/users/:userId
+PUT    /api/users/:userId/password
 GET    /api/ai-agents
 POST   /api/ai-agents
 PATCH  /api/ai-agents/:connectionId
@@ -450,7 +451,7 @@ WEB_DESIGN_RUNNER_URL=http://localhost:3456
 - The top navigation separates primary app routes from the account dropdown.
 - Dashboard is temporarily removed from primary navigation. Authentication, the logo, `/`, and legacy `/dashboard` visits use the first role-available primary route: Subjects for administrators/course managers/teachers, otherwise Courses.
 - Account-wide configuration lives under `/settings`, with the current profile and security editor at `/settings/profile`.
-- Administrators manage accounts under `/settings/users`, including server-side filters and conventional paged results (10 per page by default, with selectable page sizes), account creation with an initial password, and one-or-many global role assignments. Administrators cannot remove their own admin role.
+- Administrators manage accounts under `/settings/users`, including server-side filters and conventional paged results (10 per page by default, with selectable page sizes), account creation with an initial password, one-or-many global role assignments, and temporary-password resets for other users. A reset invalidates existing sessions and requires the user to replace the temporary password at `/change-password` before other authenticated access. Administrators cannot remove their own admin role or use the reset action on themselves.
 - Users can update their first and last name and change their password after confirming the current password; email changes are reserved for administrators.
 - AI agent connection settings live under `/settings/ai-agents`; users can create personal connections, choose their question-authoring helper, and admins can create global connections for later course use.
 - Plugin authoring screens can use the selected question-authoring AI agent through server-side plugin routes; the MCQ plugin uses this to generate validated MCQ source from a teacher description.

@@ -6,7 +6,7 @@ Cognelo is a modular intelligent tutoring system for programming education.
 
 - **Next.js + TypeScript** for both API and web apps: one language, shared types, strong developer experience, and deployable apps without introducing microservices early.
 - **PostgreSQL + Prisma** for relational integrity, explicit migrations, and future research-friendly querying.
-- **JWT in HttpOnly cookies** for secure browser auth in the MVP, with space for refresh tokens, SSO, invitations, and password reset flows later.
+- **JWT in HttpOnly cookies** for secure browser auth in the MVP, with authentication-version invalidation for administrator password resets and space for refresh tokens, SSO, and invitations later.
 - **Zod contracts** shared between frontend and backend for DTO validation and stable API expectations.
 - **Activity and content type registry packages** for plugin-style registration without coupling activity or non-activity content behavior to subjects, banks, courses, or the content tree.
 
@@ -42,9 +42,9 @@ The API applies centralized Origin-based CSRF protection to every unsafe request
 
 ## Core Modules
 
-- **Auth** owns password hashing, JWT creation, login/logout, and current-user lookup.
+- **Auth** owns password hashing, JWT creation, authentication-version checks, login/logout, forced-password-change gating, and current-user lookup.
 - **Authorization** maps global roles, course memberships, section participants, and activity-bank ownership into permissions.
-- **Users/Roles** support many-to-many global roles and future additional roles. Admin-only user management lists and filters accounts, creates active accounts with initial passwords, and edits identity plus global role assignments.
+- **Users/Roles** support many-to-many global roles and future additional roles. Admin-only user management lists and filters accounts, creates active accounts with initial passwords, edits identity plus global role assignments, and issues temporary passwords to other users. A reset increments `User.authVersion`, marks `mustChangePassword`, invalidates older JWTs, and restricts the next authenticated session to current-user/password endpoints until replacement.
 - **Subjects** own reusable curriculum context, a supported teaching-language locale used by subject AI generation, subject-level material, and a subject-scoped prerequisite knowledge graph.
 - **Activity AI authoring** receives knowledge alignment through a host-owned shared context. Every generation mode receives the complete subject concept/skill catalog as a curriculum boundary. Generators can additionally consume the live unsaved skill draft as specific targets, request catalog-constrained skill suggestions for their generated draft, or ignore the selection draft without reading or mutating it. The host keeps both tab panels mounted and combines activity content with knowledge selections at the persistence boundary.
 - **Activity banks** own reusable activity authoring and version history for a subject. Bank management is capability-gated (currently owner/admin), subject changes are allowed only while empty, and populated-bank deletion either transfers activities to a writable same-subject bank or cascades bank content after explicit confirmation while preserving detached course-local copies.

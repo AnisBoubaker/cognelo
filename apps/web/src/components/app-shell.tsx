@@ -25,11 +25,21 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [loading, router, user]);
 
+  useEffect(() => {
+    if (!loading && user?.mustChangePassword) {
+      router.replace("/change-password");
+    }
+  }, [loading, router, user]);
+
   if (loading) {
     return <main className="page">{t("common.loading")}</main>;
   }
 
   if (!user) {
+    return <main className="page">{t("common.redirecting")}</main>;
+  }
+
+  if (user.mustChangePassword) {
     return <main className="page">{t("common.redirecting")}</main>;
   }
 

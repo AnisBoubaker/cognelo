@@ -7,10 +7,14 @@ export { AUTH_COOKIE, validateCsrfOrigin } from "./csrf";
 import { AUTH_COOKIE } from "./csrf";
 
 
-export async function requireUser() {
+export async function requireUser(options: { allowPasswordChangeRequired?: boolean } = {}) {
   const env = getServerEnv();
   const token = (await cookies()).get(AUTH_COOKIE)?.value;
-  return verifyAuthToken(token, env.JWT_SECRET);
+  const user = await verifyAuthToken(token, env.JWT_SECRET);
+  if (user.mustChangePassword && !options.allowPasswordChangeRequired) {
+    throw new AppError(403, "PASSWORD_CHANGE_REQUIRED", "You must change your temporary password before continuing.");
+  }
+  return user;
 }
 
 function corsHeaders(init?: ResponseInit) {

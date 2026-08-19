@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import {
   AdminUserCreateSchema,
   AdminUserFiltersSchema,
+  AdminUserPasswordResetSchema,
   AdminUserUpdateSchema,
   UserPasswordChangeSchema,
   UserProfileUpdateSchema,
@@ -100,6 +101,28 @@ export async function updateUser(user: CurrentUser, userId: string, input: unkno
   return toAdminUser(updated);
 }
 
+export async function resetUserPassword(user: CurrentUser, userId: string, input: unknown) {
+  assertAdmin(user);
+  if (user.id === userId) {
+    throw new AppError(400, "CANNOT_RESET_OWN_PASSWORD", "Change your own password from your profile instead.");
+  }
+  const data = AdminUserPasswordResetSchema.parse(input);
+  const existing = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!existing) {
+    throw notFound("User");
+  }
+  const passwordHash = await bcrypt.hash(data.password, 12);
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash,
+      mustChangePassword: true,
+      authVersion: { increment: 1 }
+    }
+  });
+  return { ok: true as const };
+}
+
 function assertAdmin(user: CurrentUser) {
   if (!isAdmin(user)) throw forbidden();
 }
@@ -113,7 +136,7 @@ async function resolveRoles(keys: RoleKey[]) {
   return roles;
 }
 
-function toAdminUser(user: { id: string; email: string; firstName: string | null; lastName: string | null; name: string | null; isActive: boolean; createdAt: Date; updatedAt: Date; roles: { role: { key: string; name: string } }[] }) {
+function toAdminUser(user: { id: string; email: string; firstName: string | null; lastName: string | null; name: string | null; isActive: boolean; mustChangePassword: boolean; createdAt: Date; updatedAt: Date; roles: { role: { key: string; name: string } }[] }) {
   return {
     id: user.id,
     email: user.email,
@@ -121,6 +144,7 @@ function toAdminUser(user: { id: string; email: string; firstName: string | null
     lastName: user.lastName,
     name: user.name,
     isActive: user.isActive,
+    mustChangePassword: user.mustChangePassword,
     roles: user.roles.map(({ role }) => ({ key: role.key as RoleKey, name: role.name })),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
@@ -151,7 +175,8 @@ export async function updateMyProfile(user: CurrentUser, input: unknown) {
     name: updatedUser.name,
     firstName: updatedUser.firstName,
     lastName: updatedUser.lastName,
-    roles: updatedUser.roles.map((userRole) => userRole.role.key as CurrentUser["roles"][number])
+    roles: updatedUser.roles.map((userRole) => userRole.role.key as CurrentUser["roles"][number]),
+    mustChangePassword: updatedUser.mustChangePassword
   };
 }
 
@@ -171,7 +196,7 @@ export async function changeMyPassword(user: CurrentUser, input: unknown) {
   const passwordHash = await bcrypt.hash(data.newPassword, 12);
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash }
+    data: { passwordHash, mustChangePassword: false }
   });
   return { ok: true as const };
 }

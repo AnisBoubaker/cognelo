@@ -4,6 +4,7 @@ import {
   ActivityBankInputSchema,
   ActivityInputSchema,
   ActivityPluginInstallationUpdateSchema,
+  AdminUserPasswordResetSchema,
   AiAgentConnectionInputSchema,
   AiAgentPreferencesInputSchema,
   ContentTypePluginInstallationUpdateSchema,
@@ -190,6 +191,17 @@ describe("shared contract schemas", () => {
         confirmNewPassword: "SamePassword123!"
       })
     ).toThrow();
+  });
+
+  it("validates matching administrator temporary passwords", () => {
+    expect(AdminUserPasswordResetSchema.parse({
+      password: "Temporary123!",
+      confirmPassword: "Temporary123!"
+    })).toEqual({ password: "Temporary123!", confirmPassword: "Temporary123!" });
+    expect(() => AdminUserPasswordResetSchema.parse({
+      password: "Temporary123!",
+      confirmPassword: "Different123!"
+    })).toThrow();
   });
 
   it("validates auth and activation payloads", () => {

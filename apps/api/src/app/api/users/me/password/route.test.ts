@@ -36,6 +36,7 @@ describe("users/me/password route", () => {
     const response = await PUT(new Request("http://test.local") as never);
 
     await expect(response.json()).resolves.toEqual({ ok: true });
+    expect(mocks.requireUser).toHaveBeenCalledWith({ allowPasswordChangeRequired: true });
     expect(mocks.changeMyPassword).toHaveBeenCalledWith(
       { id: "user-1", roles: ["teacher"] },
       {
