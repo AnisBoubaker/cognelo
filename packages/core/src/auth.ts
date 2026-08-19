@@ -61,6 +61,10 @@ export async function verifyAuthToken(token: string | undefined, secret: string)
     if (!user || !user.isActive) {
       throw unauthorized();
     }
+    const tokenAuthVersion = typeof payload.authVersion === "number" ? payload.authVersion : 0;
+    if (tokenAuthVersion !== (user.authVersion ?? 0)) {
+      throw unauthorized();
+    }
     return toCurrentUser(user);
   } catch {
     throw unauthorized();
@@ -74,6 +78,7 @@ function toCurrentUser(user: {
   firstName?: string | null;
   lastName?: string | null;
   roles: { role: { key: string } }[];
+  mustChangePassword?: boolean;
 }): CurrentUser {
   return {
     id: user.id,
@@ -81,7 +86,8 @@ function toCurrentUser(user: {
     name: user.name,
     firstName: user.firstName ?? firstNameFromName(user.name),
     lastName: user.lastName ?? lastNameFromName(user.name),
-    roles: user.roles.map((userRole) => userRole.role.key as CurrentUser["roles"][number])
+    roles: user.roles.map((userRole) => userRole.role.key as CurrentUser["roles"][number]),
+    mustChangePassword: Boolean(user.mustChangePassword)
   };
 }
 
@@ -149,6 +155,8 @@ async function signInUser(
     email: string;
     name: string | null;
     roles: { role: { key: string } }[];
+    authVersion?: number;
+    mustChangePassword?: boolean;
   },
   secret: string
 ) {
@@ -156,7 +164,8 @@ async function signInUser(
   const token = await new SignJWT({
     roles: currentUser.roles,
     email: currentUser.email,
-    name: currentUser.name
+    name: currentUser.name,
+    authVersion: user.authVersion ?? 0
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(currentUser.id)

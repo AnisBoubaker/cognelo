@@ -45,6 +45,8 @@ const activeUser = {
   firstName: "Ada",
   lastName: "Teacher",
   isActive: true,
+  authVersion: 0,
+  mustChangePassword: false,
   passwordHash: "",
   roles: [{ role: { key: "teacher" } }]
 };
@@ -101,6 +103,21 @@ describe("auth services", () => {
       email: "teacher@example.test",
       roles: ["teacher"]
     });
+  });
+
+  it("returns the forced-change state and rejects tokens issued before an administrator reset", async () => {
+    mockPrisma.user.findUnique.mockResolvedValueOnce({
+      ...activeUser,
+      authVersion: 2,
+      mustChangePassword: true,
+      passwordHash: await bcrypt.hash("Temporary123!", 4)
+    });
+
+    const result = await loginWithPassword("teacher@example.test", "Temporary123!", secret);
+    expect(result.user.mustChangePassword).toBe(true);
+
+    mockPrisma.user.findUnique.mockResolvedValueOnce({ ...activeUser, authVersion: 3 });
+    await expect(verifyAuthToken(result.token, secret)).rejects.toMatchObject({ status: 401, code: "UNAUTHORIZED" });
   });
 
   it("rejects missing, invalid, wrong-secret, and inactive-user tokens", async () => {

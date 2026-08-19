@@ -26,7 +26,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const user = await login(email, password);
-      router.replace(getPrimaryLandingPath(user));
+      router.replace(user.mustChangePassword ? "/change-password" : getPrimaryLandingPath(user));
     } catch (err) {
       if (err instanceof ApiError && err.code === "PENDING_ACCOUNT_SETUP") {
         setMode("activate");
