@@ -31,6 +31,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [loading, router, user]);
 
+  useEffect(() => {
+    if (!loading && user && !user.mustChangePassword && user.emailVerified === false) {
+      router.replace("/verify-email");
+    }
+  }, [loading, router, user]);
+
   if (loading) {
     return <main className="page">{t("common.loading")}</main>;
   }
@@ -40,6 +46,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   if (user.mustChangePassword) {
+    return <main className="page">{t("common.redirecting")}</main>;
+  }
+
+  if (user.emailVerified === false) {
     return <main className="page">{t("common.redirecting")}</main>;
   }
 

@@ -8,7 +8,7 @@ export function OPTIONS() {
 
 export async function GET() {
   return handleRoute(async () => {
-    const user = await requireUser({ allowPasswordChangeRequired: true });
+    const user = await requireUser({ allowPasswordChangeRequired: true, allowEmailVerificationRequired: true });
     return json({ user: await getMe(user) });
   });
 }

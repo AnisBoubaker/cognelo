@@ -39,7 +39,8 @@ async function main() {
       lastName,
       name: `${firstName} ${lastName}`.trim(),
       passwordHash: await bcrypt.hash(password, 12),
-      isActive: true
+      isActive: true,
+      emailVerifiedAt: new Date()
     }
   });
   await prisma.userRole.upsert({

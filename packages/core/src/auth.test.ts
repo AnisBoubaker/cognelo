@@ -47,6 +47,7 @@ const activeUser = {
   isActive: true,
   authVersion: 0,
   mustChangePassword: false,
+  emailVerifiedAt: new Date("2026-01-01T00:00:00.000Z"),
   passwordHash: "",
   roles: [{ role: { key: "teacher" } }]
 };
@@ -95,7 +96,7 @@ describe("auth services", () => {
 
     const result = await loginWithPassword("Teacher@Example.Test", "Password123!", secret);
 
-    expect(result.user).toMatchObject({ id: "user-1", email: "teacher@example.test", roles: ["teacher"] });
+    expect(result.user).toMatchObject({ id: "user-1", email: "teacher@example.test", roles: ["teacher"], emailVerified: true });
 
     mockPrisma.user.findUnique.mockResolvedValueOnce(activeUser);
     await expect(verifyAuthToken(result.token, secret)).resolves.toMatchObject({
@@ -103,6 +104,17 @@ describe("auth services", () => {
       email: "teacher@example.test",
       roles: ["teacher"]
     });
+  });
+
+  it("returns an email-verification requirement for a new account", async () => {
+    mockPrisma.user.findUnique.mockResolvedValueOnce({
+      ...activeUser,
+      emailVerifiedAt: null,
+      passwordHash: await bcrypt.hash("Password123!", 4)
+    });
+
+    const result = await loginWithPassword("teacher@example.test", "Password123!", secret);
+    expect(result.user.emailVerified).toBe(false);
   });
 
   it("returns the forced-change state and rejects tokens issued before an administrator reset", async () => {

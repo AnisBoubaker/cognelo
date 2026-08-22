@@ -43,11 +43,11 @@ docs/
 
 ## Core Modules
 
-- Auth: login, logout, current-user token verification
+- Auth: login, logout, current-user token verification, forced password replacement, and first-login email verification
 - Users: `/users/me` plus account-wide profile settings
 - Admin user management: list/filter accounts by role, first name, last name, or email; create accounts; edit account names, emails, and multi-role assignments; and issue forced-change temporary passwords
 - AI agent connections: account-wide model/provider connection records, with admin-managed global entries
-- Email delivery: admin-managed SMTP relay or Microsoft Graph OAuth configuration, encrypted credentials, and an admin-only test message
+- Email delivery: admin-managed SMTP relay or Microsoft Graph OAuth configuration, encrypted credentials, an admin-only test message, and guarded account-verification messages
 - Authorization: global roles plus course memberships and activity-bank ownership
 - Subjects: shared curriculum containers with an explicit teaching language, subject-level material, activity banks, and subject-scoped knowledge graphs with draggable nodes and reconnectable arrow endpoints
 - Activity banks: reusable activity authoring libraries scoped to a subject and owned by an individual
@@ -113,6 +113,8 @@ Core endpoints:
 ```text
 POST   /api/auth/login
 POST   /api/auth/logout
+POST   /api/auth/email-verification/send
+POST   /api/auth/email-verification/verify
 GET    /api/health
 GET    /api/users/me
 PATCH  /api/users/me
@@ -452,7 +454,7 @@ Email credential encryption key:
 EMAIL_CREDENTIALS_ENCRYPTION_KEY=<64 hexadecimal characters from `openssl rand -hex 32`>
 ```
 
-This key encrypts SMTP passwords and Microsoft Graph client secrets stored in PostgreSQL. Keep it stable, instance-specific, backed up with the environment configuration, and outside source control. Email delivery is configured by administrators at `/settings/email`. SMTP works with any relay provider; Microsoft Graph uses an Entra application with `Mail.Send` application permission and administrator consent. The test action may target any valid address and always uses the last saved configuration.
+This key encrypts SMTP passwords and Microsoft Graph client secrets stored in PostgreSQL and keys the HMAC hashes used for one-time email-verification codes. Keep it stable, instance-specific, backed up with the environment configuration, and outside source control. Email delivery is configured by administrators at `/settings/email`. SMTP works with any relay provider; Microsoft Graph uses an Entra application with `Mail.Send` application permission and administrator consent. The test action may target any valid address and always uses the last saved configuration.
 
 ## Frontend Notes
 
@@ -461,12 +463,12 @@ This key encrypts SMTP passwords and Microsoft Graph client secrets stored in Po
 - The header and login page use the Cognelo logo from the repo's brand assets.
 - The favicon/app icon uses the square Cognelo icon asset served from `apps/web/src/app/icon.png`.
 - The top navigation separates primary app routes from the account dropdown.
-- Dashboard is temporarily removed from primary navigation. Authentication, the logo, `/`, and legacy `/dashboard` visits use the first role-available primary route: Subjects for administrators/course managers/teachers, otherwise Courses.
+- Dashboard is temporarily removed from primary navigation. Authentication, the logo, `/`, and legacy `/dashboard` visits first enforce temporary-password replacement and email verification, then use the first role-available primary route: Subjects for administrators/course managers/teachers, otherwise Courses.
 - Account-wide configuration lives under `/settings`, with the current profile and security editor at `/settings/profile`.
-- Administrators manage accounts under `/settings/users`, including server-side filters and conventional paged results (10 per page by default, with selectable page sizes), account creation with an initial password, one-or-many global role assignments, and temporary-password resets for other users. A reset invalidates existing sessions and requires the user to replace the temporary password at `/change-password` before other authenticated access. Administrators cannot remove their own admin role or use the reset action on themselves.
+- Administrators manage accounts under `/settings/users`, including server-side filters and conventional paged results (10 per page by default, with selectable page sizes), account creation with an initial password, one-or-many global role assignments, email-verification status, and temporary-password resets for other users. A reset invalidates existing sessions and requires the user to replace the temporary password at `/change-password` before other authenticated access. New accounts must verify their address at `/verify-email`; changing an account email makes verification required again. Administrators cannot remove their own admin role or use the reset action on themselves.
 - Users can update their first and last name and change their password after confirming the current password; email changes are reserved for administrators.
 - AI agent connection settings live under `/settings/ai-agents`; users can create personal connections, choose their question-authoring helper, and admins can create global connections for later course use.
-- Administrators configure outbound email under `/settings/email` using either an SMTP relay or Microsoft Graph app-only OAuth credentials. Stored passwords/secrets are encrypted and never returned to the browser. The test message can target any valid address; future system messages must use the guarded core path that accepts only active users or unclaimed participants in account activation.
+- Administrators configure outbound email under `/settings/email` using either an SMTP relay or Microsoft Graph app-only OAuth credentials. Stored passwords/secrets are encrypted and never returned to the browser. The test message can target any valid address. Cognelo uses the guarded system-mail path to send first-login verification codes only to active accounts, localized to the user’s current interface language; future account and notification messages must use that same eligibility boundary.
 - Plugin authoring screens can use the selected question-authoring AI agent through server-side plugin routes; the MCQ plugin uses this to generate validated MCQ source from a teacher description.
 - Bank and course activity descriptions serve as student prompts and accept up to 30,000 characters so reading-comprehension activities can include complete passages.
 - All core and plugin authoring/settings forms should register unsaved-change state through `useUnsavedChangesGuard` from `@cognelo/activity-ui`. Registered forms show a shared confirmation dialog before internal navigation, with actions to continue editing, save and leave, or discard changes. Browser refresh/close uses the native browser warning.

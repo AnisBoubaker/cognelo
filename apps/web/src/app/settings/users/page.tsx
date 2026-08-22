@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { AppIcon } from "@/components/app-icon";
 import { useAuth } from "@/components/auth-provider";
@@ -13,7 +14,8 @@ type UserDraft = { email: string; firstName: string; lastName: string; password:
 const emptyDraft: UserDraft = { email: "", firstName: "", lastName: "", password: "", roles: [] };
 
 export default function UserSettingsPage() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, refresh } = useAuth();
+  const router = useRouter();
   const { t } = useI18n();
   const notifications = useNotifications();
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -140,6 +142,14 @@ export default function UserSettingsPage() {
       if (editingUser) {
         await api.updateUser(editingUser.id, { email: draft.email, firstName: draft.firstName, lastName: draft.lastName, roles: draft.roles });
         notifications.success(t("settings.userUpdated"));
+        const changedOwnEmail = editingUser.id === currentUser?.id
+          && draft.email.trim().toLowerCase() !== editingUser.email.toLowerCase();
+        if (changedOwnEmail) {
+          closeEditor();
+          await refresh();
+          router.replace("/verify-email");
+          return;
+        }
       } else {
         await api.createUser(draft);
         notifications.success(t("settings.userCreated"));
@@ -182,7 +192,7 @@ export default function UserSettingsPage() {
                 {loading ? <p className="muted">{t("common.loading")}</p> : users.length ? (
                   <div className="table-list user-settings-list">
                     <div className="table-row table-row-users table-head" aria-hidden="true"><span>{t("settings.userName")}</span><span>{t("settings.email")}</span><span>{t("settings.roles")}</span><span /></div>
-                    {users.map((user) => <div className="table-row table-row-users" key={user.id}><strong>{user.firstName} {user.lastName}</strong><span>{user.email}</span><div className="metadata-badges">{user.roles.map((role) => <span className="metadata-badge" key={role.key}>{t(`roles.${role.key}`)}</span>)}{user.mustChangePassword ? <span className="metadata-badge">{t("settings.passwordChangeRequiredBadge")}</span> : null}</div><div className="row"><button className="secondary" type="button" onClick={() => openEdit(user)}>{t("common.edit")}</button><button className="secondary" disabled={user.id === currentUser?.id} title={user.id === currentUser?.id ? t("settings.adminPasswordResetSelfHelp") : undefined} type="button" onClick={() => openPasswordReset(user)}>{t("settings.adminPasswordResetAction")}</button></div></div>)}
+                    {users.map((user) => <div className="table-row table-row-users" key={user.id}><strong>{user.firstName} {user.lastName}</strong><span>{user.email}</span><div className="metadata-badges">{user.roles.map((role) => <span className="metadata-badge" key={role.key}>{t(`roles.${role.key}`)}</span>)}{user.mustChangePassword ? <span className="metadata-badge">{t("settings.passwordChangeRequiredBadge")}</span> : null}{!user.emailVerified ? <span className="metadata-badge">{t("settings.emailVerificationRequiredBadge")}</span> : null}</div><div className="row"><button className="secondary" type="button" onClick={() => openEdit(user)}>{t("common.edit")}</button><button className="secondary" disabled={user.id === currentUser?.id} title={user.id === currentUser?.id ? t("settings.adminPasswordResetSelfHelp") : undefined} type="button" onClick={() => openPasswordReset(user)}>{t("settings.adminPasswordResetAction")}</button></div></div>)}
                   </div>
                 ) : <p className="muted">{t("settings.usersEmpty")}</p>}
                 {!loading && pagination.total > 0 ? <nav className="pagination-bar" aria-label={t("settings.usersPaginationLabel")}><div className="pagination-controls"><button className="secondary" type="button" disabled={pagination.page <= 1} onClick={() => setPagination((current) => ({ ...current, page: current.page - 1 }))}>{t("settings.previousPage")}</button>{paginationItems(pagination.page, pagination.totalPages).map((item, index) => item === "ellipsis" ? <span className="pagination-ellipsis" key={`ellipsis-${index}`} aria-hidden="true">…</span> : <button className={item === pagination.page ? "pagination-page is-active" : "secondary pagination-page"} type="button" aria-current={item === pagination.page ? "page" : undefined} key={item} onClick={() => setPagination((current) => ({ ...current, page: item }))}>{item}</button>)}<button className="secondary" type="button" disabled={pagination.page >= pagination.totalPages} onClick={() => setPagination((current) => ({ ...current, page: current.page + 1 }))}>{t("settings.nextPage")}</button></div><label className="pagination-size"><span>{t("settings.usersPerPage")}</span><select value={pagination.pageSize} onChange={(event) => setPagination((current) => ({ ...current, page: 1, pageSize: Number(event.target.value) }))}>{[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}</select></label></nav> : null}

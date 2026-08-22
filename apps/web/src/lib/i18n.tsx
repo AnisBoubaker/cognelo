@@ -7,6 +7,7 @@ export { locales, type Locale, type MessageTree } from "./i18n/types";
 
 type I18nContextValue = {
   locale: Locale;
+  ready: boolean;
   setLocale: (locale: Locale) => void;
   t: (key: string, vars?: Record<string, string | number>) => string;
 };
@@ -71,9 +72,11 @@ export function translateMessage(locale: Locale, key: string, vars?: Record<stri
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>("en");
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     setLocaleState(detectInitialLocale());
+    setReady(true);
   }, []);
 
   useEffect(() => {
@@ -85,10 +88,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const value = useMemo<I18nContextValue>(
     () => ({
       locale,
+      ready,
       setLocale: (nextLocale) => setLocaleState(nextLocale),
       t: (key, vars) => translateMessage(locale, key, vars)
     }),
-    [locale]
+    [locale, ready]
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

@@ -6,3 +6,15 @@ export function getPrimaryLandingPath(user: Pick<CurrentUser, "roles">) {
   );
   return canManageLearningContent ? "/subjects" : "/courses";
 }
+
+export function getAuthenticatedLandingPath(
+  user: Pick<CurrentUser, "roles" | "mustChangePassword" | "emailVerified">
+) {
+  if (user.mustChangePassword) {
+    return "/change-password";
+  }
+  if (user.emailVerified === false) {
+    return "/verify-email";
+  }
+  return getPrimaryLandingPath(user);
+}

@@ -7,12 +7,15 @@ export { AUTH_COOKIE, validateCsrfOrigin } from "./csrf";
 import { AUTH_COOKIE } from "./csrf";
 
 
-export async function requireUser(options: { allowPasswordChangeRequired?: boolean } = {}) {
+export async function requireUser(options: { allowPasswordChangeRequired?: boolean; allowEmailVerificationRequired?: boolean } = {}) {
   const env = getServerEnv();
   const token = (await cookies()).get(AUTH_COOKIE)?.value;
   const user = await verifyAuthToken(token, env.JWT_SECRET);
   if (user.mustChangePassword && !options.allowPasswordChangeRequired) {
     throw new AppError(403, "PASSWORD_CHANGE_REQUIRED", "You must change your temporary password before continuing.");
+  }
+  if (user.emailVerified === false && !options.allowEmailVerificationRequired) {
+    throw new AppError(403, "EMAIL_VERIFICATION_REQUIRED", "Verify your email address before continuing.");
   }
   return user;
 }

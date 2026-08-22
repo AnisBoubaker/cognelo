@@ -8,7 +8,7 @@ export function OPTIONS() {
 
 export async function PUT(request: NextRequest) {
   return handleRoute(async () => {
-    const user = await requireUser({ allowPasswordChangeRequired: true });
+    const user = await requireUser({ allowPasswordChangeRequired: true, allowEmailVerificationRequired: true });
     return json(await changeMyPassword(user, await readJson(request)));
   });
 }

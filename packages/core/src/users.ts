@@ -79,15 +79,20 @@ export async function updateUser(user: CurrentUser, userId: string, input: unkno
     throw notFound("User");
   }
   const email = data.email.toLowerCase();
+  const emailChanged = email !== existing.email;
   const emailOwner = await prisma.user.findUnique({ where: { email }, select: { id: true } });
   if (emailOwner && emailOwner.id !== userId) {
     throw new AppError(409, "USER_EMAIL_EXISTS", "A user with this email already exists.");
   }
   const roles = await resolveRoles(data.roles);
+  if (emailChanged) {
+    await prisma.emailVerificationChallenge.deleteMany({ where: { userId } });
+  }
   const updated = await prisma.user.update({
     where: { id: userId },
     data: {
       email,
+      ...(emailChanged ? { emailVerifiedAt: null } : {}),
       firstName: data.firstName,
       lastName: data.lastName,
       name: `${data.firstName} ${data.lastName}`.trim(),
@@ -136,7 +141,7 @@ async function resolveRoles(keys: RoleKey[]) {
   return roles;
 }
 
-function toAdminUser(user: { id: string; email: string; firstName: string | null; lastName: string | null; name: string | null; isActive: boolean; mustChangePassword: boolean; createdAt: Date; updatedAt: Date; roles: { role: { key: string; name: string } }[] }) {
+function toAdminUser(user: { id: string; email: string; firstName: string | null; lastName: string | null; name: string | null; isActive: boolean; mustChangePassword: boolean; emailVerifiedAt?: Date | null; createdAt: Date; updatedAt: Date; roles: { role: { key: string; name: string } }[] }) {
   return {
     id: user.id,
     email: user.email,
@@ -145,6 +150,7 @@ function toAdminUser(user: { id: string; email: string; firstName: string | null
     name: user.name,
     isActive: user.isActive,
     mustChangePassword: user.mustChangePassword,
+    emailVerified: Boolean(user.emailVerifiedAt),
     roles: user.roles.map(({ role }) => ({ key: role.key as RoleKey, name: role.name })),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
@@ -176,7 +182,8 @@ export async function updateMyProfile(user: CurrentUser, input: unknown) {
     firstName: updatedUser.firstName,
     lastName: updatedUser.lastName,
     roles: updatedUser.roles.map((userRole) => userRole.role.key as CurrentUser["roles"][number]),
-    mustChangePassword: updatedUser.mustChangePassword
+    mustChangePassword: updatedUser.mustChangePassword,
+    emailVerified: Boolean(updatedUser.emailVerifiedAt)
   };
 }
 

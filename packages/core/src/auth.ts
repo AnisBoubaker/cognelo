@@ -79,6 +79,7 @@ function toCurrentUser(user: {
   lastName?: string | null;
   roles: { role: { key: string } }[];
   mustChangePassword?: boolean;
+  emailVerifiedAt?: Date | null;
 }): CurrentUser {
   return {
     id: user.id,
@@ -87,7 +88,8 @@ function toCurrentUser(user: {
     firstName: user.firstName ?? firstNameFromName(user.name),
     lastName: user.lastName ?? lastNameFromName(user.name),
     roles: user.roles.map((userRole) => userRole.role.key as CurrentUser["roles"][number]),
-    mustChangePassword: Boolean(user.mustChangePassword)
+    mustChangePassword: Boolean(user.mustChangePassword),
+    emailVerified: Boolean(user.emailVerifiedAt)
   };
 }
 
@@ -157,6 +159,7 @@ async function signInUser(
     roles: { role: { key: string } }[];
     authVersion?: number;
     mustChangePassword?: boolean;
+    emailVerifiedAt?: Date | null;
   },
   secret: string
 ) {

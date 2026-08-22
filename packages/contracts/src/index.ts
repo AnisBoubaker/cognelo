@@ -44,6 +44,9 @@ export type EmailDeliveryTransport = z.infer<typeof EmailDeliveryTransportSchema
 export const SmtpSecurityModeSchema = z.enum(["starttls", "tls", "none"]);
 export type SmtpSecurityMode = z.infer<typeof SmtpSecurityModeSchema>;
 
+export const UiLocaleSchema = z.enum(["en", "fr", "zh", "ar"]);
+export type UiLocale = z.infer<typeof UiLocaleSchema>;
+
 export const RecordIdSchema = z.string().trim().min(1).max(191);
 export type RecordId = z.infer<typeof RecordIdSchema>;
 
@@ -187,6 +190,16 @@ export const EmailTestInputSchema = z.object({
 });
 export type EmailTestInput = z.infer<typeof EmailTestInputSchema>;
 
+export const EmailVerificationCodeInputSchema = z.object({
+  code: z.string().trim().regex(/^\d{6}$/, "Verification code must contain exactly six digits.")
+});
+export type EmailVerificationCodeInput = z.infer<typeof EmailVerificationCodeInputSchema>;
+
+export const EmailVerificationRequestSchema = z.object({
+  locale: UiLocaleSchema.optional().default("en")
+});
+export type EmailVerificationRequest = z.infer<typeof EmailVerificationRequestSchema>;
+
 export const ActivityPluginInstallationUpdateSchema = z.union([
   z.object({ action: z.literal("activate"), restoreBackupId: z.string().cuid().optional().nullable() }),
   z.object({ action: z.literal("deactivate") }),
@@ -222,7 +235,7 @@ export const CourseSettingsInputSchema = z.object({
 });
 export type CourseSettingsInput = z.infer<typeof CourseSettingsInputSchema>;
 
-export const SubjectTeachingLanguageSchema = z.enum(["en", "fr", "zh", "ar"]);
+export const SubjectTeachingLanguageSchema = UiLocaleSchema;
 export type SubjectTeachingLanguage = z.infer<typeof SubjectTeachingLanguageSchema>;
 
 export const SubjectInputSchema = z.object({
@@ -668,4 +681,5 @@ export type CurrentUser = {
   lastName: string | null;
   roles: RoleKey[];
   mustChangePassword?: boolean;
+  emailVerified?: boolean;
 };

@@ -7,7 +7,7 @@ import { LocaleSwitcher } from "@/components/locale-switcher";
 import { useAuth } from "@/components/auth-provider";
 import { api, ApiError } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import { getPrimaryLandingPath } from "@/lib/navigation";
+import { getAuthenticatedLandingPath, getPrimaryLandingPath } from "@/lib/navigation";
 
 export default function ForcedPasswordChangePage() {
   const { user, loading, logout, refresh } = useAuth();
@@ -43,7 +43,7 @@ export default function ForcedPasswordChangePage() {
     try {
       await api.changeMyPassword({ currentPassword, newPassword, confirmNewPassword });
       await refresh();
-      if (user) router.replace(getPrimaryLandingPath(user));
+      if (user) router.replace(getAuthenticatedLandingPath({ ...user, mustChangePassword: false }));
     } catch (err) {
       setError(err instanceof ApiError && err.code === "CURRENT_PASSWORD_INCORRECT"
         ? t("settings.currentPasswordIncorrect")
