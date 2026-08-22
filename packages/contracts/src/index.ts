@@ -38,6 +38,12 @@ export type AiAgentProvider = z.infer<typeof AiAgentProviderSchema>;
 export const AiAgentScopeSchema = z.enum(["personal", "global"]);
 export type AiAgentScope = z.infer<typeof AiAgentScopeSchema>;
 
+export const EmailDeliveryTransportSchema = z.enum(["smtp", "microsoft_graph"]);
+export type EmailDeliveryTransport = z.infer<typeof EmailDeliveryTransportSchema>;
+
+export const SmtpSecurityModeSchema = z.enum(["starttls", "tls", "none"]);
+export type SmtpSecurityMode = z.infer<typeof SmtpSecurityModeSchema>;
+
 export const RecordIdSchema = z.string().trim().min(1).max(191);
 export type RecordId = z.infer<typeof RecordIdSchema>;
 
@@ -150,6 +156,36 @@ export const AiAgentPreferencesInputSchema = z.object({
   questionAuthoringAiAgentConnectionId: z.string().cuid().nullable().optional()
 });
 export type AiAgentPreferencesInput = z.infer<typeof AiAgentPreferencesInputSchema>;
+
+const EmailSenderFields = {
+  fromName: z.string().trim().min(1).max(160).refine((value) => !/[\r\n]/.test(value), "Sender name cannot contain line breaks."),
+  fromEmail: z.string().trim().email().max(320)
+};
+
+export const EmailDeliveryConfigurationInputSchema = z.discriminatedUnion("transport", [
+  z.object({
+    ...EmailSenderFields,
+    transport: z.literal("smtp"),
+    smtpHost: z.string().trim().min(1).max(255),
+    smtpPort: z.coerce.number().int().min(1).max(65535),
+    smtpSecurity: SmtpSecurityModeSchema,
+    smtpUsername: z.string().trim().max(320).optional().default(""),
+    smtpPassword: z.string().max(2000).optional().default("")
+  }),
+  z.object({
+    ...EmailSenderFields,
+    transport: z.literal("microsoft_graph"),
+    graphTenantId: z.string().trim().min(1).max(255).regex(/^[A-Za-z0-9.-]+$/, "Microsoft tenant ID is invalid."),
+    graphClientId: z.string().trim().min(1).max(255).regex(/^[A-Za-z0-9.-]+$/, "Microsoft application ID is invalid."),
+    graphClientSecret: z.string().max(2000).optional().default("")
+  })
+]);
+export type EmailDeliveryConfigurationInput = z.infer<typeof EmailDeliveryConfigurationInputSchema>;
+
+export const EmailTestInputSchema = z.object({
+  recipientEmail: z.string().trim().email().max(320)
+});
+export type EmailTestInput = z.infer<typeof EmailTestInputSchema>;
 
 export const ActivityPluginInstallationUpdateSchema = z.union([
   z.object({ action: z.literal("activate"), restoreBackupId: z.string().cuid().optional().nullable() }),

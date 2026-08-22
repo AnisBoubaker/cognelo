@@ -78,6 +78,22 @@ describe("web API client", () => {
     );
   });
 
+  it("sends admin email tests to the settings endpoint without restricting the address", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+    const input = { recipientEmail: "outside@gmail.com" };
+
+    await expect(api.sendEmailDeliveryTest(input)).resolves.toEqual({ ok: true });
+    expect(fetch).toHaveBeenCalledWith(
+      `${expectedApiUrl}/api/settings/email/test`,
+      expect.objectContaining({ method: "POST", body: JSON.stringify(input) })
+    );
+  });
+
   it("dispatches the unauthorized event on 401 responses", async () => {
     const dispatchEvent = vi.fn();
     vi.stubGlobal("window", { dispatchEvent });

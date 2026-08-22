@@ -7,6 +7,7 @@ export * from "./authorization";
 export * from "./background-jobs";
 export * from "./course-content";
 export * from "./courses";
+export * from "./email-delivery";
 export * from "./errors";
 export * from "./gradebook";
 export * from "./groups";

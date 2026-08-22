@@ -47,6 +47,7 @@ docs/
 - Users: `/users/me` plus account-wide profile settings
 - Admin user management: list/filter accounts by role, first name, last name, or email; create accounts; edit account names, emails, and multi-role assignments; and issue forced-change temporary passwords
 - AI agent connections: account-wide model/provider connection records, with admin-managed global entries
+- Email delivery: admin-managed SMTP relay or Microsoft Graph OAuth configuration, encrypted credentials, and an admin-only test message
 - Authorization: global roles plus course memberships and activity-bank ownership
 - Subjects: shared curriculum containers with an explicit teaching language, subject-level material, activity banks, and subject-scoped knowledge graphs with draggable nodes and reconnectable arrow endpoints
 - Activity banks: reusable activity authoring libraries scoped to a subject and owned by an individual
@@ -137,6 +138,9 @@ DELETE /api/subjects/:subjectId/concepts/:conceptId/skills/:skillId
 POST   /api/subjects/:subjectId/prerequisites
 DELETE /api/subjects/:subjectId/prerequisites/:prerequisiteId
 POST   /api/subjects/:subjectId/knowledge-graph/generate
+GET    /api/settings/email
+PUT    /api/settings/email
+POST   /api/settings/email/test
 GET    /api/activity-banks
 POST   /api/activity-banks
 GET    /api/activity-banks/:activityBankId
@@ -442,6 +446,14 @@ Web design runner environment variable:
 WEB_DESIGN_RUNNER_URL=http://localhost:3456
 ```
 
+Email credential encryption key:
+
+```text
+EMAIL_CREDENTIALS_ENCRYPTION_KEY=<64 hexadecimal characters from `openssl rand -hex 32`>
+```
+
+This key encrypts SMTP passwords and Microsoft Graph client secrets stored in PostgreSQL. Keep it stable, instance-specific, backed up with the environment configuration, and outside source control. Email delivery is configured by administrators at `/settings/email`. SMTP works with any relay provider; Microsoft Graph uses an Entra application with `Mail.Send` application permission and administrator consent. The test action may target any valid address and always uses the last saved configuration.
+
 ## Frontend Notes
 
 - Login, settings, subjects, activity banks, courses, course detail, and edit flows are translated in English, French, and Chinese.
@@ -454,6 +466,7 @@ WEB_DESIGN_RUNNER_URL=http://localhost:3456
 - Administrators manage accounts under `/settings/users`, including server-side filters and conventional paged results (10 per page by default, with selectable page sizes), account creation with an initial password, one-or-many global role assignments, and temporary-password resets for other users. A reset invalidates existing sessions and requires the user to replace the temporary password at `/change-password` before other authenticated access. Administrators cannot remove their own admin role or use the reset action on themselves.
 - Users can update their first and last name and change their password after confirming the current password; email changes are reserved for administrators.
 - AI agent connection settings live under `/settings/ai-agents`; users can create personal connections, choose their question-authoring helper, and admins can create global connections for later course use.
+- Administrators configure outbound email under `/settings/email` using either an SMTP relay or Microsoft Graph app-only OAuth credentials. Stored passwords/secrets are encrypted and never returned to the browser. The test message can target any valid address; future system messages must use the guarded core path that accepts only active users or unclaimed participants in account activation.
 - Plugin authoring screens can use the selected question-authoring AI agent through server-side plugin routes; the MCQ plugin uses this to generate validated MCQ source from a teacher description.
 - Bank and course activity descriptions serve as student prompts and accept up to 30,000 characters so reading-comprehension activities can include complete passages.
 - All core and plugin authoring/settings forms should register unsaved-change state through `useUnsavedChangesGuard` from `@cognelo/activity-ui`. Registered forms show a shared confirmation dialog before internal navigation, with actions to continue editing, save and leave, or discard changes. Browser refresh/close uses the native browser warning.

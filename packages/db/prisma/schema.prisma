@@ -119,6 +119,17 @@ enum BackgroundJobStatus {
   cancelled
 }
 
+enum EmailDeliveryTransport {
+  smtp
+  microsoft_graph
+}
+
+enum SmtpSecurityMode {
+  starttls
+  tls
+  none
+}
+
 model User {
   id                      String                   @id @default(cuid())
   email                   String                   @unique
@@ -150,8 +161,30 @@ model User {
   grades                  Grade[]                  @relation("GradeUser")
   gradedGrades            Grade[]                  @relation("GradeGrader")
   gradeEvents             GradeEvent[]             @relation("GradeEventActor")
+  updatedEmailDeliveryConfigurations EmailDeliveryConfiguration[] @relation("EmailDeliveryConfigurationUpdater")
 
   @@index([email])
+}
+
+model EmailDeliveryConfiguration {
+  id                         String                 @id @default("global")
+  transport                  EmailDeliveryTransport
+  fromName                   String
+  fromEmail                  String
+  smtpHost                   String?
+  smtpPort                   Int?
+  smtpSecurity               SmtpSecurityMode?
+  smtpUsername               String?
+  smtpPasswordEncrypted      String?
+  graphTenantId              String?
+  graphClientId              String?
+  graphClientSecretEncrypted String?
+  updatedById                String?
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
+  updatedBy                  User?                  @relation("EmailDeliveryConfigurationUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([updatedById])
 }
 
 model BackgroundJob {
