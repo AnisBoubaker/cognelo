@@ -202,12 +202,19 @@ Generate a JWT secret separately:
 openssl rand -hex 48
 ```
 
+Generate a separate email-credential encryption key and preserve it in protected configuration backups:
+
+```bash
+openssl rand -hex 32
+```
+
 Use this environment template. Replace every placeholder and keep the public URLs free of trailing slashes:
 
 ```dotenv
 NODE_ENV=production
 DATABASE_URL="postgresql://cognelo_app1:DATABASE_PASSWORD@127.0.0.1:5432/cognelo_app1?schema=public&connection_limit=10&pool_timeout=10"
 JWT_SECRET="PASTE_96_CHARACTER_HEX_SECRET"
+EMAIL_CREDENTIALS_ENCRYPTION_KEY="PASTE_64_CHARACTER_HEX_KEY"
 NEXT_PUBLIC_API_URL="https://app1.cognelo.org"
 CORS_ORIGIN="https://app1.cognelo.org"
 
@@ -225,6 +232,16 @@ WEB_DESIGN_RUNNER_URL="http://10.80.0.2:3456"
 ```
 
 These addresses use the WireGuard inventory in Section 2. For another instance, use its allocated WireGuard subnet and sandbox ports. Leave the corresponding activity plugin disabled until that dependency is secured and reachable.
+
+`EMAIL_CREDENTIALS_ENCRYPTION_KEY` encrypts SMTP passwords and Microsoft Graph client secrets stored in the database. It must be unique per Cognelo instance, must not be derived from `JWT_SECRET`, and must remain unchanged while encrypted email credentials exist. Losing it makes those credentials unreadable; restore it together with the database or re-enter the credentials after setting a new key.
+
+After deployment, an administrator configures **Settings → Email delivery**:
+
+- For SMTP, use an authenticated relay, prefer STARTTLS on port 587 or direct TLS on port 465, and use a sender domain authorized by that relay.
+- For Microsoft Graph, create a Microsoft Entra application, grant Microsoft Graph `Mail.Send` application permission with administrator consent, create a client secret, and restrict the application to the intended sender mailbox using the institution's current Exchange application-access controls. The configured sender email must identify that mailbox. Microsoft 365 controls the final displayed mailbox name.
+- Send the admin test message to an external address and confirm both receipt and authentication results in the received headers.
+
+Transport configuration alone does not establish sender reputation. Publish SPF for the actual relay, enable DKIM through the sending service or Microsoft 365 tenant, and publish an aligned DMARC policy for the visible sender domain. Start DMARC in monitoring mode and tighten it after reviewing reports. Avoid mixing unrelated systems under one sending subdomain, keep mailing lists clean, and investigate repeated bounces before enabling future automated notifications.
 
 Check permissions:
 
@@ -1153,6 +1170,9 @@ Common failure causes:
 - Upload succeeds but files disappear after deployment: the deployment's `storage` symlink is missing or points to the wrong instance.
 - A plugin is absent from the picker: activate and enable it in administrator settings; also verify its external dependency when applicable.
 - Browser calls the wrong hostname: rebuild the web application after correcting `NEXT_PUBLIC_API_URL`; changing it only at runtime is insufficient.
+- Email configuration cannot save or test a credential: verify that `EMAIL_CREDENTIALS_ENCRYPTION_KEY` contains the same 64 hexadecimal characters used when the secret was stored, then inspect the API journal.
+- SMTP or Microsoft Graph rejects a test: verify relay credentials and TLS settings, or the Entra tenant/application IDs, client-secret validity, `Mail.Send` administrator consent, sender-mailbox access policy, and sender address.
+- Email arrives in spam: verify SPF, DKIM, and DMARC alignment for the visible sender domain and inspect the message authentication headers; changing Cognelo's transport alone does not repair domain reputation.
 - `ECONNREFUSED` for Judge0 or the runner: check the latest handshake with `wg show wg0` on the application host, then the WireGuard/UFW configuration and `docker compose ps` and logs on the sandbox host.
 - Judge0 returns `401 Unauthorized`: ensure `AUTHN_TOKEN` in `judge0.conf` exactly matches `JUDGE0_AUTH_TOKEN` in the instance `.env`, then restart the API after correcting it.
 - Judge0 returns a limit validation error: compare the limits sent by the coding-exercise plugin with `MAX_*` and `ALLOW_ENABLE_*` in `judge0.conf`.
@@ -1166,6 +1186,7 @@ Common failure causes:
 - On the application host expose only 22, 80, and 443. On the sandbox host expose only restricted SSH and WireGuard UDP from the application public IP. Restrict SSH source addresses where possible.
 - Keep PostgreSQL and Node listeners on loopback.
 - Use a unique JWT secret and database credentials per instance.
+- Use a unique email-credential encryption key per instance, protect it with `.env` backups, and never rotate or remove it without replacing stored email credentials.
 - Protect `.env`, backups, and deploy keys; never commit them.
 - Do not run production services as root.
 - Do not use the development seed in production.
@@ -1188,6 +1209,7 @@ Common failure causes:
 - [ ] Core and plugin migrations complete without errors.
 - [ ] `/api/health` succeeds locally and through HTTPS.
 - [ ] The administrator can sign in and change their password.
+- [ ] The administrator can save the chosen email route and deliver a test to an external address; received headers show expected SPF, DKIM, and DMARC results.
 - [ ] Required plugins are activated and enabled; unused plugins remain disabled.
 - [ ] An uploaded file survives a service restart and deployment switch.
 - [ ] A representative student submission reaches the gradebook.

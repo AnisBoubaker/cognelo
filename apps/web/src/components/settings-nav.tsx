@@ -26,6 +26,7 @@ export function SettingsNav() {
     ? [
         ...settingsItems,
         { href: "/settings/users", labelKey: "settings.usersNav", textKey: "settings.usersNavText" },
+        { href: "/settings/email", labelKey: "settings.emailDeliveryNav", textKey: "settings.emailDeliveryNavText" },
         { href: "/settings/plugins", labelKey: "settings.pluginsNav", textKey: "settings.pluginsNavText" }
       ]
     : settingsItems;

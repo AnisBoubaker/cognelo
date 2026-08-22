@@ -17,6 +17,8 @@ import {
   CourseMaterialInputSchema,
   CourseMaterialUpdateSchema,
   EnrollmentInputSchema,
+  EmailDeliveryConfigurationInputSchema,
+  EmailTestInputSchema,
   LoginInputSchema,
   SubjectInputSchema,
   SubjectKnowledgeGraphGenerationInputSchema,
@@ -28,6 +30,32 @@ import {
 } from "./index";
 
 describe("shared contract schemas", () => {
+  it("validates vendor-neutral and Microsoft institutional email routes", () => {
+    expect(EmailDeliveryConfigurationInputSchema.parse({
+      transport: "smtp",
+      fromName: "Cognelo",
+      fromEmail: "notify@example.test",
+      smtpHost: "smtp.example.test",
+      smtpPort: 587,
+      smtpSecurity: "starttls"
+    })).toMatchObject({ smtpUsername: "", smtpPassword: "" });
+    expect(EmailDeliveryConfigurationInputSchema.parse({
+      transport: "microsoft_graph",
+      fromName: "Cognelo",
+      fromEmail: "notify@institution.test",
+      graphTenantId: "tenant-id",
+      graphClientId: "client-id"
+    })).toMatchObject({ graphClientSecret: "" });
+    expect(() => EmailDeliveryConfigurationInputSchema.parse({
+      transport: "microsoft_graph",
+      fromName: "Cognelo",
+      fromEmail: "invalid",
+      graphTenantId: "tenant id",
+      graphClientId: "client-id"
+    })).toThrow();
+    expect(EmailTestInputSchema.parse({ recipientEmail: "outside@gmail.com" })).toEqual({ recipientEmail: "outside@gmail.com" });
+  });
+
   it("normalizes Test authoring defaults", () => {
     expect(TestCreateSchema.parse({ title: "Midterm" })).toMatchObject({
       title: "Midterm",

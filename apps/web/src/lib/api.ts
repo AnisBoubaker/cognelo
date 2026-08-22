@@ -25,6 +25,8 @@ import type {
   CourseUpdate,
   CurrentUser,
   ContentTypePluginInstallationUpdate,
+  EmailDeliveryConfigurationInput,
+  EmailTestInput,
   MaterialKind,
   SubjectInput,
   SubjectKnowledgeConceptInput,
@@ -72,6 +74,22 @@ export type AiAgentConnection = {
 
 export type AiAgentPreferences = {
   questionAuthoringAiAgentConnectionId: string | null;
+};
+
+export type EmailDeliveryConfiguration = {
+  configured: boolean;
+  transport: "smtp" | "microsoft_graph";
+  fromName: string;
+  fromEmail: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecurity: "starttls" | "tls" | "none";
+  smtpUsername: string;
+  hasSmtpPassword: boolean;
+  graphTenantId: string;
+  graphClientId: string;
+  hasGraphClientSecret: boolean;
+  updatedAt: string | null;
 };
 
 export type ActivityPluginInstallation = {
@@ -971,6 +989,18 @@ export const api = {
   deleteAiAgentConnection: (connectionId: string) =>
     request<{ ok: true }>(`/ai-agents/${connectionId}`, {
       method: "DELETE"
+    }),
+  emailDeliveryConfiguration: () =>
+    request<{ configuration: EmailDeliveryConfiguration }>("/settings/email"),
+  updateEmailDeliveryConfiguration: (input: EmailDeliveryConfigurationInput) =>
+    request<{ configuration: EmailDeliveryConfiguration }>("/settings/email", {
+      method: "PUT",
+      body: JSON.stringify(input)
+    }),
+  sendEmailDeliveryTest: (input: EmailTestInput) =>
+    request<{ ok: true }>("/settings/email/test", {
+      method: "POST",
+      body: JSON.stringify(input)
     }),
   activityPlugins: () => request<{ plugins: ActivityPluginInstallation[] }>("/plugins"),
   updateActivityPlugin: (pluginKey: string, input: ActivityPluginInstallationUpdate) =>
