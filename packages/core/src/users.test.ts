@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPrisma = vi.hoisted(() => ({
+  emailVerificationChallenge: { deleteMany: vi.fn() },
   user: {
     findUnique: vi.fn(),
     findMany: vi.fn(),
@@ -40,6 +41,8 @@ describe("user services", () => {
       name: "Ada Lovelace",
       firstName: "Ada",
       lastName: "Lovelace",
+      mustChangePassword: false,
+      emailVerifiedAt: new Date("2026-01-01T00:00:00.000Z"),
       roles: [{ role: { key: "teacher" } }]
     });
 
@@ -61,7 +64,9 @@ describe("user services", () => {
       name: "Ada Lovelace",
       firstName: "Ada",
       lastName: "Lovelace",
-      roles: ["teacher"]
+      roles: ["teacher"],
+      mustChangePassword: false,
+      emailVerified: true
     });
 
     expect(mockPrisma.user.update).toHaveBeenCalledWith(
@@ -170,5 +175,37 @@ describe("user services", () => {
   it("does not let an administrator remove their own admin role", async () => {
     await expect(updateUser(admin, admin.id, { email: admin.email, firstName: "Ada", lastName: "Admin", roles: ["teacher"] })).rejects.toMatchObject({ code: "CANNOT_REMOVE_OWN_ADMIN_ROLE" });
     expect(mockPrisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it("requires verification again when an administrator changes an email address", async () => {
+    mockPrisma.user.findUnique
+      .mockResolvedValueOnce({ id: "user-2", email: "old@example.test", roles: [] })
+      .mockResolvedValueOnce(null);
+    mockPrisma.role.findMany.mockResolvedValue([{ id: "role-student", key: "student", name: "Student" }]);
+    mockPrisma.user.update.mockResolvedValue({
+      id: "user-2",
+      email: "new@example.test",
+      firstName: "New",
+      lastName: "User",
+      name: "New User",
+      isActive: true,
+      mustChangePassword: false,
+      emailVerifiedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      roles: [{ role: { key: "student", name: "Student" } }]
+    });
+
+    await updateUser(admin, "user-2", {
+      email: "new@example.test",
+      firstName: "New",
+      lastName: "User",
+      roles: ["student"]
+    });
+
+    expect(mockPrisma.emailVerificationChallenge.deleteMany).toHaveBeenCalledWith({ where: { userId: "user-2" } });
+    expect(mockPrisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ email: "new@example.test", emailVerifiedAt: null })
+    }));
   });
 });

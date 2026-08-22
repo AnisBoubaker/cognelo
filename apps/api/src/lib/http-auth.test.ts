@@ -27,4 +27,12 @@ describe("forced password-change authorization", () => {
     await expect(requireUser()).rejects.toMatchObject({ status: 403, code: "PASSWORD_CHANGE_REQUIRED" });
     await expect(requireUser({ allowPasswordChangeRequired: true })).resolves.toBe(user);
   });
+
+  it("blocks unverified sessions except for the verification flow", async () => {
+    const user = { id: "user-2", roles: ["student"], mustChangePassword: false, emailVerified: false };
+    mocks.verifyAuthToken.mockResolvedValue(user);
+
+    await expect(requireUser()).rejects.toMatchObject({ status: 403, code: "EMAIL_VERIFICATION_REQUIRED" });
+    await expect(requireUser({ allowEmailVerificationRequired: true })).resolves.toBe(user);
+  });
 });

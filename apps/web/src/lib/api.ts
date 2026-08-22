@@ -27,6 +27,8 @@ import type {
   ContentTypePluginInstallationUpdate,
   EmailDeliveryConfigurationInput,
   EmailTestInput,
+  EmailVerificationCodeInput,
+  EmailVerificationRequest,
   MaterialKind,
   SubjectInput,
   SubjectKnowledgeConceptInput,
@@ -52,6 +54,7 @@ export type AdminUser = {
   name: string | null;
   isActive: boolean;
   mustChangePassword: boolean;
+  emailVerified: boolean;
   roles: Array<{ key: AdminRole["key"]; name: string }>;
   createdAt: string;
   updatedAt: string;
@@ -942,6 +945,16 @@ export const api = {
     }),
   activateAccount: (input: ActivateAccountInput) =>
     request<{ user: CurrentUser }>("/auth/activate", {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  requestEmailVerification: (input: EmailVerificationRequest) =>
+    request<{ required: boolean; sent: boolean; retryAfterSeconds: number; expiresInSeconds: number }>("/auth/email-verification/send", {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  verifyEmailAddress: (input: EmailVerificationCodeInput) =>
+    request<{ verified: true }>("/auth/email-verification/verify", {
       method: "POST",
       body: JSON.stringify(input)
     }),

@@ -52,8 +52,8 @@ async function upsertUser(email: string, name: string, roleKeys: string[]) {
   const lastName = lastNameParts.join(" ");
   const user = await prisma.user.upsert({
     where: { email },
-    update: { name, firstName, lastName, passwordHash, isActive: true },
-    create: { email, name, firstName, lastName, passwordHash }
+    update: { name, firstName, lastName, passwordHash, isActive: true, emailVerifiedAt: new Date() },
+    create: { email, name, firstName, lastName, passwordHash, emailVerifiedAt: new Date() }
   });
 
   for (const key of roleKeys) {

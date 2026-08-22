@@ -233,13 +233,15 @@ WEB_DESIGN_RUNNER_URL="http://10.80.0.2:3456"
 
 These addresses use the WireGuard inventory in Section 2. For another instance, use its allocated WireGuard subnet and sandbox ports. Leave the corresponding activity plugin disabled until that dependency is secured and reachable.
 
-`EMAIL_CREDENTIALS_ENCRYPTION_KEY` encrypts SMTP passwords and Microsoft Graph client secrets stored in the database. It must be unique per Cognelo instance, must not be derived from `JWT_SECRET`, and must remain unchanged while encrypted email credentials exist. Losing it makes those credentials unreadable; restore it together with the database or re-enter the credentials after setting a new key.
+`EMAIL_CREDENTIALS_ENCRYPTION_KEY` encrypts SMTP passwords and Microsoft Graph client secrets stored in the database and keys the HMAC hashes for one-time email-verification codes. It must be unique per Cognelo instance, must not be derived from `JWT_SECRET`, and must remain unchanged while encrypted email credentials or outstanding verification challenges exist. Losing it makes stored credentials unreadable and outstanding codes unusable; restore it together with the database or re-enter the credentials after setting a new key.
 
 After deployment, an administrator configures **Settings → Email delivery**:
 
 - For SMTP, use an authenticated relay, prefer STARTTLS on port 587 or direct TLS on port 465, and use a sender domain authorized by that relay.
 - For Microsoft Graph, create a Microsoft Entra application, grant Microsoft Graph `Mail.Send` application permission with administrator consent, create a client secret, and restrict the application to the intended sender mailbox using the institution's current Exchange application-access controls. The configured sender email must identify that mailbox. Microsoft 365 controls the final displayed mailbox name.
 - Send the admin test message to an external address and confirm both receipt and authentication results in the received headers.
+
+Configure and test email delivery before administrators create accounts or participants activate accounts. New accounts receive a six-digit verification code after authentication and cannot access normal application routes until verification succeeds. The code expires after 10 minutes, resends are limited to once per minute, and five incorrect attempts require a new code. Existing accounts are marked verified by the migration, and the production bootstrap administrator starts verified, so upgrading or bootstrapping does not depend on email already being configured.
 
 Transport configuration alone does not establish sender reputation. Publish SPF for the actual relay, enable DKIM through the sending service or Microsoft 365 tenant, and publish an aligned DMARC policy for the visible sender domain. Start DMARC in monitoring mode and tighten it after reviewing reports. Avoid mixing unrelated systems under one sending subdomain, keep mailing lists clean, and investigate repeated bounces before enabling future automated notifications.
 
@@ -1186,7 +1188,7 @@ Common failure causes:
 - On the application host expose only 22, 80, and 443. On the sandbox host expose only restricted SSH and WireGuard UDP from the application public IP. Restrict SSH source addresses where possible.
 - Keep PostgreSQL and Node listeners on loopback.
 - Use a unique JWT secret and database credentials per instance.
-- Use a unique email-credential encryption key per instance, protect it with `.env` backups, and never rotate or remove it without replacing stored email credentials.
+- Use a unique email-credential encryption key per instance, protect it with `.env` backups, and never rotate or remove it without replacing stored email credentials and invalidating outstanding verification codes.
 - Protect `.env`, backups, and deploy keys; never commit them.
 - Do not run production services as root.
 - Do not use the development seed in production.
@@ -1210,6 +1212,7 @@ Common failure causes:
 - [ ] `/api/health` succeeds locally and through HTTPS.
 - [ ] The administrator can sign in and change their password.
 - [ ] The administrator can save the chosen email route and deliver a test to an external address; received headers show expected SPF, DKIM, and DMARC results.
+- [ ] A newly created test account receives its first-login code at an external address, cannot access normal routes before verification, and can access its role landing page after entering the code.
 - [ ] Required plugins are activated and enabled; unused plugins remain disabled.
 - [ ] An uploaded file survives a service restart and deployment switch.
 - [ ] A representative student submission reaches the gradebook.

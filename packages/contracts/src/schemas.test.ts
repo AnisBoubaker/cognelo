@@ -19,6 +19,8 @@ import {
   EnrollmentInputSchema,
   EmailDeliveryConfigurationInputSchema,
   EmailTestInputSchema,
+  EmailVerificationCodeInputSchema,
+  EmailVerificationRequestSchema,
   LoginInputSchema,
   SubjectInputSchema,
   SubjectKnowledgeGraphGenerationInputSchema,
@@ -54,6 +56,11 @@ describe("shared contract schemas", () => {
       graphClientId: "client-id"
     })).toThrow();
     expect(EmailTestInputSchema.parse({ recipientEmail: "outside@gmail.com" })).toEqual({ recipientEmail: "outside@gmail.com" });
+    expect(EmailVerificationCodeInputSchema.parse({ code: "042731" })).toEqual({ code: "042731" });
+    expect(() => EmailVerificationCodeInputSchema.parse({ code: "12345" })).toThrow();
+    expect(EmailVerificationRequestSchema.parse({ locale: "fr" })).toEqual({ locale: "fr" });
+    expect(EmailVerificationRequestSchema.parse({})).toEqual({ locale: "en" });
+    expect(() => EmailVerificationRequestSchema.parse({ locale: "de" })).toThrow();
   });
 
   it("normalizes Test authoring defaults", () => {

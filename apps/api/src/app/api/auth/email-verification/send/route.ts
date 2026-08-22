@@ -1,14 +1,16 @@
 import type { NextRequest } from "next/server";
-import { changeMyPassword } from "@cognelo/core";
+import { getServerEnv } from "@cognelo/config";
+import { requestEmailVerification } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
 export function OPTIONS() {
   return options();
 }
 
-export async function PUT(request: NextRequest) {
+export async function POST(request: NextRequest) {
   return handleRoute(async () => {
     const user = await requireUser({ allowPasswordChangeRequired: true, allowEmailVerificationRequired: true });
-    return json(await changeMyPassword(user, await readJson(request)));
+    const env = getServerEnv();
+    return json(await requestEmailVerification(user, await readJson(request), env.EMAIL_CREDENTIALS_ENCRYPTION_KEY));
   });
 }

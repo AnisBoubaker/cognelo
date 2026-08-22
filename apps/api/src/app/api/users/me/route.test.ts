@@ -35,7 +35,10 @@ describe("users/me route", () => {
     const response = await GET();
 
     await expect(response.json()).resolves.toEqual({ user: { id: "user-1", email: "teacher@example.test" } });
-    expect(mocks.requireUser).toHaveBeenCalledWith({ allowPasswordChangeRequired: true });
+    expect(mocks.requireUser).toHaveBeenCalledWith({
+      allowPasswordChangeRequired: true,
+      allowEmailVerificationRequired: true
+    });
     expect(mocks.getMe).toHaveBeenCalledWith({ id: "user-1", roles: ["teacher"] });
   });
 
