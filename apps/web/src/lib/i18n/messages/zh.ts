@@ -604,7 +604,7 @@ export const zhMessages = {
       groupView: "分组",
       groupViewSelect: "选择分组视角",
       groupContentTitle: "{group} 的内容",
-      groupContentText: "此处按该分组的可见性显示继承的课程内容，并可移动或删除分组专属项目。",
+      groupContentText: "此处按该分组的可见性显示继承的课程内容。可使用各项目的菜单为此分组显示或隐藏项目。",
       hideInGroup: "在此分组中隐藏",
       showInGroup: "在此分组中显示",
       noGroups: "暂无分组。",
