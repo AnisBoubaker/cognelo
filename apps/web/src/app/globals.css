@@ -578,6 +578,14 @@ select:focus {
   width: 100%;
 }
 
+.account-version {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.2;
+  padding-top: 2px;
+  text-align: center;
+}
+
 .page {
   margin: 0 auto;
   max-width: none;
