@@ -8,6 +8,7 @@ import { useAuth } from "@/components/auth-provider";
 import { BrandLogo } from "@/components/brand-logo";
 import { AppIcon } from "@/components/app-icon";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { COGNELO_VERSION_LABEL } from "@/lib/app-version";
 import { useI18n } from "@/lib/i18n";
 import { getPrimaryLandingPath } from "@/lib/navigation";
 
@@ -132,6 +133,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   >
                     {t("common.logout")}
                   </button>
+                  <small className="account-version">{COGNELO_VERSION_LABEL}</small>
                 </div>
             </ContextMenu>
           </div>

@@ -359,6 +359,7 @@ All seeded accounts use `Password123!`.
 
 The application does not prefill the sign-in form. Browsers and password managers may offer saved credentials through the standard username and password autocomplete fields.
 The login submit control uses an explicit non-native appearance so Safari autofill cannot repaint its gradient away while retaining white text.
+The authenticated account menu shows the running web build as `Cognelo ver. …` beneath Logout. Builds derive this value from the nearest `cognelo-*` Git tag and include commit/dirtiness metadata when the checkout is not exactly tagged. `NEXT_PUBLIC_COGNELO_VERSION` can override the value at build time, and source archives without Git metadata fall back to the web package version.
 
 ```text
 admin@cognelo.local
