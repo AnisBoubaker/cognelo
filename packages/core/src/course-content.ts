@@ -645,7 +645,7 @@ export async function updateGroupContentItem(
     where: {
       id: contentItemId,
       courseId,
-      OR: [{ groupId }, { groupId: null, kind: "folder" }]
+      OR: [{ groupId }, { groupId: null }]
     }
   });
   if (!item) {
@@ -660,8 +660,8 @@ export async function updateGroupContentItem(
   if (input.isVisible === undefined || hasNonVisibilityUpdate) {
     throw new AppError(
       400,
-      "GROUP_SHARED_FOLDER_VISIBILITY_ONLY",
-      "A group can only override the visibility of a shared course folder."
+      "GROUP_INHERITED_CONTENT_VISIBILITY_ONLY",
+      "A group can only override the visibility of inherited course content."
     );
   }
 

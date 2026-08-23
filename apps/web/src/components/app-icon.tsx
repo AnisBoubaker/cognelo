@@ -6,6 +6,7 @@ import {
   IconArrowsExchange,
   IconBrandGithub,
   IconBrowser,
+  IconBook2,
   IconCheck,
   IconChecklist,
   IconClipboardCheck,
@@ -43,6 +44,7 @@ import {
   IconTextSize,
   IconTornado,
   IconTrash,
+  IconUsersGroup,
   IconVideo,
   IconX,
   type IconProps
@@ -53,9 +55,9 @@ import React, { type ComponentType } from "react";
 
 export type AppIconName =
   | "activityAdd" | "add" | "alert" | "assign" | "check" | "chevronDown" | "close"
-  | "compare" | "download" | "duplicate" | "down" | "drag" | "edit" | "folder"
+  | "compare" | "course" | "download" | "duplicate" | "down" | "drag" | "edit" | "folder"
   | "folderAdd" | "folderOpen" | "hidden" | "more" | "move" | "open" | "remove"
-  | "save" | "sync" | "up" | "visible";
+  | "participants" | "save" | "sync" | "up" | "visible";
 
 const appIcons = {
   activityAdd: IconFilePlus,
@@ -66,6 +68,7 @@ const appIcons = {
   chevronDown: IconChevronDown,
   close: IconX,
   compare: IconArrowsExchange,
+  course: IconBook2,
   download: IconDownload,
   duplicate: IconCopy,
   down: IconArrowDown,
@@ -78,6 +81,7 @@ const appIcons = {
   more: IconDots,
   move: IconArrowRight,
   open: IconExternalLink,
+  participants: IconUsersGroup,
   remove: IconTrash,
   save: IconFileCheck,
   sync: IconReplace,

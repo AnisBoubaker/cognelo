@@ -57,7 +57,7 @@ The API applies centralized Origin-based CSRF protection to every unsafe request
 - **Courses** own course lifecycle, course-local material, and course-local copies of bank activities.
 - **Course content resources** are plugin-backed non-activity resources such as GitHub repos, files, and text notes.
 - **Course materials** are legacy generic records retained for compatibility while new non-activity content moves to content type plugins.
-- **Sections** are currently implemented by `CourseGroup` records and own participants plus activity availability windows. Group deletion is transactional and cannot remove the final course group; participants can be deduplicated into another group, or permanently removed with their group-scoped gradebook records after explicit confirmation. The product language should move toward "section"; the generic word "group" is reserved for future concepts.
+- **Sections** are currently implemented by `CourseGroup` records and own participants plus activity availability windows. The course Participants tab manages all section rosters inline with modal group/participant forms. Group deletion is transactional and cannot remove the final course group; participants can be deduplicated into another group, or permanently removed with their group-scoped gradebook records after explicit confirmation. The product language should move toward "section"; the generic word "group" is reserved for future concepts.
 - **Activities** are typed course-local activity copies. Most delegate behavior to installed plugins; core-backed compound activities may use the same generic activity, assignment, content, attempt, and gradebook infrastructure without participating in plugin installation lifecycle.
 
 ## Content Model
@@ -124,7 +124,7 @@ Core owns:
 - `ContentTypePluginInstallation` and `ContentTypePluginTableBackup` for activation, enablement, and backup state
 - generic course/group content resource API routes and plugin dispatch
 
-Effective content visibility is also an authorization input. Student content listings omit hidden items and descendants of hidden folders, and non-manager assigned-activity resolution applies the same rule before serving the activity or dispatching any activity plugin route.
+Effective content visibility is also an authorization input. A group may override the visibility of any inherited course content item without mutating the course default; group-specific placements retain their own visibility and ordering. Student content listings omit hidden items and descendants of hidden folders, and non-manager assigned-activity resolution applies the same rule before serving the activity or dispatching any activity plugin route. Teachers select Course or a specific Group perspective from the course Content tab; separate group workspaces remain student-facing.
 
 Content type plugins own:
 

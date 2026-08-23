@@ -452,7 +452,7 @@ First plugin integration target:
 - Completed: add participant history view through per-row attempt history summaries.
 - Completed: course-wide teacher gradebook now defaults to activity-level summaries with submission count, graded count, mean grade, all-groups release/hide, detailed-results navigation, and expandable group-specific summaries with group release/hide controls. Group gradebook uses the same activity-summary layout scoped to the current group.
 - Completed: detailed results navigation supports course-wide activity results and group-scoped activity results through `?groupId=:groupId`.
-- Completed: detailed results back links return to the originating course/group gradebook tab through `?tab=gradebook`.
+- Completed: detailed-results back links return to the course Gradebook tab and preserve `groupId` when the report is group-scoped.
 - Completed: detailed activity results page lists per-student results and supports a Parsons "See answer" overlay with previous/next submission navigation and an "Include attempts" option for non-submission attempts/events.
 - Completed: add filters:
   - group
@@ -484,7 +484,7 @@ First plugin integration target:
 - Completed: keep student grade responses limited to normalized summaries and plugin-supported reviews of the authenticated student’s own attempts, without raw plugin grading payloads or hidden Test details.
 - Completed: released Parsons grades include sanitized deterministic feedback and a grading breakdown, using the same order/indentation messages that formative checks show, without exposing raw plugin payloads or grading timestamps.
 - Completed: the generic Grades view does not expose detailed attempt history; activity plugins may provide an authorized own-attempt review surface for repeatable assessments.
-- Completed: add teacher release/hide controls for each gradebook item in course and group gradebook views.
+- Completed: add teacher release/hide controls for each gradebook item in the course gradebook, including expandable group summaries and group-scoped detail links.
 - Completed: record release/hide audit events per student participant on the gradebook item.
 
 ### Phase 8: Manual Grading And Regrading
