@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   assertCanManageCourse: vi.fn(),
+  clearActivityResponseDraft: vi.fn(),
   getWebDesignExpectedResult: vi.fn(),
   listRecentWebDesignExerciseSubmissions: vi.fn(),
   listWebDesignExerciseTests: vi.fn(),
@@ -14,7 +15,8 @@ vi.mock("@cognelo/core", async () => {
   const actual = await vi.importActual<typeof import("@cognelo/core")>("@cognelo/core");
   return {
     ...actual,
-    assertCanManageCourse: mocks.assertCanManageCourse
+    assertCanManageCourse: mocks.assertCanManageCourse,
+    clearActivityResponseDraft: mocks.clearActivityResponseDraft
   };
 });
 
@@ -59,6 +61,7 @@ const context = {
 describe("web design coding exercise routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.clearActivityResponseDraft.mockResolvedValue({ ok: true });
     mocks.listWebDesignExerciseTests.mockResolvedValue({ tests: [] });
     mocks.replaceWebDesignExerciseTests.mockResolvedValue({ tests: [{ id: "test-1" }] });
     mocks.getWebDesignExpectedResult.mockResolvedValue({ expectedResult: null });
@@ -95,7 +98,17 @@ describe("web design coding exercise routes", () => {
     ).resolves.toEqual({ submission: { id: "run-1" } });
 
     await expect(
-      webDesignExerciseSubmitRoute.methods.POST?.({ request: new Request("http://test.local"), context, readJson: async () => ({ files: [file] }) })
+      webDesignExerciseSubmitRoute.methods.POST?.({
+        request: new Request("http://test.local"),
+        context: { ...context, groupId: "group-1" },
+        readJson: async () => ({ files: [file] })
+      })
     ).resolves.toEqual({ submission: { id: "submit-1" } });
+    expect(mocks.clearActivityResponseDraft).toHaveBeenCalledWith(
+      context.user,
+      "course-1",
+      "group-1",
+      "activity-1"
+    );
   });
 });

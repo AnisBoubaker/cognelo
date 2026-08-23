@@ -492,6 +492,7 @@ model CourseGroupParticipant {
   group            CourseGroup                @relation(fields: [groupId], references: [id], onDelete: Cascade)
   user             User?                      @relation(fields: [userId], references: [id], onDelete: SetNull)
   activityAttempts ActivityAttempt[]
+  activityResponseDrafts ActivityResponseDraft[]
   grades           Grade[]
   gradeEvents      GradeEvent[]
 
@@ -539,11 +540,26 @@ model CourseGroupActivity {
   activity         Activity            @relation(fields: [activityId], references: [id], onDelete: Cascade)
   gradebookItem    GradebookItem?
   activityAttempts ActivityAttempt[]
+  responseDrafts   ActivityResponseDraft[]
   contentItems     CourseContentItem[]
 
   @@unique([groupId, activityId])
   @@index([groupId, position])
   @@index([activityId])
+}
+
+model ActivityResponseDraft {
+  id              String                 @id @default(cuid())
+  groupActivityId String
+  participantId   String
+  state           Json                   @default("{}")
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  groupActivity   CourseGroupActivity    @relation(fields: [groupActivityId], references: [id], onDelete: Cascade)
+  participant     CourseGroupParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([groupActivityId, participantId])
+  @@index([participantId, updatedAt])
 }
 
 model CourseGroupHiddenCourseMaterial {

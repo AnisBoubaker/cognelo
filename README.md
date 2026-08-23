@@ -59,6 +59,7 @@ docs/
 - Content resources: plugin-backed non-activity course content such as GitHub repos, uploaded files, and Markdown text
 - Materials: legacy generic typed course material records retained for compatibility while new content uses content type plugins
 - Activities: typed course-local activity copies with JSON config and research metadata
+- Student response drafts: core-owned per-participant/per-assignment JSON state for resumable standalone activity work without consuming a gradebook attempt
 - Activity knowledge links: every bank and course activity editor receives a core-owned Concepts tab for linking the activity to its subject knowledge graph; AI authoring can use selected skills, suggest replacement skill links, or ignore knowledge links
 - Activity types: enabled type listing plus SDK definitions
 
@@ -224,6 +225,16 @@ Plugin-specific subroutes are dispatched through:
 /api/courses/:courseId/groups/:groupId/content-resources/:resourceId/[...pluginPath]
 ```
 
+Standalone student activity drafts use the generic assigned-activity route:
+
+```text
+GET    /api/courses/:courseId/groups/:groupId/activities/assigned/:activityId/draft
+PUT    /api/courses/:courseId/groups/:groupId/activities/assigned/:activityId/draft
+DELETE /api/courses/:courseId/groups/:groupId/activities/assigned/:activityId/draft
+```
+
+These drafts are separate from gradebook attempts. Compound Test children continue to autosave through their parent Test runtime and `TestItemAttempt` records rather than this standalone route.
+
 Concrete plugin routes are documented in the owning plugin package.
 
 The web app keeps plugin-specific React wiring in registries: activity renderers in `apps/web/src/lib/activity-renderers.tsx`, and content type settings/rendering in `apps/web/src/lib/content-type-renderers.tsx`. Route components should consume registered definitions and renderer entries instead of importing plugin packages or branching on concrete plugin keys.
@@ -262,6 +273,7 @@ Core Prisma entities include:
 - `ContentTypePluginInstallation`
 - `ContentTypePluginTableBackup`
 - `Activity`
+- `ActivityResponseDraft`
 - `CourseGroupActivity`
 - `GradebookItem`
 - `ActivityAttempt`

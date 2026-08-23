@@ -24,6 +24,7 @@ It is intentionally a planning artifact. Implementation should proceed iterative
 ### Attempts
 
 - Core owns shared attempt metadata in an `ActivityAttempt` table.
+- Unfinished standalone responses are stored separately in `ActivityResponseDraft`; autosaving ordinary work must not start or consume a gradebook attempt.
 - Plugins own plugin-specific attempt state, submissions, artifacts, events, and grading internals.
 - Attempt lifecycle is:
   - `started`
@@ -65,6 +66,7 @@ It is intentionally a planning artifact. Implementation should proceed iterative
 - Formative activity checks are recorded by the plugin for analytics/research, but they do not create core submissions or gradebook grades.
 - Summative activity submissions create core attempts, submissions, and grades when the plugin can grade immediately.
 - Every submission creates an attempt.
+- A successful final submission clears its standalone response draft on a best-effort basis; draft cleanup failure must not turn an already-recorded submission into a client-visible submission failure.
 - An attempt should not remain submitted without grading.
 - Teachers can manually grade or override automatic grades.
 - Teachers can regrade after tests/rubrics/reference answers change.

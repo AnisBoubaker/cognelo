@@ -26,6 +26,18 @@ describe("MCQ student attempt state", () => {
       completedSubmission: false
     });
   });
+
+  it("restores an autosaved draft without hiding completed submission history", () => {
+    expect(deriveMcqStudentAttemptState({
+      submission: { lifecycle: "graded", answers: { "question-1": ["old-choice"] } },
+      draft: { answers: { "question-1": ["draft-choice"] } },
+      availability: { canStart: true }
+    })).toEqual({
+      answers: { "question-1": ["draft-choice"] },
+      submitted: false,
+      completedSubmission: true
+    });
+  });
 });
 
 describe("MCQ source parser", () => {

@@ -26,6 +26,8 @@ Students will be able to:
 - submit code for evaluation against hidden tests
 - resume their work and review prior results
 
+Standalone student source code autosaves through the core `ActivityResponseDraft` state host and is restored on reload. Successful final submission clears that draft. Embedded Test coding exercises continue to use the Test execution host and its `TestItemAttempt` autosave queue.
+
 ## Package Contents
 
 ```text

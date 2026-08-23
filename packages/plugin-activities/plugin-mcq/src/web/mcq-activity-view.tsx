@@ -17,6 +17,7 @@ type ActivityLike = {
   description: string;
   config?: Record<string, unknown>;
   assignment?: {
+    id?: string;
     metadata?: Record<string, unknown>;
   };
 };
@@ -29,6 +30,7 @@ type McqActivityViewProps = {
   submissionClient?: {
     getStatus?: (activityId: string) => Promise<{
       submission: { answers: StudentAnswerState; lifecycle?: string } | null;
+      draft?: { answers: StudentAnswerState } | null;
       grade?: { rawScore: number; rawMaxScore: number; normalizedScore?: number; normalizedMaxScore?: number } | null;
       attempts?: Array<{
         submission: { id: string; attemptNumber: number; submittedAt: string | null; answers: StudentAnswerState; lifecycle?: string };
@@ -293,7 +295,8 @@ export function McqActivityView({
   const [studentAnswers, setStudentAnswers] = useState<StudentAnswerState>({});
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const isSummativeStudentSession = !canManage && activity.assignment?.metadata?.assessmentMode === "summative" && Boolean(submissionClient);
+  const isStudentSession = !canManage && Boolean(submissionClient);
+  const isSummativeStudentSession = isStudentSession && activity.assignment?.metadata?.assessmentMode === "summative";
   const activityConfigKey = useMemo(() => JSON.stringify(activity.config ?? {}), [activity.config]);
 
   useEffect(() => {
@@ -353,7 +356,7 @@ export function McqActivityView({
   const hasUnsavedChanges = canManage && !snapshotsEqual(currentSnapshot, savedSnapshot);
 
   useEffect(() => {
-    if (!isSummativeStudentSession || !submissionClient?.getStatus) {
+    if (!isStudentSession || !submissionClient?.getStatus) {
       setSubmissionStatusReady(true);
       return;
     }
@@ -406,7 +409,7 @@ export function McqActivityView({
   }, [
     activity.id,
     copy.submitError,
-    isSummativeStudentSession,
+    isStudentSession,
     notifications,
     onNewAttemptAvailabilityChange,
     onPreviousSubmissionsAvailabilityChange,
@@ -416,7 +419,7 @@ export function McqActivityView({
   const selectedSubmissionReview = submissionReviews.find((review) => review.id === selectedSubmissionId) ?? submissionReviews[0] ?? null;
 
   useEffect(() => {
-    if (!isSummativeStudentSession || !submissionClient?.save || !submissionStatusReady || submitted) {
+    if (!isStudentSession || !submissionClient?.save || !submissionStatusReady || submitted) {
       return;
     }
     const save = () => {
@@ -430,7 +433,7 @@ export function McqActivityView({
     }
     const timeout = window.setTimeout(save, autosaveDelayMs);
     return () => window.clearTimeout(timeout);
-  }, [activity.id, autosaveDelayMs, copy.submitError, isSummativeStudentSession, notifications, studentAnswers, submissionClient, submissionStatusReady, submitted]);
+  }, [activity.id, autosaveDelayMs, copy.submitError, isStudentSession, notifications, studentAnswers, submissionClient, submissionStatusReady, submitted]);
 
   const discardChanges = useCallback(() => {
     setTitle(savedSnapshot.title);

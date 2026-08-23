@@ -35,6 +35,7 @@ This file is for coding-exercises-specific memory only.
 - Group-scoped student coding-exercise access uses assigned-activity routes under `groups/:groupId/activities/assigned/:activityId/...` to avoid route conflicts with teacher assignment-management endpoints.
 - Coding plugin routes must remain plugin-owned and mounted through generic course/group plugin dispatchers, not hardcoded as plugin-specific API route files in `apps/api`.
 - Student coding uses the shared Monaco editor from `@cognelo/activity-ui`, while teacher authoring still uses the in-house editor for the lighter authoring workflow.
+- Standalone student source code loads and autosaves through core `ActivityResponseDraft`; serialized saves prevent stale requests from winning, activity-object identity refreshes do not reset the editor, and final submission clears the draft. Test-embedded coding exercises remain on the Test execution host and `TestItemAttempt` autosave path.
 - Plugin-owned user-facing translations should live inside the plugin package rather than in the host app's global i18n file.
 - Teacher authoring forms must register with the shared unsaved-change guard from `@cognelo/activity-ui`; future coding-exercise tabs/settings should keep `isDirty`, save, and discard behavior wired through `useUnsavedChangesGuard`.
 - The teacher authoring form exposes that same combined public/private draft through the shared responsive `EditActionBar`; its status becomes saved only after the entire multi-part save succeeds.

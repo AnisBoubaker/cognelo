@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   assertCanManageActivityBank: vi.fn(),
   assertCanManageCourse: vi.fn(),
+  clearActivityResponseDraft: vi.fn(),
   generateCodingExercisePrompt: vi.fn(),
   generateCodingExerciseSolution: vi.fn(),
   generateCodingExerciseTests: vi.fn(),
@@ -21,7 +22,8 @@ vi.mock("@cognelo/core", async () => {
   return {
     ...actual,
     assertCanManageActivityBank: mocks.assertCanManageActivityBank,
-    assertCanManageCourse: mocks.assertCanManageCourse
+    assertCanManageCourse: mocks.assertCanManageCourse,
+    clearActivityResponseDraft: mocks.clearActivityResponseDraft
   };
 });
 
@@ -81,6 +83,7 @@ const context = {
 describe("coding exercise plugin routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.clearActivityResponseDraft.mockResolvedValue({ ok: true });
     mocks.listRecentCodingExerciseExecutions.mockResolvedValue([{ id: "run-1", kind: "run" }, { id: "submit-1", kind: "submit" }]);
     mocks.runCodingExercise.mockResolvedValue({ id: "run-1" });
     mocks.submitCodingExercise.mockResolvedValue({ id: "submit-1" });
@@ -106,10 +109,16 @@ describe("coding exercise plugin routes", () => {
     await expect(
       codingExerciseSubmitRoute.methods.POST?.({
         request: new Request("http://test.local"),
-        context,
+        context: { ...context, groupId: "group-1" },
         readJson: async () => ({ sourceCode: "print(1)" })
       })
     ).resolves.toEqual({ execution: { id: "submit-1" } });
+    expect(mocks.clearActivityResponseDraft).toHaveBeenCalledWith(
+      context.user,
+      "course-1",
+      "group-1",
+      "activity-1"
+    );
   });
 
   it("manages hidden tests only in course context with teacher permission", async () => {

@@ -24,6 +24,10 @@ type ActivityLike = {
   title: string;
   description: string;
   config?: Record<string, unknown>;
+  assignment?: {
+    id?: string;
+    metadata?: Record<string, unknown>;
+  };
 };
 
 type HiddenTest = {
@@ -259,6 +263,7 @@ export function CodingExerciseActivityView({
   const [recentSubmissions, setRecentSubmissions] = useState<CodingExecution[]>([]);
   const [workingAction, setWorkingAction] = useState<"run" | "submit" | null>(null);
   const [executionStateLoaded, setExecutionStateLoaded] = useState(!executionStateHost);
+  const activityConfigKey = useMemo(() => JSON.stringify(activity.config ?? {}), [activity.config]);
   const sampleValidationTests = getReferenceValidationTests(referenceValidationSummary, "sampleTests");
   const hiddenValidationTests = getReferenceValidationTests(referenceValidationSummary, "hiddenTests");
   const templateProjection = buildCodingExerciseStudentTemplateProjectionFromSource(
@@ -318,7 +323,7 @@ export function CodingExerciseActivityView({
     setError("");
     setReplacementDialog(null);
     previousActivityIdRef.current = activity.id;
-  }, [activity]);
+  }, [activity.id, activity.title, activity.description, activityConfigKey, canManage]);
 
   useEffect(() => {
     if (canManage || !executionStateHost) {
@@ -852,6 +857,7 @@ export function CodingExerciseActivityView({
       const result = await codingClient.submitCode(course.id, activity.id, {
         sourceCode: editorCode
       });
+      await executionStateHost?.clear?.().catch(() => undefined);
       setSubmitExecution(result.execution);
       const submissions = await codingClient.listSubmissions(course.id, activity.id);
       setRecentSubmissions(submissions.executions);
