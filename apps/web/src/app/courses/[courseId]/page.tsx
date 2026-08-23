@@ -1,6 +1,6 @@
 "use client";
 
-import { ConfirmationDialog, ContextMenu, MarkdownRenderer } from "@cognelo/activity-ui";
+import { ContextMenu, MarkdownRenderer } from "@cognelo/activity-ui";
 import { resolveLocalizedText, type ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -11,6 +11,7 @@ import {
   MouseEvent as ReactMouseEvent,
   PointerEvent,
   useEffect,
+  useMemo,
   useRef,
   useState
 } from "react";
@@ -19,6 +20,7 @@ import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
 import { ActivityTypeIcon, AppIcon, FolderContentIcon as SharedFolderContentIcon } from "@/components/app-icon";
 import { useAuth } from "@/components/auth-provider";
 import { CourseSettingsPanel, type CourseSettingsSection } from "@/components/course-settings-panel";
+import { CourseParticipantsPanel } from "@/components/course-participants-panel";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import {
@@ -29,6 +31,7 @@ import {
   ActivityType,
   AiAgentConnection,
   Course,
+  CourseGroup,
   CourseContentItem,
   CourseContentResource,
   CourseGradebook,
@@ -49,14 +52,6 @@ type ContentContextMenu = {
   point?: { x: number; y: number };
 };
 type BankSyncAction = "retrieve_original" | "retrieve_latest" | "publish_to_bank";
-type GroupDeleteState = {
-  group: NonNullable<Course["groups"]>[number];
-  participants: NonNullable<Awaited<ReturnType<typeof api.group>>["group"]["participants"]>;
-  step: "options" | "confirm-empty" | "confirm-permanent";
-  mode: "move" | "delete";
-  targetGroupId: string;
-};
-
 const contentDragActivationDistance = 8;
 
 export default function CourseDetailPage() {
@@ -67,6 +62,11 @@ export default function CourseDetailPage() {
   const { user, loading: authLoading } = useAuth();
   const { locale, t } = useI18n();
   const [course, setCourse] = useState<Course | null>(null);
+  const [contentGroup, setContentGroup] = useState<CourseGroup | null>(null);
+  const [contentViewSelectorMode, setContentViewSelectorMode] = useState<"course" | "group">(
+    () => searchParams.get("view") === "group" ? "group" : "course"
+  );
+  const [lastSelectedContentGroupId, setLastSelectedContentGroupId] = useState<string | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [contentTypeDefinitions, setContentTypeDefinitions] = useState<ContentTypeDefinition[]>([]);
@@ -77,7 +77,7 @@ export default function CourseDetailPage() {
   const [aiAgentConnections, setAiAgentConnections] = useState<AiAgentConnection[]>([]);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
   const [contentItems, setContentItems] = useState<CourseContentItem[]>([]);
-  const [gradebookGroupId, setGradebookGroupId] = useState("");
+  const [gradebookGroupId, setGradebookGroupId] = useState(() => searchParams.get("tab") === "gradebook" ? searchParams.get("groupId") ?? "" : "");
   const [gradebookActivityId, setGradebookActivityId] = useState("");
   const [gradebookStatus, setGradebookStatus] = useState<GradebookStatus>("all");
   const [savingReleaseItemId, setSavingReleaseItemId] = useState<string | null>(null);
@@ -105,12 +105,6 @@ export default function CourseDetailPage() {
   const [assignAllGradeStrategy, setAssignAllGradeStrategy] = useState<"latest" | "best" | "first" | "weighted_average">("latest");
   const [assignAllDropLowestAttempt, setAssignAllDropLowestAttempt] = useState(false);
   const [assignAllSavingActivityId, setAssignAllSavingActivityId] = useState<string | null>(null);
-  const [groupTitle, setGroupTitle] = useState("");
-  const [isAddingGroup, setIsAddingGroup] = useState(false);
-  const [groupActionMenuId, setGroupActionMenuId] = useState<string | null>(null);
-  const [groupActionMenuAnchor, setGroupActionMenuAnchor] = useState<HTMLButtonElement | null>(null);
-  const [groupDeleteState, setGroupDeleteState] = useState<GroupDeleteState | null>(null);
-  const [isDeletingGroup, setIsDeletingGroup] = useState(false);
   const [settingsContentItemId, setSettingsContentItemId] = useState<string | null>(null);
   const [settingsMaterialTitle, setSettingsMaterialTitle] = useState("");
   const [settingsMaterialUrl, setSettingsMaterialUrl] = useState("");
@@ -140,6 +134,15 @@ export default function CourseDetailPage() {
   const folderTitleInputRef = useRef<HTMLInputElement | null>(null);
   const cancelFolderEditRef = useRef(false);
   const skipFolderBlurRef = useRef(false);
+  const initializedGroupSelectionCourseIdRef = useRef<string | null>(null);
+  const requestedContentGroupId = searchParams.get("view") === "group" ? searchParams.get("groupId") : null;
+
+  useEffect(() => {
+    setContentViewSelectorMode(requestedContentGroupId ? "group" : "course");
+    if (requestedContentGroupId) {
+      setLastSelectedContentGroupId(requestedContentGroupId);
+    }
+  }, [requestedContentGroupId]);
 
   async function refresh() {
     const [courseResult, typeResult] = await Promise.all([api.course(courseId), api.activityTypes()]);
@@ -149,16 +152,20 @@ export default function CourseDetailPage() {
     const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
     const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher";
     if (userCanManage) {
-      const [gradebookResult, contentResult, contentTypesResult, contentResourcesResult, subjectsResult] = await Promise.all([
+      const validContentGroupId = requestedContentGroupId && courseResult.course.groups?.some((group) => group.id === requestedContentGroupId)
+        ? requestedContentGroupId
+        : null;
+      const [gradebookResult, contentResult, contentTypesResult, contentResourcesResult, subjectsResult, contentGroupResult] = await Promise.all([
         api.courseGradebook(courseId, {
           groupId: gradebookGroupId || undefined,
           activityId: gradebookActivityId || undefined,
           status: gradebookStatus
         }),
-        api.courseContent(courseId),
+        validContentGroupId ? api.groupContent(courseId, validContentGroupId) : api.courseContent(courseId),
         api.courseContentTypes(courseId),
-        api.courseContentResources(courseId),
-        api.subjects()
+        validContentGroupId ? api.groupContentResources(courseId, validContentGroupId) : api.courseContentResources(courseId),
+        api.subjects(),
+        validContentGroupId ? api.group(courseId, validContentGroupId) : Promise.resolve(null)
       ]);
       setGradebook(gradebookResult.gradebook);
       setContentItems(contentResult.contentItems);
@@ -166,6 +173,7 @@ export default function CourseDetailPage() {
       setActiveContentTypeDefinitions(contentTypesResult.activeContentTypes ?? contentTypesResult.contentTypes);
       setContentResources(contentResourcesResult.resources);
       setSubjects(subjectsResult.subjects);
+      setContentGroup(contentGroupResult?.group ?? null);
     } else {
       setGradebook(null);
       setContentItems([]);
@@ -173,6 +181,7 @@ export default function CourseDetailPage() {
       setActiveContentTypeDefinitions([]);
       setContentResources([]);
       setSubjects([]);
+      setContentGroup(null);
     }
     api
       .aiAgentConnections()
@@ -188,7 +197,7 @@ export default function CourseDetailPage() {
 
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("courseDetail.loadError")));
-  }, [courseId, t, user, gradebookGroupId, gradebookActivityId, gradebookStatus]);
+  }, [courseId, t, user, gradebookGroupId, gradebookActivityId, gradebookStatus, requestedContentGroupId]);
 
   useEffect(() => {
     if (!editingFolderId) {
@@ -269,9 +278,53 @@ export default function CourseDetailPage() {
 
   const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
   const canManage = user?.roles.includes("admin") || membershipRole === "owner" || membershipRole === "teacher";
-  const studentRedirectGroupId = course && !canManage ? course.groups?.[0]?.id : null;
+  const sortedCourseGroups = useMemo(
+    () => [...(course?.groups ?? [])].sort((left, right) => compareGroupTitles(left.title, right.title, locale)),
+    [course?.groups, locale]
+  );
+  const sortedGradebookGroups = useMemo(
+    () => [...(gradebook?.groups ?? [])].sort((left, right) => compareGroupTitles(left.title, right.title, locale)),
+    [gradebook?.groups, locale]
+  );
+  const studentRedirectGroupId = course && !canManage ? sortedCourseGroups[0]?.id : null;
   const gradebookActivities = buildGradebookActivitySummaries(gradebook?.items ?? [], gradebook?.rows ?? []);
   const gradebookOverview = buildGradebookOverview(gradebookActivities);
+
+  useEffect(() => {
+    if (!course || course.id !== courseId || initializedGroupSelectionCourseIdRef.current === courseId) {
+      return;
+    }
+    initializedGroupSelectionCourseIdRef.current = courseId;
+    setLastSelectedContentGroupId(null);
+    if (!requestedContentGroupId || !sortedCourseGroups.length) {
+      return;
+    }
+
+    const firstGroupId = sortedCourseGroups[0].id;
+    const requestedGroupExists = sortedCourseGroups.some((group) => group.id === requestedContentGroupId);
+    const navigationEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    const initialGroupId = navigationEntry?.type === "reload"
+      ? firstGroupId
+      : requestedGroupExists ? requestedContentGroupId : firstGroupId;
+    setContentViewSelectorMode("group");
+    setLastSelectedContentGroupId(initialGroupId);
+    if (initialGroupId !== requestedContentGroupId) {
+      router.replace(`/courses/${courseId}?tab=content&view=group&groupId=${encodeURIComponent(initialGroupId)}`);
+    }
+  }, [course, courseId, requestedContentGroupId, router, sortedCourseGroups]);
+
+  function openGroupContentView() {
+    const rememberedGroupId = lastSelectedContentGroupId && sortedCourseGroups.some((group) => group.id === lastSelectedContentGroupId)
+      ? lastSelectedContentGroupId
+      : null;
+    const groupId = rememberedGroupId ?? sortedCourseGroups[0]?.id;
+    if (!groupId) {
+      return;
+    }
+    setContentViewSelectorMode("group");
+    setLastSelectedContentGroupId(groupId);
+    router.push(`/courses/${courseId}?tab=content&view=group&groupId=${encodeURIComponent(groupId)}`);
+  }
 
   useEffect(() => {
     if (studentRedirectGroupId) {
@@ -454,60 +507,6 @@ export default function CourseDetailPage() {
     } finally {
       setIsAddingActivity(false);
     }
-  }
-
-  async function createGroup(event: FormEvent) {
-    event.preventDefault();
-    setError("");
-    try {
-      await api.createGroup(courseId, {
-        title: groupTitle
-      });
-      await refresh();
-      setGroupTitle("");
-      setIsAddingGroup(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("courseDetail.createGroupError"));
-    }
-  }
-
-  async function openGroupDelete(group: NonNullable<Course["groups"]>[number]) {
-    setGroupActionMenuId(null);
-    setGroupActionMenuAnchor(null);
-    setError("");
-    try {
-      const result = await api.group(courseId, group.id);
-      const participants = result.group.participants ?? [];
-      const hasLearners = participants.some((participant) => participant.role === "student");
-      setGroupDeleteState({ group, participants, step: hasLearners ? "options" : "confirm-empty", mode: "move", targetGroupId: "" });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("courseDetail.deleteGroupError"));
-    }
-  }
-
-  async function deleteGroup(input: { action: "move"; targetGroupId: string } | { action: "delete"; confirmParticipantDeletion?: boolean }) {
-    if (!groupDeleteState) return;
-    setIsDeletingGroup(true);
-    setError("");
-    try {
-      await api.deleteGroup(courseId, groupDeleteState.group.id, input);
-      setGroupDeleteState(null);
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("courseDetail.deleteGroupError"));
-    } finally {
-      setIsDeletingGroup(false);
-    }
-  }
-
-  function submitGroupDeleteOptions(event: FormEvent) {
-    event.preventDefault();
-    if (!groupDeleteState) return;
-    if (groupDeleteState.mode === "delete") {
-      setGroupDeleteState({ ...groupDeleteState, step: "confirm-permanent" });
-      return;
-    }
-    void deleteGroup({ action: "move", targetGroupId: groupDeleteState.targetGroupId });
   }
 
   async function removeActivity(activity: NonNullable<Course["activities"]>[number]) {
@@ -712,10 +711,11 @@ export default function CourseDetailPage() {
   const pickerContentTypes = contentTypeDefinitions;
   const visibleContentItems = flattenContentItems(contentItems, collapsedContentFolderIds);
   const courseMaterialById = new Map(materials.map((material) => [material.id, material]));
+  const groupMaterialById = new Map((contentGroup?.materials ?? []).map((material) => [material.id, material]));
   const contentResourceById = new Map(contentResources.map((resource) => [resource.id, resource]));
   const contentTypeByKey = new Map(activeContentTypeDefinitions.map((definition) => [definition.key, definition]));
   const courseActivityById = new Map((course?.activities ?? []).map((activity) => [activity.id, activity]));
-  const courseGroupById = new Map((course?.groups ?? []).map((group) => [group.id, group]));
+  const groupAssignmentById = new Map((contentGroup?.activities ?? []).map((assignment) => [assignment.id, assignment]));
   const settingsContentItem = settingsContentItemId ? contentItems.find((item) => item.id === settingsContentItemId) ?? null : null;
   const settingsActivity = settingsContentItem?.activityId ? courseActivityById.get(settingsContentItem.activityId) ?? null : null;
   const settingsActivityIsTest = settingsActivity?.activityType.key === "test";
@@ -723,8 +723,8 @@ export default function CourseDetailPage() {
   const settingsContentType = settingsContentResource ? contentTypeByKey.get(settingsContentResource.contentTypeKey) ?? null : null;
   const SettingsContentTypeRenderer = resolveContentTypeSettingsRenderer(settingsContentType?.settingsRendererKey);
   const requestedCourseTab = searchParams.get("tab");
-  const activeCourseTab = requestedCourseTab === "groups" || requestedCourseTab === "gradebook" || requestedCourseTab === "settings"
-    ? requestedCourseTab
+  const activeCourseTab = requestedCourseTab === "participants" || requestedCourseTab === "groups" || requestedCourseTab === "gradebook" || requestedCourseTab === "settings"
+    ? requestedCourseTab === "groups" ? "participants" : requestedCourseTab
     : "content";
   const activeCourseSettingsSection: CourseSettingsSection = searchParams.get("section") === "ai" ? "ai" : "general";
   const pickerPlacementPanel = (
@@ -920,7 +920,11 @@ export default function CourseDetailPage() {
   async function toggleContentVisibility(item: CourseContentItem) {
     setMaterialActionError("");
     try {
-      await updateContentInScope(item, { isVisible: !item.isVisible });
+      if (contentGroup) {
+        await api.updateGroupContentItem(courseId, contentGroup.id, item.id, { isVisible: !item.isVisible });
+      } else {
+        await updateContentInScope(item, { isVisible: !item.isVisible });
+      }
       await refresh();
     } catch (err) {
       setMaterialActionError(err instanceof Error ? err.message : t("courseDetail.contentUpdateError"));
@@ -936,12 +940,22 @@ export default function CourseDetailPage() {
 
     setMaterialActionError("");
     try {
-      if (item.activityId) {
+      if (contentGroup && item.courseGroupActivityId) {
+        await api.deleteGroupActivityAssignment(courseId, contentGroup.id, item.courseGroupActivityId);
+      } else if (item.activityId) {
         await api.deleteActivity(courseId, item.activityId);
       } else if (item.materialId) {
-        await api.deleteMaterial(courseId, item.materialId);
+        if (contentGroup && item.groupId && groupMaterialById.has(item.materialId)) {
+          await api.deleteGroupMaterial(courseId, contentGroup.id, item.materialId);
+        } else {
+          await api.deleteMaterial(courseId, item.materialId);
+        }
       } else if (item.contentResourceId) {
-        await api.deleteCourseContentResource(courseId, item.contentResourceId);
+        if (contentGroup && item.groupId) {
+          await api.deleteGroupContentResource(courseId, contentGroup.id, item.contentResourceId);
+        } else {
+          await api.deleteCourseContentResource(courseId, item.contentResourceId);
+        }
       } else {
         await deleteContentInScope(item);
       }
@@ -1171,7 +1185,7 @@ export default function CourseDetailPage() {
   }
 
   function handleContentPointerDown(item: CourseContentItem, event: PointerEvent) {
-    if (event.button !== 0) {
+    if (event.button !== 0 || (contentGroup && !item.groupId)) {
       return;
     }
     event.preventDefault();
@@ -1292,7 +1306,10 @@ export default function CourseDetailPage() {
       return contentResourceById.get(item.contentResourceId)?.title ?? item.titleSnapshot ?? t("courseDetail.untitledMaterial");
     }
     if (item.materialId) {
-      return courseMaterialById.get(item.materialId)?.title ?? item.titleSnapshot ?? t("courseDetail.untitledMaterial");
+      return courseMaterialById.get(item.materialId)?.title ?? groupMaterialById.get(item.materialId)?.title ?? item.titleSnapshot ?? t("courseDetail.untitledMaterial");
+    }
+    if (item.courseGroupActivityId) {
+      return groupAssignmentById.get(item.courseGroupActivityId)?.activity.title ?? item.titleSnapshot ?? t("courseDetail.defaultActivityTitle");
     }
     if (item.activityId) {
       return courseActivityById.get(item.activityId)?.title ?? item.titleSnapshot ?? t("courseDetail.defaultActivityTitle");
@@ -1301,11 +1318,22 @@ export default function CourseDetailPage() {
   }
 
   function contentItemHref(item: CourseContentItem) {
+    if (contentGroup && item.courseGroupActivityId) {
+      const assignment = groupAssignmentById.get(item.courseGroupActivityId);
+      return assignment ? `/courses/${courseId}/groups/${contentGroup.id}/activities/assigned/${assignment.activity.id}` : null;
+    }
     if (item.activityId && courseActivityById.has(item.activityId)) {
       return `/courses/${courseId}/activities/${item.activityId}`;
     }
     if (item.materialId && courseMaterialById.has(item.materialId)) {
       return materialHref(courseMaterialById.get(item.materialId) as CourseMaterial) ?? null;
+    }
+    if (contentGroup && item.materialId && groupMaterialById.has(item.materialId)) {
+      const material = groupMaterialById.get(item.materialId);
+      if (!material) return null;
+      return legacyMaterialHasStoredFile(material)
+        ? withMaterialDownloadVersion(api.groupMaterialDownloadUrl(courseId, contentGroup.id, material.id), material)
+        : material.url ?? null;
     }
     if (item.contentResourceId && contentResourceById.has(item.contentResourceId)) {
       const resource = contentResourceById.get(item.contentResourceId) as CourseContentResource;
@@ -1314,7 +1342,10 @@ export default function CourseDetailPage() {
         return null;
       }
       if (definition.embeddingSource === "file_upload" && typeof resource.metadata?.storedName === "string") {
-        return withContentResourceDownloadVersion(api.courseContentResourceDownloadUrl(courseId, resource.id), resource);
+        const downloadUrl = contentGroup
+          ? api.groupContentResourceDownloadUrl(courseId, contentGroup.id, resource.id)
+          : api.courseContentResourceDownloadUrl(courseId, resource.id);
+        return withContentResourceDownloadVersion(downloadUrl, resource);
       }
       return typeof resource.metadata?.url === "string" ? resource.metadata.url : null;
     }
@@ -1366,6 +1397,49 @@ export default function CourseDetailPage() {
             <WorkspaceTabs
               ariaLabel={t("courseDetail.workspaceTabs")}
               initialTab={activeCourseTab}
+              toolbar={(
+                <div className="course-view-selector" role="group" aria-label={t("courseDetail.contentViewSelectorLabel")}>
+                  <Link
+                    aria-current={contentViewSelectorMode === "course" ? "page" : undefined}
+                    className={`course-view-option course-view-course-option ${contentViewSelectorMode === "course" ? "is-active" : ""}`}
+                    href={`/courses/${courseId}?tab=content`}
+                    title={t("courseDetail.courseView")}
+                    onClick={() => setContentViewSelectorMode("course")}
+                  >
+                    <AppIcon name="course" />
+                    <span className="course-view-option-label">{t("courseDetail.courseView")}</span>
+                  </Link>
+                  <div className={`course-view-option course-view-group-option ${contentViewSelectorMode === "group" ? "is-active" : ""}`}>
+                    <button
+                      aria-expanded={contentViewSelectorMode === "group"}
+                      aria-label={t("courseDetail.groupView")}
+                      className="course-view-option-trigger"
+                      disabled={!sortedCourseGroups.length}
+                      title={t("courseDetail.groupView")}
+                      type="button"
+                      onClick={openGroupContentView}
+                    >
+                      <AppIcon name="participants" />
+                    </button>
+                    <span className="course-view-option-control" aria-hidden={contentViewSelectorMode !== "group"}>
+                      <select
+                        aria-label={t("courseDetail.groupViewSelect")}
+                        disabled={contentViewSelectorMode !== "group"}
+                        tabIndex={contentViewSelectorMode === "group" ? 0 : -1}
+                        title={contentGroup?.title ?? sortedCourseGroups.find((group) => group.id === lastSelectedContentGroupId)?.title}
+                        value={contentGroup?.id ?? requestedContentGroupId ?? lastSelectedContentGroupId ?? sortedCourseGroups[0]?.id ?? ""}
+                        onChange={(event) => {
+                          const groupId = event.target.value;
+                          setLastSelectedContentGroupId(groupId);
+                          router.push(`/courses/${courseId}?tab=content&view=group&groupId=${encodeURIComponent(groupId)}`);
+                        }}
+                      >
+                        {sortedCourseGroups.map((group) => <option key={group.id} title={group.title} value={group.id}>{truncateGroupTitle(group.title)}</option>)}
+                      </select>
+                    </span>
+                  </div>
+                </div>
+              )}
               tabs={[
                 {
                   href: `/courses/${courseId}?tab=content`,
@@ -1376,8 +1450,8 @@ export default function CourseDetailPage() {
                       <div className="section-heading">
                         <div>
                           <p className="eyebrow">{t("courseDetail.contentEyebrow")}</p>
-                          <h2>{t("courseDetail.contentTitle")}</h2>
-                          <p className="muted">{t("courseDetail.contentText")}</p>
+                          <h2>{contentGroup ? t("courseDetail.groupContentTitle", { group: contentGroup.title }) : t("courseDetail.contentTitle")}</h2>
+                          <p className="muted">{contentGroup ? t("courseDetail.groupContentText") : t("courseDetail.contentText")}</p>
                         </div>
                         <div className="section-actions content-header-actions">
                           <button
@@ -1404,6 +1478,7 @@ export default function CourseDetailPage() {
                               setContentHeaderMenuAnchor(null);
                             }}
                           >
+                            {!contentGroup ? <>
                               <button
                                 className="content-context-menu-item"
                                 disabled={isAddingActivity}
@@ -1426,6 +1501,7 @@ export default function CourseDetailPage() {
                                 <MaterialActionIcon name="activityAdd" />
                                 <span>{t("courseDetail.newRootActivityAction")}</span>
                               </button>
+                            </> : null}
                               <button
                                 className="content-context-menu-item"
                                 disabled={!contentFolderOptions.length}
@@ -1464,13 +1540,14 @@ export default function CourseDetailPage() {
                             const title = contentItemTitle(item);
                             const isCollapsed = collapsedContentFolderIds.has(item.id);
                             const href = contentItemHref(item);
-                            const material = item.materialId ? courseMaterialById.get(item.materialId) : null;
+                            const material = item.materialId ? courseMaterialById.get(item.materialId) ?? groupMaterialById.get(item.materialId) : null;
                             const materialIsDownloadable = material ? legacyMaterialHasStoredFile(material) : false;
                             const contentResource = item.contentResourceId ? contentResourceById.get(item.contentResourceId) : null;
                             const contentResourceDefinition = contentResource ? contentTypeByKey.get(contentResource.contentTypeKey) ?? null : null;
                             const contentResourceIsUnavailable = Boolean(contentResource && !contentResourceDefinition);
                             const contentResourceIsFile = contentResourceDefinition?.embeddingSource === "file_upload";
-                            const activity = item.activityId ? courseActivityById.get(item.activityId) : null;
+                            const assignment = item.courseGroupActivityId ? groupAssignmentById.get(item.courseGroupActivityId) : null;
+                            const activity = assignment?.activity ?? (item.activityId ? courseActivityById.get(item.activityId) : null);
                             const allGroupsRule = activity ? getAllGroupsAssignmentRule(activity) : null;
                             const activityLabel = activity ? activityCopy(activity.activityType.key).name : null;
                             const isHidden = item.effectiveVisibility ? item.effectiveVisibility !== "visible" : !item.isVisible;
@@ -1490,7 +1567,7 @@ export default function CourseDetailPage() {
                                 onContextMenu={(event) => openContentContextMenu(item, event)}
                               >
                                 <div className="table-main table-main-stack">
-                                  <span
+                                  {contentGroup && !item.groupId ? <span className="content-tree-student-spacer" aria-hidden="true" /> : <span
                                     aria-label={t("courseDetail.dragContentItem", { title })}
                                     className="drag-handle"
                                     role="button"
@@ -1499,7 +1576,7 @@ export default function CourseDetailPage() {
                                     onPointerDown={(event) => handleContentPointerDown(item, event)}
                                   >
                                     <MaterialActionIcon name="drag" />
-                                  </span>
+                                  </span>}
                                   {item.kind === "folder" ? (
                                     <button
                                       aria-label={
@@ -1638,7 +1715,7 @@ export default function CourseDetailPage() {
                                         </Link>
                                       )
                                     ) : null}
-                                    {item.kind === "folder" ? (
+                                    {item.kind === "folder" && !contentGroup ? (
                                       <>
                                         <button
                                           className="content-context-menu-item"
@@ -1665,7 +1742,7 @@ export default function CourseDetailPage() {
                                         </button>
                                       </>
                                     ) : null}
-                                    {item.kind === "activity" && activity ? (
+                                    {item.kind === "activity" && activity && !contentGroup ? (
                                       <><button
                                         className="content-context-menu-item"
                                         role="menuitem"
@@ -1686,7 +1763,7 @@ export default function CourseDetailPage() {
                                         </button>
                                       ) : null}</>
                                     ) : null}
-                                    {item.kind === "content" && (contentResource || material) ? (
+                                    {item.kind === "content" && (contentResource || material) && !contentGroup ? (
                                       <button
                                         className="content-context-menu-item"
                                         role="menuitem"
@@ -1701,7 +1778,7 @@ export default function CourseDetailPage() {
                                         <span>{t("courseDetail.duplicateActivity")}</span>
                                       </button>
                                     ) : null}
-                                    <button
+                                    {!contentGroup ? <button
                                       className="content-context-menu-item"
                                       role="menuitem"
                                       type="button"
@@ -1712,7 +1789,7 @@ export default function CourseDetailPage() {
                                     >
                                       <MaterialActionIcon name="edit" />
                                       <span>{t(item.kind === "folder" ? "courseDetail.renameFolderAction" : "courseDetail.contentSettingsAction")}</span>
-                                    </button>
+                                    </button> : null}
                                     <button
                                       className="content-context-menu-item"
                                       role="menuitem"
@@ -1723,9 +1800,9 @@ export default function CourseDetailPage() {
                                       }}
                                     >
                                       <MaterialActionIcon name={item.isVisible ? "hidden" : "visible"} />
-                                      <span>{item.isVisible ? t("courseDetail.contentHidden") : t("courseDetail.contentVisible")}</span>
+                                      <span>{item.isVisible ? t(contentGroup ? "courseDetail.hideInGroup" : "courseDetail.contentHidden") : t(contentGroup ? "courseDetail.showInGroup" : "courseDetail.contentVisible")}</span>
                                     </button>
-                                    <button
+                                    {(!contentGroup || Boolean(item.groupId)) ? <button
                                       className="content-context-menu-item is-danger"
                                       role="menuitem"
                                       type="button"
@@ -1736,7 +1813,7 @@ export default function CourseDetailPage() {
                                     >
                                       <MaterialActionIcon name="remove" />
                                       <span>{t("common.remove")}</span>
-                                    </button>
+                                    </button> : null}
                                 </ContextMenu>
                               </div>
                             );
@@ -1750,80 +1827,16 @@ export default function CourseDetailPage() {
                   )
                 },
                 {
-                  href: `/courses/${courseId}?tab=groups`,
-                  id: "groups",
-                  label: t("courseDetail.groupsTab"),
+                  href: `/courses/${courseId}?tab=participants`,
+                  id: "participants",
+                  label: t("courseDetail.participantsTab"),
                   render: () => (
-                    <section className="section stack">
-                      <div className="section-heading">
-                        <div>
-                          <p className="eyebrow">{t("courseDetail.groupsEyebrow")}</p>
-                          <h2>{t("courseDetail.groupsTitle")}</h2>
-                        </div>
-                        <button className="secondary" type="button" onClick={() => setIsAddingGroup((current) => !current)}>
-                          {isAddingGroup ? t("common.cancel") : t("courseDetail.groupShellTitle")}
-                        </button>
-                      </div>
-
-                      {isAddingGroup ? (
-                        <form className="form inline-panel" onSubmit={createGroup}>
-                          <div>
-                            <p className="eyebrow">{t("courseDetail.groupShellEyebrow")}</p>
-                            <h2>{t("courseDetail.groupShellTitle")}</h2>
-                          </div>
-                          <div className="field">
-                            <label htmlFor="groupTitle">{t("courseDetail.groupTitle")}</label>
-                            <input
-                              id="groupTitle"
-                              value={groupTitle}
-                              onChange={(event) => setGroupTitle(event.target.value)}
-                              placeholder={t("courseDetail.groupTitlePlaceholder")}
-                              required
-                              minLength={2}
-                            />
-                          </div>
-                          <div className="row">
-                            <button type="submit">{t("courseDetail.createGroup")}</button>
-                            <button className="secondary" type="button" onClick={() => setIsAddingGroup(false)}>
-                              {t("common.close")}
-                            </button>
-                          </div>
-                        </form>
-                      ) : null}
-
-                      {course.groups?.length ? (
-                        <div className="table-list">
-                          <div className="table-row table-row-groups table-head" aria-hidden="true">
-                            <span>{t("courseDetail.titleHeader")}</span>
-                            <span>{t("courseDetail.availabilityHeader")}</span>
-                            <span>{t("courseDetail.statusHeader")}</span>
-                            <span>{t("courseDetail.actionsHeader")}</span>
-                          </div>
-                          {course.groups.map((group) => (
-                            <div className="table-row table-row-groups" key={group.id}>
-                              <div className="table-main">
-                                <strong>
-                                  <Link href={`/courses/${course.id}/groups/${group.id}`}>{group.title}</Link>
-                                </strong>
-                              </div>
-                              <span className="table-meta muted">{formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</span>
-                              <span className="table-meta muted">{group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}</span>
-                              <div className="table-actions">
-                                <div className="content-header-actions">
-                                  <button aria-expanded={groupActionMenuId === group.id} aria-haspopup="menu" aria-label={t("courseDetail.groupActions", { title: group.title })} className="secondary icon-button" type="button" onClick={(event) => { const opening = groupActionMenuId !== group.id; setGroupActionMenuId(opening ? group.id : null); setGroupActionMenuAnchor(opening ? event.currentTarget : null); }}><AppIcon name="more" size={20} /></button>
-                                  <ContextMenu anchor={groupActionMenuAnchor} className="content-context-menu" open={groupActionMenuId === group.id} onClose={() => { setGroupActionMenuId(null); setGroupActionMenuAnchor(null); }}>
-                                      <Link className="content-context-menu-item" href={`/courses/${course.id}/groups/${group.id}`} role="menuitem"><AppIcon name="open" /><span>{t("common.open")}</span></Link>
-                                      <button className="content-context-menu-item is-danger" disabled={(course.groups?.length ?? 0) <= 1} title={(course.groups?.length ?? 0) <= 1 ? t("courseDetail.deleteLastGroupHelp") : undefined} role="menuitem" type="button" onClick={() => void openGroupDelete(group)}><AppIcon name="remove" /><span>{t("courseDetail.deleteGroupAction")}</span></button>
-                                  </ContextMenu>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="muted">{t("courseDetail.noGroups")}</p>
-                      )}
-                    </section>
+                    <CourseParticipantsPanel
+                      courseId={courseId}
+                      currentUserId={user?.id}
+                      groups={sortedCourseGroups}
+                      onChanged={refresh}
+                    />
                   )
                 },
                 {
@@ -1854,7 +1867,7 @@ export default function CourseDetailPage() {
                           <label htmlFor="gradebook-group-filter">{t("courseDetail.groupFilter")}</label>
                           <select id="gradebook-group-filter" value={gradebookGroupId} onChange={(event) => setGradebookGroupId(event.target.value)}>
                             <option value="">{t("courseDetail.allGroups")}</option>
-                            {(gradebook?.groups ?? []).map((group) => (
+                            {sortedGradebookGroups.map((group) => (
                               <option key={group.id} value={group.id}>
                                 {group.title}
                               </option>
@@ -2335,20 +2348,6 @@ export default function CourseDetailPage() {
                 </section>
               </div>
             ) : null}
-            {groupDeleteState?.step === "options" ? (
-              <div className="dialog-backdrop" role="presentation"><section aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="group-delete-options-title">
-                <div><p className="eyebrow">{t("courseDetail.deleteGroupEyebrow")}</p><h2 id="group-delete-options-title">{t("courseDetail.deleteGroupTitle")}</h2></div>
-                <p>{t("courseDetail.deleteGroupParticipantsMessage", { title: groupDeleteState.group.title, count: groupDeleteState.participants.length })}</p>
-                <form className="form" onSubmit={submitGroupDeleteOptions}>
-                  <label className="checkbox-row"><input type="radio" name="group-delete-mode" checked={groupDeleteState.mode === "move"} onChange={() => setGroupDeleteState({ ...groupDeleteState, mode: "move" })} /><span>{t("courseDetail.moveGroupParticipants")}</span></label>
-                  {groupDeleteState.mode === "move" ? <div className="field"><label htmlFor="destination-group">{t("courseDetail.destinationGroup")}</label><select id="destination-group" required value={groupDeleteState.targetGroupId} onChange={(event) => setGroupDeleteState({ ...groupDeleteState, targetGroupId: event.target.value })}><option value="">{t("courseDetail.chooseDestinationGroup")}</option>{course.groups?.filter((group) => group.id !== groupDeleteState.group.id).map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}</select><p className="muted">{t("courseDetail.moveGroupParticipantsHelp")}</p></div> : null}
-                  <label className="checkbox-row"><input type="radio" name="group-delete-mode" checked={groupDeleteState.mode === "delete"} onChange={() => setGroupDeleteState({ ...groupDeleteState, mode: "delete" })} /><span>{t("courseDetail.deleteGroupParticipants")}</span></label>
-                  <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setGroupDeleteState(null)}>{t("common.cancel")}</button><button className={groupDeleteState.mode === "delete" ? "danger" : ""} disabled={isDeletingGroup || (groupDeleteState.mode === "move" && !groupDeleteState.targetGroupId)} type="submit">{isDeletingGroup ? t("common.saving") : t("courseDetail.continueGroupDeletion")}</button></div>
-                </form>
-              </section></div>
-            ) : null}
-            <ConfirmationDialog open={groupDeleteState?.step === "confirm-empty"} eyebrow={t("courseDetail.deleteGroupEyebrow")} title={t("courseDetail.deleteGroupTitle")} message={t("courseDetail.deleteEmptyGroupConfirm", { title: groupDeleteState?.group.title ?? "" })} confirmLabel={t("courseDetail.deleteGroupAction")} cancelLabel={t("common.cancel")} confirmVariant="danger" isConfirming={isDeletingGroup} onCancel={() => setGroupDeleteState(null)} onConfirm={() => void deleteGroup({ action: "delete" })} />
-            <ConfirmationDialog open={groupDeleteState?.step === "confirm-permanent"} eyebrow={t("courseDetail.deleteGroupPermanentEyebrow")} title={t("courseDetail.deleteGroupPermanentTitle")} message={t("courseDetail.deleteGroupPermanentConfirm", { title: groupDeleteState?.group.title ?? "", count: groupDeleteState?.participants.length ?? 0 })} confirmLabel={t("courseDetail.deleteGroupPermanently")} cancelLabel={t("common.cancel")} confirmVariant="danger" isConfirming={isDeletingGroup} onCancel={() => setGroupDeleteState(null)} onConfirm={() => void deleteGroup({ action: "delete", confirmParticipantDeletion: true })} />
             {showActivityPicker ? (
               <ActivityPickerDialog
                 activityTypes={activityTypes}
@@ -2647,6 +2646,15 @@ function sum(values: number[]) {
 
 function roundGrade(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function compareGroupTitles(left: string, right: string, locale: string) {
+  return left.localeCompare(right, locale, { numeric: true, sensitivity: "base" });
+}
+
+function truncateGroupTitle(title: string) {
+  const characters = Array.from(title);
+  return characters.length > 20 ? `${characters.slice(0, 19).join("")}…` : title;
 }
 
 function compareContentItems(left: CourseContentItem, right: CourseContentItem) {

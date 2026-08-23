@@ -77,8 +77,8 @@ export default function GradebookActivityResultsPage() {
   const rows = gradebook?.rows ?? [];
   const activityTitle = rows[0]?.activityTitle ?? gradebook?.items[0]?.activityTitle ?? t("common.loading");
   const groupTitle = groupId ? gradebook?.items.find((item) => item.groupId === groupId)?.groupTitle : null;
-  const backHref = groupId ? `/courses/${courseId}/groups/${groupId}?tab=gradebook` : `/courses/${courseId}?tab=gradebook`;
-  const backLabel = groupId ? t("courseDetail.backToGroupGradebook") : t("courseDetail.backToCourseGradebook");
+  const backHref = groupId ? `/courses/${courseId}?tab=gradebook&groupId=${encodeURIComponent(groupId)}` : `/courses/${courseId}?tab=gradebook`;
+  const backLabel = t("courseDetail.backToCourseGradebook");
   const manualGradingRenderer = rows[0]?.activityTypeKey ? getManualGradingRenderer(rows[0].activityTypeKey) : null;
   const selectedAttempt = overlay?.attempts[overlay.selectedIndex] ?? null;
   const hasRowsWithSubmittedAttempts = rows.some((row) => hasSubmittedAttempt(row));

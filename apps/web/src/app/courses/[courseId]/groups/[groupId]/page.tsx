@@ -3,7 +3,7 @@
 import { MarkdownRenderer } from "@cognelo/activity-ui";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { CSSProperties, FocusEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ActivityTypeIcon, AppIcon, FolderContentIcon as SharedFolderContentIcon } from "@/components/app-icon";
@@ -43,6 +43,7 @@ const contentDragActivationDistance = 8;
 export default function CourseGroupPage() {
   const params = useParams<{ courseId: string; groupId: string }>();
   const { courseId, groupId } = params;
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const { locale, t } = useI18n();
@@ -107,6 +108,12 @@ export default function CourseGroupPage() {
 
   const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
   const canManage = user?.roles.includes("admin") || membershipRole === "owner" || membershipRole === "teacher";
+
+  useEffect(() => {
+    if (canManage && group) {
+      router.replace(`/courses/${courseId}?tab=content&view=group&groupId=${encodeURIComponent(groupId)}`);
+    }
+  }, [canManage, courseId, group, groupId, router]);
 
   async function refresh() {
     setContentLoaded(false);
@@ -1212,6 +1219,10 @@ export default function CourseGroupPage() {
     } finally {
       setRemovingParticipantId(null);
     }
+  }
+
+  if (canManage) {
+    return <AppShell><main className="page stack"><p>{t("common.loading")}</p></main></AppShell>;
   }
 
   return (

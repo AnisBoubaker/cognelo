@@ -645,7 +645,7 @@ describe("course content services", () => {
     });
   });
 
-  it("applies a group visibility override without changing the shared folder", async () => {
+  it("applies a group visibility override without changing inherited course content", async () => {
     mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1" });
     mockPrisma.courseContentItem.findMany.mockResolvedValue([
       { id: "week-1", parentId: null, isVisible: true, groupId: null, kind: "folder", activityId: null, courseGroupActivityId: null },
@@ -661,27 +661,27 @@ describe("course content services", () => {
     ]);
   });
 
-  it("stores a group-only visibility override for a shared folder", async () => {
+  it("stores a group-only visibility override for an inherited course item", async () => {
     mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1" });
     mockPrisma.courseContentItem.findFirst.mockResolvedValue({
-      id: "week-1",
+      id: "course-resource-1",
       courseId: "course-1",
       groupId: null,
-      kind: "folder",
+      kind: "content",
       isVisible: true
     });
 
-    await updateGroupContentItem(teacherUser, "course-1", "group-1", "week-1", { isVisible: false });
+    await updateGroupContentItem(teacherUser, "course-1", "group-1", "course-resource-1", { isVisible: false });
 
     expect(mockPrisma.courseGroupContentVisibilityOverride.upsert).toHaveBeenCalledWith({
-      where: { groupId_contentItemId: { groupId: "group-1", contentItemId: "week-1" } },
-      create: { groupId: "group-1", contentItemId: "week-1", isVisible: false },
+      where: { groupId_contentItemId: { groupId: "group-1", contentItemId: "course-resource-1" } },
+      create: { groupId: "group-1", contentItemId: "course-resource-1", isVisible: false },
       update: { isVisible: false }
     });
     expect(mockPrisma.courseContentItem.update).not.toHaveBeenCalled();
   });
 
-  it("removes a redundant group visibility override when restoring the shared value", async () => {
+  it("removes a redundant group visibility override when restoring the inherited value", async () => {
     mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1" });
     mockPrisma.courseContentItem.findFirst.mockResolvedValue({
       id: "week-1",

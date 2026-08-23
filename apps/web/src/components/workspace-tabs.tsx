@@ -13,10 +13,11 @@ export type WorkspaceTabDefinition<T extends string> = {
 type WorkspaceTabsProps<T extends string> = {
   ariaLabel: string;
   initialTab: T;
+  toolbar?: ReactNode;
   tabs: Array<WorkspaceTabDefinition<T>>;
 };
 
-export function WorkspaceTabs<T extends string>({ ariaLabel, initialTab, tabs }: WorkspaceTabsProps<T>) {
+export function WorkspaceTabs<T extends string>({ ariaLabel, initialTab, toolbar, tabs }: WorkspaceTabsProps<T>) {
   const [activeTab, setActiveTab] = useState<T>(initialTab);
   const instanceId = useId();
   const activeDefinition = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
@@ -31,25 +32,28 @@ export function WorkspaceTabs<T extends string>({ ariaLabel, initialTab, tabs }:
 
   return (
     <section className="section stack">
-      <div className="tab-strip" role="tablist" aria-label={ariaLabel}>
-        {tabs.map((tab) => {
-          const tabId = `${instanceId}-${tab.id}-tab`;
-          const panelId = `${instanceId}-${tab.id}-panel`;
-          const isActive = tab.id === activeDefinition.id;
+      <div className="workspace-tab-toolbar">
+        <div className="tab-strip" role="tablist" aria-label={ariaLabel}>
+          {tabs.map((tab) => {
+            const tabId = `${instanceId}-${tab.id}-tab`;
+            const panelId = `${instanceId}-${tab.id}-panel`;
+            const isActive = tab.id === activeDefinition.id;
 
-          const tabProps = {
-            "aria-controls": panelId,
-            "aria-selected": isActive,
-            className: `tab-button ${isActive ? "is-active" : ""}`,
-            id: tabId,
-            role: "tab" as const
-          };
-          return tab.href ? (
-            <Link key={tab.id} {...tabProps} href={tab.href}>{tab.label}</Link>
-          ) : (
-            <button key={tab.id} {...tabProps} type="button" onClick={() => setActiveTab(tab.id)}>{tab.label}</button>
-          );
-        })}
+            const tabProps = {
+              "aria-controls": panelId,
+              "aria-selected": isActive,
+              className: `tab-button ${isActive ? "is-active" : ""}`,
+              id: tabId,
+              role: "tab" as const
+            };
+            return tab.href ? (
+              <Link key={tab.id} {...tabProps} href={tab.href}>{tab.label}</Link>
+            ) : (
+              <button key={tab.id} {...tabProps} type="button" onClick={() => setActiveTab(tab.id)}>{tab.label}</button>
+            );
+          })}
+        </div>
+        {toolbar ? <div className="workspace-tab-trailing">{toolbar}</div> : null}
       </div>
 
       <div
