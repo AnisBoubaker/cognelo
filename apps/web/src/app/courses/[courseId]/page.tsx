@@ -1185,7 +1185,7 @@ export default function CourseDetailPage() {
   }
 
   function handleContentPointerDown(item: CourseContentItem, event: PointerEvent) {
-    if (event.button !== 0 || (contentGroup && !item.groupId)) {
+    if (event.button !== 0 || contentGroup) {
       return;
     }
     event.preventDefault();
@@ -1528,14 +1528,16 @@ export default function CourseDetailPage() {
 
                       {visibleContentItems.length ? (
                         <div className="table-list">
-                          <div
-                            className={`root-drop-zone ${draggingContentItemId ? "is-active" : ""} ${
-                              contentDropTarget?.type === "root" ? "is-drop-target" : ""
-                            }`}
-                            data-content-root-drop="true"
-                          >
-                            {t("courseDetail.moveToTopLevel")}
-                          </div>
+                          {!contentGroup ? (
+                            <div
+                              className={`root-drop-zone ${draggingContentItemId ? "is-active" : ""} ${
+                                contentDropTarget?.type === "root" ? "is-drop-target" : ""
+                              }`}
+                              data-content-root-drop="true"
+                            >
+                              {t("courseDetail.moveToTopLevel")}
+                            </div>
+                          ) : null}
                           {visibleContentItems.map(({ item, depth }) => {
                             const title = contentItemTitle(item);
                             const isCollapsed = collapsedContentFolderIds.has(item.id);
@@ -1567,16 +1569,20 @@ export default function CourseDetailPage() {
                                 onContextMenu={(event) => openContentContextMenu(item, event)}
                               >
                                 <div className="table-main table-main-stack">
-                                  {contentGroup && !item.groupId ? <span className="content-tree-student-spacer" aria-hidden="true" /> : <span
-                                    aria-label={t("courseDetail.dragContentItem", { title })}
-                                    className="drag-handle"
-                                    role="button"
-                                    tabIndex={0}
-                                    title={t("courseDetail.dragToMove")}
-                                    onPointerDown={(event) => handleContentPointerDown(item, event)}
-                                  >
-                                    <MaterialActionIcon name="drag" />
-                                  </span>}
+                                  {contentGroup ? (
+                                    <span className="content-tree-student-spacer" aria-hidden="true" />
+                                  ) : (
+                                    <span
+                                      aria-label={t("courseDetail.dragContentItem", { title })}
+                                      className="drag-handle"
+                                      role="button"
+                                      tabIndex={0}
+                                      title={t("courseDetail.dragToMove")}
+                                      onPointerDown={(event) => handleContentPointerDown(item, event)}
+                                    >
+                                      <MaterialActionIcon name="drag" />
+                                    </span>
+                                  )}
                                   {item.kind === "folder" ? (
                                     <button
                                       aria-label={
@@ -1802,18 +1808,20 @@ export default function CourseDetailPage() {
                                       <MaterialActionIcon name={item.isVisible ? "hidden" : "visible"} />
                                       <span>{item.isVisible ? t(contentGroup ? "courseDetail.hideInGroup" : "courseDetail.contentHidden") : t(contentGroup ? "courseDetail.showInGroup" : "courseDetail.contentVisible")}</span>
                                     </button>
-                                    {(!contentGroup || Boolean(item.groupId)) ? <button
-                                      className="content-context-menu-item is-danger"
-                                      role="menuitem"
-                                      type="button"
-                                      onClick={() => {
-                                        setContentContextMenu(null);
-                                        void removeContentItem(item);
-                                      }}
-                                    >
-                                      <MaterialActionIcon name="remove" />
-                                      <span>{t("common.remove")}</span>
-                                    </button> : null}
+                                    {!contentGroup ? (
+                                      <button
+                                        className="content-context-menu-item is-danger"
+                                        role="menuitem"
+                                        type="button"
+                                        onClick={() => {
+                                          setContentContextMenu(null);
+                                          void removeContentItem(item);
+                                        }}
+                                      >
+                                        <MaterialActionIcon name="remove" />
+                                        <span>{t("common.remove")}</span>
+                                      </button>
+                                    ) : null}
                                 </ContextMenu>
                               </div>
                             );

@@ -605,7 +605,7 @@ export const frMessages = {
       groupView: "Groupe",
       groupViewSelect: "Choisir la perspective d’un groupe",
       groupContentTitle: "Contenu pour {group}",
-      groupContentText: "Le contenu hérité du cours est affiché selon la visibilité de ce groupe. Les éléments propres au groupe peuvent être déplacés ou supprimés ici.",
+      groupContentText: "Le contenu hérité du cours est affiché selon la visibilité de ce groupe. Utilisez le menu de chaque élément pour l’afficher ou le masquer dans ce groupe.",
       hideInGroup: "Masquer dans ce groupe",
       showInGroup: "Afficher dans ce groupe",
       noGroups: "Aucun groupe pour le moment.",

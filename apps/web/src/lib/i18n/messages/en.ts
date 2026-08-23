@@ -612,7 +612,7 @@ export const enMessages = {
       groupView: "Group",
       groupViewSelect: "Choose a group perspective",
       groupContentTitle: "Content for {group}",
-      groupContentText: "Inherited course content is shown with this group's visibility. Group-specific items can be moved or removed here.",
+      groupContentText: "Inherited course content is shown with this group's visibility. Use each item's menu to show or hide it for this group.",
       hideInGroup: "Hide in this group",
       showInGroup: "Show in this group",
       noGroups: "No groups yet.",

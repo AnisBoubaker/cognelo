@@ -698,7 +698,7 @@ describe("course content services", () => {
     });
   });
 
-  it("replaces a shared activity placement with its assigned group placement", async () => {
+  it("keeps a shared activity placement and merges its assigned group activity identity", async () => {
     mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1" });
     mockPrisma.courseContentItem.findMany.mockResolvedValue([
       { id: "week-1", parentId: null, isVisible: true, groupId: null, kind: "folder", activityId: null, courseGroupActivityId: null },
@@ -733,7 +733,48 @@ describe("course content services", () => {
 
     const result = await listContentItems(teacherUser, "course-1", { groupId: "group-1" });
 
-    expect(result.map((item) => item.id)).toEqual(["week-1", "group-activity-1", "course-activity-2"]);
+    expect(result).toMatchObject([
+      { id: "week-1", groupId: null },
+      { id: "course-activity-1", groupId: null, courseGroupActivityId: "assignment-1" },
+      { id: "course-activity-2", groupId: null, courseGroupActivityId: null }
+    ]);
+  });
+
+  it("keeps a group visibility override actionable after an activity is assigned to the group", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1" });
+    mockPrisma.courseContentItem.findMany.mockResolvedValue([
+      {
+        id: "course-activity-1",
+        parentId: "week-1",
+        isVisible: true,
+        groupId: null,
+        kind: "activity",
+        activityId: "activity-1",
+        courseGroupActivityId: null
+      },
+      {
+        id: "group-activity-1",
+        parentId: "week-1",
+        isVisible: true,
+        groupId: "group-1",
+        kind: "activity",
+        activityId: "activity-1",
+        courseGroupActivityId: "assignment-1"
+      }
+    ]);
+    mockPrisma.courseGroupContentVisibilityOverride.findMany.mockResolvedValue([
+      { groupId: "group-1", contentItemId: "course-activity-1", isVisible: false }
+    ]);
+
+    await expect(listContentItems(teacherUser, "course-1", { groupId: "group-1" })).resolves.toMatchObject([
+      {
+        id: "course-activity-1",
+        groupId: null,
+        courseGroupActivityId: "assignment-1",
+        isVisible: false,
+        effectiveVisibility: "hidden"
+      }
+    ]);
   });
 
   it("keeps an assigned group activity hidden when its shared placement is inside a hidden folder", async () => {
@@ -763,7 +804,7 @@ describe("course content services", () => {
     const teacherResult = await listContentItems(teacherUser, "course-1", { groupId: "group-1" });
     expect(teacherResult).toMatchObject([
       { id: "hidden-folder", effectiveVisibility: "hidden" },
-      { id: "group-activity-1", effectiveVisibility: "hidden_by_parent" }
+      { id: "course-activity-1", groupId: null, courseGroupActivityId: "assignment-1", effectiveVisibility: "hidden_by_parent" }
     ]);
 
     const studentResult = await listContentItems(teacherUser, "course-1", { groupId: "group-1", visibleOnly: true });

@@ -125,7 +125,7 @@ Core owns:
 - `ContentTypePluginInstallation` and `ContentTypePluginTableBackup` for activation, enablement, and backup state
 - generic course/group content resource API routes and plugin dispatch
 
-Effective content visibility is also an authorization input. A group may override the visibility of any inherited course content item without mutating the course default; group-specific placements retain their own visibility and ordering. Student content listings omit hidden items and descendants of hidden folders, and non-manager assigned-activity resolution applies the same rule before serving the activity or dispatching any activity plugin route. Teachers select Course or a specific Group perspective from the course Content tab; separate group workspaces remain student-facing.
+Effective content visibility is also an authorization input. A group may override the visibility of any inherited course content item without mutating the course default; group-specific placements retain their stored visibility and ordering. When a group assignment shadows an inherited course activity placement, core returns the inherited placement with the selected assignment identity merged into it, so visibility, folder placement, ordering, and actions never come from conflicting rows. Student content listings omit hidden items and descendants of hidden folders, and non-manager assigned-activity resolution applies the same rule before serving the activity or dispatching any activity plugin route. Teachers manage structure in Course perspective and use Group perspective only to inspect effective content and override visibility; separate group workspaces remain student-facing.
 
 Content type plugins own:
 

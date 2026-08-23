@@ -697,7 +697,7 @@ export async function listContentItems(user: CurrentUser, courseId: string, opti
     ? await prisma.courseGroupContentVisibilityOverride.findMany({ where: { groupId: scope.groupId } })
     : [];
   const withVisibility = addEffectiveVisibility(applyGroupVisibilityOverrides(items, overrides));
-  const scopedItems = removeCourseActivityPlacementsShadowedByGroupAssignments(withVisibility, scope.groupId);
+  const scopedItems = mergeGroupAssignmentsIntoSharedActivityPlacements(withVisibility, scope.groupId);
   return options.visibleOnly ? scopedItems.filter((item) => item.effectiveVisibility === "visible") : scopedItems;
 }
 
@@ -714,7 +714,7 @@ function applyGroupVisibilityOverrides<T extends { id: string; isVisible: boolea
     : item);
 }
 
-function removeCourseActivityPlacementsShadowedByGroupAssignments<
+function mergeGroupAssignmentsIntoSharedActivityPlacements<
   T extends {
     activityId: string | null;
     courseGroupActivityId: string | null;
@@ -727,42 +727,40 @@ function removeCourseActivityPlacementsShadowedByGroupAssignments<
     return items;
   }
 
-  const assignedActivityIds = new Set(
+  const groupAssignmentByActivityId = new Map(
     items
       .filter(
         (item) =>
           item.groupId === groupId && item.kind === "activity" && Boolean(item.courseGroupActivityId) && typeof item.activityId === "string"
       )
-      .map((item) => item.activityId as string)
+      .map((item) => [item.activityId as string, item] as const)
   );
-
-  const hiddenCourseActivityPlacements = new Map(
+  const sharedActivityIds = new Set(
     items
-      .filter(
-        (item) =>
-          item.groupId === null &&
-          item.kind === "activity" &&
-          typeof item.activityId === "string" &&
-          item.effectiveVisibility !== "visible"
-      )
-      .map((item) => [item.activityId as string, item.effectiveVisibility] as const)
+      .filter((item) => item.groupId === null && item.kind === "activity" && typeof item.activityId === "string")
+      .map((item) => item.activityId as string)
   );
 
   return items
     .filter(
       (item) =>
-        !(item.groupId === null && item.kind === "activity" && typeof item.activityId === "string" && assignedActivityIds.has(item.activityId))
+        !(
+          item.groupId === groupId &&
+          item.kind === "activity" &&
+          typeof item.activityId === "string" &&
+          Boolean(item.courseGroupActivityId) &&
+          sharedActivityIds.has(item.activityId)
+        )
     )
     .map((item) => {
       if (
-        item.groupId === groupId &&
+        item.groupId === null &&
         item.kind === "activity" &&
-        item.courseGroupActivityId &&
         typeof item.activityId === "string"
       ) {
-        const inheritedVisibility = hiddenCourseActivityPlacements.get(item.activityId);
-        if (inheritedVisibility) {
-          return { ...item, effectiveVisibility: inheritedVisibility };
+        const groupAssignment = groupAssignmentByActivityId.get(item.activityId);
+        if (groupAssignment?.courseGroupActivityId) {
+          return { ...item, courseGroupActivityId: groupAssignment.courseGroupActivityId };
         }
       }
       return item;
