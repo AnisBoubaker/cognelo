@@ -41,7 +41,7 @@ export type ActivityExecutionContext =
   | {
       kind: "standalone";
       groupActivityId: string;
-      activityAttemptId: string;
+      activityAttemptId: string | null;
     }
   | {
       kind: "test_item";
@@ -54,6 +54,7 @@ export type ActivityExecutionStateHost<TState> = {
   context: ActivityExecutionContext;
   load: () => Promise<TState | null>;
   save: (state: TState) => Promise<TState>;
+  clear?: () => Promise<void>;
   executeAction?: <TResult = unknown>(action: string, payload: unknown) => Promise<TResult>;
 };
 

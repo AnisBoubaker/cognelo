@@ -24,6 +24,10 @@ type ActivityLike = {
   title: string;
   description: string;
   config?: Record<string, unknown>;
+  assignment?: {
+    id?: string;
+    metadata?: Record<string, unknown>;
+  };
 };
 
 type CourseLike = {
@@ -443,6 +447,7 @@ export function WebDesignCodingExerciseActivityView({
   const [authoringTests, setAuthoringTests] = useState<WebDesignExerciseTestRecord[]>([]);
   const [authoringTestsLoaded, setAuthoringTestsLoaded] = useState(false);
   const [executionStateLoaded, setExecutionStateLoaded] = useState(!executionStateHost);
+  const activityConfigKey = useMemo(() => JSON.stringify(activity.config ?? {}), [activity.config]);
   const previousActivityIdRef = useRef(activity.id);
   const referencePreloadActivityIdRef = useRef<string | null>(null);
   const solutionDirtyRef = useRef(false);
@@ -506,7 +511,7 @@ export function WebDesignCodingExerciseActivityView({
       setAuthoringTests([]);
       setAuthoringTestsLoaded(false);
     }
-  }, [activity]);
+  }, [activity.id, activity.title, activity.description, activityConfigKey, canManage]);
 
   useEffect(() => {
     if (canManage || !executionStateHost) {
@@ -952,6 +957,9 @@ export function WebDesignCodingExerciseActivityView({
         kind === "run"
           ? await webDesignClient.runCode(course.id, activity.id, { files: normalizedStarterFiles })
           : await webDesignClient.submitCode(course.id, activity.id, { files: normalizedStarterFiles });
+      if (kind === "submit") {
+        await executionStateHost?.clear?.().catch(() => undefined);
+      }
       setLatestSubmission(result.submission);
     } catch (err) {
       setExecutionError(err instanceof Error ? err.message : copy.noRunner);

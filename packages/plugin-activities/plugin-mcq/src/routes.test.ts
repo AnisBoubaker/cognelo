@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   assertCanManageActivityBank: vi.fn(),
   assertCanManageCourse: vi.fn(),
+  clearActivityResponseDraft: vi.fn(),
   generateQuestionAuthoringText: vi.fn(),
   getActivityAttemptAvailability: vi.fn(),
   recordActivityAttemptGradingResult: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("@cognelo/core", async () => {
     ...actual,
     assertCanManageActivityBank: mocks.assertCanManageActivityBank,
     assertCanManageCourse: mocks.assertCanManageCourse,
+    clearActivityResponseDraft: mocks.clearActivityResponseDraft,
     generateQuestionAuthoringText: mocks.generateQuestionAuthoringText,
     getActivityAttemptAvailability: mocks.getActivityAttemptAvailability,
     recordActivityAttemptGradingResult: mocks.recordActivityAttemptGradingResult,
@@ -53,6 +55,7 @@ const context = {
 describe("MCQ generation route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.clearActivityResponseDraft.mockResolvedValue({ ok: true });
     mocks.prisma.course.findUnique.mockResolvedValue({ subject: { title: "Programming", description: "Basics" } });
     mocks.prisma.courseGroupParticipant.findFirst.mockResolvedValue({
       id: "participant-1",
@@ -239,6 +242,12 @@ describe("MCQ generation route", () => {
         rawMaxScore: 1,
         source: "auto"
       })
+    );
+    expect(mocks.clearActivityResponseDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "student-1" }),
+      "course-1",
+      "group-1",
+      "activity-1"
     );
   });
 

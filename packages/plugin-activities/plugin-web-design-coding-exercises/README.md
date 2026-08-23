@@ -10,6 +10,8 @@ It documents plugin-specific architecture, browser preview boundaries, and Playw
 
 Teachers can define a private HTML/CSS/JavaScript solution bundle and a separate student starter bundle. Activity-bank authoring stores the reusable source version; assigning that bank activity to a course creates a course-local copy. Students work only from the copied starter bundle in Monaco editor tabs and see their own result immediately in a sandboxed iframe.
 
+Standalone student file bundles autosave through the core `ActivityResponseDraft` state host and resume after reload. Successful final submission clears that draft. Embedded Test web-design activities continue to autosave through the Test execution host and `TestItemAttempt` rather than the standalone draft route.
+
 Teachers can include `{{ EXPECTED_RESULT }}` in the prompt to show students a visual target, or `{{ EXPECTED_RESULT_CROPPED }}` to trim large plain background regions around that target. Cognelo replaces either token with a screenshot generated from the private solution bundle; the student browser receives only the image artifact, never the solution source files.
 
 ## Package Contents

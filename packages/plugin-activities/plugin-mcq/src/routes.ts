@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import {
   AppError,
+  clearActivityResponseDraft,
   activityGenerationKnowledgeSchema,
   assertCanManageActivityBank,
   assertCanManageCourse,
@@ -154,6 +155,7 @@ export const mcqSubmissionRoute: PluginRouteDefinition = {
         } as Prisma.InputJsonValue,
         normalizedResult: (gradingResult.metadata ?? {}) as Prisma.InputJsonValue
       });
+      await clearActivityResponseDraft(context.user, context.courseId, context.groupId, context.activity.id).catch(() => undefined);
 
       return {
         submission: toMcqSubmissionRecord(submittedAttempt.metadata, {

@@ -589,6 +589,13 @@ export type CourseTestRuntime = {
   hasPreviousSubmissions: boolean;
 };
 
+export type ActivityResponseDraft = {
+  id: string;
+  state: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CourseGroupActivityAssignment = {
   id: string;
   activityId: string;
@@ -1257,6 +1264,20 @@ export const api = {
     request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}`),
   groupActivity: (courseId: string, groupId: string, activityId: string) =>
     request<{ activity: Activity }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}`),
+  activityResponseDraft: (courseId: string, groupId: string, activityId: string) =>
+    request<{ draft: ActivityResponseDraft | null }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/draft`
+    ),
+  saveActivityResponseDraft: (courseId: string, groupId: string, activityId: string, state: Record<string, unknown>) =>
+    request<{ draft: ActivityResponseDraft }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/draft`,
+      { method: "PUT", body: JSON.stringify({ state }) }
+    ),
+  clearActivityResponseDraft: (courseId: string, groupId: string, activityId: string) =>
+    request<{ ok: true }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/draft`,
+      { method: "DELETE" }
+    ),
   assignActivityToAllCourseGroups: (courseId: string, activityId: string, input: CourseAllGroupsActivityAssignmentInput) =>
     request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}/assign-all-groups`, {
       method: "POST",

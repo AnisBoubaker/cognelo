@@ -32,6 +32,7 @@ import {
 import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
 import { TestActivityView, type TestStudentItemRendererContext } from "@/components/test-activity-view";
 import { TestManualGradingPanel } from "@/components/test-manual-grading-panel";
+import { createStandaloneActivityDraftHost } from "@/lib/activity-response-draft-host";
 import type { Locale } from "@/lib/i18n";
 import {
   itemScorePercentage,
@@ -125,6 +126,30 @@ function isAttemptAvailability(value: unknown): value is { canStart: boolean; re
   return Boolean(value && typeof value === "object" && "canStart" in value && typeof (value as { canStart?: unknown }).canStart === "boolean");
 }
 
+function useStandaloneResponseDraftHost(input: {
+  activityId: string;
+  canManage: boolean;
+  courseId?: string;
+  groupActivityId?: string;
+  groupId?: string;
+}) {
+  return useMemo(() => {
+    if (input.canManage || !input.courseId || !input.groupId || !input.groupActivityId) {
+      return undefined;
+    }
+    return createStandaloneActivityDraftHost({
+      groupActivityId: input.groupActivityId,
+      client: {
+        load: async () => (await api.activityResponseDraft(input.courseId!, input.groupId!, input.activityId)).draft?.state ?? null,
+        save: async (state) => (await api.saveActivityResponseDraft(input.courseId!, input.groupId!, input.activityId, state)).draft.state,
+        clear: async () => {
+          await api.clearActivityResponseDraft(input.courseId!, input.groupId!, input.activityId);
+        }
+      }
+    });
+  }, [input.activityId, input.canManage, input.courseId, input.groupActivityId, input.groupId]);
+}
+
 function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActivityView>) {
   const {
     activityRouteCourseId,
@@ -208,6 +233,13 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
     ...activityProps
   } = props;
   const courseId = activityRouteCourseId ?? activityProps.course?.id;
+  const executionStateHost = useStandaloneResponseDraftHost({
+    activityId: activityProps.activity.id,
+    canManage: activityProps.canManage,
+    courseId,
+    groupActivityId: activityProps.activity.assignment?.id,
+    groupId
+  });
   return (
     <CodingExerciseActivityView
       {...activityProps}
@@ -264,6 +296,7 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
           return { executions: result.executions as CodingExerciseExecution[] };
         }
       }}
+      executionStateHost={executionStateHost}
     />
   );
 }
@@ -356,7 +389,7 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
 
 function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<typeof WebDesignCodingExerciseActivityView>) {
   const {
-    activityRouteCourseId: _activityRouteCourseId,
+    activityRouteCourseId,
     groupId,
     hasQuestionAuthoringAgent: _hasQuestionAuthoringAgent,
     onSubmitted: _onSubmitted,
@@ -367,6 +400,14 @@ function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<ty
     onPreviousSubmissionsAvailabilityChange: _onPreviousSubmissionsAvailabilityChange,
     ...activityProps
   } = props;
+  const courseId = activityRouteCourseId ?? activityProps.course?.id;
+  const executionStateHost = useStandaloneResponseDraftHost({
+    activityId: activityProps.activity.id,
+    canManage: activityProps.canManage,
+    courseId,
+    groupActivityId: activityProps.activity.assignment?.id,
+    groupId
+  });
   return (
     <WebDesignCodingExerciseActivityView
       {...activityProps}
@@ -419,6 +460,7 @@ function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<ty
           return { submissions: result.submissions as WebDesignExerciseSubmission[] };
         }
       }}
+      executionStateHost={executionStateHost}
     />
   );
 }
@@ -437,21 +479,45 @@ function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView
     ...activityProps
   } = props;
   const courseId = activityRouteCourseId;
-  const mcqClient = createMcqClient(apiRequest);
+  const mcqClient = useMemo(() => createMcqClient(apiRequest), []);
+  const responseDraftHost = useStandaloneResponseDraftHost({
+    activityId: activityProps.activity.id,
+    canManage: activityProps.canManage,
+    courseId,
+    groupActivityId: activityProps.activity.assignment?.id,
+    groupId
+  });
+  const submissionClient = useMemo(() => {
+    if (!courseId || !groupId) {
+      return undefined;
+    }
+    return {
+      getStatus: async (activityId: string) => {
+        const [status, draftState] = await Promise.all([
+          mcqClient.groupSubmissionStatus(courseId, groupId, activityId),
+          responseDraftHost?.load() ?? Promise.resolve(null)
+        ]);
+        return {
+          ...status,
+          draft: draftState ? { answers: asStudentAnswers(draftState.answers) } : null
+        };
+      },
+      save: responseDraftHost
+        ? async (_activityId: string, answers: Record<string, string[]>) => {
+            await responseDraftHost.save({ answers });
+          }
+        : undefined,
+      submit: async (activityId: string, answers: Record<string, string[]>) => {
+        const result = await mcqClient.submitGroup(courseId, groupId, activityId, { answers });
+        await responseDraftHost?.clear?.().catch(() => undefined);
+        return { submission: result.submission };
+      }
+    };
+  }, [courseId, groupId, mcqClient, responseDraftHost]);
   return (
     <McqActivityView
       {...activityProps}
-      submissionClient={
-        courseId && groupId
-          ? {
-              getStatus: async (activityId) => mcqClient.groupSubmissionStatus(courseId, groupId, activityId),
-              submit: async (activityId, answers) => {
-                const result = await mcqClient.submitGroup(courseId, groupId, activityId, { answers });
-                return { submission: result.submission };
-              }
-            }
-          : undefined
-      }
+      submissionClient={submissionClient}
       onSubmitted={onSubmitted}
       showCorrectAnswers={Boolean(showReleasedAnswers)}
       releasedMaxScore={releasedMaxScore}

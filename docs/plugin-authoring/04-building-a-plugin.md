@@ -188,9 +188,11 @@ saveTracingQuizBankData: (activityBankId: string, bankActivityId: string, input:
 
 ## Step 6: Add Persistence If Needed
 
-If learner attempts or submissions need to survive reloads, add plugin-owned tables to:
+If ordinary unfinished learner responses need to survive reloads, first use the core `ActivityResponseDraft` state host described in the previous chapter. It is per student and assigned activity, does not consume a gradebook attempt, serializes browser saves, and is deliberately separate from compound Test child autosave.
 
-- [packages/db/prisma/schema.prisma](../../packages/db/prisma/schema.prisma)
+Add plugin-owned tables only when the activity needs richer domain records such as attempt events, immutable submissions, execution artifacts, grading evidence, or private authoring data. Those tables belong in the plugin package's own Prisma schema, migrations, generated client, and database manifest—for example:
+
+- `packages/plugin-activities/plugin-your-plugin/prisma/schema.prisma`
 
 Parsons is the best example of this pattern.
 

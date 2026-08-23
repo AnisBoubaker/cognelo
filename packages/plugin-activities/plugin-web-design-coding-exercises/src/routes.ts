@@ -1,5 +1,5 @@
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
-import { AppError, assertCanManageCourse } from "@cognelo/core";
+import { AppError, assertCanManageCourse, clearActivityResponseDraft } from "@cognelo/core";
 import {
   listRecentWebDesignExerciseSubmissions,
   listWebDesignExerciseReviewSubmissions,
@@ -124,6 +124,9 @@ export const webDesignExerciseSubmitRoute: PluginRouteDefinition = {
         userId: context.user.id,
         input
       });
+      if (context.courseId && context.groupId) {
+        await clearActivityResponseDraft(context.user, context.courseId, context.groupId, context.activity.id).catch(() => undefined);
+      }
 
       return { submission };
     }

@@ -43,13 +43,14 @@ export type McqSubmissionAvailability = {
 
 export function deriveMcqStudentAttemptState(input: {
   submission: { answers: McqSubmission["answers"]; lifecycle?: McqSubmission["lifecycle"] } | null;
+  draft?: { answers: McqSubmission["answers"] } | null;
   availability: Pick<McqSubmissionAvailability, "canStart">;
 }) {
   const completedSubmission = input.submission?.lifecycle !== "started" && Boolean(input.submission);
   const startsFreshAttempt = completedSubmission && input.availability.canStart;
 
   return {
-    answers: startsFreshAttempt ? {} : input.submission?.answers ?? {},
+    answers: input.draft?.answers ?? (startsFreshAttempt ? {} : input.submission?.answers ?? {}),
     submitted: completedSubmission && !startsFreshAttempt,
     completedSubmission
   };

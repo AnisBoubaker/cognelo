@@ -1,5 +1,5 @@
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
-import { AppError, assertCanManageActivityBank, assertCanManageCourse } from "@cognelo/core";
+import { AppError, assertCanManageActivityBank, assertCanManageCourse, clearActivityResponseDraft } from "@cognelo/core";
 import {
   codingExerciseRunInputSchema,
   codingExerciseSubmitInputSchema,
@@ -151,6 +151,9 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
         activityConfig: context.activity.config,
         input
       });
+      if (context.courseId && context.groupId) {
+        await clearActivityResponseDraft(context.user, context.courseId, context.groupId, context.activity.id).catch(() => undefined);
+      }
 
       return { execution };
     }

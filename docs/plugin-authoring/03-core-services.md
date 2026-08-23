@@ -225,6 +225,12 @@ This is how the web app knows which React component to show for a given activity
 
 If your renderer is not added there, the activity may exist in the database but still render as unsupported in the browser.
 
+### Student Response Drafts And Execution State Hosts
+
+Interactive learner renderers should receive an `ActivityExecutionStateHost` instead of keeping unfinished work only in component state. For standalone assigned activities, the web registry can create a serialized host with `createStandaloneActivityDraftHost`; it loads and saves bounded JSON through the core `ActivityResponseDraft` route without starting a gradebook attempt. Call the optional `clear()` only after a successful final submission. Plugins with richer attempt/event semantics, such as Parsons, may continue to own their specialized persisted draft model.
+
+The same renderer may receive a different host inside a compound Test. Test children must use the injected Test host, which autosaves into `TestItemAttempt` under the parent attempt. Never call the standalone draft route from a Test child, and never replace the Test host with a standalone host.
+
 ## Prisma And The Shared Database
 
 Shared platform Prisma schema lives in:
