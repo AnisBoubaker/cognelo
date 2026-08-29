@@ -21,6 +21,7 @@ This file is for web-design-coding-exercises-specific memory only.
 - Student coding should offer a full-screen/focus mode that shows only file tabs, editor, preview, console, and an exit control to avoid nested page/editor scrolling during focused work.
 - Graded submission should run through a Cognelo server route backed by an external Playwright runner service, not inside the web app or directly in the browser.
 - The external Playwright runner should run through Docker Compose using the official Playwright image, so browser binaries and OS dependencies are container-managed.
+- The runner requires Sharp `0.35.4` or newer and `tsx` `4.23.12` or newer on the platform Node 24 baseline. Dependency upgrades must retain an end-to-end cropped-screenshot smoke test, because the `{{ EXPECTED_RESULT_CROPPED }}` path exercises Sharp's raw-buffer inspection and PNG extraction rather than only Playwright rendering.
 - Playwright tests must stay teacher/admin-only and should be validated against the teacher reference solution before being saved.
 - Saving teacher tests is runner-dependent: all enabled sample and hidden tests are executed against the teacher reference bundle before persistence; failing validation rejects the save and leaves existing tests unchanged.
 - Plugin route behavior must stay inside the plugin package. The API app should expose only generic plugin dispatchers for course, section/group assigned, and activity-bank contexts.
