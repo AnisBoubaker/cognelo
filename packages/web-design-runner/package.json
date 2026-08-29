@@ -6,12 +6,12 @@
   "main": "src/index.ts",
   "dependencies": {
     "@playwright/test": "1.59.1",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.4",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.12.12",
-    "tsx": "^4.10.5",
+    "tsx": "^4.23.12",
     "typescript": "^5.4.5"
   },
   "scripts": {

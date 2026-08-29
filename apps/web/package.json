@@ -20,7 +20,7 @@
     "@xyflow/react": "^12.11.2",
     "elkjs": "^0.12.0",
     "katex": "^0.16.45",
-    "next": "16.2.4",
+    "next": "16.3.3",
     "prism-react-renderer": "^2.4.1",
     "prismjs": "^1.30.0",
     "react": "^19.2.5",
