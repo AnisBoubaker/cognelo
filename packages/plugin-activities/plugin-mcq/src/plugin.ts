@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ActivityPlugin } from "@cognelo/activity-sdk";
+import { MCQ_AI_MAX_QUESTION_COUNT, MCQ_SOURCE_MAX_LENGTH } from "./constants";
 import { parseMcqSource } from "./mcq";
 
 const supportedLanguages = new Set<string>([
@@ -31,9 +32,9 @@ const supportedLanguages = new Set<string>([
 
 const mcqConfigSchema = z
   .object({
-    source: z.string().min(20).max(30000),
+    source: z.string().min(20).max(MCQ_SOURCE_MAX_LENGTH),
     aiGenerationInstructions: z.string().max(4000).default(""),
-    aiQuestionCount: z.number().int().min(1).max(20).default(5),
+    aiQuestionCount: z.number().int().min(1).max(MCQ_AI_MAX_QUESTION_COUNT).default(5),
     defaultCodeLanguage: z.string().min(1).max(40).default("none"),
     randomizeChoices: z.boolean().default(false)
   })

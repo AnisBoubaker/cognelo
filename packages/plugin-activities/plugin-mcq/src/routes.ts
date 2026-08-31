@@ -15,6 +15,7 @@ import {
   submitActivityAttempt
 } from "@cognelo/core";
 import { prisma, type Prisma } from "@cognelo/db";
+import { MCQ_AI_MAX_QUESTION_COUNT } from "./constants";
 import { buildMcqGradingResultFromConfig } from "./grading";
 import { parseMcqSource, type McqAnswerState, type McqParseError } from "./mcq";
 
@@ -23,7 +24,7 @@ const mcqGenerateInputSchema = z.object({
   defaultCodeLanguage: z.string().min(1).max(40).default("none"),
   instructions: z.string().max(4000).default(""),
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
-  questionCount: z.number().int().min(1).max(20).default(5),
+  questionCount: z.number().int().min(1).max(MCQ_AI_MAX_QUESTION_COUNT).default(5),
   knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
 });
 
@@ -326,7 +327,7 @@ async function generateValidMcqSource(input: {
     const raw = await generateQuestionAuthoringText(input.user, {
       systemPrompt,
       userPrompt,
-      maxOutputTokens: 6000
+      maxOutputTokens: Math.max(6000, input.questionCount * 200)
     });
     const source = normalizeGeneratedSource(raw);
     const parsed = parseMcqSource(source, "none");

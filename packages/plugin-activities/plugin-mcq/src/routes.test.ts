@@ -106,6 +106,49 @@ describe("MCQ generation route", () => {
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.userPrompt).toContain("Generate exactly 1 valid Cognelo multiple-choice question.");
   });
 
+  it("accepts requests for up to 80 questions and scales the output allowance", async () => {
+    const source = Array.from(
+      { length: 80 },
+      (_value, index) => `## Question ${index + 1}\n\n- [x] Correct\n- [ ] Wrong`
+    ).join("\n\n");
+    mocks.generateQuestionAuthoringText.mockResolvedValue(source);
+
+    await expect(
+      mcqGenerateRoute.methods.POST?.({
+        request: new Request("http://test.local"),
+        context,
+        readJson: async () => ({
+          description: "Generate a comprehensive programming assessment.",
+          defaultCodeLanguage: "none",
+          locale: "en",
+          questionCount: 80
+        })
+      })
+    ).resolves.toMatchObject({ attempts: 1, source: expect.stringContaining("## Question 80") });
+
+    expect(mocks.generateQuestionAuthoringText).toHaveBeenCalledWith(
+      context.user,
+      expect.objectContaining({ maxOutputTokens: 16000 })
+    );
+  });
+
+  it("rejects requests for more than 80 questions", async () => {
+    await expect(
+      mcqGenerateRoute.methods.POST?.({
+        request: new Request("http://test.local"),
+        context,
+        readJson: async () => ({
+          description: "Generate a comprehensive programming assessment.",
+          defaultCodeLanguage: "none",
+          locale: "en",
+          questionCount: 81
+        })
+      })
+    ).rejects.toMatchObject({ name: "ZodError" });
+
+    expect(mocks.generateQuestionAuthoringText).not.toHaveBeenCalled();
+  });
+
   it("retries when the model returns the wrong number of questions", async () => {
     mocks.generateQuestionAuthoringText
       .mockResolvedValueOnce(`## Question 1\n\n- [x] Correct\n- [ ] Wrong`)
