@@ -5,6 +5,7 @@ export type ParticipantCsvRow = {
   firstName: string;
   lastName: string;
   email: string;
+  assignedPassword: string | null;
   externalId: string | null;
 };
 
@@ -17,12 +18,14 @@ export type ParticipantCsvIssue = {
     | "invalid_email"
     | "malformed_csv"
     | "missing_value"
+    | "password_too_short"
     | "too_long"
     | "too_many_rows"
     | "unclosed_quote";
   line?: number;
-  field?: "firstName" | "lastName" | "email" | "externalId";
+  field?: "firstName" | "lastName" | "email" | "assignedPassword" | "externalId";
   value?: string;
+  expected?: string;
 };
 
 export type ParticipantCsvResult = {
@@ -31,10 +34,11 @@ export type ParticipantCsvResult = {
 };
 
 const MAX_ROWS = 500;
-const ALLOWED_COLUMN_COUNTS = new Set([3, 4]);
 const EmailSchema = z.string().email();
 
-export function parseParticipantCsv(source: string): ParticipantCsvResult {
+export function parseParticipantCsv(source: string, options: { includesAssignedPasswords?: boolean } = {}): ParticipantCsvResult {
+  const includesAssignedPasswords = options.includesAssignedPasswords === true;
+  const allowedColumnCounts = includesAssignedPasswords ? new Set([4, 5]) : new Set([3, 4]);
   const text = source.replace(/^\uFEFF/, "");
   if (!text.trim()) return { rows: [], issues: [{ code: "empty_file" }] };
 
@@ -50,29 +54,45 @@ export function parseParticipantCsv(source: string): ParticipantCsvResult {
   const rows: ParticipantCsvRow[] = [];
   const seenEmails = new Set<string>();
   for (const record of records.slice(0, MAX_ROWS)) {
-    if (!ALLOWED_COLUMN_COUNTS.has(record.values.length)) {
-      issues.push({ code: "invalid_column_count", line: record.line, value: String(record.values.length) });
+    if (!allowedColumnCounts.has(record.values.length)) {
+      issues.push({
+        code: "invalid_column_count",
+        line: record.line,
+        value: String(record.values.length),
+        expected: includesAssignedPasswords ? "4 or 5" : "3 or 4"
+      });
       continue;
     }
 
-    const [rawFirstName, rawLastName, rawEmail, rawExternalId] = record.values;
+    const [rawFirstName, rawLastName, rawEmail, rawFourthColumn, rawFifthColumn] = record.values;
     const firstName = rawFirstName.trim();
     const lastName = rawLastName.trim();
     const email = rawEmail.trim().toLowerCase();
-    const externalId = (rawExternalId ?? "").trim() || null;
+    const assignedPassword = includesAssignedPasswords ? rawFourthColumn : null;
+    const externalId = (includesAssignedPasswords ? rawFifthColumn : rawFourthColumn)?.trim() || null;
     let rowIsValid = true;
 
-    for (const [field, value] of [["firstName", firstName], ["lastName", lastName], ["email", email]] as const) {
+    const requiredValues = [
+      ["firstName", firstName],
+      ["lastName", lastName],
+      ["email", email],
+      ...(includesAssignedPasswords ? [["assignedPassword", assignedPassword ?? ""] as const] : [])
+    ] as const;
+    for (const [field, value] of requiredValues) {
       if (!value) {
         issues.push({ code: "missing_value", line: record.line, field });
         rowIsValid = false;
       }
     }
-    for (const [field, value, max] of [["firstName", firstName, 120], ["lastName", lastName, 120], ["email", email, 320], ["externalId", externalId ?? "", 120]] as const) {
+    for (const [field, value, max] of [["firstName", firstName, 120], ["lastName", lastName, 120], ["email", email, 320], ["assignedPassword", assignedPassword ?? "", 200], ["externalId", externalId ?? "", 120]] as const) {
       if (value.length > max) {
         issues.push({ code: "too_long", line: record.line, field, value: String(max) });
         rowIsValid = false;
       }
+    }
+    if (assignedPassword && assignedPassword.length < 8) {
+      issues.push({ code: "password_too_short", line: record.line, field: "assignedPassword", value: "8" });
+      rowIsValid = false;
     }
     if (email && !isValidEmail(email)) {
       issues.push({ code: "invalid_email", line: record.line, field: "email", value: email });
@@ -84,7 +104,7 @@ export function parseParticipantCsv(source: string): ParticipantCsvResult {
     }
     if (email) seenEmails.add(email);
 
-    if (rowIsValid) rows.push({ line: record.line, firstName, lastName, email, externalId });
+    if (rowIsValid) rows.push({ line: record.line, firstName, lastName, email, assignedPassword, externalId });
   }
 
   return { rows, issues };

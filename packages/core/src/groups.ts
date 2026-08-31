@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import {
   CourseAllGroupsActivityAssignmentInputSchema,
   CourseGroupStatus,
@@ -566,13 +567,64 @@ export async function addGroupParticipant(user: CurrentUser, courseId: string, g
   if (!existingUser && (!firstName || !lastName)) {
     throw new AppError(400, "GROUP_PARTICIPANT_NAME_REQUIRED", "First name and last name are required for a new participant.");
   }
+  if (
+    data.assignedPassword &&
+    existingUser &&
+    (
+      !existingUser.isActive ||
+      existingUser.mustChangePassword ||
+      !existingUser.emailVerifiedAt ||
+      !(await bcrypt.compare(data.assignedPassword, existingUser.passwordHash))
+    )
+  ) {
+    throw assignedPasswordAccountConflict();
+  }
+
+  const assignedPasswordHash = data.assignedPassword && !existingUser ? await bcrypt.hash(data.assignedPassword, 12) : null;
 
   try {
     const participant = await prisma.$transaction(async (tx) => {
+      let linkedUserId = existingUser?.id ?? null;
+
+      if (assignedPasswordHash) {
+        const pendingParticipants = await tx.courseGroupParticipant.findMany({
+          where: { email: normalizedEmail, userId: null },
+          include: { group: { select: { courseId: true } } }
+        });
+        const createdUser = await tx.user.create({
+          data: {
+            email: normalizedEmail,
+            name: `${firstName} ${lastName}`.trim(),
+            firstName,
+            lastName,
+            passwordHash: assignedPasswordHash,
+            mustChangePassword: false,
+            isActive: true,
+            emailVerifiedAt: new Date()
+          },
+          select: { id: true }
+        });
+        linkedUserId = createdUser.id;
+
+        await ensureStudentRole(createdUser.id, tx);
+        const courseRoles = new Map<string, CourseGroupParticipantRole>([[courseId, "student"]]);
+        for (const pendingParticipant of pendingParticipants) {
+          const pendingCourseId = pendingParticipant.group.courseId;
+          courseRoles.set(pendingCourseId, highestParticipantRole(courseRoles.get(pendingCourseId), pendingParticipant.role));
+        }
+        for (const [participantCourseId, role] of courseRoles) {
+          await ensureMembershipsForGroupParticipant(createdUser.id, participantCourseId, role, tx);
+        }
+        await tx.courseGroupParticipant.updateMany({
+          where: { email: normalizedEmail, userId: null },
+          data: { userId: createdUser.id }
+        });
+      }
+
       const createdParticipant = await tx.courseGroupParticipant.create({
         data: {
           groupId,
-          userId: existingUser?.id ?? null,
+          userId: linkedUserId,
           role: data.role,
           firstName,
           lastName,
@@ -604,8 +656,23 @@ export async function addGroupParticipant(user: CurrentUser, courseId: string, g
     ) {
       throw new AppError(400, "GROUP_PARTICIPANT_EXISTS", "This participant is already part of the group.");
     }
+    if (
+      data.assignedPassword &&
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      throw assignedPasswordAccountConflict();
+    }
     throw error;
   }
+}
+
+function assignedPasswordAccountConflict() {
+  return new AppError(
+    409,
+    "GROUP_PARTICIPANT_ASSIGNED_PASSWORD_ACCOUNT_CONFLICT",
+    "An existing account for this email is not ready for immediate login with the assigned password. Its password was not changed."
+  );
 }
 
 export async function lookupGroupParticipantCandidate(user: CurrentUser, courseId: string, email: string) {
@@ -1238,6 +1305,18 @@ async function ensureMembershipsForGroupParticipant(
       role
     }
   });
+}
+
+function highestParticipantRole(
+  current: CourseGroupParticipantRole | undefined,
+  next: CourseGroupParticipantRole
+): CourseGroupParticipantRole {
+  const rank: Record<CourseGroupParticipantRole, number> = {
+    teacher: 3,
+    ta: 2,
+    student: 1
+  };
+  return !current || rank[next] > rank[current] ? next : current;
 }
 
 function firstNameFromName(name: string | null) {
