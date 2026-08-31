@@ -1,5 +1,7 @@
 # Copy this file to judge0.conf on the sandbox host, replace every
-# REPLACE_* value, and keep the resulting file mode 0600.
+# REPLACE_* value, and keep the resulting file root-owned with mode 0640 and
+# group 999. The pinned Judge0 image runs as GID 999 and must be able to read
+# this bind-mounted file; the protected runtime directory prevents host access.
 
 JUDGE0_TELEMETRY_ENABLE=false
 RESTART_MAX_TRIES=10

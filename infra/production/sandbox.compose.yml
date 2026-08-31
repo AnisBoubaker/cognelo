@@ -13,13 +13,12 @@ services:
     restart: unless-stopped
     volumes:
       - ./judge0.conf:/judge0.conf:ro
-    ports:
-      - "${SANDBOX_BIND_ADDRESS:-127.0.0.1}:${JUDGE0_PORT:-2358}:2358"
     depends_on:
       - judge0-db
       - judge0-redis
     networks:
-      - sandbox
+      sandbox:
+        ipv4_address: ${JUDGE0_SERVER_CONTAINER_IP:-172.30.0.10}
     logging: *default-logging
 
   judge0-workers:
@@ -81,10 +80,9 @@ services:
     environment:
       PORT: 3456
       NODE_ENV: production
-    ports:
-      - "${SANDBOX_BIND_ADDRESS:-127.0.0.1}:${WEB_DESIGN_RUNNER_PORT:-3456}:3456"
     networks:
-      - sandbox
+      sandbox:
+        ipv4_address: ${WEB_DESIGN_RUNNER_CONTAINER_IP:-172.30.0.11}
     logging: *default-logging
     healthcheck:
       test:
@@ -100,6 +98,9 @@ services:
 networks:
   sandbox:
     internal: true
+    ipam:
+      config:
+        - subnet: ${SANDBOX_DOCKER_SUBNET:-172.30.0.0/24}
 
 volumes:
   judge0-data:
