@@ -1,16 +1,18 @@
 "use client";
 
 import { ConfirmationDialog } from "@cognelo/activity-ui";
-import { FocusEvent, FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FocusEvent, FormEvent, useEffect, useState } from "react";
 import { AppIcon } from "@/components/app-icon";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import {
   api,
+  ApiError,
   type CourseGroup,
   type GroupParticipant,
   type GroupParticipantCandidate
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { parseParticipantCsv, type ParticipantCsvIssue, type ParticipantCsvRow } from "@/lib/participant-csv";
 
 type GroupEditor = {
   groupId: string | null;
@@ -38,6 +40,20 @@ type ParticipantEditor = {
   candidate: GroupParticipantCandidate | null;
 };
 
+type ParticipantImportState = {
+  group: CourseGroup;
+  fileName: string;
+  rows: ParticipantCsvRow[];
+  issues: ParticipantCsvIssue[];
+  importing: boolean;
+  completed: number;
+  result: {
+    imported: number;
+    skipped: number;
+    failures: Array<{ line: number; email: string; message: string }>;
+  } | null;
+};
+
 export function CourseParticipantsPanel({
   courseId,
   currentUserId,
@@ -54,6 +70,7 @@ export function CourseParticipantsPanel({
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [editor, setEditor] = useState<GroupEditor | null>(null);
   const [participantEditor, setParticipantEditor] = useState<ParticipantEditor | null>(null);
+  const [participantImport, setParticipantImport] = useState<ParticipantImportState | null>(null);
   const [deleteState, setDeleteState] = useState<GroupDeleteState | null>(null);
   const [checkingEmail, setCheckingEmail] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -125,6 +142,65 @@ export function CourseParticipantsPanel({
   function openParticipantEditor(group: CourseGroup) {
     setError("");
     setParticipantEditor({ group, role: "student", firstName: "", lastName: "", email: "", externalId: "", candidate: null });
+  }
+
+  function openParticipantImport(group: CourseGroup) {
+    setError("");
+    setParticipantImport({ group, fileName: "", rows: [], issues: [], importing: false, completed: 0, result: null });
+  }
+
+  async function selectParticipantCsv(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file || !participantImport) return;
+    if (file.size > 1_000_000) {
+      setParticipantImport({ ...participantImport, fileName: file.name, rows: [], issues: [{ code: "file_too_large" }], result: null });
+      return;
+    }
+    const parsed = parseParticipantCsv(await file.text());
+    setParticipantImport({ ...participantImport, fileName: file.name, rows: parsed.rows, issues: parsed.issues, completed: 0, result: null });
+  }
+
+  async function importParticipants() {
+    if (!participantImport || participantImport.issues.length || !participantImport.rows.length) return;
+    const importGroup = participantImport.group;
+    const rows = participantImport.rows;
+    const existingEmails = new Set((groupDetails[importGroup.id]?.participants ?? importGroup.participants ?? []).map((participant) => participant.email.toLowerCase()));
+    let imported = 0;
+    let skipped = 0;
+    const failures: Array<{ line: number; email: string; message: string }> = [];
+    setParticipantImport({ ...participantImport, importing: true, completed: 0, result: null });
+
+    for (const [index, row] of rows.entries()) {
+      if (existingEmails.has(row.email)) {
+        skipped += 1;
+      } else {
+        try {
+          await api.addGroupParticipant(courseId, importGroup.id, {
+            role: "student",
+            firstName: row.firstName,
+            lastName: row.lastName,
+            email: row.email,
+            externalId: row.externalId
+          });
+          imported += 1;
+          existingEmails.add(row.email);
+        } catch (err) {
+          if (err instanceof ApiError && err.code === "GROUP_PARTICIPANT_EXISTS") {
+            skipped += 1;
+            existingEmails.add(row.email);
+          } else {
+            failures.push({ line: row.line, email: row.email, message: err instanceof Error ? err.message : t("groupPage.participantCreateError") });
+          }
+        }
+      }
+      setParticipantImport((current) => current ? { ...current, completed: index + 1 } : current);
+    }
+
+    setParticipantImport((current) => current ? { ...current, importing: false, result: { imported, skipped, failures } } : current);
+    if (imported) {
+      await loadGroupDetails();
+      await onChanged();
+    }
   }
 
   async function resolveParticipantEmail(event?: FocusEvent<HTMLInputElement>) {
@@ -265,6 +341,10 @@ export function CourseParticipantsPanel({
                       <AppIcon name="add" />
                       <span>{t("groupPage.addParticipant")}</span>
                     </button>
+                    <button className="secondary" type="button" onClick={() => openParticipantImport(detail)}>
+                      <AppIcon name="upload" />
+                      <span>{t("groupPage.importParticipants")}</span>
+                    </button>
                     <button className="secondary icon-button" type="button" title={t("courseDetail.editGroup")} onClick={() => openEditGroup(detail)}>
                       <AppIcon name="edit" />
                     </button>
@@ -307,7 +387,7 @@ export function CourseParticipantsPanel({
           })}
         </div>
       ) : <p className="muted">{t("courseDetail.noGroups")}</p>}
-      {error && !editor && !participantEditor && !deleteState ? <p className="error" role="alert">{error}</p> : null}
+      {error && !editor && !participantEditor && !participantImport && !deleteState ? <p className="error" role="alert">{error}</p> : null}
 
       {editor ? (
         <div className="dialog-backdrop" role="presentation">
@@ -346,6 +426,59 @@ export function CourseParticipantsPanel({
         </div>
       ) : null}
 
+      {participantImport ? (
+        <div className="dialog-backdrop" role="presentation">
+          <section aria-labelledby="participant-import-title" aria-modal="true" className="dialog-panel participant-import-dialog" role="dialog">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">{participantImport.group.title}</p>
+                <h2 id="participant-import-title">{t("groupPage.importParticipantsTitle")}</h2>
+                <p className="muted">{t("groupPage.importParticipantsText")}</p>
+              </div>
+              <button className="secondary icon-button" disabled={participantImport.importing} type="button" title={t("common.close")} onClick={() => setParticipantImport(null)}><AppIcon name="close" /></button>
+            </div>
+            <div className="form">
+              <div className="field">
+                <label htmlFor="participant-csv-file">{t("groupPage.importFileLabel")}</label>
+                <input accept=".csv,text/csv" disabled={participantImport.importing} id="participant-csv-file" type="file" onChange={(event) => void selectParticipantCsv(event)} />
+                <p className="muted">{t("groupPage.importFormatHelp")}</p>
+                <code className="participant-import-template">Ada,Lovelace,ada@example.org,20260001</code>
+              </div>
+
+              {participantImport.fileName ? <p className="muted">{t("groupPage.importFileSelected", { name: participantImport.fileName })}</p> : null}
+              {participantImport.rows.length && !participantImport.issues.length ? (
+                <p className="participant-import-ready">{t("groupPage.importReady", { count: participantImport.rows.length })}</p>
+              ) : null}
+              {participantImport.issues.length ? (
+                <div className="participant-import-issues" role="alert">
+                  <p className="error">{t("groupPage.importIssues", { count: participantImport.issues.length })}</p>
+                  <ul>
+                    {participantImport.issues.slice(0, 10).map((issue, index) => <li key={`${issue.code}-${issue.line ?? 0}-${index}`}>{formatParticipantCsvIssue(issue, t)}</li>)}
+                  </ul>
+                  {participantImport.issues.length > 10 ? <p className="muted">{t("groupPage.importMoreIssues", { count: participantImport.issues.length - 10 })}</p> : null}
+                </div>
+              ) : null}
+              {participantImport.importing ? (
+                <p>{t("groupPage.importProgress", { completed: participantImport.completed, total: participantImport.rows.length })}</p>
+              ) : null}
+              {participantImport.result ? (
+                <div className="participant-import-result" role="status">
+                  <p>{t("groupPage.importResult", { imported: participantImport.result.imported, skipped: participantImport.result.skipped, failed: participantImport.result.failures.length })}</p>
+                  {participantImport.result.failures.length ? <>
+                    <p className="muted">{t("groupPage.importPartialHelp")}</p>
+                    <ul>{participantImport.result.failures.slice(0, 10).map((failure) => <li key={`${failure.line}-${failure.email}`}>{t("groupPage.importFailure", failure)}</li>)}</ul>
+                  </> : null}
+                </div>
+              ) : null}
+              <div className="dialog-actions">
+                <button className="secondary" disabled={participantImport.importing} type="button" onClick={() => setParticipantImport(null)}>{participantImport.result ? t("common.close") : t("common.cancel")}</button>
+                {!participantImport.result ? <button disabled={participantImport.importing || Boolean(participantImport.issues.length) || !participantImport.rows.length} type="button" onClick={() => void importParticipants()}>{participantImport.importing ? t("groupPage.importingParticipants") : t("groupPage.importParticipantsAction")}</button> : null}
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {deleteState?.step === "options" ? <div className="dialog-backdrop" role="presentation"><section aria-labelledby="participant-group-delete-title" aria-modal="true" className="dialog-panel" role="dialog"><div><p className="eyebrow">{t("courseDetail.deleteGroupEyebrow")}</p><h2 id="participant-group-delete-title">{t("courseDetail.deleteGroupTitle")}</h2></div><p>{t("courseDetail.deleteGroupParticipantsMessage", { title: deleteState.group.title, count: deleteState.participants.length })}</p><form className="form" onSubmit={submitDeleteOptions}><label className="checkbox-row"><input checked={deleteState.mode === "move"} name="participant-group-delete-mode" type="radio" onChange={() => setDeleteState({ ...deleteState, mode: "move" })} /><span>{t("courseDetail.moveGroupParticipants")}</span></label>{deleteState.mode === "move" ? <div className="field"><label htmlFor="participant-destination-group">{t("courseDetail.destinationGroup")}</label><select id="participant-destination-group" required value={deleteState.targetGroupId} onChange={(event) => setDeleteState({ ...deleteState, targetGroupId: event.target.value })}><option value="">{t("courseDetail.chooseDestinationGroup")}</option>{groups.filter((group) => group.id !== deleteState.group.id).map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}</select><p className="muted">{t("courseDetail.moveGroupParticipantsHelp")}</p></div> : null}<label className="checkbox-row"><input checked={deleteState.mode === "delete"} name="participant-group-delete-mode" type="radio" onChange={() => setDeleteState({ ...deleteState, mode: "delete" })} /><span>{t("courseDetail.deleteGroupParticipants")}</span></label>{error ? <p className="error">{error}</p> : null}<div className="dialog-actions"><button className="secondary" type="button" onClick={() => setDeleteState(null)}>{t("common.cancel")}</button><button className={deleteState.mode === "delete" ? "danger" : ""} disabled={saving || (deleteState.mode === "move" && !deleteState.targetGroupId)} type="submit">{saving ? t("common.saving") : t("courseDetail.continueGroupDeletion")}</button></div></form></section></div> : null}
       <ConfirmationDialog open={deleteState?.step === "confirm-empty"} eyebrow={t("courseDetail.deleteGroupEyebrow")} title={t("courseDetail.deleteGroupTitle")} message={t("courseDetail.deleteEmptyGroupConfirm", { title: deleteState?.group.title ?? "" })} confirmLabel={t("courseDetail.deleteGroupAction")} cancelLabel={t("common.cancel")} confirmVariant="danger" isConfirming={saving} onCancel={() => setDeleteState(null)} onConfirm={() => void deleteGroup({ action: "delete" })} />
       <ConfirmationDialog open={deleteState?.step === "confirm-permanent"} eyebrow={t("courseDetail.deleteGroupPermanentEyebrow")} title={t("courseDetail.deleteGroupPermanentTitle")} message={t("courseDetail.deleteGroupPermanentConfirm", { title: deleteState?.group.title ?? "", count: deleteState?.participants.length ?? 0 })} confirmLabel={t("courseDetail.deleteGroupPermanently")} cancelLabel={t("common.cancel")} confirmVariant="danger" isConfirming={saving} onCancel={() => setDeleteState(null)} onConfirm={() => void deleteGroup({ action: "delete", confirmParticipantDeletion: true })} />
@@ -374,4 +507,18 @@ function formatAvailabilityWindow(from: string | null | undefined, until: string
   if (from && until) return t("groupPage.availableWindow", { from: format(from), until: format(until) });
   if (from) return t("groupPage.availableAfter", { from: format(from) });
   return t("groupPage.availableBefore", { until: format(until as string) });
+}
+
+function formatParticipantCsvIssue(issue: ParticipantCsvIssue, t: (key: string, vars?: Record<string, string | number>) => string) {
+  const field = issue.field ? t(`groupPage.importField${capitalize(issue.field)}`) : "";
+  if (issue.code === "empty_file") return t("groupPage.importIssueEmptyFile");
+  if (issue.code === "file_too_large") return t("groupPage.importIssueFileTooLarge");
+  if (issue.code === "missing_value") return t("groupPage.importIssueMissingValue", { line: issue.line ?? 0, field });
+  if (issue.code === "invalid_email") return t("groupPage.importIssueInvalidEmail", { line: issue.line ?? 0, value: issue.value ?? "" });
+  if (issue.code === "invalid_column_count") return t("groupPage.importIssueColumnCount", { line: issue.line ?? 0, count: issue.value ?? "" });
+  if (issue.code === "malformed_csv") return t("groupPage.importIssueMalformedCsv", { line: issue.line ?? 0 });
+  if (issue.code === "duplicate_email") return t("groupPage.importIssueDuplicateEmail", { line: issue.line ?? 0, value: issue.value ?? "" });
+  if (issue.code === "too_long") return t("groupPage.importIssueTooLong", { line: issue.line ?? 0, field, max: issue.value ?? "" });
+  if (issue.code === "too_many_rows") return t("groupPage.importIssueTooManyRows", { max: issue.value ?? "500" });
+  return t("groupPage.importIssueUnclosedQuote", { line: issue.line ?? 0 });
 }
