@@ -8,6 +8,7 @@ import {
   type McqQuestion,
   type ParsedMcq
 } from "../mcq";
+import { MCQ_AI_MAX_QUESTION_COUNT } from "../constants";
 import { deriveMcqStudentAttemptState } from "../client";
 import { MarkdownBlocksView } from "./markdown-blocks-view";
 
@@ -649,11 +650,11 @@ export function McqActivityView({
                 <label htmlFor="mcq-ai-question-count">{copy.questionCount}</label>
                 <input
                   id="mcq-ai-question-count"
-                  max={20}
+                  max={MCQ_AI_MAX_QUESTION_COUNT}
                   min={1}
                   type="number"
                   value={questionCount}
-                  onChange={(event) => setQuestionCount(Math.max(1, Math.min(20, Number(event.target.value) || 1)))}
+                  onChange={(event) => setQuestionCount(Math.max(1, Math.min(MCQ_AI_MAX_QUESTION_COUNT, Number(event.target.value) || 1)))}
                 />
               </div>
               <div className="field">
@@ -1295,7 +1296,10 @@ function snapshotsEqual(left: McqFormSnapshot, right: McqFormSnapshot) {
 
 function normalizeQuestionCount(value: unknown) {
   const numericValue = Number(value ?? fallbackConfig.aiQuestionCount);
-  return Math.max(1, Math.min(20, Number.isFinite(numericValue) ? Math.round(numericValue) : fallbackConfig.aiQuestionCount));
+  return Math.max(
+    1,
+    Math.min(MCQ_AI_MAX_QUESTION_COUNT, Number.isFinite(numericValue) ? Math.round(numericValue) : fallbackConfig.aiQuestionCount)
+  );
 }
 
 function formatSubmissionAvailability(

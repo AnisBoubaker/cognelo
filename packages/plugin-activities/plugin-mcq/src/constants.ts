@@ -1,0 +1,2 @@
+export const MCQ_AI_MAX_QUESTION_COUNT = 80;
+export const MCQ_SOURCE_MAX_LENGTH = 100_000;

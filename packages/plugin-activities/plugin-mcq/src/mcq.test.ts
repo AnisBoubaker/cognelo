@@ -260,6 +260,26 @@ describe("MCQ activity config", () => {
     });
   });
 
+  it("accepts up to 80 AI-generated questions", () => {
+    expect(configSchema?.parse({ source, aiQuestionCount: 80, randomizeChoices: false })).toMatchObject({
+      aiQuestionCount: 80
+    });
+    expect(() => configSchema?.parse({ source, aiQuestionCount: 81, randomizeChoices: false })).toThrow();
+  });
+
+  it("stores an 80-question generated source beyond the former 30,000-character limit", () => {
+    const generatedSource = Array.from(
+      { length: 80 },
+      (_value, index) => `## Question ${index + 1}\n${"Detailed question context. ".repeat(15)}\n\n- [x] Correct\n- [ ] Incorrect`
+    ).join("\n\n");
+
+    expect(generatedSource.length).toBeGreaterThan(30_000);
+    expect(configSchema?.parse({ source: generatedSource, aiQuestionCount: 80, randomizeChoices: false })).toMatchObject({
+      source: generatedSource,
+      aiQuestionCount: 80
+    });
+  });
+
   it("adds defaults for AI generation settings in older config", () => {
     expect(configSchema?.parse({ source, randomizeChoices: false })).toMatchObject({
       aiGenerationInstructions: "",
