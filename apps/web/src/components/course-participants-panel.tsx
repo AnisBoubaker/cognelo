@@ -43,6 +43,8 @@ type ParticipantEditor = {
 type ParticipantImportState = {
   group: CourseGroup;
   fileName: string;
+  fileContents: string;
+  includesAssignedPasswords: boolean;
   rows: ParticipantCsvRow[];
   issues: ParticipantCsvIssue[];
   importing: boolean;
@@ -146,18 +148,34 @@ export function CourseParticipantsPanel({
 
   function openParticipantImport(group: CourseGroup) {
     setError("");
-    setParticipantImport({ group, fileName: "", rows: [], issues: [], importing: false, completed: 0, result: null });
+    setParticipantImport({ group, fileName: "", fileContents: "", includesAssignedPasswords: false, rows: [], issues: [], importing: false, completed: 0, result: null });
   }
 
   async function selectParticipantCsv(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file || !participantImport) return;
     if (file.size > 1_000_000) {
-      setParticipantImport({ ...participantImport, fileName: file.name, rows: [], issues: [{ code: "file_too_large" }], result: null });
+      setParticipantImport({ ...participantImport, fileName: file.name, fileContents: "", rows: [], issues: [{ code: "file_too_large" }], result: null });
       return;
     }
-    const parsed = parseParticipantCsv(await file.text());
-    setParticipantImport({ ...participantImport, fileName: file.name, rows: parsed.rows, issues: parsed.issues, completed: 0, result: null });
+    const fileContents = await file.text();
+    const parsed = parseParticipantCsv(fileContents, { includesAssignedPasswords: participantImport.includesAssignedPasswords });
+    setParticipantImport({ ...participantImport, fileName: file.name, fileContents, rows: parsed.rows, issues: parsed.issues, completed: 0, result: null });
+  }
+
+  function setParticipantImportPasswordMode(includesAssignedPasswords: boolean) {
+    if (!participantImport || participantImport.importing) return;
+    const parsed = participantImport.fileContents
+      ? parseParticipantCsv(participantImport.fileContents, { includesAssignedPasswords })
+      : { rows: [], issues: [] };
+    setParticipantImport({
+      ...participantImport,
+      includesAssignedPasswords,
+      rows: parsed.rows,
+      issues: parsed.issues,
+      completed: 0,
+      result: null
+    });
   }
 
   async function importParticipants() {
@@ -180,6 +198,7 @@ export function CourseParticipantsPanel({
             firstName: row.firstName,
             lastName: row.lastName,
             email: row.email,
+            assignedPassword: row.assignedPassword ?? undefined,
             externalId: row.externalId
           });
           imported += 1;
@@ -196,7 +215,13 @@ export function CourseParticipantsPanel({
       setParticipantImport((current) => current ? { ...current, completed: index + 1 } : current);
     }
 
-    setParticipantImport((current) => current ? { ...current, importing: false, result: { imported, skipped, failures } } : current);
+    setParticipantImport((current) => current ? {
+      ...current,
+      fileContents: "",
+      rows: current.rows.map((row) => ({ ...row, assignedPassword: null })),
+      importing: false,
+      result: { imported, skipped, failures }
+    } : current);
     if (imported) {
       await loadGroupDetails();
       await onChanged();
@@ -438,11 +463,25 @@ export function CourseParticipantsPanel({
               <button className="secondary icon-button" disabled={participantImport.importing} type="button" title={t("common.close")} onClick={() => setParticipantImport(null)}><AppIcon name="close" /></button>
             </div>
             <div className="form">
+              <label className="checkbox-row">
+                <input
+                  checked={participantImport.includesAssignedPasswords}
+                  disabled={participantImport.importing}
+                  type="checkbox"
+                  onChange={(event) => setParticipantImportPasswordMode(event.target.checked)}
+                />
+                <span>{t("groupPage.importIncludesAssignedPasswords")}</span>
+              </label>
+              <p className="muted">{t("groupPage.importIncludesAssignedPasswordsHelp")}</p>
               <div className="field">
                 <label htmlFor="participant-csv-file">{t("groupPage.importFileLabel")}</label>
                 <input accept=".csv,text/csv" disabled={participantImport.importing} id="participant-csv-file" type="file" onChange={(event) => void selectParticipantCsv(event)} />
-                <p className="muted">{t("groupPage.importFormatHelp")}</p>
-                <code className="participant-import-template">Ada,Lovelace,ada@example.org,20260001</code>
+                <p className="muted">{t(participantImport.includesAssignedPasswords ? "groupPage.importFormatHelpWithPasswords" : "groupPage.importFormatHelp")}</p>
+                <code className="participant-import-template">
+                  {participantImport.includesAssignedPasswords
+                    ? "Anonymous,Student,anonymous-1@example.invalid,AssignedPassword,20260001"
+                    : "Ada,Lovelace,ada@example.org,20260001"}
+                </code>
               </div>
 
               {participantImport.fileName ? <p className="muted">{t("groupPage.importFileSelected", { name: participantImport.fileName })}</p> : null}
@@ -514,8 +553,9 @@ function formatParticipantCsvIssue(issue: ParticipantCsvIssue, t: (key: string, 
   if (issue.code === "empty_file") return t("groupPage.importIssueEmptyFile");
   if (issue.code === "file_too_large") return t("groupPage.importIssueFileTooLarge");
   if (issue.code === "missing_value") return t("groupPage.importIssueMissingValue", { line: issue.line ?? 0, field });
+  if (issue.code === "password_too_short") return t("groupPage.importIssuePasswordTooShort", { line: issue.line ?? 0, min: issue.value ?? "8" });
   if (issue.code === "invalid_email") return t("groupPage.importIssueInvalidEmail", { line: issue.line ?? 0, value: issue.value ?? "" });
-  if (issue.code === "invalid_column_count") return t("groupPage.importIssueColumnCount", { line: issue.line ?? 0, count: issue.value ?? "" });
+  if (issue.code === "invalid_column_count") return t("groupPage.importIssueColumnCount", { line: issue.line ?? 0, count: issue.value ?? "", expected: issue.expected ?? "" });
   if (issue.code === "malformed_csv") return t("groupPage.importIssueMalformedCsv", { line: issue.line ?? 0 });
   if (issue.code === "duplicate_email") return t("groupPage.importIssueDuplicateEmail", { line: issue.line ?? 0, value: issue.value ?? "" });
   if (issue.code === "too_long") return t("groupPage.importIssueTooLong", { line: issue.line ?? 0, field, max: issue.value ?? "" });

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
+const bcryptMocks = vi.hoisted(() => ({ compare: vi.fn(), hash: vi.fn() }));
+
 const tx = vi.hoisted(() => ({
   activity: {
     findMany: vi.fn(),
@@ -34,7 +36,8 @@ const tx = vi.hoisted(() => ({
     create: vi.fn(),
     createMany: vi.fn(),
     delete: vi.fn(),
-    findMany: vi.fn()
+    findMany: vi.fn(),
+    updateMany: vi.fn()
   },
   courseMembership: {
     deleteMany: vi.fn(),
@@ -45,6 +48,9 @@ const tx = vi.hoisted(() => ({
   },
   userRole: {
     upsert: vi.fn()
+  },
+  user: {
+    create: vi.fn()
   }
 }));
 
@@ -121,6 +127,10 @@ vi.mock("@cognelo/db", () => ({
   }
 }));
 
+vi.mock("bcryptjs", () => ({
+  default: { compare: bcryptMocks.compare, hash: bcryptMocks.hash }
+}));
+
 vi.mock("./authorization", () => authMocks);
 
 const {
@@ -160,6 +170,8 @@ const studentUser: CurrentUser = {
 describe("group services", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    bcryptMocks.compare.mockResolvedValue(true);
+    bcryptMocks.hash.mockResolvedValue("assigned-password-hash");
     mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof tx) => unknown) => handler(tx));
     tx.courseGroupActivity.create.mockImplementation(async (input: { data: { groupId: string; activityId: string } }) => ({
       id: "assignment-created",
@@ -661,6 +673,110 @@ describe("group services", () => {
         where: { courseId_userId_role: { courseId: "course-1", userId: "student-1", role: "student" } }
       })
     );
+  });
+
+  it("creates and immediately links a verified student account with an assigned password", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+    tx.courseGroupParticipant.findMany.mockResolvedValue([
+      { role: "student", group: { courseId: "course-2" } }
+    ]);
+    tx.user.create.mockResolvedValue({ id: "student-1" });
+    tx.courseGroupParticipant.create.mockResolvedValue({ id: "participant-1", userId: "student-1" });
+    tx.role.findUnique.mockResolvedValue({ id: "role-student", key: "student" });
+
+    await expect(addGroupParticipant(teacherUser, "course-1", "group-1", {
+      email: "Anonymous-1@Example.Invalid",
+      firstName: "Anonymous",
+      lastName: "One",
+      role: "student",
+      assignedPassword: "Password-001"
+    })).resolves.toMatchObject({ id: "participant-1", userId: "student-1" });
+
+    expect(bcryptMocks.hash).toHaveBeenCalledWith("Password-001", 12);
+    expect(tx.user.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        email: "anonymous-1@example.invalid",
+        firstName: "Anonymous",
+        lastName: "One",
+        passwordHash: "assigned-password-hash",
+        mustChangePassword: false,
+        isActive: true,
+        emailVerifiedAt: expect.any(Date)
+      }),
+      select: { id: true }
+    });
+    expect(tx.courseGroupParticipant.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ userId: "student-1", role: "student" }) })
+    );
+    expect(tx.courseGroupParticipant.updateMany).toHaveBeenCalledWith({
+      where: { email: "anonymous-1@example.invalid", userId: null },
+      data: { userId: "student-1" }
+    });
+    expect(tx.courseMembership.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { courseId_userId_role: { courseId: "course-1", userId: "student-1", role: "student" } }
+      })
+    );
+    expect(tx.courseMembership.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { courseId_userId_role: { courseId: "course-2", userId: "student-1", role: "student" } }
+      })
+    );
+  });
+
+  it("links an existing ready account when its assigned password matches", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: "student-1",
+      email: "student@example.test",
+      name: "Student One",
+      passwordHash: "existing-hash",
+      isActive: true,
+      mustChangePassword: false,
+      emailVerifiedAt: new Date("2026-01-01T00:00:00.000Z")
+    });
+    tx.courseGroupParticipant.create.mockResolvedValue({ id: "participant-1", userId: "student-1" });
+    tx.role.findUnique.mockResolvedValue({ id: "role-student", key: "student" });
+
+    await expect(addGroupParticipant(teacherUser, "course-1", "group-1", {
+      email: "student@example.test",
+      role: "student",
+      assignedPassword: "Password-001"
+    })).resolves.toMatchObject({ id: "participant-1", userId: "student-1" });
+
+    expect(bcryptMocks.compare).toHaveBeenCalledWith("Password-001", "existing-hash");
+    expect(bcryptMocks.hash).not.toHaveBeenCalled();
+    expect(tx.user.create).not.toHaveBeenCalled();
+    expect(tx.courseGroupParticipant.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ userId: "student-1" }) })
+    );
+  });
+
+  it("never overwrites an existing account when its assigned password does not match", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: "student-1",
+      email: "student@example.test",
+      name: "Student One",
+      passwordHash: "existing-hash",
+      isActive: true,
+      mustChangePassword: false,
+      emailVerifiedAt: new Date("2026-01-01T00:00:00.000Z")
+    });
+    bcryptMocks.compare.mockResolvedValue(false);
+
+    await expect(addGroupParticipant(teacherUser, "course-1", "group-1", {
+      email: "student@example.test",
+      firstName: "Student",
+      lastName: "One",
+      role: "student",
+      assignedPassword: "Password-001"
+    })).rejects.toMatchObject({ status: 409, code: "GROUP_PARTICIPANT_ASSIGNED_PASSWORD_ACCOUNT_CONFLICT" });
+
+    expect(bcryptMocks.compare).toHaveBeenCalledWith("Password-001", "existing-hash");
+    expect(bcryptMocks.hash).not.toHaveBeenCalled();
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
   it("rejects unavailable assigned activities for students", async () => {

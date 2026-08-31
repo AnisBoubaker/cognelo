@@ -654,13 +654,24 @@ export const CourseGroupActivityUpdateSchema = z.object({
 });
 export type CourseGroupActivityUpdate = z.infer<typeof CourseGroupActivityUpdateSchema>;
 
-export const CourseGroupParticipantInputSchema = z.object({
-  role: CourseGroupParticipantRoleSchema.optional().default("student"),
-  firstName: z.string().trim().min(1).max(120).optional(),
-  lastName: z.string().trim().min(1).max(120).optional(),
-  email: z.string().email(),
-  externalId: z.string().trim().max(120).optional().nullable()
-});
+export const CourseGroupParticipantInputSchema = z
+  .object({
+    role: CourseGroupParticipantRoleSchema.optional().default("student"),
+    firstName: z.string().trim().min(1).max(120).optional(),
+    lastName: z.string().trim().min(1).max(120).optional(),
+    email: z.string().email(),
+    assignedPassword: z.string().min(8).max(200).optional(),
+    externalId: z.string().trim().max(120).optional().nullable()
+  })
+  .superRefine((value, context) => {
+    if (value.assignedPassword && value.role !== "student") {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["assignedPassword"],
+        message: "Assigned passwords are supported only for student participants."
+      });
+    }
+  });
 export type CourseGroupParticipantInput = z.infer<typeof CourseGroupParticipantInputSchema>;
 
 export const CourseGroupDeleteInputSchema = z.discriminatedUnion("action", [
