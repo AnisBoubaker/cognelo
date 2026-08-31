@@ -166,11 +166,31 @@ sudo -u app1 /bin/bash -c '
   npm run db:generate
   npm run typecheck
   NEXT_PUBLIC_API_URL="http://localhost:3001" npm test
-  npm run build
+
+  storage_target=$(readlink -f storage)
+  test "$storage_target" = /srv/cognelo/app1/shared/storage
+  test ! -e storage.persistent-link
+  test ! -e storage.build-empty
+  mv storage storage.persistent-link
+  restore_storage() {
+    mv storage storage.build-empty
+    mv storage.persistent-link storage
+    rmdir storage.build-empty
+  }
+  trap restore_storage EXIT
+  mkdir storage
+  NEXT_PUBLIC_COGNELO_VERSION="0.6.0" npm run build
 '
 ```
 
-`--include=dev` is required for TypeScript and the test/build tooling. The final build uses the production `NEXT_PUBLIC_API_URL` loaded from `.env`; that URL is embedded in the browser bundle.
+`--include=dev` is required for TypeScript and the test/build tooling. The final build uses the production `NEXT_PUBLIC_API_URL` loaded from `.env`; that URL is embedded in the browser bundle. Set `NEXT_PUBLIC_COGNELO_VERSION` to the immutable release version without the `cognelo-` tag prefix. This prevents expected Prisma generation changes in the deployment worktree from making the compiled release label incorrectly include `-dirty`.
+
+The temporary empty `storage` directory is build-only. Turbopack traces the
+whole project for some server imports and can reject uploaded-file symlinks
+that resolve outside the deployment worktree. The exit trap restores the
+persistent instance symlink before the command returns and removes the empty
+directory; it neither copies nor changes `/srv/cognelo/app1/shared/storage`.
+Re-run `readlink -f` and verify the instance-specific target before migrating.
 
 Do not continue if installation, generation, tests, type checking, or the build fails. Fix the release and publish a new tag rather than editing the production worktree.
 

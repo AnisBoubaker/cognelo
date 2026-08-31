@@ -284,19 +284,42 @@ Install dependencies, generate Prisma clients, verify, and build as the service 
 
 ```bash
 sudo -u app1 /bin/bash -c '
-  cd /srv/cognelo/app1/deployments/cognelo-0.5.0 &&
-  set -a && . ./.env && set +a &&
-  npm ci --include=dev &&
-  npm run db:generate &&
-  npm run typecheck &&
-  NEXT_PUBLIC_API_URL="http://localhost:3001" npm test &&
-  npm run build
+  set -euo pipefail
+  cd /srv/cognelo/app1/deployments/cognelo-0.5.0
+  set -a
+  . ./.env
+  set +a
+  npm ci --include=dev
+  npm run db:generate
+  npm run typecheck
+  NEXT_PUBLIC_API_URL="http://localhost:3001" npm test
+
+  storage_target=$(readlink -f storage)
+  test "$storage_target" = /srv/cognelo/app1/shared/storage
+  test ! -e storage.persistent-link
+  test ! -e storage.build-empty
+  mv storage storage.persistent-link
+  restore_storage() {
+    mv storage storage.build-empty
+    mv storage.persistent-link storage
+    rmdir storage.build-empty
+  }
+  trap restore_storage EXIT
+  mkdir storage
+  NEXT_PUBLIC_COGNELO_VERSION="0.5.0" npm run build
 '
 ```
 
-`--include=dev` is required even though the loaded environment sets `NODE_ENV=production`: TypeScript, Vitest, and other build-time tools are development dependencies. The inline localhost URL applies only to the mocked test process so URL-specific tests remain deterministic; the following build still embeds the production `NEXT_PUBLIC_API_URL` from `.env`.
+`--include=dev` is required even though the loaded environment sets `NODE_ENV=production`: TypeScript, Vitest, and other build-time tools are development dependencies. The inline localhost URL applies only to the mocked test process so URL-specific tests remain deterministic; the following build still embeds the production `NEXT_PUBLIC_API_URL` from `.env`. Set `NEXT_PUBLIC_COGNELO_VERSION` to the immutable release version without the `cognelo-` tag prefix. Prisma generation can modify tracked generated clients in the deployment worktree, so relying on Git detection after generation would incorrectly label an exact tagged production build as `-dirty`.
 
 Builds may report the known Turbopack file-tracing warning caused by plugin Prisma clients. A successful build still ends with both the API and web route summaries.
+
+The empty `storage` directory exists only while the build runs. Turbopack's
+whole-project tracing can otherwise reject uploaded-file symlinks that resolve
+outside the deployment worktree. The exit trap restores the persistent
+instance symlink before the command returns and removes the empty directory;
+it never copies or changes the shared storage contents. Re-run `readlink -f`
+and verify the instance-specific target before migrations.
 
 Apply all core and plugin migrations from the new deployment:
 
@@ -629,10 +652,17 @@ sudo install -m 0644 \
   /srv/cognelo-sandboxes/app1/deployments/cognelo-0.5.0/infra/production/sandbox.compose.yml \
   /srv/cognelo-sandboxes/app1/runtime/sandbox.compose.yml
 
-sudo install -m 0600 \
+sudo install -m 0640 \
   /srv/cognelo-sandboxes/app1/deployments/cognelo-0.5.0/infra/production/judge0.conf.example \
   /srv/cognelo-sandboxes/app1/runtime/judge0.conf
+sudo chown root:999 /srv/cognelo-sandboxes/app1/runtime/judge0.conf
 ```
+
+The numeric group is intentional: the pinned `judge0/judge0:1.13.1` image runs
+as GID `999` and its startup script must read the bind-mounted configuration.
+Mode `0600 root:root` makes the container silently fall back to localhost
+database and Redis defaults. Keep the parent runtime directory mode `0750` so
+host processes in an unrelated group numbered `999` cannot traverse to it.
 
 ### 14.3 Configure Judge0 secrets and limits
 
@@ -695,6 +725,9 @@ COMPOSE_PROJECT_NAME=app1-sandbox
 SANDBOX_BIND_ADDRESS=10.80.0.2
 JUDGE0_PORT=2358
 WEB_DESIGN_RUNNER_PORT=3456
+SANDBOX_DOCKER_SUBNET=172.30.0.0/24
+JUDGE0_SERVER_CONTAINER_IP=172.30.0.10
+WEB_DESIGN_RUNNER_CONTAINER_IP=172.30.0.11
 JUDGE0_IMAGE=judge0/judge0:1.13.1
 WEB_DESIGN_RUNNER_IMAGE=cognelo/web-design-runner:cognelo-0.5.0
 PLAYWRIGHT_SECCOMP_PROFILE=/srv/cognelo-sandboxes/app1/runtime/seccomp_profile.json
@@ -713,7 +746,11 @@ sudo docker compose --env-file .env -f sandbox.compose.yml \
 
 `judge0/judge0:1.13.1`, `postgres:16.2`, `redis:7.2.4`, and the Playwright base image are pinned rather than `latest`. For even stricter supply-chain control, replace each tag with the image digest printed by `docker image inspect --format '{{index .RepoDigests 0}}' IMAGE` after the first approved pull.
 
-Do not start the stack until the sandbox WireGuard address exists in Section 14.6; Docker cannot bind `10.80.0.2` before that interface is up.
+The Compose network remains internal and has no direct port publishing. Section
+14.6 creates host socket proxies that listen only on the selected sandbox bind
+address and forward to these fixed internal addresses. This preserves the
+runner's no-outbound-network boundary and avoids Docker Engine 29 silently
+discarding port mappings for services attached only to an internal network.
 
 ### 14.6 Create the WireGuard point-to-point network
 
@@ -784,7 +821,9 @@ sudo ufw enable
 sudo ufw status verbose
 ```
 
-Do not add public-interface rules for `2358` or `3456`. Docker-published ports must still bind specifically to `10.80.0.2`; firewall rules are defense in depth, not a substitute for interface-specific binding.
+Do not add public-interface rules for `2358` or `3456`. The host socket proxies
+below bind specifically to `10.80.0.2`; firewall rules are defense in depth,
+not a substitute for interface-specific binding.
 
 Enable WireGuard first on the sandbox host and then on the application host:
 
@@ -794,20 +833,79 @@ sudo systemctl status wg-quick@wg0 --no-pager
 sudo wg show wg0
 ```
 
-Because Docker publishes the sandbox APIs specifically on `10.80.0.2`, make the dedicated sandbox host's Docker service depend on that address existing after every reboot. On the sandbox host, create `/etc/systemd/system/docker.service.d/wireguard.conf`:
+Keep the Compose network internal and expose only its two fixed service
+addresses through systemd socket proxies. Create
+`/etc/systemd/system/app1-sandbox-judge0.socket`:
 
 ```ini
 [Unit]
-After=wg-quick@wg0.service
 Requires=wg-quick@wg0.service
+After=wg-quick@wg0.service
+
+[Socket]
+ListenStream=10.80.0.2:2358
+NoDelay=true
+
+[Install]
+WantedBy=sockets.target
 ```
 
-This sandbox VPS is dedicated to workloads that require `wg0`, so preventing Docker from starting when WireGuard configuration is broken is safer than starting containers with failed port bindings. Load the dependency now; restarting Docker is safe here because the sandbox stack has not been started yet:
+Create `/etc/systemd/system/app1-sandbox-judge0.service`:
+
+```ini
+[Unit]
+Requires=docker.service
+After=docker.service
+
+[Service]
+ExecStart=/lib/systemd/systemd-socket-proxyd 172.30.0.10:2358
+DynamicUser=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+```
+
+Create the matching runner units with the same hardening:
+
+```ini
+# /etc/systemd/system/app1-sandbox-runner.socket
+[Unit]
+Requires=wg-quick@wg0.service
+After=wg-quick@wg0.service
+
+[Socket]
+ListenStream=10.80.0.2:3456
+NoDelay=true
+
+[Install]
+WantedBy=sockets.target
+```
+
+```ini
+# /etc/systemd/system/app1-sandbox-runner.service
+[Unit]
+Requires=docker.service
+After=docker.service
+
+[Service]
+ExecStart=/lib/systemd/systemd-socket-proxyd 172.30.0.11:3456
+DynamicUser=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+```
+
+Enable the sockets; their proxy services start automatically on the first
+connection:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl restart docker
-sudo systemctl status docker --no-pager
+sudo systemctl enable --now \
+  app1-sandbox-judge0.socket \
+  app1-sandbox-runner.socket
+sudo ss -ltnp | grep -E '10\.80\.0\.2:(2358|3456)\b'
 ```
 
 From the application host, verify that the peer has completed an authenticated handshake:
@@ -833,6 +931,39 @@ sudo systemctl daemon-reload
 sudo systemctl restart app1-api
 ```
 
+#### Firewall-only exception
+
+WireGuard remains the production reference because Judge0 uses authenticated
+plain HTTP and the tunnel encrypts learner code, results, and the API token in
+transit. An operator may explicitly accept that risk when both VPSs have fixed
+public IPv4 addresses and use a firewall-only connection instead:
+
+1. Skip the WireGuard packages, keys, interfaces, and API systemd drop-in.
+2. In the two socket units above, omit the `Requires`/`After` lines for
+   `wg-quick@wg0` and set `ListenStream` to
+   `SANDBOX_PUBLIC_IPV4:2358` and `SANDBOX_PUBLIC_IPV4:3456`.
+3. Keep UFW's incoming default at `deny`; allow those ports only from
+   `APPLICATION_PUBLIC_IPV4`:
+
+   ```bash
+   sudo ufw allow from APPLICATION_PUBLIC_IPV4 \
+     to SANDBOX_PUBLIC_IPV4 port 2358 proto tcp
+   sudo ufw allow from APPLICATION_PUBLIC_IPV4 \
+     to SANDBOX_PUBLIC_IPV4 port 3456 proto tcp
+   ```
+
+4. Use the public restricted URLs in every consuming instance:
+
+   ```dotenv
+   JUDGE0_BASE_URL="http://SANDBOX_PUBLIC_IPV4:2358"
+   WEB_DESIGN_RUNNER_URL="http://SANDBOX_PUBLIC_IPV4:3456"
+   ```
+
+The listeners are host systemd sockets, so these connections pass through
+UFW's input policy; no Docker port is published. Verify from the application
+host that both ports work, and from a non-allowlisted source that both time out.
+Never add an unrestricted public rule for either port.
+
 ### 14.7 Run end-to-end sandbox smoke tests
 
 On the sandbox host, start Judge0's data services first, inspect them, and then start the complete stack:
@@ -848,13 +979,22 @@ sudo docker compose --env-file .env -f sandbox.compose.yml \
 sudo docker compose --env-file .env -f sandbox.compose.yml up -d
 sudo docker compose --env-file .env -f sandbox.compose.yml ps
 sudo docker compose --env-file .env -f sandbox.compose.yml logs --tail=200
-sudo ss -ltnp | grep -E '10\.80\.0\.2:(2358|3456)\b'
-curl --fail http://10.80.0.2:3456/health
+SANDBOX_LISTENER_ADDRESS=10.80.0.2 # or the accepted firewall-only public IPv4
+sudo ss -ltnp | grep -E "${SANDBOX_LISTENER_ADDRESS}:(2358|3456)\\b"
+curl --fail "http://${SANDBOX_LISTENER_ADDRESS}:3456/health"
 ```
 
-Both published ports must show only `10.80.0.2`, never `0.0.0.0`, `[::]`, or the sandbox public address. The Compose network is marked `internal`, so neither learner code nor Chromium can make outbound requests. Consequently, web-design exercises must include required HTML, CSS, JavaScript, and other assets rather than loading them from CDNs.
+Both socket listeners must show only the selected private address (or the
+explicitly accepted firewall-only public address), never `0.0.0.0` or `[::]`.
+The Compose network is marked `internal`, so neither learner code nor Chromium
+can make outbound requests. Consequently, web-design exercises must include
+required HTML, CSS, JavaScript, and other assets rather than loading them from
+CDNs.
 
-On the application host, verify an actual Judge0 compilation/execution over WireGuard. This example discovers the installed Python 3 language ID instead of hard-coding one:
+On the application host, verify an actual Judge0 compilation/execution over
+the selected restricted path (WireGuard in the reference topology or the
+public listener in the firewall-only exception). This example discovers the
+installed Python 3 language ID instead of hard-coding one:
 
 ```bash
 sudo apt install -y jq
@@ -915,14 +1055,23 @@ rm /tmp/cognelo-runner-smoke.json
 The runner result must report `status: "completed"`, `score: 1`, and `maxScore: 1`. Finally:
 
 1. restart the sandbox host and application host separately;
-2. confirm the Compose stack and both `wg-quick@wg0` units return automatically;
+2. confirm the Compose stack and both `wg-quick@wg0` units return automatically,
+   or, for the firewall-only exception, confirm both socket units return and
+   the non-allowlisted reachability tests still time out;
 3. activate the required plugins under **Settings → Plugins**;
 4. submit one small coding exercise and one web-design exercise through the Cognelo UI;
 5. confirm both results reach the gradebook.
 
 ### 14.8 Same-host fallback
 
-For a small non-production installation with only one Ubuntu server, the same Compose project can run there with `SANDBOX_BIND_ADDRESS=127.0.0.1`; omit WireGuard and use loopback URLs in Cognelo's `.env`. This is operationally simpler, but Judge0's server and worker containers are privileged. A container escape or kernel vulnerability would then place Cognelo, PostgreSQL, uploaded files, and every co-located instance in the same failure domain. The two-VPS deployment is therefore the production reference, not merely a performance optimization.
+For a small non-production installation with only one Ubuntu server, the same
+Compose project can run there with both systemd socket proxies listening on
+`127.0.0.1`; omit WireGuard and use loopback URLs in Cognelo's `.env`. This is
+operationally simpler, but Judge0's server and worker containers are
+privileged. A container escape or kernel vulnerability would then place
+Cognelo, PostgreSQL, uploaded files, and every co-located instance in the same
+failure domain. The two-VPS deployment is therefore the production reference,
+not merely a performance optimization.
 
 ## 15. Add another Cognelo instance
 
@@ -948,6 +1097,9 @@ COMPOSE_PROJECT_NAME=app2-sandbox
 SANDBOX_BIND_ADDRESS=10.80.0.6
 JUDGE0_PORT=2359
 WEB_DESIGN_RUNNER_PORT=3457
+SANDBOX_DOCKER_SUBNET=172.30.1.0/24
+JUDGE0_SERVER_CONTAINER_IP=172.30.1.10
+WEB_DESIGN_RUNNER_CONTAINER_IP=172.30.1.11
 JUDGE0_IMAGE=judge0/judge0:1.13.1
 WEB_DESIGN_RUNNER_IMAGE=cognelo/web-design-runner:cognelo-0.5.0
 PLAYWRIGHT_SECCOMP_PROFILE=/srv/cognelo-sandboxes/app2/runtime/seccomp_profile.json
@@ -960,7 +1112,18 @@ JUDGE0_BASE_URL="http://10.80.0.6:2359"
 WEB_DESIGN_RUNNER_URL="http://10.80.0.6:3457"
 ```
 
-Do not share a Judge0 token, Compose project, WireGuard keys, or WireGuard subnet between instances. Separate projects avoid cross-instance database, queue, capacity, and lifecycle coupling. The same locally built runner image may be reused only when both instances run the exact same Cognelo tag.
+Separate sandbox projects remain the default because they avoid cross-instance
+database, token, queue, capacity, upgrade, and lifecycle coupling. The same
+locally built runner image may be reused without further validation only when
+both instances run the exact same Cognelo tag.
+
+Instances on the same application server and under the same operator trust
+boundary may intentionally share one Judge0/runner stack. In that exception,
+both application environments use the same two URLs, Judge0 token, queue, and
+failure domain. Before mixing Cognelo tags, confirm that the runner source and
+request contract are compatible and run both end-to-end smoke tests from the
+application host. A later sandbox upgrade must be tested against every
+consuming instance.
 
 Useful collision checks:
 
@@ -973,7 +1136,13 @@ sudo apachectl -S
 sudo docker ps --format 'table {{.Names}}\t{{.Ports}}'
 ```
 
-Multiple instances may share the application host's PostgreSQL service and Apache process and may use the same dedicated sandbox VM, but they do not share databases, files, sessions, service accounts, Node processes, Compose projects, Judge0 state, WireGuard subnets, or WireGuard keys.
+Multiple instances may share the application host's PostgreSQL service and
+Apache process and may use the same dedicated sandbox VM, but they do not share
+databases, files, sessions, service accounts, or Node processes. By default,
+they also use separate Compose projects, Judge0 state, WireGuard subnets, and
+keys. The explicitly accepted shared-stack exception above shares only the
+Judge0/runner stack, its token, queue, capacity, upgrade schedule, and failure
+domain.
 
 ## 16. Backups
 
@@ -1094,7 +1263,7 @@ sudo -u app1 /bin/bash -c '
   npm run db:generate &&
   npm run typecheck &&
   NEXT_PUBLIC_API_URL="http://localhost:3001" npm test &&
-  npm run build
+  NEXT_PUBLIC_COGNELO_VERSION="0.6.0" npm run build
 '
 
 sudo systemctl stop app1-api
@@ -1185,7 +1354,11 @@ Common failure causes:
 
 - Use SSH keys and restrict SSH source addresses where practical.
 - Keep Ubuntu, Node.js, Apache, PostgreSQL, and sandbox images patched.
-- On the application host expose only 22, 80, and 443. On the sandbox host expose only restricted SSH and WireGuard UDP from the application public IP. Restrict SSH source addresses where possible.
+- On the application host expose only 22, 80, and 443. On the sandbox host,
+  expose only restricted SSH and WireGuard UDP from the application public IP
+  in the reference topology. In the firewall-only exception, expose the two
+  fixed-address socket listeners only to the application host's fixed public
+  IPv4. Restrict SSH source addresses where possible.
 - Keep PostgreSQL and Node listeners on loopback.
 - Use a unique JWT secret and database credentials per instance.
 - Use a unique email-credential encryption key per instance, protect it with `.env` backups, and never rotate or remove it without replacing stored email credentials and invalidating outstanding verification codes.
@@ -1194,8 +1367,10 @@ Common failure causes:
 - Do not use the development seed in production.
 - Do not deploy the development runner Compose configuration as production.
 - Keep untrusted code execution off the database/application host when possible.
-- Bind sandbox APIs only to their sandbox WireGuard address, never to the public interface; allow those ports on `wg0` only from the matching application WireGuard address.
-- Keep each instance's sandbox Compose project, Judge0 token, ports, volume, WireGuard subnet, and WireGuard keys separate.
+- In the reference topology, bind host socket proxies only to the sandbox WireGuard address and allow those ports on `wg0` only from the matching application peer. If the firewall-only exception is explicitly accepted, bind to the fixed public IPv4 address and admit only the fixed application-host IPv4 address.
+- Keep each instance's sandbox Compose project, Judge0 token, ports, volume,
+  WireGuard subnet, and keys separate unless the same-operator shared-stack
+  exception in Section 15 has been explicitly selected and tested.
 - Run the Playwright runner as `pwuser` with the checked-in resource limits and the matching official seccomp profile.
 - Keep the sandbox Compose network internal; do not grant learner executions outbound access without a separately reviewed proxy policy.
 - Pin sandbox images and record approved image digests; do not deploy `latest`.
@@ -1216,8 +1391,11 @@ Common failure causes:
 - [ ] Required plugins are activated and enabled; unused plugins remain disabled.
 - [ ] An uploaded file survives a service restart and deployment switch.
 - [ ] A representative student submission reaches the gradebook.
-- [ ] Sandbox containers bind only to the sandbox WireGuard address and have no outbound network.
-- [ ] Both WireGuard interfaces return automatically after reboot, show a recent handshake, and expose no sandbox API on the public interface.
+- [ ] Sandbox containers remain on the internal Docker network with no outbound access; host socket proxies bind only to the selected WireGuard address, or to the explicitly accepted firewall-only public address restricted to the application host.
+- [ ] In the reference topology, both WireGuard interfaces return automatically
+  after reboot, show a recent handshake, and expose no sandbox API on the
+  public interface. In the firewall-only exception, both socket units return,
+  the application host can reach them, and non-allowlisted sources time out.
 - [ ] Judge0 authentication rejects a missing/incorrect token and accepts the configured token.
 - [ ] The Judge0 Python execution smoke test returns `Accepted` and `5`.
 - [ ] The Playwright runner smoke test reports `completed`, `1 / 1`.
