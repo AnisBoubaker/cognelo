@@ -1,4 +1,5 @@
 import { getActivityDefinition } from "@cognelo/activity-sdk";
+import { randomUUID } from "node:crypto";
 import {
   ActivityBankInputSchema,
   ActivityBankDeleteSchema,
@@ -102,6 +103,8 @@ export async function updateSubject(user: CurrentUser, subjectId: string, input:
     });
   }
   const knowledgeGraph = data.knowledgeGraph;
+  const allowedConceptDeletionIds = new Set(data.knowledgeGraphDeletions?.conceptIds ?? []);
+  const allowedSkillDeletionIds = new Set(data.knowledgeGraphDeletions?.skillIds ?? []);
   validateKnowledgeGraphDraft(knowledgeGraph);
   return prisma.$transaction(async (transaction) => {
     await transaction.subject.update({
@@ -120,8 +123,17 @@ export async function updateSubject(user: CurrentUser, subjectId: string, input:
     const storedConceptIds = new Set(storedConcepts.map((concept) => concept.id));
     const submittedConceptIds = new Set(knowledgeGraph.concepts.map((concept) => concept.id));
     const omittedConceptIds = [...storedConceptIds].filter((conceptId) => !submittedConceptIds.has(conceptId));
-    if (omittedConceptIds.length) {
+    if (omittedConceptIds.some((conceptId) => !allowedConceptDeletionIds.has(conceptId))) {
       throw new AppError(409, "KNOWLEDGE_CONCEPT_DELETE_REQUIRES_CONFIRMATION", "Delete concepts through the confirmed concept deletion action before saving the graph.");
+    }
+    for (const conceptId of omittedConceptIds) {
+      await transaction.bankActivityKnowledgeConcept.deleteMany({ where: { conceptId } });
+      await transaction.activityKnowledgeConcept.deleteMany({ where: { conceptId } });
+      await transaction.subjectKnowledgePrerequisite.deleteMany({
+        where: { OR: [{ sourceConceptId: conceptId }, { requiredConceptId: conceptId }] }
+      });
+      await transaction.subjectKnowledgeSkill.updateMany({ where: { conceptId, active: true }, data: { active: false } });
+      await transaction.subjectKnowledgeConcept.update({ where: { id: conceptId }, data: { active: false } });
     }
     const conceptIds = new Map<string, string>();
     for (const concept of knowledgeGraph.concepts) {
@@ -150,8 +162,13 @@ export async function updateSubject(user: CurrentUser, subjectId: string, input:
       if (concept.skillRecords) {
         const stored = storedConcepts.find((candidate) => candidate.id === concept.id);
         const submittedSkillIds = new Set(concept.skillRecords.map((skill) => skill.id));
-        if (stored?.skillRecords.some((skill) => !submittedSkillIds.has(skill.id))) {
+        const omittedSkills = stored?.skillRecords.filter((skill) => !submittedSkillIds.has(skill.id)) ?? [];
+        if (omittedSkills.some((skill) => !allowedSkillDeletionIds.has(skill.id))) {
           throw new AppError(409, "KNOWLEDGE_SKILL_DELETE_REQUIRES_CONFIRMATION", "Delete skills through the confirmed skill deletion action before saving the graph.");
+        }
+        for (const skill of omittedSkills) {
+          await removeSubjectKnowledgeSkillFromCurrentLinks(transaction, concept.id, skill.id, skill.title);
+          await transaction.subjectKnowledgeSkill.update({ where: { id: skill.id }, data: { active: false } });
         }
         const storedSkillIds = new Set(stored?.skillRecords.map((skill) => skill.id) ?? []);
         for (const skill of concept.skillRecords) {
@@ -271,37 +288,50 @@ export async function deleteSubjectKnowledgeSkill(user: CurrentUser, subjectId: 
   }
   await prisma.$transaction(async (transaction) => {
     const skill = await transaction.subjectKnowledgeSkill.findUniqueOrThrow({ where: { id: skillId } });
-    const updateLinks = async (links: Array<{ bankActivityId?: string; activityId?: string; selectsAllSkills: boolean; selectedSkillIds: unknown; selectedSkills: unknown }>, kind: "bank" | "activity") => {
-      for (const link of links) {
-        if (link.selectsAllSkills) continue;
-        const ids = jsonStringArray(link.selectedSkillIds);
-        const titles = jsonStringArray(link.selectedSkills);
-        if (!ids.includes(skillId) && !titles.includes(skill.title)) continue;
-        const nextIds = [...new Set(ids.filter((id) => id !== skillId).concat(replacement ? [replacement.id] : []))];
-        const nextTitles = [...new Set(titles.filter((title) => title !== skill.title).concat(replacement ? [replacement.title] : []))];
-        const where = kind === "bank"
-          ? { bankActivityId_conceptId: { bankActivityId: link.bankActivityId!, conceptId } }
-          : { activityId_conceptId: { activityId: link.activityId!, conceptId } };
-        if (!nextIds.length && !nextTitles.length) {
-          if (kind === "bank") await transaction.bankActivityKnowledgeConcept.delete({ where: where as never });
-          else await transaction.activityKnowledgeConcept.delete({ where: where as never });
-        } else if (kind === "bank") {
-          await transaction.bankActivityKnowledgeConcept.update({ where: where as never, data: { selectedSkillIds: nextIds, selectedSkills: nextTitles } });
-        } else {
-          await transaction.activityKnowledgeConcept.update({ where: where as never, data: { selectedSkillIds: nextIds, selectedSkills: nextTitles } });
-        }
-      }
-    };
-    const concept = await transaction.subjectKnowledgeConcept.findUniqueOrThrow({
-      where: { id: conceptId }, include: { bankActivityLinks: true, activityLinks: true }
-    });
-    await updateLinks(concept.bankActivityLinks, "bank");
-    await updateLinks(concept.activityLinks, "activity");
+    await removeSubjectKnowledgeSkillFromCurrentLinks(transaction, conceptId, skillId, skill.title, replacement);
     await transaction.subjectKnowledgeSkill.update({ where: { id: skillId }, data: { active: false } });
     const remaining = await transaction.subjectKnowledgeSkill.findMany({ where: { conceptId, active: true }, orderBy: { position: "asc" } });
     await transaction.subjectKnowledgeConcept.update({ where: { id: conceptId }, data: { skills: remaining.map((item) => item.title).join("\n") } });
   });
   return impact;
+}
+
+async function removeSubjectKnowledgeSkillFromCurrentLinks(
+  transaction: Prisma.TransactionClient,
+  conceptId: string,
+  skillId: string,
+  skillTitle: string,
+  replacement?: { id: string; title: string } | null
+) {
+  const updateLinks = async (
+    links: Array<{ bankActivityId?: string; activityId?: string; selectsAllSkills: boolean; selectedSkillIds: unknown; selectedSkills: unknown }>,
+    kind: "bank" | "activity"
+  ) => {
+    for (const link of links) {
+      if (link.selectsAllSkills) continue;
+      const ids = jsonStringArray(link.selectedSkillIds);
+      const titles = jsonStringArray(link.selectedSkills);
+      if (!ids.includes(skillId) && !titles.includes(skillTitle)) continue;
+      const nextIds = [...new Set(ids.filter((id) => id !== skillId).concat(replacement ? [replacement.id] : []))];
+      const nextTitles = [...new Set(titles.filter((title) => title !== skillTitle).concat(replacement ? [replacement.title] : []))];
+      const where = kind === "bank"
+        ? { bankActivityId_conceptId: { bankActivityId: link.bankActivityId!, conceptId } }
+        : { activityId_conceptId: { activityId: link.activityId!, conceptId } };
+      if (!nextIds.length && !nextTitles.length) {
+        if (kind === "bank") await transaction.bankActivityKnowledgeConcept.delete({ where: where as never });
+        else await transaction.activityKnowledgeConcept.delete({ where: where as never });
+      } else if (kind === "bank") {
+        await transaction.bankActivityKnowledgeConcept.update({ where: where as never, data: { selectedSkillIds: nextIds, selectedSkills: nextTitles } });
+      } else {
+        await transaction.activityKnowledgeConcept.update({ where: where as never, data: { selectedSkillIds: nextIds, selectedSkills: nextTitles } });
+      }
+    }
+  };
+  const concept = await transaction.subjectKnowledgeConcept.findUniqueOrThrow({
+    where: { id: conceptId }, include: { bankActivityLinks: true, activityLinks: true }
+  });
+  await updateLinks(concept.bankActivityLinks, "bank");
+  await updateLinks(concept.activityLinks, "activity");
 }
 
 function jsonStringArray(value: unknown) {
@@ -373,19 +403,25 @@ export async function generateSubjectKnowledgeGraph(user: CurrentUser, subjectId
     } : undefined
   });
   const positions = layoutGeneratedKnowledgeGraph(graph);
-  const concepts = graph.concepts.map((concept, index) => {
+  const existingConcepts = new Map(
+    (data.mode === "iterate" ? data.existingGraph?.concepts ?? [] : []).map((concept) => [concept.id, concept])
+  );
+  const concepts = graph.concepts.map((concept) => {
     const position = positions.get(concept.key) ?? { x: 0, y: 0 };
     const skillTitles = concept.skills.split(/\r?\n/).map((skill) => skill.trim()).filter(Boolean);
+    const existingConcept = existingConcepts.get(concept.key);
+    const conceptId = existingConcept?.id ?? `generated-concept-${randomUUID()}`;
+    const unusedExistingSkills = [...(existingConcept?.skillRecords ?? [])];
     return {
-      id: `generated-concept-${index}-${concept.key}`.slice(0, 160),
+      id: conceptId,
       subjectId,
       title: concept.title,
       skills: concept.skills,
       active: true,
       skillRecords: skillTitles.map((title, skillIndex) => ({
-        id: `generated-skill-${index}-${skillIndex}-${concept.key}`.slice(0, 160),
+        id: takeExistingSkillId(unusedExistingSkills, title) ?? `generated-skill-${randomUUID()}`,
         subjectId,
-        conceptId: `generated-concept-${index}-${concept.key}`.slice(0, 160),
+        conceptId,
         title,
         position: skillIndex,
         active: true
@@ -395,8 +431,8 @@ export async function generateSubjectKnowledgeGraph(user: CurrentUser, subjectId
     };
   });
   const conceptIds = new Map(graph.concepts.map((concept, index) => [concept.key, concepts[index]!.id]));
-  const prerequisites = graph.prerequisites.map((prerequisite, index) => ({
-    id: `generated-prerequisite-${index}`,
+  const prerequisites = graph.prerequisites.map((prerequisite) => ({
+    id: `generated-prerequisite-${randomUUID()}`,
     subjectId,
     sourceConceptId: conceptIds.get(prerequisite.sourceKey)!,
     requiredConceptId: conceptIds.get(prerequisite.requiredKey)!,
@@ -404,6 +440,12 @@ export async function generateSubjectKnowledgeGraph(user: CurrentUser, subjectId
     targetHandle: null
   }));
   return { concepts, prerequisites };
+}
+
+function takeExistingSkillId(skills: Array<{ id: string; title: string }>, title: string) {
+  const index = skills.findIndex((skill) => skill.title === title);
+  if (index < 0) return undefined;
+  return skills.splice(index, 1)[0]!.id;
 }
 
 function validateKnowledgeGraphDraft(graph: ReturnType<typeof SubjectKnowledgeGraphDraftSchema.parse>) {

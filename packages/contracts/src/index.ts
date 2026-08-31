@@ -298,8 +298,19 @@ export const SubjectKnowledgeGraphDraftSchema = z.object({
 });
 export type SubjectKnowledgeGraphDraft = z.infer<typeof SubjectKnowledgeGraphDraftSchema>;
 
+export const SubjectKnowledgeGraphDeletionsSchema = z.object({
+  conceptIds: z.array(RecordIdSchema).max(200).refine((ids) => new Set(ids).size === ids.length, "Concept deletion identifiers must be unique."),
+  skillIds: z.array(RecordIdSchema).max(40000).refine((ids) => new Set(ids).size === ids.length, "Skill deletion identifiers must be unique.")
+});
+export type SubjectKnowledgeGraphDeletions = z.infer<typeof SubjectKnowledgeGraphDeletionsSchema>;
+
 export const SubjectUpdateSchema = SubjectInputSchema.partial().extend({
-  knowledgeGraph: SubjectKnowledgeGraphDraftSchema.optional()
+  knowledgeGraph: SubjectKnowledgeGraphDraftSchema.optional(),
+  knowledgeGraphDeletions: SubjectKnowledgeGraphDeletionsSchema.optional()
+}).superRefine((value, context) => {
+  if (value.knowledgeGraphDeletions && !value.knowledgeGraph) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["knowledgeGraphDeletions"], message: "Knowledge graph deletions require a graph draft." });
+  }
 });
 export type SubjectUpdate = z.infer<typeof SubjectUpdateSchema>;
 

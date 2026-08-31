@@ -644,6 +644,7 @@ Model changes must create a new `modelVersion` and allow side-by-side/rebuild ev
 - Completed: added `SubjectKnowledgeSkill`, active/retired state, and a data-preserving migration from concept skill lines.
 - Completed: updated the subject contracts/services/editor to preserve skill IDs and render chip-based add/edit/delete controls.
 - Completed: added immediate transactional deletion impact analysis. Skills can be replaced within the same concept or removed from current mappings; concept deletion removes current mappings and graph edges; immutable activity versions remain unchanged.
+- Completed: AI graph iteration preserves retained concept IDs and exact-title skill IDs, displays an informational addition/deletion summary plus conditional current-activity-link warning, and can atomically retire only its exact disclosed removals during the combined Subject save without weakening the normal deletion guard.
 - Completed: added stable IDs plus title snapshots to bank, activity-version, and course-activity mappings, and snapshots resolved skills into attempt metadata at attempt start.
 - Completed: updated AI authoring knowledge contracts to carry stable skill IDs while continuing to send titles as model context.
 - Completed: updated affected root documentation and automated tests.
