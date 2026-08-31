@@ -325,6 +325,16 @@ describe("shared contract schemas", () => {
         prerequisites: []
       }
     }).knowledgeGraph?.concepts[0]?.skills).toBe("Declare a variable\nAssign a value");
+    expect(SubjectUpdateSchema.parse({
+      knowledgeGraph: {
+        concepts: [{ id: "variables", title: "Variables", skills: "Declare a variable", positionX: 0, positionY: 0 }],
+        prerequisites: []
+      },
+      knowledgeGraphDeletions: { conceptIds: ["removed-concept"], skillIds: ["removed-skill"] }
+    }).knowledgeGraphDeletions).toEqual({ conceptIds: ["removed-concept"], skillIds: ["removed-skill"] });
+    expect(() => SubjectUpdateSchema.parse({
+      knowledgeGraphDeletions: { conceptIds: ["removed-concept"], skillIds: [] }
+    })).toThrow();
     expect(ActivityBankInputSchema.parse({ subjectId: "subject-1", title: "Bank" })).toMatchObject({
       description: "",
       metadata: {}

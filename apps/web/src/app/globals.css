@@ -866,6 +866,36 @@ select:focus {
   max-width: 260px;
 }
 
+.knowledge-generation-warning {
+  background: #fff7df;
+  border: 1px solid #e7c66a;
+  border-radius: 8px;
+  color: #674d00;
+  font-weight: 700;
+  padding: 12px;
+}
+
+.knowledge-generation-summary-dialog {
+  display: grid;
+  gap: 18px;
+  max-width: 720px;
+  width: min(100%, 720px);
+}
+
+.knowledge-generation-change-list {
+  display: grid;
+  gap: 8px;
+}
+
+.knowledge-generation-change-list h3,
+.knowledge-generation-change-list ul {
+  margin: 0;
+}
+
+.knowledge-generation-change-list ul {
+  padding-inline-start: 24px;
+}
+
 .knowledge-graph-layout-controls {
   display: flex;
   align-items: flex-end;

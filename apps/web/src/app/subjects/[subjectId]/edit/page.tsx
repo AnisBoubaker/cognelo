@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { EditActionBar, RichTextEditor, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { EditActionBar, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SubjectKnowledgeGraph } from "@/components/subject-knowledge-graph";
@@ -13,12 +13,14 @@ export default function EditSubjectPage() {
   const subjectId = params.subjectId;
   const router = useRouter();
   const { locale, t } = useI18n();
+  const { notify } = useNotifications();
   const [subject, setSubject] = useState<Subject | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [teachingLanguage, setTeachingLanguage] = useState<Locale>("en");
   const [graphConcepts, setGraphConcepts] = useState<SubjectKnowledgeConcept[]>([]);
   const [graphPrerequisites, setGraphPrerequisites] = useState<SubjectKnowledgePrerequisite[]>([]);
+  const [knowledgeGraphDeletions, setKnowledgeGraphDeletions] = useState<{ conceptIds: string[]; skillIds: string[] }>({ conceptIds: [], skillIds: [] });
   const [savedSnapshot, setSavedSnapshot] = useState<{
     title: string;
     description: string;
@@ -43,6 +45,7 @@ export default function EditSubjectPage() {
         const prerequisites = result.subject.knowledgePrerequisites ?? [];
         setGraphConcepts(concepts);
         setGraphPrerequisites(prerequisites);
+        setKnowledgeGraphDeletions({ conceptIds: [], skillIds: [] });
         setSavedSnapshot({ title: result.subject.title, description: result.subject.description ?? "", teachingLanguage: result.subject.teachingLanguage, concepts, prerequisites });
       })
       .catch((err) => setError(err instanceof Error ? err.message : t("editSubject.loadError")));
@@ -70,6 +73,7 @@ export default function EditSubjectPage() {
     setTeachingLanguage(savedSnapshot.teachingLanguage);
     setGraphConcepts(savedSnapshot.concepts);
     setGraphPrerequisites(savedSnapshot.prerequisites);
+    setKnowledgeGraphDeletions({ conceptIds: [], skillIds: [] });
     setError("");
   }, [savedSnapshot]);
 
@@ -85,16 +89,24 @@ export default function EditSubjectPage() {
           id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle
         }))
       };
-      const result = await api.updateSubject(subjectId, { title, description, teachingLanguage, knowledgeGraph });
+      const result = await api.updateSubject(subjectId, {
+        title,
+        description,
+        teachingLanguage,
+        knowledgeGraph,
+        knowledgeGraphDeletions: knowledgeGraphDeletions.conceptIds.length || knowledgeGraphDeletions.skillIds.length
+          ? knowledgeGraphDeletions
+          : undefined
+      });
       setSavedSnapshot({ title, description, teachingLanguage, concepts: graphConcepts, prerequisites: graphPrerequisites });
       router.push(`/subjects/${result.subject.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("editSubject.saveError"));
+      notify({ variant: "error", message: err instanceof Error ? err.message : t("editSubject.saveError") });
       throw err;
     } finally {
       setSaving(false);
     }
-  }, [description, graphConcepts, graphPrerequisites, router, subjectId, t, teachingLanguage, title]);
+  }, [description, graphConcepts, graphPrerequisites, knowledgeGraphDeletions, notify, router, subjectId, t, teachingLanguage, title]);
 
   useUnsavedChangesGuard(
     useMemo(
@@ -194,7 +206,12 @@ export default function EditSubjectPage() {
                       : current.concepts.filter((concept) => concept.id !== conceptId),
                     prerequisites: skillId ? current.prerequisites : current.prerequisites.filter((edge) => edge.sourceConceptId !== conceptId && edge.requiredConceptId !== conceptId)
                   }));
+                  setKnowledgeGraphDeletions((current) => ({
+                    conceptIds: current.conceptIds.filter((id) => id !== conceptId),
+                    skillIds: skillId ? current.skillIds.filter((id) => id !== skillId) : current.skillIds
+                  }));
                 }}
+                onAiGeneratedDeletions={setKnowledgeGraphDeletions}
               />
             </div>
             <EditActionBar

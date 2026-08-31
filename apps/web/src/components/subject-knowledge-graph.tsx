@@ -32,6 +32,10 @@ import {
   type ConceptDeletionImpact
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import {
+  diffKnowledgeGraphGeneration,
+  type KnowledgeGraphGenerationDiff
+} from "@/lib/knowledge-graph-generation-diff";
 
 type Props = {
   subjectId: string;
@@ -46,11 +50,13 @@ type Props = {
   isVisible?: boolean;
   onChange?: (graph: SubjectKnowledgeGraphDraft) => void;
   onPersistedDeletion?: (deletion: { conceptId: string; skillId?: string }) => void;
+  onAiGeneratedDeletions?: (deletions: { conceptIds: string[]; skillIds: string[] }) => void;
 };
 
 type ConceptNode = Node<{ label: string }>;
 type LayoutPreset = "hierarchical" | "forest" | "radial" | "force" | "compact";
 type GenerationMode = "new" | "iterate";
+type GenerationSummary = KnowledgeGraphGenerationDiff & { hasCurrentActivityLinks: boolean };
 
 const elk = new ELK();
 
@@ -182,7 +188,8 @@ export function SubjectKnowledgeGraph({
   teachingLanguage = "en",
   isVisible = true,
   onChange,
-  onPersistedDeletion
+  onPersistedDeletion,
+  onAiGeneratedDeletions
 }: Props) {
   const { t } = useI18n();
   const { notify } = useNotifications();
@@ -204,6 +211,9 @@ export function SubjectKnowledgeGraph({
   const [maxConcepts, setMaxConcepts] = useState(12);
   const [generating, setGenerating] = useState(false);
   const [showReplaceDialog, setShowReplaceDialog] = useState(false);
+  const [newGraphHasActivityLinks, setNewGraphHasActivityLinks] = useState(false);
+  const [checkingGenerationImpact, setCheckingGenerationImpact] = useState(false);
+  const [generationSummary, setGenerationSummary] = useState<GenerationSummary | null>(null);
   const [generationMode, setGenerationMode] = useState<GenerationMode>(initialConcepts.length ? "iterate" : "new");
   const [layoutPreset, setLayoutPreset] = useState<LayoutPreset>("hierarchical");
   const [arranging, setArranging] = useState(false);
@@ -470,16 +480,40 @@ export function SubjectKnowledgeGraph({
     applyGraph(concepts, prerequisites.filter((edge) => !deletedIds.has(edge.id)));
   }
 
-  function requestGeneration() {
+  async function requestGeneration() {
     if (subjectDescription.trim().length < 10) {
       notify({ variant: "error", message: t("knowledgeGraph.aiDescriptionRequired") });
       return;
     }
     if (generationMode === "new" && concepts.length) {
-      setShowReplaceDialog(true);
+      setCheckingGenerationImpact(true);
+      try {
+        const replacementDiff = diffKnowledgeGraphGeneration(savedConcepts, []);
+        setNewGraphHasActivityLinks(await deletedItemsHaveCurrentActivityLinks(replacementDiff));
+        setShowReplaceDialog(true);
+      } catch (error) {
+        notify({ variant: "error", message: error instanceof Error ? error.message : t("knowledgeGraph.aiImpactError") });
+      } finally {
+        setCheckingGenerationImpact(false);
+      }
       return;
     }
     void generateGraph();
+  }
+
+  async function deletedItemsHaveCurrentActivityLinks(diff: KnowledgeGraphGenerationDiff) {
+    const savedConceptIds = new Set(savedConcepts.map((concept) => concept.id));
+    const savedSkillIds = new Set(savedConcepts.flatMap((concept) => concept.skillRecords.map((skill) => skill.id)));
+    const deletedConceptIds = new Set(diff.deletedConcepts.map((concept) => concept.id));
+    const impacts = await Promise.all([
+      ...diff.deletedConcepts
+        .filter((concept) => savedConceptIds.has(concept.id))
+        .map((concept) => api.subjectKnowledgeConceptDeletionImpact(subjectId, concept.id).then((result) => result.impact)),
+      ...diff.deletedSkills
+        .filter((skill) => skill.conceptId && !deletedConceptIds.has(skill.conceptId) && savedSkillIds.has(skill.id))
+        .map((skill) => api.subjectKnowledgeSkillDeletionImpact(subjectId, skill.conceptId!, skill.id).then((result) => result.impact))
+    ]);
+    return impacts.some((impact) => impact.bankActivityCount + impact.courseActivityCount > 0);
   }
 
   async function generateGraph() {
@@ -493,14 +527,25 @@ export function SubjectKnowledgeGraph({
         teachingLanguage,
         mode: generationMode,
         existingGraph: generationMode === "iterate" ? {
-          concepts: concepts.map(({ id, title, skills, positionX, positionY }) => ({ id, title, skills, positionX, positionY })),
+          concepts: concepts.map(({ id, title, skills, skillRecords, positionX, positionY }) => ({ id, title, skills, skillRecords, positionX, positionY })),
           prerequisites: prerequisites.map(({ id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle }) => ({
             id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle
           }))
         } : undefined
       });
+      const iterationDiff = diffKnowledgeGraphGeneration(concepts, result.concepts);
+      const savedDiff = diffKnowledgeGraphGeneration(savedConcepts, result.concepts);
+      const deletedConceptIds = new Set(savedDiff.deletedConcepts.map((concept) => concept.id));
+      const hasCurrentActivityLinks = generationMode === "iterate"
+        ? await deletedItemsHaveCurrentActivityLinks(savedDiff)
+        : newGraphHasActivityLinks;
+      onAiGeneratedDeletions?.({
+        conceptIds: savedDiff.deletedConcepts.map((concept) => concept.id),
+        skillIds: savedDiff.deletedSkills.filter((skill) => !skill.conceptId || !deletedConceptIds.has(skill.conceptId)).map((skill) => skill.id)
+      });
       applyGraph(result.concepts, result.prerequisites);
       selectConcept(null);
+      if (generationMode === "iterate") setGenerationSummary({ ...iterationDiff, hasCurrentActivityLinks });
       notify({ variant: "success", message: t("knowledgeGraph.aiGenerated") });
     } catch (error) {
       notify({ variant: "error", message: error instanceof Error ? error.message : t("knowledgeGraph.aiGenerateError") });
@@ -511,6 +556,7 @@ export function SubjectKnowledgeGraph({
 
   function revertGraph() {
     applyGraph(savedConcepts, savedPrerequisites);
+    onAiGeneratedDeletions?.({ conceptIds: [], skillIds: [] });
     selectConcept(null);
     notify({ variant: "info", message: t("knowledgeGraph.reverted") });
   }
@@ -631,8 +677,8 @@ export function SubjectKnowledgeGraph({
             </div>
             <p className="muted">{t("knowledgeGraph.aiHelp")}</p>
             <div className="row">
-              <button type="button" disabled={generating || subjectDescription.trim().length < 10} onClick={requestGeneration}>
-                {generating
+              <button type="button" disabled={generating || checkingGenerationImpact || subjectDescription.trim().length < 10} onClick={() => void requestGeneration()}>
+                {generating || checkingGenerationImpact
                   ? t("knowledgeGraph.aiGenerating")
                   : t(generationMode === "iterate" ? "knowledgeGraph.aiIterate" : "knowledgeGraph.aiGenerate")}
               </button>
@@ -808,6 +854,7 @@ export function SubjectKnowledgeGraph({
               <p className="eyebrow">{t("knowledgeGraph.aiGenerate")}</p>
               <h2 id="knowledge-graph-ai-replace-title">{t("knowledgeGraph.aiReplaceTitle")}</h2>
               <p className="muted">{t("knowledgeGraph.aiReplaceMessage")}</p>
+              {newGraphHasActivityLinks ? <p className="knowledge-generation-warning">{t("knowledgeGraph.aiActivityLinksWarning")}</p> : null}
             </div>
             <div className="dialog-actions">
               <button className="secondary" type="button" onClick={() => setShowReplaceDialog(false)}>
@@ -816,6 +863,29 @@ export function SubjectKnowledgeGraph({
               <button type="button" onClick={() => void generateGraph()}>
                 {t("knowledgeGraph.aiReplace")}
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {generationSummary ? (
+        <div className="dialog-backdrop" role="presentation">
+          <div aria-modal="true" className="dialog-panel knowledge-generation-summary-dialog" role="dialog" aria-labelledby="knowledge-graph-ai-summary-title">
+            <div className="stack" style={{ gap: 8 }}>
+              <p className="eyebrow">{t("knowledgeGraph.aiIterate")}</p>
+              <h2 id="knowledge-graph-ai-summary-title">{t("knowledgeGraph.aiChangesTitle")}</h2>
+              <p className="muted">{t("knowledgeGraph.aiChangesMessage")}</p>
+              {generationSummary.hasCurrentActivityLinks ? <p className="knowledge-generation-warning">{t("knowledgeGraph.aiActivityLinksWarning")}</p> : null}
+            </div>
+            {generationSummary.addedConcepts.length ? <GenerationChangeList title={t("knowledgeGraph.aiAddedConcepts")} items={generationSummary.addedConcepts.map((item) => item.title)} /> : null}
+            {generationSummary.deletedConcepts.length ? <GenerationChangeList title={t("knowledgeGraph.aiDeletedConcepts")} items={generationSummary.deletedConcepts.map((item) => item.title)} /> : null}
+            {generationSummary.addedSkills.length ? <GenerationChangeList title={t("knowledgeGraph.aiAddedSkills")} items={generationSummary.addedSkills.map((item) => t("knowledgeGraph.aiSkillChange", { skill: item.title, concept: item.conceptTitle ?? "" }))} /> : null}
+            {generationSummary.deletedSkills.length ? <GenerationChangeList title={t("knowledgeGraph.aiDeletedSkills")} items={generationSummary.deletedSkills.map((item) => t("knowledgeGraph.aiSkillChange", { skill: item.title, concept: item.conceptTitle ?? "" }))} /> : null}
+            {!generationSummary.addedConcepts.length && !generationSummary.deletedConcepts.length && !generationSummary.addedSkills.length && !generationSummary.deletedSkills.length
+              ? <p>{t("knowledgeGraph.aiNoStructuralChanges")}</p>
+              : null}
+            <div className="dialog-actions">
+              <button type="button" onClick={() => setGenerationSummary(null)}>{t("knowledgeGraph.aiChangesOk")}</button>
             </div>
           </div>
         </div>
@@ -872,4 +942,8 @@ export function SubjectKnowledgeGraph({
       />
     </section>
   );
+}
+
+function GenerationChangeList({ title, items }: { title: string; items: string[] }) {
+  return <section className="knowledge-generation-change-list"><h3>{title}</h3><ul>{items.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul></section>;
 }
