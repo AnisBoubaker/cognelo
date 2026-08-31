@@ -428,9 +428,45 @@ select:focus {
   flex: 0 0 auto;
 }
 
-.participant-editor-dialog {
+.participant-editor-dialog,
+.participant-import-dialog {
   max-width: 720px;
   width: min(100%, 720px);
+}
+
+.participant-import-template {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  display: block;
+  overflow-x: auto;
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+
+.participant-import-ready,
+.participant-import-result {
+  background: #eefaf7;
+  border: 1px solid #b9ded2;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.participant-import-issues,
+.participant-import-result {
+  display: grid;
+  gap: 8px;
+}
+
+.participant-import-issues p,
+.participant-import-result p {
+  margin: 0;
+}
+
+.participant-import-issues ul,
+.participant-import-result ul {
+  margin: 0;
+  padding-inline-start: 22px;
 }
 
 [role="tablist"]:has(> button[role="tab"]) {

@@ -44,6 +44,7 @@ import {
   IconTextSize,
   IconTornado,
   IconTrash,
+  IconUpload,
   IconUsersGroup,
   IconVideo,
   IconX,
@@ -57,7 +58,7 @@ export type AppIconName =
   | "activityAdd" | "add" | "alert" | "assign" | "check" | "chevronDown" | "close"
   | "compare" | "course" | "download" | "duplicate" | "down" | "drag" | "edit" | "folder"
   | "folderAdd" | "folderOpen" | "hidden" | "more" | "move" | "open" | "remove"
-  | "participants" | "save" | "sync" | "up" | "visible";
+  | "participants" | "save" | "sync" | "up" | "upload" | "visible";
 
 const appIcons = {
   activityAdd: IconFilePlus,
@@ -86,6 +87,7 @@ const appIcons = {
   save: IconFileCheck,
   sync: IconReplace,
   up: IconArrowUp,
+  upload: IconUpload,
   visible: IconEye
 } satisfies Record<AppIconName, ComponentType<IconProps>>;
 
