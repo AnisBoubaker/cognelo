@@ -5,12 +5,21 @@ export const codingExerciseTestInsertionToken = "{{ TEST_CODE }}";
 
 export const codingExerciseExecutionModeSchema = z.literal("template");
 
+export const codingExerciseOutputMatchModeSchema = z.enum(["exact", "contains_lines", "regex"]);
+export type CodingExerciseOutputMatchMode = z.infer<typeof codingExerciseOutputMatchModeSchema>;
+
+const outputMatcherFields = {
+  outputMatchMode: codingExerciseOutputMatchModeSchema.default("exact"),
+  containsLinesOrderMatters: z.boolean().default(false)
+};
+
 export const sampleTestSchema = z.object({
   id: z.string().min(1).max(80),
   input: z.string().max(8000).default(""),
   output: z.string().max(8000).default(""),
   testCode: z.string().max(40000).default(""),
-  title: z.string().max(200).default("")
+  title: z.string().max(200).default(""),
+  ...outputMatcherFields
 });
 
 export const codingExerciseConfigSchema = z.object({
@@ -34,7 +43,8 @@ export const codingExerciseHiddenTestSchema = z.object({
   expectedOutput: z.string().max(12000).default(""),
   testCode: z.string().max(40000).default(""),
   isEnabled: z.boolean().default(true),
-  weight: z.number().int().min(1).max(100).default(1)
+  weight: z.number().int().min(1).max(100).default(1),
+  ...outputMatcherFields
 });
 
 export const codingExercisePrivateConfigSchema = z.object({
@@ -119,7 +129,9 @@ export function normalizeCodingExerciseSampleTests(value: unknown) {
           input: test.input,
           output: test.output,
           testCode: test.testCode,
-          title: test.explanation
+          title: test.explanation,
+          outputMatchMode: "exact" as const,
+          containsLinesOrderMatters: false
         }))
       )
     )

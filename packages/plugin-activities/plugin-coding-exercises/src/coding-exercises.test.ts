@@ -23,6 +23,20 @@ describe("coding exercise config and template helpers", () => {
     ).toBe("template");
   });
 
+  it("keeps legacy sample and hidden tests on exact output matching", () => {
+    const config = parseCodingExerciseConfig({
+      prompt: "Write a function that adds two numbers.",
+      sampleTests: [{ id: "sample-1", input: "", output: "2", testCode: "", title: "Sample" }]
+    });
+    const hidden = codingExerciseHiddenTestsInputSchema.parse({
+      referenceSolution: "print(2)",
+      tests: [{ id: "hidden-1", name: "Hidden", expectedOutput: "2" }]
+    });
+
+    expect(config.sampleTests[0]).toMatchObject({ outputMatchMode: "exact", containsLinesOrderMatters: false });
+    expect(hidden.tests[0]).toMatchObject({ outputMatchMode: "exact", containsLinesOrderMatters: false });
+  });
+
   it("merges hidden support code into private template source", () => {
     const privateConfig = parseCodingExercisePrivateConfig({
       hiddenSupportCode: "def helper():\n    return 1",

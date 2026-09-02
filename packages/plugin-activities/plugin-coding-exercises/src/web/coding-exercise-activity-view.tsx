@@ -15,6 +15,7 @@ import {
   parseCodingExercisePrivateConfig,
   splitCodingExerciseTemplateSource,
   type CodingExerciseConfig,
+  type CodingExerciseOutputMatchMode,
   type CodingExercisePrivateConfig
 } from "../coding-exercises";
 import { formatCodingExercisesMessage, normalizeCodingExercisesLocale, type CodingExercisesLocale } from "./messages";
@@ -36,6 +37,8 @@ type HiddenTest = {
   stdin: string;
   expectedOutput: string;
   testCode: string;
+  outputMatchMode: CodingExerciseOutputMatchMode;
+  containsLinesOrderMatters: boolean;
   isEnabled: boolean;
   weight: number;
   orderIndex?: number;
@@ -114,7 +117,14 @@ type CodingExerciseClient = {
   runCode: (
     courseId: string,
     activityId: string,
-    input: { sourceCode: string; stdin?: string; expectedOutput?: string; testCode?: string }
+    input: {
+      sourceCode: string;
+      stdin?: string;
+      expectedOutput?: string;
+      testCode?: string;
+      outputMatchMode?: CodingExerciseOutputMatchMode;
+      containsLinesOrderMatters?: boolean;
+    }
   ) => Promise<{ execution: CodingExecution }>;
   listRuns: (courseId: string, activityId: string) => Promise<{ executions: CodingExecution[] }>;
   submitCode: (courseId: string, activityId: string, input: { sourceCode: string }) => Promise<{ execution: CodingExecution }>;
@@ -256,6 +266,8 @@ export function CodingExerciseActivityView({
   const [sampleInput, setSampleInput] = useState("");
   const [sampleExpectedOutput, setSampleExpectedOutput] = useState("");
   const [sampleTestCode, setSampleTestCode] = useState("");
+  const [sampleOutputMatchMode, setSampleOutputMatchMode] = useState<CodingExerciseOutputMatchMode>("exact");
+  const [sampleContainsLinesOrderMatters, setSampleContainsLinesOrderMatters] = useState(false);
   const [selectedSampleTestId, setSelectedSampleTestId] = useState("");
   const [runExecution, setRunExecution] = useState<CodingExecution | null>(null);
   const [submitExecution, setSubmitExecution] = useState<CodingExecution | null>(null);
@@ -309,6 +321,8 @@ export function CodingExerciseActivityView({
     setSampleInput(sampleTests[0]?.input ?? "");
     setSampleExpectedOutput(sampleTests[0]?.output ?? "");
     setSampleTestCode(sampleTests[0]?.testCode ?? "");
+    setSampleOutputMatchMode(sampleTests[0]?.outputMatchMode ?? "exact");
+    setSampleContainsLinesOrderMatters(sampleTests[0]?.containsLinesOrderMatters ?? false);
     setRunExecution(null);
     setSubmitExecution(null);
     if (isNewActivity) {
@@ -392,7 +406,7 @@ export function CodingExerciseActivityView({
       .catch((err) => setError(err instanceof Error ? err.message : t("loadHistoryError")));
   }, [activity.id, course?.id]);
 
-  function updateSampleTest(index: number, field: keyof CodingExerciseConfig["sampleTests"][number], value: string) {
+  function updateSampleTest(index: number, field: keyof CodingExerciseConfig["sampleTests"][number], value: string | boolean) {
     setConfig((current) => {
       const next = [...normalizeCodingExerciseSampleTests(current.sampleTests)];
       const item = next[index];
@@ -415,7 +429,9 @@ export function CodingExerciseActivityView({
           input: "",
           output: "",
           testCode: "",
-          title: ""
+          title: "",
+          outputMatchMode: "exact",
+          containsLinesOrderMatters: false
         }
       ]
     }));
@@ -445,6 +461,8 @@ export function CodingExerciseActivityView({
         stdin: "",
         expectedOutput: "",
         testCode: "",
+        outputMatchMode: "exact",
+        containsLinesOrderMatters: false,
         isEnabled: true,
         weight: 1,
         orderIndex: current.length
@@ -459,6 +477,8 @@ export function CodingExerciseActivityView({
     setSampleInput(selectedTest?.input ?? "");
     setSampleExpectedOutput(selectedTest?.output ?? "");
     setSampleTestCode(selectedTest?.testCode ?? "");
+    setSampleOutputMatchMode(selectedTest?.outputMatchMode ?? "exact");
+    setSampleContainsLinesOrderMatters(selectedTest?.containsLinesOrderMatters ?? false);
   }
 
   function removeHiddenTest(index: number) {
@@ -802,6 +822,8 @@ export function CodingExerciseActivityView({
       const generatedAt = Date.now();
       const generatedHiddenTests = result.hiddenTests.map((test, index) => ({
         ...test,
+        outputMatchMode: "exact" as const,
+        containsLinesOrderMatters: false,
         id: `${test.id}-${generatedAt}-${index + 1}`.slice(0, 80),
         orderIndex: index,
         metadata: {},
@@ -835,7 +857,9 @@ export function CodingExerciseActivityView({
         sourceCode: editorCode,
         stdin: sampleInput,
         expectedOutput: sampleExpectedOutput,
-        testCode: sampleTestCode
+        testCode: sampleTestCode,
+        outputMatchMode: sampleOutputMatchMode,
+        containsLinesOrderMatters: sampleContainsLinesOrderMatters
       });
       setRunExecution(result.execution);
       const runs = await codingClient.listRuns(course.id, activity.id);
@@ -1188,6 +1212,36 @@ export function CodingExerciseActivityView({
                       <textarea rows={3} value={test.input} onChange={(event) => updateSampleTest(index, "input", event.target.value)} />
                     </div>
                     <div className="field">
+                      <label htmlFor={`sample-output-match-mode-${index}`}>{t("outputMatchMode")}</label>
+                      <select
+                        id={`sample-output-match-mode-${index}`}
+                        value={test.outputMatchMode}
+                        onChange={(event) => updateSampleTest(index, "outputMatchMode", event.target.value)}
+                      >
+                        <option value="exact">{t("outputMatchExact")}</option>
+                        <option value="contains_lines">{t("outputMatchContainsLines")}</option>
+                        <option value="regex">{t("outputMatchRegex")}</option>
+                      </select>
+                      <p className="muted" style={{ margin: 0 }}>
+                        {test.outputMatchMode === "contains_lines"
+                          ? t("outputMatchContainsLinesHelp")
+                          : test.outputMatchMode === "regex"
+                            ? t("outputMatchRegexHelp")
+                            : t("outputMatchExactHelp")}
+                      </p>
+                    </div>
+                    {test.outputMatchMode === "contains_lines" ? (
+                      <label className="row" style={{ alignItems: "center", gap: 8 }}>
+                        <input
+                          type="checkbox"
+                          checked={test.containsLinesOrderMatters}
+                          style={{ height: 16, margin: 0, width: 16 }}
+                          onChange={(event) => updateSampleTest(index, "containsLinesOrderMatters", event.target.checked)}
+                        />
+                        <span>{t("containsLinesRequireOrder")}</span>
+                      </label>
+                    ) : null}
+                    <div className="field">
                       <label>{t("expectedOutput")}</label>
                       <textarea rows={3} value={test.output} onChange={(event) => updateSampleTest(index, "output", event.target.value)} />
                     </div>
@@ -1256,6 +1310,36 @@ export function CodingExerciseActivityView({
                       <label>{t("input")}</label>
                       <textarea rows={3} value={test.stdin} onChange={(event) => updateHiddenTest(index, "stdin", event.target.value)} />
                     </div>
+                    <div className="field">
+                      <label htmlFor={`hidden-output-match-mode-${index}`}>{t("outputMatchMode")}</label>
+                      <select
+                        id={`hidden-output-match-mode-${index}`}
+                        value={test.outputMatchMode}
+                        onChange={(event) => updateHiddenTest(index, "outputMatchMode", event.target.value)}
+                      >
+                        <option value="exact">{t("outputMatchExact")}</option>
+                        <option value="contains_lines">{t("outputMatchContainsLines")}</option>
+                        <option value="regex">{t("outputMatchRegex")}</option>
+                      </select>
+                      <p className="muted" style={{ margin: 0 }}>
+                        {test.outputMatchMode === "contains_lines"
+                          ? t("outputMatchContainsLinesHelp")
+                          : test.outputMatchMode === "regex"
+                            ? t("outputMatchRegexHelp")
+                            : t("outputMatchExactHelp")}
+                      </p>
+                    </div>
+                    {test.outputMatchMode === "contains_lines" ? (
+                      <label className="row" style={{ alignItems: "center", gap: 8 }}>
+                        <input
+                          type="checkbox"
+                          checked={test.containsLinesOrderMatters}
+                          style={{ height: 16, margin: 0, width: 16 }}
+                          onChange={(event) => updateHiddenTest(index, "containsLinesOrderMatters", event.target.checked)}
+                        />
+                        <span>{t("containsLinesRequireOrder")}</span>
+                      </label>
+                    ) : null}
                     <div className="field">
                       <label>{t("expectedOutput")}</label>
                       <textarea
@@ -1372,6 +1456,29 @@ export function CodingExerciseActivityView({
               <label>{t("sampleInput")}</label>
               <textarea rows={4} value={sampleInput} onChange={(event) => setSampleInput(event.target.value)} />
             </div>
+            <div className="field">
+              <label htmlFor="coding-sample-output-match-mode">{t("outputMatchMode")}</label>
+              <select
+                id="coding-sample-output-match-mode"
+                value={sampleOutputMatchMode}
+                onChange={(event) => setSampleOutputMatchMode(event.target.value as CodingExerciseOutputMatchMode)}
+              >
+                <option value="exact">{t("outputMatchExact")}</option>
+                <option value="contains_lines">{t("outputMatchContainsLines")}</option>
+                <option value="regex">{t("outputMatchRegex")}</option>
+              </select>
+            </div>
+            {sampleOutputMatchMode === "contains_lines" ? (
+              <label className="row" style={{ alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={sampleContainsLinesOrderMatters}
+                  style={{ height: 16, margin: 0, width: 16 }}
+                  onChange={(event) => setSampleContainsLinesOrderMatters(event.target.checked)}
+                />
+                <span>{t("containsLinesRequireOrder")}</span>
+              </label>
+            ) : null}
             <div className="field">
               <label>{t("expectedOutput")}</label>
               <textarea rows={4} value={sampleExpectedOutput} onChange={(event) => setSampleExpectedOutput(event.target.value)} />

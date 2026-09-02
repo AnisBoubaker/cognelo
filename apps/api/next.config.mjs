@@ -1,4 +1,5 @@
 const nextConfig = {
+  serverExternalPackages: ["re2-wasm"],
   transpilePackages: [
     "@cognelo/config",
     "@cognelo/contracts",

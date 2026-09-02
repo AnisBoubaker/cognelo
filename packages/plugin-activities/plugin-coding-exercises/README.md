@@ -148,6 +148,16 @@ Behavior:
 - Judge0 source is assembled server-side from the private template plus student code, then per-test harness code is injected at `{{ TEST_CODE }}` when present
 - enabled hidden tests are validated against the teacher reference solution before they are saved
 
+### Output matching
+
+Each visible or hidden test has an explicit output comparison mode:
+
+- **Exact** is the default and preserves legacy behavior by sending `expected_output` to Judge0. Tests saved before comparison modes existed normalize to Exact.
+- **Contains lines** treats every non-empty expected-output line as literal text and requires it to occur as a complete stdout line. Extra output is allowed. Teachers can optionally require the expected lines to occur in their authored order; when order is not required, duplicate expected lines still require the same number of output occurrences.
+- **Regular expression** searches stdout with the linear-time RE2 WebAssembly engine. It does not support backreferences or lookaround, and patterns are limited to 4,000 characters.
+
+For Contains lines and Regular expression, Cognelo omits Judge0's `expected_output`. Judge0 must first report a successful compile and execution; Cognelo then evaluates stdout with the selected comparator. Compilation, runtime, resource-limit, and other sandbox failures always fail the test before output matching. The same comparator is used for teacher reference validation, student sample runs, and hidden-test grading.
+
 For development, Judge0 runs locally in Docker on `http://localhost:2358`. Compose defaults to the pinned Apple Silicon image `ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2`; override `JUDGE0_IMAGE` when another architecture or approved build is required. The image exposes Cognelo's C, C++, Go, Java, JavaScript, Python, Rust, and TypeScript runtimes and has been validated with real submissions.
 
 For production, `JUDGE0_BASE_URL` should point to the dedicated physical Judge0 host, ideally on a private network segment with an auth token and host-level access controls.
