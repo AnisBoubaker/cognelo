@@ -51,6 +51,14 @@ type MessageKey =
   | "remove"
   | "input"
   | "expectedOutput"
+  | "outputMatchMode"
+  | "outputMatchExact"
+  | "outputMatchContainsLines"
+  | "outputMatchRegex"
+  | "outputMatchExactHelp"
+  | "outputMatchContainsLinesHelp"
+  | "outputMatchRegexHelp"
+  | "containsLinesRequireOrder"
   | "testHarnessCode"
   | "testHarnessCodeHelp"
   | "visibleTestHarnessHelp"
@@ -157,6 +165,14 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     remove: "Remove",
     input: "Input",
     expectedOutput: "Expected output",
+    outputMatchMode: "Output matching",
+    outputMatchExact: "Exact",
+    outputMatchContainsLines: "Contains lines",
+    outputMatchRegex: "Regular expression",
+    outputMatchExactHelp: "Judge0 compares the complete program output with this expected output.",
+    outputMatchContainsLinesHelp: "Every non-empty expected line must occur as a complete literal output line. Extra output is allowed.",
+    outputMatchRegexHelp: "The safe RE2 pattern is searched anywhere in stdout. Backreferences and lookaround are not supported.",
+    containsLinesRequireOrder: "Require lines in this order",
     testHarnessCode: "Test code",
     testHarnessCodeHelp: "Optional code for this test. If present, the template must include {{ TEST_CODE }}, and the code will be injected there.",
     visibleTestHarnessHelp: "Visible sample harness code. Students can inspect or adjust it for public sample runs.",
@@ -260,6 +276,14 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     remove: "Supprimer",
     input: "Entrée",
     expectedOutput: "Sortie attendue",
+    outputMatchMode: "Comparaison de la sortie",
+    outputMatchExact: "Exacte",
+    outputMatchContainsLines: "Contient les lignes",
+    outputMatchRegex: "Expression régulière",
+    outputMatchExactHelp: "Judge0 compare toute la sortie du programme à cette sortie attendue.",
+    outputMatchContainsLinesHelp: "Chaque ligne attendue non vide doit apparaître comme une ligne littérale complète. Les sorties supplémentaires sont permises.",
+    outputMatchRegexHelp: "Le motif RE2 sécurisé est recherché partout dans stdout. Les références arrière et les assertions ne sont pas prises en charge.",
+    containsLinesRequireOrder: "Exiger les lignes dans cet ordre",
     testHarnessCode: "Code de test",
     testHarnessCodeHelp: "Code optionnel pour ce test. S’il est présent, le gabarit doit contenir {{ TEST_CODE }}, et ce code y sera injecté.",
     visibleTestHarnessHelp: "Code de harnais visible pour l'exemple. Les étudiants peuvent l'inspecter ou l'ajuster pour les exécutions publiques.",
@@ -363,6 +387,14 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     remove: "删除",
     input: "输入",
     expectedOutput: "期望输出",
+    outputMatchMode: "输出匹配方式",
+    outputMatchExact: "精确匹配",
+    outputMatchContainsLines: "包含指定行",
+    outputMatchRegex: "正则表达式",
+    outputMatchExactHelp: "Judge0 会将程序的完整输出与此期望输出进行比较。",
+    outputMatchContainsLinesHelp: "每个非空期望行都必须作为完整的文字行出现在输出中；允许额外输出。",
+    outputMatchRegexHelp: "安全的 RE2 模式会在 stdout 的任意位置查找；不支持反向引用和前后查找。",
+    containsLinesRequireOrder: "要求各行按此顺序出现",
     testHarnessCode: "测试代码",
     testHarnessCodeHelp: "此测试的可选代码。如需使用，模板必须包含 {{ TEST_CODE }}，并且该代码会注入到那里。",
     visibleTestHarnessHelp: "公开示例运行用的可见脚手架代码。学生可以查看或调整它。",

@@ -3,13 +3,21 @@ import { AppError } from "@cognelo/core";
 import { z } from "zod";
 import {
   buildCodingExerciseSource,
+  codingExerciseOutputMatchModeSchema,
   parseCodingExerciseConfig,
   parseCodingExercisePrivateConfig,
+  type CodingExerciseOutputMatchMode,
   type CodingExercisePrivateConfig,
   type CodingExerciseSampleTest
 } from "./coding-exercises";
 import { Prisma, prisma } from "./db-client";
 import { resolveJudge0Language, runJudge0Submission } from "./judge0";
+import {
+  compareCodingExerciseOutput,
+  getJudge0ExpectedOutput,
+  validateCodingExerciseOutputMatcher,
+  type CodingExerciseOutputMatcher
+} from "./output-matcher";
 
 type CodingExerciseExecutionRow = {
   id: string;
@@ -58,7 +66,9 @@ export const codingExerciseRunInputSchema = z.object({
   sourceCode: z.string().min(1).max(60000),
   stdin: z.string().max(12000).optional().default(""),
   expectedOutput: z.string().max(12000).optional().default(""),
-  testCode: z.string().max(40000).optional().default("")
+  testCode: z.string().max(40000).optional().default(""),
+  outputMatchMode: codingExerciseOutputMatchModeSchema.optional().default("exact"),
+  containsLinesOrderMatters: z.boolean().optional().default(false)
 });
 
 export type CodingExerciseRunInput = z.infer<typeof codingExerciseRunInputSchema>;
@@ -73,6 +83,8 @@ type HiddenTestCase = {
   stdin: string;
   expectedOutput: string;
   testCode: string;
+  outputMatchMode: CodingExerciseOutputMatchMode;
+  containsLinesOrderMatters: boolean;
   isEnabled: boolean;
   weight: number;
   orderIndex: number;
@@ -84,6 +96,8 @@ type ReferenceValidationTestCase = {
   stdin: string;
   expectedOutput: string;
   testCode: string;
+  outputMatchMode: CodingExerciseOutputMatchMode;
+  containsLinesOrderMatters: boolean;
   weight: number;
 };
 
@@ -101,6 +115,16 @@ function getHiddenTestCode(value: unknown) {
   return typeof metadata?.testCode === "string" ? metadata.testCode : "";
 }
 
+function getHiddenTestOutputMatcher(value: unknown): CodingExerciseOutputMatcher {
+  const metadata =
+    value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  const parsedMode = codingExerciseOutputMatchModeSchema.safeParse(metadata.outputMatchMode);
+  return {
+    outputMatchMode: parsedMode.success ? parsedMode.data : "exact",
+    containsLinesOrderMatters: metadata.containsLinesOrderMatters === true
+  };
+}
+
 function toHiddenTestCase(test: {
   id: string;
   name: string;
@@ -111,12 +135,14 @@ function toHiddenTestCase(test: {
   orderIndex: number;
   metadata: unknown;
 }): HiddenTestCase {
+  const outputMatcher = getHiddenTestOutputMatcher(test.metadata);
   return {
     id: test.id,
     name: test.name,
     stdin: test.stdin,
     expectedOutput: test.expectedOutput,
     testCode: getHiddenTestCode(test.metadata),
+    ...outputMatcher,
     isEnabled: test.isEnabled,
     weight: test.weight,
     orderIndex: test.orderIndex
@@ -132,6 +158,8 @@ export async function runCodingExercise(params: {
   const env = getServerEnv();
   const config = parseCodingExerciseConfig(params.activityConfig);
   const input = codingExerciseRunInputSchema.parse(params.input);
+  const outputMatcher = toOutputMatcher(input);
+  assertValidOutputMatcher(input.expectedOutput, outputMatcher);
   const privateConfig = await getCodingExercisePrivateConfig({ activityId: params.activityId });
   const runtime = await resolveJudge0Language(config.language);
   const sourceCode = buildCodingExerciseSource({
@@ -165,7 +193,7 @@ export async function runCodingExercise(params: {
       languageId: runtime.languageId,
       sourceCode,
       stdin: input.stdin,
-      expectedOutput: input.expectedOutput,
+      expectedOutput: getJudge0ExpectedOutput(input.expectedOutput, outputMatcher),
       cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
       wallTimeLimit: 10,
       memoryLimitKb: 128000,
@@ -173,22 +201,26 @@ export async function runCodingExercise(params: {
       enablePerProcessAndThreadMemoryLimit: env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS
     });
 
+    const comparison = evaluateJudge0Result(result, input.expectedOutput, outputMatcher);
     const normalizedExecution = await codingExerciseExecutionClient.pluginCodingExerciseExecution.update({
       where: { id: pendingExecution.id },
       data: {
-        status: result.status?.id === 3 ? "completed" : "failed",
+        status: comparison.matched ? "completed" : "failed",
         judge0Token: result.token,
         stdout: result.stdout,
         stderr: result.stderr,
         compileOutput: result.compile_output,
-        message: result.message,
+        message: result.message ?? comparison.message,
         timeSeconds: result.time,
         memoryKb: result.memory ?? undefined,
         judge0StatusId: result.status?.id,
         judge0StatusLabel: result.status?.description,
         resultSummary: {
           judge0LanguageName: runtime.languageName,
-          accepted: result.status?.id === 3,
+          accepted: comparison.matched,
+          outputMatchMode: input.outputMatchMode,
+          containsLinesOrderMatters: input.containsLinesOrderMatters,
+          comparisonMessage: comparison.message,
           executionMode: config.executionMode,
           phase: "finished"
         } as Prisma.InputJsonValue
@@ -314,7 +346,7 @@ export async function submitCodingExercise(params: {
         languageId: runtime.languageId,
         sourceCode,
         stdin: hiddenTest.stdin,
-        expectedOutput: hiddenTest.expectedOutput,
+        expectedOutput: getJudge0ExpectedOutput(hiddenTest.expectedOutput, hiddenTest),
         cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
         wallTimeLimit: 10,
         memoryLimitKb: 128000,
@@ -322,11 +354,12 @@ export async function submitCodingExercise(params: {
         enablePerProcessAndThreadMemoryLimit: env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS
       });
 
-      const passed = result.status?.id === 3;
+      const comparison = evaluateJudge0Result(result, hiddenTest.expectedOutput, hiddenTest);
+      const passed = comparison.matched;
       if (passed) {
         earnedWeight += hiddenTest.weight;
       } else if (!firstFailureMessage) {
-        firstFailureMessage = result.message ?? result.stderr ?? result.compile_output ?? result.status?.description ?? "Hidden test failed.";
+        firstFailureMessage = result.message ?? result.stderr ?? result.compile_output ?? comparison.message ?? result.status?.description ?? "Hidden test failed.";
       }
 
       latestToken = result.token;
@@ -345,7 +378,9 @@ export async function submitCodingExercise(params: {
         weight: hiddenTest.weight,
         statusId: result.status?.id ?? null,
         statusLabel: result.status?.description ?? null,
-        message: result.message ?? result.stderr ?? result.compile_output ?? null,
+        message: result.message ?? result.stderr ?? result.compile_output ?? comparison.message ?? null,
+        outputMatchMode: hiddenTest.outputMatchMode,
+        containsLinesOrderMatters: hiddenTest.containsLinesOrderMatters,
         timeSeconds: result.time ?? null,
         memoryKb: result.memory ?? null
       });
@@ -435,6 +470,8 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
     stdin: test.input,
     expectedOutput: test.output,
     testCode: test.testCode,
+    outputMatchMode: test.outputMatchMode,
+    containsLinesOrderMatters: test.containsLinesOrderMatters,
     weight: 1
   }));
   const enabledHiddenTests = params.hiddenTests
@@ -445,6 +482,8 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
       stdin: test.stdin,
       expectedOutput: test.expectedOutput,
       testCode: test.testCode,
+      outputMatchMode: test.outputMatchMode,
+      containsLinesOrderMatters: test.containsLinesOrderMatters,
       weight: test.weight
     }));
   const allTestsCount = sampleTests.length + enabledHiddenTests.length;
@@ -532,6 +571,7 @@ async function validateReferenceSolutionTestGroup(params: {
   let earnedWeight = 0;
 
   for (const testCase of params.tests) {
+    assertValidOutputMatcher(testCase.expectedOutput, testCase);
     totalWeight += testCase.weight;
     const composedSourceCode = buildCodingExerciseSource({
       config: params.config,
@@ -543,7 +583,7 @@ async function validateReferenceSolutionTestGroup(params: {
       languageId: params.languageId,
       sourceCode: composedSourceCode,
       stdin: testCase.stdin,
-      expectedOutput: testCase.expectedOutput,
+      expectedOutput: getJudge0ExpectedOutput(testCase.expectedOutput, testCase),
       cpuTimeLimit: params.cpuTimeLimit,
       wallTimeLimit: 10,
       memoryLimitKb: 128000,
@@ -551,7 +591,8 @@ async function validateReferenceSolutionTestGroup(params: {
       enablePerProcessAndThreadMemoryLimit: params.env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS
     });
 
-    const passed = result.status?.id === 3;
+    const comparison = evaluateJudge0Result(result, testCase.expectedOutput, testCase);
+    const passed = comparison.matched;
     if (passed) {
       earnedWeight += testCase.weight;
     }
@@ -567,7 +608,9 @@ async function validateReferenceSolutionTestGroup(params: {
       stdout: result.stdout ?? null,
       stderr: result.stderr ?? null,
       compileOutput: result.compile_output ?? null,
-      message: result.message ?? null,
+      message: result.message ?? comparison.message,
+      outputMatchMode: testCase.outputMatchMode,
+      containsLinesOrderMatters: testCase.containsLinesOrderMatters,
       timeSeconds: result.time ?? null,
       memoryKb: result.memory ?? null
     });
@@ -581,6 +624,37 @@ async function validateReferenceSolutionTestGroup(params: {
     totalWeight,
     tests: testResults
   };
+}
+
+function toOutputMatcher(value: {
+  outputMatchMode: CodingExerciseOutputMatchMode;
+  containsLinesOrderMatters: boolean;
+}): CodingExerciseOutputMatcher {
+  return {
+    outputMatchMode: value.outputMatchMode,
+    containsLinesOrderMatters: value.containsLinesOrderMatters
+  };
+}
+
+function assertValidOutputMatcher(expectedOutput: string, matcher: CodingExerciseOutputMatcher) {
+  const message = validateCodingExerciseOutputMatcher(expectedOutput, matcher);
+  if (message) {
+    throw new AppError(400, "INVALID_OUTPUT_MATCHER", message);
+  }
+}
+
+function evaluateJudge0Result(
+  result: Awaited<ReturnType<typeof runJudge0Submission>>,
+  expectedOutput: string,
+  matcher: CodingExerciseOutputMatcher
+) {
+  if (result.status?.id !== 3) {
+    return { matched: false, message: null as string | null };
+  }
+  if (matcher.outputMatchMode === "exact") {
+    return { matched: true, message: null as string | null };
+  }
+  return compareCodingExerciseOutput(expectedOutput, result.stdout ?? "", matcher);
 }
 
 function normalizeResultSummary(value: unknown) {

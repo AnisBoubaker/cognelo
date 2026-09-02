@@ -1,5 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+type MockHiddenTest = {
+  id: string;
+  name: string;
+  stdin: string;
+  expectedOutput: string;
+  isEnabled: boolean;
+  weight: number;
+  orderIndex: number;
+  metadata: Record<string, unknown>;
+};
+
 const dbMocks = vi.hoisted(() => {
   const now = new Date("2026-05-14T12:00:00.000Z");
   const executionRow = (overrides: Record<string, unknown> = {}) => ({
@@ -49,14 +60,14 @@ const dbMocks = vi.hoisted(() => {
         orderIndex: 1,
         metadata: { testCode: "" }
       }
-    ]
+    ] as MockHiddenTest[]
   };
 
   return {
     get hiddenTests() {
       return state.hiddenTests;
     },
-    set hiddenTests(value: typeof state.hiddenTests) {
+    set hiddenTests(value: MockHiddenTest[]) {
       state.hiddenTests = value;
     },
     executions: state.executions,
@@ -219,13 +230,75 @@ describe("coding exercise executions", () => {
         activityId: "activity-1",
         userId: "student-1",
         activityConfig,
-        input: { sourceCode: "print(2)", stdin: "1", expectedOutput: "2", testCode: "" }
+        input: {
+          sourceCode: "print(2)", stdin: "1", expectedOutput: "2", testCode: "",
+          outputMatchMode: "exact", containsLinesOrderMatters: false
+        }
       })
     ).resolves.toMatchObject({
       status: "completed",
       judge0Token: "token-1",
       stdout: "2",
       resultSummary: { accepted: true, phase: "finished" }
+    });
+  });
+
+  it("compares contained lines after Judge0 successfully executes the program", async () => {
+    judge0Mocks.runJudge0Submission.mockResolvedValueOnce({
+      token: "token-contains",
+      stdout: "Age: Poids: Temperature:\nTemperature: 38.7 degC\nAge saisi: 3 ans\nPoids: 12.5 kg\n",
+      status: { id: 3, description: "Accepted" }
+    });
+
+    await expect(
+      runCodingExercise({
+        activityId: "activity-1",
+        userId: "student-1",
+        activityConfig,
+        input: {
+          sourceCode: "print('recap')",
+          stdin: "3\n12.5\n38.7",
+          expectedOutput: "Age saisi: 3 ans\nPoids: 12.5 kg\nTemperature: 38.7 degC",
+          testCode: "",
+          outputMatchMode: "contains_lines",
+          containsLinesOrderMatters: false
+        }
+      })
+    ).resolves.toMatchObject({
+      status: "completed",
+      resultSummary: { accepted: true, outputMatchMode: "contains_lines" }
+    });
+    expect(judge0Mocks.runJudge0Submission).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedOutput: undefined })
+    );
+  });
+
+  it("records a Cognelo regex mismatch after a successful Judge0 execution", async () => {
+    judge0Mocks.runJudge0Submission.mockResolvedValueOnce({
+      token: "token-regex",
+      stdout: "Poids: 12x5 kg\n",
+      status: { id: 3, description: "Accepted" }
+    });
+
+    await expect(
+      runCodingExercise({
+        activityId: "activity-1",
+        userId: "student-1",
+        activityConfig,
+        input: {
+          sourceCode: "print('wrong')",
+          stdin: "",
+          expectedOutput: "Poids: 12\\.5 kg",
+          testCode: "",
+          outputMatchMode: "regex",
+          containsLinesOrderMatters: false
+        }
+      })
+    ).resolves.toMatchObject({
+      status: "failed",
+      message: "Program output did not match the expected regular expression.",
+      judge0StatusLabel: "Accepted",
+      resultSummary: { accepted: false, outputMatchMode: "regex" }
     });
   });
 
@@ -246,7 +319,10 @@ describe("coding exercise executions", () => {
         activityId: "activity-1",
         userId: "student-1",
         activityConfig,
-        input: { sourceCode: "raise Exception()", stdin: "", expectedOutput: "", testCode: "" }
+        input: {
+          sourceCode: "raise Exception()", stdin: "", expectedOutput: "", testCode: "",
+          outputMatchMode: "exact", containsLinesOrderMatters: false
+        }
       })
     ).resolves.toMatchObject({
       status: "failed",
@@ -300,6 +376,58 @@ describe("coding exercise executions", () => {
     });
   });
 
+  it("grades hidden contains-lines tests in Cognelo after Judge0 accepts execution", async () => {
+    dbMocks.hiddenTests = [
+      {
+        id: "hidden-contains",
+        name: "Contains recap lines",
+        stdin: "3\n12.5\n38.7",
+        expectedOutput: "Age saisi: 3 ans\nPoids: 12.5 kg\nTemperature: 38.7 degC",
+        isEnabled: true,
+        weight: 4,
+        orderIndex: 0,
+        metadata: {
+          testCode: "",
+          outputMatchMode: "contains_lines",
+          containsLinesOrderMatters: true
+        }
+      }
+    ];
+    judge0Mocks.runJudge0Submission.mockResolvedValueOnce({
+      token: "token-hidden-contains",
+      stdout: "Age: Poids: Temperature:\nAge saisi: 3 ans\nPoids: 12.5 kg\nTemperature: 38.7 degC\n",
+      status: { id: 3, description: "Accepted" }
+    });
+
+    await expect(
+      submitCodingExercise({
+        activityId: "activity-1",
+        userId: "student-1",
+        activityConfig,
+        input: { sourceCode: "print('student')" }
+      })
+    ).resolves.toMatchObject({
+      status: "completed",
+      resultSummary: {
+        accepted: true,
+        testCount: 1,
+        passedCount: 1,
+        earnedWeight: 4,
+        totalWeight: 4,
+        tests: [
+          expect.objectContaining({
+            passed: true,
+            outputMatchMode: "contains_lines",
+            containsLinesOrderMatters: true
+          })
+        ]
+      }
+    });
+    expect(judge0Mocks.runJudge0Submission).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedOutput: undefined })
+    );
+  });
+
   it("validates reference solutions against sample and hidden tests with mocked Judge0", async () => {
     judge0Mocks.runJudge0Submission
       .mockResolvedValueOnce({ token: "s1", stdout: "2", status: { id: 3, description: "Accepted" } })
@@ -309,7 +437,10 @@ describe("coding exercise executions", () => {
       validateReferenceSolutionAgainstHiddenTests({
         activityConfig,
         sourceCode: "print('reference')",
-        sampleTests: [{ id: "sample-1", title: "Sample", input: "1", output: "2", testCode: "" }],
+        sampleTests: [{
+          id: "sample-1", title: "Sample", input: "1", output: "2", testCode: "",
+          outputMatchMode: "exact", containsLinesOrderMatters: false
+        }],
         hiddenTests: [
           {
             id: "hidden-1",
@@ -317,6 +448,8 @@ describe("coding exercise executions", () => {
             stdin: "2",
             expectedOutput: "4",
             testCode: "",
+            outputMatchMode: "exact",
+            containsLinesOrderMatters: false,
             isEnabled: true,
             weight: 3,
             orderIndex: 0
@@ -351,6 +484,8 @@ describe("coding exercise executions", () => {
             stdin: "",
             expectedOutput: "",
             testCode: "",
+            outputMatchMode: "exact",
+            containsLinesOrderMatters: false,
             isEnabled: true,
             weight: 1,
             orderIndex: 0

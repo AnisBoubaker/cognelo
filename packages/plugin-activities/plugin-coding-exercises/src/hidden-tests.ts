@@ -1,6 +1,12 @@
 import type { CurrentUser } from "@cognelo/contracts";
 import { assertActivityAuthoringMutable, assertCanManageActivityBank, assertCanManageCourse, AppError } from "@cognelo/core";
-import { codingExerciseHiddenTestsInputSchema, codingExerciseTemplateRequiresTestCodeMarker, parseCodingExercisePrivateConfig } from "./coding-exercises";
+import {
+  codingExerciseHiddenTestsInputSchema,
+  codingExerciseOutputMatchModeSchema,
+  codingExerciseTemplateRequiresTestCodeMarker,
+  parseCodingExercisePrivateConfig,
+  type CodingExerciseOutputMatchMode
+} from "./coding-exercises";
 import { Prisma, prisma } from "./db-client";
 import { getCodingExerciseReferenceSolution, validateReferenceSolutionAgainstHiddenTests } from "./executions";
 
@@ -44,6 +50,8 @@ type HiddenTestRecord = {
   stdin: string;
   expectedOutput: string;
   testCode: string;
+  outputMatchMode: CodingExerciseOutputMatchMode;
+  containsLinesOrderMatters: boolean;
   isEnabled: boolean;
   weight: number;
   orderIndex: number;
@@ -124,7 +132,9 @@ export async function replaceCodingExerciseHiddenTests(params: {
           weight: test.weight,
           metadata: {
             stableId: test.id,
-            testCode: test.testCode
+            testCode: test.testCode,
+            outputMatchMode: test.outputMatchMode,
+            containsLinesOrderMatters: test.containsLinesOrderMatters
           } as Prisma.InputJsonValue
         }))
       });
@@ -184,7 +194,9 @@ export async function replaceBankCodingExerciseHiddenTests(params: {
           weight: test.weight,
           metadata: {
             stableId: test.id,
-            testCode: test.testCode
+            testCode: test.testCode,
+            outputMatchMode: test.outputMatchMode,
+            containsLinesOrderMatters: test.containsLinesOrderMatters
           } as Prisma.InputJsonValue
         }))
       });
@@ -467,7 +479,11 @@ function toValidatedHiddenTestsResponse(input: Awaited<ReturnType<typeof validat
     tests: input.tests.map((test, index) => ({
       ...test,
       orderIndex: index,
-      metadata: { stableId: test.id },
+      metadata: {
+        stableId: test.id,
+        outputMatchMode: test.outputMatchMode,
+        containsLinesOrderMatters: test.containsLinesOrderMatters
+      },
       createdAt: timestamp,
       updatedAt: timestamp
     })),
@@ -499,6 +515,7 @@ function toHiddenTestRecord(test: {
     stdin: test.stdin,
     expectedOutput: test.expectedOutput,
     testCode: getHiddenTestCode(test.metadata),
+    ...getHiddenTestOutputMatcher(test.metadata),
     isEnabled: test.isEnabled,
     weight: test.weight,
     orderIndex: test.orderIndex,
@@ -511,6 +528,15 @@ function toHiddenTestRecord(test: {
 function getHiddenTestCode(value: unknown) {
   const metadata = normalizeMetadata(value);
   return typeof metadata.testCode === "string" ? metadata.testCode : "";
+}
+
+function getHiddenTestOutputMatcher(value: unknown) {
+  const metadata = normalizeMetadata(value);
+  const parsedMode = codingExerciseOutputMatchModeSchema.safeParse(metadata.outputMatchMode);
+  return {
+    outputMatchMode: parsedMode.success ? parsedMode.data : "exact" as const,
+    containsLinesOrderMatters: metadata.containsLinesOrderMatters === true
+  };
 }
 
 function assertBankCodingExerciseStorageAvailable() {

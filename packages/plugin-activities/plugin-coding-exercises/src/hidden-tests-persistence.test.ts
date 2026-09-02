@@ -10,7 +10,12 @@ const dbMocks = vi.hoisted(() => {
       isEnabled: true,
       weight: 2,
       orderIndex: 1,
-      metadata: { stableId: "hidden-2", testCode: "print(double(2))" },
+      metadata: {
+        stableId: "hidden-2",
+        testCode: "print(double(2))",
+        outputMatchMode: "contains_lines",
+        containsLinesOrderMatters: true
+      },
       createdAt: new Date("2026-05-14T12:00:00.000Z"),
       updatedAt: new Date("2026-05-14T12:00:00.000Z")
     }
@@ -145,6 +150,8 @@ const hiddenInput = {
       stdin: "1",
       expectedOutput: "2",
       testCode: "print(double(1))",
+      outputMatchMode: "contains_lines",
+      containsLinesOrderMatters: true,
       isEnabled: true,
       weight: 1
     },
@@ -154,6 +161,8 @@ const hiddenInput = {
       stdin: "2",
       expectedOutput: "4",
       testCode: "print(double(2))",
+      outputMatchMode: "regex",
+      containsLinesOrderMatters: false,
       isEnabled: true,
       weight: 2
     }
@@ -167,11 +176,16 @@ describe("coding exercise hidden test persistence", () => {
 
   it("lists course and bank hidden tests with separate reference solution storage", async () => {
     await expect(listCodingExerciseHiddenTests({ activityId: "course-activity-1" })).resolves.toMatchObject({
-      tests: [{ id: "hidden-2", testCode: "print(double(2))" }],
+      tests: [{
+        id: "hidden-2",
+        testCode: "print(double(2))",
+        outputMatchMode: "contains_lines",
+        containsLinesOrderMatters: true
+      }],
       referenceSolution: { sourceCode: "def double(n): return n * 2" }
     });
     await expect(listBankCodingExerciseHiddenTests({ bankActivityId: "bank-activity-1" })).resolves.toMatchObject({
-      tests: [{ id: "bank-hidden-1", testCode: "print(double(1))" }],
+      tests: [{ id: "bank-hidden-1", testCode: "print(double(1))", outputMatchMode: "exact" }],
       referenceSolution: { sourceCode: "def double(n): return n * 2" }
     });
 
@@ -195,8 +209,18 @@ describe("coding exercise hidden test persistence", () => {
     });
     expect(dbMocks.transaction.pluginCodingExerciseHiddenTest.createMany).toHaveBeenCalledWith({
       data: [
-        expect.objectContaining({ activityId: "course-activity-1", name: "First", orderIndex: 0 }),
-        expect.objectContaining({ activityId: "course-activity-1", name: "Second", orderIndex: 1 })
+        expect.objectContaining({
+          activityId: "course-activity-1",
+          name: "First",
+          orderIndex: 0,
+          metadata: expect.objectContaining({ outputMatchMode: "contains_lines", containsLinesOrderMatters: true })
+        }),
+        expect.objectContaining({
+          activityId: "course-activity-1",
+          name: "Second",
+          orderIndex: 1,
+          metadata: expect.objectContaining({ outputMatchMode: "regex", containsLinesOrderMatters: false })
+        })
       ]
     });
     expect(dbMocks.transaction.pluginCodingExerciseReferenceSolution.upsert).toHaveBeenCalledWith(

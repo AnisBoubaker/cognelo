@@ -217,13 +217,23 @@ export type CodingExerciseTestsGenerationResult =
   | {
       status?: "ok" | "warning";
       warningMessage?: string;
-      sampleTests: Array<{ id: string; input: string; output: string; testCode: string; title: string }>;
+      sampleTests: Array<{
+        id: string;
+        input: string;
+        output: string;
+        testCode: string;
+        title: string;
+        outputMatchMode: "exact" | "contains_lines" | "regex";
+        containsLinesOrderMatters: boolean;
+      }>;
       hiddenTests: Array<{
         id: string;
         name: string;
         stdin: string;
         expectedOutput: string;
         testCode: string;
+        outputMatchMode: "exact" | "contains_lines" | "regex";
+        containsLinesOrderMatters: boolean;
         isEnabled: boolean;
         weight: number;
       }>;
@@ -618,6 +628,8 @@ export type CodingExerciseHiddenTest = {
   stdin: string;
   expectedOutput: string;
   testCode: string;
+  outputMatchMode: "exact" | "contains_lines" | "regex";
+  containsLinesOrderMatters: boolean;
   isEnabled: boolean;
   weight: number;
   orderIndex: number;
@@ -1300,7 +1312,15 @@ export const api = {
     activityId: string,
     input: {
       tests: Array<Omit<CodingExerciseHiddenTest, "orderIndex" | "metadata" | "createdAt" | "updatedAt"> & { orderIndex?: number }>;
-      sampleTests: Array<{ id: string; input: string; output: string; testCode: string; title: string }>;
+      sampleTests: Array<{
+        id: string;
+        input: string;
+        output: string;
+        testCode: string;
+        title: string;
+        outputMatchMode: "exact" | "contains_lines" | "regex";
+        containsLinesOrderMatters: boolean;
+      }>;
       referenceSolution: string;
       privateConfig?: CodingExerciseReferenceSolution["privateConfig"];
       activityConfig?: Record<string, unknown>;
@@ -1317,7 +1337,14 @@ export const api = {
   runCodingExercise: (
     courseId: string,
     activityId: string,
-    input: { sourceCode: string; stdin?: string; expectedOutput?: string }
+    input: {
+      sourceCode: string;
+      stdin?: string;
+      expectedOutput?: string;
+      testCode?: string;
+      outputMatchMode?: "exact" | "contains_lines" | "regex";
+      containsLinesOrderMatters?: boolean;
+    }
   ) =>
     request<{ execution: CodingExerciseExecution }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/run`, {
       method: "POST",
@@ -1356,7 +1383,15 @@ export const api = {
     bankActivityId: string,
     input: {
       tests: Array<Omit<CodingExerciseHiddenTest, "orderIndex" | "metadata" | "createdAt" | "updatedAt"> & { orderIndex?: number }>;
-      sampleTests: Array<{ id: string; input: string; output: string; testCode: string; title: string }>;
+      sampleTests: Array<{
+        id: string;
+        input: string;
+        output: string;
+        testCode: string;
+        title: string;
+        outputMatchMode: "exact" | "contains_lines" | "regex";
+        containsLinesOrderMatters: boolean;
+      }>;
       referenceSolution: string;
       privateConfig?: CodingExerciseReferenceSolution["privateConfig"];
       activityConfig?: Record<string, unknown>;
@@ -1766,7 +1801,15 @@ export const api = {
     activityId: string,
     input: {
       tests: Array<Omit<CodingExerciseHiddenTest, "orderIndex" | "metadata" | "createdAt" | "updatedAt"> & { orderIndex?: number }>;
-      sampleTests: Array<{ id: string; input: string; output: string; testCode: string; title: string }>;
+      sampleTests: Array<{
+        id: string;
+        input: string;
+        output: string;
+        testCode: string;
+        title: string;
+        outputMatchMode: "exact" | "contains_lines" | "regex";
+        containsLinesOrderMatters: boolean;
+      }>;
       referenceSolution: string;
       privateConfig?: CodingExerciseReferenceSolution["privateConfig"];
     }
@@ -1782,7 +1825,14 @@ export const api = {
     courseId: string,
     groupId: string,
     activityId: string,
-    input: { sourceCode: string; stdin?: string; expectedOutput?: string }
+    input: {
+      sourceCode: string;
+      stdin?: string;
+      expectedOutput?: string;
+      testCode?: string;
+      outputMatchMode?: "exact" | "contains_lines" | "regex";
+      containsLinesOrderMatters?: boolean;
+    }
   ) =>
     request<{ execution: CodingExerciseExecution }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/run`,
