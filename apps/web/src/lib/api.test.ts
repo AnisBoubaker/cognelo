@@ -78,6 +78,23 @@ describe("web API client", () => {
     );
   });
 
+  it("sends administrator email confirmation to the selected account endpoint", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ user: { id: "user-1", emailVerified: true } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+
+    await expect(api.confirmUserEmail("user-1")).resolves.toMatchObject({
+      user: { id: "user-1", emailVerified: true }
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      `${expectedApiUrl}/api/users/user-1/email-verification`,
+      expect.objectContaining({ method: "PUT" })
+    );
+  });
+
   it("sends admin email tests to the settings endpoint without restricting the address", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ ok: true }), {

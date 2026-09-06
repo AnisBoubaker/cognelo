@@ -1000,6 +1000,8 @@ export const api = {
     request<{ user: AdminUser }>("/users", { method: "POST", body: JSON.stringify(input) }),
   updateUser: (userId: string, input: AdminUserUpdate) =>
     request<{ user: AdminUser }>(`/users/${userId}`, { method: "PATCH", body: JSON.stringify(input) }),
+  confirmUserEmail: (userId: string) =>
+    request<{ user: AdminUser }>(`/users/${userId}/email-verification`, { method: "PUT" }),
   resetUserPassword: (userId: string, input: AdminUserPasswordReset) =>
     request<{ ok: true }>(`/users/${userId}/password`, { method: "PUT", body: JSON.stringify(input) }),
   aiAgentConnections: () => request<{ connections: AiAgentConnection[]; preferences: AiAgentPreferences }>("/ai-agents"),
