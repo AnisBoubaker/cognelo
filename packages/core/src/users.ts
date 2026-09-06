@@ -106,6 +106,29 @@ export async function updateUser(user: CurrentUser, userId: string, input: unkno
   return toAdminUser(updated);
 }
 
+export async function confirmUserEmail(user: CurrentUser, userId: string) {
+  assertAdmin(user);
+  const existing = await prisma.user.findUnique({ where: { id: userId }, include: adminUserInclude });
+  if (!existing) {
+    throw notFound("User");
+  }
+
+  if (existing.emailVerifiedAt) {
+    await prisma.emailVerificationChallenge.deleteMany({ where: { userId } });
+    return toAdminUser(existing);
+  }
+
+  const [updated] = await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: { emailVerifiedAt: new Date() },
+      include: adminUserInclude
+    }),
+    prisma.emailVerificationChallenge.deleteMany({ where: { userId } })
+  ]);
+  return toAdminUser(updated);
+}
+
 export async function resetUserPassword(user: CurrentUser, userId: string, input: unknown) {
   assertAdmin(user);
   if (user.id === userId) {

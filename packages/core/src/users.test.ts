@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPrisma = vi.hoisted(() => ({
+  $transaction: vi.fn((operations: unknown[]) => Promise.all(operations)),
   emailVerificationChallenge: { deleteMany: vi.fn() },
   user: {
     findUnique: vi.fn(),
@@ -25,7 +26,7 @@ vi.mock("bcryptjs", () => ({
   default: bcryptMocks
 }));
 
-const { changeMyPassword, createUser, listUsers, resetUserPassword, updateMyProfile, updateUser } = await import("./users");
+const { changeMyPassword, confirmUserEmail, createUser, listUsers, resetUserPassword, updateMyProfile, updateUser } = await import("./users");
 
 const admin = { id: "admin-1", email: "admin@example.test", name: "Admin", firstName: "Ada", lastName: "Admin", roles: ["admin" as const] };
 
@@ -207,5 +208,43 @@ describe("user services", () => {
     expect(mockPrisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ email: "new@example.test", emailVerifiedAt: null })
     }));
+  });
+
+  it("lets an administrator confirm an unverified account without an email code", async () => {
+    const unverifiedUser = {
+      id: "user-2",
+      email: "student@example.test",
+      firstName: "Student",
+      lastName: "User",
+      name: "Student User",
+      isActive: true,
+      mustChangePassword: false,
+      emailVerifiedAt: null,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      roles: [{ role: { key: "student", name: "Student" } }]
+    };
+    mockPrisma.user.findUnique.mockResolvedValue(unverifiedUser);
+    mockPrisma.user.update.mockResolvedValue({
+      ...unverifiedUser,
+      emailVerifiedAt: new Date("2026-09-05T12:00:00.000Z")
+    });
+    mockPrisma.emailVerificationChallenge.deleteMany.mockResolvedValue({ count: 1 });
+
+    await expect(confirmUserEmail(admin, "user-2")).resolves.toMatchObject({
+      id: "user-2",
+      emailVerified: true
+    });
+
+    expect(mockPrisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "user-2" },
+      data: { emailVerifiedAt: expect.any(Date) }
+    }));
+    expect(mockPrisma.emailVerificationChallenge.deleteMany).toHaveBeenCalledWith({ where: { userId: "user-2" } });
+  });
+
+  it("requires administrator access to confirm an account", async () => {
+    await expect(confirmUserEmail({ ...admin, roles: ["teacher"] }, "user-2")).rejects.toMatchObject({ status: 403 });
+    expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
   });
 });

@@ -231,6 +231,7 @@ export const zhMessages = {
       addUser: "添加用户", editUser: "编辑用户", userEyebrow: "用户账户", userName: "姓名", filterRole: "角色", allRoles: "所有角色", applyFilters: "应用筛选", clearFilters: "清除",
       initialPassword: "初始密码", initialPasswordHelp: "至少使用 8 个字符。用户可在个人资料中更改密码。", rolesHelp: "选择一个或多个平台角色。", userRoleRequired: "请至少选择一个角色。",
       emailVerificationRequiredBadge: "需要验证电子邮件",
+      adminEmailConfirmationAction: "确认账户", adminEmailConfirmationTitle: "不使用电子邮件验证码确认账户？", adminEmailConfirmationHelp: "确认 {name} 的账户并允许其跳过电子邮件验证码访问？请仅在通过其他可信方式核实本人身份后使用此操作。", adminEmailConfirmationSubmit: "确认账户", adminEmailConfirmationSuccess: "已确认 {name} 的账户。", adminEmailConfirmationError: "无法确认账户。",
       adminPasswordResetAction: "重置密码", adminPasswordResetTitle: "重置 {name} 的密码", adminPasswordResetHelp: "为此账户设置临时密码。", temporaryPassword: "临时密码", confirmTemporaryPassword: "确认临时密码", adminPasswordResetConsequence: "现有会话将被注销。用户下次登录时必须先更换临时密码，才能访问应用。", adminPasswordResetSubmit: "设置临时密码", resettingPassword: "正在重置密码…", adminPasswordResetSuccess: "已为 {name} 设置临时密码。", adminPasswordResetError: "无法重置密码。", adminPasswordResetSelfHelp: "请在个人资料中更改您自己的密码。", passwordChangeRequiredBadge: "需要更改密码", forcedPasswordChangeTitle: "选择新密码", forcedPasswordChangeHelp: "管理员已重置您的密码。继续之前，请更换临时密码。", finishPasswordResetFirst: "离开前请设置或取消临时密码。",
       userCreated: "用户已创建。", userUpdated: "用户已更新。", userSaveError: "无法保存用户。", finishUserEditFirst: "离开前请保存或取消用户编辑。",
       usersPaginationLabel: "用户分页", previousPage: "上一页", nextPage: "下一页", usersPerPage: "每页用户数",

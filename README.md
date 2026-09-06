@@ -45,7 +45,7 @@ docs/
 
 - Auth: login, logout, current-user token verification, forced password replacement, and first-login email verification
 - Users: `/users/me` plus account-wide profile settings
-- Admin user management: list/filter accounts by role, first name, last name, or email; create accounts; edit account names, emails, and multi-role assignments; and issue forced-change temporary passwords
+- Admin user management: list/filter accounts by role, first name, last name, or email; create accounts; edit account names, emails, and multi-role assignments; explicitly confirm an account without an emailed code; and issue forced-change temporary passwords
 - AI agent connections: account-wide model/provider connection records, with admin-managed global entries
 - Email delivery: admin-managed SMTP relay or Microsoft Graph OAuth configuration, encrypted credentials, an admin-only test message, and guarded account-verification messages
 - Authorization: global roles plus course memberships and activity-bank ownership
@@ -123,6 +123,7 @@ PUT    /api/users/me/password
 GET    /api/users
 POST   /api/users
 PATCH  /api/users/:userId
+PUT    /api/users/:userId/email-verification
 PUT    /api/users/:userId/password
 GET    /api/ai-agents
 POST   /api/ai-agents
@@ -478,7 +479,7 @@ This key encrypts SMTP passwords and Microsoft Graph client secrets stored in Po
 - The top navigation separates primary app routes from the account dropdown.
 - Dashboard is temporarily removed from primary navigation. Authentication, the logo, `/`, and legacy `/dashboard` visits first enforce temporary-password replacement and email verification when those account flags require them, then use the first role-available primary route: Subjects for administrators/course managers/teachers, otherwise Courses. Student accounts created by an assigned-password CSV import start verified and do not require a password replacement.
 - Account-wide configuration lives under `/settings`, with the current profile and security editor at `/settings/profile`.
-- Administrators manage accounts under `/settings/users`, including server-side filters and conventional paged results (10 per page by default, with selectable page sizes), account creation with an initial password, one-or-many global role assignments, email-verification status, and temporary-password resets for other users. A reset invalidates existing sessions and requires the user to replace the temporary password at `/change-password` before other authenticated access. New accounts must verify their address at `/verify-email`; changing an account email makes verification required again. Administrators cannot remove their own admin role or use the reset action on themselves.
+- Administrators manage accounts under `/settings/users`, including server-side filters and conventional paged results (10 per page by default, with selectable page sizes), account creation with an initial password, one-or-many global role assignments, email-verification status, explicit confirmation of an unverified account without an emailed code, and temporary-password resets for other users. Account confirmation requires a warning dialog, sets the existing verification timestamp, and removes any outstanding verification challenge. A password reset invalidates existing sessions and requires the user to replace the temporary password at `/change-password` before other authenticated access. New accounts must verify their address at `/verify-email` unless an administrator explicitly confirms the account; changing an account email makes verification required again. Administrators cannot remove their own admin role or use the reset action on themselves.
 - Users can update their first and last name and change their password after confirming the current password; email changes are reserved for administrators.
 - AI agent connection settings live under `/settings/ai-agents`; users can create personal connections, choose their question-authoring helper, and admins can create global connections for later course use.
 - Administrators configure outbound email under `/settings/email` using either an SMTP relay or Microsoft Graph app-only OAuth credentials. Stored passwords/secrets are encrypted and never returned to the browser. The test message can target any valid address. Cognelo uses the guarded system-mail path to send first-login verification codes only to active accounts, localized to the user’s current interface language; future account and notification messages must use that same eligibility boundary.
