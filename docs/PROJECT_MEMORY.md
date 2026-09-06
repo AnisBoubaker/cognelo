@@ -233,6 +233,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 - Use `npm run build --workspace @cognelo/web` to confirm the Next.js web app still produces a valid production build.
 - Use `npm run db:migrate:all` after core or plugin Prisma schema changes so core migrations, plugin migration manifests, and generated clients stay aligned.
 - Use root `npm test` for the Vitest suite covering contracts, core lifecycle services, API route orchestration, and plugin copy/delete lifecycle contracts.
+- Use root `npm run test:e2e` for critical browser journeys. Playwright shares one migrated and seeded development database, authenticates through reusable admin/teacher/student helpers, runs with one worker, provisions time-independent disposable learning data through authenticated API routes, and removes only exact records created by the run. Browser artifacts stay under ignored `tmp/` paths. Keep selectors semantic and scoped by roles, labels, and visible text; use structural CSS only when accessible names cannot disambiguate an element.
 - Use root `npm run typecheck` and `npm run build` when shared packages or both apps are touched.
 
 ## Seed Users
