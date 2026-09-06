@@ -40,6 +40,10 @@ Shared cross-plugin frontend primitives live in `packages/activity-ui`. In addit
 
 The API applies centralized Origin-based CSRF protection to every unsafe request carrying the HttpOnly session cookie. Generic plugin dispatch is also an authorization boundary: course and bank authoring dispatchers require management permission, assigned group dispatch validates group assignment access, unsafe content-resource plugin methods require course management, and registrations without explicit supported type keys fail closed.
 
+## Browser Test Architecture
+
+The repository-level Playwright suite in `tests/e2e` exercises the web application against the real API and development database. Shared fixtures authenticate documented admin, teacher, and student accounts through the login API and create isolated browser contexts from the resulting HttpOnly-cookie storage state; the interactive sign-in and sign-out path remains independently covered through the UI. Stateful cross-role tests use one worker and provision uniquely named, availability-independent courses through authenticated public API routes so tests do not depend on durable seed dates. Teardown may use Prisma only for exact identifiers or unique generated values created by that test run, never broad prefixes or seed records. Browser actions favor accessibility roles, labels, and visible text, making the suite an additional check on usable semantics as well as behavior.
+
 ## Core Modules
 
 - **Auth** owns password hashing, JWT creation, authentication-version checks, login/logout, forced-password-change gating, first-login email-verification gating, and current-user lookup. New self-activated accounts remain restricted to current-user, password-change, verification, and logout endpoints until their address is verified. The explicit assigned-password student-import path creates already-verified accounts with no forced password change so pseudonymous students can sign in immediately without email delivery. Six-digit verification codes expire after 10 minutes, have a 60-second resend cooldown and five-attempt limit, and are stored only as HMAC-SHA256 hashes.

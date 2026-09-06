@@ -423,9 +423,10 @@ npm run db:seed
 ```bash
 npm run typecheck
 npm test
+npm run test:e2e
 ```
 
-The test suite uses Vitest for contracts, core service behavior, API route orchestration, and plugin lifecycle contracts. It intentionally does not include browser E2E tests yet.
+Vitest covers contracts, core service behavior, API route orchestration, and plugin lifecycle contracts. Playwright covers the critical browser journeys across authentication, role-aware navigation, administration, teacher setup, learner submission, automatic grading, grade release, and learner grade visibility. The E2E suite requires a migrated and seeded development database, starts missing web/API development servers automatically, uses disposable uniquely named records, and cleans up only the exact records it creates. See [tests/e2e/README.md](tests/e2e/README.md) for the flow inventory, environment overrides, and browser installation options.
 
 7. Start both apps:
 

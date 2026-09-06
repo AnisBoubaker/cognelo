@@ -11,6 +11,7 @@ dist
 *.tsbuildinfo
 coverage
 TEST_COVERAGE_GAPS.tmp.txt
+/docs/SECURITY_REMEDIATION_TRACKER.md
 packages/db/generated
 packages/plugin-activities/*/src/generated
 storage
