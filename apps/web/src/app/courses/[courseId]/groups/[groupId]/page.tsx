@@ -107,7 +107,11 @@ export default function CourseGroupPage() {
   const [contentActionError, setContentActionError] = useState("");
 
   const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
-  const canManage = user?.roles.includes("admin") || membershipRole === "owner" || membershipRole === "teacher";
+  const canManage =
+    user?.roles.includes("admin") ||
+    membershipRole === "owner" ||
+    membershipRole === "teacher" ||
+    membershipRole === "ta";
 
   useEffect(() => {
     if (canManage && group) {
@@ -131,7 +135,7 @@ export default function CourseGroupPage() {
     setActivityTypes(typeResult.activityTypes);
     setActivityDefinitions(typeResult.registeredDefinitions);
     const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
-    const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher";
+    const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher" || role === "ta";
     const [contentResult, contentTypesResult, contentResourcesResult] = await Promise.all([
       api.groupContent(courseId, groupId, { visibleOnly: !userCanManage }),
       api.courseContentTypes(courseId),

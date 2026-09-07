@@ -77,11 +77,16 @@ const judge0LanguageNameCandidates: Record<string, readonly string[]> = {
     "C++ (Clang 18.1.8)",
     "C++ (Clang 7.0.1)"
   ],
-  javascript: ["JavaScript (Node.js 22.08.0)", "JavaScript (Node.js 20.17.0)", "JavaScript (Node.js 12.14.0)"],
-  typescript: ["TypeScript (5.6.2)", "TypeScript (5.4.5)", "TypeScript (3.7.4)"],
-  python: ["Python (3.12.5)", "Python (3.11.2)", "Python (3.10.0)", "Python (3.8.1)"],
-  java: ["Java (OpenJDK 17.0.6)", "Java (OpenJDK 13.0.1)"],
-  go: ["Go (1.22.6)", "Go (1.18.5)", "Go (1.13.5)"],
+  javascript: [
+    "JavaScript (Node.js 22.8.0)",
+    "JavaScript (Node.js 22.08.0)",
+    "JavaScript (Node.js 20.17.0)",
+    "JavaScript (Node.js 12.14.0)"
+  ],
+  typescript: ["TypeScript (5.6.3)", "TypeScript (5.6.2)", "TypeScript (5.4.5)", "TypeScript (3.7.4)"],
+  python: ["Python (3.12.7)", "Python (3.12.5)", "Python (3.11.2)", "Python (3.10.0)", "Python (3.8.1)"],
+  java: ["Java (OpenJDK 17.0.12)", "Java (OpenJDK 17.0.6)", "Java (OpenJDK 13.0.1)"],
+  go: ["Go (1.22.7)", "Go (1.22.6)", "Go (1.18.5)", "Go (1.13.5)"],
   rust: ["Rust (1.81.0)", "Rust (1.40.0)"]
 };
 

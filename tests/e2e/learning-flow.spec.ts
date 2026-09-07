@@ -34,7 +34,7 @@ test.describe("student submission and teacher grading", () => {
     await teacherPage.goto(`/courses/${data.courseId}?tab=gradebook`);
     await expect(teacherPage.getByRole("heading", { name: "Course gradebook" })).toBeVisible();
     await expect(teacherPage.getByRole("button", { name: `Expand ${data.activityTitle}` })).toBeVisible();
-    teacherPage.once("dialog", (dialog) => dialog.accept());
+    teacherPage.once("dialog", (dialog) => void dialog.accept());
     await teacherPage.getByRole("button", { name: "Release", exact: true }).click();
     await expect(teacherPage.getByRole("button", { name: "Hide", exact: true })).toBeVisible();
 

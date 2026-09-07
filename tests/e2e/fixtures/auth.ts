@@ -10,7 +10,7 @@ import {
 
 export type AuthRole = "admin" | "teacher" | "student";
 
-type Credentials = {
+export type Credentials = {
   email: string;
   password: string;
 };
@@ -68,7 +68,10 @@ export async function createAuthenticatedStorageState(role: AuthRole): Promise<S
 }
 
 export async function loginThroughUi(page: Page, role: AuthRole) {
-  const account = credentialsFor(role);
+  await loginWithCredentialsThroughUi(page, credentialsFor(role));
+}
+
+export async function loginWithCredentialsThroughUi(page: Page, account: Credentials) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(account.email);
   await page.getByLabel("Password").fill(account.password);

@@ -426,7 +426,7 @@ npm test
 npm run test:e2e
 ```
 
-Vitest covers contracts, core service behavior, API route orchestration, and plugin lifecycle contracts. Playwright covers the critical browser journeys across authentication, role-aware navigation, administration, teacher setup, learner submission, automatic grading, grade release, and learner grade visibility. The E2E suite requires a migrated and seeded development database, starts missing web/API development servers automatically, uses disposable uniquely named records, and cleans up only the exact records it creates. See [tests/e2e/README.md](tests/e2e/README.md) for the flow inventory, environment overrides, and browser installation options.
+Vitest covers contracts, core service behavior, API route orchestration, and plugin lifecycle contracts. Playwright covers authentication; global and course-scoped roles; administration; course, group, participant, and bank management; authoring and learner completion for every installed activity type; compound Tests; attempt policies; automatic grading; grade release; and learner grade visibility. The E2E suite requires a migrated and seeded development database, starts missing web/API development servers automatically, uses disposable uniquely named records, and cleans up only the exact records it creates. Real coding, web-design, and Coding Homework flows additionally require their documented execution or AI services. See [tests/e2e/README.md](tests/e2e/README.md) for the flow inventory, prerequisites, environment overrides, and browser installation options.
 
 7. Start both apps:
 

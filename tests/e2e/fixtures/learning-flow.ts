@@ -13,7 +13,7 @@ export type LearningFlowData = {
 
 async function responseJson<T>(response: APIResponse): Promise<T> {
   if (!response.ok()) {
-    throw new Error(`E2E data request failed: ${response.request().method()} ${response.url()} -> ${response.status()} ${await response.text()}`);
+    throw new Error(`E2E data request failed: ${response.url()} -> ${response.status()} ${await response.text()}`);
   }
   return response.json() as Promise<T>;
 }
