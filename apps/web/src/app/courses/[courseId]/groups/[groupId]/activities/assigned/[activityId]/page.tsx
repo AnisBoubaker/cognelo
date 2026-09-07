@@ -30,7 +30,11 @@ export default function GroupActivityPage() {
   const [error, setError] = useState("");
 
   const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
-  const canManage = user?.roles.includes("admin") || membershipRole === "owner" || membershipRole === "teacher";
+  const canManage =
+    user?.roles.includes("admin") ||
+    membershipRole === "owner" ||
+    membershipRole === "teacher" ||
+    membershipRole === "ta";
   const ActivityRenderer =
     activity && activityDefinitions.some((definition) => definition.key === activity.activityType.key)
       ? activityRenderers[activity.activityType.key as keyof typeof activityRenderers]
@@ -59,7 +63,7 @@ export default function GroupActivityPage() {
       );
 
       const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
-      const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher";
+      const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher" || role === "ta";
       let activityResult: Awaited<ReturnType<typeof api.groupActivity>>;
       try {
         activityResult = await api.groupActivity(courseId, groupId, activityId);

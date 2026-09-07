@@ -150,8 +150,11 @@ export default function CourseDetailPage() {
     setActivityTypes(typeResult.activityTypes);
     setActivityDefinitions(typeResult.registeredDefinitions);
     const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
-    const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher";
+    const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher" || role === "ta";
     if (userCanManage) {
+      const canViewSubjectCatalog = user?.roles.some((userRole) =>
+        userRole === "admin" || userRole === "course_manager" || userRole === "teacher"
+      );
       const validContentGroupId = requestedContentGroupId && courseResult.course.groups?.some((group) => group.id === requestedContentGroupId)
         ? requestedContentGroupId
         : null;
@@ -164,7 +167,9 @@ export default function CourseDetailPage() {
         validContentGroupId ? api.groupContent(courseId, validContentGroupId) : api.courseContent(courseId),
         api.courseContentTypes(courseId),
         validContentGroupId ? api.groupContentResources(courseId, validContentGroupId) : api.courseContentResources(courseId),
-        api.subjects(),
+        canViewSubjectCatalog
+          ? api.subjects()
+          : Promise.resolve({ subjects: courseResult.course.subject ? [courseResult.course.subject] : [] }),
         validContentGroupId ? api.group(courseId, validContentGroupId) : Promise.resolve(null)
       ]);
       setGradebook(gradebookResult.gradebook);
@@ -187,7 +192,10 @@ export default function CourseDetailPage() {
       .aiAgentConnections()
       .then((aiAgentResult) => setAiAgentConnections(aiAgentResult.connections.filter((connection) => connection.isEnabled)))
       .catch(() => setAiAgentConnections([]));
-    if (userCanManage && courseResult.course.subjectId) {
+    const canViewSubjectCatalog = user?.roles.some((role) =>
+      role === "admin" || role === "course_manager" || role === "teacher"
+    );
+    if (userCanManage && canViewSubjectCatalog && courseResult.course.subjectId) {
       const banksResult = await api.activityBanks(courseResult.course.subjectId);
       setActivityBanks(banksResult.activityBanks);
     } else {
@@ -277,7 +285,11 @@ export default function CourseDetailPage() {
   }
 
   const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
-  const canManage = user?.roles.includes("admin") || membershipRole === "owner" || membershipRole === "teacher";
+  const canManage =
+    user?.roles.includes("admin") ||
+    membershipRole === "owner" ||
+    membershipRole === "teacher" ||
+    membershipRole === "ta";
   const sortedCourseGroups = useMemo(
     () => [...(course?.groups ?? [])].sort((left, right) => compareGroupTitles(left.title, right.title, locale)),
     [course?.groups, locale]
