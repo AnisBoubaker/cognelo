@@ -21,6 +21,7 @@ const dbMocks = vi.hoisted(() => {
     status: "pending",
     languageKey: "python",
     judge0LanguageId: 71,
+    sourceCode: "print(1)",
     judge0Token: null,
     stdin: "",
     expectedOutput: "",
@@ -64,6 +65,7 @@ const dbMocks = vi.hoisted(() => {
   };
 
   return {
+    executionRow,
     get hiddenTests() {
       return state.hiddenTests;
     },
@@ -82,6 +84,7 @@ const dbMocks = vi.hoisted(() => {
           status: args.data.status,
           languageKey: args.data.languageKey,
           judge0LanguageId: args.data.judge0LanguageId,
+          sourceCode: args.data.sourceCode,
           judge0Token: null,
           stdin: args.data.stdin ?? "",
           expectedOutput: args.data.expectedOutput ?? "",
@@ -173,6 +176,7 @@ vi.mock("./db-client", () => ({
 vi.mock("./judge0", () => judge0Mocks);
 
 const {
+  listCodingExerciseAttemptHistory,
   listRecentCodingExerciseExecutions,
   runCodingExercise,
   submitCodingExercise,
@@ -554,6 +558,35 @@ describe("coding exercise executions", () => {
       where: { activityId: "activity-1", userId: "student-1" },
       orderBy: [{ createdAt: "desc" }],
       take: 3
+    });
+  });
+
+  it("groups every completed submission with the runs that preceded it", async () => {
+    dbMocks.prisma.pluginCodingExerciseExecution.findMany.mockResolvedValueOnce([
+      dbMocks.executionRow({ id: "run-1", createdAt: new Date("2026-05-14T12:01:00.000Z") }),
+      dbMocks.executionRow({ id: "run-2", createdAt: new Date("2026-05-14T12:02:00.000Z") }),
+      dbMocks.executionRow({ id: "submit-1", kind: "submit", status: "completed", sourceCode: "first", createdAt: new Date("2026-05-14T12:03:00.000Z") }),
+      dbMocks.executionRow({ id: "run-3", createdAt: new Date("2026-05-14T12:04:00.000Z") }),
+      dbMocks.executionRow({ id: "submit-2", kind: "submit", status: "failed", sourceCode: "second", createdAt: new Date("2026-05-14T12:05:00.000Z") }),
+      dbMocks.executionRow({ id: "run-current", createdAt: new Date("2026-05-14T12:06:00.000Z") })
+    ]);
+
+    await expect(listCodingExerciseAttemptHistory({ activityId: "activity-1", userId: "student-1" })).resolves.toEqual({
+      currentRuns: [expect.objectContaining({ id: "run-current" })],
+      attempts: [
+        {
+          submission: expect.objectContaining({ id: "submit-2", sourceCode: "second" }),
+          runs: [expect.objectContaining({ id: "run-3" })]
+        },
+        {
+          submission: expect.objectContaining({ id: "submit-1", sourceCode: "first" }),
+          runs: [expect.objectContaining({ id: "run-1" }), expect.objectContaining({ id: "run-2" })]
+        }
+      ]
+    });
+    expect(dbMocks.prisma.pluginCodingExerciseExecution.findMany).toHaveBeenCalledWith({
+      where: { activityId: "activity-1", userId: "student-1" },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }]
     });
   });
 });

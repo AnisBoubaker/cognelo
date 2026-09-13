@@ -27,6 +27,7 @@ type CodingExerciseExecutionRow = {
   status: "pending" | "completed" | "failed";
   languageKey: string;
   judge0LanguageId: number;
+  sourceCode: string;
   judge0Token: string | null;
   stdin: string | null;
   expectedOutput: string | null;
@@ -268,6 +269,44 @@ export async function listRecentCodingExerciseExecutions(params: {
   });
 
   return executions.map((execution) => toCodingExerciseExecutionRecord(execution));
+}
+
+export async function listCodingExerciseAttemptHistory(params: {
+  activityId: string;
+  userId: string;
+}) {
+  const executions = await codingExerciseExecutionClient.pluginCodingExerciseExecution.findMany({
+    where: {
+      activityId: params.activityId,
+      userId: params.userId
+    },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+  });
+
+  const attempts: Array<{
+    submission: ReturnType<typeof toCodingExerciseExecutionRecord>;
+    runs: Array<ReturnType<typeof toCodingExerciseExecutionRecord>>;
+  }> = [];
+  let currentRuns: Array<ReturnType<typeof toCodingExerciseExecutionRecord>> = [];
+
+  for (const execution of executions) {
+    const record = toCodingExerciseExecutionRecord(execution);
+    if (record.kind === "run") {
+      currentRuns.push(record);
+      continue;
+    }
+
+    attempts.push({
+      submission: record,
+      runs: currentRuns
+    });
+    currentRuns = [];
+  }
+
+  return {
+    currentRuns: [...currentRuns].reverse(),
+    attempts: [...attempts].reverse()
+  };
 }
 
 export async function listCodingExerciseReviewExecutions(params: { activityId: string; userIds: string[] }) {
@@ -679,6 +718,7 @@ function toCodingExerciseExecutionRecord(execution: CodingExerciseExecutionRow) 
     status: execution.status,
     languageKey: execution.languageKey,
     judge0LanguageId: execution.judge0LanguageId,
+    sourceCode: execution.sourceCode,
     judge0Token: execution.judge0Token,
     stdin: execution.stdin ?? "",
     expectedOutput: execution.expectedOutput ?? "",

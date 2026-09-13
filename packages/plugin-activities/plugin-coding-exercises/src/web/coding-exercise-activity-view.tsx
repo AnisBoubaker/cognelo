@@ -2,7 +2,7 @@
 
 import { type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
-import { CodeEditor, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
+import { CodeEditor, CodeRenderer, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   alignCodingExerciseStarterCodeToTemplate,
   buildCodingExerciseStudentTemplateProjectionFromSource,
@@ -59,6 +59,8 @@ type CodingExecution = {
   id: string;
   kind: "run" | "submit";
   status: "pending" | "completed" | "failed";
+  sourceCode: string;
+  stdin: string;
   stdout?: string | null;
   stderr?: string | null;
   compileOutput?: string | null;
@@ -68,6 +70,17 @@ type CodingExecution = {
   judge0StatusLabel?: string | null;
   resultSummary?: Record<string, unknown>;
   createdAt: string;
+};
+
+type CodingAttemptHistory = {
+  submission: CodingExecution;
+  runs: CodingExecution[];
+};
+
+type CodingAttemptAvailability = {
+  attemptsRemaining: number | null;
+  canStart: boolean;
+  reason: string | null;
 };
 
 type ReferenceValidationTestResult = {
@@ -128,8 +141,20 @@ type CodingExerciseClient = {
     }
   ) => Promise<{ execution: CodingExecution }>;
   listRuns: (courseId: string, activityId: string) => Promise<{ executions: CodingExecution[] }>;
-  submitCode: (courseId: string, activityId: string, input: { sourceCode: string }) => Promise<{ execution: CodingExecution }>;
+  submitCode: (
+    courseId: string,
+    activityId: string,
+    input: { sourceCode: string }
+  ) => Promise<{ execution: CodingExecution; availability: CodingAttemptAvailability }>;
   listSubmissions: (courseId: string, activityId: string) => Promise<{ executions: CodingExecution[] }>;
+  listHistory?: (
+    courseId: string,
+    activityId: string
+  ) => Promise<{
+    currentRuns: CodingExecution[];
+    attempts: CodingAttemptHistory[];
+    availability: CodingAttemptAvailability;
+  }>;
 };
 
 type CodingExerciseAiGenerationClient = {
@@ -195,6 +220,10 @@ type CodingExerciseActivityViewProps = {
   executionStateHost?: ActivityExecutionStateHost<Record<string, unknown>>;
   deferSubmission?: boolean;
   readOnly?: boolean;
+  studentViewMode?: "attempt" | "previous";
+  onNewAttemptAvailabilityChange?: (canStartNewAttempt: boolean) => void;
+  onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
+  onSubmitted?: () => void;
 };
 
 const fallbackConfig: CodingExerciseConfig = {
@@ -223,7 +252,11 @@ export function CodingExerciseActivityView({
   locale,
   executionStateHost,
   deferSubmission = false,
-  readOnly = false
+  readOnly = false,
+  studentViewMode = "attempt",
+  onNewAttemptAvailabilityChange,
+  onPreviousSubmissionsAvailabilityChange,
+  onSubmitted
 }: CodingExerciseActivityViewProps) {
   const pluginLocale = normalizeCodingExercisesLocale(locale);
   const actionCopy = getEditActionBarCopy(pluginLocale);
@@ -279,7 +312,11 @@ export function CodingExerciseActivityView({
   const [runExecution, setRunExecution] = useState<CodingExecution | null>(null);
   const [submitExecution, setSubmitExecution] = useState<CodingExecution | null>(null);
   const [recentRuns, setRecentRuns] = useState<CodingExecution[]>([]);
-  const [recentSubmissions, setRecentSubmissions] = useState<CodingExecution[]>([]);
+  const [previousAttempts, setPreviousAttempts] = useState<CodingAttemptHistory[]>([]);
+  const [submissionConfirmation, setSubmissionConfirmation] = useState<{
+    execution: CodingExecution;
+    availability: CodingAttemptAvailability;
+  } | null>(null);
   const [workingAction, setWorkingAction] = useState<"run" | "submit" | null>(null);
   const [executionStateLoaded, setExecutionStateLoaded] = useState(!executionStateHost);
   const studentWorkspaceRef = useRef<HTMLDivElement | null>(null);
@@ -337,6 +374,7 @@ export function CodingExerciseActivityView({
     setSampleContainsLinesOrderMatters(sampleTests[0]?.containsLinesOrderMatters ?? false);
     setRunExecution(null);
     setSubmitExecution(null);
+    setSubmissionConfirmation(null);
     if (isNewActivity) {
       setHiddenTests([]);
       setReferenceSolution("");
@@ -344,6 +382,8 @@ export function CodingExerciseActivityView({
       setReferenceValidationSummary(null);
       setExpandedSampleTestIds([]);
       setExpandedHiddenTestIds([]);
+      setRecentRuns([]);
+      setPreviousAttempts([]);
       aiGenerationDraftRef.current = null;
     }
     setError("");
@@ -423,17 +463,26 @@ export function CodingExerciseActivityView({
   }, [activity.id, canManage, course?.id]);
 
   useEffect(() => {
-    if (!course?.id || !codingClient) {
+    if (canManage || deferSubmission || !course?.id || !codingClient?.listHistory) {
       return;
     }
 
-    Promise.all([codingClient.listRuns(course.id, activity.id), codingClient.listSubmissions(course.id, activity.id)])
-      .then(([runs, submissions]) => {
-        setRecentRuns(runs.executions);
-        setRecentSubmissions(submissions.executions);
+    let cancelled = false;
+    codingClient.listHistory(course.id, activity.id)
+      .then((history) => {
+        if (cancelled) return;
+        setRecentRuns(history.currentRuns);
+        setPreviousAttempts(history.attempts);
+        onNewAttemptAvailabilityChange?.(!readOnly && history.availability.canStart);
+        onPreviousSubmissionsAvailabilityChange?.(history.attempts.length > 0);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : t("loadHistoryError")));
-  }, [activity.id, course?.id]);
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : t("loadHistoryError"));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activity.id, canManage, codingClient, course?.id, deferSubmission, onNewAttemptAvailabilityChange, onPreviousSubmissionsAvailabilityChange, readOnly]);
 
   function updateSampleTest(index: number, field: keyof CodingExerciseConfig["sampleTests"][number], value: string | boolean) {
     setConfig((current) => {
@@ -921,8 +970,7 @@ export function CodingExerciseActivityView({
         compareOutput: !isPersonalizedTest
       });
       setRunExecution(result.execution);
-      const runs = await codingClient.listRuns(course.id, activity.id);
-      setRecentRuns(runs.executions);
+      setRecentRuns((current) => [result.execution, ...current]);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("runError"));
     } finally {
@@ -942,8 +990,18 @@ export function CodingExerciseActivityView({
       });
       await executionStateHost?.clear?.().catch(() => undefined);
       setSubmitExecution(result.execution);
-      const submissions = await codingClient.listSubmissions(course.id, activity.id);
-      setRecentSubmissions(submissions.executions);
+      setEditorCode(alignCodingExerciseStarterCodeToTemplate(config.starterCode, config.studentTemplateSource));
+      setRunExecution(null);
+      setPreviousAttempts((current) => [
+        { submission: result.execution, runs: [...recentRuns].reverse() },
+        ...current
+      ]);
+      setRecentRuns([]);
+      setSubmissionConfirmation(result);
+      onPreviousSubmissionsAvailabilityChange?.(true);
+      if (result.availability.canStart) {
+        onNewAttemptAvailabilityChange?.(!readOnly);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t("submitError"));
     } finally {
@@ -953,10 +1011,20 @@ export function CodingExerciseActivityView({
 
   function updateStudentCode(sourceCode: string) {
     setEditorCode(sourceCode);
+    setSubmitExecution(null);
     if (executionStateHost && executionStateLoaded && !readOnly) {
       void executionStateHost.save({ sourceCode }).catch((err) => {
         setError(err instanceof Error ? err.message : t("submitError"));
       });
+    }
+  }
+
+  function acknowledgeSubmission() {
+    const canStartAnotherAttempt = submissionConfirmation?.availability.canStart !== false;
+    setSubmissionConfirmation(null);
+    if (!canStartAnotherAttempt) {
+      onNewAttemptAvailabilityChange?.(false);
+      onSubmitted?.();
     }
   }
 
@@ -1479,209 +1547,308 @@ export function CodingExerciseActivityView({
         </form>
       ) : (
         <div className="stack">
-          <MarkdownRenderer markdown={config.prompt} />
-          <div
-            className={`coding-exercise-student-workspace${deferSubmission ? "" : " has-actions"}`}
-            ref={studentWorkspaceRef}
-            style={
-              {
-                "--coding-exercise-editor-width": workspaceEditorWidth === null ? "2fr" : `${workspaceEditorWidth}px`
-              } as CSSProperties
-            }
-          >
-            <div className="coding-exercise-editor-pane">
-              <MonacoCodeEditor
-                id={`coding-exercise-student-${activity.id}`}
-                ariaLabel={activity.title || t("starterCode")}
-                value={editorCode}
-                onChange={updateStudentCode}
-                language={config.language}
-                height="100%"
-                minHeight={520}
-                readOnly={readOnly || !executionStateLoaded}
-                readOnlyPrefix={templateProjection.readOnlyPrefix}
-                readOnlySuffix={templateProjection.readOnlySuffix}
-              />
-            </div>
-
-            {!deferSubmission ? (
-              <div className="row coding-exercise-editor-actions" style={{ alignItems: "center" }}>
-                <button type="button" onClick={submitCode} disabled={readOnly || workingAction === "submit"}>
-                  {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
-                </button>
-                {submitExecution && submitExecution.status !== "pending" ? (
-                  <OutcomeMark passed={submitExecution.status === "completed"} locale={pluginLocale} />
-                ) : null}
-              </div>
-            ) : null}
-
-            <div
-              className="coding-exercise-workspace-divider"
-              role="separator"
-              aria-label={t("resizeWorkspace")}
-              aria-orientation="vertical"
-              aria-valuemin={getStudentWorkspaceEditorLimits(studentWorkspaceRef.current).min}
-              aria-valuemax={getStudentWorkspaceEditorLimits(studentWorkspaceRef.current).max}
-              aria-valuenow={Math.round(
-                workspaceEditorWidth ?? getStudentWorkspaceDefaultEditorWidth(studentWorkspaceRef.current)
-              )}
-              tabIndex={0}
-              onDoubleClick={() => setWorkspaceEditorWidth(null)}
-              onPointerDown={(event) => {
-                event.currentTarget.setPointerCapture(event.pointerId);
-                resizeStudentWorkspace(event);
-              }}
-              onPointerMove={(event) => {
-                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                  resizeStudentWorkspace(event);
+          {studentViewMode === "previous" ? (
+            <CodingAttemptHistoryList attempts={previousAttempts} language={config.language} locale={pluginLocale} />
+          ) : (
+            <>
+              <MarkdownRenderer markdown={config.prompt} />
+              <div
+                className={`coding-exercise-student-workspace${deferSubmission ? "" : " has-actions"}`}
+                ref={studentWorkspaceRef}
+                style={
+                  {
+                    "--coding-exercise-editor-width": workspaceEditorWidth === null ? "2fr" : `${workspaceEditorWidth}px`
+                  } as CSSProperties
                 }
-              }}
-              onKeyDown={(event) => {
-                const { min, max } = getStudentWorkspaceEditorLimits(studentWorkspaceRef.current);
-                const current = workspaceEditorWidth ?? getStudentWorkspaceDefaultEditorWidth(studentWorkspaceRef.current);
-                if (event.key === "ArrowLeft") setWorkspaceEditorWidth(Math.max(min, current - 24));
-                else if (event.key === "ArrowRight") setWorkspaceEditorWidth(Math.min(max, current + 24));
-                else if (event.key === "Home") setWorkspaceEditorWidth(min);
-                else if (event.key === "End") setWorkspaceEditorWidth(max);
-                else return;
-                event.preventDefault();
-              }}
-            />
-
-            <section
-              className="stack coding-exercise-test-runner"
-              style={{
-                border: "1px solid rgba(13, 27, 71, 0.1)",
-                borderRadius: 12,
-                minWidth: 0,
-                padding: 18
-              }}
-            >
-              <TestSelector
-                id="coding-visible-sample"
-                label={t("testSelection")}
-                value={selectedSampleTestId}
-                options={[
-                  ...visibleSampleTests.map((test) => ({ value: test.id, label: getSampleTestSummary(test) })),
-                  { value: personalizedTestId, label: t("personalizedTest") }
-                ]}
-                onChange={applySampleTest}
-              />
-
-              <div className="field">
-                <label htmlFor="coding-sample-input">{t("inputOnePerLine")}</label>
-                <textarea
-                  id="coding-sample-input"
-                  rows={5}
-                  value={sampleInput}
-                  onChange={(event) => updateRunInput(event.target.value)}
-                />
-              </div>
-
-              {!isPersonalizedTest ? (
-                <>
-                  <div className="field">
-                    <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
-                      <label htmlFor="coding-sample-expected-output">{t("expectedOutput")}</label>
-                      <select
-                        id="coding-sample-output-match-mode"
-                        aria-label={t("outputMatchMode")}
-                        value={sampleOutputMatchMode}
-                        onChange={(event) => setSampleOutputMatchMode(event.target.value as CodingExerciseOutputMatchMode)}
-                        style={{ minWidth: 150, width: "auto" }}
-                      >
-                        <option value="contains_lines">{t("outputMatchContainsLines")}</option>
-                        <option value="exact">{t("outputMatchExactlyThis")}</option>
-                        <option value="regex">{t("outputMatchRegex")}</option>
-                      </select>
-                    </div>
-                    <textarea
-                      id="coding-sample-expected-output"
-                      rows={5}
-                      value={sampleExpectedOutput}
-                      onChange={(event) => setSampleExpectedOutput(event.target.value)}
-                    />
-                  </div>
-                  {sampleOutputMatchMode === "contains_lines" ? (
-                    <label className="row" style={{ alignItems: "center", gap: 8 }}>
-                      <input
-                        type="checkbox"
-                        checked={sampleContainsLinesOrderMatters}
-                        style={{ height: 16, margin: 0, width: 16 }}
-                        onChange={(event) => setSampleContainsLinesOrderMatters(event.target.checked)}
-                      />
-                      <span>{t("containsLinesRequireOrder")}</span>
-                    </label>
-                  ) : null}
-                </>
-              ) : null}
-
-              <button type="button" onClick={runCode} disabled={readOnly || workingAction === "run"}>
-                {workingAction === "run" ? t("running") : t("runTest")}
-              </button>
-
-              <div className="field">
-                <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
-                  <label id="coding-test-output-label">{t("testOutput")}</label>
-                  {!isPersonalizedTest && runExecution && runExecution.status !== "pending" ? (
-                    <OutcomeMark passed={runExecution.status === "completed"} locale={pluginLocale} />
-                  ) : null}
+              >
+                <div className="coding-exercise-editor-pane">
+                  <MonacoCodeEditor
+                    id={`coding-exercise-student-${activity.id}`}
+                    ariaLabel={activity.title || t("starterCode")}
+                    value={editorCode}
+                    onChange={updateStudentCode}
+                    language={config.language}
+                    height="100%"
+                    minHeight={520}
+                    readOnly={readOnly || !executionStateLoaded}
+                    readOnlyPrefix={templateProjection.readOnlyPrefix}
+                    readOnlySuffix={templateProjection.readOnlySuffix}
+                  />
                 </div>
-                <pre
-                  aria-labelledby="coding-test-output-label"
+
+                {!deferSubmission ? (
+                  <div className="row coding-exercise-editor-actions" style={{ alignItems: "center" }}>
+                    <button type="button" onClick={submitCode} disabled={readOnly || workingAction === "submit"}>
+                      {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
+                    </button>
+                    {submitExecution && submitExecution.status !== "pending" ? (
+                      <OutcomeMark passed={submitExecution.status === "completed"} locale={pluginLocale} />
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div
+                  className="coding-exercise-workspace-divider"
+                  role="separator"
+                  aria-label={t("resizeWorkspace")}
+                  aria-orientation="vertical"
+                  aria-valuemin={getStudentWorkspaceEditorLimits(studentWorkspaceRef.current).min}
+                  aria-valuemax={getStudentWorkspaceEditorLimits(studentWorkspaceRef.current).max}
+                  aria-valuenow={Math.round(
+                    workspaceEditorWidth ?? getStudentWorkspaceDefaultEditorWidth(studentWorkspaceRef.current)
+                  )}
+                  tabIndex={0}
+                  onDoubleClick={() => setWorkspaceEditorWidth(null)}
+                  onPointerDown={(event) => {
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                    resizeStudentWorkspace(event);
+                  }}
+                  onPointerMove={(event) => {
+                    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                      resizeStudentWorkspace(event);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    const { min, max } = getStudentWorkspaceEditorLimits(studentWorkspaceRef.current);
+                    const current = workspaceEditorWidth ?? getStudentWorkspaceDefaultEditorWidth(studentWorkspaceRef.current);
+                    if (event.key === "ArrowLeft") setWorkspaceEditorWidth(Math.max(min, current - 24));
+                    else if (event.key === "ArrowRight") setWorkspaceEditorWidth(Math.min(max, current + 24));
+                    else if (event.key === "Home") setWorkspaceEditorWidth(min);
+                    else if (event.key === "End") setWorkspaceEditorWidth(max);
+                    else return;
+                    event.preventDefault();
+                  }}
+                />
+
+                <section
+                  className="stack coding-exercise-test-runner"
                   style={{
-                    background: "rgba(13, 27, 71, 0.035)",
-                    border: "1px solid rgba(13, 27, 71, 0.08)",
-                    borderRadius: 8,
-                    boxSizing: "border-box",
-                    margin: 0,
-                    minHeight: 128,
-                    overflow: "auto",
-                    padding: 12,
-                    whiteSpace: "pre-wrap"
+                    border: "1px solid rgba(13, 27, 71, 0.1)",
+                    borderRadius: 12,
+                    minWidth: 0,
+                    padding: 18
                   }}
                 >
-                  {runExecution ? getExecutionDisplayOutput(runExecution, pluginLocale) : ""}
-                </pre>
+                  <TestSelector
+                    id="coding-visible-sample"
+                    label={t("testSelection")}
+                    value={selectedSampleTestId}
+                    options={[
+                      ...visibleSampleTests.map((test) => ({ value: test.id, label: getSampleTestSummary(test) })),
+                      { value: personalizedTestId, label: t("personalizedTest") }
+                    ]}
+                    onChange={applySampleTest}
+                  />
+
+                  <div className="field">
+                    <label htmlFor="coding-sample-input">{t("inputOnePerLine")}</label>
+                    <textarea
+                      id="coding-sample-input"
+                      rows={5}
+                      value={sampleInput}
+                      readOnly={!isPersonalizedTest}
+                      onChange={(event) => updateRunInput(event.target.value)}
+                    />
+                  </div>
+
+                  {!isPersonalizedTest ? (
+                    <>
+                      <div className="field">
+                        <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                          <label htmlFor="coding-sample-expected-output">{t("expectedOutput")}</label>
+                          <select
+                            id="coding-sample-output-match-mode"
+                            aria-label={t("outputMatchMode")}
+                            value={sampleOutputMatchMode}
+                            disabled
+                            onChange={(event) => setSampleOutputMatchMode(event.target.value as CodingExerciseOutputMatchMode)}
+                            style={{ minWidth: 150, width: "auto" }}
+                          >
+                            <option value="contains_lines">{t("outputMatchContainsLines")}</option>
+                            <option value="exact">{t("outputMatchExactlyThis")}</option>
+                            <option value="regex">{t("outputMatchRegex")}</option>
+                          </select>
+                        </div>
+                        <textarea
+                          id="coding-sample-expected-output"
+                          rows={5}
+                          value={sampleExpectedOutput}
+                          readOnly
+                          onChange={(event) => setSampleExpectedOutput(event.target.value)}
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="coding-sample-test-code">{t("testHarnessCode")}</label>
+                        <textarea
+                          id="coding-sample-test-code"
+                          rows={5}
+                          value={sampleTestCode}
+                          readOnly
+                        />
+                      </div>
+                      {sampleOutputMatchMode === "contains_lines" ? (
+                        <label className="row" style={{ alignItems: "center", gap: 8 }}>
+                          <input
+                            type="checkbox"
+                            checked={sampleContainsLinesOrderMatters}
+                            disabled
+                            style={{ height: 16, margin: 0, width: 16 }}
+                            onChange={(event) => setSampleContainsLinesOrderMatters(event.target.checked)}
+                          />
+                          <span>{t("containsLinesRequireOrder")}</span>
+                        </label>
+                      ) : null}
+                    </>
+                  ) : null}
+
+                  <button type="button" onClick={runCode} disabled={readOnly || workingAction === "run"}>
+                    {workingAction === "run" ? t("running") : t("runTest")}
+                  </button>
+
+                  <div className="field">
+                    <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                      <label id="coding-test-output-label">{t("testOutput")}</label>
+                      {!isPersonalizedTest && runExecution && runExecution.status !== "pending" ? (
+                        <OutcomeMark passed={runExecution.status === "completed"} locale={pluginLocale} />
+                      ) : null}
+                    </div>
+                    <pre
+                      aria-labelledby="coding-test-output-label"
+                      style={{
+                        background: "rgba(13, 27, 71, 0.035)",
+                        border: "1px solid rgba(13, 27, 71, 0.08)",
+                        borderRadius: 8,
+                        boxSizing: "border-box",
+                        margin: 0,
+                        minHeight: 128,
+                        overflow: "auto",
+                        padding: 12,
+                        whiteSpace: "pre-wrap"
+                      }}
+                    >
+                      {runExecution ? getExecutionDisplayOutput(runExecution, pluginLocale) : ""}
+                    </pre>
+                  </div>
+
+                  {error ? <p className="error">{error}</p> : null}
+                </section>
               </div>
 
-              {error ? <p className="error">{error}</p> : null}
-            </section>
-          </div>
-
-          {submitExecution ? <ExecutionCard execution={submitExecution} title={t("latestSubmission")} locale={pluginLocale} /> : null}
-
-          {recentRuns.length ? (
-            <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
-              <h3>{t("recentRuns")}</h3>
-              {recentRuns.map((execution) => (
-                <ExecutionCard
-                  key={execution.id}
-                  execution={execution}
-                  title={new Date(execution.createdAt).toLocaleString(pluginLocale)}
-                  compact
-                  locale={pluginLocale}
-                />
-              ))}
-            </section>
-          ) : null}
-
-          {recentSubmissions.length ? (
-            <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
-              <h3>{t("recentSubmissions")}</h3>
-              {recentSubmissions.map((execution) => (
-                <ExecutionCard
-                  key={execution.id}
-                  execution={execution}
-                  title={new Date(execution.createdAt).toLocaleString(pluginLocale)}
-                  compact
-                  locale={pluginLocale}
-                />
-              ))}
-            </section>
+              {recentRuns.length ? (
+                <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
+                  <h3>{t("recentRuns")}</h3>
+                  {recentRuns.map((execution) => (
+                    <ExecutionCard
+                      key={execution.id}
+                      execution={execution}
+                      title={new Date(execution.createdAt).toLocaleString(pluginLocale)}
+                      compact
+                      locale={pluginLocale}
+                    />
+                  ))}
+                </section>
+              ) : null}
+            </>
+          )}
+          {submissionConfirmation ? (
+            <div className="dialog-backdrop" role="presentation">
+              <div
+                aria-modal="true"
+                className="dialog-panel"
+                role="dialog"
+                aria-labelledby="coding-submission-confirmation-title"
+              >
+                <div className="stack" style={{ gap: 10 }}>
+                  <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                    <h2 id="coding-submission-confirmation-title" style={{ margin: 0 }}>
+                      {t("submissionCompleteTitle")}
+                    </h2>
+                    <OutcomeMark
+                      passed={submissionConfirmation.execution.status === "completed"}
+                      locale={pluginLocale}
+                    />
+                  </div>
+                  <p className="muted">{t("submissionRecordedMessage")}</p>
+                  {submissionConfirmation.availability.attemptsRemaining === null ? null : submissionConfirmation.availability.canStart ? (
+                    <p className="muted">
+                      {t("submissionAttemptsRemaining", {
+                        count: submissionConfirmation.availability.attemptsRemaining
+                      })}
+                    </p>
+                  ) : (
+                    <p className="muted">{t("submissionNoAttemptsRemaining")}</p>
+                  )}
+                </div>
+                <div className="dialog-actions">
+                  <button type="button" onClick={acknowledgeSubmission}>
+                    {t("confirmOk")}
+                  </button>
+                </div>
+              </div>
+            </div>
           ) : null}
         </div>
       )}
+    </section>
+  );
+}
+
+function CodingAttemptHistoryList({
+  attempts,
+  language,
+  locale
+}: {
+  attempts: CodingAttemptHistory[];
+  language: string;
+  locale: CodingExercisesLocale;
+}) {
+  return (
+    <section className="stack coding-exercise-attempt-history">
+      {attempts.map((attempt, index) => {
+        const attemptNumber = attempts.length - index;
+        return (
+          <details className="coding-exercise-attempt-accordion" key={attempt.submission.id}>
+            <summary>
+              <span>{formatCodingExercisesMessage(locale, "attemptNumber", { number: attemptNumber })}</span>
+              <time dateTime={attempt.submission.createdAt}>
+                {new Date(attempt.submission.createdAt).toLocaleString(locale)}
+              </time>
+              {attempt.submission.status === "pending" ? (
+                <span className="muted">{formatCodingExercisesMessage(locale, "statusPending")}</span>
+              ) : (
+                <OutcomeMark passed={attempt.submission.status === "completed"} locale={locale} />
+              )}
+            </summary>
+            <div className="stack coding-exercise-attempt-content">
+              <div className="stack stack-tight">
+                <strong>{formatCodingExercisesMessage(locale, "submittedSolution")}</strong>
+                <CodeRenderer code={attempt.submission.sourceCode} language={language} showLineNumbers />
+              </div>
+              <ExecutionCard
+                execution={attempt.submission}
+                title={formatCodingExercisesMessage(locale, "submissionResult")}
+                locale={locale}
+              />
+              <div className="stack stack-tight">
+                <strong>{formatCodingExercisesMessage(locale, "attemptRuns")}</strong>
+                {attempt.runs.length ? (
+                  attempt.runs.map((execution, runIndex) => (
+                    <ExecutionCard
+                      key={execution.id}
+                      execution={execution}
+                      title={formatCodingExercisesMessage(locale, "runNumber", { number: runIndex + 1 })}
+                      compact
+                      locale={locale}
+                    />
+                  ))
+                ) : (
+                  <p className="muted">{formatCodingExercisesMessage(locale, "noAttemptRuns")}</p>
+                )}
+              </div>
+            </div>
+          </details>
+        );
+      })}
     </section>
   );
 }
@@ -2132,6 +2299,14 @@ function ExecutionCard({
           <OutcomeMark passed={execution.status === "completed"} locale={locale} />
         ) : null}
       </div>
+      {execution.kind === "run" ? (
+        <div className="field">
+          <label>{formatCodingExercisesMessage(locale, "runInput")}</label>
+          <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+            {execution.stdin || formatCodingExercisesMessage(locale, "noRunInput")}
+          </pre>
+        </div>
+      ) : null}
       {execution.stdout ? (
         <div className="field">
           <label>{formatCodingExercisesMessage(locale, "stdout")}</label>

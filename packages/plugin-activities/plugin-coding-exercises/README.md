@@ -26,11 +26,13 @@ Students will be able to:
 - submit code for evaluation against hidden tests
 - resume their work and review prior results
 
-The learner workspace places the code editor and submission action in the left column and the test controls in the right column. It starts with a two-thirds/one-third split, exposes an accessible draggable divider that can also be resized with the keyboard, and collapses responsively on narrow screens. In the two-column layout, the editor stretches to the full height of the test runner while the submission action remains directly below it. The test selector wraps its selected label and uses the shared anchored-popover primitive so full test names remain readable even when the test column is narrow. Selecting a visible test fills its input, expected output, and comparison mode; its saved harness remains server-bound and is applied automatically. Selecting **Personalized test** preserves a separate custom input, hides expected-output controls, runs without an output assertion or sample harness, and shows the raw execution output without a pass/fail mark.
+The learner workspace places the code editor and submission action in the left column and the test controls in the right column. It starts with a two-thirds/one-third split, exposes an accessible draggable divider that can also be resized with the keyboard, and collapses responsively on narrow screens. In the two-column layout, the editor stretches to the full height of the test runner while the submission action remains directly below it. The test selector wraps its selected label and uses the shared anchored-popover primitive so full test names remain readable even when the test column is narrow. Selecting a visible test fills and displays its input, expected output, comparison mode, ordering option, and saved harness as read-only settings. Selecting **Personalized test** preserves a separate editable custom input, hides expected-output and harness controls, runs without an output assertion or sample harness, and shows the raw execution output without a pass/fail mark.
 
 Preset-test and submission outcomes use only an accessible green checkmark or red cross. Judge0 lifecycle/status labels remain internal diagnostics rather than student-facing success text; pending executions retain a neutral pending label until an outcome exists, and personalized runs deliberately show no outcome mark because they do not compare output.
 
-Standalone student source code autosaves through the core `ActivityResponseDraft` state host and is restored on reload. Successful final submission clears that draft. Embedded Test coding exercises continue to use the Test execution host and its `TestItemAttempt` autosave queue.
+Standalone student source code autosaves through the core `ActivityResponseDraft` state host and is restored on reload. Every completed or failed submission clears that draft and resets the editor to the activity's starter code. Embedded Test coding exercises continue to use the Test execution host and its `TestItemAttempt` autosave queue.
+
+Standalone learners use the host's **New attempt** and **Previous submissions** tabs once at least one submission exists. The current attempt shows the prompt and only runs created after the latest submission. Run cards include the saved standard input as well as Judge0 output and diagnostics. The previous-submissions tab omits the prompt and lists submissions newest-first as accordions; expanding one shows the submitted source, its hidden-test result, and every practice run made after the preceding submission and before that submission. This timestamp projection also organizes execution history created before the attempt-history UI existed, so no execution-table migration is required. Submission opens a confirmation dialog after the result is recorded and moved to history. Summative group submissions also use the shared core attempt lifecycle and assignment attempt limits; when no attempt remains, the host exposes only previous submissions and confirmation sends the learner back to course content.
 
 ## Package Contents
 
@@ -136,6 +138,7 @@ GET    /api/courses/:courseId/activities/:activityId/coding-exercises/run
 POST   /api/courses/:courseId/activities/:activityId/coding-exercises/run
 GET    /api/courses/:courseId/activities/:activityId/coding-exercises/submit
 POST   /api/courses/:courseId/activities/:activityId/coding-exercises/submit
+GET    /api/courses/:courseId/activities/:activityId/coding-exercises/history
 GET    /api/courses/:courseId/activities/:activityId/coding-exercises/hidden-tests
 PUT    /api/courses/:courseId/activities/:activityId/coding-exercises/hidden-tests
 ```
@@ -147,7 +150,8 @@ Plugin routes are declared in this package and mounted by the platform's generic
 Behavior:
 
 - `run` is for learner-visible preset and personalized execution; personalized runs explicitly disable output comparison and omit the sample harness
-- `submit` evaluates against plugin-owned hidden tests
+- `submit` evaluates against plugin-owned hidden tests, records summative group work in the shared core attempt lifecycle, and returns post-submission attempt availability
+- `history` returns every prior submission with the practice runs that preceded it, plus only the unsubmitted runs belonging to the current attempt and the learner's current attempt availability
 - `hidden-tests` is teacher/admin only and carries the private reference solution
 - Judge0 source is assembled server-side from the private template plus student code, then per-test harness code is injected at `{{ TEST_CODE }}` when present
 - enabled hidden tests are validated against the teacher reference solution before they are saved

@@ -660,6 +660,7 @@ export type CodingExerciseExecution = {
   status: "pending" | "completed" | "failed";
   languageKey: string;
   judge0LanguageId: number;
+  sourceCode: string;
   judge0Token?: string | null;
   stdin: string;
   expectedOutput: string;
@@ -674,6 +675,21 @@ export type CodingExerciseExecution = {
   resultSummary: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+};
+
+export type CodingExerciseAttemptHistory = {
+  submission: CodingExerciseExecution;
+  runs: CodingExerciseExecution[];
+};
+
+export type CodingExerciseAttemptAvailability = {
+  attemptLimitMode?: string;
+  gradesReleased?: boolean;
+  maxAttempts: number | null;
+  usedAttempts: number | null;
+  attemptsRemaining: number | null;
+  canStart: boolean;
+  reason: string | null;
 };
 
 export type WebDesignExerciseFile = {
@@ -1356,12 +1372,16 @@ export const api = {
   codingExerciseRuns: (courseId: string, activityId: string) =>
     request<{ executions: CodingExerciseExecution[] }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/run`),
   submitCodingExercise: (courseId: string, activityId: string, input: { sourceCode: string }) =>
-    request<{ execution: CodingExerciseExecution }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/submit`, {
+    request<{ execution: CodingExerciseExecution; availability: CodingExerciseAttemptAvailability }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/submit`, {
       method: "POST",
       body: JSON.stringify(input)
     }),
   codingExerciseSubmissions: (courseId: string, activityId: string) =>
     request<{ executions: CodingExerciseExecution[] }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/submit`),
+  codingExerciseHistory: (courseId: string, activityId: string) =>
+    request<{ currentRuns: CodingExerciseExecution[]; attempts: CodingExerciseAttemptHistory[]; availability: CodingExerciseAttemptAvailability }>(
+      `/courses/${courseId}/activities/${activityId}/coding-exercises/history`
+    ),
   generateCodingExercisePrompt: (courseId: string, activityId: string, input: CodingExercisePromptGenerationInput) =>
     request<CodingExercisePromptGenerationResult>(`/courses/${courseId}/activities/${activityId}/coding-exercises/generate-prompt`, {
       method: "POST",
@@ -1850,7 +1870,7 @@ export const api = {
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/run`
     ),
   submitGroupCodingExercise: (courseId: string, groupId: string, activityId: string, input: { sourceCode: string }) =>
-    request<{ execution: CodingExerciseExecution }>(
+    request<{ execution: CodingExerciseExecution; availability: CodingExerciseAttemptAvailability }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/submit`,
       {
         method: "POST",
@@ -1860,6 +1880,10 @@ export const api = {
   groupCodingExerciseSubmissions: (courseId: string, groupId: string, activityId: string) =>
     request<{ executions: CodingExerciseExecution[] }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/submit`
+    ),
+  groupCodingExerciseHistory: (courseId: string, groupId: string, activityId: string) =>
+    request<{ currentRuns: CodingExerciseExecution[]; attempts: CodingExerciseAttemptHistory[]; availability: CodingExerciseAttemptAvailability }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/history`
     ),
   groupWebDesignExerciseTests: (courseId: string, groupId: string, activityId: string) =>
     request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(

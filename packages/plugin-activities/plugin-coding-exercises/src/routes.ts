@@ -1,8 +1,18 @@
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
-import { AppError, assertCanManageActivityBank, assertCanManageCourse, clearActivityResponseDraft } from "@cognelo/core";
+import {
+  AppError,
+  assertCanManageActivityBank,
+  assertCanManageCourse,
+  clearActivityResponseDraft,
+  getActivityAttemptAvailability,
+  recordActivityAttemptGradingResult,
+  startActivityAttempt,
+  submitActivityAttempt
+} from "@cognelo/core";
 import {
   codingExerciseRunInputSchema,
   codingExerciseSubmitInputSchema,
+  listCodingExerciseAttemptHistory,
   listCodingExerciseReviewExecutions,
   listRecentCodingExerciseExecutions,
   runCodingExercise,
@@ -22,7 +32,7 @@ import {
   replaceBankCodingExerciseHiddenTests,
   replaceCodingExerciseHiddenTests
 } from "./hidden-tests";
-import { prisma } from "@cognelo/db";
+import { prisma, type Prisma } from "@cognelo/db";
 
 function requireCourseId(courseId: string | undefined) {
   if (!courseId) {
@@ -145,20 +155,162 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
     },
     POST: async ({ context, readJson }) => {
       const input = codingExerciseSubmitInputSchema.parse(await readJson());
+      const existingHistory = await listCodingExerciseAttemptHistory({
+        activityId: context.activity.id,
+        userId: context.user.id
+      });
+      const availability = await getCodingExerciseAttemptAvailability({
+        context,
+        submissionCount: existingHistory.attempts.length
+      });
+      if (!availability.canStart) {
+        throw new AppError(
+          409,
+          availability.reason ?? "ATTEMPT_UNAVAILABLE",
+          "No coding exercise submission attempt is currently available."
+        );
+      }
       const execution = await submitCodingExercise({
         activityId: context.activity.id,
         userId: context.user.id,
         activityConfig: context.activity.config,
         input
       });
+      if (isSummativeGroupActivity(context)) {
+        const earnedWeight = numberValue(execution.resultSummary.earnedWeight);
+        const totalWeight = numberValue(execution.resultSummary.totalWeight);
+        if (earnedWeight === null || totalWeight === null || totalWeight <= 0) {
+          throw new AppError(409, "CODING_EXERCISE_RESULT_INVALID", "The coding exercise did not return a valid weighted result.");
+        }
+        const metadata = {
+          mode: "summative",
+          executionId: execution.id,
+          submittedSourceCode: input.sourceCode
+        } as Prisma.InputJsonValue;
+        const coreAttempt = await startActivityAttempt(context.user, {
+          courseId: context.courseId,
+          groupId: context.groupId,
+          activityId: context.activity.id,
+          pluginKey: "coding-exercises",
+          pluginVersion: "0.1.0",
+          pluginAttemptRef: execution.id,
+          metadata
+        });
+        const submittedAttempt = await submitActivityAttempt(context.user, {
+          attemptId: coreAttempt.id,
+          pluginAttemptRef: execution.id,
+          metadata
+        });
+        await recordActivityAttemptGradingResult(context.user, {
+          attemptId: submittedAttempt.id,
+          rawScore: earnedWeight,
+          rawMaxScore: totalWeight,
+          source: "auto",
+          isPass: execution.status === "completed",
+          rawResult: {
+            executionId: execution.id,
+            analyticsPayload: execution.resultSummary
+          } as Prisma.InputJsonValue,
+          normalizedResult: {
+            kind: "coding-exercise",
+            executionId: execution.id
+          } as Prisma.InputJsonValue
+        });
+      }
       if (context.courseId && context.groupId) {
         await clearActivityResponseDraft(context.user, context.courseId, context.groupId, context.activity.id).catch(() => undefined);
       }
 
-      return { execution };
+      return {
+        execution,
+        availability: await getCodingExerciseAttemptAvailability({
+          context,
+          submissionCount: existingHistory.attempts.length + 1
+        })
+      };
     }
   }
 };
+
+export const codingExerciseHistoryRoute: PluginRouteDefinition = {
+  path: "coding-exercises/history",
+  activityTypeKeys: ["coding-exercise"],
+  methods: {
+    GET: async ({ context }) => {
+      const history = await listCodingExerciseAttemptHistory({
+        activityId: context.activity.id,
+        userId: context.user.id
+      });
+      return {
+        ...history,
+        availability: await getCodingExerciseAttemptAvailability({
+          context,
+          submissionCount: history.attempts.length
+        })
+      };
+    }
+  }
+};
+
+function isSummativeGroupActivity(context: {
+  courseId?: string;
+  groupId?: string;
+  activity: { assignment?: { metadata?: Record<string, unknown> } };
+}): context is typeof context & { courseId: string; groupId: string } {
+  return Boolean(
+    context.courseId &&
+      context.groupId &&
+      context.activity.assignment?.metadata?.assessmentMode === "summative"
+  );
+}
+
+async function getCodingExerciseAttemptAvailability(params: {
+  context: {
+    courseId?: string;
+    groupId?: string;
+    activity: { id: string; assignment?: { metadata?: Record<string, unknown> } };
+    user: Parameters<typeof getActivityAttemptAvailability>[0];
+  };
+  submissionCount: number;
+}) {
+  if (!isSummativeGroupActivity(params.context)) {
+    return {
+      attemptLimitMode: "unlimited",
+      gradesReleased: false,
+      maxAttempts: null,
+      usedAttempts: null,
+      attemptsRemaining: null,
+      canStart: true,
+      reason: null
+    };
+  }
+
+  const availability = await getActivityAttemptAvailability(params.context.user, {
+    courseId: params.context.courseId,
+    groupId: params.context.groupId,
+    activityId: params.context.activity.id
+  });
+  if (availability.attemptLimitMode !== "max_attempts" || availability.maxAttempts === null) {
+    return availability;
+  }
+
+  const usedAttempts = Math.max(availability.usedAttempts ?? 0, params.submissionCount);
+  const attemptsRemaining = Math.max(0, availability.maxAttempts - usedAttempts);
+  return {
+    ...availability,
+    usedAttempts,
+    attemptsRemaining,
+    canStart: availability.canStart && attemptsRemaining > 0,
+    reason:
+      availability.canStart && attemptsRemaining === 0
+        ? "ATTEMPT_LIMIT_REACHED"
+        : availability.reason
+  };
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
 
 export const codingExerciseHiddenTestsRoute: PluginRouteDefinition = {
   path: "coding-exercises/hidden-tests",

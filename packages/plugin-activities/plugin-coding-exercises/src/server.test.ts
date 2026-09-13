@@ -20,6 +20,7 @@ vi.mock("./routes", () => ({
   codingExerciseGeneratePromptRoute: { path: "generate-prompt", methods: {} },
   codingExerciseGenerateSolutionRoute: { path: "generate-solution", methods: {} },
   codingExerciseGenerateTestsRoute: { path: "generate-tests", methods: {} },
+  codingExerciseHistoryRoute: { path: "history", methods: {} },
   codingExerciseHiddenTestsRoute: { path: "hidden-tests", methods: {} },
   codingExerciseRunRoute: { path: "run", methods: {} },
   codingExerciseReviewAllRoute: { path: "review-all", methods: {} },
