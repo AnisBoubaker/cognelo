@@ -84,6 +84,8 @@ type MessageKey =
   | "runTest"
   | "testOutput"
   | "noOutput"
+  | "fullScreen"
+  | "exitFullScreen"
   | "resizeWorkspace"
   | "running"
   | "submitForGrading"
@@ -220,6 +222,8 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     runTest: "Run test",
     testOutput: "Test output",
     noOutput: "No output.",
+    fullScreen: "Full screen",
+    exitFullScreen: "Exit full screen",
     resizeWorkspace: "Resize code editor and test runner",
     running: "Running...",
     submitForGrading: "Submit for grading",
@@ -353,6 +357,8 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     runTest: "Exécuter le test",
     testOutput: "Sortie du test",
     noOutput: "Aucune sortie.",
+    fullScreen: "Plein écran",
+    exitFullScreen: "Quitter le plein écran",
     resizeWorkspace: "Redimensionner l’éditeur de code et l’espace de test",
     running: "Exécution...",
     submitForGrading: "Soumettre pour évaluation",
@@ -486,6 +492,8 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     runTest: "运行测试",
     testOutput: "测试输出",
     noOutput: "无输出。",
+    fullScreen: "全屏",
+    exitFullScreen: "退出全屏",
     resizeWorkspace: "调整代码编辑器和测试面板的大小",
     running: "运行中...",
     submitForGrading: "提交评分",

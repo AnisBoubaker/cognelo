@@ -309,6 +309,7 @@ export function CodingExerciseActivityView({
   const [selectedSampleTestId, setSelectedSampleTestId] = useState("");
   const [personalizedInput, setPersonalizedInput] = useState("");
   const [workspaceEditorWidth, setWorkspaceEditorWidth] = useState<number | null>(null);
+  const [isWorkspaceFullScreen, setIsWorkspaceFullScreen] = useState(false);
   const [runExecution, setRunExecution] = useState<CodingExecution | null>(null);
   const [submitExecution, setSubmitExecution] = useState<CodingExecution | null>(null);
   const [recentRuns, setRecentRuns] = useState<CodingExecution[]>([]);
@@ -367,6 +368,7 @@ export function CodingExerciseActivityView({
     setSelectedSampleTestId(sampleTests[0]?.id ?? personalizedTestId);
     setPersonalizedInput("");
     setWorkspaceEditorWidth(null);
+    setIsWorkspaceFullScreen(false);
     setSampleInput(sampleTests[0]?.input ?? "");
     setSampleExpectedOutput(sampleTests[0]?.output ?? "");
     setSampleTestCode(sampleTests[0]?.testCode ?? "");
@@ -407,6 +409,27 @@ export function CodingExerciseActivityView({
     observer.observe(workspace);
     return () => observer.disconnect();
   }, [canManage]);
+
+  useEffect(() => {
+    if (!isWorkspaceFullScreen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsWorkspaceFullScreen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isWorkspaceFullScreen]);
 
   useEffect(() => {
     if (canManage || !executionStateHost) {
@@ -997,6 +1020,7 @@ export function CodingExerciseActivityView({
         ...current
       ]);
       setRecentRuns([]);
+      setIsWorkspaceFullScreen(false);
       setSubmissionConfirmation(result);
       onPreviousSubmissionsAvailabilityChange?.(true);
       if (result.availability.canStart) {
@@ -1553,82 +1577,98 @@ export function CodingExerciseActivityView({
             <>
               <MarkdownRenderer markdown={config.prompt} />
               <div
-                className={`coding-exercise-student-workspace${deferSubmission ? "" : " has-actions"}`}
-                ref={studentWorkspaceRef}
-                style={
-                  {
-                    "--coding-exercise-editor-width": workspaceEditorWidth === null ? "2fr" : `${workspaceEditorWidth}px`
-                  } as CSSProperties
-                }
+                aria-label={isWorkspaceFullScreen ? t("fullScreen") : undefined}
+                aria-modal={isWorkspaceFullScreen || undefined}
+                className={`coding-exercise-workspace-shell${isWorkspaceFullScreen ? " is-full-screen" : ""}`}
+                role={isWorkspaceFullScreen ? "dialog" : undefined}
               >
-                <div className="coding-exercise-editor-pane">
-                  <MonacoCodeEditor
-                    id={`coding-exercise-student-${activity.id}`}
-                    ariaLabel={activity.title || t("starterCode")}
-                    value={editorCode}
-                    onChange={updateStudentCode}
-                    language={config.language}
-                    height="100%"
-                    minHeight={520}
-                    readOnly={readOnly || !executionStateLoaded}
-                    readOnlyPrefix={templateProjection.readOnlyPrefix}
-                    readOnlySuffix={templateProjection.readOnlySuffix}
-                  />
+                <div className="coding-exercise-workspace-toolbar">
+                  <button
+                    className="secondary"
+                    type="button"
+                    onClick={() => setIsWorkspaceFullScreen((current) => !current)}
+                  >
+                    {isWorkspaceFullScreen ? t("exitFullScreen") : t("fullScreen")}
+                  </button>
                 </div>
 
-                {!deferSubmission ? (
-                  <div className="row coding-exercise-editor-actions" style={{ alignItems: "center" }}>
-                    <button type="button" onClick={submitCode} disabled={readOnly || workingAction === "submit"}>
-                      {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
-                    </button>
-                    {submitExecution && submitExecution.status !== "pending" ? (
-                      <OutcomeMark passed={submitExecution.status === "completed"} locale={pluginLocale} />
-                    ) : null}
-                  </div>
-                ) : null}
-
                 <div
-                  className="coding-exercise-workspace-divider"
-                  role="separator"
-                  aria-label={t("resizeWorkspace")}
-                  aria-orientation="vertical"
-                  aria-valuemin={getStudentWorkspaceEditorLimits(studentWorkspaceRef.current).min}
-                  aria-valuemax={getStudentWorkspaceEditorLimits(studentWorkspaceRef.current).max}
-                  aria-valuenow={Math.round(
-                    workspaceEditorWidth ?? getStudentWorkspaceDefaultEditorWidth(studentWorkspaceRef.current)
-                  )}
-                  tabIndex={0}
-                  onDoubleClick={() => setWorkspaceEditorWidth(null)}
-                  onPointerDown={(event) => {
-                    event.currentTarget.setPointerCapture(event.pointerId);
-                    resizeStudentWorkspace(event);
-                  }}
-                  onPointerMove={(event) => {
-                    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                      resizeStudentWorkspace(event);
-                    }
-                  }}
-                  onKeyDown={(event) => {
-                    const { min, max } = getStudentWorkspaceEditorLimits(studentWorkspaceRef.current);
-                    const current = workspaceEditorWidth ?? getStudentWorkspaceDefaultEditorWidth(studentWorkspaceRef.current);
-                    if (event.key === "ArrowLeft") setWorkspaceEditorWidth(Math.max(min, current - 24));
-                    else if (event.key === "ArrowRight") setWorkspaceEditorWidth(Math.min(max, current + 24));
-                    else if (event.key === "Home") setWorkspaceEditorWidth(min);
-                    else if (event.key === "End") setWorkspaceEditorWidth(max);
-                    else return;
-                    event.preventDefault();
-                  }}
-                />
-
-                <section
-                  className="stack coding-exercise-test-runner"
-                  style={{
-                    border: "1px solid rgba(13, 27, 71, 0.1)",
-                    borderRadius: 12,
-                    minWidth: 0,
-                    padding: 18
-                  }}
+                  className={`coding-exercise-student-workspace${deferSubmission ? "" : " has-actions"}`}
+                  ref={studentWorkspaceRef}
+                  style={
+                    {
+                      "--coding-exercise-editor-width": workspaceEditorWidth === null ? "2fr" : `${workspaceEditorWidth}px`
+                    } as CSSProperties
+                  }
                 >
+                  <div className="coding-exercise-editor-pane">
+                    <MonacoCodeEditor
+                      id={`coding-exercise-student-${activity.id}`}
+                      ariaLabel={activity.title || t("starterCode")}
+                      value={editorCode}
+                      onChange={updateStudentCode}
+                      language={config.language}
+                      height="100%"
+                      minHeight={isWorkspaceFullScreen ? 0 : 520}
+                      readOnly={readOnly || !executionStateLoaded}
+                      readOnlyPrefix={templateProjection.readOnlyPrefix}
+                      readOnlySuffix={templateProjection.readOnlySuffix}
+                    />
+                  </div>
+
+                  {!deferSubmission ? (
+                    <div className="row coding-exercise-editor-actions" style={{ alignItems: "center" }}>
+                      <button type="button" onClick={submitCode} disabled={readOnly || workingAction === "submit"}>
+                        {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
+                      </button>
+                      {submitExecution && submitExecution.status !== "pending" ? (
+                        <OutcomeMark passed={submitExecution.status === "completed"} locale={pluginLocale} />
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <div
+                    className="coding-exercise-workspace-divider"
+                    role="separator"
+                    aria-label={t("resizeWorkspace")}
+                    aria-orientation="vertical"
+                    aria-valuemin={getStudentWorkspaceEditorLimits(studentWorkspaceRef.current).min}
+                    aria-valuemax={getStudentWorkspaceEditorLimits(studentWorkspaceRef.current).max}
+                    aria-valuenow={Math.round(
+                      workspaceEditorWidth ?? getStudentWorkspaceDefaultEditorWidth(studentWorkspaceRef.current)
+                    )}
+                    tabIndex={0}
+                    onDoubleClick={() => setWorkspaceEditorWidth(null)}
+                    onPointerDown={(event) => {
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                      resizeStudentWorkspace(event);
+                    }}
+                    onPointerMove={(event) => {
+                      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                        resizeStudentWorkspace(event);
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      const { min, max } = getStudentWorkspaceEditorLimits(studentWorkspaceRef.current);
+                      const current = workspaceEditorWidth ?? getStudentWorkspaceDefaultEditorWidth(studentWorkspaceRef.current);
+                      if (event.key === "ArrowLeft") setWorkspaceEditorWidth(Math.max(min, current - 24));
+                      else if (event.key === "ArrowRight") setWorkspaceEditorWidth(Math.min(max, current + 24));
+                      else if (event.key === "Home") setWorkspaceEditorWidth(min);
+                      else if (event.key === "End") setWorkspaceEditorWidth(max);
+                      else return;
+                      event.preventDefault();
+                    }}
+                  />
+
+                  <section
+                    className="stack coding-exercise-test-runner"
+                    style={{
+                      border: "1px solid rgba(13, 27, 71, 0.1)",
+                      borderRadius: 12,
+                      minWidth: 0,
+                      padding: 18
+                    }}
+                  >
                   <TestSelector
                     id="coding-visible-sample"
                     label={t("testSelection")}
@@ -1716,8 +1756,9 @@ export function CodingExerciseActivityView({
                     </pre>
                   </div>
 
-                  {error ? <p className="error">{error}</p> : null}
-                </section>
+                    {error ? <p className="error">{error}</p> : null}
+                  </section>
+                </div>
               </div>
 
               {recentRuns.length ? (

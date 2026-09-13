@@ -194,6 +194,26 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(testRunner.getByRole("textbox", { name: "Expected output" })).toHaveCount(0);
     await expect(testRunner.getByText("Test code", { exact: true })).toHaveCount(0);
 
+    const workspaceShell = studentPage.locator(".coding-exercise-workspace-shell");
+    await studentPage.getByRole("button", { name: "Full screen" }).click();
+    await expect(studentPage.getByRole("dialog", { name: "Full screen" })).toBeVisible();
+    await expect(workspaceShell).toHaveClass(/is-full-screen/);
+    const viewport = studentPage.viewportSize();
+    const fullScreenBox = await workspaceShell.boundingBox();
+    const fullScreenEditorBox = await workspaceShell.locator(".coding-exercise-editor-pane").boundingBox();
+    const fullScreenRunnerBox = await testRunner.boundingBox();
+    expect(fullScreenBox?.x).toBeLessThanOrEqual(1);
+    expect(fullScreenBox?.y).toBeLessThanOrEqual(1);
+    expect(fullScreenBox?.width).toBeGreaterThanOrEqual((viewport?.width ?? 0) - 2);
+    expect(fullScreenBox?.height).toBeGreaterThanOrEqual((viewport?.height ?? 0) - 2);
+    expect(fullScreenEditorBox?.x).toBeLessThan(fullScreenRunnerBox?.x ?? 0);
+    expect(Math.abs((fullScreenEditorBox?.height ?? 0) - (fullScreenRunnerBox?.height ?? 0))).toBeLessThanOrEqual(2);
+    await studentPage.keyboard.press("Escape");
+    await expect(workspaceShell).not.toHaveClass(/is-full-screen/);
+    await studentPage.getByRole("button", { name: "Full screen" }).click();
+    await studentPage.getByRole("button", { name: "Exit full screen" }).click();
+    await expect(workspaceShell).not.toHaveClass(/is-full-screen/);
+
     await testSelector.press("ArrowDown");
     await expect(studentPage.getByRole("menuitemradio", { name: "Personalized test" })).toBeVisible();
     await studentPage.getByRole("menuitemradio", { name: "Personalized test" }).click();
