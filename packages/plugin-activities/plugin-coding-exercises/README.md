@@ -26,6 +26,8 @@ Students will be able to:
 - submit code for evaluation against hidden tests
 - resume their work and review prior results
 
+Student execution cards summarize completed outcomes with only an accessible green checkmark or red cross. Judge0 lifecycle/status labels remain internal diagnostics rather than student-facing success text; pending executions retain a neutral pending label until an outcome exists.
+
 Standalone student source code autosaves through the core `ActivityResponseDraft` state host and is restored on reload. Successful final submission clears that draft. Embedded Test coding exercises continue to use the Test execution host and its `TestItemAttempt` autosave queue.
 
 ## Package Contents
@@ -153,7 +155,7 @@ Behavior:
 Each visible or hidden test has an explicit output comparison mode:
 
 - **Exact** is the default and preserves legacy behavior by sending `expected_output` to Judge0. Tests saved before comparison modes existed normalize to Exact.
-- **Contains lines** treats every non-empty expected-output line as literal text and requires it to occur as a complete stdout line. Extra output is allowed. Teachers can optionally require the expected lines to occur in their authored order; when order is not required, duplicate expected lines still require the same number of output occurrences.
+- **Contains lines** treats every non-empty expected-output line as literal text and requires it to occur within a stdout line; surrounding text on that stdout line is allowed. Trailing whitespace is removed from both expected and actual lines before comparison, while leading whitespace remains significant. Extra output is allowed. Teachers can optionally require the literal occurrences to appear in their authored order; duplicate expected lines require the same number of non-overlapping output occurrences.
 - **Regular expression** searches stdout with the linear-time RE2 WebAssembly engine. It does not support backreferences or lookaround, and patterns are limited to 4,000 characters.
 
 For Contains lines and Regular expression, Cognelo omits Judge0's `expected_output`. Judge0 must first report a successful compile and execution; Cognelo then evaluates stdout with the selected comparator. Compilation, runtime, resource-limit, and other sandbox failures always fail the test before output matching. The same comparator is used for teacher reference validation, student sample runs, and hidden-test grading.
