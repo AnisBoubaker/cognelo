@@ -1346,6 +1346,7 @@ export const api = {
       testCode?: string;
       outputMatchMode?: "exact" | "contains_lines" | "regex";
       containsLinesOrderMatters?: boolean;
+      compareOutput?: boolean;
     }
   ) =>
     request<{ execution: CodingExerciseExecution }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/run`, {
@@ -1834,6 +1835,7 @@ export const api = {
       testCode?: string;
       outputMatchMode?: "exact" | "contains_lines" | "regex";
       containsLinesOrderMatters?: boolean;
+      compareOutput?: boolean;
     }
   ) =>
     request<{ execution: CodingExerciseExecution }>(
