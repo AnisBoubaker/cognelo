@@ -334,12 +334,21 @@ async function generateValidMcqSource(input: {
     const issues = collectMcqIssues(source, parsed, input.questionCount, input.defaultCodeLanguage);
 
     if (!issues.length) {
+      const audited = await auditGeneratedMcqAnswerKey({
+        input,
+        source,
+        systemPrompt
+      });
       const knowledgeConceptSelections = await suggestActivityKnowledgeSelections({
         user: input.user,
         knowledge: input.knowledge,
-        generatedActivity: source
+        generatedActivity: audited.source
       });
-      return { source, attempts: attempt, knowledgeConceptSelections };
+      return {
+        source: audited.source,
+        attempts: attempt + audited.attempts - 1,
+        knowledgeConceptSelections
+      };
     }
 
     lastSource = source;
@@ -350,6 +359,42 @@ async function generateValidMcqSource(input: {
   throw new AppError(422, "MCQ_AI_GENERATION_INVALID", "The AI agent could not generate valid MCQ syntax after three attempts.", {
     issues: lastIssues,
     source: lastSource
+  });
+}
+
+async function auditGeneratedMcqAnswerKey(input: {
+  input: {
+    user: Parameters<typeof generateQuestionAuthoringText>[0];
+    description: string;
+    defaultCodeLanguage: string;
+    instructions: string;
+    locale: "en" | "fr" | "zh" | "ar";
+    questionCount: number;
+  };
+  source: string;
+  systemPrompt: string;
+}) {
+  let source = input.source;
+  let issues: McqParseError[] = [];
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const raw = await generateQuestionAuthoringText(input.input.user, {
+      systemPrompt: input.systemPrompt,
+      userPrompt: buildAnswerKeyAuditPrompt(source, input.input, issues),
+      maxOutputTokens: Math.max(6000, input.input.questionCount * 200)
+    });
+    source = normalizeGeneratedSource(raw);
+    const parsed = parseMcqSource(source, "none");
+    issues = collectMcqIssues(source, parsed, input.input.questionCount, input.input.defaultCodeLanguage);
+
+    if (!issues.length) {
+      return { source, attempts: attempt };
+    }
+  }
+
+  throw new AppError(422, "MCQ_AI_ANSWER_KEY_AUDIT_INVALID", "The AI agent could not return a valid audited MCQ answer key.", {
+    issues,
+    source
   });
 }
 
@@ -372,7 +417,9 @@ function buildSystemPrompt(input: {
     "- Every fenced code block must include an explicit language identifier after the opening backticks. Never return an unlabeled fenced code block.",
     "- Each question must include at least three choices.",
     "- Each question must include at least one correct choice.",
-    "- Use one correct choice for single-answer questions and multiple `[x]` choices only when the question clearly asks for multiple answers.",
+    "- Independently solve every question before marking its answer key; never mark only one choice when other choices are also objectively correct.",
+    "- For a single-answer question, exactly one choice must be objectively correct, it alone must use `[x]`, and every `[ ]` distractor must be clearly false.",
+    "- When two or more choices are objectively correct, explicitly tell the learner to select all correct answers and mark every correct choice with `[x]`.",
     input.defaultCodeLanguage === "none"
       ? "- This is not a programming exercise. Do not introduce programming code unless the teacher explicitly requests it; if code is requested, label every fence with the appropriate language."
       : `- The selected programming language is ${input.defaultCodeLanguage}. Every fenced code block must open with \`\`\`${input.defaultCodeLanguage}; do not use another language.`,
@@ -400,6 +447,35 @@ function buildInitialUserPrompt(input: { description: string; instructions: stri
     "Additional instructions from the teacher:",
     input.instructions.trim() || "No additional instructions were provided."
   ].join("\n\n");
+}
+
+function buildAnswerKeyAuditPrompt(
+  source: string,
+  input: { description: string; instructions: string; questionCount: number },
+  validationIssues: McqParseError[]
+) {
+  return [
+    "Audit the answer key of the candidate MCQ below and return the complete corrected MCQ source only.",
+    "Do not trust the existing `[x]` markers. Solve every question independently and evaluate every choice for factual correctness.",
+    "For each question:",
+    "- If exactly one choice is objectively correct, mark only that choice `[x]`, keep all other choices clearly false, and use single-answer wording.",
+    "- If two or more choices are objectively correct, explicitly ask the learner to select all correct answers and mark every objectively correct choice `[x]`.",
+    "- Rewrite ambiguous questions or choices so the complete correct set is indisputable.",
+    "- Preserve the requested subject, difficulty, language, and teacher instructions.",
+    `- Preserve exactly ${input.questionCount} question${input.questionCount === 1 ? "" : "s"} and valid Cognelo MCQ syntax.`,
+    "",
+    "Student prompt and activity context:",
+    input.description.trim(),
+    "",
+    "Additional instructions from the teacher:",
+    input.instructions.trim() || "No additional instructions were provided.",
+    ...(validationIssues.length
+      ? ["", "The previous audit also had these syntax issues; correct them:", ...validationIssues.map((issue) => `- Line ${issue.line}: ${issue.message}`)]
+      : []),
+    "",
+    "Candidate MCQ source:",
+    source
+  ].join("\n");
 }
 
 function buildCorrectionPrompt(
