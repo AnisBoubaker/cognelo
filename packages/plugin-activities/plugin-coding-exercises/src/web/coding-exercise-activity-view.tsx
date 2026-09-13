@@ -1481,7 +1481,7 @@ export function CodingExerciseActivityView({
         <div className="stack">
           <MarkdownRenderer markdown={config.prompt} />
           <div
-            className="coding-exercise-student-workspace"
+            className={`coding-exercise-student-workspace${deferSubmission ? "" : " has-actions"}`}
             ref={studentWorkspaceRef}
             style={
               {
@@ -1489,29 +1489,31 @@ export function CodingExerciseActivityView({
               } as CSSProperties
             }
           >
-            <div className="stack" style={{ minWidth: 0 }}>
+            <div className="coding-exercise-editor-pane">
               <MonacoCodeEditor
                 id={`coding-exercise-student-${activity.id}`}
                 ariaLabel={activity.title || t("starterCode")}
                 value={editorCode}
                 onChange={updateStudentCode}
                 language={config.language}
+                height="100%"
                 minHeight={520}
                 readOnly={readOnly || !executionStateLoaded}
                 readOnlyPrefix={templateProjection.readOnlyPrefix}
                 readOnlySuffix={templateProjection.readOnlySuffix}
               />
-              {!deferSubmission ? (
-                <div className="row" style={{ alignItems: "center" }}>
-                  <button type="button" onClick={submitCode} disabled={readOnly || workingAction === "submit"}>
-                    {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
-                  </button>
-                  {submitExecution && submitExecution.status !== "pending" ? (
-                    <OutcomeMark passed={submitExecution.status === "completed"} locale={pluginLocale} />
-                  ) : null}
-                </div>
-              ) : null}
             </div>
+
+            {!deferSubmission ? (
+              <div className="row coding-exercise-editor-actions" style={{ alignItems: "center" }}>
+                <button type="button" onClick={submitCode} disabled={readOnly || workingAction === "submit"}>
+                  {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
+                </button>
+                {submitExecution && submitExecution.status !== "pending" ? (
+                  <OutcomeMark passed={submitExecution.status === "completed"} locale={pluginLocale} />
+                ) : null}
+              </div>
+            ) : null}
 
             <div
               className="coding-exercise-workspace-divider"
@@ -1547,7 +1549,7 @@ export function CodingExerciseActivityView({
             />
 
             <section
-              className="stack"
+              className="stack coding-exercise-test-runner"
               style={{
                 border: "1px solid rgba(13, 27, 71, 0.1)",
                 borderRadius: 12,
