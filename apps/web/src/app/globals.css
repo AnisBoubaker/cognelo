@@ -3687,14 +3687,41 @@ a.card:hover,
 }
 
 .coding-exercise-student-workspace {
-  align-items: start;
+  align-items: stretch;
   display: grid;
+  grid-template-areas: "editor divider runner";
   grid-template-columns: minmax(360px, var(--coding-exercise-editor-width, 2fr)) 12px minmax(280px, 1fr);
+}
+
+.coding-exercise-student-workspace.has-actions {
+  grid-template-areas:
+    "editor divider runner"
+    "actions . .";
+  row-gap: 16px;
+}
+
+.coding-exercise-editor-pane {
+  grid-area: editor;
+  min-height: 520px;
+  min-width: 0;
+}
+
+.coding-exercise-editor-pane > .monaco-code-editor {
+  height: 100%;
+}
+
+.coding-exercise-editor-actions {
+  grid-area: actions;
+}
+
+.coding-exercise-test-runner {
+  grid-area: runner;
 }
 
 .coding-exercise-workspace-divider {
   align-self: stretch;
   cursor: col-resize;
+  grid-area: divider;
   min-height: 100%;
   position: relative;
   touch-action: none;
@@ -3797,7 +3824,17 @@ a.card:hover,
 @media (max-width: 900px) {
   .coding-exercise-student-workspace {
     gap: 20px;
+    grid-template-areas:
+      "editor"
+      "runner";
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .coding-exercise-student-workspace.has-actions {
+    grid-template-areas:
+      "editor"
+      "actions"
+      "runner";
   }
 
   .coding-exercise-workspace-divider {
