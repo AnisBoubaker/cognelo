@@ -104,6 +104,48 @@ describe("MCQ generation route", () => {
       })
     );
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.userPrompt).toContain("Generate exactly 1 valid Cognelo multiple-choice question.");
+    expect(mocks.generateQuestionAuthoringText.mock.calls[1]?.[1]?.userPrompt).toContain("Do not trust the existing `[x]` markers.");
+    expect(mocks.generateQuestionAuthoringText).toHaveBeenCalledTimes(2);
+  });
+
+  it("audits generated answer keys and marks every objectively correct choice", async () => {
+    const incompleteAnswerKey = [
+      "## Question 1",
+      "Select all prime numbers.",
+      "",
+      "- [x] 2",
+      "- [ ] 3",
+      "- [ ] 4"
+    ].join("\n");
+    const auditedAnswerKey = [
+      "## Question 1",
+      "Select all prime numbers.",
+      "",
+      "- [x] 2",
+      "- [x] 3",
+      "- [ ] 4"
+    ].join("\n");
+    mocks.generateQuestionAuthoringText
+      .mockResolvedValueOnce(incompleteAnswerKey)
+      .mockResolvedValueOnce(auditedAnswerKey);
+
+    await expect(
+      mcqGenerateRoute.methods.POST?.({
+        request: new Request("http://test.local"),
+        context,
+        readJson: async () => ({
+          description: "Generate a mathematics question about prime numbers.",
+          defaultCodeLanguage: "none",
+          locale: "en",
+          questionCount: 1
+        })
+      })
+    ).resolves.toMatchObject({ attempts: 1, source: auditedAnswerKey });
+
+    const auditPrompt = mocks.generateQuestionAuthoringText.mock.calls[1]?.[1]?.userPrompt;
+    expect(auditPrompt).toContain("Solve every question independently");
+    expect(auditPrompt).toContain("mark every objectively correct choice `[x]`");
+    expect(auditPrompt).toContain(incompleteAnswerKey);
   });
 
   it("accepts requests for up to 80 questions and scales the output allowance", async () => {
@@ -152,7 +194,7 @@ describe("MCQ generation route", () => {
   it("retries when the model returns the wrong number of questions", async () => {
     mocks.generateQuestionAuthoringText
       .mockResolvedValueOnce(`## Question 1\n\n- [x] Correct\n- [ ] Wrong`)
-      .mockResolvedValueOnce(`## Question 1\n\n- [x] Correct\n- [ ] Wrong\n\n## Question 2\n\n- [x] Correct\n- [ ] Wrong`);
+      .mockResolvedValue(`## Question 1\n\n- [x] Correct\n- [ ] Wrong\n\n## Question 2\n\n- [x] Correct\n- [ ] Wrong`);
 
     await expect(
       mcqGenerateRoute.methods.POST?.({
@@ -199,6 +241,19 @@ describe("MCQ generation route", () => {
         "- [x] hello",
         "- [ ] goodbye",
         "- [ ] nothing"
+      ].join("\n"))
+      .mockResolvedValue([
+        "## Question 1",
+        "",
+        "What is printed?",
+        "",
+        "```python",
+        "print('hello')",
+        "```",
+        "",
+        "- [x] hello",
+        "- [ ] goodbye",
+        "- [ ] nothing"
       ].join("\n"));
 
     await expect(
@@ -216,6 +271,29 @@ describe("MCQ generation route", () => {
 
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("must open with ```python");
     expect(mocks.generateQuestionAuthoringText.mock.calls[1]?.[1]?.userPrompt).toContain("must include an explicit programming language");
+  });
+
+  it("retries when the audited answer key has invalid syntax", async () => {
+    const source = `## Question 1\n\n- [x] Correct\n- [ ] Wrong`;
+    mocks.generateQuestionAuthoringText
+      .mockResolvedValueOnce(source)
+      .mockResolvedValueOnce("not mcq")
+      .mockResolvedValueOnce(source);
+
+    await expect(
+      mcqGenerateRoute.methods.POST?.({
+        request: new Request("http://test.local"),
+        context,
+        readJson: async () => ({
+          description: "Generate a simple programming MCQ.",
+          defaultCodeLanguage: "none",
+          locale: "en",
+          questionCount: 1
+        })
+      })
+    ).resolves.toMatchObject({ attempts: 2, source });
+
+    expect(mocks.generateQuestionAuthoringText.mock.calls[2]?.[1]?.userPrompt).toContain("previous audit also had these syntax issues");
   });
 
   it("retries malformed source and fails after repeated invalid output", async () => {
