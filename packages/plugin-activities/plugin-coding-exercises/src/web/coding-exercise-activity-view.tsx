@@ -1640,72 +1640,58 @@ export function CodingExerciseActivityView({
                     onChange={applySampleTest}
                   />
 
-                  <div className="field">
-                    <label htmlFor="coding-sample-input">{t("inputOnePerLine")}</label>
-                    <textarea
-                      id="coding-sample-input"
-                      rows={5}
-                      value={sampleInput}
-                      readOnly={!isPersonalizedTest}
-                      onChange={(event) => updateRunInput(event.target.value)}
-                    />
-                  </div>
-
-                  {!isPersonalizedTest ? (
-                    <>
-                      <div className="field">
-                        <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
-                          <label htmlFor="coding-sample-expected-output">{t("expectedOutput")}</label>
-                          <select
-                            id="coding-sample-output-match-mode"
-                            aria-label={t("outputMatchMode")}
-                            value={sampleOutputMatchMode}
-                            disabled
-                            onChange={(event) => setSampleOutputMatchMode(event.target.value as CodingExerciseOutputMatchMode)}
-                            style={{ minWidth: 150, width: "auto" }}
-                          >
-                            <option value="contains_lines">{t("outputMatchContainsLines")}</option>
-                            <option value="exact">{t("outputMatchExactlyThis")}</option>
-                            <option value="regex">{t("outputMatchRegex")}</option>
-                          </select>
+                  {isPersonalizedTest ? (
+                    <div className="field">
+                      <label htmlFor="coding-sample-input">{t("inputOnePerLine")}</label>
+                      <textarea
+                        id="coding-sample-input"
+                        rows={5}
+                        value={sampleInput}
+                        onChange={(event) => updateRunInput(event.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="coding-exercise-test-information">
+                      <div
+                        className="coding-exercise-test-information-item"
+                        role="group"
+                        aria-labelledby="coding-sample-input-label"
+                      >
+                        <strong id="coding-sample-input-label">{t("inputOnePerLine")}</strong>
+                        <pre>{sampleInput || t("noRunInput")}</pre>
+                      </div>
+                      <div
+                        className="coding-exercise-test-information-item"
+                        role="group"
+                        aria-labelledby="coding-sample-expected-output-label"
+                      >
+                        <div className="coding-exercise-test-information-heading">
+                          <strong id="coding-sample-expected-output-label">{t("expectedOutput")}</strong>
+                          <span className="coding-exercise-test-match-mode">
+                            {sampleOutputMatchMode === "contains_lines"
+                              ? t("outputMatchContainsLines")
+                              : sampleOutputMatchMode === "regex"
+                                ? t("outputMatchRegex")
+                                : t("outputMatchExactlyThis")}
+                          </span>
                         </div>
-                        <textarea
-                          id="coding-sample-expected-output"
-                          rows={5}
-                          value={sampleExpectedOutput}
-                          readOnly
-                          onChange={(event) => setSampleExpectedOutput(event.target.value)}
-                        />
+                        <pre>{sampleExpectedOutput || "—"}</pre>
+                        {sampleOutputMatchMode === "contains_lines" ? (
+                          <p className="muted coding-exercise-test-order-note">
+                            {sampleContainsLinesOrderMatters
+                              ? t("containsLinesRequireOrder")
+                              : t("containsLinesAnyOrder")}
+                          </p>
+                        ) : null}
                       </div>
-                      <div className="field">
-                        <label htmlFor="coding-sample-test-code">{t("testHarnessCode")}</label>
-                        <textarea
-                          id="coding-sample-test-code"
-                          rows={5}
-                          value={sampleTestCode}
-                          readOnly
-                        />
-                      </div>
-                      {sampleOutputMatchMode === "contains_lines" ? (
-                        <label className="row" style={{ alignItems: "center", gap: 8 }}>
-                          <input
-                            type="checkbox"
-                            checked={sampleContainsLinesOrderMatters}
-                            disabled
-                            style={{ height: 16, margin: 0, width: 16 }}
-                            onChange={(event) => setSampleContainsLinesOrderMatters(event.target.checked)}
-                          />
-                          <span>{t("containsLinesRequireOrder")}</span>
-                        </label>
-                      ) : null}
-                    </>
-                  ) : null}
+                    </div>
+                  )}
 
                   <button type="button" onClick={runCode} disabled={readOnly || workingAction === "run"}>
                     {workingAction === "run" ? t("running") : t("runTest")}
                   </button>
 
-                  <div className="field">
+                  <div className="field coding-exercise-test-output">
                     <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                       <label id="coding-test-output-label">{t("testOutput")}</label>
                       {!isPersonalizedTest && runExecution && runExecution.status !== "pending" ? (
