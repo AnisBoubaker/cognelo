@@ -59,6 +59,7 @@ type MessageKey =
   | "outputMatchContainsLinesHelp"
   | "outputMatchRegexHelp"
   | "containsLinesRequireOrder"
+  | "containsLinesAnyOrder"
   | "testHarnessCode"
   | "testHarnessCodeHelp"
   | "visibleTestHarnessHelp"
@@ -194,9 +195,10 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     outputMatchContainsLinesHelp: "Every non-empty expected line must occur as literal text within an output line. Trailing whitespace is ignored, and extra output is allowed.",
     outputMatchRegexHelp: "The safe RE2 pattern is searched anywhere in stdout. Backreferences and lookaround are not supported.",
     containsLinesRequireOrder: "Require lines in this order",
+    containsLinesAnyOrder: "Lines may appear in any order",
     testHarnessCode: "Test code",
     testHarnessCodeHelp: "Optional code for this test. If present, the template must include {{ TEST_CODE }}, and the code will be injected there.",
-    visibleTestHarnessHelp: "Visible sample harness code. Students can inspect or adjust it for public sample runs.",
+    visibleTestHarnessHelp: "Optional sample harness code. It is applied automatically and is not shown to students.",
     testTitle: "Title",
     hiddenTests: "Hidden tests",
     addHiddenTest: "Add hidden test",
@@ -326,9 +328,10 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     outputMatchContainsLinesHelp: "Chaque ligne attendue non vide doit apparaître comme texte littéral dans une ligne de sortie. Les espaces de fin sont ignorés et les sorties supplémentaires sont permises.",
     outputMatchRegexHelp: "Le motif RE2 sécurisé est recherché partout dans stdout. Les références arrière et les assertions ne sont pas prises en charge.",
     containsLinesRequireOrder: "Exiger les lignes dans cet ordre",
+    containsLinesAnyOrder: "Les lignes peuvent apparaître dans n’importe quel ordre",
     testHarnessCode: "Code de test",
     testHarnessCodeHelp: "Code optionnel pour ce test. S’il est présent, le gabarit doit contenir {{ TEST_CODE }}, et ce code y sera injecté.",
-    visibleTestHarnessHelp: "Code de harnais visible pour l'exemple. Les étudiants peuvent l'inspecter ou l'ajuster pour les exécutions publiques.",
+    visibleTestHarnessHelp: "Code de harnais optionnel pour l’exemple. Il est appliqué automatiquement et n’est pas montré aux étudiants.",
     testTitle: "Titre",
     hiddenTests: "Tests cachés",
     addHiddenTest: "Ajouter un test caché",
@@ -458,9 +461,10 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     outputMatchContainsLinesHelp: "每个非空期望行都必须作为文字出现在某个输出行中；忽略行尾空白，并允许额外输出。",
     outputMatchRegexHelp: "安全的 RE2 模式会在 stdout 的任意位置查找；不支持反向引用和前后查找。",
     containsLinesRequireOrder: "要求各行按此顺序出现",
+    containsLinesAnyOrder: "各行可以按任意顺序出现",
     testHarnessCode: "测试代码",
     testHarnessCodeHelp: "此测试的可选代码。如需使用，模板必须包含 {{ TEST_CODE }}，并且该代码会注入到那里。",
-    visibleTestHarnessHelp: "公开示例运行用的可见脚手架代码。学生可以查看或调整它。",
+    visibleTestHarnessHelp: "用于示例运行的可选脚手架代码。它会自动应用，且不会向学生显示。",
     testTitle: "标题",
     hiddenTests: "隐藏测试",
     addHiddenTest: "添加隐藏测试",

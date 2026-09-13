@@ -3715,7 +3715,63 @@ a.card:hover,
 }
 
 .coding-exercise-test-runner {
+  align-items: stretch;
+  display: flex;
+  flex-direction: column;
   grid-area: runner;
+  min-height: 0;
+}
+
+.coding-exercise-test-information {
+  display: grid;
+  gap: 14px;
+}
+
+.coding-exercise-test-information-item {
+  display: grid;
+  gap: 7px;
+}
+
+.coding-exercise-test-information-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  justify-content: space-between;
+}
+
+.coding-exercise-test-information-item pre {
+  background: rgba(13, 27, 71, 0.035);
+  border-radius: 8px;
+  margin: 0;
+  max-height: 132px;
+  overflow: auto;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+}
+
+.coding-exercise-test-match-mode {
+  background: color-mix(in srgb, var(--brand-blue), white 92%);
+  border-radius: 999px;
+  color: var(--brand-ink);
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 4px 9px;
+}
+
+.coding-exercise-test-order-note {
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.coding-exercise-test-output {
+  flex: 1 1 128px;
+  grid-template-rows: auto minmax(128px, 1fr);
+  min-height: 0;
+}
+
+.coding-exercise-test-output > pre {
+  height: 100%;
 }
 
 .coding-exercise-workspace-divider {
