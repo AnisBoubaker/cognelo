@@ -6,17 +6,24 @@ describe("coding exercise output matcher", () => {
     expect(getJudge0ExpectedOutput("12.5", { outputMatchMode: "exact", containsLinesOrderMatters: false })).toBe("12.5");
   });
 
-  it("requires complete literal lines and accounts for duplicates", () => {
+  it("finds literal text within output lines and accounts for duplicates", () => {
     const matcher = { outputMatchMode: "contains_lines" as const, containsLinesOrderMatters: false };
     expect(compareCodingExerciseOutput("Age: 3\nPoids: 12.5", "prompt\nPoids: 12.5\nAge: 3\n", matcher).matched).toBe(true);
-    expect(compareCodingExerciseOutput("3", "38.7\n", matcher).matched).toBe(false);
-    expect(compareCodingExerciseOutput("ok\nok", "ok\n", matcher).matched).toBe(false);
+    expect(compareCodingExerciseOutput("3", "Temperature: 38.7\n", matcher).matched).toBe(true);
+    expect(compareCodingExerciseOutput("ok\nok", "result: ok\n", matcher).matched).toBe(false);
+    expect(compareCodingExerciseOutput("ok\nok", "result: ok, then ok\n", matcher).matched).toBe(true);
+  });
+
+  it("ignores trailing whitespace on expected and actual contained lines", () => {
+    const matcher = { outputMatchMode: "contains_lines" as const, containsLinesOrderMatters: false };
+    expect(compareCodingExerciseOutput("first   \nsecond\t", "result: second  \nvalue: first\t \n", matcher).matched).toBe(true);
+    expect(compareCodingExerciseOutput(" first", "result:first   \n", matcher).matched).toBe(false);
   });
 
   it("can require contained lines to appear in order", () => {
     const matcher = { outputMatchMode: "contains_lines" as const, containsLinesOrderMatters: true };
-    expect(compareCodingExerciseOutput("first\nsecond", "prompt\nfirst\nignored\nsecond\n", matcher).matched).toBe(true);
-    expect(compareCodingExerciseOutput("first\nsecond", "second\nfirst\n", matcher).matched).toBe(false);
+    expect(compareCodingExerciseOutput("first\nsecond", "result: first then second\n", matcher).matched).toBe(true);
+    expect(compareCodingExerciseOutput("first\nsecond", "result: second\nprompt: first\n", matcher).matched).toBe(false);
   });
 
   it("supports safe RE2 search patterns across normalized program output", () => {

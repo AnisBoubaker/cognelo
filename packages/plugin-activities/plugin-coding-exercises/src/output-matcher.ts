@@ -65,10 +65,10 @@ export function compareCodingExerciseOutput(
   }
 
   const requiredLines = getRequiredLines(expectedOutput);
-  const outputLines = normalizeLineEndings(stdout).split("\n");
+  const comparableOutput = getComparableLines(stdout).join("\n");
   const matched = matcher.containsLinesOrderMatters
-    ? containsLinesInOrder(outputLines, requiredLines)
-    : containsLinesInAnyOrder(outputLines, requiredLines);
+    ? containsLinesInOrder(comparableOutput, requiredLines)
+    : containsLinesInAnyOrder(comparableOutput, requiredLines);
 
   return {
     matched,
@@ -85,37 +85,51 @@ export function getJudge0ExpectedOutput(expectedOutput: string, matcher: CodingE
 }
 
 function getRequiredLines(expectedOutput: string) {
-  return normalizeLineEndings(expectedOutput)
-    .split("\n")
-    .filter((line) => line.trim().length > 0);
+  return getComparableLines(expectedOutput).filter((line) => line.trim().length > 0);
 }
 
-function containsLinesInOrder(outputLines: string[], requiredLines: string[]) {
-  let outputIndex = 0;
+function getComparableLines(value: string) {
+  return normalizeLineEndings(value)
+    .split("\n")
+    .map((line) => line.trimEnd());
+}
+
+function containsLinesInOrder(output: string, requiredLines: string[]) {
+  let searchIndex = 0;
   for (const requiredLine of requiredLines) {
-    const nextIndex = outputLines.indexOf(requiredLine, outputIndex);
+    const nextIndex = output.indexOf(requiredLine, searchIndex);
     if (nextIndex === -1) {
       return false;
     }
-    outputIndex = nextIndex + 1;
+    searchIndex = nextIndex + requiredLine.length;
   }
   return true;
 }
 
-function containsLinesInAnyOrder(outputLines: string[], requiredLines: string[]) {
-  const availableLineCounts = new Map<string, number>();
-  for (const line of outputLines) {
-    availableLineCounts.set(line, (availableLineCounts.get(line) ?? 0) + 1);
+function containsLinesInAnyOrder(output: string, requiredLines: string[]) {
+  const requiredLineCounts = new Map<string, number>();
+  for (const requiredLine of requiredLines) {
+    requiredLineCounts.set(requiredLine, (requiredLineCounts.get(requiredLine) ?? 0) + 1);
   }
 
-  for (const requiredLine of requiredLines) {
-    const availableCount = availableLineCounts.get(requiredLine) ?? 0;
-    if (!availableCount) {
+  for (const [requiredLine, requiredCount] of requiredLineCounts) {
+    if (countNonOverlappingOccurrences(output, requiredLine) < requiredCount) {
       return false;
     }
-    availableLineCounts.set(requiredLine, availableCount - 1);
   }
   return true;
+}
+
+function countNonOverlappingOccurrences(value: string, searchValue: string) {
+  let count = 0;
+  let searchIndex = 0;
+  while (searchIndex < value.length) {
+    const nextIndex = value.indexOf(searchValue, searchIndex);
+    if (nextIndex === -1) break;
+    count += 1;
+    searchIndex = nextIndex + searchValue.length;
+  }
+  return count;
 }
 
 function normalizeLineEndings(value: string) {

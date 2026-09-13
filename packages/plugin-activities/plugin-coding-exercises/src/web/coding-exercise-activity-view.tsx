@@ -1864,9 +1864,11 @@ function ExecutionCard({
     <section className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 16 }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
         <strong>{title}</strong>
-        <span className="muted">
-          {formatExecutionStatus(locale, execution.status)} {execution.judge0StatusLabel ? `· ${execution.judge0StatusLabel}` : ""}
-        </span>
+        {execution.status === "pending" ? (
+          <span className="muted">{formatCodingExercisesMessage(locale, "statusPending")}</span>
+        ) : (
+          <OutcomeMark passed={execution.status === "completed"} locale={locale} />
+        )}
       </div>
       {execution.stdout ? (
         <div className="field">
@@ -1895,12 +1897,7 @@ function ExecutionCard({
             return (
               <div key={String(item.id ?? item.name)} className="row" style={{ justifyContent: "space-between", gap: 12 }}>
                 <span>{String(item.name ?? item.id ?? formatCodingExercisesMessage(locale, "test"))}</span>
-                <span className="muted">
-                  {item.passed
-                    ? formatCodingExercisesMessage(locale, "passed").toLowerCase()
-                    : formatCodingExercisesMessage(locale, "failed").toLowerCase()}{" "}
-                  {item.statusLabel ? `· ${String(item.statusLabel)}` : ""}
-                </span>
+                {typeof item.passed === "boolean" ? <OutcomeMark passed={item.passed} locale={locale} /> : null}
               </div>
             );
           })}
@@ -1910,12 +1907,21 @@ function ExecutionCard({
   );
 }
 
-function formatExecutionStatus(locale: CodingExercisesLocale, status: CodingExecution["status"]) {
-  if (status === "completed") {
-    return formatCodingExercisesMessage(locale, "statusCompleted");
-  }
-  if (status === "failed") {
-    return formatCodingExercisesMessage(locale, "statusFailed");
-  }
-  return formatCodingExercisesMessage(locale, "statusPending");
+function OutcomeMark({ passed, locale }: { passed: boolean; locale: CodingExercisesLocale }) {
+  const label = formatCodingExercisesMessage(locale, passed ? "passed" : "failed");
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      style={{
+        color: passed ? "#157347" : "#b42318",
+        fontSize: 20,
+        fontWeight: 700,
+        lineHeight: 1
+      }}
+    >
+      {passed ? "✓" : "✕"}
+    </span>
+  );
 }
