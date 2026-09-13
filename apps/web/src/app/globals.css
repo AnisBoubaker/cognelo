@@ -3686,6 +3686,27 @@ a.card:hover,
   box-shadow: inset 3px 0 0 rgba(41, 213, 207, 0.55);
 }
 
+.coding-exercise-workspace-shell {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+}
+
+.coding-exercise-workspace-shell.is-full-screen {
+  background: #f8fbff;
+  grid-template-rows: auto minmax(0, 1fr);
+  inset: 0;
+  overflow: hidden;
+  padding: 16px;
+  position: fixed;
+  z-index: 70;
+}
+
+.coding-exercise-workspace-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .coding-exercise-student-workspace {
   align-items: stretch;
   display: grid;
@@ -3698,6 +3719,23 @@ a.card:hover,
     "editor divider runner"
     "actions . .";
   row-gap: 16px;
+}
+
+.coding-exercise-workspace-shell.is-full-screen .coding-exercise-student-workspace {
+  height: 100%;
+  min-height: 0;
+}
+
+.coding-exercise-workspace-shell.is-full-screen .coding-exercise-student-workspace.has-actions {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.coding-exercise-workspace-shell.is-full-screen .coding-exercise-editor-pane {
+  min-height: 0;
+}
+
+.coding-exercise-workspace-shell.is-full-screen .coding-exercise-test-runner {
+  overflow: auto;
 }
 
 .coding-exercise-editor-pane {
@@ -3935,6 +3973,10 @@ a.card:hover,
 }
 
 @media (max-width: 900px) {
+  .coding-exercise-workspace-shell.is-full-screen {
+    overflow: auto;
+  }
+
   .coding-exercise-student-workspace {
     gap: 20px;
     grid-template-areas:
@@ -3952,6 +3994,14 @@ a.card:hover,
 
   .coding-exercise-workspace-divider {
     display: none;
+  }
+
+  .coding-exercise-workspace-shell.is-full-screen .coding-exercise-student-workspace {
+    height: auto;
+  }
+
+  .coding-exercise-workspace-shell.is-full-screen .coding-exercise-editor-pane {
+    min-height: 520px;
   }
 
   .coding-exercise-attempt-accordion > summary {
