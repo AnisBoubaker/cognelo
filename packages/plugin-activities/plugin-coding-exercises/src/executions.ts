@@ -68,10 +68,11 @@ export const codingExerciseRunInputSchema = z.object({
   expectedOutput: z.string().max(12000).optional().default(""),
   testCode: z.string().max(40000).optional().default(""),
   outputMatchMode: codingExerciseOutputMatchModeSchema.optional().default("exact"),
-  containsLinesOrderMatters: z.boolean().optional().default(false)
+  containsLinesOrderMatters: z.boolean().optional().default(false),
+  compareOutput: z.boolean().optional().default(true)
 });
 
-export type CodingExerciseRunInput = z.infer<typeof codingExerciseRunInputSchema>;
+export type CodingExerciseRunInput = z.input<typeof codingExerciseRunInputSchema>;
 
 export const codingExerciseSubmitInputSchema = z.object({
   sourceCode: z.string().min(1).max(60000)
@@ -159,14 +160,16 @@ export async function runCodingExercise(params: {
   const config = parseCodingExerciseConfig(params.activityConfig);
   const input = codingExerciseRunInputSchema.parse(params.input);
   const outputMatcher = toOutputMatcher(input);
-  assertValidOutputMatcher(input.expectedOutput, outputMatcher);
+  if (input.compareOutput) {
+    assertValidOutputMatcher(input.expectedOutput, outputMatcher);
+  }
   const privateConfig = await getCodingExercisePrivateConfig({ activityId: params.activityId });
   const runtime = await resolveJudge0Language(config.language);
   const sourceCode = buildCodingExerciseSource({
     config,
     privateConfig,
     studentSourceCode: input.sourceCode,
-    testCode: input.testCode
+    testCode: input.compareOutput ? input.testCode : ""
   });
 
   const pendingExecution = await codingExerciseExecutionClient.pluginCodingExerciseExecution.create({
@@ -193,7 +196,7 @@ export async function runCodingExercise(params: {
       languageId: runtime.languageId,
       sourceCode,
       stdin: input.stdin,
-      expectedOutput: getJudge0ExpectedOutput(input.expectedOutput, outputMatcher),
+      expectedOutput: input.compareOutput ? getJudge0ExpectedOutput(input.expectedOutput, outputMatcher) : undefined,
       cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
       wallTimeLimit: 10,
       memoryLimitKb: 128000,
@@ -201,7 +204,7 @@ export async function runCodingExercise(params: {
       enablePerProcessAndThreadMemoryLimit: env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS
     });
 
-    const comparison = evaluateJudge0Result(result, input.expectedOutput, outputMatcher);
+    const comparison = evaluateJudge0Result(result, input.expectedOutput, outputMatcher, input.compareOutput);
     const normalizedExecution = await codingExerciseExecutionClient.pluginCodingExerciseExecution.update({
       where: { id: pendingExecution.id },
       data: {
@@ -218,6 +221,7 @@ export async function runCodingExercise(params: {
         resultSummary: {
           judge0LanguageName: runtime.languageName,
           accepted: comparison.matched,
+          outputCompared: input.compareOutput,
           outputMatchMode: input.outputMatchMode,
           containsLinesOrderMatters: input.containsLinesOrderMatters,
           comparisonMessage: comparison.message,
@@ -234,7 +238,8 @@ export async function runCodingExercise(params: {
       data: {
         status: "failed",
         resultSummary: {
-          phase: "failed-before-result"
+          phase: "failed-before-result",
+          outputCompared: input.compareOutput
         } as Prisma.InputJsonValue,
         message: error instanceof Error ? error.message : "Unknown Judge0 execution failure."
       }
@@ -646,10 +651,14 @@ function assertValidOutputMatcher(expectedOutput: string, matcher: CodingExercis
 function evaluateJudge0Result(
   result: Awaited<ReturnType<typeof runJudge0Submission>>,
   expectedOutput: string,
-  matcher: CodingExerciseOutputMatcher
+  matcher: CodingExerciseOutputMatcher,
+  compareOutput = true
 ) {
   if (result.status?.id !== 3) {
     return { matched: false, message: null as string | null };
+  }
+  if (!compareOutput) {
+    return { matched: true, message: null as string | null };
   }
   if (matcher.outputMatchMode === "exact") {
     return { matched: true, message: null as string | null };

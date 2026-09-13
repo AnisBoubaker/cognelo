@@ -243,6 +243,50 @@ describe("coding exercise executions", () => {
     });
   });
 
+  it("runs personalized input without comparing stdout", async () => {
+    dbMocks.prisma.pluginCodingExerciseReferenceSolution.findUnique.mockResolvedValueOnce({
+      sourceCode: "print('reference')",
+      privateConfig: { templateSource: "{{ STUDENT_CODE }}\n{{ TEST_CODE }}" },
+      validationSummary: { accepted: true },
+      createdAt: new Date("2026-05-14T12:00:00.000Z"),
+      updatedAt: new Date("2026-05-14T12:00:00.000Z")
+    });
+    judge0Mocks.runJudge0Submission.mockResolvedValueOnce({
+      token: "token-personalized",
+      stdout: "Any program output is allowed.\n",
+      stderr: null,
+      compile_output: null,
+      message: null,
+      time: "0.01",
+      memory: 512,
+      status: { id: 3, description: "Accepted" }
+    });
+
+    await expect(
+      runCodingExercise({
+        activityId: "activity-1",
+        userId: "student-1",
+        activityConfig,
+        input: {
+          sourceCode: "print('anything')",
+          stdin: "custom input",
+          testCode: "raise Exception('sample harness must not run')",
+          compareOutput: false
+        }
+      })
+    ).resolves.toMatchObject({
+      status: "completed",
+      stdout: "Any program output is allowed.\n",
+      resultSummary: { accepted: true, outputCompared: false }
+    });
+    expect(judge0Mocks.runJudge0Submission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expectedOutput: undefined,
+        sourceCode: "print('anything')\n"
+      })
+    );
+  });
+
   it("compares contained lines after Judge0 successfully executes the program", async () => {
     judge0Mocks.runJudge0Submission.mockResolvedValueOnce({
       token: "token-contains",

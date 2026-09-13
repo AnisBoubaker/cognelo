@@ -76,6 +76,14 @@ type MessageKey =
   | "sampleRun"
   | "sampleInput"
   | "runSampleTest"
+  | "testSelection"
+  | "personalizedTest"
+  | "inputOnePerLine"
+  | "outputMatchExactlyThis"
+  | "runTest"
+  | "testOutput"
+  | "noOutput"
+  | "resizeWorkspace"
   | "running"
   | "submitForGrading"
   | "submitting"
@@ -190,6 +198,14 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     sampleRun: "Sample run",
     sampleInput: "Sample input",
     runSampleTest: "Run sample test",
+    testSelection: "Test",
+    personalizedTest: "Personalized test",
+    inputOnePerLine: "Input (one value per line)",
+    outputMatchExactlyThis: "Exactly this",
+    runTest: "Run test",
+    testOutput: "Test output",
+    noOutput: "No output.",
+    resizeWorkspace: "Resize code editor and test runner",
     running: "Running...",
     submitForGrading: "Submit for grading",
     submitting: "Submitting...",
@@ -301,6 +317,14 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     sampleRun: "Exécution d'exemple",
     sampleInput: "Entrée d'exemple",
     runSampleTest: "Exécuter le test d'exemple",
+    testSelection: "Test",
+    personalizedTest: "Test personnalisé",
+    inputOnePerLine: "Entrée (une valeur par ligne)",
+    outputMatchExactlyThis: "Exactement ceci",
+    runTest: "Exécuter le test",
+    testOutput: "Sortie du test",
+    noOutput: "Aucune sortie.",
+    resizeWorkspace: "Redimensionner l’éditeur de code et l’espace de test",
     running: "Exécution...",
     submitForGrading: "Soumettre pour évaluation",
     submitting: "Soumission...",
@@ -412,6 +436,14 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     sampleRun: "示例运行",
     sampleInput: "示例输入",
     runSampleTest: "运行示例测试",
+    testSelection: "测试",
+    personalizedTest: "个性化测试",
+    inputOnePerLine: "输入（每行一个值）",
+    outputMatchExactlyThis: "完全一致",
+    runTest: "运行测试",
+    testOutput: "测试输出",
+    noOutput: "无输出。",
+    resizeWorkspace: "调整代码编辑器和测试面板的大小",
     running: "运行中...",
     submitForGrading: "提交评分",
     submitting: "提交中...",

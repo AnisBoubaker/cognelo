@@ -1,8 +1,8 @@
 "use client";
 
-import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
-import { CodeEditor, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
+import { CodeEditor, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   alignCodingExerciseStarterCodeToTemplate,
   buildCodingExerciseStudentTemplateProjectionFromSource,
@@ -124,6 +124,7 @@ type CodingExerciseClient = {
       testCode?: string;
       outputMatchMode?: CodingExerciseOutputMatchMode;
       containsLinesOrderMatters?: boolean;
+      compareOutput?: boolean;
     }
   ) => Promise<{ execution: CodingExecution }>;
   listRuns: (courseId: string, activityId: string) => Promise<{ executions: CodingExecution[] }>;
@@ -207,6 +208,10 @@ const fallbackConfig: CodingExerciseConfig = {
 };
 
 const disabledCodingExerciseLanguages = new Set(["javascript"]);
+const personalizedTestId = "__personalized_test__";
+const workspaceDividerWidth = 12;
+const minimumEditorWidth = 360;
+const minimumTestRunnerWidth = 280;
 
 export function CodingExerciseActivityView({
   activity,
@@ -269,18 +274,23 @@ export function CodingExerciseActivityView({
   const [sampleOutputMatchMode, setSampleOutputMatchMode] = useState<CodingExerciseOutputMatchMode>("exact");
   const [sampleContainsLinesOrderMatters, setSampleContainsLinesOrderMatters] = useState(false);
   const [selectedSampleTestId, setSelectedSampleTestId] = useState("");
+  const [personalizedInput, setPersonalizedInput] = useState("");
+  const [workspaceEditorWidth, setWorkspaceEditorWidth] = useState<number | null>(null);
   const [runExecution, setRunExecution] = useState<CodingExecution | null>(null);
   const [submitExecution, setSubmitExecution] = useState<CodingExecution | null>(null);
   const [recentRuns, setRecentRuns] = useState<CodingExecution[]>([]);
   const [recentSubmissions, setRecentSubmissions] = useState<CodingExecution[]>([]);
   const [workingAction, setWorkingAction] = useState<"run" | "submit" | null>(null);
   const [executionStateLoaded, setExecutionStateLoaded] = useState(!executionStateHost);
+  const studentWorkspaceRef = useRef<HTMLDivElement | null>(null);
   const activityConfigKey = useMemo(() => JSON.stringify(activity.config ?? {}), [activity.config]);
   const sampleValidationTests = getReferenceValidationTests(referenceValidationSummary, "sampleTests");
   const hiddenValidationTests = getReferenceValidationTests(referenceValidationSummary, "hiddenTests");
   const templateProjection = buildCodingExerciseStudentTemplateProjectionFromSource(
     config.studentTemplateSource || buildCodingExerciseTemplateSource("", "")
   );
+  const visibleSampleTests = normalizeCodingExerciseSampleTests(config.sampleTests);
+  const isPersonalizedTest = selectedSampleTestId === personalizedTestId;
 
   useEffect(() => {
     if (typeof document === "undefined" || document.getElementById("coding-exercise-spinner-style")) {
@@ -317,7 +327,9 @@ export function CodingExerciseActivityView({
       );
     }
     setEditorCode(alignCodingExerciseStarterCodeToTemplate(nextConfig.starterCode, nextConfig.studentTemplateSource));
-    setSelectedSampleTestId(sampleTests[0]?.id ?? "");
+    setSelectedSampleTestId(sampleTests[0]?.id ?? personalizedTestId);
+    setPersonalizedInput("");
+    setWorkspaceEditorWidth(null);
     setSampleInput(sampleTests[0]?.input ?? "");
     setSampleExpectedOutput(sampleTests[0]?.output ?? "");
     setSampleTestCode(sampleTests[0]?.testCode ?? "");
@@ -338,6 +350,23 @@ export function CodingExerciseActivityView({
     setReplacementDialog(null);
     previousActivityIdRef.current = activity.id;
   }, [activity.id, activity.title, activity.description, activityConfigKey, canManage]);
+
+  useEffect(() => {
+    const workspace = studentWorkspaceRef.current;
+    if (!workspace || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      setWorkspaceEditorWidth((current) => {
+        if (current === null) return null;
+        const { min, max } = getStudentWorkspaceEditorLimits(workspace);
+        return Math.min(max, Math.max(min, current));
+      });
+    });
+    observer.observe(workspace);
+    return () => observer.disconnect();
+  }, [canManage]);
 
   useEffect(() => {
     if (canManage || !executionStateHost) {
@@ -472,6 +501,16 @@ export function CodingExerciseActivityView({
   }
 
   function applySampleTest(testId: string) {
+    if (testId === personalizedTestId) {
+      setSelectedSampleTestId(testId);
+      setSampleInput(personalizedInput);
+      setSampleExpectedOutput("");
+      setSampleTestCode("");
+      setSampleOutputMatchMode("exact");
+      setSampleContainsLinesOrderMatters(false);
+      setRunExecution(null);
+      return;
+    }
     const selectedTest = normalizeCodingExerciseSampleTests(config.sampleTests).find((test) => test.id === testId);
     setSelectedSampleTestId(testId);
     setSampleInput(selectedTest?.input ?? "");
@@ -479,6 +518,23 @@ export function CodingExerciseActivityView({
     setSampleTestCode(selectedTest?.testCode ?? "");
     setSampleOutputMatchMode(selectedTest?.outputMatchMode ?? "exact");
     setSampleContainsLinesOrderMatters(selectedTest?.containsLinesOrderMatters ?? false);
+    setRunExecution(null);
+  }
+
+  function updateRunInput(value: string) {
+    setSampleInput(value);
+    if (selectedSampleTestId === personalizedTestId) {
+      setPersonalizedInput(value);
+    }
+  }
+
+  function resizeStudentWorkspace(event: ReactPointerEvent<HTMLDivElement>) {
+    const workspace = studentWorkspaceRef.current;
+    if (!workspace) return;
+    const bounds = workspace.getBoundingClientRect();
+    const { min, max } = getStudentWorkspaceEditorLimits(workspace);
+    const nextWidth = event.clientX - bounds.left;
+    setWorkspaceEditorWidth(Math.min(max, Math.max(min, nextWidth)));
   }
 
   function removeHiddenTest(index: number) {
@@ -852,14 +908,17 @@ export function CodingExerciseActivityView({
     }
     setWorkingAction("run");
     setError("");
+    setRunExecution(null);
     try {
+      const isPersonalizedTest = selectedSampleTestId === personalizedTestId;
       const result = await codingClient.runCode(course.id, activity.id, {
         sourceCode: editorCode,
         stdin: sampleInput,
-        expectedOutput: sampleExpectedOutput,
-        testCode: sampleTestCode,
-        outputMatchMode: sampleOutputMatchMode,
-        containsLinesOrderMatters: sampleContainsLinesOrderMatters
+        expectedOutput: isPersonalizedTest ? "" : sampleExpectedOutput,
+        testCode: isPersonalizedTest ? "" : sampleTestCode,
+        outputMatchMode: isPersonalizedTest ? "exact" : sampleOutputMatchMode,
+        containsLinesOrderMatters: isPersonalizedTest ? false : sampleContainsLinesOrderMatters,
+        compareOutput: !isPersonalizedTest
       });
       setRunExecution(result.execution);
       const runs = await codingClient.listRuns(course.id, activity.id);
@@ -1422,89 +1481,173 @@ export function CodingExerciseActivityView({
         <div className="stack">
           <h2>{activity.title}</h2>
           <MarkdownRenderer markdown={config.prompt} />
-          <MonacoCodeEditor
-            id={`coding-exercise-student-${activity.id}`}
-            ariaLabel={activity.title || t("starterCode")}
-            value={editorCode}
-            onChange={updateStudentCode}
-            language={config.language}
-            minHeight={360}
-            readOnly={readOnly || !executionStateLoaded}
-            readOnlyPrefix={templateProjection.readOnlyPrefix}
-            readOnlySuffix={templateProjection.readOnlySuffix}
-          />
-
-          <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
-            <h3>{t("sampleRun")}</h3>
-            {normalizeCodingExerciseSampleTests(config.sampleTests).length ? (
-              <div className="field">
-                <label htmlFor="coding-visible-sample">{t("visibleSampleTests")}</label>
-                <select
-                  id="coding-visible-sample"
-                  value={selectedSampleTestId}
-                  onChange={(event) => applySampleTest(event.target.value)}
-                >
-                  {normalizeCodingExerciseSampleTests(config.sampleTests).map((test) => (
-                    <option key={test.id} value={test.id}>
-                      {getSampleTestSummary(test)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
-            <div className="field">
-              <label>{t("sampleInput")}</label>
-              <textarea rows={4} value={sampleInput} onChange={(event) => setSampleInput(event.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="coding-sample-output-match-mode">{t("outputMatchMode")}</label>
-              <select
-                id="coding-sample-output-match-mode"
-                value={sampleOutputMatchMode}
-                onChange={(event) => setSampleOutputMatchMode(event.target.value as CodingExerciseOutputMatchMode)}
-              >
-                <option value="exact">{t("outputMatchExact")}</option>
-                <option value="contains_lines">{t("outputMatchContainsLines")}</option>
-                <option value="regex">{t("outputMatchRegex")}</option>
-              </select>
-            </div>
-            {sampleOutputMatchMode === "contains_lines" ? (
-              <label className="row" style={{ alignItems: "center", gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={sampleContainsLinesOrderMatters}
-                  style={{ height: 16, margin: 0, width: 16 }}
-                  onChange={(event) => setSampleContainsLinesOrderMatters(event.target.checked)}
-                />
-                <span>{t("containsLinesRequireOrder")}</span>
-              </label>
-            ) : null}
-            <div className="field">
-              <label>{t("expectedOutput")}</label>
-              <textarea rows={4} value={sampleExpectedOutput} onChange={(event) => setSampleExpectedOutput(event.target.value)} />
-            </div>
-            <div className="stack">
-              <label className="editor-section-label">{t("testHarnessCode")}</label>
-              <p className="muted" style={{ margin: 0 }}>
-                {t("visibleTestHarnessHelp")}
-              </p>
-              <CodeEditor value={sampleTestCode} onChange={setSampleTestCode} language={config.language} minHeight={160} />
-            </div>
-            <div className="row">
-              <button type="button" onClick={runCode} disabled={readOnly || workingAction === "run"}>
-                {workingAction === "run" ? t("running") : t("runSampleTest")}
-              </button>
+          <div
+            className="coding-exercise-student-workspace"
+            ref={studentWorkspaceRef}
+            style={
+              {
+                "--coding-exercise-editor-width": workspaceEditorWidth === null ? "2fr" : `${workspaceEditorWidth}px`
+              } as CSSProperties
+            }
+          >
+            <div className="stack" style={{ minWidth: 0 }}>
+              <MonacoCodeEditor
+                id={`coding-exercise-student-${activity.id}`}
+                ariaLabel={activity.title || t("starterCode")}
+                value={editorCode}
+                onChange={updateStudentCode}
+                language={config.language}
+                minHeight={520}
+                readOnly={readOnly || !executionStateLoaded}
+                readOnlyPrefix={templateProjection.readOnlyPrefix}
+                readOnlySuffix={templateProjection.readOnlySuffix}
+              />
               {!deferSubmission ? (
-                <button type="button" onClick={submitCode} disabled={readOnly || workingAction === "submit"}>
-                  {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
-                </button>
+                <div className="row" style={{ alignItems: "center" }}>
+                  <button type="button" onClick={submitCode} disabled={readOnly || workingAction === "submit"}>
+                    {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
+                  </button>
+                  {submitExecution && submitExecution.status !== "pending" ? (
+                    <OutcomeMark passed={submitExecution.status === "completed"} locale={pluginLocale} />
+                  ) : null}
+                </div>
               ) : null}
             </div>
-          </section>
 
-          {error ? <p className="error">{error}</p> : null}
+            <div
+              className="coding-exercise-workspace-divider"
+              role="separator"
+              aria-label={t("resizeWorkspace")}
+              aria-orientation="vertical"
+              aria-valuemin={getStudentWorkspaceEditorLimits(studentWorkspaceRef.current).min}
+              aria-valuemax={getStudentWorkspaceEditorLimits(studentWorkspaceRef.current).max}
+              aria-valuenow={Math.round(
+                workspaceEditorWidth ?? getStudentWorkspaceDefaultEditorWidth(studentWorkspaceRef.current)
+              )}
+              tabIndex={0}
+              onDoubleClick={() => setWorkspaceEditorWidth(null)}
+              onPointerDown={(event) => {
+                event.currentTarget.setPointerCapture(event.pointerId);
+                resizeStudentWorkspace(event);
+              }}
+              onPointerMove={(event) => {
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                  resizeStudentWorkspace(event);
+                }
+              }}
+              onKeyDown={(event) => {
+                const { min, max } = getStudentWorkspaceEditorLimits(studentWorkspaceRef.current);
+                const current = workspaceEditorWidth ?? getStudentWorkspaceDefaultEditorWidth(studentWorkspaceRef.current);
+                if (event.key === "ArrowLeft") setWorkspaceEditorWidth(Math.max(min, current - 24));
+                else if (event.key === "ArrowRight") setWorkspaceEditorWidth(Math.min(max, current + 24));
+                else if (event.key === "Home") setWorkspaceEditorWidth(min);
+                else if (event.key === "End") setWorkspaceEditorWidth(max);
+                else return;
+                event.preventDefault();
+              }}
+            />
 
-          {runExecution ? <ExecutionCard execution={runExecution} title={t("latestSampleRun")} locale={pluginLocale} /> : null}
+            <section
+              className="stack"
+              style={{
+                border: "1px solid rgba(13, 27, 71, 0.1)",
+                borderRadius: 12,
+                minWidth: 0,
+                padding: 18
+              }}
+            >
+              <TestSelector
+                id="coding-visible-sample"
+                label={t("testSelection")}
+                value={selectedSampleTestId}
+                options={[
+                  ...visibleSampleTests.map((test) => ({ value: test.id, label: getSampleTestSummary(test) })),
+                  { value: personalizedTestId, label: t("personalizedTest") }
+                ]}
+                onChange={applySampleTest}
+              />
+
+              <div className="field">
+                <label htmlFor="coding-sample-input">{t("inputOnePerLine")}</label>
+                <textarea
+                  id="coding-sample-input"
+                  rows={5}
+                  value={sampleInput}
+                  onChange={(event) => updateRunInput(event.target.value)}
+                />
+              </div>
+
+              {!isPersonalizedTest ? (
+                <>
+                  <div className="field">
+                    <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                      <label htmlFor="coding-sample-expected-output">{t("expectedOutput")}</label>
+                      <select
+                        id="coding-sample-output-match-mode"
+                        aria-label={t("outputMatchMode")}
+                        value={sampleOutputMatchMode}
+                        onChange={(event) => setSampleOutputMatchMode(event.target.value as CodingExerciseOutputMatchMode)}
+                        style={{ minWidth: 150, width: "auto" }}
+                      >
+                        <option value="contains_lines">{t("outputMatchContainsLines")}</option>
+                        <option value="exact">{t("outputMatchExactlyThis")}</option>
+                        <option value="regex">{t("outputMatchRegex")}</option>
+                      </select>
+                    </div>
+                    <textarea
+                      id="coding-sample-expected-output"
+                      rows={5}
+                      value={sampleExpectedOutput}
+                      onChange={(event) => setSampleExpectedOutput(event.target.value)}
+                    />
+                  </div>
+                  {sampleOutputMatchMode === "contains_lines" ? (
+                    <label className="row" style={{ alignItems: "center", gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={sampleContainsLinesOrderMatters}
+                        style={{ height: 16, margin: 0, width: 16 }}
+                        onChange={(event) => setSampleContainsLinesOrderMatters(event.target.checked)}
+                      />
+                      <span>{t("containsLinesRequireOrder")}</span>
+                    </label>
+                  ) : null}
+                </>
+              ) : null}
+
+              <button type="button" onClick={runCode} disabled={readOnly || workingAction === "run"}>
+                {workingAction === "run" ? t("running") : t("runTest")}
+              </button>
+
+              <div className="field">
+                <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                  <label id="coding-test-output-label">{t("testOutput")}</label>
+                  {!isPersonalizedTest && runExecution && runExecution.status !== "pending" ? (
+                    <OutcomeMark passed={runExecution.status === "completed"} locale={pluginLocale} />
+                  ) : null}
+                </div>
+                <pre
+                  aria-labelledby="coding-test-output-label"
+                  style={{
+                    background: "rgba(13, 27, 71, 0.035)",
+                    border: "1px solid rgba(13, 27, 71, 0.08)",
+                    borderRadius: 8,
+                    boxSizing: "border-box",
+                    margin: 0,
+                    minHeight: 128,
+                    overflow: "auto",
+                    padding: 12,
+                    whiteSpace: "pre-wrap"
+                  }}
+                >
+                  {runExecution ? getExecutionDisplayOutput(runExecution, pluginLocale) : ""}
+                </pre>
+              </div>
+
+              {error ? <p className="error">{error}</p> : null}
+            </section>
+          </div>
+
           {submitExecution ? <ExecutionCard execution={submitExecution} title={t("latestSubmission")} locale={pluginLocale} /> : null}
 
           {recentRuns.length ? (
@@ -1544,6 +1687,123 @@ export function CodingExerciseActivityView({
 
 function normalizeObject(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function getStudentWorkspaceEditorLimits(workspace: HTMLDivElement | null) {
+  const workspaceWidth = workspace?.getBoundingClientRect().width ?? 960;
+  return {
+    min: minimumEditorWidth,
+    max: Math.max(minimumEditorWidth, workspaceWidth - workspaceDividerWidth - minimumTestRunnerWidth)
+  };
+}
+
+function getStudentWorkspaceDefaultEditorWidth(workspace: HTMLDivElement | null) {
+  const workspaceWidth = workspace?.getBoundingClientRect().width ?? 960;
+  const availableWidth = Math.max(0, workspaceWidth - workspaceDividerWidth);
+  const { min, max } = getStudentWorkspaceEditorLimits(workspace);
+  return Math.min(max, Math.max(min, availableWidth * (2 / 3)));
+}
+
+function TestSelector({
+  id,
+  label,
+  value,
+  options,
+  onChange
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
+  const menuId = `${id}-menu`;
+  const selectedOption = options.find((option) => option.value === value) ?? options[0];
+
+  useEffect(() => {
+    if (!anchor) return;
+    const animationFrame = window.requestAnimationFrame(() => {
+      const menu = document.getElementById(menuId);
+      menu?.querySelector<HTMLButtonElement>(`[role="menuitemradio"][aria-checked="true"]`)?.focus();
+    });
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [anchor, menuId]);
+
+  function selectOption(nextValue: string) {
+    onChange(nextValue);
+    const trigger = anchor;
+    setAnchor(null);
+    trigger?.focus();
+  }
+
+  function moveOptionFocus(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    const menu = document.getElementById(menuId);
+    const items = Array.from(menu?.querySelectorAll<HTMLButtonElement>(`[role="menuitemradio"]`) ?? []);
+    const currentIndex = items.indexOf(event.currentTarget);
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowDown") nextIndex = (currentIndex + 1) % items.length;
+    else if (event.key === "ArrowUp") nextIndex = (currentIndex - 1 + items.length) % items.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = items.length - 1;
+    else if (event.key === "Escape") {
+      const trigger = anchor;
+      setAnchor(null);
+      trigger?.focus();
+    } else {
+      return;
+    }
+    event.preventDefault();
+    if (nextIndex !== null) items[nextIndex]?.focus();
+  }
+
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <button
+        id={id}
+        type="button"
+        className="coding-exercise-test-selector"
+        aria-controls={menuId}
+        aria-expanded={Boolean(anchor)}
+        aria-haspopup="menu"
+        title={selectedOption?.label}
+        onClick={(event) => setAnchor((current) => (current ? null : event.currentTarget))}
+        onKeyDown={(event) => {
+          if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+          event.preventDefault();
+          setAnchor(event.currentTarget);
+        }}
+      >
+        <span>{selectedOption?.label ?? ""}</span>
+        <span aria-hidden="true" className="coding-exercise-test-selector-chevron">▾</span>
+      </button>
+      <ContextMenu
+        anchor={anchor}
+        className="coding-exercise-test-menu"
+        open={Boolean(anchor)}
+        onClose={() => setAnchor(null)}
+      >
+        <div id={menuId} role="none">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="menuitemradio"
+              aria-checked={option.value === value}
+              className="coding-exercise-test-menu-option"
+              title={option.label}
+              onClick={() => selectOption(option.value)}
+              onKeyDown={moveOptionFocus}
+            >
+              <span aria-hidden="true">{option.value === value ? "✓" : ""}</span>
+              <span>{option.label}</span>
+            </button>
+          ))}
+        </div>
+      </ContextMenu>
+    </div>
+  );
 }
 
 function getPersistedPrivateConfig(privateConfig: CodingExercisePrivateConfig): CodingExercisePrivateConfig {
@@ -1860,15 +2120,16 @@ function ExecutionCard({
 }) {
   const testSummary = execution.resultSummary?.tests;
   const tests = Array.isArray(testSummary) ? testSummary : [];
+  const outputCompared = execution.resultSummary?.outputCompared !== false;
   return (
     <section className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 16 }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
         <strong>{title}</strong>
         {execution.status === "pending" ? (
           <span className="muted">{formatCodingExercisesMessage(locale, "statusPending")}</span>
-        ) : (
+        ) : outputCompared ? (
           <OutcomeMark passed={execution.status === "completed"} locale={locale} />
-        )}
+        ) : null}
       </div>
       {execution.stdout ? (
         <div className="field">
@@ -1905,6 +2166,29 @@ function ExecutionCard({
       ) : null}
     </section>
   );
+}
+
+function getExecutionDisplayOutput(execution: CodingExecution, locale: CodingExercisesLocale) {
+  const blocks: string[] = [];
+  const stdout = execution.stdout ?? "";
+  const stderr = execution.stderr ?? "";
+  const compileOutput = execution.compileOutput ?? "";
+  const message = execution.message?.trim();
+
+  if (stdout) {
+    blocks.push(stdout);
+  }
+  if (compileOutput) {
+    blocks.push(`${formatCodingExercisesMessage(locale, "compilerOutput")}:\n${compileOutput}`);
+  }
+  if (stderr) {
+    blocks.push(`${formatCodingExercisesMessage(locale, "runtimeError")}:\n${stderr}`);
+  }
+  if (message && message !== stderr.trim() && message !== compileOutput.trim()) {
+    blocks.push(message);
+  }
+
+  return blocks.length ? blocks.join("\n\n") : formatCodingExercisesMessage(locale, "noOutput");
 }
 
 function OutcomeMark({ passed, locale }: { passed: boolean; locale: CodingExercisesLocale }) {

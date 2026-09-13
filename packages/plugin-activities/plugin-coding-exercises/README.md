@@ -22,11 +22,13 @@ Teachers will be able to:
 Students will be able to:
 
 - read the prompt and write code in the shared Monaco editor
-- run code against visible examples
+- run code against visible examples or with personalized input
 - submit code for evaluation against hidden tests
 - resume their work and review prior results
 
-Student execution cards summarize completed outcomes with only an accessible green checkmark or red cross. Judge0 lifecycle/status labels remain internal diagnostics rather than student-facing success text; pending executions retain a neutral pending label until an outcome exists.
+The learner workspace places the code editor and submission action in the left column and the test controls in the right column. It starts with a two-thirds/one-third split, exposes an accessible draggable divider that can also be resized with the keyboard, and collapses responsively on narrow screens. The test selector wraps its selected label and uses the shared anchored-popover primitive so full test names remain readable even when the test column is narrow. Selecting a visible test fills its input, expected output, and comparison mode; its saved harness remains server-bound and is applied automatically. Selecting **Personalized test** preserves a separate custom input, hides expected-output controls, runs without an output assertion or sample harness, and shows the raw execution output without a pass/fail mark.
+
+Preset-test and submission outcomes use only an accessible green checkmark or red cross. Judge0 lifecycle/status labels remain internal diagnostics rather than student-facing success text; pending executions retain a neutral pending label until an outcome exists, and personalized runs deliberately show no outcome mark because they do not compare output.
 
 Standalone student source code autosaves through the core `ActivityResponseDraft` state host and is restored on reload. Successful final submission clears that draft. Embedded Test coding exercises continue to use the Test execution host and its `TestItemAttempt` autosave queue.
 
@@ -144,7 +146,7 @@ Plugin routes are declared in this package and mounted by the platform's generic
 
 Behavior:
 
-- `run` is for learner-visible sample execution
+- `run` is for learner-visible preset and personalized execution; personalized runs explicitly disable output comparison and omit the sample harness
 - `submit` evaluates against plugin-owned hidden tests
 - `hidden-tests` is teacher/admin only and carries the private reference solution
 - Judge0 source is assembled server-side from the private template plus student code, then per-test harness code is injected at `{{ TEST_CODE }}` when present

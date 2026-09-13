@@ -3686,6 +3686,125 @@ a.card:hover,
   box-shadow: inset 3px 0 0 rgba(41, 213, 207, 0.55);
 }
 
+.coding-exercise-student-workspace {
+  align-items: start;
+  display: grid;
+  grid-template-columns: minmax(360px, var(--coding-exercise-editor-width, 2fr)) 12px minmax(280px, 1fr);
+}
+
+.coding-exercise-workspace-divider {
+  align-self: stretch;
+  cursor: col-resize;
+  min-height: 100%;
+  position: relative;
+  touch-action: none;
+  z-index: 2;
+}
+
+.coding-exercise-workspace-divider::after {
+  background: color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 999px;
+  content: "";
+  inset: 0 5px;
+  position: absolute;
+  transition: background 120ms ease, inset 120ms ease;
+}
+
+.coding-exercise-workspace-divider:hover::after,
+.coding-exercise-workspace-divider:focus-visible::after {
+  background: var(--brand-blue);
+  inset-inline: 4px;
+}
+
+.coding-exercise-workspace-divider:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand-blue) 45%, transparent);
+  outline-offset: -2px;
+}
+
+.coding-exercise-test-selector,
+.coding-exercise-test-selector:hover,
+.coding-exercise-test-selector:focus-visible {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--line);
+  box-shadow: none;
+  color: var(--ink);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  height: auto;
+  justify-content: stretch;
+  min-height: 42px;
+  text-align: start;
+  transform: none;
+  width: 100%;
+}
+
+.coding-exercise-test-selector > span:first-child,
+.coding-exercise-test-menu-option > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.coding-exercise-test-selector-chevron {
+  align-self: center;
+  transition: transform 120ms ease;
+}
+
+.coding-exercise-test-selector[aria-expanded="true"] .coding-exercise-test-selector-chevron {
+  transform: rotate(180deg);
+}
+
+.coding-exercise-test-menu {
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--line), var(--brand-blue) 12%);
+  border-radius: 8px;
+  box-shadow: 0 16px 38px rgba(13, 27, 71, 0.13), 0 2px 8px rgba(13, 27, 71, 0.05);
+  max-height: min(420px, calc(100vh - 16px));
+  max-width: min(560px, calc(100vw - 16px));
+  min-width: min(360px, calc(100vw - 16px));
+  overflow-y: auto;
+  padding: 5px;
+  width: max-content;
+}
+
+.coding-exercise-test-menu-option,
+.coding-exercise-test-menu-option:hover,
+.coding-exercise-test-menu-option:focus-visible {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--ink);
+  display: grid;
+  font-weight: 620;
+  gap: 8px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  justify-content: stretch;
+  min-height: 36px;
+  padding: 7px 9px;
+  text-align: start;
+  transform: none;
+  width: 100%;
+}
+
+.coding-exercise-test-menu-option:hover,
+.coding-exercise-test-menu-option:focus-visible,
+.coding-exercise-test-menu-option[aria-checked="true"] {
+  background: color-mix(in srgb, var(--brand-blue), white 94%);
+  outline: none;
+}
+
+@media (max-width: 900px) {
+  .coding-exercise-student-workspace {
+    gap: 20px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .coding-exercise-workspace-divider {
+    display: none;
+  }
+}
+
 .parsons-editor-group-rail-inner {
   position: relative;
 }
