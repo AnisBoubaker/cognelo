@@ -113,7 +113,21 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(studentPage.getByRole("heading", { name: "Rebuild the solution" })).toBeVisible();
     const submit = studentPage.getByRole("button", { name: "Submit", exact: true });
     await submit.click();
-    await expect(submit).toBeDisabled();
+    const confirmation = studentPage.getByRole("dialog", { name: "Submit solution?" });
+    await expect(confirmation).toBeVisible();
+    await confirmation.getByRole("button", { name: "Keep working" }).click();
+    await expect(confirmation).toBeHidden();
+
+    await submit.click();
+    const submissionFinished = studentPage.waitForResponse(
+      (response) =>
+        response.ok() &&
+        response.request().method() === "PATCH" &&
+        response.url().endsWith("/parsons/attempt")
+    );
+    await confirmation.getByRole("button", { name: "Submit solution" }).click();
+    await submissionFinished;
+    await expect(studentPage).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));
   });
 
   test("teacher authors a coding exercise and the student runs and submits code", async ({ teacherPage, studentPage }) => {

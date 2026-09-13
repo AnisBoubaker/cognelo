@@ -521,21 +521,6 @@ export default function CourseDetailPage() {
     }
   }
 
-  async function removeActivity(activity: NonNullable<Course["activities"]>[number]) {
-    const confirmed = window.confirm(t("courseDetail.removeActivityConfirm", { title: activity.title }));
-    if (!confirmed) {
-      return;
-    }
-
-    setError("");
-    try {
-      await api.deleteActivity(courseId, activity.id);
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("courseDetail.removeActivityError"));
-    }
-  }
-
   function startAssigningActivityToAllGroups(activity: NonNullable<Course["activities"]>[number]) {
     const rule = getAllGroupsAssignmentRule(activity);
     const coursePlacement = contentItems.find(
@@ -1802,7 +1787,11 @@ export default function CourseDetailPage() {
                                       type="button"
                                       onClick={() => {
                                         setContentContextMenu(null);
-                                        item.kind === "folder" ? startEditingFolder(item, false) : openContentSettings(item);
+                                        if (item.kind === "folder") {
+                                          startEditingFolder(item, false);
+                                        } else {
+                                          openContentSettings(item);
+                                        }
                                       }}
                                     >
                                       <MaterialActionIcon name="edit" />
@@ -2538,13 +2527,6 @@ function formatAvailabilityValue(value: string) {
   }).format(date);
 }
 
-function formatGradebookScore(score: number | null, maxScore: number) {
-  if (score === null) {
-    return "-";
-  }
-  return `${formatGradeNumber(score)} / ${formatGradeNumber(maxScore)}`;
-}
-
 function formatGradeNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
@@ -2772,7 +2754,7 @@ function MaterialActionIcon({
     | "up"
     | "visible";
 }) {
-  const paths = {
+  const _paths = {
     activityAdd: (
       <>
         <path d="M6 4h9l3 3v13H6z" />

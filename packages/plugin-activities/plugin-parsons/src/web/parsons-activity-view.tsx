@@ -90,6 +90,7 @@ type ParsonsActivityViewProps = {
   attemptsClient?: ParsonsAttemptsClient;
   studentViewMode?: "attempt" | "previous";
   deferSubmission?: boolean;
+  onSubmitted?: () => void;
   onNewAttemptAvailabilityChange?: (canStartNewAttempt: boolean) => void;
   onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
   t: (key: string, vars?: Record<string, string | number>) => string;
@@ -132,6 +133,7 @@ export function ParsonsActivityView({
   attemptsClient,
   studentViewMode = "attempt",
   deferSubmission = false,
+  onSubmitted,
   onNewAttemptAvailabilityChange,
   onPreviousSubmissionsAvailabilityChange,
   t,
@@ -160,6 +162,8 @@ export function ParsonsActivityView({
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showReplaceGenerationDialog, setShowReplaceGenerationDialog] = useState(false);
+  const [showSubmitConfirmDialog, setShowSubmitConfirmDialog] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [attempt, setAttempt] = useState<ParsonsAttemptLike | null>(null);
   const [previousSubmissions, setPreviousSubmissions] = useState<ParsonsSubmissionReview[]>([]);
   const attemptRef = useRef<ParsonsAttemptLike | null>(null);
@@ -195,6 +199,8 @@ export function ParsonsActivityView({
     setError("");
     setGenerating(false);
     setShowReplaceGenerationDialog(false);
+    setShowSubmitConfirmDialog(false);
+    setSubmitting(false);
   }, [activity.id, activity.title, activity.description, activityConfigKey]);
 
   useEffect(() => {
@@ -559,10 +565,11 @@ export function ParsonsActivityView({
     });
   }
 
-  function submitSolution() {
-    if (isReadOnlyStudentAttempt) {
+  async function submitSolution() {
+    if (isReadOnlyStudentAttempt || submitting) {
       return;
     }
+    setSubmitting(true);
     const result = evaluateParsonsSolution(blocksRef.current, parseParsonsConfig(activity.config));
     if (!isSummativeStudentSession) {
       const nextFeedback = formatFeedback(result);
@@ -574,20 +581,28 @@ export function ParsonsActivityView({
       }
     }
 
-    void persistAttemptUpdate({
-      state: buildAttemptStateSnapshot(blocksRef.current, selectedBlockIdRef.current, result),
-      event: {
-        type: "submit",
-        payload: {
-          isCorrect: result.isCorrect,
-          misplacedBlocks: result.misplacedBlocks,
-          incorrectIndents: result.incorrectIndents
-        }
-      },
-      result,
-      submit: true,
-      complete: true
-    });
+    try {
+      const submittedAttempt = await persistAttemptUpdate({
+        state: buildAttemptStateSnapshot(blocksRef.current, selectedBlockIdRef.current, result),
+        event: {
+          type: "submit",
+          payload: {
+            isCorrect: result.isCorrect,
+            misplacedBlocks: result.misplacedBlocks,
+            incorrectIndents: result.incorrectIndents
+          }
+        },
+        result,
+        submit: true,
+        complete: true
+      });
+      if (submittedAttempt) {
+        setShowSubmitConfirmDialog(false);
+        onSubmitted?.();
+      }
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function toggleSelectedLine(lineIndex: number) {
@@ -977,7 +992,7 @@ export function ParsonsActivityView({
             {t("parsons.reset")}
           </button>
           {isSummativeStudentSession && !deferSubmission ? (
-            <button type="button" onClick={submitSolution} disabled={isReadOnlyStudentAttempt}>
+            <button type="button" onClick={() => setShowSubmitConfirmDialog(true)} disabled={isReadOnlyStudentAttempt || submitting}>
               {t("parsons.submit")}
             </button>
           ) : !isSummativeStudentSession ? (
@@ -1086,6 +1101,26 @@ export function ParsonsActivityView({
           ))}
         </div>
       </section>
+      ) : null}
+
+      {showSubmitConfirmDialog ? (
+        <div className="dialog-backdrop" role="presentation">
+          <div aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="parsons-submit-confirm-title">
+            <div className="stack" style={{ gap: 8 }}>
+              <p className="eyebrow">{t("parsons.submit")}</p>
+              <h2 id="parsons-submit-confirm-title">{t("parsons.submitConfirmTitle")}</h2>
+              <p className="muted">{t("parsons.submitConfirmMessage")}</p>
+            </div>
+            <div className="dialog-actions">
+              <button className="secondary" type="button" disabled={submitting} onClick={() => setShowSubmitConfirmDialog(false)}>
+                {t("parsons.keepWorking")}
+              </button>
+              <button type="button" disabled={submitting} onClick={() => void submitSolution()}>
+                {submitting ? t("parsons.submitting") : t("parsons.confirmSubmit")}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </>
   );

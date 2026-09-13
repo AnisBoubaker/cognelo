@@ -16,6 +16,7 @@ This file is for Parsons-specific memory only.
 - Teachers can add precedence rules between groups.
 - Scrambling is generated from the reference solution and should be random on each fresh try/reset.
 - Students can click a line to activate it and then use arrow keys to move it; left/right adjust indentation when indentation mode is enabled.
+- Standalone summative submission requires explicit confirmation. Cancelling leaves the current arrangement intact; confirming waits for persistence to succeed and then returns the student to course content.
 - Order feedback should count minimally misplaced units rather than every downstream displaced line.
 - Parsons AI generation uses the platform knowledge modes. All modes provide the complete subject catalog as a curriculum boundary; selected skills additionally steer generation, suggestion maps the generated prompt and solution to exact subject skills in the unsaved host draft, and ignore neither reads nor changes that draft and performs no mapping pass.
 

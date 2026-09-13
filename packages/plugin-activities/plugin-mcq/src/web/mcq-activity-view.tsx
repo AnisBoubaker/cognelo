@@ -1010,7 +1010,7 @@ function McqQuestionCard({
   question,
   index,
   selected,
-  submitted,
+  submitted: _submitted,
   showFeedback,
   questionLabel,
   correctLabel,

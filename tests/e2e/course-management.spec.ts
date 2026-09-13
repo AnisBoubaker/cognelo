@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures/auth";
+import { createAuthenticatedApi, expect, test } from "./fixtures/auth";
 import {
   createBankActivityThroughUi,
   createCourseActivity,
@@ -12,11 +12,12 @@ import {
 test.describe.serial("course, group, participant, attempt, and gradebook workflows", () => {
   let data: ActivitySuiteData | undefined;
   let activityTitle = "";
+  let activityId = "";
 
   test.beforeAll(async () => {
     data = await provisionActivitySuite();
     activityTitle = `E2E repeatable assessment ${data.token}`;
-    await createCourseActivity(data, {
+    activityId = await createCourseActivity(data, {
       activityTypeKey: "mcq",
       config: {
         aiGenerationInstructions: "",
@@ -78,7 +79,6 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
   });
 
   test("student uses multiple attempts and cannot exceed the configured attempt policy", async ({ studentPage: page }) => {
-    test.fail(true, "Known assessment-integrity bug: https://github.com/AnisBoubaker/cognelo/issues/160");
     test.setTimeout(120_000);
     if (!data) throw new Error("The activity suite was not provisioned.");
 
@@ -94,6 +94,20 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     await expect(page.getByRole("tab", { name: "New attempt" })).toHaveCount(0);
     await expect(page.getByRole("tab", { name: "Previous submissions" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Submit", exact: true })).toHaveCount(0);
+
+    const studentApi = await createAuthenticatedApi("student");
+    try {
+      const fourthSubmission = await studentApi.post(
+        `/api/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${activityId}/mcq/submission`,
+        { data: { answers: { "question-1": ["question-1-choice-1"] } } }
+      );
+      expect(fourthSubmission.status()).toBe(409);
+      await expect(fourthSubmission.json()).resolves.toMatchObject({
+        error: { code: "ATTEMPT_LIMIT_REACHED" }
+      });
+    } finally {
+      await studentApi.dispose();
+    }
   });
 
   test("teacher filters, exports, releases, and hides group gradebook results", async ({ teacherPage: page }) => {
@@ -233,5 +247,13 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
 async function submitCurrentMcqAttempt(page: import("@playwright/test").Page, choice: "No" | "Yes") {
   await page.getByLabel(choice, { exact: true }).check();
   await page.getByRole("button", { name: "Submit", exact: true }).click();
+  const submissionFinished = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/mcq/submission")
+  );
   await page.getByRole("dialog", { name: "Submit answers?" }).getByRole("button", { name: "Submit answers" }).click();
+  const response = await submissionFinished;
+  expect(response.ok()).toBeTruthy();
+  await expect(page).toHaveURL(/\/courses\/[^/]+\/groups\/[^/]+$/);
 }

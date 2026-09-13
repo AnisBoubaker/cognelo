@@ -38,6 +38,17 @@ describe("MCQ student attempt state", () => {
       completedSubmission: true
     });
   });
+
+  it("keeps the completed submission read-only when no attempt remains", () => {
+    expect(deriveMcqStudentAttemptState({
+      submission: { lifecycle: "graded", answers: { "question-1": ["choice-1"] } },
+      availability: { canStart: false }
+    })).toEqual({
+      answers: { "question-1": ["choice-1"] },
+      submitted: true,
+      completedSubmission: true
+    });
+  });
 });
 
 describe("MCQ source parser", () => {
