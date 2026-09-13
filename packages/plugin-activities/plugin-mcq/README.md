@@ -45,6 +45,8 @@ Draft MCQ saves update mutable bank authoring without creating a version; a chan
 
 For summative activities that permit another attempt, the **New attempt** tab starts with an empty editable response even when a completed submission exists. Completed answers remain under **Previous submissions**, where the student can select any of their own submissions by timestamp; an unfinished attempt still resumes its saved answers.
 
+When the configured attempt limit is exhausted, reopening the activity shows submission history without a new-attempt form. The submission route independently rechecks availability and rejects any extra request, even if a client bypasses the UI.
+
 Before the teacher releases the final grade, this repeatable-assessment review shows the student each attempt’s provisional score and MCQ feedback so it can inform the next attempt. Grade release publishes the final grade selected by the gradebook strategy and closes further attempts; single-attempt summative results remain hidden until release.
 
 Submitted-answer review uses a green row for a missed correct choice so the correct answer remains visually recognizable, while retaining the orange exclamation icon that distinguishes it from a correctly selected answer.

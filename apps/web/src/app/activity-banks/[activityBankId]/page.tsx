@@ -122,16 +122,6 @@ export default function ActivityBankDetailPage() {
     }
   }
 
-  function beginEditing(activity: BankActivity) {
-    setEditingActivity({
-      id: activity.id,
-      title: activity.title,
-      description: activity.description,
-      lifecycle: activity.lifecycle as EditingActivityState["lifecycle"],
-      activityTypeKey: activity.activityType.key
-    });
-  }
-
   async function saveActivityEdit(event: FormEvent) {
     event.preventDefault();
     if (!bank || !editingActivity) {

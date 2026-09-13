@@ -25,6 +25,7 @@ Students can:
 - restore indentation when required
 - use click-to-select plus arrow-key movement
 - resume persisted attempts
+- confirm standalone summative submission before it is recorded, then return to the course content page
 
 ## Package Contents
 
@@ -116,6 +117,7 @@ Summative submissions do not show correctness feedback during the activity. When
 - order feedback counts minimally misplaced units instead of cascading false counts
 - groups are stored as line ranges so edits inside a group keep the group coherent
 - teacher authoring uses the shared responsive `EditActionBar` for saved/unsaved status and snapshot-backed Cancel/Save actions
+- standalone summative submission uses a confirmation dialog; cancelling keeps the arrangement editable, while a successful confirmation records the attempt before navigating back to course content
 
 ## Contributor Workflow
 

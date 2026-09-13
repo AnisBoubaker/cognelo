@@ -79,10 +79,10 @@ export async function loginWithCredentialsThroughUi(page: Page, account: Credent
   await expect(page.getByRole("button", { name: "Open account menu" })).toBeVisible();
 }
 
-async function useAuthenticatedPage(
+async function provideAuthenticatedPage(
   browser: Browser,
   role: AuthRole,
-  use: (page: Page) => Promise<void>
+  provide: (page: Page) => Promise<void>
 ) {
   const context = await browser.newContext({
     baseURL: WEB_BASE_URL,
@@ -91,16 +91,16 @@ async function useAuthenticatedPage(
   });
   const page = await context.newPage();
   try {
-    await use(page);
+    await provide(page);
   } finally {
     await context.close();
   }
 }
 
 export const test = base.extend<AuthenticatedFixtures>({
-  adminPage: async ({ browser }, use) => useAuthenticatedPage(browser, "admin", use),
-  teacherPage: async ({ browser }, use) => useAuthenticatedPage(browser, "teacher", use),
-  studentPage: async ({ browser }, use) => useAuthenticatedPage(browser, "student", use)
+  adminPage: async ({ browser }, use) => provideAuthenticatedPage(browser, "admin", use),
+  teacherPage: async ({ browser }, use) => provideAuthenticatedPage(browser, "teacher", use),
+  studentPage: async ({ browser }, use) => provideAuthenticatedPage(browser, "student", use)
 });
 
 export { expect };

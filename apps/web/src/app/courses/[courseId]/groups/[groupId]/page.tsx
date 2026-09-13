@@ -51,7 +51,7 @@ export default function CourseGroupPage() {
   const [group, setGroup] = useState<CourseGroup | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
-  const [contentTypeDefinitions, setContentTypeDefinitions] = useState<ContentTypeDefinition[]>([]);
+  const [, setContentTypeDefinitions] = useState<ContentTypeDefinition[]>([]);
   const [activeContentTypeDefinitions, setActiveContentTypeDefinitions] = useState<ContentTypeDefinition[]>([]);
   const [contentResources, setContentResources] = useState<CourseContentResource[]>([]);
   const [contentItems, setContentItems] = useState<CourseContentItem[]>([]);
@@ -2223,16 +2223,6 @@ function toDateTimeLocalValue(value?: string | null) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-function formatBytes(bytes: number) {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function formatAvailabilityWindow(
   availableFrom: string | null | undefined,
   availableUntil: string | null | undefined,
@@ -2616,7 +2606,7 @@ function MaterialActionIcon({
 }: {
   name: "activityAdd" | "close" | "download" | "down" | "drag" | "edit" | "hidden" | "open" | "remove" | "save" | "up" | "visible";
 }) {
-  const paths = {
+  const _paths = {
     activityAdd: (
       <>
         <path d="M6 4h9l3 3v13H6z" />

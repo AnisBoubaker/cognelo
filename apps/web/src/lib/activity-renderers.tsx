@@ -1,4 +1,4 @@
-import type { ComponentProps, ComponentType, JSXElementConstructor, ReactNode } from "react";
+import type { ComponentProps, ComponentType, ElementType, ReactNode } from "react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
@@ -17,7 +17,6 @@ import {
   parseParsonsConfig,
   ParsonsActivityView,
   ParsonsManualGradingPanel,
-  type ParsonsAttemptRecord,
   type ParsonsGenerationInput,
   type ParsonsGradebookAttemptRecord
 } from "@cognelo/plugin-parsons";
@@ -54,7 +53,7 @@ import {
   type WebDesignExerciseTest
 } from "@/lib/api";
 
-type ActivityRendererProps<T extends JSXElementConstructor<any>> = ComponentProps<T> & {
+type ActivityRendererProps<T extends ElementType> = ComponentProps<T> & {
   activityRouteCourseId?: string;
   groupId?: string;
   hasQuestionAuthoringAgent?: boolean;
@@ -155,7 +154,7 @@ function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActi
     activityRouteCourseId,
     groupId,
     hasQuestionAuthoringAgent,
-    onSubmitted: _onSubmitted,
+    onSubmitted,
     showReleasedAnswers: _showReleasedAnswers,
     releasedMaxScore: _releasedMaxScore,
     studentViewMode,
@@ -212,6 +211,7 @@ function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActi
       {...activityProps}
       aiGenerationClient={aiGenerationClient}
       attemptsClient={attemptsClient}
+      onSubmitted={onSubmitted}
       onNewAttemptAvailabilityChange={onNewAttemptAvailabilityChange}
       onPreviousSubmissionsAvailabilityChange={onPreviousSubmissionsAvailabilityChange}
       studentViewMode={studentViewMode}

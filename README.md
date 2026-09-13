@@ -421,12 +421,13 @@ npm run db:seed
 6. Run automated checks:
 
 ```bash
+npm run lint
 npm run typecheck
 npm test
 npm run test:e2e
 ```
 
-Vitest covers contracts, core service behavior, API route orchestration, and plugin lifecycle contracts. Playwright covers authentication; global and course-scoped roles; administration; course, group, participant, and bank management; authoring and learner completion for every installed activity type; compound Tests; attempt policies; automatic grading; grade release; and learner grade visibility. The E2E suite requires a migrated and seeded development database, starts missing web/API development servers automatically, uses disposable uniquely named records, and cleans up only the exact records it creates. Real coding, web-design, and Coding Homework flows additionally require their documented execution or AI services. See [tests/e2e/README.md](tests/e2e/README.md) for the flow inventory, prerequisites, environment overrides, and browser installation options.
+ESLint uses the repository-level flat configuration with Next.js Core Web Vitals and TypeScript rules; generated clients and build outputs are excluded. React Compiler rules that would require broad runtime-sensitive refactors are temporarily disabled so restoring lint remains a tooling-only migration. Vitest covers contracts, core service behavior, API route orchestration, and plugin lifecycle contracts. Playwright covers authentication; global and course-scoped roles; administration; course, group, participant, and bank management; authoring and learner completion for every installed activity type; compound Tests; attempt policies; automatic grading; grade release; and learner grade visibility. The E2E suite requires a migrated and seeded development database, starts missing web/API development servers automatically, uses disposable uniquely named records, and cleans up only the exact records it creates. Real coding, web-design, and Coding Homework flows additionally require their documented execution or AI services. See [tests/e2e/README.md](tests/e2e/README.md) for the flow inventory, prerequisites, environment overrides, and browser installation options.
 
 7. Start both apps:
 

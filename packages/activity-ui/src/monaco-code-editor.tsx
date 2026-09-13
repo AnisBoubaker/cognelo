@@ -243,19 +243,6 @@ function configureMonaco(monaco: Monaco) {
   monaco.editor.setTheme("cognelo-light");
 }
 
-function getEditableMonacoRange(monaco: Monaco | null, displayedValue: string, readOnlyPrefix: string, studentValue: string) {
-  if (!monaco) {
-    return null;
-  }
-
-  const startOffset = readOnlyPrefix.length;
-  const endOffset = readOnlyPrefix.length + studentValue.length;
-  const startPosition = getPositionFromOffset(displayedValue, startOffset);
-  const endPosition = getPositionFromOffset(displayedValue, endOffset);
-
-  return new monaco.Range(startPosition.lineNumber, startPosition.column, endPosition.lineNumber, endPosition.column);
-}
-
 function getPositionFromOffset(value: string, offset: number) {
   const beforeOffset = value.slice(0, offset);
   const lines = beforeOffset.split("\n");

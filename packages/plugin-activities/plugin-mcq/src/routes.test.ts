@@ -294,6 +294,42 @@ describe("MCQ generation route", () => {
     );
   });
 
+  it("rejects a summative submission when the configured attempt limit is exhausted", async () => {
+    mocks.getActivityAttemptAvailability.mockResolvedValueOnce({
+      canStart: false,
+      reason: "ATTEMPT_LIMIT_REACHED",
+      attemptLimitMode: "max_attempts",
+      gradesReleased: false,
+      maxAttempts: 3,
+      usedAttempts: 3,
+      attemptsRemaining: 0
+    });
+
+    await expect(
+      mcqSubmissionRoute.methods.POST?.({
+        request: new Request("http://test.local"),
+        context: {
+          ...context,
+          user: { ...context.user, id: "student-1", roles: ["student" as const] },
+          groupId: "group-1",
+          activity: {
+            ...context.activity,
+            config: { source: "## Question\n\n- [x] Correct\n- [ ] Wrong" },
+            assignment: {
+              id: "assignment-1",
+              metadata: { assessmentMode: "summative" }
+            }
+          }
+        },
+        readJson: async () => ({ answers: { "question-1": ["question-1-choice-1"] } })
+      })
+    ).rejects.toMatchObject({ status: 409, code: "ATTEMPT_LIMIT_REACHED" });
+
+    expect(mocks.startActivityAttempt).not.toHaveBeenCalled();
+    expect(mocks.submitActivityAttempt).not.toHaveBeenCalled();
+    expect(mocks.recordActivityAttemptGradingResult).not.toHaveBeenCalled();
+  });
+
   it("lists every completed submission for the authenticated student in newest-first order", async () => {
     mocks.prisma.activityAttempt.findMany.mockResolvedValueOnce([
       {

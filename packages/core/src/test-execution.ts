@@ -792,8 +792,8 @@ function manifestItemIds(metadata: unknown) {
   return new Set(manifestItems(metadata).map((item) => item.testItemId));
 }
 
-function asRecord(value: unknown): Record<string, any> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
 function numberOrNull(value: unknown) {

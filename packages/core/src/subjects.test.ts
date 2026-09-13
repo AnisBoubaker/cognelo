@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
+import type { AppError } from "./errors";
 
 const mockPrisma = vi.hoisted(() => ({
   activity: {
@@ -28,7 +29,6 @@ vi.mock("./plugins", () => ({
 }));
 
 const { deleteBankActivity } = await import("./subjects");
-const { AppError } = await import("./errors");
 
 const adminUser: CurrentUser = {
   id: "user-admin",
@@ -61,7 +61,7 @@ describe("deleteBankActivity", () => {
       status: 409,
       code: "BANK_ACTIVITY_IN_USE",
       details: { courseCount: 2 }
-    } satisfies Partial<InstanceType<typeof AppError>>);
+    } satisfies Partial<AppError>);
 
     expect(mockPrisma.bankActivity.delete).not.toHaveBeenCalled();
   });

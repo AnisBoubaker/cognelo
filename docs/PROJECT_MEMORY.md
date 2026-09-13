@@ -229,6 +229,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 
 ## Verification Habits
 
+- Use root `npm run lint` for repository-wide ESLint checks. The flat configuration applies the Next.js Core Web Vitals and TypeScript presets across application and package source while excluding generated clients and build artifacts; `npm run lint:fix` is the explicit opt-in autofix command. React Compiler rules with substantial pre-existing, runtime-sensitive cleanup are temporarily disabled and should be re-enabled through a dedicated remediation effort; the remaining recommended rules continue to fail lint on errors.
 - Use `npm run typecheck --workspace @cognelo/web` for frontend-only changes.
 - Use `npm run build --workspace @cognelo/web` to confirm the Next.js web app still produces a valid production build.
 - Use `npm run db:migrate:all` after core or plugin Prisma schema changes so core migrations, plugin migration manifests, and generated clients stay aligned.

@@ -16,7 +16,7 @@ export function calculateContextMenuPosition(input: {
 }) {
   const margin = 8;
   const gap = 4;
-  let left = input.anchorRect ? input.anchorRect.right - input.menuWidth : input.point?.x ?? margin;
+  const left = input.anchorRect ? input.anchorRect.right - input.menuWidth : input.point?.x ?? margin;
   let top = input.anchorRect ? input.anchorRect.bottom + gap : input.point?.y ?? margin;
   if (top + input.menuHeight > input.viewportHeight - margin) {
     top = input.anchorRect ? input.anchorRect.top - input.menuHeight - gap : top - input.menuHeight;

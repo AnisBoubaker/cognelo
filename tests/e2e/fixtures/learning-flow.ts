@@ -1,5 +1,5 @@
 import { prisma } from "@cognelo/db";
-import type { APIRequestContext, APIResponse } from "@playwright/test";
+import type { APIResponse } from "@playwright/test";
 import { createAuthenticatedApi, credentialsFor } from "./auth";
 
 export type LearningFlowData = {
