@@ -1479,7 +1479,6 @@ export function CodingExerciseActivityView({
         </form>
       ) : (
         <div className="stack">
-          <h2>{activity.title}</h2>
           <MarkdownRenderer markdown={config.prompt} />
           <div
             className="coding-exercise-student-workspace"
