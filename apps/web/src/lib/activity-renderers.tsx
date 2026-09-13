@@ -224,12 +224,12 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
     activityRouteCourseId,
     groupId,
     hasQuestionAuthoringAgent,
-    onSubmitted: _onSubmitted,
+    onSubmitted,
     showReleasedAnswers: _showReleasedAnswers,
     releasedMaxScore: _releasedMaxScore,
-    studentViewMode: _studentViewMode,
-    onNewAttemptAvailabilityChange: _onNewAttemptAvailabilityChange,
-    onPreviousSubmissionsAvailabilityChange: _onPreviousSubmissionsAvailabilityChange,
+    studentViewMode,
+    onNewAttemptAvailabilityChange,
+    onPreviousSubmissionsAvailabilityChange,
     ...activityProps
   } = props;
   const courseId = activityRouteCourseId ?? activityProps.course?.id;
@@ -240,63 +240,87 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
     groupActivityId: activityProps.activity.assignment?.id,
     groupId
   });
+  const aiGenerationClient = useMemo(
+    () =>
+      activityProps.canManage && hasQuestionAuthoringAgent && courseId
+        ? {
+            generatePrompt: (input: Parameters<typeof api.generateCodingExercisePrompt>[2]) =>
+              api.generateCodingExercisePrompt(courseId, activityProps.activity.id, input),
+            generateSolution: (input: Parameters<typeof api.generateCodingExerciseSolution>[2]) =>
+              api.generateCodingExerciseSolution(courseId, activityProps.activity.id, input),
+            generateTests: (input: Parameters<typeof api.generateCodingExerciseTests>[2]) =>
+              api.generateCodingExerciseTests(courseId, activityProps.activity.id, input)
+          }
+        : undefined,
+    [activityProps.activity.id, activityProps.canManage, courseId, hasQuestionAuthoringAgent]
+  );
+  const codingClient = useMemo(
+    () => ({
+      listHiddenTests: async (courseId: string, activityId: string) => {
+        const result = groupId
+          ? await api.groupCodingExerciseHiddenTests(courseId, groupId, activityId)
+          : await api.codingExerciseHiddenTests(courseId, activityId);
+        return {
+          tests: result.tests as CodingExerciseHiddenTest[],
+          referenceSolution: result.referenceSolution
+        };
+      },
+      saveHiddenTests: async (
+        courseId: string,
+        activityId: string,
+        input: Parameters<typeof api.saveCodingExerciseHiddenTests>[2]
+      ) => {
+        const result = groupId
+          ? await api.saveGroupCodingExerciseHiddenTests(courseId, groupId, activityId, input)
+          : await api.saveCodingExerciseHiddenTests(courseId, activityId, input);
+        return {
+          tests: result.tests as CodingExerciseHiddenTest[],
+          referenceSolution: result.referenceSolution
+        };
+      },
+      runCode: async (courseId: string, activityId: string, input: Parameters<typeof api.runCodingExercise>[2]) => {
+        const result = groupId
+          ? await api.runGroupCodingExercise(courseId, groupId, activityId, input)
+          : await api.runCodingExercise(courseId, activityId, input);
+        return { execution: result.execution as CodingExerciseExecution };
+      },
+      listRuns: async (courseId: string, activityId: string) => {
+        const result = groupId
+          ? await api.groupCodingExerciseRuns(courseId, groupId, activityId)
+          : await api.codingExerciseRuns(courseId, activityId);
+        return { executions: result.executions as CodingExerciseExecution[] };
+      },
+      submitCode: async (courseId: string, activityId: string, input: { sourceCode: string }) => {
+        const result = groupId
+          ? await api.submitGroupCodingExercise(courseId, groupId, activityId, input)
+          : await api.submitCodingExercise(courseId, activityId, input);
+        return { execution: result.execution as CodingExerciseExecution, availability: result.availability };
+      },
+      listSubmissions: async (courseId: string, activityId: string) => {
+        const result = groupId
+          ? await api.groupCodingExerciseSubmissions(courseId, groupId, activityId)
+          : await api.codingExerciseSubmissions(courseId, activityId);
+        return { executions: result.executions as CodingExerciseExecution[] };
+      },
+      listHistory: async (courseId: string, activityId: string) => {
+        const result = groupId
+          ? await api.groupCodingExerciseHistory(courseId, groupId, activityId)
+          : await api.codingExerciseHistory(courseId, activityId);
+        return result;
+      }
+    }),
+    [groupId]
+  );
   return (
     <CodingExerciseActivityView
       {...activityProps}
-      aiGenerationClient={
-        activityProps.canManage && hasQuestionAuthoringAgent && courseId
-          ? {
-              generatePrompt: (input) => api.generateCodingExercisePrompt(courseId, activityProps.activity.id, input),
-              generateSolution: (input) => api.generateCodingExerciseSolution(courseId, activityProps.activity.id, input),
-              generateTests: (input) => api.generateCodingExerciseTests(courseId, activityProps.activity.id, input)
-            }
-          : undefined
-      }
-      codingClient={{
-        listHiddenTests: async (courseId, activityId) => {
-          const result = groupId
-            ? await api.groupCodingExerciseHiddenTests(courseId, groupId, activityId)
-            : await api.codingExerciseHiddenTests(courseId, activityId);
-          return {
-            tests: result.tests as CodingExerciseHiddenTest[],
-            referenceSolution: result.referenceSolution
-          };
-        },
-        saveHiddenTests: async (courseId, activityId, input) => {
-          const result = groupId
-            ? await api.saveGroupCodingExerciseHiddenTests(courseId, groupId, activityId, input)
-            : await api.saveCodingExerciseHiddenTests(courseId, activityId, input);
-          return {
-            tests: result.tests as CodingExerciseHiddenTest[],
-            referenceSolution: result.referenceSolution
-          };
-        },
-        runCode: async (courseId, activityId, input) => {
-          const result = groupId
-            ? await api.runGroupCodingExercise(courseId, groupId, activityId, input)
-            : await api.runCodingExercise(courseId, activityId, input);
-          return { execution: result.execution as CodingExerciseExecution };
-        },
-        listRuns: async (courseId, activityId) => {
-          const result = groupId
-            ? await api.groupCodingExerciseRuns(courseId, groupId, activityId)
-            : await api.codingExerciseRuns(courseId, activityId);
-          return { executions: result.executions as CodingExerciseExecution[] };
-        },
-        submitCode: async (courseId, activityId, input) => {
-          const result = groupId
-            ? await api.submitGroupCodingExercise(courseId, groupId, activityId, input)
-            : await api.submitCodingExercise(courseId, activityId, input);
-          return { execution: result.execution as CodingExerciseExecution };
-        },
-        listSubmissions: async (courseId, activityId) => {
-          const result = groupId
-            ? await api.groupCodingExerciseSubmissions(courseId, groupId, activityId)
-            : await api.codingExerciseSubmissions(courseId, activityId);
-          return { executions: result.executions as CodingExerciseExecution[] };
-        }
-      }}
+      aiGenerationClient={aiGenerationClient}
+      codingClient={codingClient}
       executionStateHost={executionStateHost}
+      studentViewMode={studentViewMode}
+      onNewAttemptAvailabilityChange={onNewAttemptAvailabilityChange}
+      onPreviousSubmissionsAvailabilityChange={onPreviousSubmissionsAvailabilityChange}
+      onSubmitted={onSubmitted}
     />
   );
 }

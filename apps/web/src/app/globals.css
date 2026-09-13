@@ -3748,6 +3748,63 @@ a.card:hover,
   outline-offset: -2px;
 }
 
+.coding-exercise-attempt-history {
+  gap: 12px;
+}
+
+.coding-exercise-attempt-accordion {
+  border: 1px solid rgba(13, 27, 71, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.coding-exercise-attempt-accordion > summary {
+  align-items: center;
+  cursor: pointer;
+  display: grid;
+  font-weight: 750;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  list-style: none;
+  padding: 16px 18px;
+}
+
+.coding-exercise-attempt-accordion > summary::-webkit-details-marker {
+  display: none;
+}
+
+.coding-exercise-attempt-accordion > summary::before {
+  color: var(--muted);
+  content: "›";
+  font-size: 1.3rem;
+  line-height: 1;
+  transform-origin: center;
+  transition: transform 120ms ease;
+}
+
+.coding-exercise-attempt-accordion[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.coding-exercise-attempt-accordion > summary time {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 550;
+}
+
+.coding-exercise-attempt-accordion[open] > summary {
+  border-bottom: 1px solid rgba(13, 27, 71, 0.08);
+}
+
+.coding-exercise-attempt-content {
+  padding: 18px;
+}
+
+.coding-exercise-attempt-content .code-renderer {
+  max-height: 520px;
+  overflow: auto;
+}
+
 .coding-exercise-test-selector,
 .coding-exercise-test-selector:hover,
 .coding-exercise-test-selector:focus-visible {
@@ -3839,6 +3896,14 @@ a.card:hover,
 
   .coding-exercise-workspace-divider {
     display: none;
+  }
+
+  .coding-exercise-attempt-accordion > summary {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .coding-exercise-attempt-accordion > summary time {
+    grid-column: 2 / -1;
   }
 }
 

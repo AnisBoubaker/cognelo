@@ -145,6 +145,8 @@ test.describe.serial("authoring and completing every activity type", () => {
     await sampleTests.getByRole("textbox").nth(0).fill("Visible greeting", { timeout: 10_000 });
     await sampleTests.getByRole("textbox").nth(1).fill("Ada", { timeout: 10_000 });
     await sampleTests.getByRole("textbox").nth(2).fill("Hello, Ada!", { timeout: 10_000 });
+    await sampleTests.getByLabel("Output matching").selectOption("contains_lines");
+    await sampleTests.getByLabel("Require lines in this order").check();
     await teacherPage.getByRole("button", { name: "Add hidden test" }).click();
     const hiddenTestToggle = teacherPage.getByRole("button", { name: "Hidden test 1" });
     await expect(hiddenTestToggle).toBeVisible({ timeout: 10_000 });
@@ -158,6 +160,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await copyAndAssignBankActivity(data, {
       activityTypeKey: "coding-exercise",
       bankActivityId,
+      gradebookSettings: { maxAttempts: 2 },
       title
     });
 
@@ -165,23 +168,67 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(studentPage.getByText("Hidden test 1", { exact: true })).toHaveCount(0);
     await expect(studentPage.getByText("Grace", { exact: true })).toHaveCount(0);
     await replaceCodeEditorContents(studentPage, title, solution);
-    await studentPage
-      .getByText("Sample input", { exact: true })
-      .locator("..")
-      .getByRole("textbox")
-      .fill("Ada", { timeout: 10_000 });
-    const runSampleTest = studentPage.getByRole("button", { name: "Run sample test" });
-    await expect(runSampleTest).toBeEnabled({ timeout: 10_000 });
-    await runSampleTest.click();
-    const latestSampleRunTitle = studentPage.getByText("Latest sample run", { exact: true });
-    await expect(latestSampleRunTitle).toBeVisible({ timeout: 60_000 });
-    await expect(latestSampleRunTitle.locator("..").locator("..")).toContainText("completed · Accepted");
+    await studentPage.getByLabel("Test", { exact: true }).click();
+    await studentPage.getByRole("menuitemradio", { name: "Visible greeting" }).click();
+    const testRunner = studentPage.getByRole("button", { name: "Run test" }).locator("xpath=ancestor::section[1]");
+    await expect(testRunner.getByLabel("Input (one value per line)")).toHaveValue("Ada");
+    await expect(testRunner.getByLabel("Input (one value per line)")).toHaveAttribute("readonly", "");
+    await expect(testRunner.getByLabel("Expected output")).toHaveValue("Hello, Ada!");
+    await expect(testRunner.getByLabel("Expected output")).toHaveAttribute("readonly", "");
+    await expect(testRunner.getByLabel("Output matching")).toHaveValue("contains_lines");
+    await expect(testRunner.getByLabel("Output matching")).toBeDisabled();
+    await expect(testRunner.getByLabel("Test code")).toHaveAttribute("readonly", "");
+    await expect(testRunner.getByLabel("Require lines in this order")).toBeChecked();
+    await expect(testRunner.getByLabel("Require lines in this order")).toBeDisabled();
+    const runTest = testRunner.getByRole("button", { name: "Run test" });
+    await expect(runTest).toBeEnabled({ timeout: 10_000 });
+    await runTest.click();
+    await expect(testRunner.getByRole("img", { name: "Passed" })).toBeVisible({ timeout: 60_000 });
+    await expect(testRunner.getByLabel("Test output")).toContainText("Hello, Ada!");
+    const currentRuns = studentPage.getByRole("heading", { name: "Recent runs" }).locator("..");
+    await expect(currentRuns).toContainText("Input");
+    await expect(currentRuns).toContainText("Ada");
+    await expect(currentRuns).toContainText("Hello, Ada!");
     const submitForGrading = studentPage.getByRole("button", { name: "Submit for grading" });
     await expect(submitForGrading).toBeEnabled({ timeout: 10_000 });
     await submitForGrading.click();
-    const latestSubmissionTitle = studentPage.getByText("Latest submission", { exact: true });
-    await expect(latestSubmissionTitle).toBeVisible({ timeout: 60_000 });
-    await expect(latestSubmissionTitle.locator("..").locator("..")).toContainText("completed · Accepted");
+    const firstConfirmation = studentPage.getByRole("dialog", { name: "Submission complete" });
+    await expect(firstConfirmation).toBeVisible({ timeout: 60_000 });
+    await expect(firstConfirmation.getByRole("img", { name: "Passed" })).toBeVisible();
+    await expect(firstConfirmation).toContainText("1 submission(s) remaining.");
+    await firstConfirmation.getByRole("button", { name: "OK" }).click();
+
+    await expect(studentPage.getByRole("tab", { name: "New attempt" })).toBeVisible();
+    await expect(studentPage.getByRole("heading", { name: "Recent runs" })).toHaveCount(0);
+    const resetEditor = studentPage.getByRole("textbox", { name: title, exact: true })
+      .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' monaco-code-editor ')][1]")
+      .locator(".view-lines");
+    await expect(resetEditor).not.toContainText(solution);
+
+    await studentPage.getByRole("tab", { name: "Previous submissions" }).click();
+    await expect(studentPage.getByText("Read one name from standard input", { exact: false })).toHaveCount(0);
+    await studentPage.getByText("Attempt 1", { exact: true }).click();
+    const firstAttempt = studentPage.locator(".coding-exercise-attempt-accordion").filter({ hasText: "Attempt 1" });
+    await expect(firstAttempt).toContainText(solution);
+    await expect(firstAttempt).toContainText("Runs in this attempt");
+    await expect(firstAttempt).toContainText("Input");
+    await expect(firstAttempt).toContainText("Ada");
+    await expect(firstAttempt).toContainText("Hello, Ada!");
+
+    await studentPage.getByRole("tab", { name: "New attempt" }).click();
+    await replaceCodeEditorContents(studentPage, title, solution);
+    await studentPage.getByRole("button", { name: "Submit for grading" }).click();
+    const finalConfirmation = studentPage.getByRole("dialog", { name: "Submission complete" });
+    await expect(finalConfirmation).toBeVisible({ timeout: 60_000 });
+    await expect(finalConfirmation).toContainText("No submissions remain.");
+    await finalConfirmation.getByRole("button", { name: "OK" }).click();
+    await expect(studentPage).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));
+
+    await openStudentActivity(studentPage, data, title);
+    await expect(studentPage.getByRole("tab", { name: "New attempt" })).toHaveCount(0);
+    await expect(studentPage.getByRole("tab", { name: "Previous submissions" })).toBeVisible();
+    await expect(studentPage.getByText("Read one name from standard input", { exact: false })).toHaveCount(0);
+    await expect(studentPage.locator(".coding-exercise-attempt-accordion")).toHaveCount(2);
   });
 
   test("teacher authors a web-design exercise and the student edits, previews, tests, and submits it", async ({ teacherPage, studentPage }) => {

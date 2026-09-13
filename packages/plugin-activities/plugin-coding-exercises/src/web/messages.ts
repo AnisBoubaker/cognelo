@@ -91,6 +91,19 @@ type MessageKey =
   | "latestSubmission"
   | "recentRuns"
   | "recentSubmissions"
+  | "attemptNumber"
+  | "submittedSolution"
+  | "submissionResult"
+  | "attemptRuns"
+  | "runNumber"
+  | "noAttemptRuns"
+  | "submissionCompleteTitle"
+  | "submissionRecordedMessage"
+  | "submissionAttemptsRemaining"
+  | "submissionNoAttemptsRemaining"
+  | "confirmOk"
+  | "runInput"
+  | "noRunInput"
   | "loadHiddenTestsError"
   | "loadHistoryError"
   | "saveError"
@@ -213,6 +226,19 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     latestSubmission: "Latest submission",
     recentRuns: "Recent runs",
     recentSubmissions: "Recent submissions",
+    attemptNumber: "Attempt {number}",
+    submittedSolution: "Submitted solution",
+    submissionResult: "Submission result",
+    attemptRuns: "Runs in this attempt",
+    runNumber: "Run {number}",
+    noAttemptRuns: "No runs were made before this submission.",
+    submissionCompleteTitle: "Submission complete",
+    submissionRecordedMessage: "Your submitted code and its runs are now available under Previous submissions.",
+    submissionAttemptsRemaining: "You have {count} submission(s) remaining.",
+    submissionNoAttemptsRemaining: "No submissions remain. Select OK to return to the course content.",
+    confirmOk: "OK",
+    runInput: "Input",
+    noRunInput: "No input",
     loadHiddenTestsError: "Unable to load hidden tests.",
     loadHistoryError: "Unable to load coding exercise history.",
     saveError: "Unable to save the coding exercise right now.",
@@ -332,6 +358,19 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     latestSubmission: "Dernière soumission",
     recentRuns: "Exécutions récentes",
     recentSubmissions: "Soumissions récentes",
+    attemptNumber: "Tentative {number}",
+    submittedSolution: "Solution soumise",
+    submissionResult: "Résultat de la soumission",
+    attemptRuns: "Exécutions de cette tentative",
+    runNumber: "Exécution {number}",
+    noAttemptRuns: "Aucune exécution n’a été effectuée avant cette soumission.",
+    submissionCompleteTitle: "Soumission terminée",
+    submissionRecordedMessage: "Votre code soumis et ses exécutions sont maintenant accessibles sous Soumissions précédentes.",
+    submissionAttemptsRemaining: "Il vous reste {count} soumission(s).",
+    submissionNoAttemptsRemaining: "Il ne reste aucune soumission. Sélectionnez OK pour retourner au contenu du cours.",
+    confirmOk: "OK",
+    runInput: "Entrée",
+    noRunInput: "Aucune entrée",
     loadHiddenTestsError: "Impossible de charger les tests cachés.",
     loadHistoryError: "Impossible de charger l'historique de l'exercice.",
     saveError: "Impossible d'enregistrer l'exercice pour le moment.",
@@ -451,6 +490,19 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     latestSubmission: "最近一次提交",
     recentRuns: "最近运行",
     recentSubmissions: "最近提交",
+    attemptNumber: "第 {number} 次尝试",
+    submittedSolution: "已提交的答案",
+    submissionResult: "提交结果",
+    attemptRuns: "本次尝试的运行记录",
+    runNumber: "第 {number} 次运行",
+    noAttemptRuns: "此提交之前没有运行记录。",
+    submissionCompleteTitle: "提交完成",
+    submissionRecordedMessage: "你提交的代码及其运行记录现已保存在“以前的提交”中。",
+    submissionAttemptsRemaining: "你还可以提交 {count} 次。",
+    submissionNoAttemptsRemaining: "已无剩余提交次数。选择“确定”返回课程内容。",
+    confirmOk: "确定",
+    runInput: "输入",
+    noRunInput: "无输入",
     loadHiddenTestsError: "无法加载隐藏测试。",
     loadHistoryError: "无法加载编程练习历史记录。",
     saveError: "暂时无法保存编程练习。",
