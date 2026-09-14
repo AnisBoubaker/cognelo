@@ -340,6 +340,19 @@ export type ActivityBankInput = z.infer<typeof ActivityBankInputSchema>;
 export const ActivityBankUpdateSchema = ActivityBankInputSchema.partial();
 export type ActivityBankUpdate = z.infer<typeof ActivityBankUpdateSchema>;
 
+export const ActivityBankFolderInputSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  parentId: RecordIdSchema.nullable().optional(),
+  position: z.number().int().min(0).optional()
+});
+export type ActivityBankFolderInput = z.infer<typeof ActivityBankFolderInputSchema>;
+
+export const ActivityBankFolderUpdateSchema = ActivityBankFolderInputSchema.partial().refine(
+  (value) => Object.values(value).some((field) => field !== undefined),
+  { message: "At least one folder field is required." }
+);
+export type ActivityBankFolderUpdate = z.infer<typeof ActivityBankFolderUpdateSchema>;
+
 export const ActivityBankDeleteSchema = z.object({
   action: z.enum(["move", "delete"]),
   targetActivityBankId: RecordIdSchema.optional(),
@@ -385,12 +398,22 @@ export const BankActivityInputSchema = z.object({
     (selections) => new Set(selections.map((selection) => selection.conceptId)).size === selections.length,
     { message: "Knowledge concept selections must be unique by concept." }
   ).optional(),
-  position: z.number().int().min(0).optional().default(0)
+  position: z.number().int().min(0).optional().default(0),
+  folderId: RecordIdSchema.nullable().optional()
 });
 export type BankActivityInput = z.infer<typeof BankActivityInputSchema>;
 
 export const BankActivityUpdateSchema = BankActivityInputSchema.partial();
 export type BankActivityUpdate = z.infer<typeof BankActivityUpdateSchema>;
+
+export const BankActivityPlacementUpdateSchema = z.object({
+  folderId: RecordIdSchema.nullable().optional(),
+  position: z.number().int().min(0).optional()
+}).refine(
+  (value) => value.folderId !== undefined || value.position !== undefined,
+  { message: "A folder or position is required." }
+);
+export type BankActivityPlacementUpdate = z.infer<typeof BankActivityPlacementUpdateSchema>;
 
 export const BankActivityMoveSchema = z.object({
   targetActivityBankId: RecordIdSchema

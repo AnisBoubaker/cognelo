@@ -168,6 +168,8 @@ For Contains lines and Regular expression, Cognelo omits Judge0's `expected_outp
 
 For development, Judge0 runs locally in Docker on `http://localhost:2358`. Compose defaults to the pinned Apple Silicon image `ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2`; override `JUDGE0_IMAGE` when another architecture or approved build is required. The image exposes Cognelo's C, C++, Go, Java, JavaScript, Python, Rust, and TypeScript runtimes and has been validated with real submissions. Cognelo resolves only explicitly supported Judge0 runtime names; keep that allowlist synchronized with the exact versions advertised by the pinned image whenever the image changes.
 
+Judge0 compiler options remain disabled at the submission API boundary. Instead, both Compose stacks run the checked-in idempotent language-configuration SQL before starting workers. It adds the ordinary course-level Linux system libraries to every active C and C++ compile command: POSIX threads, math, dynamic loading, and POSIX realtime (`-pthread -lm -ldl -lrt`). The C and C++ driver already links the language standard library, while optional third-party libraries remain outside Cognelo's guaranteed runtime contract. Any Judge0 image or configuration upgrade must pass a real C `sqrt()` compile/execute smoke test.
+
 For production, `JUDGE0_BASE_URL` should point to the dedicated physical Judge0 host, ideally on a private network segment with an auth token and host-level access controls.
 
 For local Judge0 CE setups that run on hosts without the legacy cgroup hierarchy expected by older Judge0 images, set `JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS=true`. Cognelo will then ask Judge0 to use per-process/per-thread enforcement instead of the older `--cg` path.

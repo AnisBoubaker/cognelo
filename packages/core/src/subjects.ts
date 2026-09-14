@@ -3,11 +3,14 @@ import { randomUUID } from "node:crypto";
 import {
   ActivityBankInputSchema,
   ActivityBankDeleteSchema,
+  ActivityBankFolderInputSchema,
+  ActivityBankFolderUpdateSchema,
   ActivityBankUpdateSchema,
   BankActivityDeleteSchema,
   BankActivityDuplicateSchema,
   BankActivityInputSchema,
   BankActivityMoveSchema,
+  BankActivityPlacementUpdateSchema,
   BankActivityUpdateSchema,
   SubjectInputSchema,
   SubjectKnowledgeConceptInputSchema,
@@ -641,6 +644,7 @@ export async function getActivityBank(user: CurrentUser, activityBankId: string)
     include: {
       subject: { include: { knowledgeConcepts: { where: { active: true }, include: { skillRecords: { where: { active: true }, orderBy: { position: "asc" } } }, orderBy: { createdAt: "asc" } }, knowledgePrerequisites: { orderBy: { createdAt: "asc" } } } },
       owner: { select: { id: true, email: true, name: true } },
+      folders: { orderBy: [{ parentId: "asc" }, { position: "asc" }, { createdAt: "asc" }] },
       activities: {
         include: {
           activityType: true,
@@ -655,7 +659,13 @@ export async function getActivityBank(user: CurrentUser, activityBankId: string)
   if (!bank) {
     throw notFound("Activity bank");
   }
-  return { ...bank, canManage: isAdmin(user) || bank.ownerId === user.id };
+  const conceptActivityCounts = Object.fromEntries(
+    (bank.subject?.knowledgeConcepts ?? []).map((concept) => [
+      concept.id,
+      bank.activities.filter((activity) => activity.knowledgeConcepts.some((selection) => selection.conceptId === concept.id)).length
+    ])
+  );
+  return { ...bank, canManage: isAdmin(user) || bank.ownerId === user.id, conceptActivityCounts };
 }
 
 export async function createActivityBank(user: CurrentUser, input: unknown) {
@@ -674,6 +684,7 @@ export async function createActivityBank(user: CurrentUser, input: unknown) {
     include: {
       subject: { include: { knowledgeConcepts: { where: { active: true }, include: { skillRecords: { where: { active: true }, orderBy: { position: "asc" } } }, orderBy: { createdAt: "asc" } }, knowledgePrerequisites: { orderBy: { createdAt: "asc" } } } },
       owner: { select: { id: true, email: true, name: true } },
+      folders: { orderBy: [{ parentId: "asc" as const }, { position: "asc" as const }, { createdAt: "asc" as const }] },
       activities: {
         include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } } },
         orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }]
@@ -712,6 +723,7 @@ export async function updateActivityBank(user: CurrentUser, activityBankId: stri
     include: {
       subject: { include: { knowledgeConcepts: { where: { active: true }, include: { skillRecords: { where: { active: true }, orderBy: { position: "asc" } } }, orderBy: { createdAt: "asc" } }, knowledgePrerequisites: { orderBy: { createdAt: "asc" } } } },
       owner: { select: { id: true, email: true, name: true } },
+      folders: { orderBy: [{ parentId: "asc" as const }, { position: "asc" as const }, { createdAt: "asc" as const }] },
       activities: {
         include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } } },
         orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }]
@@ -755,16 +767,11 @@ export async function deleteActivityBank(user: CurrentUser, activityBankId: stri
     }
 
     await prisma.$transaction(async (transaction) => {
-      const lastActivity = await transaction.bankActivity.findFirst({
-        where: { bankId: destination.id },
-        orderBy: [{ position: "desc" }, { createdAt: "desc" }],
-        select: { position: true }
-      });
-      const startingPosition = (lastActivity?.position ?? -1) + 1;
+      const startingPosition = await nextBankItemPosition(transaction, destination.id, null);
       for (const [index, activity] of bank.activities.entries()) {
         await transaction.bankActivity.update({
           where: { id: activity.id },
-          data: { bankId: destination.id, position: startingPosition + index }
+          data: { bankId: destination.id, folderId: null, position: startingPosition + index }
         });
       }
       await transaction.activityBank.delete({ where: { id: activityBankId } });
@@ -802,6 +809,8 @@ export async function createBankActivity(user: CurrentUser, activityBankId: stri
   const data = BankActivityInputSchema.parse(input);
   const activityType = await resolveActivityType(data.activityTypeKey);
   const mergedConfig = validateActivityPayload(data.activityTypeKey, data.config, data.metadata);
+  await assertValidActivityBankFolder(prisma, activityBankId, data.folderId);
+  const position = data.position ?? await nextBankItemPosition(prisma, activityBankId, data.folderId ?? null);
   const knowledgeConceptSelections = data.knowledgeConceptSelections ?? selectionsFromLegacyIds(data.knowledgeConceptIds) ?? [];
   if (knowledgeConceptSelections.length) {
     const bank = await prisma.activityBank.findUnique({ where: { id: activityBankId }, select: { subjectId: true } });
@@ -819,7 +828,8 @@ export async function createBankActivity(user: CurrentUser, activityBankId: stri
         lifecycle: data.lifecycle,
         config: mergedConfig as Prisma.InputJsonValue,
         metadata: data.metadata as Prisma.InputJsonValue,
-        position: data.position,
+        position,
+        folderId: data.folderId ?? null,
         createdById: user.id,
         knowledgeConcepts: { create: conceptSelectionCreates(knowledgeConceptSelections) }
       }
@@ -875,6 +885,9 @@ export async function updateBankActivity(user: CurrentUser, bankActivityId: stri
   const nextMetadata = data.metadata ?? currentMetadata;
   const requestedKnowledgeConceptSelections = data.knowledgeConceptSelections ?? selectionsFromLegacyIds(data.knowledgeConceptIds);
   const nextKnowledgeConceptSelections = requestedKnowledgeConceptSelections ?? selectionsFromStoredLinks(bankActivity.knowledgeConcepts);
+  if (data.folderId !== undefined) {
+    await assertValidActivityBankFolder(prisma, bankActivity.bankId, data.folderId);
+  }
   if (requestedKnowledgeConceptSelections?.length) {
     await assertValidConceptSelections(nextKnowledgeConceptSelections, bankActivity.bank.subjectId);
   }
@@ -942,6 +955,7 @@ export async function updateBankActivity(user: CurrentUser, bankActivityId: stri
         config: mergedConfig as Prisma.InputJsonValue,
         metadata: nextMetadata as Prisma.InputJsonValue,
         position: data.position,
+        ...(data.folderId !== undefined ? { folderId: data.folderId } : {}),
         currentVersionId: version?.id ?? latestPublishedVersion?.id,
         knowledgeConcepts: {
           deleteMany: {},
@@ -1007,11 +1021,7 @@ export async function duplicateBankActivity(user: CurrentUser, activityBankId: s
   });
   if (!source || source.bankId !== activityBankId) throw notFound("Bank activity");
 
-  const lastActivity = await prisma.bankActivity.findFirst({
-    where: { bankId: activityBankId },
-    orderBy: [{ position: "desc" }, { createdAt: "desc" }],
-    select: { position: true }
-  });
+  const position = await nextBankItemPosition(prisma, activityBankId, source.folderId ?? null);
 
   return prisma.$transaction(async (transaction) => {
     const duplicate = await transaction.bankActivity.create({
@@ -1023,7 +1033,8 @@ export async function duplicateBankActivity(user: CurrentUser, activityBankId: s
         lifecycle: "draft",
         config: source.config as Prisma.InputJsonValue,
         metadata: source.metadata as Prisma.InputJsonValue,
-        position: (lastActivity?.position ?? -1) + 1,
+        position,
+        folderId: source.folderId ?? null,
         createdById: user.id,
         knowledgeConcepts: {
           create: source.knowledgeConcepts.map((selection) => ({
@@ -1095,16 +1106,151 @@ export async function moveBankActivity(user: CurrentUser, activityBankId: string
   if (destination.subjectId !== source.bank.subjectId) {
     throw new AppError(400, "ACTIVITY_BANK_SUBJECT_MISMATCH", "Activities can only be moved to a bank under the same subject.");
   }
-  const lastActivity = await prisma.bankActivity.findFirst({
-    where: { bankId: destination.id },
-    orderBy: [{ position: "desc" }, { createdAt: "desc" }],
-    select: { position: true }
-  });
+  const position = await nextBankItemPosition(prisma, destination.id, null);
   return prisma.bankActivity.update({
     where: { id: bankActivityId },
-    data: { bankId: destination.id, position: (lastActivity?.position ?? -1) + 1 },
+    data: { bankId: destination.id, folderId: null, position },
     include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } }, versions: { where: { lifecycle: "published" }, orderBy: { versionNumber: "desc" } } }
   });
+}
+
+type ActivityBankOrganizationDb = Pick<typeof prisma, "activityBankFolder" | "bankActivity">;
+
+export async function createActivityBankFolder(user: CurrentUser, activityBankId: string, input: unknown) {
+  await assertCanManageActivityBank(user, activityBankId);
+  const data = ActivityBankFolderInputSchema.parse(input);
+  await assertValidActivityBankFolder(prisma, activityBankId, data.parentId);
+  return prisma.activityBankFolder.create({
+    data: {
+      bankId: activityBankId,
+      parentId: data.parentId ?? null,
+      title: data.title,
+      position: data.position ?? await nextBankItemPosition(prisma, activityBankId, data.parentId ?? null)
+    }
+  });
+}
+
+export async function updateActivityBankFolder(
+  user: CurrentUser,
+  activityBankId: string,
+  folderId: string,
+  input: unknown
+) {
+  await assertCanManageActivityBank(user, activityBankId);
+  const data = ActivityBankFolderUpdateSchema.parse(input);
+  const folder = await prisma.activityBankFolder.findFirst({ where: { id: folderId, bankId: activityBankId } });
+  if (!folder) throw notFound("Activity bank folder");
+  if (data.parentId !== undefined) {
+    if (data.parentId === folderId) {
+      throw new AppError(400, "INVALID_ACTIVITY_BANK_FOLDER_PARENT", "A folder cannot be moved inside itself.");
+    }
+    await assertValidActivityBankFolder(prisma, activityBankId, data.parentId);
+    if (data.parentId) {
+      const descendants = await collectActivityBankFolderDescendantIds(prisma, folderId);
+      if (descendants.has(data.parentId)) {
+        throw new AppError(400, "INVALID_ACTIVITY_BANK_FOLDER_PARENT", "A folder cannot be moved inside one of its descendants.");
+      }
+    }
+  }
+  return prisma.activityBankFolder.update({
+    where: { id: folderId },
+    data: {
+      ...(data.title !== undefined ? { title: data.title } : {}),
+      ...(data.parentId !== undefined ? { parentId: data.parentId } : {}),
+      ...(data.position !== undefined ? { position: data.position } : {})
+    }
+  });
+}
+
+export async function deleteActivityBankFolder(user: CurrentUser, activityBankId: string, folderId: string) {
+  await assertCanManageActivityBank(user, activityBankId);
+  const folder = await prisma.activityBankFolder.findFirst({ where: { id: folderId, bankId: activityBankId } });
+  if (!folder) throw notFound("Activity bank folder");
+  const descendantIds = await collectActivityBankFolderDescendantIds(prisma, folderId);
+  const folderIds = [folderId, ...descendantIds];
+  const activities = await prisma.bankActivity.findMany({
+    where: { bankId: activityBankId, folderId: { in: folderIds } },
+    orderBy: [{ folderId: "asc" }, { position: "asc" }, { createdAt: "asc" }]
+  });
+  const startingPosition = await nextBankItemPosition(prisma, activityBankId, null);
+
+  await prisma.$transaction(async (transaction) => {
+    for (const [index, activity] of activities.entries()) {
+      await transaction.bankActivity.update({
+        where: { id: activity.id },
+        data: { folderId: null, position: startingPosition + index }
+      });
+    }
+    await transaction.activityBankFolder.delete({ where: { id: folderId } });
+  });
+  return { activityCount: activities.length };
+}
+
+export async function updateBankActivityPlacement(
+  user: CurrentUser,
+  activityBankId: string,
+  bankActivityId: string,
+  input: unknown
+) {
+  await assertCanManageActivityBank(user, activityBankId);
+  const data = BankActivityPlacementUpdateSchema.parse(input);
+  const activity = await prisma.bankActivity.findFirst({ where: { id: bankActivityId, bankId: activityBankId } });
+  if (!activity) throw notFound("Bank activity");
+  if (data.folderId !== undefined) {
+    await assertValidActivityBankFolder(prisma, activityBankId, data.folderId);
+  }
+  return prisma.bankActivity.update({
+    where: { id: bankActivityId },
+    data: {
+      ...(data.folderId !== undefined ? { folderId: data.folderId } : {}),
+      ...(data.position !== undefined ? { position: data.position } : {})
+    },
+    include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } }, versions: { where: { lifecycle: "published" }, orderBy: { versionNumber: "desc" } } }
+  });
+}
+
+async function assertValidActivityBankFolder(
+  db: ActivityBankOrganizationDb,
+  activityBankId: string,
+  folderId: string | null | undefined
+) {
+  if (!folderId) return;
+  const folder = await db.activityBankFolder.findFirst({ where: { id: folderId, bankId: activityBankId }, select: { id: true } });
+  if (!folder) throw notFound("Activity bank folder");
+}
+
+async function nextBankItemPosition(
+  db: ActivityBankOrganizationDb,
+  activityBankId: string,
+  parentId: string | null
+) {
+  const [lastFolder, lastActivity] = await Promise.all([
+    db.activityBankFolder.findFirst({
+      where: { bankId: activityBankId, parentId },
+      orderBy: [{ position: "desc" }, { createdAt: "desc" }],
+      select: { position: true }
+    }),
+    db.bankActivity.findFirst({
+      where: { bankId: activityBankId, folderId: parentId },
+      orderBy: [{ position: "desc" }, { createdAt: "desc" }],
+      select: { position: true }
+    })
+  ]);
+  return Math.max(lastFolder?.position ?? -1, lastActivity?.position ?? -1) + 1;
+}
+
+async function collectActivityBankFolderDescendantIds(db: ActivityBankOrganizationDb, folderId: string) {
+  const descendantIds = new Set<string>();
+  let frontier = [folderId];
+  while (frontier.length) {
+    const children = await db.activityBankFolder.findMany({
+      where: { parentId: { in: frontier } },
+      select: { id: true }
+    });
+    frontier = children.map((child) => child.id).filter((id) => !descendantIds.has(id));
+    frontier.forEach((id) => descendantIds.add(id));
+  }
+  return descendantIds;
 }
 
 async function assertCanViewSubjects(user: CurrentUser) {

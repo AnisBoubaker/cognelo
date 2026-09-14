@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
 const tx = vi.hoisted(() => ({
+  activityBankFolder: {
+    delete: vi.fn()
+  },
   activityVersion: {
     create: vi.fn()
   },
@@ -19,6 +22,12 @@ const mockPrisma = vi.hoisted(() => ({
     findUnique: vi.fn(),
     update: vi.fn()
   },
+  activityBankFolder: {
+    create: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+    update: vi.fn()
+  },
   activityType: {
     findUnique: vi.fn()
   },
@@ -27,8 +36,10 @@ const mockPrisma = vi.hoisted(() => ({
   },
   bankActivity: {
     count: vi.fn(),
+    findFirst: vi.fn(),
     findMany: vi.fn(),
-    findUnique: vi.fn()
+    findUnique: vi.fn(),
+    update: vi.fn()
   },
   subject: {
     create: vi.fn(),
@@ -53,6 +64,7 @@ vi.mock("./plugins", () => ({
 
 const {
   createActivityBank,
+  createActivityBankFolder,
   createBankActivity,
   createSubject,
   getActivityBank,
@@ -60,7 +72,10 @@ const {
   listActivityBanks,
   listBankActivities,
   listSubjects,
+  deleteActivityBankFolder,
   updateActivityBank,
+  updateActivityBankFolder,
+  updateBankActivityPlacement,
   updateBankActivity,
   updateSubject
 } = await import("./subjects");
@@ -87,6 +102,9 @@ describe("subject and activity bank services", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof tx) => unknown) => handler(tx));
+    mockPrisma.activityBankFolder.findFirst.mockResolvedValue(null);
+    mockPrisma.activityBankFolder.findMany.mockResolvedValue([]);
+    mockPrisma.bankActivity.findFirst.mockResolvedValue(null);
   });
 
   it("lists, gets, creates, and updates subjects for managers", async () => {
@@ -259,5 +277,74 @@ describe("subject and activity bank services", () => {
         })
       })
     );
+  });
+
+  it("returns per-concept activity counts with an activity bank", async () => {
+    mockPrisma.activityBank.findUnique.mockResolvedValueOnce({ id: "bank-1", ownerId: "teacher-1" }).mockResolvedValueOnce({
+      id: "bank-1",
+      ownerId: "teacher-1",
+      subject: { knowledgeConcepts: [{ id: "concept-1" }, { id: "concept-2" }] },
+      activities: [
+        { id: "activity-1", knowledgeConcepts: [{ conceptId: "concept-1" }] },
+        { id: "activity-2", knowledgeConcepts: [{ conceptId: "concept-1" }, { conceptId: "concept-2" }] }
+      ]
+    });
+
+    await expect(getActivityBank(teacherUser, "bank-1")).resolves.toMatchObject({
+      conceptActivityCounts: { "concept-1": 2, "concept-2": 1 }
+    });
+  });
+
+  it("creates and renames nested activity bank folders", async () => {
+    mockPrisma.activityBank.findUnique.mockResolvedValue({ id: "bank-1", ownerId: "teacher-1" });
+    mockPrisma.activityBankFolder.findFirst.mockResolvedValue({ id: "folder-1", bankId: "bank-1", title: "Old" });
+    mockPrisma.activityBankFolder.create.mockResolvedValue({ id: "folder-2", title: "New" });
+    mockPrisma.activityBankFolder.update.mockResolvedValue({ id: "folder-1", title: "Renamed" });
+
+    await createActivityBankFolder(teacherUser, "bank-1", { title: "New", parentId: "folder-1" });
+    expect(mockPrisma.activityBankFolder.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ bankId: "bank-1", parentId: "folder-1", title: "New" })
+    }));
+
+    await updateActivityBankFolder(teacherUser, "bank-1", "folder-1", { title: "Renamed" });
+    expect(mockPrisma.activityBankFolder.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ title: "Renamed" })
+    }));
+  });
+
+  it("moves folder activities to the bank root when deleting their folder tree", async () => {
+    mockPrisma.activityBank.findUnique.mockResolvedValue({ id: "bank-1", ownerId: "teacher-1" });
+    mockPrisma.activityBankFolder.findFirst.mockResolvedValue({ id: "folder-1", bankId: "bank-1" });
+    mockPrisma.activityBankFolder.findMany
+      .mockResolvedValueOnce([{ id: "folder-2" }])
+      .mockResolvedValueOnce([]);
+    mockPrisma.bankActivity.findMany.mockResolvedValue([
+      { id: "activity-1", folderId: "folder-1", position: 0 },
+      { id: "activity-2", folderId: "folder-2", position: 0 }
+    ]);
+
+    await expect(deleteActivityBankFolder(teacherUser, "bank-1", "folder-1")).resolves.toEqual({ activityCount: 2 });
+    expect(tx.bankActivity.update).toHaveBeenNthCalledWith(1, {
+      where: { id: "activity-1" },
+      data: { folderId: null, position: 0 }
+    });
+    expect(tx.bankActivity.update).toHaveBeenNthCalledWith(2, {
+      where: { id: "activity-2" },
+      data: { folderId: null, position: 1 }
+    });
+    expect(tx.activityBankFolder.delete).toHaveBeenCalledWith({ where: { id: "folder-1" } });
+  });
+
+  it("updates activity placement without changing authored content", async () => {
+    mockPrisma.activityBank.findUnique.mockResolvedValue({ id: "bank-1", ownerId: "teacher-1" });
+    mockPrisma.activityBankFolder.findFirst.mockResolvedValue({ id: "folder-1", bankId: "bank-1" });
+    mockPrisma.bankActivity.findFirst.mockResolvedValue({ id: "activity-1", bankId: "bank-1" });
+    mockPrisma.bankActivity.update.mockResolvedValue({ id: "activity-1", folderId: "folder-1", position: 2 });
+
+    await updateBankActivityPlacement(teacherUser, "bank-1", "activity-1", { folderId: "folder-1", position: 2 });
+    expect(mockPrisma.bankActivity.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: { folderId: "folder-1", position: 2 }
+    }));
+    expect(tx.activityVersion.create).not.toHaveBeenCalled();
   });
 });

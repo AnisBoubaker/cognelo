@@ -405,9 +405,27 @@ model ActivityBank {
   subject     Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   owner       User           @relation("ActivityBankOwner", fields: [ownerId], references: [id])
   activities  BankActivity[]
+  folders     ActivityBankFolder[]
 
   @@index([subjectId, updatedAt])
   @@index([ownerId])
+}
+
+model ActivityBankFolder {
+  id         String               @id @default(cuid())
+  bankId     String
+  parentId   String?
+  title      String
+  position   Int                  @default(0)
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+  bank       ActivityBank         @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  parent     ActivityBankFolder?  @relation("ActivityBankFolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children   ActivityBankFolder[] @relation("ActivityBankFolderTree")
+  activities BankActivity[]
+
+  @@index([bankId, parentId, position])
+  @@index([parentId])
 }
 
 model CourseMembership {
@@ -669,11 +687,13 @@ model BankActivity {
   config           Json              @default("{}")
   metadata         Json              @default("{}")
   position         Int               @default(0)
+  folderId         String?
   currentVersionId String?
   createdById      String
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   bank             ActivityBank      @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  folder           ActivityBankFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
   activityType     ActivityType      @relation(fields: [activityTypeId], references: [id])
   currentVersion   ActivityVersion?  @relation("CurrentBankActivityVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   createdBy        User              @relation("BankActivityCreator", fields: [createdById], references: [id])
@@ -681,7 +701,8 @@ model BankActivity {
   courseActivities Activity[]
   knowledgeConcepts BankActivityKnowledgeConcept[]
 
-  @@index([bankId, position])
+  @@index([bankId, folderId, position])
+  @@index([folderId])
   @@index([activityTypeId])
   @@index([currentVersionId])
 }

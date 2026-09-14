@@ -216,6 +216,12 @@ sudo cp --preserve=mode,ownership,timestamps \
   /srv/cognelo-sandboxes/app1/runtime/judge0.conf \
   /srv/cognelo-sandboxes/app1/runtime/sandbox.compose.yml \
   /var/backups/cognelo/app1/pre-cognelo-0.6.0-sandbox/
+
+if sudo test -f /srv/cognelo-sandboxes/app1/runtime/configure-languages.sql; then
+  sudo cp --preserve=mode,ownership,timestamps \
+    /srv/cognelo-sandboxes/app1/runtime/configure-languages.sql \
+    /var/backups/cognelo/app1/pre-cognelo-0.6.0-sandbox/
+fi
 ```
 
 These files can contain secrets. Protect and encrypt them like the application `.env` backup.
@@ -261,6 +267,27 @@ curl --fail http://10.80.0.2:3456/health
 ```
 
 If the release notes specify changes to `sandbox.compose.yml`, `judge0.conf`, Playwright, Judge0, Redis, the sandbox PostgreSQL version, seccomp, ports, or WireGuard, follow those exact release-specific steps. Do not overwrite the persistent runtime `.env` or `judge0.conf`, because they contain instance-specific settings and secrets. Do not use mutable image tags such as `latest`.
+
+When a release changes the Judge0 language configuration, copy both versioned files from that release, validate them, stop workers, run the configuration once, and recreate the workers only after it succeeds:
+
+```bash
+sudo install -m 0644 \
+  /srv/cognelo-sandboxes/app1/deployments/cognelo-0.6.0/infra/production/sandbox.compose.yml \
+  /srv/cognelo-sandboxes/app1/runtime/sandbox.compose.yml
+sudo install -m 0644 \
+  /srv/cognelo-sandboxes/app1/deployments/cognelo-0.6.0/infra/judge0/configure-languages.sql \
+  /srv/cognelo-sandboxes/app1/runtime/configure-languages.sql
+
+cd /srv/cognelo-sandboxes/app1/runtime
+sudo docker compose --env-file .env -f sandbox.compose.yml config --quiet
+sudo docker compose --env-file .env -f sandbox.compose.yml stop judge0-workers
+sudo docker compose --env-file .env -f sandbox.compose.yml \
+  up -d --force-recreate judge0-language-config judge0-workers
+sudo docker compose --env-file .env -f sandbox.compose.yml \
+  ps -a judge0-language-config judge0-workers
+```
+
+The configuration is idempotent. Compose waits for its successful exit before recreating the workers. `judge0-language-config` must show `Exited (0)` and its logs must show every active C/C++ runtime with `-pthread -lm -ldl -lrt`. Complete the Python and C Judge0 smoke tests from the initial deployment runbook after this change.
 
 ## 4. Back up the database
 
@@ -387,7 +414,7 @@ Complete a short production smoke test:
 3. Confirm existing uploaded files can still be downloaded.
 4. Confirm Settings → Plugins shows the expected activation state.
 5. Submit one designated test activity and confirm its result reaches the gradebook.
-6. If enabled, run one small Judge0 coding exercise.
+6. If enabled, run one small Judge0 coding exercise and the documented C system-library smoke test.
 7. If enabled, run one small Playwright web-design exercise.
 8. Check recent logs for recurring errors.
 

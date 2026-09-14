@@ -548,6 +548,7 @@ The checked-in production files are:
 
 - `infra/production/sandbox.compose.yml` — Judge0, its private PostgreSQL/Redis dependencies, and the web-design runner;
 - `infra/production/judge0.conf.example` — restricted Judge0 defaults matching Cognelo's requests;
+- `infra/judge0/configure-languages.sql` — idempotent C/C++ system-library configuration applied before Judge0 workers start;
 - `infra/production/web-design-runner.Dockerfile` — a non-root runner image using the repository's exact Playwright version.
 
 The root `docker-compose.yml` remains development-only and must not be used here.
@@ -653,6 +654,10 @@ sudo install -m 0644 \
   /srv/cognelo-sandboxes/app1/deployments/cognelo-0.5.0/infra/production/sandbox.compose.yml \
   /srv/cognelo-sandboxes/app1/runtime/sandbox.compose.yml
 
+sudo install -m 0644 \
+  /srv/cognelo-sandboxes/app1/deployments/cognelo-0.5.0/infra/judge0/configure-languages.sql \
+  /srv/cognelo-sandboxes/app1/runtime/configure-languages.sql
+
 sudo install -m 0640 \
   /srv/cognelo-sandboxes/app1/deployments/cognelo-0.5.0/infra/production/judge0.conf.example \
   /srv/cognelo-sandboxes/app1/runtime/judge0.conf
@@ -742,10 +747,12 @@ cd /srv/cognelo-sandboxes/app1/runtime
 
 sudo docker compose --env-file .env -f sandbox.compose.yml config --quiet
 sudo docker compose --env-file .env -f sandbox.compose.yml \
-  pull judge0-server judge0-workers judge0-db judge0-redis
+  pull judge0-server judge0-workers judge0-language-config judge0-db judge0-redis
 ```
 
 `judge0/judge0:1.13.1`, `postgres:16.2`, `redis:7.2.4`, and the Playwright base image are pinned rather than `latest`. For even stricter supply-chain control, replace each tag with the image digest printed by `docker image inspect --format '{{index .RepoDigests 0}}' IMAGE` after the first approved pull.
+
+The one-shot `judge0-language-config` service waits for Judge0's language table, then idempotently appends `-pthread -lm -ldl -lrt` to every active C and C++ compile command. These are the ordinary math and POSIX system libraries expected in programming courses; the compiler driver already links the C or C++ standard library. Judge0 submission-controlled compiler options remain disabled. Workers depend on successful completion of this service, so a missing runtime or failed configuration stops code execution instead of silently accepting a partially configured sandbox.
 
 The Compose network remains internal and has no direct port publishing. Section
 14.6 creates host socket proxies that listen only on the selected sandbox bind
@@ -979,11 +986,15 @@ sudo docker compose --env-file .env -f sandbox.compose.yml \
 
 sudo docker compose --env-file .env -f sandbox.compose.yml up -d
 sudo docker compose --env-file .env -f sandbox.compose.yml ps
+sudo docker compose --env-file .env -f sandbox.compose.yml \
+  ps -a judge0-language-config
 sudo docker compose --env-file .env -f sandbox.compose.yml logs --tail=200
 SANDBOX_LISTENER_ADDRESS=10.80.0.2 # or the accepted firewall-only public IPv4
 sudo ss -ltnp | grep -E "${SANDBOX_LISTENER_ADDRESS}:(2358|3456)\\b"
 curl --fail "http://${SANDBOX_LISTENER_ADDRESS}:3456/health"
 ```
+
+`judge0-language-config` must report `Exited (0)`, and its log must list the active C/C++ compile commands with exactly one occurrence of each required flag. Do not start Cognelo coding-exercise traffic if that service failed or if the workers did not start.
 
 Both socket listeners must show only the selected private address (or the
 explicitly accepted firewall-only public address), never `0.0.0.0` or `[::]`.
@@ -1017,11 +1028,66 @@ curl --fail --silent --show-error \
   --data "{\"language_id\":${PYTHON_LANGUAGE_ID},\"source_code\":\"print(2 + 3)\",\"expected_output\":\"5\"}" \
   'http://10.80.0.2:2358/submissions?base64_encoded=false&wait=true' \
   | jq
-
-unset JUDGE0_SMOKE_TOKEN PYTHON_LANGUAGE_ID
 ```
 
-The result must have status `Accepted` and stdout `5`. Next, create a Playwright request without putting difficult JSON quoting on the command line:
+The result must have status `Accepted` and stdout `5`. Then verify the complete C/C++ system-library configuration with a C program that uses all four configured libraries:
+
+```bash
+C_LANGUAGE_ID=$(
+  curl --fail --silent --show-error \
+    --header "X-Auth-Token: ${JUDGE0_SMOKE_TOKEN}" \
+    http://10.80.0.2:2358/languages \
+  | jq -r '[.[] | select(.name | startswith("C ("))][0].id'
+)
+test -n "${C_LANGUAGE_ID}" && test "${C_LANGUAGE_ID}" != "null"
+
+tee /tmp/cognelo-judge0-c-smoke.c >/dev/null <<'C'
+#include <dlfcn.h>
+#include <math.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <time.h>
+
+static void *noop(void *argument) {
+  return argument;
+}
+
+int main(void) {
+  pthread_t thread;
+  struct timespec now;
+  void *self = dlopen(NULL, RTLD_LAZY);
+
+  if (self == NULL || clock_gettime(CLOCK_MONOTONIC, &now) != 0 ||
+      pthread_create(&thread, NULL, noop, NULL) != 0) {
+    return 1;
+  }
+
+  pthread_join(thread, NULL);
+  dlclose(self);
+  printf("%.3f\n", sqrt(4.0));
+  return 0;
+}
+C
+
+jq -n \
+  --argjson language_id "${C_LANGUAGE_ID}" \
+  --rawfile source_code /tmp/cognelo-judge0-c-smoke.c \
+  '{language_id: $language_id, source_code: $source_code, expected_output: "2.000\n"}' \
+  >/tmp/cognelo-judge0-c-smoke.json
+
+curl --fail --silent --show-error \
+  --request POST \
+  --header "Content-Type: application/json" \
+  --header "X-Auth-Token: ${JUDGE0_SMOKE_TOKEN}" \
+  --data-binary @/tmp/cognelo-judge0-c-smoke.json \
+  'http://10.80.0.2:2358/submissions?base64_encoded=false&wait=true' \
+  | jq
+
+rm /tmp/cognelo-judge0-c-smoke.c /tmp/cognelo-judge0-c-smoke.json
+unset C_LANGUAGE_ID JUDGE0_SMOKE_TOKEN PYTHON_LANGUAGE_ID
+```
+
+The C result must have status `Accepted` and stdout `2.000`. Next, create a Playwright request without putting difficult JSON quoting on the command line:
 
 ```bash
 tee /tmp/cognelo-runner-smoke.json >/dev/null <<'JSON'
@@ -1349,6 +1415,7 @@ Common failure causes:
 - `ECONNREFUSED` for Judge0 or the runner: check the latest handshake with `wg show wg0` on the application host, then the WireGuard/UFW configuration and `docker compose ps` and logs on the sandbox host.
 - Judge0 returns `401 Unauthorized`: ensure `AUTHN_TOKEN` in `judge0.conf` exactly matches `JUDGE0_AUTH_TOKEN` in the instance `.env`, then restart the API after correcting it.
 - Judge0 returns a limit validation error: compare the limits sent by the coding-exercise plugin with `MAX_*` and `ALLOW_ENABLE_*` in `judge0.conf`.
+- Judge0 C/C++ submissions fail to link `sqrt`, threads, `dlopen`, or realtime functions: confirm `configure-languages.sql` is beside `sandbox.compose.yml`, inspect `docker compose ps -a judge0-language-config` and its logs, rerun the one-shot service, then recreate the workers. Do not enable submission-controlled compiler options as a workaround.
 - Chromium fails to launch: verify the runner image version matches `@playwright/test`, the official seccomp profile is readable, and the container is running as `pwuser`; inspect runner logs before changing security options.
 - A web-design exercise cannot load an external font, script, or image: expected in the hardened deployment; the runner has no outbound network. Include required assets in the exercise instead.
 
@@ -1400,6 +1467,7 @@ Common failure causes:
   the application host can reach them, and non-allowlisted sources time out.
 - [ ] Judge0 authentication rejects a missing/incorrect token and accepts the configured token.
 - [ ] The Judge0 Python execution smoke test returns `Accepted` and `5`.
+- [ ] The Judge0 C system-library smoke test returns `Accepted` and `2.000`.
 - [ ] The Playwright runner smoke test reports `completed`, `1 / 1`.
 - [ ] One real coding exercise and one real web-design exercise reach the gradebook.
 - [ ] Database and storage backups complete and exist off-host.
