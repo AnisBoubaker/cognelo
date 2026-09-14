@@ -140,9 +140,9 @@ test.describe.serial("authoring and completing every activity type", () => {
       "",
       "Read **one name** from standard input and print `Hello, <name>!`.",
       "",
-      "$$",
-      "g(n) = n + 1",
-      "$$"
+      "$$V = \\sqrt{\\frac{2mg}{0.5\\rho\\pi r^2}}$$",
+      "",
+      "Use the formula above."
     ].join("\n");
     const bankActivityId = await createBankActivityThroughUi(teacherPage, data, {
       category: "Programming",
@@ -155,6 +155,19 @@ test.describe.serial("authoring and completing every activity type", () => {
     const promptField = teacherPage.locator('label[for="coding-prompt"]').locator("..");
     await promptField.getByRole("tab", { name: "Markdown" }).click();
     await promptField.getByRole("textbox", { name: "Prompt" }).fill(prompt);
+    await promptField.getByRole("tab", { name: "Visual" }).click();
+    const visualPrompt = promptField.getByRole("textbox", { name: "Prompt" });
+    const visualFormula = visualPrompt.locator(".markdown-math-display");
+    await expect(visualFormula.locator(".katex-display")).toBeVisible();
+    await expect(visualFormula).toHaveAttribute("contenteditable", "false");
+    await expect(visualPrompt).not.toContainText("$$");
+    await visualPrompt.locator("p").last().click();
+    await teacherPage.keyboard.press("End");
+    await teacherPage.keyboard.type(" Be precise; compare with $\\sqrt{m}$.");
+    await promptField.getByRole("tab", { name: "Markdown" }).click();
+    const markdownPrompt = promptField.getByRole("textbox", { name: "Prompt" });
+    await expect(markdownPrompt).toHaveValue(/\$\$V = \\sqrt\{\\frac\{2mg\}\{0\.5\\rho\\pi r\^2\}\}\$\$/);
+    await expect(markdownPrompt).toHaveValue(/Use the formula above\. Be precise; compare with \$\\sqrt\{m\}\$\./);
     await teacherPage
       .getByText("Reference solution", { exact: true })
       .locator("..")
@@ -180,6 +193,13 @@ test.describe.serial("authoring and completing every activity type", () => {
     await hiddenTests.getByRole("textbox").nth(3).fill("Hello, Grace!", { timeout: 10_000 });
     await teacherPage.getByRole("button", { name: "Save coding exercise" }).click();
     await expect(teacherPage.getByText("Coding exercise saved.", { exact: true })).toBeVisible({ timeout: 120_000 });
+    await teacherPage.reload();
+    await expect(teacherPage.getByRole("heading", { name: "Coding exercise authoring" })).toBeVisible();
+    const reopenedPromptField = teacherPage.locator('label[for="coding-prompt"]').locator("..");
+    await reopenedPromptField.getByRole("tab", { name: "Markdown" }).click();
+    await expect(reopenedPromptField.getByRole("textbox", { name: "Prompt" })).toHaveValue(
+      `${prompt} Be precise; compare with $\\sqrt{m}$.`
+    );
     await publishCurrentBankActivity(teacherPage);
 
     await copyAndAssignBankActivity(data, {
@@ -196,7 +216,9 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(studentPrompt.locator("code")).toContainText("Hello, <name>!");
     await expect(studentPrompt.locator(".markdown-math-display .katex-display")).toBeVisible();
     await expect(studentPrompt.locator(".markdown-math-display math")).toHaveCount(1);
+    await expect(studentPrompt.locator(".markdown-math-inline .katex")).toHaveCount(1);
     await expect(studentPrompt).not.toContainText("$$");
+    await expect(studentPrompt).toContainText("Use the formula above. Be precise; compare with");
     await expect(studentPage.getByText("Hidden test 1", { exact: true })).toHaveCount(0);
     await expect(studentPage.getByText("Grace", { exact: true })).toHaveCount(0);
     await replaceCodeEditorContents(studentPage, title, solution);
