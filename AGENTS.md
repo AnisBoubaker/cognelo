@@ -39,3 +39,7 @@ Documentation is part of the definition of done.
 - Record durable decisions and non-obvious pitfalls, not a chronological work log.
 
 Before handing off, explicitly review every affected root or plugin `README.md` and `PROJECT_MEMORY.md`, update anything made stale by the change, and state any documentation that could not be verified.
+
+## Perform atomic commits
+
+Before starting a new task, evaluate whether this is a totally new feature or one thats is unrelated to the one that preceded it. If so, consider the last feature or task complete and validated and do an automatic commit.
