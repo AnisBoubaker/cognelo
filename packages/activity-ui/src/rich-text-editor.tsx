@@ -1,8 +1,9 @@
 "use client";
 
 import DOMPurify from "dompurify";
-import { type ClipboardEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type ClipboardEvent, type KeyboardEvent, type MouseEvent, useEffect, useRef, useState } from "react";
 import { CodeEditor } from "./code-editor";
+import { EquationEditorDialog } from "./equation-editor-dialog";
 import { renderMarkdownToHtml } from "./markdown";
 
 export type RichTextEditorLocale = "en" | "fr" | "zh" | "ar";
@@ -34,7 +35,26 @@ const editorCopy = {
     numberedList: "Numbered list",
     link: "Link",
     unlink: "Remove link",
-    linkPrompt: "Enter the link URL"
+    linkPrompt: "Enter the link URL",
+    equation: "Equation",
+    addEquation: "Add equation",
+    editEquation: "Edit equation",
+    equationHelp: "Build the equation with the visual field, shortcut buttons, or on-screen keyboard.",
+    equationInput: "Equation",
+    equationStyle: "Equation placement",
+    equationInline: "Inline",
+    equationDisplay: "On its own line",
+    equationShortcuts: "Common structures",
+    equationKeyboard: "Math keyboard",
+    equationLoading: "Loading equation editor…",
+    equationLoadError: "The equation editor could not be loaded.",
+    equationRequired: "Enter an equation before continuing.",
+    equationIncomplete: "Complete every empty box before continuing.",
+    equationCancel: "Cancel",
+    equationInsert: "Insert equation",
+    equationUpdate: "Update equation",
+    equationRemove: "Remove equation",
+    equationClose: "Close"
   },
   fr: {
     editorMode: "Mode d'edition",
@@ -52,7 +72,26 @@ const editorCopy = {
     numberedList: "Liste numerotee",
     link: "Lien",
     unlink: "Supprimer le lien",
-    linkPrompt: "Saisissez l'adresse du lien"
+    linkPrompt: "Saisissez l'adresse du lien",
+    equation: "Équation",
+    addEquation: "Ajouter une équation",
+    editEquation: "Modifier l'équation",
+    equationHelp: "Construisez l'équation avec le champ visuel, les raccourcis ou le clavier à l'écran.",
+    equationInput: "Équation",
+    equationStyle: "Disposition de l'équation",
+    equationInline: "Dans le texte",
+    equationDisplay: "Sur sa propre ligne",
+    equationShortcuts: "Structures courantes",
+    equationKeyboard: "Clavier mathématique",
+    equationLoading: "Chargement de l'éditeur d'équations…",
+    equationLoadError: "Impossible de charger l'éditeur d'équations.",
+    equationRequired: "Saisissez une équation avant de continuer.",
+    equationIncomplete: "Remplissez toutes les cases vides avant de continuer.",
+    equationCancel: "Annuler",
+    equationInsert: "Insérer l'équation",
+    equationUpdate: "Mettre à jour l'équation",
+    equationRemove: "Supprimer l'équation",
+    equationClose: "Fermer"
   },
   zh: {
     editorMode: "编辑器模式",
@@ -70,7 +109,26 @@ const editorCopy = {
     numberedList: "编号列表",
     link: "链接",
     unlink: "移除链接",
-    linkPrompt: "输入链接地址"
+    linkPrompt: "输入链接地址",
+    equation: "公式",
+    addEquation: "添加公式",
+    editEquation: "编辑公式",
+    equationHelp: "使用可视化输入框、快捷按钮或屏幕键盘构建公式。",
+    equationInput: "公式",
+    equationStyle: "公式位置",
+    equationInline: "行内",
+    equationDisplay: "独立一行",
+    equationShortcuts: "常用结构",
+    equationKeyboard: "数学键盘",
+    equationLoading: "正在加载公式编辑器…",
+    equationLoadError: "无法加载公式编辑器。",
+    equationRequired: "请先输入公式。",
+    equationIncomplete: "请先填写所有空白框。",
+    equationCancel: "取消",
+    equationInsert: "插入公式",
+    equationUpdate: "更新公式",
+    equationRemove: "删除公式",
+    equationClose: "关闭"
   },
   ar: {
     editorMode: "وضع المحرر",
@@ -88,9 +146,35 @@ const editorCopy = {
     numberedList: "قائمة مرقمة",
     link: "رابط",
     unlink: "إزالة الرابط",
-    linkPrompt: "أدخل عنوان الرابط"
+    linkPrompt: "أدخل عنوان الرابط",
+    equation: "معادلة",
+    addEquation: "إضافة معادلة",
+    editEquation: "تعديل المعادلة",
+    equationHelp: "أنشئ المعادلة باستخدام الحقل المرئي أو الاختصارات أو لوحة المفاتيح على الشاشة.",
+    equationInput: "المعادلة",
+    equationStyle: "موضع المعادلة",
+    equationInline: "ضمن النص",
+    equationDisplay: "في سطر مستقل",
+    equationShortcuts: "تراكيب شائعة",
+    equationKeyboard: "لوحة مفاتيح الرياضيات",
+    equationLoading: "جارٍ تحميل محرر المعادلات…",
+    equationLoadError: "تعذر تحميل محرر المعادلات.",
+    equationRequired: "أدخل معادلة قبل المتابعة.",
+    equationIncomplete: "أكمل جميع الخانات الفارغة قبل المتابعة.",
+    equationCancel: "إلغاء",
+    equationInsert: "إدراج المعادلة",
+    equationUpdate: "تحديث المعادلة",
+    equationRemove: "حذف المعادلة",
+    equationClose: "إغلاق"
   }
 } as const;
+
+type EquationDialogState = {
+  displayMode: boolean;
+  latex: string;
+  mode: "add" | "edit";
+  targetIndex: number | null;
+};
 
 export function RichTextEditor({
   value,
@@ -102,9 +186,12 @@ export function RichTextEditor({
   ariaLabel
 }: RichTextEditorProps) {
   const [mode, setMode] = useState<"visual" | "markdown">("visual");
+  const [equationDialog, setEquationDialog] = useState<EquationDialogState | null>(null);
   const visualRef = useRef<HTMLDivElement | null>(null);
   const visualMarkdownRef = useRef<string | null>(null);
+  const visualEquationsInteractiveRef = useRef<boolean | null>(null);
   const selectionRangeRef = useRef<Range | null>(null);
+  const equationDialogOpeningRef = useRef(false);
   const copy = editorCopy[locale] ?? editorCopy.en;
 
   useEffect(() => {
@@ -112,13 +199,14 @@ export function RichTextEditor({
     if (!visualElement) {
       return;
     }
-    if (visualMarkdownRef.current === value) {
+    if (visualMarkdownRef.current === value && visualEquationsInteractiveRef.current === !disabled) {
       return;
     }
     selectionRangeRef.current = null;
-    visualElement.innerHTML = markdownToEditorHtml(value);
+    renderVisualEditorHtml(visualElement, value, copy.editEquation, !disabled);
     visualMarkdownRef.current = value;
-  }, [value]);
+    visualEquationsInteractiveRef.current = !disabled;
+  }, [copy.editEquation, disabled, value]);
 
   function syncVisualValue({ refreshRenderedMath = false }: { refreshRenderedMath?: boolean } = {}) {
     if (!visualRef.current) {
@@ -129,7 +217,8 @@ export function RichTextEditor({
     onChange(markdown);
     if (refreshRenderedMath) {
       selectionRangeRef.current = null;
-      visualRef.current.innerHTML = markdownToEditorHtml(markdown);
+      renderVisualEditorHtml(visualRef.current, markdown, copy.editEquation, !disabled);
+      visualEquationsInteractiveRef.current = !disabled;
     }
   }
 
@@ -170,6 +259,83 @@ export function RichTextEditor({
     }
   }
 
+  function addEquation() {
+    if (disabled) {
+      return;
+    }
+    saveSelection();
+    equationDialogOpeningRef.current = true;
+    setEquationDialog({ displayMode: true, latex: "", mode: "add", targetIndex: null });
+  }
+
+  function editEquation(target: HTMLElement) {
+    if (disabled) {
+      return;
+    }
+    const source = readProtectedMathSource(target);
+    if (source === null) {
+      return;
+    }
+    const displayMode = target.getAttribute("data-markdown-math-display") === "true";
+    const targetIndex = visualRef.current
+      ? Array.from(visualRef.current.querySelectorAll("[data-markdown-math-source]")).indexOf(target)
+      : -1;
+    if (targetIndex < 0) {
+      return;
+    }
+    equationDialogOpeningRef.current = true;
+    setEquationDialog({ displayMode, latex: extractMathExpression(source, displayMode), mode: "edit", targetIndex });
+  }
+
+  function applyEquation({ displayMode, latex }: { displayMode: boolean; latex: string }) {
+    const visualElement = visualRef.current;
+    if (!visualElement || !equationDialog) {
+      return;
+    }
+    const source = displayMode ? `$$\n${latex}\n$$` : `$${latex}$`;
+    const mathElement = createVisualMathElement(source, copy.editEquation);
+    if (!mathElement) {
+      return;
+    }
+
+    const currentTarget = equationDialog.targetIndex === null
+      ? null
+      : visualElement.querySelectorAll<HTMLElement>("[data-markdown-math-source]")[equationDialog.targetIndex];
+    if (equationDialog.mode === "edit") {
+      if (!currentTarget) {
+        setEquationDialog(null);
+        return;
+      }
+      currentTarget.replaceWith(mathElement);
+    } else {
+      insertVisualMathElement(visualElement, mathElement, displayMode, selectionRangeRef.current);
+    }
+    syncVisualValue({ refreshRenderedMath: true });
+    setEquationDialog(null);
+  }
+
+  function removeEquation() {
+    const visualElement = visualRef.current;
+    const currentTarget = visualElement && equationDialog?.targetIndex !== null && equationDialog?.targetIndex !== undefined
+      ? visualElement.querySelectorAll<HTMLElement>("[data-markdown-math-source]")[equationDialog.targetIndex]
+      : null;
+    if (!currentTarget) {
+      setEquationDialog(null);
+      return;
+    }
+    currentTarget.remove();
+    syncVisualValue({ refreshRenderedMath: true });
+    setEquationDialog(null);
+  }
+
+  function handleVisualClick(event: MouseEvent<HTMLDivElement>) {
+    const target = (event.target as HTMLElement).closest<HTMLElement>("[data-markdown-math-source]");
+    if (target) {
+      event.preventDefault();
+      editEquation(target);
+    }
+  }
+
   function handlePaste(event: ClipboardEvent<HTMLDivElement>) {
     event.preventDefault();
     const clipboardHtml = event.clipboardData.getData("text/html");
@@ -182,6 +348,12 @@ export function RichTextEditor({
   }
 
   function handleVisualKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const mathTarget = (event.target as HTMLElement).closest<HTMLElement>("[data-markdown-math-source]");
+    if (mathTarget && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      editEquation(mathTarget);
+      return;
+    }
     if (event.key !== "Enter" || !event.shiftKey || disabled) {
       return;
     }
@@ -249,6 +421,9 @@ export function RichTextEditor({
             <button aria-label={copy.unlink} title={copy.unlink} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("unlink")}>
               {copy.unlink}
             </button>
+            <button aria-label={copy.addEquation} title={copy.addEquation} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={addEquation}>
+              <span aria-hidden="true">∑</span> {copy.equation}
+            </button>
           </div>
           <div
             id={id}
@@ -262,12 +437,14 @@ export function RichTextEditor({
             suppressContentEditableWarning
             onBlur={() => {
               saveSelection();
-              syncVisualValue({ refreshRenderedMath: true });
+              syncVisualValue({ refreshRenderedMath: !equationDialogOpeningRef.current });
+              equationDialogOpeningRef.current = false;
             }}
             onInput={() => {
               saveSelection();
               syncVisualValue();
             }}
+            onClick={handleVisualClick}
             onKeyDown={handleVisualKeyDown}
             onKeyUp={saveSelection}
             onMouseUp={saveSelection}
@@ -285,8 +462,121 @@ export function RichTextEditor({
           disabled={disabled}
         />
       </div>
+      {equationDialog ? (
+        <EquationEditorDialog
+          copy={{
+            eyebrow: copy.equation,
+            addTitle: copy.addEquation,
+            editTitle: copy.editEquation,
+            help: copy.equationHelp,
+            inputLabel: copy.equationInput,
+            styleLabel: copy.equationStyle,
+            inline: copy.equationInline,
+            display: copy.equationDisplay,
+            shortcuts: copy.equationShortcuts,
+            keyboard: copy.equationKeyboard,
+            loading: copy.equationLoading,
+            loadError: copy.equationLoadError,
+            required: copy.equationRequired,
+            incomplete: copy.equationIncomplete,
+            cancel: copy.equationCancel,
+            insert: copy.equationInsert,
+            update: copy.equationUpdate,
+            remove: copy.equationRemove,
+            close: copy.equationClose
+          }}
+          displayMode={equationDialog.displayMode}
+          initialLatex={equationDialog.latex}
+          locale={locale}
+          mode={equationDialog.mode}
+          onCancel={() => setEquationDialog(null)}
+          onConfirm={applyEquation}
+          onRemove={equationDialog.mode === "edit" ? removeEquation : undefined}
+        />
+      ) : null}
     </div>
   );
+}
+
+function renderVisualEditorHtml(element: HTMLElement, markdown: string, editEquationLabel: string, equationsInteractive: boolean) {
+  element.innerHTML = markdownToEditorHtml(markdown);
+  prepareVisualMathWidgets(element, editEquationLabel, equationsInteractive);
+}
+
+function prepareVisualMathWidgets(root: ParentNode, editEquationLabel: string, interactive = true) {
+  root.querySelectorAll<HTMLElement>("[data-markdown-math-source]").forEach((element) => {
+    if (!interactive) {
+      element.removeAttribute("aria-label");
+      element.removeAttribute("role");
+      element.removeAttribute("tabindex");
+      element.removeAttribute("title");
+      return;
+    }
+    element.setAttribute("aria-label", editEquationLabel);
+    element.setAttribute("role", "button");
+    element.setAttribute("tabindex", "0");
+    element.setAttribute("title", editEquationLabel);
+  });
+}
+
+function createVisualMathElement(source: string, editEquationLabel: string) {
+  const host = document.createElement("div");
+  host.innerHTML = markdownToEditorHtml(source);
+  const element = host.querySelector<HTMLElement>("[data-markdown-math-source]");
+  if (element) {
+    prepareVisualMathWidgets(host, editEquationLabel);
+  }
+  return element;
+}
+
+function insertVisualMathElement(root: HTMLElement, element: HTMLElement, displayMode: boolean, savedRange: Range | null) {
+  const range = savedRange && root.contains(savedRange.commonAncestorContainer) ? savedRange : null;
+  if (!displayMode) {
+    if (range) {
+      range.deleteContents();
+      range.insertNode(element);
+      return;
+    }
+    const paragraph = document.createElement("p");
+    paragraph.append(element);
+    root.append(paragraph);
+    return;
+  }
+
+  const directChild = range ? findDirectEditorChild(root, range.commonAncestorContainer) : null;
+  if (directChild?.textContent?.trim()) {
+    directChild.after(element);
+  } else if (directChild) {
+    directChild.replaceWith(element);
+  } else {
+    root.append(element);
+  }
+  if (!element.nextElementSibling) {
+    const trailingParagraph = document.createElement("p");
+    trailingParagraph.append(document.createElement("br"));
+    element.after(trailingParagraph);
+  }
+}
+
+function findDirectEditorChild(root: HTMLElement, node: Node) {
+  let current = node.nodeType === Node.ELEMENT_NODE ? node as HTMLElement : node.parentElement;
+  while (current?.parentElement && current.parentElement !== root) {
+    current = current.parentElement;
+  }
+  return current?.parentElement === root ? current : null;
+}
+
+function extractMathExpression(source: string, displayMode: boolean) {
+  if (displayMode && source.startsWith("$$") && source.endsWith("$$")) {
+    return source.slice(2, -2).trim();
+  }
+  if (source.startsWith("\\(") && source.endsWith("\\)")) {
+    return source.slice(2, -2).trim();
+  }
+  if (source.startsWith("$") && source.endsWith("$")) {
+    return source.slice(1, -1).trim();
+  }
+  return source.trim();
 }
 
 function markdownToEditorHtml(markdown: string) {
