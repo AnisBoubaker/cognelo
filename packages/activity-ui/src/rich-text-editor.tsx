@@ -5,6 +5,7 @@ import { type ClipboardEvent, type KeyboardEvent, type MouseEvent, useEffect, us
 import { CodeEditor } from "./code-editor";
 import { EquationEditorDialog } from "./equation-editor-dialog";
 import { renderMarkdownToHtml } from "./markdown";
+import { TableEditorDialog } from "./table-editor-dialog";
 
 export type RichTextEditorLocale = "en" | "fr" | "zh" | "ar";
 
@@ -54,7 +55,22 @@ const editorCopy = {
     equationInsert: "Insert equation",
     equationUpdate: "Update equation",
     equationRemove: "Remove equation",
-    equationClose: "Close"
+    equationClose: "Close",
+    table: "Table",
+    addTable: "Add table",
+    tableHelp: "Choose the table size. The first row is used as the column header.",
+    tableRows: "Rows",
+    tableColumns: "Columns",
+    tableCancel: "Cancel",
+    tableInsert: "Insert table",
+    tableClose: "Close",
+    tableActions: "Table actions",
+    addRowBefore: "Add row before",
+    addRowAfter: "Add row after",
+    addColumnBefore: "Add column before",
+    addColumnAfter: "Add column after",
+    removeRow: "Remove current row",
+    removeColumn: "Remove current column"
   },
   fr: {
     editorMode: "Mode d'edition",
@@ -91,7 +107,22 @@ const editorCopy = {
     equationInsert: "Insérer l'équation",
     equationUpdate: "Mettre à jour l'équation",
     equationRemove: "Supprimer l'équation",
-    equationClose: "Fermer"
+    equationClose: "Fermer",
+    table: "Tableau",
+    addTable: "Ajouter un tableau",
+    tableHelp: "Choisissez le nombre de lignes et de colonnes. La première ligne sert d'en-tête.",
+    tableRows: "Lignes",
+    tableColumns: "Colonnes",
+    tableCancel: "Annuler",
+    tableInsert: "Insérer le tableau",
+    tableClose: "Fermer",
+    tableActions: "Actions du tableau",
+    addRowBefore: "Ajouter une ligne avant",
+    addRowAfter: "Ajouter une ligne après",
+    addColumnBefore: "Ajouter une colonne avant",
+    addColumnAfter: "Ajouter une colonne après",
+    removeRow: "Supprimer la ligne actuelle",
+    removeColumn: "Supprimer la colonne actuelle"
   },
   zh: {
     editorMode: "编辑器模式",
@@ -128,7 +159,22 @@ const editorCopy = {
     equationInsert: "插入公式",
     equationUpdate: "更新公式",
     equationRemove: "删除公式",
-    equationClose: "关闭"
+    equationClose: "关闭",
+    table: "表格",
+    addTable: "添加表格",
+    tableHelp: "选择行数和列数。第一行将用作列标题。",
+    tableRows: "行",
+    tableColumns: "列",
+    tableCancel: "取消",
+    tableInsert: "插入表格",
+    tableClose: "关闭",
+    tableActions: "表格操作",
+    addRowBefore: "在前面添加行",
+    addRowAfter: "在后面添加行",
+    addColumnBefore: "在前面添加列",
+    addColumnAfter: "在后面添加列",
+    removeRow: "删除当前行",
+    removeColumn: "删除当前列"
   },
   ar: {
     editorMode: "وضع المحرر",
@@ -165,7 +211,22 @@ const editorCopy = {
     equationInsert: "إدراج المعادلة",
     equationUpdate: "تحديث المعادلة",
     equationRemove: "حذف المعادلة",
-    equationClose: "إغلاق"
+    equationClose: "إغلاق",
+    table: "جدول",
+    addTable: "إضافة جدول",
+    tableHelp: "اختر عدد الصفوف والأعمدة. يُستخدم الصف الأول كرأس للأعمدة.",
+    tableRows: "الصفوف",
+    tableColumns: "الأعمدة",
+    tableCancel: "إلغاء",
+    tableInsert: "إدراج الجدول",
+    tableClose: "إغلاق",
+    tableActions: "إجراءات الجدول",
+    addRowBefore: "إضافة صف قبله",
+    addRowAfter: "إضافة صف بعده",
+    addColumnBefore: "إضافة عمود قبله",
+    addColumnAfter: "إضافة عمود بعده",
+    removeRow: "حذف الصف الحالي",
+    removeColumn: "حذف العمود الحالي"
   }
 } as const;
 
@@ -174,6 +235,12 @@ type EquationDialogState = {
   latex: string;
   mode: "add" | "edit";
   targetIndex: number | null;
+};
+
+type TableCellSelection = {
+  columnIndex: number;
+  rowIndex: number;
+  tableIndex: number;
 };
 
 export function RichTextEditor({
@@ -187,6 +254,8 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const [mode, setMode] = useState<"visual" | "markdown">("visual");
   const [equationDialog, setEquationDialog] = useState<EquationDialogState | null>(null);
+  const [tableDialogOpen, setTableDialogOpen] = useState(false);
+  const [tableSelection, setTableSelection] = useState<TableCellSelection | null>(null);
   const visualRef = useRef<HTMLDivElement | null>(null);
   const visualMarkdownRef = useRef<string | null>(null);
   const visualEquationsInteractiveRef = useRef<boolean | null>(null);
@@ -204,9 +273,14 @@ export function RichTextEditor({
     }
     selectionRangeRef.current = null;
     renderVisualEditorHtml(visualElement, value, copy.editEquation, !disabled);
+    setTableSelection(null);
     visualMarkdownRef.current = value;
     visualEquationsInteractiveRef.current = !disabled;
   }, [copy.editEquation, disabled, value]);
+
+  useEffect(() => {
+    renderTableCellSelection(visualRef.current, tableSelection);
+  }, [tableSelection]);
 
   function syncVisualValue({ refreshRenderedMath = false }: { refreshRenderedMath?: boolean } = {}) {
     if (!visualRef.current) {
@@ -218,6 +292,7 @@ export function RichTextEditor({
     if (refreshRenderedMath) {
       selectionRangeRef.current = null;
       renderVisualEditorHtml(visualRef.current, markdown, copy.editEquation, !disabled);
+      renderTableCellSelection(visualRef.current, tableSelection);
       visualEquationsInteractiveRef.current = !disabled;
     }
   }
@@ -266,6 +341,117 @@ export function RichTextEditor({
     saveSelection();
     equationDialogOpeningRef.current = true;
     setEquationDialog({ displayMode: true, latex: "", mode: "add", targetIndex: null });
+  }
+
+  function addTable() {
+    if (disabled) {
+      return;
+    }
+    saveSelection();
+    equationDialogOpeningRef.current = true;
+    setTableDialogOpen(true);
+  }
+
+  function insertTable({ columns, rows }: { columns: number; rows: number }) {
+    const visualElement = visualRef.current;
+    if (!visualElement) {
+      return;
+    }
+    const table = createVisualTable(rows, columns);
+    insertVisualBlockElement(visualElement, table, selectionRangeRef.current);
+    const tableIndex = Array.from(visualElement.querySelectorAll("table")).indexOf(table);
+    syncVisualValue();
+    setTableDialogOpen(false);
+    setTableSelection({ columnIndex: 0, rowIndex: 0, tableIndex });
+  }
+
+  function addTableRow(position: "before" | "after") {
+    const context = resolveTableSelection(visualRef.current, tableSelection);
+    if (!context) {
+      return;
+    }
+    const row = document.createElement("tr");
+    for (let columnIndex = 0; columnIndex < context.columnCount; columnIndex += 1) {
+      row.append(createEmptyTableCell("td"));
+    }
+    if (position === "before") {
+      context.row.before(row);
+    } else {
+      context.row.after(row);
+    }
+    normalizeVisualTable(context.table);
+    setTableSelection({
+      ...tableSelection!,
+      rowIndex: tableSelection!.rowIndex + (position === "before" ? 1 : 0)
+    });
+    syncVisualValue();
+  }
+
+  function addTableColumn(position: "before" | "after") {
+    const context = resolveTableSelection(visualRef.current, tableSelection);
+    if (!context) {
+      return;
+    }
+    Array.from(context.table.rows).forEach((row, rowIndex) => {
+      const cells = getDirectTableCells(row);
+      const currentCell = cells[context.columnIndex];
+      const cell = createEmptyTableCell(rowIndex === 0 ? "th" : "td");
+      if (!currentCell || (position === "after" && !currentCell.nextElementSibling)) {
+        row.append(cell);
+      } else if (position === "before") {
+        currentCell.before(cell);
+      } else {
+        currentCell.after(cell);
+      }
+    });
+    normalizeVisualTable(context.table);
+    setTableSelection({
+      ...tableSelection!,
+      columnIndex: tableSelection!.columnIndex + (position === "before" ? 1 : 0)
+    });
+    syncVisualValue();
+  }
+
+  function removeTableRow() {
+    const context = resolveTableSelection(visualRef.current, tableSelection);
+    if (!context) {
+      return;
+    }
+    if (context.table.rows.length === 1) {
+      context.table.remove();
+      setTableSelection(null);
+      syncVisualValue();
+      return;
+    }
+    context.row.remove();
+    normalizeVisualTable(context.table);
+    setTableSelection({
+      ...tableSelection!,
+      rowIndex: Math.min(context.rowIndex, context.table.rows.length - 1)
+    });
+    syncVisualValue();
+  }
+
+  function removeTableColumn() {
+    const context = resolveTableSelection(visualRef.current, tableSelection);
+    if (!context) {
+      return;
+    }
+    if (context.columnCount === 1) {
+      context.table.remove();
+      setTableSelection(null);
+      syncVisualValue();
+      return;
+    }
+    Array.from(context.table.rows).forEach((row) => {
+      getDirectTableCells(row)[context.columnIndex]?.remove();
+    });
+    normalizeVisualTable(context.table);
+    setTableSelection({
+      ...tableSelection!,
+      columnIndex: Math.min(context.columnIndex, context.columnCount - 2)
+    });
+    syncVisualValue();
   }
 
   function editEquation(target: HTMLElement) {
@@ -329,10 +515,21 @@ export function RichTextEditor({
   }
 
   function handleVisualClick(event: MouseEvent<HTMLDivElement>) {
-    const target = (event.target as HTMLElement).closest<HTMLElement>("[data-markdown-math-source]");
-    if (target) {
+    if (disabled) {
+      return;
+    }
+    const eventTarget = event.target as HTMLElement;
+    const mathTarget = eventTarget.closest<HTMLElement>("[data-markdown-math-source]");
+    if (mathTarget) {
       event.preventDefault();
-      editEquation(target);
+      editEquation(mathTarget);
+      return;
+    }
+    const tableCell = eventTarget.closest<HTMLTableCellElement>("th, td");
+    if (tableCell && visualRef.current?.contains(tableCell)) {
+      setTableSelection(findTableCellSelection(visualRef.current, tableCell));
+    } else {
+      setTableSelection(null);
     }
   }
 
@@ -424,7 +621,32 @@ export function RichTextEditor({
             <button aria-label={copy.addEquation} title={copy.addEquation} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={addEquation}>
               <span aria-hidden="true">∑</span> {copy.equation}
             </button>
+            <button aria-label={copy.addTable} title={copy.addTable} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={addTable}>
+              <span aria-hidden="true">▦</span> {copy.table}
+            </button>
           </div>
+          {tableSelection ? (
+            <div className="rich-text-editor-table-toolbar" role="toolbar" aria-label={copy.tableActions}>
+              <button aria-label={copy.addRowBefore} title={copy.addRowBefore} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => addTableRow("before")}>
+                <span aria-hidden="true">＋↑</span> {copy.addRowBefore}
+              </button>
+              <button aria-label={copy.addRowAfter} title={copy.addRowAfter} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => addTableRow("after")}>
+                <span aria-hidden="true">＋↓</span> {copy.addRowAfter}
+              </button>
+              <button aria-label={copy.addColumnBefore} title={copy.addColumnBefore} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => addTableColumn("before")}>
+                <span aria-hidden="true">＋←</span> {copy.addColumnBefore}
+              </button>
+              <button aria-label={copy.addColumnAfter} title={copy.addColumnAfter} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => addTableColumn("after")}>
+                <span aria-hidden="true">＋→</span> {copy.addColumnAfter}
+              </button>
+              <button aria-label={copy.removeRow} title={copy.removeRow} type="button" onMouseDown={(event) => event.preventDefault()} onClick={removeTableRow}>
+                <span aria-hidden="true">−↕</span> {copy.removeRow}
+              </button>
+              <button aria-label={copy.removeColumn} title={copy.removeColumn} type="button" onMouseDown={(event) => event.preventDefault()} onClick={removeTableColumn}>
+                <span aria-hidden="true">−↔</span> {copy.removeColumn}
+              </button>
+            </div>
+          ) : null}
           <div
             id={id}
             ref={visualRef}
@@ -494,6 +716,22 @@ export function RichTextEditor({
           onRemove={equationDialog.mode === "edit" ? removeEquation : undefined}
         />
       ) : null}
+      {tableDialogOpen ? (
+        <TableEditorDialog
+          copy={{
+            eyebrow: copy.table,
+            title: copy.addTable,
+            help: copy.tableHelp,
+            rows: copy.tableRows,
+            columns: copy.tableColumns,
+            cancel: copy.tableCancel,
+            insert: copy.tableInsert,
+            close: copy.tableClose
+          }}
+          onCancel={() => setTableDialogOpen(false)}
+          onConfirm={insertTable}
+        />
+      ) : null}
     </div>
   );
 }
@@ -555,6 +793,134 @@ function insertVisualMathElement(root: HTMLElement, element: HTMLElement, displa
     const trailingParagraph = document.createElement("p");
     trailingParagraph.append(document.createElement("br"));
     element.after(trailingParagraph);
+  }
+}
+
+function createVisualTable(rowCount: number, columnCount: number) {
+  const table = document.createElement("table");
+  const head = document.createElement("thead");
+  const body = document.createElement("tbody");
+
+  for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+    const row = document.createElement("tr");
+    for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
+      row.append(createEmptyTableCell(rowIndex === 0 ? "th" : "td"));
+    }
+    (rowIndex === 0 ? head : body).append(row);
+  }
+
+  table.append(head);
+  if (body.rows.length) {
+    table.append(body);
+  }
+  return table;
+}
+
+function createEmptyTableCell(tag: "td" | "th") {
+  const cell = document.createElement(tag);
+  cell.append(document.createElement("br"));
+  return cell;
+}
+
+function insertVisualBlockElement(root: HTMLElement, element: HTMLElement, savedRange: Range | null) {
+  const range = savedRange && root.contains(savedRange.commonAncestorContainer) ? savedRange : null;
+  const directChild = range ? findDirectEditorChild(root, range.commonAncestorContainer) : null;
+  if (directChild?.textContent?.trim()) {
+    directChild.after(element);
+  } else if (directChild) {
+    directChild.replaceWith(element);
+  } else {
+    root.append(element);
+  }
+  if (!element.nextElementSibling) {
+    const trailingParagraph = document.createElement("p");
+    trailingParagraph.append(document.createElement("br"));
+    element.after(trailingParagraph);
+  }
+}
+
+function findTableCellSelection(root: HTMLElement, cell: HTMLTableCellElement): TableCellSelection | null {
+  const table = cell.closest("table");
+  const row = cell.parentElement;
+  if (!(table instanceof HTMLTableElement) || !(row instanceof HTMLTableRowElement)) {
+    return null;
+  }
+  const tableIndex = Array.from(root.querySelectorAll("table")).indexOf(table);
+  const rowIndex = Array.from(table.rows).indexOf(row);
+  const columnIndex = getDirectTableCells(row).indexOf(cell);
+  if (tableIndex < 0 || rowIndex < 0 || columnIndex < 0) {
+    return null;
+  }
+  return { columnIndex, rowIndex, tableIndex };
+}
+
+function renderTableCellSelection(root: HTMLElement | null, selection: TableCellSelection | null) {
+  if (!root) {
+    return;
+  }
+  root.querySelectorAll("[data-rte-table-active]").forEach((cell) => cell.removeAttribute("data-rte-table-active"));
+  const context = resolveTableSelection(root, selection);
+  context?.cell.setAttribute("data-rte-table-active", "true");
+}
+
+function resolveTableSelection(root: HTMLElement | null, selection: TableCellSelection | null) {
+  if (!root || !selection) {
+    return null;
+  }
+  const table = root.querySelectorAll<HTMLTableElement>("table")[selection.tableIndex];
+  const row = table?.rows[selection.rowIndex];
+  const cell = row ? getDirectTableCells(row)[selection.columnIndex] : undefined;
+  if (!table || !row || !cell) {
+    return null;
+  }
+  const columnCount = Math.max(...Array.from(table.rows).map((tableRow) => getDirectTableCells(tableRow).length));
+  return {
+    cell,
+    columnCount,
+    columnIndex: selection.columnIndex,
+    row,
+    rowIndex: selection.rowIndex,
+    table
+  };
+}
+
+function getDirectTableCells(row: HTMLTableRowElement) {
+  return Array.from(row.children).filter((child): child is HTMLTableCellElement =>
+    child instanceof HTMLTableCellElement
+  );
+}
+
+function normalizeVisualTable(table: HTMLTableElement) {
+  const rows = Array.from(table.rows);
+  if (!rows.length) {
+    table.remove();
+    return;
+  }
+  const columnCount = Math.max(...rows.map((row) => getDirectTableCells(row).length), 1);
+  const head = document.createElement("thead");
+  const body = document.createElement("tbody");
+
+  rows.forEach((row, rowIndex) => {
+    while (getDirectTableCells(row).length < columnCount) {
+      row.append(createEmptyTableCell(rowIndex === 0 ? "th" : "td"));
+    }
+    getDirectTableCells(row).forEach((cell) => {
+      const desiredTag = rowIndex === 0 ? "th" : "td";
+      if (cell.tagName.toLowerCase() === desiredTag) {
+        cell.removeAttribute("colspan");
+        cell.removeAttribute("rowspan");
+        return;
+      }
+      const replacement = document.createElement(desiredTag);
+      replacement.innerHTML = cell.innerHTML;
+      cell.replaceWith(replacement);
+    });
+    (rowIndex === 0 ? head : body).append(row);
+  });
+
+  table.replaceChildren(head);
+  if (body.rows.length) {
+    table.append(body);
   }
 }
 

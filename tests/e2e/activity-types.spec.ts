@@ -1,4 +1,4 @@
-import type { Locator, Page } from "@playwright/test";
+import type { Locator, Page, Request } from "@playwright/test";
 import { prisma } from "@cognelo/db";
 import { expect, test } from "./fixtures/auth";
 import {
@@ -207,11 +207,50 @@ test.describe.serial("authoring and completing every activity type", () => {
     await visualPrompt.locator("p").last().click();
     await teacherPage.keyboard.press("End");
     await teacherPage.keyboard.type(" Be precise; compare with $\\sqrt{m}$.");
+    await promptField.getByRole("button", { name: "Add table" }).click();
+    const addTableDialog = teacherPage.getByRole("dialog", { name: "Add table" });
+    await addTableDialog.getByLabel("Rows").fill("2");
+    await addTableDialog.getByLabel("Columns").fill("2");
+    const unexpectedTableSaveRequests: string[] = [];
+    const trackUnexpectedTableSave = (request: Request) => {
+      if (
+        request.method() === "PATCH" &&
+        new URL(request.url()).pathname.endsWith(`/api/activity-banks/${data.activityBankId}/activities/${bankActivityId}`)
+      ) {
+        unexpectedTableSaveRequests.push(request.url());
+      }
+    };
+    teacherPage.on("request", trackUnexpectedTableSave);
+    await addTableDialog.getByRole("button", { name: "Insert table" }).click();
+    await teacherPage.waitForTimeout(100);
+    teacherPage.off("request", trackUnexpectedTableSave);
+    expect(unexpectedTableSaveRequests).toEqual([]);
+    await expect(teacherPage.getByText("Coding exercise saved.", { exact: true })).toHaveCount(0);
+    const authoredTable = visualPrompt.locator("table").last();
+    await expect(authoredTable.locator("tr")).toHaveCount(2);
+    await expect(authoredTable.locator("tr").first().locator("th")).toHaveCount(2);
+    await authoredTable.locator("td").first().click();
+    const tableActions = promptField.getByRole("toolbar", { name: "Table actions" });
+    await expect(tableActions).toBeVisible();
+    await tableActions.getByRole("button", { name: "Add row before" }).click();
+    await tableActions.getByRole("button", { name: "Add row after" }).click();
+    await tableActions.getByRole("button", { name: "Remove current row" }).click();
+    await expect(authoredTable.locator("tr")).toHaveCount(3);
+    await tableActions.getByRole("button", { name: "Add column before" }).click();
+    await tableActions.getByRole("button", { name: "Add column after" }).click();
+    await tableActions.getByRole("button", { name: "Remove current column" }).click();
+    await expect(authoredTable.locator("tr").first().locator("th")).toHaveCount(3);
+    await authoredTable.locator("th").nth(0).fill("Name");
+    await authoredTable.locator("th").nth(1).fill("Unit");
+    await authoredTable.locator("th").nth(2).fill("Value");
+    await authoredTable.locator("tbody tr").nth(0).locator("td").nth(0).fill("Radius");
+    await authoredTable.locator("tbody tr").nth(1).locator("td").nth(2).fill("3.20");
     await promptField.getByRole("tab", { name: "Markdown" }).click();
     const markdownPrompt = promptField.getByRole("textbox", { name: "Prompt" });
     await expect(markdownPrompt).toHaveValue(/\$\$V = \\sqrt\{\\frac\{2mg\}\{0\.5\\rho\\pi r\^2\}\}\$\$/);
     await expect(markdownPrompt).toHaveValue(/Use the formula above\./);
     await expect(markdownPrompt).toHaveValue(/\$\\pi.*\\times.*\\pi\$ Be precise; compare with \$\\sqrt\{m\}\$\./);
+    await expect(markdownPrompt).toHaveValue(/\| Name \| Unit \| Value \|\n\| --- \| --- \| --- \|/);
     await teacherPage
       .getByText("Reference solution", { exact: true })
       .locator("..")
@@ -220,15 +259,14 @@ test.describe.serial("authoring and completing every activity type", () => {
     await teacherPage.getByRole("button", { name: "Add sample test" }).click();
     const sampleTestToggle = teacherPage.getByRole("button", { name: "sample-2" });
     await expect(sampleTestToggle).toBeVisible({ timeout: 10_000 });
-    const sampleTests = teacherPage
-      .getByRole("heading", { name: "Visible sample tests" })
-      .locator("..")
-      .locator("..");
-    await sampleTests.getByRole("textbox").nth(0).fill("Visible greeting", { timeout: 10_000 });
-    await sampleTests.getByRole("textbox").nth(1).fill("Ada", { timeout: 10_000 });
-    await sampleTests.getByRole("textbox").nth(2).fill("Hello, Ada!", { timeout: 10_000 });
-    await sampleTests.getByLabel("Output matching").selectOption("contains_lines");
-    await sampleTests.getByLabel("Require lines in this order").check();
+    const sampleTestEditor = teacherPage.locator("#sample-output-match-mode-1").locator("xpath=ancestor::section[1]");
+    await sampleTestEditor.getByRole("textbox").nth(0).fill("Visible greeting", { timeout: 10_000 });
+    await sampleTestEditor.getByRole("textbox").nth(1).fill("Ada", { timeout: 10_000 });
+    await sampleTestEditor.getByRole("textbox").nth(2).fill("Hello, Ada!", { timeout: 10_000 });
+    const sampleOutputMatchMode = sampleTestEditor.getByLabel("Output matching");
+    await sampleOutputMatchMode.selectOption("contains_lines");
+    await expect(sampleOutputMatchMode).toHaveValue("contains_lines");
+    await sampleTestEditor.getByLabel("Require lines in this order").check();
     await teacherPage.getByRole("button", { name: "Add hidden test" }).click();
     const hiddenTestToggle = teacherPage.getByRole("button", { name: "Hidden test 1" });
     await expect(hiddenTestToggle).toBeVisible({ timeout: 10_000 });
@@ -245,6 +283,13 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(reopenedPrompt).toHaveValue(/\$\$V = \\sqrt\{\\frac\{2mg\}\{0\.5\\rho\\pi r\^2\}\}\$\$/);
     await expect(reopenedPrompt).toHaveValue(/Use the formula above\./);
     await expect(reopenedPrompt).toHaveValue(/\$\\pi.*\\times.*\\pi\$ Be precise; compare with \$\\sqrt\{m\}\$\./);
+    await expect(reopenedPrompt).toHaveValue(/\| Name \| Unit \| Value \|\n\| --- \| --- \| --- \|/);
+    await reopenedPromptField.getByRole("tab", { name: "Visual" }).click();
+    await expect(reopenedPromptField.locator("table tr")).toHaveCount(3);
+    await expect(reopenedPromptField.locator("table th")).toHaveCount(3);
+    await teacherPage.getByRole("button", { name: "Visible greeting" }).click();
+    await expect(teacherPage.locator("#sample-output-match-mode-1")).toHaveValue("contains_lines");
+    await expect(teacherPage.getByLabel("Require lines in this order")).toBeChecked();
     await publishCurrentBankActivity(teacherPage);
 
     await copyAndAssignBankActivity(data, {
@@ -262,6 +307,10 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(studentPrompt.locator(".markdown-math-display .katex-display").first()).toBeVisible();
     await expect(studentPrompt.locator(".markdown-math-display math")).toHaveCount(1);
     await expect(studentPrompt.locator(".markdown-math-inline .katex")).toHaveCount(2);
+    await expect(studentPrompt.locator("table tr")).toHaveCount(3);
+    await expect(studentPrompt.locator("table th")).toHaveCount(3);
+    await expect(studentPrompt.locator("table")).toContainText("Radius");
+    await expect(studentPrompt.locator("table")).toContainText("3.20");
     await expect(studentPrompt).not.toContainText("$$");
     await expect(studentPrompt).toContainText("Use the formula above.");
     await expect(studentPrompt).toContainText("Be precise; compare with");
@@ -270,7 +319,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await replaceCodeEditorContents(studentPage, title, solution);
     const testSelector = studentPage.locator("#coding-visible-sample");
     await testSelector.click();
-    await studentPage.getByRole("menuitemradio", { name: "Visible greeting" }).click();
+    await studentPage.getByRole("menuitemradio", { name: "Visible greeting" }).evaluate((element: HTMLElement) => element.click());
     const testRunner = studentPage.getByRole("button", { name: "Run test" }).locator("xpath=ancestor::section[1]");
     await expect(testRunner.getByRole("group", { name: "Input (one value per line)" })).toContainText("Ada");
     await expect(testRunner.getByRole("group", { name: "Expected output" })).toContainText("Hello, Ada!");
@@ -302,7 +351,7 @@ test.describe.serial("authoring and completing every activity type", () => {
 
     await testSelector.press("ArrowDown");
     await expect(studentPage.getByRole("menuitemradio", { name: "Personalized test" })).toBeVisible();
-    await studentPage.getByRole("menuitemradio", { name: "Personalized test" }).click();
+    await studentPage.getByRole("menuitemradio", { name: "Personalized test" }).evaluate((element: HTMLElement) => element.click());
     const personalizedInput = testRunner.getByRole("textbox", { name: "Input (one value per line)" });
     await expect(personalizedInput).toBeEditable();
     await expect(testRunner.getByRole("group", { name: "Expected output" })).toHaveCount(0);
@@ -316,7 +365,7 @@ test.describe.serial("authoring and completing every activity type", () => {
 
     await testSelector.press("ArrowDown");
     await expect(studentPage.getByRole("menuitemradio", { name: "Visible greeting" })).toBeVisible();
-    await studentPage.getByRole("menuitemradio", { name: "Visible greeting" }).click();
+    await studentPage.getByRole("menuitemradio", { name: "Visible greeting" }).evaluate((element: HTMLElement) => element.click());
     const runTest = testRunner.getByRole("button", { name: "Run test" });
     await expect(runTest).toBeEnabled({ timeout: 10_000 });
     await runTest.click();
