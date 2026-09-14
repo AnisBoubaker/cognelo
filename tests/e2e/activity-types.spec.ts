@@ -163,11 +163,55 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(visualPrompt).not.toContainText("$$");
     await visualPrompt.locator("p").last().click();
     await teacherPage.keyboard.press("End");
+    await promptField.getByRole("button", { name: "Add equation" }).click();
+    const addEquationDialog = teacherPage.getByRole("dialog", { name: "Add equation" });
+    await expect(addEquationDialog.locator("math-field")).toBeVisible();
+    const keyboardHost = addEquationDialog.locator(".equation-editor-keyboard-host");
+    const keyboardLayoutTabs = keyboardHost.locator(".MLK__layer.is-visible > .MLK__toolbar > .left > div");
+    await expect(keyboardLayoutTabs).toHaveCount(3);
+    await keyboardLayoutTabs.nth(1).click();
+    const shiftedKeycapHints = keyboardHost.locator(".MLK__layer.is-visible .MLK__shift");
+    await expect.poll(() => shiftedKeycapHints.count()).toBeGreaterThan(0);
+    await expect(shiftedKeycapHints.first()).toBeHidden();
+    await expect
+      .poll(() =>
+        keyboardHost.evaluate((host) => {
+          const keyboardPlate = host.querySelector<HTMLElement>(".MLK__plate");
+          if (!keyboardPlate) return false;
+          const hostBounds = host.getBoundingClientRect();
+          const plateBounds = keyboardPlate.getBoundingClientRect();
+          return plateBounds.top >= hostBounds.top - 1 && plateBounds.bottom <= hostBounds.bottom + 1;
+        })
+      )
+      .toBe(true);
+    await expect
+      .poll(async () => {
+        const keyboardBounds = await keyboardHost.boundingBox();
+        const actionBounds = await addEquationDialog.locator(".equation-editor-actions").boundingBox();
+        return Boolean(keyboardBounds && actionBounds && keyboardBounds.y + keyboardBounds.height <= actionBounds.y + 1);
+      })
+      .toBe(true);
+    await addEquationDialog.locator(".equation-editor-shortcuts").getByRole("button", { name: "π", exact: true }).click();
+    await addEquationDialog.getByRole("button", { name: "Insert equation" }).click();
+    await expect(visualPrompt.locator(".markdown-math-display")).toHaveCount(2);
+
+    await visualPrompt.locator(".markdown-math-display").last().click();
+    const editEquationDialog = teacherPage.getByRole("dialog", { name: "Edit equation" });
+    await expect(editEquationDialog.locator("math-field")).toBeVisible();
+    await editEquationDialog.getByRole("button", { name: "Inline", exact: true }).click();
+    const equationShortcuts = editEquationDialog.locator(".equation-editor-shortcuts");
+    await equationShortcuts.getByRole("button", { name: "×", exact: true }).click();
+    await equationShortcuts.getByRole("button", { name: "π", exact: true }).click();
+    await editEquationDialog.getByRole("button", { name: "Update equation" }).click();
+
+    await visualPrompt.locator("p").last().click();
+    await teacherPage.keyboard.press("End");
     await teacherPage.keyboard.type(" Be precise; compare with $\\sqrt{m}$.");
     await promptField.getByRole("tab", { name: "Markdown" }).click();
     const markdownPrompt = promptField.getByRole("textbox", { name: "Prompt" });
     await expect(markdownPrompt).toHaveValue(/\$\$V = \\sqrt\{\\frac\{2mg\}\{0\.5\\rho\\pi r\^2\}\}\$\$/);
-    await expect(markdownPrompt).toHaveValue(/Use the formula above\. Be precise; compare with \$\\sqrt\{m\}\$\./);
+    await expect(markdownPrompt).toHaveValue(/Use the formula above\./);
+    await expect(markdownPrompt).toHaveValue(/\$\\pi.*\\times.*\\pi\$ Be precise; compare with \$\\sqrt\{m\}\$\./);
     await teacherPage
       .getByText("Reference solution", { exact: true })
       .locator("..")
@@ -197,9 +241,10 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(teacherPage.getByRole("heading", { name: "Coding exercise authoring" })).toBeVisible();
     const reopenedPromptField = teacherPage.locator('label[for="coding-prompt"]').locator("..");
     await reopenedPromptField.getByRole("tab", { name: "Markdown" }).click();
-    await expect(reopenedPromptField.getByRole("textbox", { name: "Prompt" })).toHaveValue(
-      `${prompt} Be precise; compare with $\\sqrt{m}$.`
-    );
+    const reopenedPrompt = reopenedPromptField.getByRole("textbox", { name: "Prompt" });
+    await expect(reopenedPrompt).toHaveValue(/\$\$V = \\sqrt\{\\frac\{2mg\}\{0\.5\\rho\\pi r\^2\}\}\$\$/);
+    await expect(reopenedPrompt).toHaveValue(/Use the formula above\./);
+    await expect(reopenedPrompt).toHaveValue(/\$\\pi.*\\times.*\\pi\$ Be precise; compare with \$\\sqrt\{m\}\$\./);
     await publishCurrentBankActivity(teacherPage);
 
     await copyAndAssignBankActivity(data, {
@@ -214,11 +259,12 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(studentPrompt.getByRole("heading", { name: "Greeting requirements" })).toBeVisible();
     await expect(studentPrompt.locator("strong")).toContainText("one name");
     await expect(studentPrompt.locator("code")).toContainText("Hello, <name>!");
-    await expect(studentPrompt.locator(".markdown-math-display .katex-display")).toBeVisible();
+    await expect(studentPrompt.locator(".markdown-math-display .katex-display").first()).toBeVisible();
     await expect(studentPrompt.locator(".markdown-math-display math")).toHaveCount(1);
-    await expect(studentPrompt.locator(".markdown-math-inline .katex")).toHaveCount(1);
+    await expect(studentPrompt.locator(".markdown-math-inline .katex")).toHaveCount(2);
     await expect(studentPrompt).not.toContainText("$$");
-    await expect(studentPrompt).toContainText("Use the formula above. Be precise; compare with");
+    await expect(studentPrompt).toContainText("Use the formula above.");
+    await expect(studentPrompt).toContainText("Be precise; compare with");
     await expect(studentPage.getByText("Hidden test 1", { exact: true })).toHaveCount(0);
     await expect(studentPage.getByText("Grace", { exact: true })).toHaveCount(0);
     await replaceCodeEditorContents(studentPage, title, solution);

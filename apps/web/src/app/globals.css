@@ -1718,8 +1718,20 @@ a.card:hover,
 }
 
 .rich-text-editor-visual [data-markdown-math-source] {
-  cursor: default;
+  border: 1px solid transparent;
+  cursor: pointer;
   user-select: all;
+}
+
+.rich-text-editor-visual [data-markdown-math-source]:hover,
+.rich-text-editor-visual [data-markdown-math-source]:focus-visible {
+  background: color-mix(in srgb, var(--brand-blue), white 94%);
+  border-color: color-mix(in srgb, var(--brand-blue), white 70%);
+  outline: none;
+}
+
+.rich-text-editor.is-disabled .rich-text-editor-visual [data-markdown-math-source] {
+  cursor: default;
 }
 
 .rich-text-editor-visual .markdown-math-inline[data-markdown-math-source] {
@@ -1729,6 +1741,168 @@ a.card:hover,
 .rich-text-editor-visual .markdown-math-display[data-markdown-math-source] {
   border-radius: 8px;
   padding: 0.35rem 0.5rem;
+}
+
+.dialog-backdrop.equation-editor-backdrop {
+  padding: 8px;
+}
+
+.dialog-panel.equation-editor-dialog {
+  display: grid;
+  gap: 10px;
+  max-height: calc(100dvh - 16px);
+  max-width: 860px;
+  padding: 18px;
+  width: min(100%, 860px);
+}
+
+.equation-editor-heading {
+  align-items: flex-start;
+}
+
+.equation-editor-heading .muted {
+  margin: 4px 0 0;
+}
+
+.equation-editor-style {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: inline-flex;
+  justify-self: start;
+  padding: 3px;
+}
+
+.equation-editor-style button {
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+  color: var(--ink);
+  min-height: 36px;
+  padding: 7px 12px;
+}
+
+.equation-editor-style button.is-active {
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--brand-blue), white 70%);
+  box-shadow: 0 1px 3px rgba(13, 27, 71, 0.1);
+}
+
+.equation-editor-field,
+.equation-editor-section {
+  display: grid;
+  gap: 8px;
+}
+
+.equation-editor-field .field-label,
+.equation-editor-section .field-label {
+  color: var(--brand-ink);
+  font-weight: 800;
+  margin: 0;
+}
+
+.equation-editor-mathfield-host {
+  min-height: 64px;
+}
+
+.equation-editor-mathfield {
+  background: white;
+  border: 1px solid color-mix(in srgb, var(--brand-blue), white 68%);
+  border-radius: 8px;
+  display: block;
+  font-size: clamp(1.25rem, 2vw, 1.7rem);
+  min-height: 64px;
+  padding: 10px 16px;
+  width: 100%;
+  --caret-color: var(--brand-blue);
+  --contains-highlight-background-color: rgba(46, 131, 216, 0.12);
+  --selection-background-color: rgba(46, 131, 216, 0.2);
+}
+
+.equation-editor-mathfield:focus-within {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px rgba(46, 131, 216, 0.13);
+}
+
+.equation-editor-shortcuts {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(12, minmax(46px, 1fr));
+}
+
+.equation-editor-shortcuts button {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  box-shadow: none;
+  color: var(--brand-ink);
+  font-family: KaTeX_Main, serif;
+  font-size: 1.05rem;
+  min-height: 38px;
+  padding: 6px;
+}
+
+.equation-editor-shortcuts button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand-blue), white 92%);
+  border-color: color-mix(in srgb, var(--brand-blue), white 64%);
+}
+
+.equation-editor-keyboard-host {
+  min-height: 190px;
+  overflow: hidden;
+  position: relative;
+  --keyboard-padding-bottom: 0;
+  --keyboard-padding-horizontal: 8px;
+  --keyboard-padding-top: 0;
+  --keycap-font-size: 15px;
+  --keycap-gap: 2px;
+  --keycap-height: 30px;
+}
+
+.equation-editor-keyboard-host .MLK__shift {
+  display: none;
+}
+
+.equation-editor-actions {
+  align-items: center;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  margin: 2px -18px -18px;
+  padding: 12px 18px 18px;
+}
+
+.equation-editor-action-spacer {
+  flex: 1;
+}
+
+@media (max-width: 720px) {
+  .equation-editor-backdrop {
+    align-items: stretch;
+    padding: 8px;
+  }
+
+  .dialog-panel.equation-editor-dialog {
+    max-height: calc(100dvh - 16px);
+    padding: 16px;
+  }
+
+  .equation-editor-shortcuts {
+    grid-template-columns: repeat(6, minmax(42px, 1fr));
+  }
+
+  .equation-editor-keyboard-host {
+    min-height: 180px;
+  }
+
+  .equation-editor-actions {
+    align-items: stretch;
+    margin: 0 -16px -16px;
+    padding: 10px 16px 16px;
+  }
+
+  .equation-editor-action-spacer {
+    display: none;
+  }
 }
 
 .field-readonly input[readonly] {
