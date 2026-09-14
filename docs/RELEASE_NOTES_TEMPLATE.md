@@ -105,6 +105,7 @@ In addition to the standard upgrade guide:
 ## Verification completed before release
 
 - [ ] Full automated test suite passed.
+- [ ] Lint passed without errors.
 - [ ] Production builds passed.
 - [ ] A freshly supplied current-production dump was restored into isolated pre-production.
 - [ ] The exact pre-tag candidate commit was deployed and tested against that clone.
