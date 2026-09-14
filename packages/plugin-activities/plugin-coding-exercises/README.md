@@ -100,6 +100,8 @@ Duplicating a coding exercise inside an activity bank invokes the platform bank-
 
 The teacher authoring UI is a form surface and must stay registered with the shared `useUnsavedChangesGuard` hook from `@cognelo/activity-ui`. Any future coding-exercise authoring tabs or settings panels should do the same so navigation can offer continue editing, save and leave, or discard and leave.
 
+The student-facing prompt is authored with the shared visual/Markdown `RichTextEditor` and remains stored as Markdown. Learner current-attempt views render it through the shared sanitized `MarkdownRenderer`, including headings, lists, emphasis, fenced code, and KaTeX-compatible inline or `$$ ... $$` display math. Previous-submission views intentionally continue to omit the prompt.
+
 When a teacher has selected an enabled question-authoring AI agent in global settings, the authoring UI can generate the student-facing prompt from the activity description, language, and subject context.
 
 Prompt, solution, and test generation all use the shared knowledge-alignment choice. Every mode provides the complete subject catalog as a curriculum boundary. `Use selected skills` additionally adds the activity's current draft skills as specific constraints, `Suggest skills` replaces the unsaved host Concepts-tab draft with exact catalog skills inferred from the generated artifact, and `Ignore skills` neither reads nor changes that draft and performs no suggestion pass.

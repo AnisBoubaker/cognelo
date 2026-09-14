@@ -2,7 +2,7 @@
 
 import { type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
-import { CodeEditor, CodeRenderer, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
+import { CodeEditor, CodeRenderer, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, RichTextEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   alignCodingExerciseStarterCodeToTemplate,
   buildCodingExerciseStudentTemplateProjectionFromSource,
@@ -1173,13 +1173,15 @@ export function CodingExerciseActivityView({
 
           <div className="field">
             <label htmlFor="coding-prompt">{t("prompt")}</label>
-            <textarea
+            <RichTextEditor
               id="coding-prompt"
-              rows={5}
+              ariaLabel={t("prompt")}
+              locale={pluginLocale}
+              minHeight={180}
               value={config.prompt}
-              onChange={(event) => {
+              onChange={(prompt) => {
                 aiGenerationDraftRef.current = null;
-                setConfig((current) => ({ ...current, prompt: event.target.value }));
+                setConfig((current) => ({ ...current, prompt }));
               }}
             />
           </div>
@@ -1575,7 +1577,7 @@ export function CodingExerciseActivityView({
             <CodingAttemptHistoryList attempts={previousAttempts} language={config.language} locale={pluginLocale} />
           ) : (
             <>
-              <MarkdownRenderer markdown={config.prompt} />
+              <MarkdownRenderer className="coding-exercise-student-prompt" markdown={config.prompt} />
               <div
                 aria-label={isWorkspaceFullScreen ? t("fullScreen") : undefined}
                 aria-modal={isWorkspaceFullScreen || undefined}

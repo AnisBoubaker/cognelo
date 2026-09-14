@@ -275,6 +275,7 @@ export function RichTextEditor({
       <div className="rich-text-editor-markdown-source" hidden={mode !== "markdown"} role="tabpanel">
         <CodeEditor
           id={id ? `${id}-markdown` : undefined}
+          ariaLabel={ariaLabel}
           language="markdown"
           minHeight={minHeight}
           value={value}

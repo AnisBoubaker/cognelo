@@ -1702,6 +1702,21 @@ a.card:hover,
   padding-left: 12px;
 }
 
+.markdown-renderer .markdown-math-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.2rem 0;
+}
+
+.markdown-renderer .markdown-math-display .katex-display {
+  margin: 0.4rem 0;
+}
+
+.markdown-renderer .markdown-math-inline {
+  max-width: 100%;
+}
+
 .field-readonly input[readonly] {
   background: linear-gradient(180deg, rgba(238, 244, 251, 0.96), rgba(245, 248, 252, 0.96));
   border-color: color-mix(in srgb, var(--brand-blue), white 72%);

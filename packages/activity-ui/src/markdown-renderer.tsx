@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import DOMPurify from "dompurify";
-import { marked } from "marked";
+import { renderMarkdownToHtml } from "./markdown";
 
 type MarkdownRendererProps = {
   markdown: string;
@@ -10,16 +10,11 @@ type MarkdownRendererProps = {
   compact?: boolean;
 };
 
-marked.setOptions({
-  breaks: true,
-  gfm: true
-});
-
 export function MarkdownRenderer({ markdown, className, compact = false }: MarkdownRendererProps) {
   const html = useMemo(() => {
-    const rendered = marked.parser(marked.lexer(markdown ?? ""));
+    const rendered = renderMarkdownToHtml(markdown);
     return DOMPurify.sanitize(rendered, {
-      USE_PROFILES: { html: true }
+      USE_PROFILES: { html: true, mathMl: true, svg: true }
     });
   }, [markdown]);
 
