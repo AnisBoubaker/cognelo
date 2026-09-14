@@ -164,6 +164,7 @@ sudo -u app1 /bin/bash -c '
   set +a
   npm ci --include=dev
   npm run db:generate
+  npm run lint
   npm run typecheck
   NEXT_PUBLIC_API_URL="http://localhost:3001" npm test
 
@@ -183,7 +184,7 @@ sudo -u app1 /bin/bash -c '
 '
 ```
 
-`--include=dev` is required for TypeScript and the test/build tooling. The final build uses the production `NEXT_PUBLIC_API_URL` loaded from `.env`; that URL is embedded in the browser bundle. Set `NEXT_PUBLIC_COGNELO_VERSION` to the immutable release version without the `cognelo-` tag prefix. This prevents expected Prisma generation changes in the deployment worktree from making the compiled release label incorrectly include `-dirty`.
+`--include=dev` is required for ESLint, TypeScript, and the test/build tooling. The final build uses the production `NEXT_PUBLIC_API_URL` loaded from `.env`; that URL is embedded in the browser bundle. Set `NEXT_PUBLIC_COGNELO_VERSION` to the immutable release version without the `cognelo-` tag prefix. This prevents expected Prisma generation changes in the deployment worktree from making the compiled release label incorrectly include `-dirty`.
 
 The temporary empty `storage` directory is build-only. Turbopack traces the
 whole project for some server imports and can reject uploaded-file symlinks
@@ -192,7 +193,7 @@ persistent instance symlink before the command returns and removes the empty
 directory; it neither copies nor changes `/srv/cognelo/app1/shared/storage`.
 Re-run `readlink -f` and verify the instance-specific target before migrating.
 
-Do not continue if installation, generation, tests, type checking, or the build fails. Fix the release and publish a new tag rather than editing the production worktree.
+Do not continue if installation, generation, lint, tests, type checking, or the build fails. Fix the release and publish a new tag rather than editing the production worktree.
 
 ## 3. Update the sandbox only when the release notes require it
 
@@ -499,7 +500,7 @@ Never remove `/srv/cognelo/app1/shared`, its `.env`, or its `storage` directory 
 - [ ] Release changes, migrations, and environment additions are reviewed.
 - [ ] Current application `.env` is backed up with root-only permissions before it is edited.
 - [ ] New detached worktree is linked to the existing shared `.env` and storage.
-- [ ] Dependencies, Prisma generation, typecheck, tests, and production build pass before downtime.
+- [ ] Dependencies, Prisma generation, lint, typecheck, tests, and production build pass before downtime.
 - [ ] Sandbox is updated only if the release changes it.
 - [ ] Sandbox runtime configuration is backed up before any sandbox edit.
 - [ ] Web and API are stopped.

@@ -291,6 +291,7 @@ sudo -u app1 /bin/bash -c '
   set +a
   npm ci --include=dev
   npm run db:generate
+  npm run lint
   npm run typecheck
   NEXT_PUBLIC_API_URL="http://localhost:3001" npm test
 
@@ -310,7 +311,7 @@ sudo -u app1 /bin/bash -c '
 '
 ```
 
-`--include=dev` is required even though the loaded environment sets `NODE_ENV=production`: TypeScript, Vitest, and other build-time tools are development dependencies. The inline localhost URL applies only to the mocked test process so URL-specific tests remain deterministic; the following build still embeds the production `NEXT_PUBLIC_API_URL` from `.env`. Set `NEXT_PUBLIC_COGNELO_VERSION` to the immutable release version without the `cognelo-` tag prefix. Prisma generation can modify tracked generated clients in the deployment worktree, so relying on Git detection after generation would incorrectly label an exact tagged production build as `-dirty`.
+`--include=dev` is required even though the loaded environment sets `NODE_ENV=production`: ESLint, TypeScript, Vitest, and other build-time tools are development dependencies. The inline localhost URL applies only to the mocked test process so URL-specific tests remain deterministic; the following build still embeds the production `NEXT_PUBLIC_API_URL` from `.env`. Set `NEXT_PUBLIC_COGNELO_VERSION` to the immutable release version without the `cognelo-` tag prefix. Prisma generation can modify tracked generated clients in the deployment worktree, so relying on Git detection after generation would incorrectly label an exact tagged production build as `-dirty`.
 
 Builds may report the known Turbopack file-tracing warning caused by plugin Prisma clients. A successful build still ends with both the API and web route summaries.
 
@@ -1202,7 +1203,7 @@ Never build over the active deployment and never deploy a mutable branch head su
 2. Fetch and resolve that tag in the instance repository.
 3. Create a detached worktree in `deployments/<tag>`.
 4. Link its `.env` and `storage` to `shared`.
-5. Run `npm ci --include=dev`, Prisma generation, typecheck, tests with the deterministic localhost API URL, and the production build.
+5. Run `npm ci --include=dev`, Prisma generation, lint, typecheck, tests with the deterministic localhost API URL, and the production build.
 6. Back up the database and storage.
 7. Stop the API for the migration window.
 8. Run `npm run db:migrate:all` from the new tagged deployment.
@@ -1261,6 +1262,7 @@ sudo -u app1 /bin/bash -c '
   set -a && . ./.env && set +a &&
   npm ci --include=dev &&
   npm run db:generate &&
+  npm run lint &&
   npm run typecheck &&
   NEXT_PUBLIC_API_URL="http://localhost:3001" npm test &&
   NEXT_PUBLIC_COGNELO_VERSION="0.6.0" npm run build
