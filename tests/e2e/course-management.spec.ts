@@ -132,7 +132,6 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
   });
 
   test("student sees only the released selected grade, not raw grading payloads", async ({ studentPage: page }) => {
-    test.fail(true, "Known grade-release bug: https://github.com/AnisBoubaker/cognelo/issues/162");
     if (!data) throw new Error("The activity suite was not provisioned.");
     await page.goto(`/courses/${data.courseId}/groups/${data.groupId}?tab=grades`);
     await expect(page.getByRole("heading", { name: "Grades", exact: true })).toBeVisible();
