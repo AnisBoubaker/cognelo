@@ -22,6 +22,21 @@ describe("shared Markdown rendering", () => {
     expect(html).toContain('<code class="language-c">');
   });
 
+  it("renders portable GFM tables", () => {
+    const html = renderMarkdownToHtml([
+      "| Name | Unit | Value |",
+      "| --- | --- | --- |",
+      "| Radius | m | 3.20 |"
+    ].join("\n"));
+
+    expect(html).toContain("<table>");
+    expect(html).toContain("<thead>");
+    expect(html).toContain("<th>Name</th>");
+    expect(html).toContain("<tbody>");
+    expect(html).toContain("<td>Radius</td>");
+    expect(html).toContain("<td>3.20</td>");
+  });
+
   it("renders display and inline LaTeX without exposing their delimiters", () => {
     const html = renderMarkdownToHtml([
       "The inline value is $r^2$ or \\(m + 1\\).",
