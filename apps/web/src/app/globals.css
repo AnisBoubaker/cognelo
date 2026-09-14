@@ -1717,6 +1717,20 @@ a.card:hover,
   max-width: 100%;
 }
 
+.rich-text-editor-visual [data-markdown-math-source] {
+  cursor: default;
+  user-select: all;
+}
+
+.rich-text-editor-visual .markdown-math-inline[data-markdown-math-source] {
+  display: inline-block;
+}
+
+.rich-text-editor-visual .markdown-math-display[data-markdown-math-source] {
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+}
+
 .field-readonly input[readonly] {
   background: linear-gradient(180deg, rgba(238, 244, 251, 0.96), rgba(245, 248, 252, 0.96));
   border-color: color-mix(in srgb, var(--brand-blue), white 72%);

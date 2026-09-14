@@ -38,6 +38,20 @@ describe("shared Markdown rendering", () => {
     expect(html).not.toContain("$$");
   });
 
+  it("can protect rendered LaTeX while retaining its original Markdown source", () => {
+    const displaySource = ["$$", "V = \\sqrt{r^2}", "$$"].join("\n");
+    const markdown = `The radius is $r^2$.\n\n${displaySource}`;
+    const protectedHtml = renderMarkdownToHtml(markdown, { protectMath: true });
+    const studentHtml = renderMarkdownToHtml(markdown);
+
+    expect(protectedHtml).toContain('contenteditable="false"');
+    expect(protectedHtml).toContain('data-markdown-math-display="true"');
+    expect(protectedHtml).toContain(`data-markdown-math-source="${encodeURIComponent(displaySource)}"`);
+    expect(protectedHtml).toContain(`data-markdown-math-source="${encodeURIComponent("$r^2$")}"`);
+    expect(studentHtml).not.toContain("data-markdown-math-source");
+    expect(studentHtml).not.toContain("contenteditable");
+  });
+
   it("does not treat ordinary currency as inline math", () => {
     const html = renderMarkdownToHtml("The prices are $5 and $ 10.");
 

@@ -1,9 +1,9 @@
 "use client";
 
 import DOMPurify from "dompurify";
-import { marked } from "marked";
 import { type ClipboardEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { CodeEditor } from "./code-editor";
+import { renderMarkdownToHtml } from "./markdown";
 
 export type RichTextEditorLocale = "en" | "fr" | "zh" | "ar";
 
@@ -92,8 +92,6 @@ const editorCopy = {
   }
 } as const;
 
-marked.setOptions({ breaks: true, gfm: true });
-
 export function RichTextEditor({
   value,
   onChange,
@@ -122,13 +120,17 @@ export function RichTextEditor({
     visualMarkdownRef.current = value;
   }, [value]);
 
-  function syncVisualValue() {
+  function syncVisualValue({ refreshRenderedMath = false }: { refreshRenderedMath?: boolean } = {}) {
     if (!visualRef.current) {
       return;
     }
     const markdown = editorHtmlToMarkdown(visualRef.current);
     visualMarkdownRef.current = markdown;
     onChange(markdown);
+    if (refreshRenderedMath) {
+      selectionRangeRef.current = null;
+      visualRef.current.innerHTML = markdownToEditorHtml(markdown);
+    }
   }
 
   function runCommand(command: string, commandValue?: string) {
@@ -172,7 +174,7 @@ export function RichTextEditor({
     event.preventDefault();
     const clipboardHtml = event.clipboardData.getData("text/html");
     if (clipboardHtml) {
-      document.execCommand("insertHTML", false, sanitizeEditorHtml(clipboardHtml));
+      document.execCommand("insertHTML", false, sanitizePastedEditorHtml(clipboardHtml));
     } else {
       document.execCommand("insertText", false, event.clipboardData.getData("text/plain"));
     }
@@ -260,7 +262,7 @@ export function RichTextEditor({
             suppressContentEditableWarning
             onBlur={() => {
               saveSelection();
-              syncVisualValue();
+              syncVisualValue({ refreshRenderedMath: true });
             }}
             onInput={() => {
               saveSelection();
@@ -288,11 +290,14 @@ export function RichTextEditor({
 }
 
 function markdownToEditorHtml(markdown: string) {
-  const html = sanitizeEditorHtml(marked.parse(markdown ?? "") as string);
+  const html = DOMPurify.sanitize(renderMarkdownToHtml(markdown, { protectMath: true }), {
+    USE_PROFILES: { html: true, mathMl: true, svg: true },
+    ADD_ATTR: ["contenteditable", "data-markdown-math-display", "data-markdown-math-source"]
+  });
   return html.trim() ? html : "<p><br></p>";
 }
 
-function sanitizeEditorHtml(html: string) {
+function sanitizePastedEditorHtml(html: string) {
   return DOMPurify.sanitize(html, {
     ALLOWED_ATTR: ["checked", "class", "disabled", "href", "title", "type"],
     ALLOWED_TAGS: [
@@ -316,13 +321,17 @@ function serializeChildren(node: Node): string {
 
 function serializeNode(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) {
-    return escapeMarkdown(node.textContent ?? "");
+    return escapeMarkdownPreservingMath(node.textContent ?? "");
   }
   if (node.nodeType !== Node.ELEMENT_NODE) {
     return "";
   }
 
   const element = node as HTMLElement;
+  const mathSource = readProtectedMathSource(element);
+  if (mathSource !== null) {
+    return element.getAttribute("data-markdown-math-display") === "true" ? `${mathSource}\n\n` : mathSource;
+  }
   const tag = element.tagName.toLowerCase();
   const content = serializeChildren(element);
 
@@ -347,6 +356,18 @@ function serializeNode(node: Node): string {
   return content;
 }
 
+function readProtectedMathSource(element: HTMLElement) {
+  const encodedSource = element.getAttribute("data-markdown-math-source");
+  if (encodedSource === null) {
+    return null;
+  }
+  try {
+    return decodeURIComponent(encodedSource);
+  } catch {
+    return encodedSource;
+  }
+}
+
 function serializeList(list: HTMLElement, ordered: boolean): string {
   return Array.from(list.children)
     .filter((child) => child.tagName.toLowerCase() === "li")
@@ -368,6 +389,29 @@ function serializeList(list: HTMLElement, ordered: boolean): string {
 
 function escapeMarkdown(value: string) {
   return value.replace(/([\\`*_{}\[\]])/g, "\\$1");
+}
+
+function escapeMarkdownPreservingMath(value: string) {
+  const mathSourcePattern = /\$\$[\s\S]*?\$\$|\\\((?:\\.|[^\\\n])*?\\\)|\$(?!\$)(?!\s)(?:\\.|[^\\$\n])*?[^\\$\s]\$(?!\$)/g;
+  let markdown = "";
+  let offset = 0;
+
+  for (const match of value.matchAll(mathSourcePattern)) {
+    const source = match[0];
+    const index = match.index;
+    const expression = source.startsWith("$$")
+      ? source.slice(2, -2)
+      : source.startsWith("\\(")
+        ? source.slice(2, -2)
+        : source.slice(1, -1);
+    if (!expression.trim()) {
+      continue;
+    }
+    markdown += escapeMarkdown(value.slice(offset, index)) + source;
+    offset = index + source.length;
+  }
+
+  return markdown + escapeMarkdown(value.slice(offset));
 }
 
 function escapeMarkdownBlockStart(value: string) {
