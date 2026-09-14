@@ -1,7 +1,16 @@
 "use client";
 
 import DOMPurify from "dompurify";
-import { type ClipboardEvent, type KeyboardEvent, type MouseEvent, useEffect, useRef, useState } from "react";
+import {
+  type ClipboardEvent,
+  type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useRef,
+  useState
+} from "react";
 import { CodeEditor } from "./code-editor";
 import { EquationEditorDialog } from "./equation-editor-dialog";
 import { renderMarkdownToHtml } from "./markdown";
@@ -24,6 +33,9 @@ const editorCopy = {
     editorMode: "Editor mode",
     visual: "Visual",
     markdown: "Markdown",
+    fullScreen: "Full screen",
+    exitFullScreen: "Exit full screen",
+    resizeEditor: "Resize editor",
     format: "Text format",
     paragraph: "Paragraph",
     heading2: "Heading 2",
@@ -76,6 +88,9 @@ const editorCopy = {
     editorMode: "Mode d'edition",
     visual: "Visuel",
     markdown: "Markdown",
+    fullScreen: "Plein écran",
+    exitFullScreen: "Quitter le plein écran",
+    resizeEditor: "Redimensionner l'éditeur",
     format: "Format du texte",
     paragraph: "Paragraphe",
     heading2: "Titre 2",
@@ -128,6 +143,9 @@ const editorCopy = {
     editorMode: "编辑器模式",
     visual: "可视化",
     markdown: "Markdown",
+    fullScreen: "全屏",
+    exitFullScreen: "退出全屏",
+    resizeEditor: "调整编辑器大小",
     format: "文本格式",
     paragraph: "段落",
     heading2: "二级标题",
@@ -180,6 +198,9 @@ const editorCopy = {
     editorMode: "وضع المحرر",
     visual: "مرئي",
     markdown: "Markdown",
+    fullScreen: "ملء الشاشة",
+    exitFullScreen: "الخروج من ملء الشاشة",
+    resizeEditor: "تغيير حجم المحرر",
     format: "تنسيق النص",
     paragraph: "فقرة",
     heading2: "عنوان 2",
@@ -243,6 +264,8 @@ type TableCellSelection = {
   tableIndex: number;
 };
 
+const maximumEditorBodyHeight = 1200;
+
 export function RichTextEditor({
   value,
   onChange,
@@ -256,12 +279,37 @@ export function RichTextEditor({
   const [equationDialog, setEquationDialog] = useState<EquationDialogState | null>(null);
   const [tableDialogOpen, setTableDialogOpen] = useState(false);
   const [tableSelection, setTableSelection] = useState<TableCellSelection | null>(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const minimumEditorBodyHeight = getMinimumEditorBodyHeight(minHeight);
+  const [editorBodyHeight, setEditorBodyHeight] = useState(() => minimumEditorBodyHeight);
   const visualRef = useRef<HTMLDivElement | null>(null);
   const visualMarkdownRef = useRef<string | null>(null);
   const visualEquationsInteractiveRef = useRef<boolean | null>(null);
   const selectionRangeRef = useRef<Range | null>(null);
   const equationDialogOpeningRef = useRef(false);
+  const resizeStartRef = useRef<{ height: number; y: number } | null>(null);
   const copy = editorCopy[locale] ?? editorCopy.en;
+
+  useEffect(() => {
+    if (!isFullScreen) {
+      return;
+    }
+    const previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function handleEscape(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape" && !equationDialog && !tableDialogOpen) {
+        event.preventDefault();
+        setIsFullScreen(false);
+      }
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, [equationDialog, isFullScreen, tableDialogOpen]);
 
   useEffect(() => {
     const visualElement = visualRef.current;
@@ -563,26 +611,80 @@ export function RichTextEditor({
     syncVisualValue();
   }
 
+  function startEditorResize(event: ReactPointerEvent<HTMLDivElement>) {
+    resizeStartRef.current = { height: editorBodyHeight, y: event.clientY };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+
+  function resizeEditor(event: ReactPointerEvent<HTMLDivElement>) {
+    const start = resizeStartRef.current;
+    if (!start || !event.currentTarget.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+    setEditorBodyHeight(clampEditorBodyHeight(start.height + event.clientY - start.y, minimumEditorBodyHeight));
+  }
+
+  function finishEditorResize(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    resizeStartRef.current = null;
+  }
+
+  function handleResizeKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "ArrowUp") {
+      setEditorBodyHeight((current) => clampEditorBodyHeight(current - 24, minimumEditorBodyHeight));
+    } else if (event.key === "ArrowDown") {
+      setEditorBodyHeight((current) => clampEditorBodyHeight(current + 24, minimumEditorBodyHeight));
+    } else if (event.key === "Home") {
+      setEditorBodyHeight(minimumEditorBodyHeight);
+    } else if (event.key === "End") {
+      setEditorBodyHeight(maximumEditorBodyHeight);
+    } else {
+      return;
+    }
+    event.preventDefault();
+  }
+
   return (
-    <div className={`rich-text-editor${disabled ? " is-disabled" : ""}`}>
-      <div className="rich-text-editor-mode-tabs" role="tablist" aria-label={copy.editorMode}>
+    <div
+      aria-label={isFullScreen ? copy.fullScreen : undefined}
+      aria-modal={isFullScreen || undefined}
+      className={`rich-text-editor${disabled ? " is-disabled" : ""}${isFullScreen ? " is-full-screen" : ""}`}
+      role={isFullScreen ? "dialog" : undefined}
+      style={{ "--rich-text-editor-body-height": `${editorBodyHeight}px` } as CSSProperties}
+    >
+      <div className="rich-text-editor-mode-bar">
+        <div className="rich-text-editor-mode-tabs" role="tablist" aria-label={copy.editorMode}>
+          <button
+            aria-selected={mode === "visual"}
+            className={mode === "visual" ? "is-active" : ""}
+            role="tab"
+            type="button"
+            onClick={() => setMode("visual")}
+          >
+            {copy.visual}
+          </button>
+          <button
+            aria-selected={mode === "markdown"}
+            className={mode === "markdown" ? "is-active" : ""}
+            role="tab"
+            type="button"
+            onClick={() => setMode("markdown")}
+          >
+            {copy.markdown}
+          </button>
+        </div>
         <button
-          aria-selected={mode === "visual"}
-          className={mode === "visual" ? "is-active" : ""}
-          role="tab"
+          aria-label={isFullScreen ? copy.exitFullScreen : copy.fullScreen}
+          className="rich-text-editor-fullscreen-toggle"
+          title={isFullScreen ? copy.exitFullScreen : copy.fullScreen}
           type="button"
-          onClick={() => setMode("visual")}
+          onClick={() => setIsFullScreen((current) => !current)}
         >
-          {copy.visual}
-        </button>
-        <button
-          aria-selected={mode === "markdown"}
-          className={mode === "markdown" ? "is-active" : ""}
-          role="tab"
-          type="button"
-          onClick={() => setMode("markdown")}
-        >
-          {copy.markdown}
+          <span aria-hidden="true">{isFullScreen ? "⤢" : "⛶"}</span>
+          <span>{isFullScreen ? copy.exitFullScreen : copy.fullScreen}</span>
         </button>
       </div>
 
@@ -655,7 +757,6 @@ export function RichTextEditor({
             className="rich-text-editor-visual markdown-renderer"
             contentEditable={!disabled}
             role="textbox"
-            style={{ minHeight }}
             suppressContentEditableWarning
             onBlur={() => {
               saveSelection();
@@ -677,12 +778,31 @@ export function RichTextEditor({
         <CodeEditor
           id={id ? `${id}-markdown` : undefined}
           ariaLabel={ariaLabel}
+          height={isFullScreen ? "100%" : editorBodyHeight}
           language="markdown"
-          minHeight={minHeight}
+          minHeight={isFullScreen ? 0 : minimumEditorBodyHeight}
           value={value}
           onChange={onChange}
           disabled={disabled}
         />
+      </div>
+      <div
+        aria-label={copy.resizeEditor}
+        aria-orientation="horizontal"
+        aria-valuemax={maximumEditorBodyHeight}
+        aria-valuemin={minimumEditorBodyHeight}
+        aria-valuenow={editorBodyHeight}
+        className="rich-text-editor-resize-handle"
+        role="separator"
+        tabIndex={0}
+        title={copy.resizeEditor}
+        onKeyDown={handleResizeKeyDown}
+        onPointerCancel={finishEditorResize}
+        onPointerDown={startEditorResize}
+        onPointerMove={resizeEditor}
+        onPointerUp={finishEditorResize}
+      >
+        <span aria-hidden="true" />
       </div>
       {equationDialog ? (
         <EquationEditorDialog
@@ -734,6 +854,14 @@ export function RichTextEditor({
       ) : null}
     </div>
   );
+}
+
+function getMinimumEditorBodyHeight(minHeight: number) {
+  return Math.max(220, minHeight + 52);
+}
+
+function clampEditorBodyHeight(value: number, minimum: number) {
+  return Math.min(maximumEditorBodyHeight, Math.max(minimum, Math.round(value)));
 }
 
 function renderVisualEditorHtml(element: HTMLElement, markdown: string, editEquationLabel: string, equationsInteractive: boolean) {
