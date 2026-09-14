@@ -135,6 +135,15 @@ test.describe.serial("authoring and completing every activity type", () => {
     if (!data) throw new Error("The activity suite was not provisioned.");
     const title = `E2E authored coding exercise ${data.token}`;
     const solution = "print(f'Hello, {input().strip()}!')";
+    const prompt = [
+      "## Greeting requirements",
+      "",
+      "Read **one name** from standard input and print `Hello, <name>!`.",
+      "",
+      "$$",
+      "g(n) = n + 1",
+      "$$"
+    ].join("\n");
     const bankActivityId = await createBankActivityThroughUi(teacherPage, data, {
       category: "Programming",
       typeName: "Coding exercise"
@@ -143,7 +152,9 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(teacherPage.getByRole("heading", { name: "Coding exercise authoring" })).toBeVisible();
     await teacherPage.getByLabel("Title", { exact: true }).fill(title);
     await teacherPage.getByLabel("Description").fill("Read a name and print a greeting.");
-    await teacherPage.getByLabel("Prompt").fill("Read one name from standard input and print `Hello, <name>!`.");
+    const promptField = teacherPage.locator('label[for="coding-prompt"]').locator("..");
+    await promptField.getByRole("tab", { name: "Markdown" }).click();
+    await promptField.getByRole("textbox", { name: "Prompt" }).fill(prompt);
     await teacherPage
       .getByText("Reference solution", { exact: true })
       .locator("..")
@@ -179,6 +190,13 @@ test.describe.serial("authoring and completing every activity type", () => {
     });
 
     await openStudentActivity(studentPage, data, title);
+    const studentPrompt = studentPage.locator(".coding-exercise-student-prompt");
+    await expect(studentPrompt.getByRole("heading", { name: "Greeting requirements" })).toBeVisible();
+    await expect(studentPrompt.locator("strong")).toContainText("one name");
+    await expect(studentPrompt.locator("code")).toContainText("Hello, <name>!");
+    await expect(studentPrompt.locator(".markdown-math-display .katex-display")).toBeVisible();
+    await expect(studentPrompt.locator(".markdown-math-display math")).toHaveCount(1);
+    await expect(studentPrompt).not.toContainText("$$");
     await expect(studentPage.getByText("Hidden test 1", { exact: true })).toHaveCount(0);
     await expect(studentPage.getByText("Grace", { exact: true })).toHaveCount(0);
     await replaceCodeEditorContents(studentPage, title, solution);

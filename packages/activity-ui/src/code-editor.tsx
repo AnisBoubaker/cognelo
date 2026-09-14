@@ -8,6 +8,7 @@ type CodeEditorProps = {
   onChange: (value: string) => void;
   language?: string;
   id?: string;
+  ariaLabel?: string;
   minHeight?: number;
   leftRail?: ReactNode;
   rightRail?: ReactNode;
@@ -22,6 +23,7 @@ export function CodeEditor({
   onChange,
   language = "text",
   id,
+  ariaLabel,
   minHeight = 220,
   leftRail,
   rightRail,
@@ -167,6 +169,7 @@ export function CodeEditor({
       </div>
       <textarea
         id={id}
+        aria-label={ariaLabel}
         ref={textareaRef}
         className="code-editor-input"
         spellCheck={false}
