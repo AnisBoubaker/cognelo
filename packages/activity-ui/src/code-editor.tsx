@@ -9,6 +9,7 @@ type CodeEditorProps = {
   language?: string;
   id?: string;
   ariaLabel?: string;
+  height?: number | string;
   minHeight?: number;
   leftRail?: ReactNode;
   rightRail?: ReactNode;
@@ -24,6 +25,7 @@ export function CodeEditor({
   language = "text",
   id,
   ariaLabel,
+  height,
   minHeight = 220,
   leftRail,
   rightRail,
@@ -61,12 +63,18 @@ export function CodeEditor({
       return;
     }
 
-    textarea.style.height = "0px";
-    const nextHeight = `${Math.max(minHeight, textarea.scrollHeight)}px`;
+    const nextHeight = height === undefined
+      ? (() => {
+          textarea.style.height = "0px";
+          return `${Math.max(minHeight, textarea.scrollHeight)}px`;
+        })()
+      : typeof height === "number"
+        ? `${height}px`
+        : height;
     textarea.style.height = nextHeight;
     overlay.style.height = nextHeight;
     container.style.height = nextHeight;
-  }, [minHeight, value]);
+  }, [height, minHeight, value]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== "Tab") {

@@ -33,6 +33,58 @@ async function replaceCodeEditorContents(page: Page, label: string, value: strin
   await expect(editorSurface).toContainText(value, { timeout: 10_000 });
 }
 
+async function verifySharedRichTextEditorLayout(page: Page, field: Locator) {
+  const editor = field.locator(".rich-text-editor");
+  const visualPanel = editor.locator(".rich-text-editor-visual-panel");
+  const markdownPanel = editor.locator(".rich-text-editor-markdown-source");
+  const initialVisualBox = await visualPanel.boundingBox();
+  await field.getByRole("tab", { name: "Markdown" }).click();
+  const initialMarkdownBox = await markdownPanel.boundingBox();
+  expect(Math.abs((initialVisualBox?.height ?? 0) - (initialMarkdownBox?.height ?? 0))).toBeLessThanOrEqual(2);
+  const markdownSource = markdownPanel.locator("textarea");
+  const initialValue = await markdownSource.inputValue();
+  await markdownSource.fill([
+    initialValue,
+    ...Array.from({ length: 30 }, (_, index) => `Overflow paragraph ${index + 1}.`)
+  ].join("\n\n"));
+  expect(Math.abs(((await markdownPanel.boundingBox())?.height ?? 0) - (initialMarkdownBox?.height ?? 0))).toBeLessThanOrEqual(2);
+  await field.getByRole("tab", { name: "Visual" }).click();
+  expect(Math.abs(((await visualPanel.boundingBox())?.height ?? 0) - (initialVisualBox?.height ?? 0))).toBeLessThanOrEqual(2);
+  await expect.poll(() =>
+    visualPanel.locator(".rich-text-editor-visual").evaluate((element) => element.scrollHeight > element.clientHeight)
+  ).toBe(true);
+  await field.getByRole("tab", { name: "Markdown" }).click();
+  await markdownSource.fill(initialValue);
+  await field.getByRole("tab", { name: "Visual" }).click();
+
+  const resizeHandle = editor.getByRole("separator", { name: "Resize editor" });
+  const resizeHandleBox = await resizeHandle.boundingBox();
+  if (!resizeHandleBox) throw new Error("The rich-text editor resize handle was not measurable.");
+  await page.mouse.move(resizeHandleBox.x + resizeHandleBox.width / 2, resizeHandleBox.y + resizeHandleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(resizeHandleBox.x + resizeHandleBox.width / 2, resizeHandleBox.y + resizeHandleBox.height / 2 + 90);
+  await page.mouse.up();
+  const resizedVisualBox = await visualPanel.boundingBox();
+  expect(resizedVisualBox?.height ?? 0).toBeGreaterThan((initialVisualBox?.height ?? 0) + 70);
+  await field.getByRole("tab", { name: "Markdown" }).click();
+  const resizedMarkdownBox = await markdownPanel.boundingBox();
+  expect(Math.abs((resizedVisualBox?.height ?? 0) - (resizedMarkdownBox?.height ?? 0))).toBeLessThanOrEqual(2);
+
+  await editor.getByRole("button", { name: "Full screen" }).click();
+  await expect(editor).toHaveClass(/is-full-screen/);
+  const viewport = page.viewportSize();
+  const fullScreenBox = await editor.boundingBox();
+  expect(fullScreenBox?.x).toBeLessThanOrEqual(1);
+  expect(fullScreenBox?.y).toBeLessThanOrEqual(1);
+  expect(fullScreenBox?.width).toBeGreaterThanOrEqual((viewport?.width ?? 0) - 2);
+  expect(fullScreenBox?.height).toBeGreaterThanOrEqual((viewport?.height ?? 0) - 2);
+  expect((await markdownPanel.boundingBox())?.height ?? 0).toBeGreaterThan((viewport?.height ?? 0) - 100);
+  await field.getByRole("tab", { name: "Visual" }).click();
+  expect((await visualPanel.boundingBox())?.height ?? 0).toBeGreaterThan((viewport?.height ?? 0) - 100);
+  await editor.getByRole("button", { name: "Exit full screen" }).click();
+  await expect(editor).not.toHaveClass(/is-full-screen/);
+}
+
 test.describe.serial("authoring and completing every activity type", () => {
   let data: ActivitySuiteData | undefined;
   let mcqBankActivityId = "";
@@ -58,7 +110,9 @@ test.describe.serial("authoring and completing every activity type", () => {
 
     await expect(teacherPage.getByRole("heading", { name: "Multiple choice questions authoring" })).toBeVisible();
     await teacherPage.getByLabel("Title", { exact: true }).fill(mcqTitle);
-    await teacherPage.getByLabel("Student prompt").fill("Select the value returned by the expression.");
+    const mcqPromptField = teacherPage.locator('label[for="mcq-description"]').locator("..");
+    await mcqPromptField.getByRole("textbox", { name: "Student prompt" }).fill("Select the value returned by the expression.");
+    await verifySharedRichTextEditorLayout(teacherPage, mcqPromptField);
     await teacherPage.locator("#mcq-source").fill([
       "## Result",
       "What is `6 * 7`?",
