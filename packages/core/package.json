@@ -10,7 +10,7 @@
     "@cognelo/db": "0.1.0",
     "bcryptjs": "^2.4.3",
     "jose": "^5.3.0",
-    "nodemailer": "^9.0.5",
+    "nodemailer": "^10.0.9",
     "zod": "^3.23.8"
   },
   "devDependencies": {
