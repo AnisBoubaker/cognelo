@@ -8,6 +8,7 @@ const transaction = vi.hoisted(() => ({
 const mockPrisma = vi.hoisted(() => ({
   $transaction: vi.fn(async (handler: (client: typeof transaction) => unknown) => handler(transaction)),
   activityBank: { findUnique: vi.fn() },
+  activityBankFolder: { findFirst: vi.fn() },
   bankActivity: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() }
 }));
 
@@ -22,6 +23,7 @@ describe("bank activity lifecycle", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.$transaction.mockImplementation(async (handler: (client: typeof transaction) => unknown) => handler(transaction));
+    mockPrisma.activityBankFolder.findFirst.mockResolvedValue(null);
   });
 
   it("duplicates into a new independent unpublished draft at the end of the bank", async () => {
@@ -51,6 +53,6 @@ describe("bank activity lifecycle", () => {
     mockPrisma.bankActivity.update.mockResolvedValue({ id: "activity-1", bankId: "bank-2" });
 
     await moveBankActivity(admin, "bank-1", "activity-1", { targetActivityBankId: "bank-2" });
-    expect(mockPrisma.bankActivity.update).toHaveBeenCalledWith(expect.objectContaining({ data: { bankId: "bank-2", position: 7 } }));
+    expect(mockPrisma.bankActivity.update).toHaveBeenCalledWith(expect.objectContaining({ data: { bankId: "bank-2", folderId: null, position: 7 } }));
   });
 });

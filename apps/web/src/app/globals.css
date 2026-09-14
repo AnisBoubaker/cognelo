@@ -1764,6 +1764,62 @@ a.card:hover,
   overflow: visible;
 }
 
+.activity-bank-tree-actions {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.activity-bank-tree-actions button {
+  align-items: center;
+  display: inline-flex;
+  gap: 7px;
+}
+
+.activity-bank-tree-row {
+  min-height: 68px;
+}
+
+.activity-bank-tree-row:not(.is-folder-row):hover {
+  background: color-mix(in srgb, var(--accent), white 88%);
+}
+
+.activity-bank-filter-dialog {
+  max-height: min(760px, calc(100vh - 40px));
+  max-width: 640px;
+  overflow: hidden;
+}
+
+.activity-bank-concept-filter-list {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  max-height: min(480px, calc(100vh - 280px));
+  overflow: auto;
+}
+
+.activity-bank-concept-filter-row {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  min-height: 54px;
+  padding: 10px 12px;
+}
+
+.activity-bank-concept-filter-row:first-child {
+  border-top: 0;
+}
+
+.activity-bank-concept-filter-row:hover {
+  background: color-mix(in srgb, var(--accent), white 91%);
+}
+
+.activity-bank-concept-filter-row input {
+  min-height: 0;
+  width: auto;
+}
+
 .activity-bank-activity-row {
   cursor: pointer;
   position: relative;

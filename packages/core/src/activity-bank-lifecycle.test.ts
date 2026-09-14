@@ -3,6 +3,7 @@ import type { CurrentUser } from "@cognelo/contracts";
 
 const transaction = vi.hoisted(() => ({
   activityBank: { delete: vi.fn() },
+  activityBankFolder: { findFirst: vi.fn() },
   bankActivity: { findFirst: vi.fn(), update: vi.fn() }
 }));
 
@@ -35,6 +36,7 @@ describe("activity bank deletion", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.$transaction.mockImplementation(async (handler: (client: typeof transaction) => unknown) => handler(transaction));
+    transaction.activityBankFolder.findFirst.mockResolvedValue(null);
   });
 
   it("moves activities in order to a writable bank under the same subject before deletion", async () => {
@@ -49,8 +51,8 @@ describe("activity bank deletion", () => {
       activityCount: 2,
       deletedActivities: []
     });
-    expect(transaction.bankActivity.update).toHaveBeenNthCalledWith(1, { where: { id: "activity-1" }, data: { bankId: "bank-2", position: 5 } });
-    expect(transaction.bankActivity.update).toHaveBeenNthCalledWith(2, { where: { id: "activity-2" }, data: { bankId: "bank-2", position: 6 } });
+    expect(transaction.bankActivity.update).toHaveBeenNthCalledWith(1, { where: { id: "activity-1" }, data: { bankId: "bank-2", folderId: null, position: 5 } });
+    expect(transaction.bankActivity.update).toHaveBeenNthCalledWith(2, { where: { id: "activity-2" }, data: { bankId: "bank-2", folderId: null, position: 6 } });
     expect(transaction.activityBank.delete).toHaveBeenCalledWith({ where: { id: "bank-1" } });
   });
 

@@ -29,10 +29,42 @@ services:
     volumes:
       - ./judge0.conf:/judge0.conf:ro
     depends_on:
-      - judge0-db
-      - judge0-redis
+      judge0-db:
+        condition: service_started
+      judge0-redis:
+        condition: service_started
+      judge0-language-config:
+        condition: service_completed_successfully
     networks:
       - sandbox
+    logging: *default-logging
+
+  judge0-language-config:
+    image: postgres:16.2
+    restart: "no"
+    env_file:
+      - ./judge0.conf
+    volumes:
+      - ./configure-languages.sql:/configure-languages.sql:ro
+    depends_on:
+      - judge0-server
+    networks:
+      - sandbox
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        export PGPASSWORD="$${POSTGRES_PASSWORD}"
+        attempt=0
+        until psql -h "$${POSTGRES_HOST}" -p "$${POSTGRES_PORT}" -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -Atqc "SELECT to_regclass('public.languages')" | grep -qx languages; do
+          attempt=$$((attempt + 1))
+          if [ "$$attempt" -ge 60 ]; then
+            echo "Judge0 languages table was not ready after 120 seconds." >&2
+            exit 1
+          fi
+          sleep 2
+        done
+        psql -h "$${POSTGRES_HOST}" -p "$${POSTGRES_PORT}" -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -v ON_ERROR_STOP=1 -f /configure-languages.sql
     logging: *default-logging
 
   judge0-db:

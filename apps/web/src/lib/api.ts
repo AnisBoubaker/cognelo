@@ -333,6 +333,18 @@ export type ActivityBank = {
     name: string | null;
   };
   activities?: BankActivity[];
+  folders?: ActivityBankFolder[];
+  conceptActivityCounts?: Record<string, number>;
+};
+
+export type ActivityBankFolder = {
+  id: string;
+  bankId: string;
+  parentId: string | null;
+  title: string;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type BankActivity = {
@@ -345,6 +357,8 @@ export type BankActivity = {
   config?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   position: number;
+  folderId?: string | null;
+  createdAt: string;
   currentVersionId?: string | null;
   activityType: ActivityType;
   currentVersion?: ActivityVersion | null;
@@ -1132,6 +1146,23 @@ export const api = {
   createBankActivity: (activityBankId: string, input: BankActivityInput) =>
     request<{ activity: BankActivity }>(`/activity-banks/${activityBankId}/activities`, {
       method: "POST",
+      body: JSON.stringify(input)
+    }),
+  createActivityBankFolder: (activityBankId: string, input: { title: string; parentId?: string | null; position?: number }) =>
+    request<{ folder: ActivityBankFolder }>(`/activity-banks/${activityBankId}/folders`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  updateActivityBankFolder: (activityBankId: string, folderId: string, input: { title?: string; parentId?: string | null; position?: number }) =>
+    request<{ folder: ActivityBankFolder }>(`/activity-banks/${activityBankId}/folders/${folderId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  deleteActivityBankFolder: (activityBankId: string, folderId: string) =>
+    request<{ ok: true; activityCount: number }>(`/activity-banks/${activityBankId}/folders/${folderId}`, { method: "DELETE" }),
+  updateBankActivityPlacement: (activityBankId: string, bankActivityId: string, input: { folderId?: string | null; position?: number }) =>
+    request<{ activity: BankActivity }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/placement`, {
+      method: "PATCH",
       body: JSON.stringify(input)
     }),
   updateBankActivity: (activityBankId: string, bankActivityId: string, input: BankActivityUpdate) =>

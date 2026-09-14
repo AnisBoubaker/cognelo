@@ -50,7 +50,7 @@ docs/
 - Email delivery: admin-managed SMTP relay or Microsoft Graph OAuth configuration, encrypted credentials, an admin-only test message, and guarded account-verification messages
 - Authorization: global roles plus course memberships and activity-bank ownership
 - Subjects: shared curriculum containers with an explicit teaching language, subject-level material, activity banks, and subject-scoped knowledge graphs with draggable nodes and reconnectable arrow endpoints
-- Activity banks: reusable activity authoring libraries scoped to a subject and owned by an individual
+- Activity banks: reusable activity authoring libraries scoped to a subject and owned by an individual, with nested drag-and-drop folders and subject-concept filters
 - Courses: create, list, read, update, archive; courses belong to a subject and receive activity copies from banks
 - Course settings: course-level AI agent selection for student support
 - Memberships: basic course membership creation
@@ -71,7 +71,7 @@ The Coding Homework Grader is registered as `coding-homework-grader` in `package
 
 The intended boundary is:
 
-- **Core tables stay generic**: `Subject`, `ActivityBank`, `BankActivity`, `ActivityVersion`, `Activity`, `ActivityType`, `CourseContentResource`, `CourseContentItem`, `Course`, and related auth/course tables remain shared.
+- **Core tables stay generic**: `Subject`, `ActivityBank`, `ActivityBankFolder`, `BankActivity`, `ActivityVersion`, `Activity`, `ActivityType`, `CourseContentResource`, `CourseContentItem`, `Course`, and related auth/course tables remain shared.
 - **Plugin tables belong to the plugin**: plugin-specific persistence lives in plugin-local Prisma schemas, migrations, clients, and database modules rather than in the core Prisma schema.
 - **Plugin HTTP handlers belong to the plugin**: the API app provides a generic dispatcher route, while plugin-specific subroutes are declared in plugin packages.
 - **Plugin dispatch authorization is fail-closed**: course activity plugin routes require course-management permission, bank plugin routes require bank-management permission, assigned group routes require authorized group access, and content-plugin mutations require course-management permission. Route definitions must explicitly name their supported activity/content type keys or they are not dispatchable.
@@ -261,6 +261,7 @@ Core Prisma entities include:
 - `SubjectKnowledgePrerequisite`
 - `SubjectMaterial`
 - `ActivityBank`
+- `ActivityBankFolder`
 - `BankActivity`
 - `ActivityVersion`
 - `Course`
@@ -294,7 +295,9 @@ Subject
     concept(s)
       directed prerequisite edge(s)
   ActivityBank(s)
+    ActivityBankFolder(s)
     BankActivity
+      BankActivityKnowledgeConcept
       ActivityVersion(s)
   Course(s)
     course-specific material
@@ -308,7 +311,9 @@ Subject
           GradeEvent(s)
 ```
 
-Activity banks are reusable authoring libraries. A bank activity keeps a mutable current record plus immutable `ActivityVersion` snapshots. Saving in the bank creates a new version for future course use.
+Activity banks are reusable authoring libraries. A bank activity keeps a mutable current record plus immutable `ActivityVersion` snapshots. Publishing changed authored content creates a new version for future course use; ordinary draft saves do not.
+
+Each bank has its own nested folder tree. Folders and activities share sibling ordering in the authoring UI, and owner/admin drag operations update only `parentId`/`folderId` plus position; they do not mutate authored activity content or version history. Deleting a folder removes that folder subtree while moving every contained activity safely to the bank root. The bank filter dialog lists the active concepts from the bank subject with distinct linked-activity counts. Applied concept selections use inclusive OR semantics, retain matching ancestor folders, and run entirely against normalized `BankActivityKnowledgeConcept` links; clearing the selection restores the full tree.
 
 The activity-bank list exposes creation plus owner/admin edit and delete actions while preserving row navigation into each bank. Title and description are editable; subject is editable only while the bank is empty. Deleting a populated bank either moves its activities, in order, to another writable bank under the same subject or requires a second confirmation to delete all bank contents. Existing course-local activity copies survive destructive bank deletion with their bank/version traceability links cleared.
 
@@ -392,7 +397,7 @@ If you are developing the coding-exercises plugin, also start Judge0 locally:
 docker compose up -d judge0-db judge0-redis judge0-server judge0-worker
 ```
 
-Local Compose defaults to `ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2`, the Cognelo-tested Apple Silicon development image. Docker Desktop uses Judge0's per-process/thread limit fallback because it does not delegate a usable cgroup-v2 subtree; this is for trusted local development and is not equivalent to production cgroup isolation. The development worker pool is capped at two because Docker Desktop reports the host CPU count and a large automatically sized pool can collide over isolate boxes. Its C, C++, Go, Java, JavaScript, Python, Rust, and TypeScript runtimes have been validated with real compile/execute and stdin/stdout submissions. Set `JUDGE0_IMAGE` to override the image. The Ubuntu production runbook continues to use the official pinned Judge0 image on its supported Linux sandbox host. Cognelo stops AI test correction immediately when every reference run fails at compilation or with a Judge0 internal error, because changing generated tests cannot repair the execution environment.
+Local Compose defaults to `ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2`, the Cognelo-tested Apple Silicon development image. Docker Desktop uses Judge0's per-process/thread limit fallback because it does not delegate a usable cgroup-v2 subtree; this is for trusted local development and is not equivalent to production cgroup isolation. The development worker pool is capped at two because Docker Desktop reports the host CPU count and a large automatically sized pool can collide over isolate boxes. Before workers accept jobs, an idempotent one-shot service configures every active C and C++ runtime with the common course-level system libraries for math, POSIX threads, dynamic loading, and POSIX realtime (`-pthread -lm -ldl -lrt`). Its C, C++, Go, Java, JavaScript, Python, Rust, and TypeScript runtimes have been validated with real compile/execute and stdin/stdout submissions. Set `JUDGE0_IMAGE` to override the image. The Ubuntu production runbook continues to use the official pinned Judge0 image on its supported Linux sandbox host. Cognelo stops AI test correction immediately when every reference run fails at compilation or with a Judge0 internal error, because changing generated tests cannot repair the execution environment.
 
 If you are developing the web-design-coding-exercises plugin, also start the Dockerized Playwright runner:
 
