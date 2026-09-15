@@ -29,6 +29,8 @@
     "db:migrate:all": "set -a && . ./.env && set +a && node ./scripts/db-migrate-all.mjs",
     "db:seed": "npm run db:seed --workspace @cognelo/db",
     "db:studio": "npm run db:studio --workspace @cognelo/db",
+    "media:gc": "set -a && . ./.env && set +a && npx tsx scripts/media-gc.ts",
+    "media:gc:delete": "set -a && . ./.env && set +a && npx tsx scripts/media-gc.ts --delete",
     "production:bootstrap": "set -a && . ./.env && set +a && npx tsx scripts/bootstrap-production.ts"
   },
   "dependencies": {

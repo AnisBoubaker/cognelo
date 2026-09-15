@@ -11,6 +11,7 @@ import {
   submitActivityAttempt
 } from "./gradebook";
 import { getGroupAssignedActivity } from "./groups";
+import { extractMediaAssetIds, reconcileMediaAssetReferences } from "./media-assets";
 
 const CORE_TEST_RUNTIME_KEY = "core:test";
 const CORE_TEST_RUNTIME_VERSION = "0.1.0";
@@ -682,14 +683,17 @@ async function ensureCurrentTestRevision(context: Awaited<ReturnType<typeof reso
     where: { testId_fingerprint: { testId: context.test.id, fingerprint: revisionFingerprint } },
     include: { items: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } }
   });
-  if (existing) return existing;
+  if (existing) {
+    await ensureTestRevisionMediaReferences(existing, snapshot);
+    return existing;
+  }
   const latest = await prisma.testRevision.findFirst({
     where: { testId: context.test.id },
     orderBy: { revisionNumber: "desc" },
     select: { revisionNumber: true }
   });
   try {
-    return await prisma.testRevision.create({
+    const revision = await prisma.testRevision.create({
       data: {
         testId: context.test.id,
         revisionNumber: (latest?.revisionNumber ?? 0) + 1,
@@ -707,16 +711,46 @@ async function ensureCurrentTestRevision(context: Awaited<ReturnType<typeof reso
       },
       include: { items: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } }
     });
+    await ensureTestRevisionMediaReferences(revision, snapshot);
+    return revision;
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const raced = await prisma.testRevision.findUnique({
         where: { testId_fingerprint: { testId: context.test.id, fingerprint: revisionFingerprint } },
         include: { items: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } }
       });
-      if (raced) return raced;
+      if (raced) {
+        await ensureTestRevisionMediaReferences(raced, snapshot);
+        return raced;
+      }
     }
     throw error;
   }
+}
+
+async function ensureTestRevisionMediaReferences(
+  revision: { id: string; items: Array<{ id: string }> },
+  snapshot: {
+    description: string;
+    settings: unknown;
+    items: Array<{ description: string; config: unknown }>;
+  }
+) {
+  if (!extractMediaAssetIds(snapshot).size) return;
+  await prisma.$transaction(async (tx) => {
+    await reconcileMediaAssetReferences(tx, { testRevisionId: revision.id }, {
+      description: snapshot.description,
+      settings: snapshot.settings
+    }, { trustedCopy: true });
+    for (const [index, revisionItem] of revision.items.entries()) {
+      const item = snapshot.items[index];
+      if (!item) continue;
+      await reconcileMediaAssetReferences(tx, { testRevisionItemId: revisionItem.id }, {
+        description: item.description,
+        config: item.config
+      }, { trustedCopy: true });
+    }
+  });
 }
 
 function buildTestTiming(settingsValue: unknown, attempt: { lifecycle?: unknown; startedAt?: unknown } | null) {

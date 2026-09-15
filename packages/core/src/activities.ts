@@ -7,6 +7,7 @@ import { assertCanManageActivityBank } from "./subjects";
 import { AppError, notFound } from "./errors";
 import { assertActivityTypeAvailable, ensureCoreActivityTypes, getEnabledActivityPluginKeys } from "./plugins";
 import { assertValidConceptSelections, conceptSelectionCreates, selectionsFromLegacyIds, selectionsFromStoredLinks } from "./activity-knowledge-concepts";
+import { reconcileMediaAssetReferences } from "./media-assets";
 
 export async function listActivityTypes() {
   await ensureCoreActivityTypes();
@@ -102,6 +103,10 @@ export async function createActivity(user: CurrentUser, courseId: string, input:
       },
       include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
     });
+    await reconcileMediaAssetReferences(tx, { activityId: activity.id }, {
+      description: activity.description,
+      config: activity.config
+    }, { actorId: user.id });
 
     if (data.contentPlacement) {
       await createCourseActivityContentItem(tx, {
@@ -177,6 +182,10 @@ async function createCourseActivityFromBankVersion(
       },
       include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
     });
+    await reconcileMediaAssetReferences(tx, { activityId: activity.id }, {
+      description: activity.description,
+      config: activity.config
+    }, { trustedCopy: true });
 
     if (data.contentPlacement) {
       await createCourseActivityContentItem(tx, {
@@ -261,6 +270,10 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
       },
       include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
     });
+    await reconcileMediaAssetReferences(tx, { activityId }, {
+      description: updatedActivity.description,
+      config: updatedActivity.config
+    }, { actorId: user.id });
 
     if (data.title !== undefined) {
       await tx.gradebookItem.updateMany({
@@ -321,6 +334,10 @@ export async function duplicateCourseActivity(user: CurrentUser, courseId: strin
       },
       include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
     });
+    await reconcileMediaAssetReferences(transaction, { activityId: activity.id }, {
+      description: activity.description,
+      config: activity.config
+    }, { trustedCopy: true });
     await transaction.courseContentItem.create({
       data: {
         courseId,
@@ -410,6 +427,10 @@ export async function syncCourseActivityWithBank(user: CurrentUser, courseId: st
         },
         include: { activityType: true }
       });
+      await reconcileMediaAssetReferences(tx, { activityVersionId: version.id }, {
+        description: version.description,
+        config: version.config
+      }, { trustedCopy: true });
       await tx.bankActivity.update({
         where: { id: source.bankActivityId! },
         data: {
@@ -423,6 +444,10 @@ export async function syncCourseActivityWithBank(user: CurrentUser, courseId: st
           knowledgeConcepts: { deleteMany: {}, create: conceptSelectionCreates(selections) }
         }
       });
+      await reconcileMediaAssetReferences(tx, { bankActivityId: source.bankActivityId! }, {
+        description: source.description,
+        config: source.config
+      }, { trustedCopy: true });
       const activity = await tx.activity.update({
         where: { id: activityId },
         data: { activityVersionId: version.id, metadata: { ...syncMetadata(source.metadata), activityVersionNumber: version.versionNumber } as Prisma.InputJsonValue },
@@ -451,20 +476,27 @@ export async function syncCourseActivityWithBank(user: CurrentUser, courseId: st
         include: { knowledgeConcepts: true }
       });
   if (!targetVersion) throw notFound("Published bank activity version");
-  const activity = await prisma.activity.update({
-    where: { id: activityId },
-    data: {
-      activityVersionId: targetVersion.id,
-      activityTypeId: targetVersion.activityTypeId,
-      title: targetVersion.title,
+  const activity = await prisma.$transaction(async (tx) => {
+    const updated = await tx.activity.update({
+      where: { id: activityId },
+      data: {
+        activityVersionId: targetVersion.id,
+        activityTypeId: targetVersion.activityTypeId,
+        title: targetVersion.title,
+        description: targetVersion.description,
+        config: targetVersion.config as Prisma.InputJsonValue,
+        metadata: { ...syncMetadata(targetVersion.metadata), activityVersionNumber: targetVersion.versionNumber } as Prisma.InputJsonValue,
+        knowledgeConcepts: { deleteMany: {}, create: conceptSelectionCreates(selectionsFromStoredLinks(targetVersion.knowledgeConcepts)) }
+      },
+      include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
+    });
+    await reconcileMediaAssetReferences(tx, { activityId }, {
       description: targetVersion.description,
-      config: targetVersion.config as Prisma.InputJsonValue,
-      metadata: { ...syncMetadata(targetVersion.metadata), activityVersionNumber: targetVersion.versionNumber } as Prisma.InputJsonValue,
-      knowledgeConcepts: { deleteMany: {}, create: conceptSelectionCreates(selectionsFromStoredLinks(targetVersion.knowledgeConcepts)) }
-    },
-    include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
+      config: targetVersion.config
+    }, { trustedCopy: true });
+    await tx.gradebookItem.updateMany({ where: { courseId, activityId }, data: { titleSnapshot: updated.title } });
+    return updated;
   });
-  await prisma.gradebookItem.updateMany({ where: { courseId, activityId }, data: { titleSnapshot: activity.title } });
   return { action: data.action, activity, version: targetVersion };
 }
 

@@ -36,5 +36,9 @@ test.describe("administrator workflows", () => {
     await page.getByRole("complementary", { name: "Settings" }).getByRole("link", { name: /Email delivery/ }).click();
     await expect(page.getByRole("heading", { name: "Email delivery" })).toBeVisible();
     await expect(page.getByLabel("Delivery method")).toBeVisible();
+
+    await page.getByRole("complementary", { name: "Settings" }).getByRole("link", { name: /Maintenance/ }).click();
+    await expect(page.getByRole("heading", { name: "Rich-text media" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Refresh" })).toBeVisible();
   });
 });

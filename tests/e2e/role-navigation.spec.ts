@@ -25,5 +25,6 @@ test.describe("role-aware navigation", () => {
     await expect(settings.getByRole("link", { name: /Profile/ })).toBeVisible();
     await expect(settings.getByRole("link", { name: /AI agents/ })).toBeVisible();
     await expect(settings.getByRole("link", { name: /Users/ })).toHaveCount(0);
+    await expect(settings.getByRole("link", { name: /Maintenance/ })).toHaveCount(0);
   });
 });

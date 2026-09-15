@@ -27,7 +27,11 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_COGNELO_VERSION: resolveCogneloVersion()
   },
-  transpilePackages: ["@cognelo/contracts", "@cognelo/activity-ui", "@cognelo/plugin-parsons", "@cognelo/plugin-mcq"]
+  transpilePackages: ["@cognelo/contracts", "@cognelo/activity-ui", "@cognelo/plugin-parsons", "@cognelo/plugin-mcq"],
+  async rewrites() {
+    const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001").replace(/\/$/, "");
+    return [{ source: "/api/media-assets/:path*", destination: `${apiUrl}/api/media-assets/:path*` }];
+  }
 };
 
 export default nextConfig;

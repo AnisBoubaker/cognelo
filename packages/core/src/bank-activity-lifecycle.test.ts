@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
+vi.mock("./media-assets", () => ({ reconcileMediaAssetReferences: vi.fn() }));
+
 const transaction = vi.hoisted(() => ({
   activityVersion: { create: vi.fn() },
   bankActivity: { create: vi.fn(), update: vi.fn() }

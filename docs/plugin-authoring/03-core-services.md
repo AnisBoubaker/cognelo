@@ -111,6 +111,7 @@ Shared UI primitives live in:
 - [packages/activity-ui/src/code-editor.tsx](../../packages/activity-ui/src/code-editor.tsx)
 - [packages/activity-ui/src/code-renderer.tsx](../../packages/activity-ui/src/code-renderer.tsx)
 - [packages/activity-ui/src/markdown-renderer.tsx](../../packages/activity-ui/src/markdown-renderer.tsx)
+- [packages/activity-ui/src/rich-text-editor.tsx](../../packages/activity-ui/src/rich-text-editor.tsx)
 - [packages/activity-ui/src/notifications.tsx](../../packages/activity-ui/src/notifications.tsx)
 - [packages/activity-ui/src/unsaved-changes.tsx](../../packages/activity-ui/src/unsaved-changes.tsx)
 
@@ -135,6 +136,17 @@ These are especially useful for programming-learning activities.
 - shared Markdown display for authored prompts and descriptions
 - one rendering path for both core pages and plugins
 - safer HTML handling instead of ad hoc `dangerouslySetInnerHTML` usage in each plugin
+
+### What `RichTextEditor` Gives You
+
+- one canonical Markdown value with Visual and source modes
+- inline/display equation building and protected KaTeX widgets
+- portable GFM table creation and row/column controls
+- authenticated PNG, JPEG, GIF, and WebP upload with required alternative text
+- click-to-edit image replacement, metadata updates, and removal
+- one resizable height shared by both modes plus full-screen authoring
+
+The default image uploader stores a first-party `/api/media-assets/<id>/content` URL. Core automatically reconciles references for generic Subject descriptions and Activity/BankActivity/ActivityVersion descriptions and config, including copy, version, synchronization, and immutable Test snapshot paths. If a plugin stores the editor value only in a plugin-owned table, it must add a durable media owner/reference integration before exposing image upload; rendering the URL alone is not enough to protect the bytes from garbage collection. See [Rich-text media assets](../../docs/MEDIA_ASSETS.md).
 
 ### What `useNotifications()` Gives You
 
@@ -161,6 +173,7 @@ import {
   CodeEditor,
   CodeRenderer,
   MarkdownRenderer,
+  RichTextEditor,
   useNotifications,
   useUnsavedChangesGuard
 } from "@cognelo/activity-ui";
@@ -184,6 +197,7 @@ export function Demo() {
   return (
     <section className="stack">
       <MarkdownRenderer markdown={"## Prompt\nWrite `hello` to the console."} />
+      <RichTextEditor value={"## Editable prompt"} onChange={() => undefined} />
       <CodeEditor value={value} onChange={setValue} language="python" />
       <CodeRenderer code={value} language="python" showLineNumbers />
       <button type="button" onClick={() => notifications.success("Saved.")}>

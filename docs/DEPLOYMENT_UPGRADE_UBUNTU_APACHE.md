@@ -56,6 +56,7 @@ The upgrade section must state:
 - whether the normal PostgreSQL backup in this guide is sufficient;
 - all database migrations, whether they run automatically, their expected duration, and whether they are backward-compatible;
 - every environment variable added, changed, renamed, or removed, with exact operator action;
+- any persistent-storage layout, permission, backup, or media-maintenance change;
 - every manual command required on the application host;
 - whether systemd, Apache, Ubuntu packages, Node.js, PostgreSQL, or filesystem permissions must change;
 - whether the sandbox must be updated and the exact runner, Compose, Judge0, Redis, PostgreSQL, seccomp, or WireGuard steps;
@@ -342,6 +343,8 @@ test "$(readlink -f /srv/cognelo/app1/deployments/cognelo-0.6.0/storage)" = \
 
 If the installation's normal storage backup or filesystem snapshot is overdue, take it through the existing backup system before continuing. Do not create an extra full copy merely for every routine tagged upgrade.
 
+When release notes introduce rich-text media, set `MEDIA_STORAGE_ROOT="./storage/media"` (or retain the default), verify the instance account owns `shared/storage`, and install/enable the instance-specific media garbage-collection service and timer from the initial deployment runbook. Run `npm run media:gc` first and review its counts; never delete files directly from the content-addressed tree.
+
 ## 5. Run migrations and activate the release
 
 With both services still stopped, run all core and plugin migrations from the new release:
@@ -525,6 +528,7 @@ Never remove `/srv/cognelo/app1/shared`, its `.env`, or its `storage` directory 
 - [ ] Current tag and health are confirmed.
 - [ ] New immutable tag is fetched and verified.
 - [ ] Release changes, migrations, and environment additions are reviewed.
+- [ ] Storage layout, permissions, backup requirements, and media-maintenance changes are reviewed.
 - [ ] Current application `.env` is backed up with root-only permissions before it is edited.
 - [ ] New detached worktree is linked to the existing shared `.env` and storage.
 - [ ] Dependencies, Prisma generation, lint, typecheck, tests, and production build pass before downtime.

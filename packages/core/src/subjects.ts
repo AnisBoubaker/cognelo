@@ -29,6 +29,7 @@ import { AppError, forbidden, notFound } from "./errors";
 import { isAdmin, isCourseManager, isTeacher } from "./authorization";
 import { assertActivityTypePluginEnabled } from "./plugins";
 import { generateQuestionAuthoringText } from "./ai-agents";
+import { reconcileMediaAssetReferences } from "./media-assets";
 
 type GeneratedKnowledgeConcept = { key: string; title: string; skills: string };
 type GeneratedKnowledgePrerequisite = { sourceKey: string; requiredKey: string };
@@ -78,15 +79,19 @@ export async function getSubject(user: CurrentUser, subjectId: string) {
 export async function createSubject(user: CurrentUser, input: unknown) {
   await assertCanManageSubjects(user);
   const data = SubjectInputSchema.parse(input);
-  return prisma.subject.create({
-    data: {
-      title: data.title,
-      description: data.description,
-      teachingLanguage: data.teachingLanguage,
-      metadata: data.metadata as Prisma.InputJsonValue,
-      createdById: user.id
-    },
-    include: subjectInclude
+  return prisma.$transaction(async (transaction) => {
+    const subject = await transaction.subject.create({
+      data: {
+        title: data.title,
+        description: data.description,
+        teachingLanguage: data.teachingLanguage,
+        metadata: data.metadata as Prisma.InputJsonValue,
+        createdById: user.id
+      },
+      include: subjectInclude
+    });
+    await reconcileMediaAssetReferences(transaction, { subjectId: subject.id }, { description: subject.description }, { actorId: user.id });
+    return subject;
   });
 }
 
@@ -94,15 +99,19 @@ export async function updateSubject(user: CurrentUser, subjectId: string, input:
   await assertCanManageSubjects(user);
   const data = SubjectUpdateSchema.parse(input);
   if (!data.knowledgeGraph) {
-    return prisma.subject.update({
-      where: { id: subjectId },
-      data: {
-        title: data.title,
-        description: data.description,
-        teachingLanguage: data.teachingLanguage,
-        metadata: data.metadata as Prisma.InputJsonValue | undefined
-      },
-      include: subjectInclude
+    return prisma.$transaction(async (transaction) => {
+      const subject = await transaction.subject.update({
+        where: { id: subjectId },
+        data: {
+          title: data.title,
+          description: data.description,
+          teachingLanguage: data.teachingLanguage,
+          metadata: data.metadata as Prisma.InputJsonValue | undefined
+        },
+        include: subjectInclude
+      });
+      await reconcileMediaAssetReferences(transaction, { subjectId }, { description: subject.description }, { actorId: user.id });
+      return subject;
     });
   }
   const knowledgeGraph = data.knowledgeGraph;
@@ -119,6 +128,8 @@ export async function updateSubject(user: CurrentUser, subjectId: string, input:
         metadata: data.metadata as Prisma.InputJsonValue | undefined
       }
     });
+    const nextDescription = data.description ?? (await transaction.subject.findUniqueOrThrow({ where: { id: subjectId }, select: { description: true } })).description;
+    await reconcileMediaAssetReferences(transaction, { subjectId }, { description: nextDescription }, { actorId: user.id });
     const storedConcepts = await transaction.subjectKnowledgeConcept.findMany({
       where: { subjectId, active: true },
       include: { skillRecords: { where: { active: true } } }
@@ -834,6 +845,10 @@ export async function createBankActivity(user: CurrentUser, activityBankId: stri
         knowledgeConcepts: { create: conceptSelectionCreates(knowledgeConceptSelections) }
       }
     });
+    await reconcileMediaAssetReferences(transaction, { bankActivityId: bankActivity.id }, {
+      description: bankActivity.description,
+      config: bankActivity.config
+    }, { actorId: user.id });
 
     const version = data.lifecycle === "published" ? await transaction.activityVersion.create({
       data: {
@@ -849,6 +864,12 @@ export async function createBankActivity(user: CurrentUser, activityBankId: stri
         knowledgeConcepts: { create: conceptSelectionCreates(knowledgeConceptSelections) }
       }
     }) : null;
+    if (version) {
+      await reconcileMediaAssetReferences(transaction, { activityVersionId: version.id }, {
+        description: version.description,
+        config: version.config
+      }, { trustedCopy: true });
+    }
 
     return transaction.bankActivity.update({
       where: { id: bankActivity.id },
@@ -944,6 +965,18 @@ export async function updateBankActivity(user: CurrentUser, bankActivityId: stri
         knowledgeConcepts: { create: conceptSelectionCreates(nextKnowledgeConceptSelections) }
       }
     }) : null;
+
+    if (version) {
+      await reconcileMediaAssetReferences(transaction, { activityVersionId: version.id }, {
+        description: version.description,
+        config: version.config
+      }, { trustedCopy: true });
+    }
+
+    await reconcileMediaAssetReferences(transaction, { bankActivityId }, {
+      description: nextDescription,
+      config: mergedConfig
+    }, { actorId: user.id });
 
     return transaction.bankActivity.update({
       where: { id: bankActivityId },
@@ -1046,6 +1079,10 @@ export async function duplicateBankActivity(user: CurrentUser, activityBankId: s
         }
       }
     });
+    await reconcileMediaAssetReferences(transaction, { bankActivityId: duplicate.id }, {
+      description: duplicate.description,
+      config: duplicate.config
+    }, { trustedCopy: true });
     return transaction.bankActivity.update({
       where: { id: duplicate.id },
       data: {},

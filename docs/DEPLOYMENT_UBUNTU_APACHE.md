@@ -217,6 +217,7 @@ JWT_SECRET="PASTE_96_CHARACTER_HEX_SECRET"
 EMAIL_CREDENTIALS_ENCRYPTION_KEY="PASTE_64_CHARACTER_HEX_KEY"
 NEXT_PUBLIC_API_URL="https://app1.cognelo.org"
 CORS_ORIGIN="https://app1.cognelo.org"
+MEDIA_STORAGE_ROOT="./storage/media"
 
 COGNELO_BACKGROUND_JOBS_DISABLED=false
 COGNELO_BACKGROUND_JOBS_CONCURRENCY=1
@@ -1215,6 +1216,8 @@ domain.
 
 Back up both PostgreSQL and `shared/storage`. A database-only backup is incomplete because uploaded bytes live on disk.
 
+Rich-text images live below `shared/storage/media` by default. Their database references and content-addressed blob files are one recovery unit; course copies and activity versions do not contain duplicate bytes. Do not expose this directory as an Apache static alias because `/api/media-assets/<id>/content` enforces user and assignment authorization.
+
 Example manual backup:
 
 ```bash
@@ -1237,6 +1240,57 @@ sudo systemctl stop app1-api
 # Run pg_dump and the storage archive.
 sudo systemctl start app1-api
 ```
+
+Run rich-text media garbage collection daily as the instance account. Inspect a dry run before enabling deletion:
+
+```bash
+sudo -u app1 /bin/bash -c '
+  cd /srv/cognelo/app1/current
+  npm run media:gc
+'
+```
+
+Create `/etc/systemd/system/app1-media-gc.service`:
+
+```ini
+[Unit]
+Description=Cognelo app1 rich-text media garbage collection
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=app1
+Group=app1
+WorkingDirectory=/srv/cognelo/app1/current
+EnvironmentFile=/srv/cognelo/app1/shared/.env
+ExecStart=/usr/bin/npm run media:gc:delete
+```
+
+Create `/etc/systemd/system/app1-media-gc.timer`:
+
+```ini
+[Unit]
+Description=Run Cognelo app1 rich-text media garbage collection daily
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=30m
+
+[Install]
+WantedBy=timers.target
+```
+
+Enable it and inspect the first result:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now app1-media-gc.timer
+sudo systemctl start app1-media-gc.service
+sudo journalctl -u app1-media-gc.service -n 100 --no-pager
+```
+
+The command expires unsaved uploads after 24 hours, retains active orphans for 30 days, moves unshared bytes to date-sharded trash, and purges trash after seven days. It also removes crash-left staging directories after two days. These delays are intentional recovery safeguards; do not replace the command with direct filesystem deletion. See [Rich-text media assets](MEDIA_ASSETS.md).
 
 The Playwright runner is stateless and is rebuilt from a Cognelo tag. Preserve the sandbox `runtime/.env`, `judge0.conf`, encrypted WireGuard configuration/key backups, image digests, and seccomp checksum in the protected configuration backup. Cognelo stores grading outcomes in its own database, so Judge0's submission database is not part of the authoritative Cognelo backup. If an organization nevertheless requires Judge0 submission retention, dump its container database separately:
 
@@ -1407,6 +1461,8 @@ Common failure causes:
 - API health returns `500`: inspect the API journal and verify `DATABASE_URL`, database ownership, and migrations.
 - Login succeeds locally but not publicly: verify `NODE_ENV=production`, HTTPS, `CORS_ORIGIN`, `NEXT_PUBLIC_API_URL`, and that the web build used the production `.env`.
 - Upload succeeds but files disappear after deployment: the deployment's `storage` symlink is missing or points to the wrong instance.
+- Rich-text image returns `403`: verify the viewer still has bank/course/assignment access and the owning content was saved so the staged upload became active. Do not work around it with a public Apache alias.
+- Rich-text media garbage collection fails: run `npm run media:gc` as the instance account, verify `MEDIA_STORAGE_ROOT`, storage ownership, and database connectivity, then inspect the service journal before retrying deletion.
 - A plugin is absent from the picker: activate and enable it in administrator settings; also verify its external dependency when applicable.
 - Browser calls the wrong hostname: rebuild the web application after correcting `NEXT_PUBLIC_API_URL`; changing it only at runtime is insufficient.
 - Email configuration cannot save or test a credential: verify that `EMAIL_CREDENTIALS_ENCRYPTION_KEY` contains the same 64 hexadecimal characters used when the secret was stored, then inspect the API journal.
@@ -1444,6 +1500,7 @@ Common failure causes:
 - Keep the sandbox Compose network internal; do not grant learner executions outbound access without a separately reviewed proxy policy.
 - Pin sandbox images and record approved image digests; do not deploy `latest`.
 - Configure off-host backups and verify restoration.
+- Enable the instance-specific media garbage-collection timer and monitor its journal.
 - Review Apache and authentication logs. Cognelo does not yet provide centralized login rate limiting, so add edge/WAF controls before exposing a high-risk public instance.
 - Test certificate renewal with `certbot renew --dry-run` after every TLS configuration change.
 

@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
+vi.mock("./media-assets", () => ({ reconcileMediaAssetReferences: vi.fn() }));
+
 const tx = vi.hoisted(() => ({
+  subject: {
+    create: vi.fn(),
+    update: vi.fn()
+  },
   activityBankFolder: {
     delete: vi.fn()
   },
@@ -114,17 +120,17 @@ describe("subject and activity bank services", () => {
     mockPrisma.subject.findUnique.mockResolvedValue({ id: "subject-1" });
     await expect(getSubject(adminUser, "subject-1")).resolves.toEqual({ id: "subject-1" });
 
-    mockPrisma.subject.create.mockResolvedValue({ id: "subject-1" });
+    tx.subject.create.mockResolvedValue({ id: "subject-1", description: "" });
     await createSubject(adminUser, { title: "Programming", teachingLanguage: "fr", metadata: { code: "INF" } });
-    expect(mockPrisma.subject.create).toHaveBeenCalledWith(
+    expect(tx.subject.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ title: "Programming", teachingLanguage: "fr", metadata: { code: "INF" }, createdById: "admin-1" })
       })
     );
 
-    mockPrisma.subject.update.mockResolvedValue({ id: "subject-1", title: "Updated" });
+    tx.subject.update.mockResolvedValue({ id: "subject-1", title: "Updated", description: "" });
     await updateSubject(adminUser, "subject-1", { title: "Updated", teachingLanguage: "zh" });
-    expect(mockPrisma.subject.update).toHaveBeenCalledWith(expect.objectContaining({
+    expect(tx.subject.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "subject-1" },
       data: expect.objectContaining({ teachingLanguage: "zh" })
     }));

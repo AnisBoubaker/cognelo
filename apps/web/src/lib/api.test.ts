@@ -111,6 +111,21 @@ describe("web API client", () => {
     );
   });
 
+  it("runs media cleanup through the administrator maintenance endpoint", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ cleanup: { removedAssets: 1 }, overview: { blobCount: 2 } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+
+    await expect(api.runMediaMaintenance()).resolves.toMatchObject({ cleanup: { removedAssets: 1 } });
+    expect(fetch).toHaveBeenCalledWith(
+      `${expectedApiUrl}/api/maintenance/media`,
+      expect.objectContaining({ method: "POST" })
+    );
+  });
+
   it("dispatches the unauthorized event on 401 responses", async () => {
     const dispatchEvent = vi.fn();
     vi.stubGlobal("window", { dispatchEvent });

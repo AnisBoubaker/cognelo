@@ -13,6 +13,7 @@ import {
 } from "react";
 import { CodeEditor } from "./code-editor";
 import { EquationEditorDialog } from "./equation-editor-dialog";
+import { ImageEditorDialog } from "./image-editor-dialog";
 import { renderMarkdownToHtml } from "./markdown";
 import { TableEditorDialog } from "./table-editor-dialog";
 
@@ -26,7 +27,18 @@ export type RichTextEditorProps = {
   minHeight?: number;
   disabled?: boolean;
   ariaLabel?: string;
+  uploadImage?: RichTextEditorImageUpload;
 };
+
+export type RichTextEditorImage = {
+  id: string;
+  url: string;
+  originalName: string;
+  mimeType: string;
+  byteSize: number;
+};
+
+export type RichTextEditorImageUpload = (file: File) => Promise<RichTextEditorImage>;
 
 const editorCopy = {
   en: {
@@ -82,7 +94,24 @@ const editorCopy = {
     addColumnBefore: "Add column before",
     addColumnAfter: "Add column after",
     removeRow: "Remove current row",
-    removeColumn: "Remove current column"
+    removeColumn: "Remove current column",
+    image: "Image",
+    addImage: "Add image",
+    editImage: "Edit image",
+    imageHelp: "Upload an image and describe it for students who cannot see it.",
+    imageFile: "Image file",
+    imageReplaceFile: "Replace image (optional)",
+    imageAltText: "Alternative text",
+    imageAltHelp: "Briefly describe the image's meaning or content.",
+    imageTitle: "Title (optional)",
+    imagePreview: "Image preview",
+    imageFileRequired: "Choose an image before continuing.",
+    imageAltRequired: "Add alternative text before continuing.",
+    imageCancel: "Cancel",
+    imageInsert: "Insert image",
+    imageUpdate: "Update image",
+    imageRemove: "Remove image",
+    imageClose: "Close"
   },
   fr: {
     editorMode: "Mode d'edition",
@@ -137,7 +166,24 @@ const editorCopy = {
     addColumnBefore: "Ajouter une colonne avant",
     addColumnAfter: "Ajouter une colonne après",
     removeRow: "Supprimer la ligne actuelle",
-    removeColumn: "Supprimer la colonne actuelle"
+    removeColumn: "Supprimer la colonne actuelle",
+    image: "Image",
+    addImage: "Ajouter une image",
+    editImage: "Modifier l'image",
+    imageHelp: "Téléversez une image et décrivez-la pour les étudiants qui ne peuvent pas la voir.",
+    imageFile: "Fichier image",
+    imageReplaceFile: "Remplacer l'image (facultatif)",
+    imageAltText: "Texte alternatif",
+    imageAltHelp: "Décrivez brièvement le sens ou le contenu de l'image.",
+    imageTitle: "Titre (facultatif)",
+    imagePreview: "Aperçu de l'image",
+    imageFileRequired: "Choisissez une image avant de continuer.",
+    imageAltRequired: "Ajoutez un texte alternatif avant de continuer.",
+    imageCancel: "Annuler",
+    imageInsert: "Insérer l'image",
+    imageUpdate: "Mettre à jour l'image",
+    imageRemove: "Supprimer l'image",
+    imageClose: "Fermer"
   },
   zh: {
     editorMode: "编辑器模式",
@@ -192,7 +238,24 @@ const editorCopy = {
     addColumnBefore: "在前面添加列",
     addColumnAfter: "在后面添加列",
     removeRow: "删除当前行",
-    removeColumn: "删除当前列"
+    removeColumn: "删除当前列",
+    image: "图片",
+    addImage: "添加图片",
+    editImage: "编辑图片",
+    imageHelp: "上传图片，并为无法看到图片的学生添加说明。",
+    imageFile: "图片文件",
+    imageReplaceFile: "替换图片（可选）",
+    imageAltText: "替代文本",
+    imageAltHelp: "简要描述图片的含义或内容。",
+    imageTitle: "标题（可选）",
+    imagePreview: "图片预览",
+    imageFileRequired: "请先选择图片。",
+    imageAltRequired: "请先添加替代文本。",
+    imageCancel: "取消",
+    imageInsert: "插入图片",
+    imageUpdate: "更新图片",
+    imageRemove: "移除图片",
+    imageClose: "关闭"
   },
   ar: {
     editorMode: "وضع المحرر",
@@ -247,7 +310,24 @@ const editorCopy = {
     addColumnBefore: "إضافة عمود قبله",
     addColumnAfter: "إضافة عمود بعده",
     removeRow: "حذف الصف الحالي",
-    removeColumn: "حذف العمود الحالي"
+    removeColumn: "حذف العمود الحالي",
+    image: "صورة",
+    addImage: "إضافة صورة",
+    editImage: "تعديل الصورة",
+    imageHelp: "ارفع صورة وأضف وصفاً للطلاب الذين لا يستطيعون رؤيتها.",
+    imageFile: "ملف الصورة",
+    imageReplaceFile: "استبدال الصورة (اختياري)",
+    imageAltText: "النص البديل",
+    imageAltHelp: "صِف معنى الصورة أو محتواها باختصار.",
+    imageTitle: "العنوان (اختياري)",
+    imagePreview: "معاينة الصورة",
+    imageFileRequired: "اختر صورة قبل المتابعة.",
+    imageAltRequired: "أضف نصاً بديلاً قبل المتابعة.",
+    imageCancel: "إلغاء",
+    imageInsert: "إدراج الصورة",
+    imageUpdate: "تحديث الصورة",
+    imageRemove: "إزالة الصورة",
+    imageClose: "إغلاق"
   }
 } as const;
 
@@ -264,6 +344,14 @@ type TableCellSelection = {
   tableIndex: number;
 };
 
+type ImageDialogState = {
+  alt: string;
+  mode: "add" | "edit";
+  src: string;
+  targetIndex: number | null;
+  title: string;
+};
+
 const maximumEditorBodyHeight = 1200;
 
 export function RichTextEditor({
@@ -273,11 +361,13 @@ export function RichTextEditor({
   locale = "en",
   minHeight = 180,
   disabled = false,
-  ariaLabel
+  ariaLabel,
+  uploadImage = defaultMediaImageUpload
 }: RichTextEditorProps) {
   const [mode, setMode] = useState<"visual" | "markdown">("visual");
   const [equationDialog, setEquationDialog] = useState<EquationDialogState | null>(null);
   const [tableDialogOpen, setTableDialogOpen] = useState(false);
+  const [imageDialog, setImageDialog] = useState<ImageDialogState | null>(null);
   const [tableSelection, setTableSelection] = useState<TableCellSelection | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const minimumEditorBodyHeight = getMinimumEditorBodyHeight(minHeight);
@@ -298,7 +388,7 @@ export function RichTextEditor({
     document.body.style.overflow = "hidden";
 
     function handleEscape(event: globalThis.KeyboardEvent) {
-      if (event.key === "Escape" && !equationDialog && !tableDialogOpen) {
+      if (event.key === "Escape" && !equationDialog && !imageDialog && !tableDialogOpen) {
         event.preventDefault();
         setIsFullScreen(false);
       }
@@ -309,7 +399,7 @@ export function RichTextEditor({
       document.removeEventListener("keydown", handleEscape);
       document.body.style.overflow = previousBodyOverflow;
     };
-  }, [equationDialog, isFullScreen, tableDialogOpen]);
+  }, [equationDialog, imageDialog, isFullScreen, tableDialogOpen]);
 
   useEffect(() => {
     const visualElement = visualRef.current;
@@ -320,11 +410,11 @@ export function RichTextEditor({
       return;
     }
     selectionRangeRef.current = null;
-    renderVisualEditorHtml(visualElement, value, copy.editEquation, !disabled);
+    renderVisualEditorHtml(visualElement, value, copy.editEquation, copy.editImage, !disabled);
     setTableSelection(null);
     visualMarkdownRef.current = value;
     visualEquationsInteractiveRef.current = !disabled;
-  }, [copy.editEquation, disabled, value]);
+  }, [copy.editEquation, copy.editImage, disabled, value]);
 
   useEffect(() => {
     renderTableCellSelection(visualRef.current, tableSelection);
@@ -339,7 +429,7 @@ export function RichTextEditor({
     onChange(markdown);
     if (refreshRenderedMath) {
       selectionRangeRef.current = null;
-      renderVisualEditorHtml(visualRef.current, markdown, copy.editEquation, !disabled);
+      renderVisualEditorHtml(visualRef.current, markdown, copy.editEquation, copy.editImage, !disabled);
       renderTableCellSelection(visualRef.current, tableSelection);
       visualEquationsInteractiveRef.current = !disabled;
     }
@@ -398,6 +488,69 @@ export function RichTextEditor({
     saveSelection();
     equationDialogOpeningRef.current = true;
     setTableDialogOpen(true);
+  }
+
+  function addImage() {
+    if (disabled) return;
+    saveSelection();
+    equationDialogOpeningRef.current = true;
+    setImageDialog({ alt: "", mode: "add", src: "", targetIndex: null, title: "" });
+  }
+
+  function editImage(target: HTMLImageElement) {
+    if (disabled || !visualRef.current) return;
+    const targetIndex = Array.from(visualRef.current.querySelectorAll("img")).indexOf(target);
+    if (targetIndex < 0) return;
+    equationDialogOpeningRef.current = true;
+    setImageDialog({
+      alt: target.getAttribute("alt") ?? "",
+      mode: "edit",
+      src: target.getAttribute("src") ?? "",
+      targetIndex,
+      title: target.getAttribute("title") ?? ""
+    });
+  }
+
+  async function applyImage({ alt, file, title }: { alt: string; file: File | null; title: string }) {
+    const visualElement = visualRef.current;
+    if (!visualElement || !imageDialog) return;
+    const src = file ? (await uploadImage(file)).url : imageDialog.src;
+    if (!src) throw new Error(copy.imageFileRequired);
+    const image = createVisualImageElement({ alt, src, title }, copy.editImage);
+    const currentTarget = imageDialog.targetIndex === null
+      ? null
+      : visualElement.querySelectorAll<HTMLImageElement>("img")[imageDialog.targetIndex];
+    if (imageDialog.mode === "edit") {
+      if (!currentTarget) {
+        setImageDialog(null);
+        return;
+      }
+      currentTarget.replaceWith(image);
+    } else {
+      const paragraph = document.createElement("p");
+      paragraph.append(image);
+      insertVisualBlockElement(visualElement, paragraph, selectionRangeRef.current);
+    }
+    syncVisualValue({ refreshRenderedMath: true });
+    setImageDialog(null);
+  }
+
+  function removeImage() {
+    const visualElement = visualRef.current;
+    const currentTarget = visualElement && imageDialog?.targetIndex !== null && imageDialog?.targetIndex !== undefined
+      ? visualElement.querySelectorAll<HTMLImageElement>("img")[imageDialog.targetIndex]
+      : null;
+    if (!currentTarget) {
+      setImageDialog(null);
+      return;
+    }
+    const parent = currentTarget.parentElement;
+    currentTarget.remove();
+    if (parent && ["p", "div"].includes(parent.tagName.toLowerCase()) && !parent.textContent?.trim() && !parent.querySelector("img")) {
+      parent.remove();
+    }
+    syncVisualValue({ refreshRenderedMath: true });
+    setImageDialog(null);
   }
 
   function insertTable({ columns, rows }: { columns: number; rows: number }) {
@@ -567,6 +720,12 @@ export function RichTextEditor({
       return;
     }
     const eventTarget = event.target as HTMLElement;
+    const imageTarget = eventTarget.closest<HTMLImageElement>("img");
+    if (imageTarget && visualRef.current?.contains(imageTarget)) {
+      event.preventDefault();
+      editImage(imageTarget);
+      return;
+    }
     const mathTarget = eventTarget.closest<HTMLElement>("[data-markdown-math-source]");
     if (mathTarget) {
       event.preventDefault();
@@ -593,6 +752,12 @@ export function RichTextEditor({
   }
 
   function handleVisualKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const imageTarget = (event.target as HTMLElement).closest<HTMLImageElement>("img");
+    if (imageTarget && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      editImage(imageTarget);
+      return;
+    }
     const mathTarget = (event.target as HTMLElement).closest<HTMLElement>("[data-markdown-math-source]");
     if (mathTarget && (event.key === "Enter" || event.key === " ")) {
       event.preventDefault();
@@ -726,6 +891,9 @@ export function RichTextEditor({
             <button aria-label={copy.addTable} title={copy.addTable} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={addTable}>
               <span aria-hidden="true">▦</span> {copy.table}
             </button>
+            <button aria-label={copy.addImage} title={copy.addImage} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={addImage}>
+              <span aria-hidden="true">▧</span> {copy.image}
+            </button>
           </div>
           {tableSelection ? (
             <div className="rich-text-editor-table-toolbar" role="toolbar" aria-label={copy.tableActions}>
@@ -852,6 +1020,36 @@ export function RichTextEditor({
           onConfirm={insertTable}
         />
       ) : null}
+      {imageDialog ? (
+        <ImageEditorDialog
+          copy={{
+            eyebrow: copy.image,
+            addTitle: copy.addImage,
+            editTitle: copy.editImage,
+            help: copy.imageHelp,
+            file: copy.imageFile,
+            replaceFile: copy.imageReplaceFile,
+            altText: copy.imageAltText,
+            altHelp: copy.imageAltHelp,
+            optionalTitle: copy.imageTitle,
+            preview: copy.imagePreview,
+            requiredFile: copy.imageFileRequired,
+            requiredAlt: copy.imageAltRequired,
+            cancel: copy.imageCancel,
+            insert: copy.imageInsert,
+            update: copy.imageUpdate,
+            remove: copy.imageRemove,
+            close: copy.imageClose
+          }}
+          initialAlt={imageDialog.alt}
+          initialSrc={imageDialog.src}
+          initialTitle={imageDialog.title}
+          mode={imageDialog.mode}
+          onCancel={() => setImageDialog(null)}
+          onConfirm={applyImage}
+          onRemove={imageDialog.mode === "edit" ? removeImage : undefined}
+        />
+      ) : null}
     </div>
   );
 }
@@ -864,9 +1062,37 @@ function clampEditorBodyHeight(value: number, minimum: number) {
   return Math.min(maximumEditorBodyHeight, Math.max(minimum, Math.round(value)));
 }
 
-function renderVisualEditorHtml(element: HTMLElement, markdown: string, editEquationLabel: string, equationsInteractive: boolean) {
+function renderVisualEditorHtml(element: HTMLElement, markdown: string, editEquationLabel: string, editImageLabel: string, widgetsInteractive: boolean) {
   element.innerHTML = markdownToEditorHtml(markdown);
-  prepareVisualMathWidgets(element, editEquationLabel, equationsInteractive);
+  prepareVisualMathWidgets(element, editEquationLabel, widgetsInteractive);
+  prepareVisualImageWidgets(element, editImageLabel, widgetsInteractive);
+}
+
+function prepareVisualImageWidgets(root: ParentNode, editImageLabel: string, interactive = true) {
+  root.querySelectorAll<HTMLImageElement>("img").forEach((image) => {
+    image.setAttribute("contenteditable", "false");
+    if (!interactive) {
+      image.removeAttribute("aria-label");
+      image.removeAttribute("role");
+      image.removeAttribute("tabindex");
+      return;
+    }
+    image.setAttribute("aria-label", editImageLabel);
+    image.setAttribute("role", "button");
+    image.setAttribute("tabindex", "0");
+  });
+}
+
+function createVisualImageElement(value: { alt: string; src: string; title: string }, editImageLabel: string) {
+  const image = document.createElement("img");
+  image.setAttribute("alt", value.alt);
+  image.setAttribute("src", value.src);
+  if (value.title) image.setAttribute("title", value.title);
+  image.setAttribute("contenteditable", "false");
+  image.setAttribute("aria-label", editImageLabel);
+  image.setAttribute("role", "button");
+  image.setAttribute("tabindex", "0");
+  return image;
 }
 
 function prepareVisualMathWidgets(root: ParentNode, editEquationLabel: string, interactive = true) {
@@ -1083,9 +1309,9 @@ function markdownToEditorHtml(markdown: string) {
 
 function sanitizePastedEditorHtml(html: string) {
   return DOMPurify.sanitize(html, {
-    ALLOWED_ATTR: ["checked", "class", "disabled", "href", "title", "type"],
+    ALLOWED_ATTR: ["alt", "checked", "class", "disabled", "href", "src", "title", "type"],
     ALLOWED_TAGS: [
-      "a", "b", "blockquote", "br", "code", "del", "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "input", "li", "ol", "p", "pre",
+      "a", "b", "blockquote", "br", "code", "del", "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "input", "li", "ol", "p", "pre",
       "strong", "table", "tbody", "td", "th", "thead", "tr", "ul"
     ]
   });
@@ -1124,6 +1350,7 @@ function serializeNode(node: Node): string {
   if (tag === "del") return `~~${content}~~`;
   if (tag === "code" && element.parentElement?.tagName.toLowerCase() !== "pre") return `\`${element.textContent ?? ""}\``;
   if (tag === "a") return `[${content}](${element.getAttribute("href") ?? ""})`;
+  if (tag === "img") return serializeImage(element as HTMLImageElement);
   if (tag === "input" && (element as HTMLInputElement).type === "checkbox") return (element as HTMLInputElement).checked ? "[x] " : "[ ] ";
   if (tag === "br") return "\n";
   if (tag === "hr") return "\n---\n\n";
@@ -1138,6 +1365,28 @@ function serializeNode(node: Node): string {
   if (tag === "table") return serializeTable(element);
   if (tag === "li") return content;
   return content;
+}
+
+function serializeImage(image: HTMLImageElement) {
+  const alt = (image.getAttribute("alt") ?? "").replace(/([\\\]])/g, "\\$1");
+  const src = image.getAttribute("src") ?? "";
+  const title = image.getAttribute("title")?.replace(/([\\"])/g, "\\$1");
+  return `![${alt}](${src}${title ? ` "${title}"` : ""})`;
+}
+
+async function defaultMediaImageUpload(file: File): Promise<RichTextEditorImage> {
+  const formData = new FormData();
+  formData.set("file", file);
+  const response = await fetch("/api/media-assets", {
+    method: "POST",
+    body: formData,
+    credentials: "include"
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || !body?.asset) {
+    throw new Error(body?.error?.message ?? "The image could not be uploaded.");
+  }
+  return body.asset as RichTextEditorImage;
 }
 
 function readProtectedMathSource(element: HTMLElement) {

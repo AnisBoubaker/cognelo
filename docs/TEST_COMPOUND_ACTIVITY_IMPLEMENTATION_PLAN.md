@@ -366,7 +366,7 @@ No child activity should expose standalone submit, attempt-limit, grade-release,
 Edit safety rules:
 
 - unrestricted edits are allowed until the first Test attempt starts;
-- starting an attempt creates an immutable `TestRevision` plus ordered `TestRevisionItem` snapshots and attaches the parent attempt to that revision;
+- starting an attempt creates an immutable `TestRevision` plus ordered `TestRevisionItem` snapshots, retains any referenced rich-text media for both snapshot levels, and attaches the parent attempt to that revision;
 - after the first attempt, structure, points, generic child configuration, and supported plugin-owned private authoring data are locked;
 - teachers use **Duplicate Test** to create an independent draft shell, child activities, item settings, and plugin-owned private data for future changes.
 

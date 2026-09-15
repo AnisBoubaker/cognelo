@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
+vi.mock("./media-assets", () => ({ reconcileMediaAssetReferences: vi.fn() }));
+
 const mockPrisma = vi.hoisted(() => ({
   activity: { findFirst: vi.fn(), update: vi.fn() }, activityAttempt: { count: vi.fn() }, activityVersion: { findFirst: vi.fn() },
   gradebookItem: { updateMany: vi.fn() }, courseMembership: { findMany: vi.fn() }
