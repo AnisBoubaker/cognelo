@@ -43,15 +43,48 @@ describe("Judge0 client", () => {
     await expect(listJudge0Languages()).rejects.toThrow("Judge0 languages request failed");
   });
 
-  it("runs submissions and surfaces non-2xx submission failures", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ token: "submission-1", stdout: "ok" }));
+  it("base64-encodes submission text and decodes Unicode result text", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      Response.json({
+        token: "submission-1",
+        stdout: Buffer.from("allô élève\n", "utf8").toString("base64"),
+        stderr: Buffer.from("avertissement : déjà défini", "utf8").toString("base64"),
+        compile_output: null,
+        message: Buffer.from("terminé", "utf8").toString("base64")
+      })
+    );
 
-    await expect(runJudge0Submission({ languageId: 71, sourceCode: "print('ok')" })).resolves.toMatchObject({
+    await expect(
+      runJudge0Submission({
+        languageId: 71,
+        sourceCode: 'print("allô élève")',
+        stdin: "Montréal",
+        expectedOutput: "allô élève"
+      })
+    ).resolves.toMatchObject({
       token: "submission-1",
-      stdout: "ok"
+      stdout: "allô élève\n",
+      stderr: "avertissement : déjà défini",
+      compile_output: null,
+      message: "terminé"
     });
 
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://judge0.test/submissions?base64_encoded=true&wait=true",
+      expect.objectContaining({
+        body: JSON.stringify({
+          language_id: 71,
+          source_code: Buffer.from('print("allô élève")', "utf8").toString("base64"),
+          stdin: Buffer.from("Montréal", "utf8").toString("base64"),
+          expected_output: Buffer.from("allô élève", "utf8").toString("base64")
+        })
+      })
+    );
+  });
+
+  it("surfaces non-2xx submission failures", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("down", { status: 503 }));
+
     await expect(runJudge0Submission({ languageId: 71, sourceCode: "print('ok')" })).rejects.toThrow("Judge0 request failed");
   });
 });

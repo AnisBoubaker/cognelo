@@ -33,7 +33,7 @@ export type Judge0Language = {
   name: string;
 };
 
-type Judge0CreateSubmissionResponse = {
+type Judge0EncodedSubmissionResponse = {
   token: string;
   stdout?: string | null;
   stderr?: string | null;
@@ -84,7 +84,7 @@ export async function resolveJudge0Language(languageKey: string) {
 
 export async function runJudge0Submission(input: Judge0SubmissionInput): Promise<Judge0SubmissionResult> {
   const env = getServerEnv();
-  const response = await fetch(`${env.JUDGE0_BASE_URL}/submissions?base64_encoded=false&wait=true`, {
+  const response = await fetch(`${env.JUDGE0_BASE_URL}/submissions?base64_encoded=true&wait=true`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -92,9 +92,9 @@ export async function runJudge0Submission(input: Judge0SubmissionInput): Promise
     },
     body: JSON.stringify({
       language_id: input.languageId,
-      source_code: input.sourceCode,
-      stdin: input.stdin,
-      expected_output: input.expectedOutput,
+      source_code: encodeJudge0Text(input.sourceCode),
+      stdin: encodeJudge0Text(input.stdin),
+      expected_output: encodeJudge0Text(input.expectedOutput),
       cpu_time_limit: input.cpuTimeLimit,
       wall_time_limit: input.wallTimeLimit,
       memory_limit: input.memoryLimitKb,
@@ -108,5 +108,20 @@ export async function runJudge0Submission(input: Judge0SubmissionInput): Promise
     throw new Error(`Judge0 request failed with ${response.status}: ${errorText}`);
   }
 
-  return (await response.json()) as Judge0CreateSubmissionResponse;
+  const result = (await response.json()) as Judge0EncodedSubmissionResponse;
+  return {
+    ...result,
+    stdout: decodeJudge0Text(result.stdout),
+    stderr: decodeJudge0Text(result.stderr),
+    compile_output: decodeJudge0Text(result.compile_output),
+    message: decodeJudge0Text(result.message)
+  };
+}
+
+function encodeJudge0Text(value: string | undefined): string | undefined {
+  return value === undefined ? undefined : Buffer.from(value, "utf8").toString("base64");
+}
+
+function decodeJudge0Text(value: string | null | undefined): string | null | undefined {
+  return typeof value === "string" ? Buffer.from(value, "base64").toString("utf8") : value;
 }
