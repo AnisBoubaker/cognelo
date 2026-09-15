@@ -1,7 +1,10 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- Preview sources are local object URLs or authenticated media routes that Next Image cannot optimize reliably. */
+
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import type { MarkdownImageSize, MarkdownImageSizeMode } from "./image-sizing";
 
 export type ImageEditorCopy = {
   eyebrow: string;
@@ -13,6 +16,17 @@ export type ImageEditorCopy = {
   altText: string;
   altHelp: string;
   optionalTitle: string;
+  sizeMode: string;
+  sizePixels: string;
+  sizeOriginalPercent: string;
+  sizeContainerPercent: string;
+  sizeValuePixels: string;
+  sizeValueOriginalPercent: string;
+  sizeValueContainerPercent: string;
+  sizeInvalidPixels: string;
+  sizeInvalidOriginalPercent: string;
+  sizeInvalidContainerPercent: string;
+  sizeDimensionsUnavailable: string;
   preview: string;
   requiredFile: string;
   requiredAlt: string;
@@ -28,9 +42,10 @@ export type ImageEditorDialogProps = {
   initialAlt?: string;
   initialSrc?: string;
   initialTitle?: string;
+  initialSize?: MarkdownImageSize;
   mode: "add" | "edit";
   onCancel: () => void;
-  onConfirm: (value: { alt: string; file: File | null; title: string }) => Promise<void>;
+  onConfirm: (value: { alt: string; file: File | null; size: MarkdownImageSize; title: string }) => Promise<void>;
   onRemove?: () => void;
 };
 
@@ -39,6 +54,7 @@ export function ImageEditorDialog({
   initialAlt = "",
   initialSrc = "",
   initialTitle = "",
+  initialSize = { mode: "original-percent", originalWidth: null, value: 100 },
   mode,
   onCancel,
   onConfirm,
@@ -47,6 +63,9 @@ export function ImageEditorDialog({
   const [alt, setAlt] = useState(initialAlt);
   const [title, setTitle] = useState(initialTitle);
   const [file, setFile] = useState<File | null>(null);
+  const [sizeMode, setSizeMode] = useState<MarkdownImageSizeMode>(initialSize.mode);
+  const [sizeValue, setSizeValue] = useState(String(initialSize.value));
+  const [originalWidth, setOriginalWidth] = useState(initialSize.originalWidth ?? 0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const selectedPreview = useMemo(() => file ? URL.createObjectURL(file) : "", [file]);
@@ -78,10 +97,33 @@ export function ImageEditorDialog({
       setError(copy.requiredAlt);
       return;
     }
+    const parsedSize = Number(sizeValue);
+    const sizeError = validateImageSize(sizeMode, parsedSize, copy);
+    if (sizeError) {
+      setError(sizeError);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      await onConfirm({ alt: alt.trim(), file, title: title.trim() });
+      const resolvedOriginalWidth = sizeMode === "original-percent" && !originalWidth
+        ? await loadImageWidth(preview)
+        : originalWidth;
+      if (sizeMode === "original-percent" && !resolvedOriginalWidth) {
+        setError(copy.sizeDimensionsUnavailable);
+        setBusy(false);
+        return;
+      }
+      await onConfirm({
+        alt: alt.trim(),
+        file,
+        size: {
+          mode: sizeMode,
+          originalWidth: sizeMode === "original-percent" ? resolvedOriginalWidth || null : null,
+          value: normalizeImageSizeValue(sizeMode, parsedSize)
+        },
+        title: title.trim()
+      });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Upload failed.");
       setBusy(false);
@@ -116,7 +158,10 @@ export function ImageEditorDialog({
                 autoFocus={mode === "add"}
                 disabled={busy}
                 type="file"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                onChange={(event) => {
+                  setFile(event.target.files?.[0] ?? null);
+                  setOriginalWidth(0);
+                }}
               />
             </label>
             <label className="field">
@@ -134,12 +179,48 @@ export function ImageEditorDialog({
               <span>{copy.optionalTitle}</span>
               <input disabled={busy} type="text" value={title} onChange={(event) => setTitle(event.target.value)} />
             </label>
+            <div className="image-editor-size-fields">
+              <label className="field">
+                <span>{copy.sizeMode}</span>
+                <select
+                  disabled={busy}
+                  value={sizeMode}
+                  onChange={(event) => setSizeMode(event.target.value as MarkdownImageSizeMode)}
+                >
+                  <option value="pixels">{copy.sizePixels}</option>
+                  <option value="original-percent">{copy.sizeOriginalPercent}</option>
+                  <option value="container-percent">{copy.sizeContainerPercent}</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>{sizeMode === "pixels"
+                  ? copy.sizeValuePixels
+                  : sizeMode === "original-percent"
+                    ? copy.sizeValueOriginalPercent
+                    : copy.sizeValueContainerPercent}</span>
+                <input
+                  disabled={busy}
+                  inputMode="decimal"
+                  max={sizeMode === "pixels" ? 10000 : sizeMode === "original-percent" ? 500 : 100}
+                  min={1}
+                  step={sizeMode === "pixels" ? 1 : 0.1}
+                  type="number"
+                  value={sizeValue}
+                  onChange={(event) => setSizeValue(event.target.value)}
+                />
+              </label>
+            </div>
           </div>
 
           <div className="image-editor-preview" aria-label={copy.preview}>
-            {/* The source is a local object URL or an authenticated media route; Next Image cannot optimize either reliably. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {preview ? <img alt={alt || ""} src={preview} /> : <span className="muted">{copy.preview}</span>}
+            {preview ? (
+              <img
+                alt={alt || ""}
+                src={preview}
+                style={{ height: "auto", width: previewImageWidth(sizeMode, Number(sizeValue), originalWidth) }}
+                onLoad={(event) => setOriginalWidth(event.currentTarget.naturalWidth)}
+              />
+            ) : <span className="muted">{copy.preview}</span>}
           </div>
         </div>
 
@@ -155,4 +236,39 @@ export function ImageEditorDialog({
     </div>,
     document.body
   );
+}
+
+function validateImageSize(mode: MarkdownImageSizeMode, value: number, copy: ImageEditorCopy) {
+  if (!Number.isFinite(value) || value < 1) {
+    return mode === "pixels"
+      ? copy.sizeInvalidPixels
+      : mode === "original-percent"
+        ? copy.sizeInvalidOriginalPercent
+        : copy.sizeInvalidContainerPercent;
+  }
+  if (mode === "pixels" && (!Number.isInteger(value) || value > 10000)) return copy.sizeInvalidPixels;
+  if (mode === "original-percent" && value > 500) return copy.sizeInvalidOriginalPercent;
+  if (mode === "container-percent" && value > 100) return copy.sizeInvalidContainerPercent;
+  return "";
+}
+
+function normalizeImageSizeValue(mode: MarkdownImageSizeMode, value: number) {
+  return mode === "pixels" ? Math.round(value) : Math.round(value * 10) / 10;
+}
+
+function previewImageWidth(mode: MarkdownImageSizeMode, value: number, originalWidth: number) {
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+  if (mode === "container-percent") return `${Math.min(value, 100)}%`;
+  if (mode === "original-percent") return originalWidth > 0 ? `${Math.max(1, Math.round(originalWidth * value / 100))}px` : undefined;
+  return `${Math.round(value)}px`;
+}
+
+async function loadImageWidth(source: string) {
+  if (!source) return 0;
+  return new Promise<number>((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image.naturalWidth);
+    image.onerror = () => resolve(0);
+    image.src = source;
+  });
 }

@@ -14,6 +14,7 @@ import {
 import { CodeEditor } from "./code-editor";
 import { EquationEditorDialog } from "./equation-editor-dialog";
 import { ImageEditorDialog } from "./image-editor-dialog";
+import { markdownImageWidth, readMarkdownImageSize, writeMarkdownImageSize, type MarkdownImageSize } from "./image-sizing";
 import { renderMarkdownToHtml } from "./markdown";
 import { TableEditorDialog } from "./table-editor-dialog";
 
@@ -104,6 +105,17 @@ const editorCopy = {
     imageAltText: "Alternative text",
     imageAltHelp: "Briefly describe the image's meaning or content.",
     imageTitle: "Title (optional)",
+    imageSizeMode: "Size basis",
+    imageSizePixels: "Pixels",
+    imageSizeOriginalPercent: "Percentage of the original image",
+    imageSizeContainerPercent: "Percentage of the container width",
+    imageSizeValuePixels: "Width (pixels)",
+    imageSizeValueOriginalPercent: "Size (% of original)",
+    imageSizeValueContainerPercent: "Width (% of container)",
+    imageSizeInvalidPixels: "Enter a whole-pixel width between 1 and 10,000.",
+    imageSizeInvalidOriginalPercent: "Enter a percentage between 1 and 500.",
+    imageSizeInvalidContainerPercent: "Enter a percentage between 1 and 100.",
+    imageSizeDimensionsUnavailable: "Wait for the image dimensions to load, then try again.",
     imagePreview: "Image preview",
     imageFileRequired: "Choose an image before continuing.",
     imageAltRequired: "Add alternative text before continuing.",
@@ -176,6 +188,17 @@ const editorCopy = {
     imageAltText: "Texte alternatif",
     imageAltHelp: "Décrivez brièvement le sens ou le contenu de l'image.",
     imageTitle: "Titre (facultatif)",
+    imageSizeMode: "Base du dimensionnement",
+    imageSizePixels: "Pixels",
+    imageSizeOriginalPercent: "Pourcentage de l'image originale",
+    imageSizeContainerPercent: "Pourcentage de la largeur du conteneur",
+    imageSizeValuePixels: "Largeur (pixels)",
+    imageSizeValueOriginalPercent: "Taille (% de l'original)",
+    imageSizeValueContainerPercent: "Largeur (% du conteneur)",
+    imageSizeInvalidPixels: "Saisissez une largeur entière entre 1 et 10 000 pixels.",
+    imageSizeInvalidOriginalPercent: "Saisissez un pourcentage entre 1 et 500.",
+    imageSizeInvalidContainerPercent: "Saisissez un pourcentage entre 1 et 100.",
+    imageSizeDimensionsUnavailable: "Attendez le chargement des dimensions de l'image, puis réessayez.",
     imagePreview: "Aperçu de l'image",
     imageFileRequired: "Choisissez une image avant de continuer.",
     imageAltRequired: "Ajoutez un texte alternatif avant de continuer.",
@@ -248,6 +271,17 @@ const editorCopy = {
     imageAltText: "替代文本",
     imageAltHelp: "简要描述图片的含义或内容。",
     imageTitle: "标题（可选）",
+    imageSizeMode: "尺寸依据",
+    imageSizePixels: "像素",
+    imageSizeOriginalPercent: "原图尺寸百分比",
+    imageSizeContainerPercent: "容器宽度百分比",
+    imageSizeValuePixels: "宽度（像素）",
+    imageSizeValueOriginalPercent: "尺寸（原图百分比）",
+    imageSizeValueContainerPercent: "宽度（容器百分比）",
+    imageSizeInvalidPixels: "请输入 1 到 10,000 之间的整数像素宽度。",
+    imageSizeInvalidOriginalPercent: "请输入 1 到 500 之间的百分比。",
+    imageSizeInvalidContainerPercent: "请输入 1 到 100 之间的百分比。",
+    imageSizeDimensionsUnavailable: "请等待图片尺寸加载后重试。",
     imagePreview: "图片预览",
     imageFileRequired: "请先选择图片。",
     imageAltRequired: "请先添加替代文本。",
@@ -320,6 +354,17 @@ const editorCopy = {
     imageAltText: "النص البديل",
     imageAltHelp: "صِف معنى الصورة أو محتواها باختصار.",
     imageTitle: "العنوان (اختياري)",
+    imageSizeMode: "أساس الحجم",
+    imageSizePixels: "بالبكسل",
+    imageSizeOriginalPercent: "نسبة من حجم الصورة الأصلي",
+    imageSizeContainerPercent: "نسبة من عرض الحاوية",
+    imageSizeValuePixels: "العرض (بالبكسل)",
+    imageSizeValueOriginalPercent: "الحجم (% من الأصل)",
+    imageSizeValueContainerPercent: "العرض (% من الحاوية)",
+    imageSizeInvalidPixels: "أدخل عرضاً صحيحاً بين 1 و10,000 بكسل.",
+    imageSizeInvalidOriginalPercent: "أدخل نسبة بين 1 و500.",
+    imageSizeInvalidContainerPercent: "أدخل نسبة بين 1 و100.",
+    imageSizeDimensionsUnavailable: "انتظر تحميل أبعاد الصورة ثم حاول مرة أخرى.",
     imagePreview: "معاينة الصورة",
     imageFileRequired: "اختر صورة قبل المتابعة.",
     imageAltRequired: "أضف نصاً بديلاً قبل المتابعة.",
@@ -347,6 +392,7 @@ type TableCellSelection = {
 type ImageDialogState = {
   alt: string;
   mode: "add" | "edit";
+  size: MarkdownImageSize;
   src: string;
   targetIndex: number | null;
   title: string;
@@ -494,7 +540,14 @@ export function RichTextEditor({
     if (disabled) return;
     saveSelection();
     equationDialogOpeningRef.current = true;
-    setImageDialog({ alt: "", mode: "add", src: "", targetIndex: null, title: "" });
+    setImageDialog({
+      alt: "",
+      mode: "add",
+      size: { mode: "original-percent", originalWidth: null, value: 100 },
+      src: "",
+      targetIndex: null,
+      title: ""
+    });
   }
 
   function editImage(target: HTMLImageElement) {
@@ -505,17 +558,23 @@ export function RichTextEditor({
     setImageDialog({
       alt: target.getAttribute("alt") ?? "",
       mode: "edit",
+      size: readMarkdownImageSize(target.getAttribute("src") ?? "") ?? {
+        mode: "original-percent",
+        originalWidth: target.naturalWidth || null,
+        value: 100
+      },
       src: target.getAttribute("src") ?? "",
       targetIndex,
       title: target.getAttribute("title") ?? ""
     });
   }
 
-  async function applyImage({ alt, file, title }: { alt: string; file: File | null; title: string }) {
+  async function applyImage({ alt, file, size, title }: { alt: string; file: File | null; size: MarkdownImageSize; title: string }) {
     const visualElement = visualRef.current;
     if (!visualElement || !imageDialog) return;
-    const src = file ? (await uploadImage(file)).url : imageDialog.src;
-    if (!src) throw new Error(copy.imageFileRequired);
+    const source = file ? (await uploadImage(file)).url : imageDialog.src;
+    if (!source) throw new Error(copy.imageFileRequired);
+    const src = writeMarkdownImageSize(source, size);
     const image = createVisualImageElement({ alt, src, title }, copy.editImage);
     const currentTarget = imageDialog.targetIndex === null
       ? null
@@ -1032,6 +1091,17 @@ export function RichTextEditor({
             altText: copy.imageAltText,
             altHelp: copy.imageAltHelp,
             optionalTitle: copy.imageTitle,
+            sizeMode: copy.imageSizeMode,
+            sizePixels: copy.imageSizePixels,
+            sizeOriginalPercent: copy.imageSizeOriginalPercent,
+            sizeContainerPercent: copy.imageSizeContainerPercent,
+            sizeValuePixels: copy.imageSizeValuePixels,
+            sizeValueOriginalPercent: copy.imageSizeValueOriginalPercent,
+            sizeValueContainerPercent: copy.imageSizeValueContainerPercent,
+            sizeInvalidPixels: copy.imageSizeInvalidPixels,
+            sizeInvalidOriginalPercent: copy.imageSizeInvalidOriginalPercent,
+            sizeInvalidContainerPercent: copy.imageSizeInvalidContainerPercent,
+            sizeDimensionsUnavailable: copy.imageSizeDimensionsUnavailable,
             preview: copy.imagePreview,
             requiredFile: copy.imageFileRequired,
             requiredAlt: copy.imageAltRequired,
@@ -1042,6 +1112,7 @@ export function RichTextEditor({
             close: copy.imageClose
           }}
           initialAlt={imageDialog.alt}
+          initialSize={imageDialog.size}
           initialSrc={imageDialog.src}
           initialTitle={imageDialog.title}
           mode={imageDialog.mode}
@@ -1070,6 +1141,11 @@ function renderVisualEditorHtml(element: HTMLElement, markdown: string, editEqua
 
 function prepareVisualImageWidgets(root: ParentNode, editImageLabel: string, interactive = true) {
   root.querySelectorAll<HTMLImageElement>("img").forEach((image) => {
+    const width = markdownImageWidth(readMarkdownImageSize(image.getAttribute("src") ?? ""));
+    if (width) {
+      image.style.height = "auto";
+      image.style.width = width;
+    }
     image.setAttribute("contenteditable", "false");
     if (!interactive) {
       image.removeAttribute("aria-label");

@@ -308,11 +308,15 @@ test.describe.serial("authoring and completing every activity type", () => {
     });
     await addImageDialog.getByLabel("Alternative text").fill("Velocity formula diagram");
     await addImageDialog.getByLabel("Title (optional)").fill("Terminal velocity");
+    await addImageDialog.getByLabel("Size basis").selectOption("container-percent");
+    await addImageDialog.getByLabel("Width (% of container)").fill("60");
     await addImageDialog.getByRole("button", { name: "Insert image" }).click();
     const authoredImage = visualPrompt.getByRole("button", { name: "Edit image" });
     await expect(authoredImage).toBeVisible();
     await authoredImage.click();
     const editImageDialog = teacherPage.getByRole("dialog", { name: "Edit image" });
+    await expect(editImageDialog.getByLabel("Size basis")).toHaveValue("container-percent");
+    await expect(editImageDialog.getByLabel("Width (% of container)")).toHaveValue("60");
     await editImageDialog.getByLabel("Alternative text").fill("Terminal velocity formula diagram");
     await editImageDialog.getByRole("button", { name: "Update image" }).click();
     await promptField.getByRole("tab", { name: "Markdown" }).click();
@@ -321,7 +325,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(markdownPrompt).toHaveValue(/Use the formula above\./);
     await expect(markdownPrompt).toHaveValue(/\$\\pi.*\\times.*\\pi\$ Be precise; compare with \$\\sqrt\{m\}\$\./);
     await expect(markdownPrompt).toHaveValue(/\| Name \| Unit \| Value \|\n\| --- \| --- \| --- \|/);
-    await expect(markdownPrompt).toHaveValue(/!\[Terminal velocity formula diagram\]\(\/api\/media-assets\/[a-z0-9]+\/content "Terminal velocity"\)/);
+    await expect(markdownPrompt).toHaveValue(/!\[Terminal velocity formula diagram\]\(\/api\/media-assets\/[a-z0-9]+\/content#cognelo-size=container:60 "Terminal velocity"\)/);
     await teacherPage
       .getByText("Reference solution", { exact: true })
       .locator("..")
@@ -355,11 +359,12 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(reopenedPrompt).toHaveValue(/Use the formula above\./);
     await expect(reopenedPrompt).toHaveValue(/\$\\pi.*\\times.*\\pi\$ Be precise; compare with \$\\sqrt\{m\}\$\./);
     await expect(reopenedPrompt).toHaveValue(/\| Name \| Unit \| Value \|\n\| --- \| --- \| --- \|/);
-    await expect(reopenedPrompt).toHaveValue(/!\[Terminal velocity formula diagram\]\(\/api\/media-assets\/[a-z0-9]+\/content "Terminal velocity"\)/);
+    await expect(reopenedPrompt).toHaveValue(/!\[Terminal velocity formula diagram\]\(\/api\/media-assets\/[a-z0-9]+\/content#cognelo-size=container:60 "Terminal velocity"\)/);
     await reopenedPromptField.getByRole("tab", { name: "Visual" }).click();
     await expect(reopenedPromptField.locator("table tr")).toHaveCount(3);
     await expect(reopenedPromptField.locator("table th")).toHaveCount(3);
     await expect(reopenedPromptField.getByRole("button", { name: "Edit image" })).toHaveAttribute("alt", "Terminal velocity formula diagram");
+    await expect(reopenedPromptField.getByRole("button", { name: "Edit image" })).toHaveAttribute("style", /width: 60%; height: auto/);
     await teacherPage.getByRole("button", { name: "Visible greeting" }).click();
     await expect(teacherPage.locator("#sample-output-match-mode-1")).toHaveValue("contains_lines");
     await expect(teacherPage.getByLabel("Require lines in this order")).toBeChecked();
@@ -385,6 +390,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(studentPrompt.locator("table")).toContainText("Radius");
     await expect(studentPrompt.locator("table")).toContainText("3.20");
     await expect(studentPrompt.getByRole("img", { name: "Terminal velocity formula diagram" })).toBeVisible();
+    await expect(studentPrompt.getByRole("img", { name: "Terminal velocity formula diagram" })).toHaveAttribute("style", /width: 60%; height: auto/);
     await expect(studentPrompt).not.toContainText("$$");
     await expect(studentPrompt).toContainText("Use the formula above.");
     await expect(studentPrompt).toContainText("Be precise; compare with");

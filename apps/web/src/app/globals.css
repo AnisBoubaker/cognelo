@@ -2089,6 +2089,12 @@ a.card:hover,
   object-fit: contain;
 }
 
+.image-editor-size-fields {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(130px, 0.65fr);
+}
+
 .image-editor-actions {
   border-top: 1px solid var(--line);
   display: grid;
@@ -2103,6 +2109,10 @@ a.card:hover,
 
   .image-editor-preview {
     min-height: 160px;
+  }
+
+  .image-editor-size-fields {
+    grid-template-columns: 1fr;
   }
 
   .image-editor-actions {
