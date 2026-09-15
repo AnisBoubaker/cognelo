@@ -236,7 +236,7 @@ PUT    /api/courses/:courseId/groups/:groupId/activities/assigned/:activityId/dr
 DELETE /api/courses/:courseId/groups/:groupId/activities/assigned/:activityId/draft
 ```
 
-These drafts are separate from gradebook attempts. Compound Test children continue to autosave through their parent Test runtime and `TestItemAttempt` records rather than this standalone route.
+These drafts are separate from gradebook attempts. Compound Test children continue to autosave through their parent Test runtime and `TestItemAttempt` records rather than this standalone route. The Test shell keys each embedded renderer by Test item so navigation cannot carry local editor state from one child into another.
 
 Concrete plugin routes are documented in the owning plugin package.
 

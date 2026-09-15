@@ -286,7 +286,7 @@ Test-level rules apply to the entire sitting:
 
 Children do not apply independent availability or attempt-limit rules.
 
-Standalone activities may persist unfinished state in core `ActivityResponseDraft` rows, but Tests deliberately do not use that path. Test children continue to serialize autosaves through the parent runtime into `TestItemAttempt`, preserving timer, no-resume, finalization, and trailing-save guarantees.
+Standalone activities may persist unfinished state in core `ActivityResponseDraft` rows, but Tests deliberately do not use that path. Test children continue to serialize autosaves through the parent runtime into `TestItemAttempt`, preserving timer, no-resume, finalization, and trailing-save guarantees. Navigation remounts the embedded renderer at the selected `TestItem` boundary, ensuring transient component/editor state cannot be displayed or autosaved for a sibling item.
 
 The current `ActivityAttempt.pluginKey` name is too narrow for a core runtime. The long-term field should be `runtimeHandlerKey`, with values such as `plugin:mcq` and `core:test`. A compatibility migration can retain existing values while the service contract changes.
 

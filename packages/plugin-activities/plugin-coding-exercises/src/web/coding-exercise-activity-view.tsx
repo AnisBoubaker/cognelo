@@ -11,13 +11,16 @@ import {
   codingExerciseTemplateRequiresTestCodeMarker,
   codingExerciseTemplateInsertionToken,
   normalizeCodingExerciseSampleTests,
-  parseCodingExerciseConfig,
   parseCodingExercisePrivateConfig,
   splitCodingExerciseTemplateSource,
   type CodingExerciseConfig,
   type CodingExerciseOutputMatchMode,
   type CodingExercisePrivateConfig
 } from "../coding-exercises";
+import {
+  getCodingExerciseActivityConfig,
+  getCodingExerciseInitialStudentSource
+} from "./coding-exercise-student-source";
 import { formatCodingExercisesMessage, normalizeCodingExercisesLocale, type CodingExercisesLocale } from "./messages";
 
 type ActivityLike = {
@@ -226,16 +229,6 @@ type CodingExerciseActivityViewProps = {
   onSubmitted?: () => void;
 };
 
-const fallbackConfig: CodingExerciseConfig = {
-  prompt: "",
-  language: "python",
-  executionMode: "template",
-  starterCode: "",
-  studentTemplateSource: "{{ STUDENT_CODE }}",
-  sampleTests: [],
-  maxEditorSeconds: 1800
-};
-
 const disabledCodingExerciseLanguages = new Set(["javascript"]);
 const personalizedTestId = "__personalized_test__";
 const workspaceDividerWidth = 12;
@@ -277,7 +270,7 @@ export function CodingExerciseActivityView({
   const previousActivityIdRef = useRef(activity.id);
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);
-  const [config, setConfig] = useState<CodingExerciseConfig>(() => parseCodingExerciseConfig(activity.config ?? fallbackConfig));
+  const [config, setConfig] = useState<CodingExerciseConfig>(() => getCodingExerciseActivityConfig(activity.config));
   const [hiddenTests, setHiddenTests] = useState<HiddenTest[]>([]);
   const [referenceSolution, setReferenceSolution] = useState("");
   const [privateConfig, setPrivateConfig] = useState<CodingExercisePrivateConfig>(() => parseCodingExercisePrivateConfig({}));
@@ -285,7 +278,7 @@ export function CodingExerciseActivityView({
         buildCodingExerciseSnapshot({
           title: activity.title,
           description: activity.description,
-          config: normalizeCodingExerciseConfigForDisplay(parseCodingExerciseConfig(activity.config ?? fallbackConfig)),
+          config: getCodingExerciseActivityConfig(activity.config),
           hiddenTests: [],
       referenceSolution: "",
       privateConfig: parseCodingExercisePrivateConfig({})
@@ -300,7 +293,7 @@ export function CodingExerciseActivityView({
   const [generatingTests, setGeneratingTests] = useState(false);
   const [replacementDialog, setReplacementDialog] = useState<"prompt" | "solution" | "tests" | null>(null);
   const [error, setError] = useState("");
-  const [editorCode, setEditorCode] = useState("");
+  const [editorCode, setEditorCode] = useState(() => getCodingExerciseInitialStudentSource(activity.config));
   const [sampleInput, setSampleInput] = useState("");
   const [sampleExpectedOutput, setSampleExpectedOutput] = useState("");
   const [sampleTestCode, setSampleTestCode] = useState("");
@@ -347,7 +340,7 @@ export function CodingExerciseActivityView({
 
   useEffect(() => {
     const isNewActivity = previousActivityIdRef.current !== activity.id;
-    const nextConfig = normalizeCodingExerciseConfigForDisplay(parseCodingExerciseConfig(activity.config ?? fallbackConfig));
+    const nextConfig = getCodingExerciseActivityConfig(JSON.parse(activityConfigKey) as Record<string, unknown>);
     const sampleTests = normalizeCodingExerciseSampleTests(nextConfig.sampleTests);
     setTitle(activity.title);
     setDescription(activity.description);
@@ -438,7 +431,9 @@ export function CodingExerciseActivityView({
     }
     let cancelled = false;
     setExecutionStateLoaded(false);
-    const initialSourceCode = alignCodingExerciseStarterCodeToTemplate(config.starterCode, config.studentTemplateSource);
+    const initialSourceCode = getCodingExerciseInitialStudentSource(
+      JSON.parse(activityConfigKey) as Record<string, unknown>
+    );
     executionStateHost.load()
       .then(async (saved) => {
         const sourceCode = typeof saved?.sourceCode === "string" ? saved.sourceCode : initialSourceCode;
@@ -455,7 +450,7 @@ export function CodingExerciseActivityView({
         if (!cancelled) setExecutionStateLoaded(true);
       });
     return () => { cancelled = true; };
-  }, [activity.id, canManage, executionStateHost, readOnly]);
+  }, [activity.id, activityConfigKey, canManage, executionStateHost, readOnly]);
 
   useEffect(() => {
     if (!canManage || !course?.id || !codingClient) {
@@ -2048,30 +2043,6 @@ function hasExistingGeneratedSolutionContent(
 function hasExistingGeneratedTestContent(config: CodingExerciseConfig, hiddenTests: HiddenTest[]) {
   const normalizedSampleTests = normalizeCodingExerciseSampleTests(config.sampleTests);
   return Boolean(normalizedSampleTests.length || hiddenTests.length);
-}
-
-function normalizeCodingExerciseConfigForDisplay(config: CodingExerciseConfig): CodingExerciseConfig {
-  if (!config.studentTemplateSource.trim() && config.starterCode.includes(codingExerciseTemplateInsertionToken)) {
-    return {
-      ...config,
-      executionMode: "template",
-      studentTemplateSource: config.starterCode,
-      starterCode: ""
-    };
-  }
-
-  if (!config.studentTemplateSource.trim()) {
-    return {
-      ...config,
-      executionMode: "template",
-      studentTemplateSource: buildCodingExerciseTemplateSource("", "")
-    };
-  }
-
-  return {
-    ...config,
-    executionMode: "template"
-  };
 }
 
 function isApiErrorLike(value: unknown): value is { code?: string; details?: unknown } {
