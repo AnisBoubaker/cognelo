@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import Editor, { type Monaco, type OnMount } from "@monaco-editor/react";
 import { normalizeMonacoLanguage } from "./code-language";
+import { getEditableMonacoValue } from "./monaco-code-editor-value";
 
 let hasRegisteredCogneloTheme = false;
 
@@ -107,14 +108,18 @@ export function MonacoCodeEditor({
         height={height ?? minHeight}
         language={editorLanguage}
         onChange={(nextValue) => {
-          const nextText = nextValue ?? "";
-
-          if (readOnly || (!readOnlyPrefix && !readOnlySuffix)) {
-            onChange(nextText);
+          const nextStudentValue = getEditableMonacoValue({
+            nextValue,
+            readOnly,
+            readOnlyPrefix,
+            readOnlySuffix
+          });
+          if (nextStudentValue !== null) {
+            onChange(nextStudentValue);
             return;
           }
 
-          if (!nextText.startsWith(readOnlyPrefix) || !nextText.endsWith(readOnlySuffix)) {
+          if (!readOnly) {
             const editor = editorRef.current;
             const model = editor?.getModel();
             if (editor && model && model.getValue() !== displayedValue) {
@@ -125,10 +130,7 @@ export function MonacoCodeEditor({
                 editor.setPosition(nextPosition);
               }
             }
-            return;
           }
-
-          onChange(nextText.slice(readOnlyPrefix.length, nextText.length - readOnlySuffix.length));
         }}
         options={{
           ariaLabel,

@@ -21,4 +21,8 @@ describe("activity response draft wiring", () => {
     expect(renderersSource).toContain("autosaveDelayMs={0}");
     expect(renderersSource).toContain("executionStateHost={executionHost}");
   });
+
+  it("remounts the embedded renderer when Test navigation selects another item", () => {
+    expect(testRuntimeSource).toContain('key={selectedItem.id}');
+  });
 });

@@ -610,7 +610,7 @@ function TestStudentRuntime({
       </section>
 
       {selectedItem ? (
-        <section className="section stack">
+        <section className="section stack" key={selectedItem.id}>
           <div>
             <p className="eyebrow">{t("courseDetail.testActivityPosition", { current: selectedIndex + 1, total: runtime.test.items.length })}</p>
             <h2>{selectedItem.activity.title}</h2>
