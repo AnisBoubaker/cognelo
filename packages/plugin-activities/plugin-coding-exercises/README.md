@@ -157,6 +157,7 @@ Behavior:
 - `history` returns every prior submission with the practice runs that preceded it, plus only the unsubmitted runs belonging to the current attempt and the learner's current attempt availability
 - `hidden-tests` is teacher/admin only and carries the private reference solution
 - Judge0 source is assembled server-side from the private template plus student code, then per-test harness code is injected at `{{ TEST_CODE }}` when present
+- Cognelo always exchanges source, stdin, expected output, stdout, stderr, compiler output, and Judge0 messages as Base64 at the Judge0 boundary, decoding them before persistence and comparison. This preserves UTF-8 program text and output such as accented characters and also safely carries non-printable diagnostics.
 - enabled hidden tests are validated against the teacher reference solution before they are saved
 
 ### Output matching
