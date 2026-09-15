@@ -975,7 +975,7 @@ export function CodingExerciseActivityView({
   }
 
   async function runCode() {
-    if (!course?.id || !codingClient) {
+    if (!course?.id || !codingClient || !editorCode.trim()) {
       return;
     }
     setWorkingAction("run");
@@ -1002,7 +1002,7 @@ export function CodingExerciseActivityView({
   }
 
   async function submitCode() {
-    if (!course?.id || !codingClient) {
+    if (!course?.id || !codingClient || !editorCode.trim()) {
       return;
     }
     setWorkingAction("submit");
@@ -1620,7 +1620,7 @@ export function CodingExerciseActivityView({
 
                   {!deferSubmission ? (
                     <div className="row coding-exercise-editor-actions" style={{ alignItems: "center" }}>
-                      <button type="button" onClick={submitCode} disabled={readOnly || workingAction === "submit"}>
+                      <button type="button" onClick={submitCode} disabled={readOnly || workingAction === "submit" || !editorCode.trim()}>
                         {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
                       </button>
                       {submitExecution && submitExecution.status !== "pending" ? (
@@ -1729,7 +1729,7 @@ export function CodingExerciseActivityView({
                     </div>
                   )}
 
-                  <button type="button" onClick={runCode} disabled={readOnly || workingAction === "run"}>
+                  <button type="button" onClick={runCode} disabled={readOnly || workingAction === "run" || !editorCode.trim()}>
                     {workingAction === "run" ? t("running") : t("runTest")}
                   </button>
 

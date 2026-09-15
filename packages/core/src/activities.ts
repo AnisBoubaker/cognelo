@@ -378,7 +378,7 @@ export async function getCourseActivityBankSyncStatus(user: CurrentUser, courseI
   return {
     status,
     attemptCount,
-    mutationsAllowed: attemptCount === 0,
+    retrievalAllowed: attemptCount === 0,
     canWriteToBank: user.roles.includes("admin") || source.bankActivity!.bank.ownerId === user.id,
     originalVersion: { id: source.activityVersion!.id, versionNumber: source.activityVersion!.versionNumber },
     latestVersion: { id: latestVersion.id, versionNumber: latestVersion.versionNumber }
@@ -389,9 +389,11 @@ export async function syncCourseActivityWithBank(user: CurrentUser, courseId: st
   await assertCanManageCourse(user, courseId);
   const data = CourseActivityBankSyncSchema.parse(input);
   const source = await loadSyncSource(courseId, activityId);
-  const attemptCount = await prisma.activityAttempt.count({ where: { activityId } });
-  if (attemptCount > 0) {
-    throw new AppError(409, "ACTIVITY_BANK_SYNC_ATTEMPTS_LOCKED", "This activity cannot be synchronized after an attempt has been created.", { attemptCount });
+  if (data.action !== "publish_to_bank") {
+    const attemptCount = await prisma.activityAttempt.count({ where: { activityId } });
+    if (attemptCount > 0) {
+      throw new AppError(409, "ACTIVITY_BANK_SYNC_ATTEMPTS_LOCKED", "This course activity cannot retrieve bank content after an attempt has been created.", { attemptCount });
+    }
   }
 
   if (data.action === "publish_to_bank") {

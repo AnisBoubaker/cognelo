@@ -22,7 +22,7 @@ This file is for Parsons-specific memory only.
 
 ## Persistence Decisions
 
-- Parsons authoring uses generic activity fields/config for course/bank synchronization. Core performs the copy and permanently locks synchronization once any attempt exists; attempt/event rows are never synchronized.
+- Parsons authoring uses generic activity fields/config for course/bank synchronization. Core performs the copy and permanently locks bank-to-course retrieval once any attempt exists; course-to-bank publication remains allowed and attempt/event rows are never synchronized.
 - Core's bank-version diff covers complete Parsons authoring because it is stored in immutable generic config; plugin-owned attempt history is not authoring data and is never compared.
 - Parsons bank config versions are publication milestones: draft saves do not create versions, while changed Published saves do.
 

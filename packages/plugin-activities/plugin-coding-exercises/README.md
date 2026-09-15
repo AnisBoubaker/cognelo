@@ -88,7 +88,7 @@ These tables are modeled in this plugin's local Prisma schema under `prisma/sche
 
 Activity-bank authoring persists the same private reference solution, hidden template data, and tests in bank-owned plugin tables. When a bank activity is assigned to a course, the plugin hook copies that private data into course-owned plugin tables so future bank edits and course edits diverge safely.
 
-Explicit course/bank synchronization replaces private authoring data through plugin hooks in either direction. Retrieval refreshes course-owned reference/test rows; publishing refreshes bank-owned rows while core creates the new immutable generic version. Core blocks both operations after any attempt.
+Explicit course/bank synchronization replaces private authoring data through plugin hooks in either direction. Retrieval refreshes course-owned reference/test rows and is blocked after any attempt. Publishing refreshes bank-owned rows while core creates the new immutable generic version, and remains allowed after attempts because it does not change the attempted course copy.
 
 Bank-version comparison currently shows public generic configuration but not private reference solutions, hidden templates, or hidden tests, because those bank-owned rows are not snapshotted per immutable activity version.
 
@@ -153,6 +153,7 @@ Behavior:
 
 - `run` is for learner-visible preset and personalized execution; personalized runs explicitly disable output comparison and omit the sample harness
 - `submit` evaluates against plugin-owned hidden tests, records summative group work in the shared core attempt lifecycle, and returns post-submission attempt availability
+- blank or whitespace-only learner source keeps Run and Submit disabled; server validation also rejects direct empty payloads before runtime lookup, execution persistence, or a Judge0 request
 - `history` returns every prior submission with the practice runs that preceded it, plus only the unsubmitted runs belonging to the current attempt and the learner's current attempt availability
 - `hidden-tests` is teacher/admin only and carries the private reference solution
 - Judge0 source is assembled server-side from the private template plus student code, then per-test harness code is injected at `{{ TEST_CODE }}` when present

@@ -655,7 +655,7 @@ export const enMessages = {
       bankSyncEyebrow: "Activity bank sync",
       bankSyncError: "Unable to synchronize with the activity bank.",
       bankSyncVersions: "Imported version {original}; latest published bank version {latest}.",
-      bankSyncAttemptsLocked: "Synchronization is locked because this activity has {count} attempt(s).",
+      bankSyncAttemptsLocked: "Retrieving bank content is locked because this activity has {count} attempt(s). You can still publish the course copy to the bank.",
       bankSyncRestoreOriginal: "Restore original bank copy (version {version})",
       bankSyncRetrieveLatest: "Retrieve latest bank version (version {version})",
       bankSyncPublish: "Publish course copy to bank",

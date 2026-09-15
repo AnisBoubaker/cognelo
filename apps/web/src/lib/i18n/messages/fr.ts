@@ -655,7 +655,7 @@ export const frMessages = {
       bankSyncEyebrow: "Synchronisation avec la banque d'activités",
       bankSyncError: "Impossible de synchroniser avec la banque d'activités.",
       bankSyncVersions: "Version importée {original}; dernière version publiée {latest}.",
-      bankSyncAttemptsLocked: "La synchronisation est verrouillée car cette activité compte {count} tentative(s).",
+      bankSyncAttemptsLocked: "La récupération du contenu de la banque est verrouillée, car cette activité compte {count} tentative(s). Vous pouvez toujours publier la copie du cours dans la banque.",
       bankSyncRestoreOriginal: "Restaurer la copie originale (version {version})",
       bankSyncRetrieveLatest: "Récupérer la dernière version (version {version})",
       bankSyncPublish: "Publier la copie du cours dans la banque",

@@ -217,6 +217,29 @@ describe("coding exercise executions", () => {
     ];
   });
 
+  it("rejects blank learner source before runtime lookup, persistence, or Judge0 execution", async () => {
+    await expect(
+      runCodingExercise({
+        activityId: "activity-1",
+        userId: "student-1",
+        activityConfig,
+        input: { sourceCode: " \n\t" }
+      })
+    ).rejects.toMatchObject({ name: "ZodError" });
+    await expect(
+      submitCodingExercise({
+        activityId: "activity-1",
+        userId: "student-1",
+        activityConfig,
+        input: { sourceCode: " \n\t" }
+      })
+    ).rejects.toMatchObject({ name: "ZodError" });
+
+    expect(judge0Mocks.resolveJudge0Language).not.toHaveBeenCalled();
+    expect(judge0Mocks.runJudge0Submission).not.toHaveBeenCalled();
+    expect(dbMocks.prisma.pluginCodingExerciseExecution.create).not.toHaveBeenCalled();
+  });
+
   it("persists a successful sample run", async () => {
     judge0Mocks.runJudge0Submission.mockResolvedValueOnce({
       token: "token-1",

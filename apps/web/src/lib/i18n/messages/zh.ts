@@ -654,7 +654,7 @@ export const zhMessages = {
       bankSyncEyebrow: "活动库同步",
       bankSyncError: "无法与活动库同步。",
       bankSyncVersions: "已导入版本 {original}；活动库最新发布版本 {latest}。",
-      bankSyncAttemptsLocked: "此活动已有 {count} 次尝试，无法同步。",
+      bankSyncAttemptsLocked: "此活动已有 {count} 次尝试，无法从活动库获取内容。您仍可将课程副本发布到活动库。",
       bankSyncRestoreOriginal: "恢复原始活动库副本（版本 {version}）",
       bankSyncRetrieveLatest: "获取活动库最新版本（版本 {version}）",
       bankSyncPublish: "将课程副本发布到活动库",

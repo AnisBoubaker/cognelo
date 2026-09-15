@@ -606,7 +606,7 @@ export const arMessages = {
       bankSyncEyebrow: "مزامنة بنك الأنشطة",
       bankSyncError: "تعذرت المزامنة مع بنك الأنشطة.",
       bankSyncVersions: "الإصدار المستورد {original}؛ أحدث إصدار منشور {latest}.",
-      bankSyncAttemptsLocked: "المزامنة مقفلة لأن لهذا النشاط {count} محاولة/محاولات.",
+      bankSyncAttemptsLocked: "استرجاع محتوى بنك الأنشطة مقفل لأن لهذا النشاط {count} محاولة/محاولات. لا يزال بإمكانك نشر نسخة المقرر في البنك.",
       bankSyncRestoreOriginal: "استعادة نسخة البنك الأصلية (الإصدار {version})",
       bankSyncRetrieveLatest: "استرجاع أحدث إصدار من البنك (الإصدار {version})",
       bankSyncPublish: "نشر نسخة المقرر في البنك",
