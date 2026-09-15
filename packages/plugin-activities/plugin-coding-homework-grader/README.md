@@ -124,7 +124,7 @@ Teacher authoring uses the shared responsive `EditActionBar`. Its saved/unsaved 
 
 The activity definition uses the semantic `file-code` icon rendered by the platform's shared Tabler icon layer.
 
-Explicit course/bank synchronization replaces assignment, requirement, and authoring-attachment rows through plugin hooks in either direction. Publishing retains shared immutable stored files while replacing bank-owned records; core creates the immutable version and blocks synchronization after any attempt.
+Explicit course/bank synchronization replaces assignment, requirement, and authoring-attachment rows through plugin hooks in either direction. Retrieval is blocked after any attempt. Publishing retains shared immutable stored files while replacing bank-owned records; core creates the immutable version and continues to allow publication after attempts because attempted course content is unchanged.
 
 Bank-version comparison currently covers generic activity config and metadata only. Private assignments, requirements, and attachments are excluded because they are not snapshotted by activity version.
 

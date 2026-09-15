@@ -27,7 +27,7 @@ describe("course activity bank sync route", () => {
   });
 
   it("returns the sync status", async () => {
-    mocks.getStatus.mockResolvedValue({ status: "bank_ahead", mutationsAllowed: true });
+    mocks.getStatus.mockResolvedValue({ status: "bank_ahead", retrievalAllowed: true });
     const response = await GET(new Request("http://test.local") as never, params);
     expect(response.status).toBe(200);
     expect(mocks.getStatus).toHaveBeenCalledWith({ id: "teacher-1", roles: ["teacher"] }, "course-1", "activity-1");

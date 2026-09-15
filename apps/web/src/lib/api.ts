@@ -566,7 +566,7 @@ export type Activity = {
 export type ActivityBankSyncStatus = {
   status: "in_sync" | "course_ahead" | "bank_ahead" | "diverged";
   attemptCount: number;
-  mutationsAllowed: boolean;
+  retrievalAllowed: boolean;
   canWriteToBank: boolean;
   originalVersion: { id: string; versionNumber: number };
   latestVersion: { id: string; versionNumber: number };

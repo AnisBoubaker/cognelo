@@ -83,11 +83,11 @@ describe("coding exercise config and template helpers", () => {
   it("maps Judge0 language keys to supported runtime candidates", () => {
     const python = getJudge0LanguageCandidates(" Python ");
     expect(python.languageKey).toBe("python");
-    expect(python.candidates).toContain("Python (3.12.7)");
-    expect(getJudge0LanguageCandidates("javascript").candidates).toContain("JavaScript (Node.js 22.8.0)");
-    expect(getJudge0LanguageCandidates("typescript").candidates).toContain("TypeScript (5.6.3)");
-    expect(getJudge0LanguageCandidates("java").candidates).toContain("Java (OpenJDK 17.0.12)");
-    expect(getJudge0LanguageCandidates("go").candidates).toContain("Go (1.22.7)");
+    expect(python.candidates[0]).toBe("Python (3.12.7)");
+    expect(getJudge0LanguageCandidates("javascript").candidates[0]).toBe("JavaScript (Node.js 22.8.0)");
+    expect(getJudge0LanguageCandidates("typescript").candidates[0]).toBe("TypeScript (5.6.3)");
+    expect(getJudge0LanguageCandidates("java").candidates[0]).toBe("Java (OpenJDK 17.0.12)");
+    expect(getJudge0LanguageCandidates("go").candidates[0]).toBe("Go (1.22.7)");
     expect(() => getJudge0LanguageCandidates("brainfuck")).toThrow("Unsupported coding exercise language");
   });
 

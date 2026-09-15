@@ -2077,13 +2077,13 @@ export default function CourseDetailPage() {
                   <div className="form">
                     <p><strong>{t(`courseDetail.bankSyncStatus.${bankSyncDialog.sync.status}`)}</strong></p>
                     <p className="muted">{t("courseDetail.bankSyncVersions", { original: bankSyncDialog.sync.originalVersion.versionNumber, latest: bankSyncDialog.sync.latestVersion.versionNumber })}</p>
-                    {!bankSyncDialog.sync.mutationsAllowed ? <p className="error">{t("courseDetail.bankSyncAttemptsLocked", { count: bankSyncDialog.sync.attemptCount })}</p> : null}
+                    {!bankSyncDialog.sync.retrievalAllowed ? <p className="error">{t("courseDetail.bankSyncAttemptsLocked", { count: bankSyncDialog.sync.attemptCount })}</p> : null}
                     {bankSyncError ? <p className="error">{bankSyncError}</p> : null}
                     <div className="dialog-actions">
                       <button className="secondary" disabled={bankSyncLoading} type="button" onClick={() => setBankSyncDialog(null)}>{t("common.cancel")}</button>
-                      {bankSyncDialog.sync.status === "course_ahead" ? <button disabled={bankSyncLoading || !bankSyncDialog.sync.mutationsAllowed} type="button" onClick={() => setBankSyncConfirmation("retrieve_original")}>{t("courseDetail.bankSyncRestoreOriginal", { version: bankSyncDialog.sync.originalVersion.versionNumber })}</button> : null}
-                      {(bankSyncDialog.sync.status === "bank_ahead" || bankSyncDialog.sync.status === "diverged") ? <button disabled={bankSyncLoading || !bankSyncDialog.sync.mutationsAllowed} type="button" onClick={() => setBankSyncConfirmation("retrieve_latest")}>{t("courseDetail.bankSyncRetrieveLatest", { version: bankSyncDialog.sync.latestVersion.versionNumber })}</button> : null}
-                      {(bankSyncDialog.sync.status === "course_ahead" || bankSyncDialog.sync.status === "diverged") && bankSyncDialog.sync.canWriteToBank ? <button disabled={bankSyncLoading || !bankSyncDialog.sync.mutationsAllowed} type="button" onClick={() => setBankSyncConfirmation("publish_to_bank")}>{t("courseDetail.bankSyncPublish")}</button> : null}
+                      {bankSyncDialog.sync.status === "course_ahead" ? <button disabled={bankSyncLoading || !bankSyncDialog.sync.retrievalAllowed} type="button" onClick={() => setBankSyncConfirmation("retrieve_original")}>{t("courseDetail.bankSyncRestoreOriginal", { version: bankSyncDialog.sync.originalVersion.versionNumber })}</button> : null}
+                      {(bankSyncDialog.sync.status === "bank_ahead" || bankSyncDialog.sync.status === "diverged") ? <button disabled={bankSyncLoading || !bankSyncDialog.sync.retrievalAllowed} type="button" onClick={() => setBankSyncConfirmation("retrieve_latest")}>{t("courseDetail.bankSyncRetrieveLatest", { version: bankSyncDialog.sync.latestVersion.versionNumber })}</button> : null}
+                      {(bankSyncDialog.sync.status === "course_ahead" || bankSyncDialog.sync.status === "diverged") && bankSyncDialog.sync.canWriteToBank ? <button disabled={bankSyncLoading} type="button" onClick={() => setBankSyncConfirmation("publish_to_bank")}>{t("courseDetail.bankSyncPublish")}</button> : null}
                     </div>
                   </div>
                 </section>

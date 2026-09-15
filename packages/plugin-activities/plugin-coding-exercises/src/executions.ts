@@ -63,8 +63,13 @@ const codingExerciseExecutionClient = prisma as typeof prisma & {
   };
 };
 
+const codingExerciseStudentSourceSchema = z
+  .string()
+  .max(60000)
+  .refine((sourceCode) => sourceCode.trim().length > 0, "Enter code before running or submitting.");
+
 export const codingExerciseRunInputSchema = z.object({
-  sourceCode: z.string().min(1).max(60000),
+  sourceCode: codingExerciseStudentSourceSchema,
   stdin: z.string().max(12000).optional().default(""),
   expectedOutput: z.string().max(12000).optional().default(""),
   testCode: z.string().max(40000).optional().default(""),
@@ -76,7 +81,7 @@ export const codingExerciseRunInputSchema = z.object({
 export type CodingExerciseRunInput = z.input<typeof codingExerciseRunInputSchema>;
 
 export const codingExerciseSubmitInputSchema = z.object({
-  sourceCode: z.string().min(1).max(60000)
+  sourceCode: codingExerciseStudentSourceSchema
 });
 
 type HiddenTestCase = {

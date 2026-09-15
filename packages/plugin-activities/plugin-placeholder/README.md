@@ -20,7 +20,7 @@ The placeholder plugin exists as a minimal activity shell while a real pedagogic
 
 This plugin intentionally relies only on core bank/course activity records for real activity behavior.
 
-Its linked course copies therefore use the platform's generic bank synchronization without a plugin hook, subject to the core attempt lock and bank-write permission rules.
+Its linked course copies therefore use the platform's generic bank synchronization without a plugin hook. Core locks bank-to-course retrieval after any attempt, while course-to-bank publication remains available to users with bank-write permission.
 
 Its immutable bank versions are also compared entirely by the shared core diff visualizer.
 
