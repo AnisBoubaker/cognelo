@@ -30,7 +30,9 @@ New uploads are `staged` for 24 hours and are visible only to their creator or a
 
 References are field-keyed and currently reconcile Markdown in descriptions plus activity configuration. Copy and synchronization operations create new logical references to the existing asset. Test attempts preserve references from their immutable revision snapshots. Deleting or replacing one occurrence therefore cannot remove bytes that another bank version, course copy, or attempt still needs.
 
-The canonical stored Markdown URL is `/api/media-assets/<asset-id>/content`. The API serves it only to an authorized authenticated user. Students must still pass the normal assignment publication and content-visibility checks; teachers and course managers use the corresponding subject, bank, or course permissions. The web development server proxies this API path so the stored URL remains environment-independent.
+The canonical stored Markdown URL is `/api/media-assets/<asset-id>/content`. Optional display sizing stays inside standard Markdown image syntax by appending a URI fragment: `#cognelo-size=px:320`, `#cognelo-size=original:50:1280`, or `#cognelo-size=container:60`. The original-percentage form stores the intrinsic pixel width as its final number so the renderer can reproduce the requested scale without loading a second copy or depending on container size. URI fragments are never sent to the media API. The shared renderer validates the numeric bounds, converts recognized fragments into width-only sizing, and always derives height automatically to preserve the image's aspect ratio; unknown or malformed fragments receive normal unsized rendering.
+
+The API serves the underlying asset only to an authorized authenticated user. Students must still pass the normal assignment publication and content-visibility checks; teachers and course managers use the corresponding subject, bank, or course permissions. The web development server proxies this API path so the stored URL remains environment-independent.
 
 ## Garbage collection
 

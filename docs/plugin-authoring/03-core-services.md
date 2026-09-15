@@ -142,7 +142,7 @@ These are especially useful for programming-learning activities.
 - one canonical Markdown value with Visual and source modes
 - inline/display equation building and protected KaTeX widgets
 - portable GFM table creation and row/column controls
-- authenticated PNG, JPEG, GIF, and WebP upload with required alternative text
+- authenticated PNG, JPEG, GIF, and WebP upload with required alternative text and pixel, intrinsic-percentage, or container-percentage sizing
 - click-to-edit image replacement, metadata updates, and removal
 - one resizable height shared by both modes plus full-screen authoring
 

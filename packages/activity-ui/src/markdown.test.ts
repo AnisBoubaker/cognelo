@@ -22,6 +22,17 @@ describe("shared Markdown rendering", () => {
     expect(html).toContain('<code class="language-c">');
   });
 
+  it("renders Cognelo URI image sizing without changing ordinary Markdown images", () => {
+    expect(renderMarkdownToHtml("![Pixels](/api/media-assets/a1/content#cognelo-size=px:320)"))
+      .toContain('<img src="/api/media-assets/a1/content#cognelo-size=px:320" alt="Pixels" style="width: 320px; height: auto">');
+    expect(renderMarkdownToHtml("![Original](/api/media-assets/a2/content#cognelo-size=original:50:1200)"))
+      .toContain('style="width: 600px; height: auto"');
+    expect(renderMarkdownToHtml("![Container](/api/media-assets/a3/content#cognelo-size=container:62.5)"))
+      .toContain('style="width: 62.5%; height: auto"');
+    expect(renderMarkdownToHtml("![Default](/api/media-assets/a4/content)"))
+      .toContain('<img src="/api/media-assets/a4/content" alt="Default">');
+  });
+
   it("renders portable GFM tables", () => {
     const html = renderMarkdownToHtml([
       "| Name | Unit | Value |",

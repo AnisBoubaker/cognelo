@@ -1,5 +1,6 @@
 import katex from "katex";
 import { Marked, type Tokens } from "marked";
+import { markdownImageWidth, readMarkdownImageSize } from "./image-sizing";
 
 type MathToken = Tokens.Generic & {
   expression: string;
@@ -25,6 +26,12 @@ function createMarkdownParser(protectMath: boolean) {
       gfm: true
     },
     {
+      renderer: {
+        image({ href, text, title }: Tokens.Image) {
+          const width = markdownImageWidth(readMarkdownImageSize(href));
+          return `<img src="${escapeHtmlAttribute(href)}" alt="${escapeHtmlAttribute(text)}"${title ? ` title="${escapeHtmlAttribute(title)}"` : ""}${width ? ` style="width: ${width}; height: auto"` : ""}>`;
+        }
+      },
       extensions: [
         {
           name: "displayMath",
