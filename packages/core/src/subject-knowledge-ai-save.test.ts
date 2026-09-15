@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
+vi.mock("./media-assets", () => ({ reconcileMediaAssetReferences: vi.fn() }));
+
 const tx = vi.hoisted(() => ({
   activityKnowledgeConcept: { delete: vi.fn(), deleteMany: vi.fn(), update: vi.fn() },
   bankActivityKnowledgeConcept: { delete: vi.fn(), deleteMany: vi.fn(), update: vi.fn() },

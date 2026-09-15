@@ -6,6 +6,7 @@ import { createActivity } from "./activities";
 import { assertCanManageCourse, assertCanViewCourse } from "./authorization";
 import { AppError, notFound } from "./errors";
 import { ensureCoreActivityTypes } from "./plugins";
+import { reconcileMediaAssetReferences } from "./media-assets";
 
 const testInclude = {
   activity: { include: { activityType: true, bankActivity: true, activityVersion: true } },
@@ -40,6 +41,10 @@ export async function createTest(user: CurrentUser, courseId: string, input: unk
         createdById: user.id
       }
     });
+    await reconcileMediaAssetReferences(tx, { activityId: activity.id }, {
+      description: activity.description,
+      config: activity.config
+    }, { actorId: user.id });
     const test = await tx.test.create({
       data: {
         courseId,
@@ -99,6 +104,10 @@ export async function duplicateTest(user: CurrentUser, courseId: string, activit
         createdById: user.id
       }
     });
+    await reconcileMediaAssetReferences(tx, { activityId: shell.id }, {
+      description: shell.description,
+      config: shell.config
+    }, { trustedCopy: true });
     const duplicated = await tx.test.create({
       data: { courseId, activityId: shell.id, settings: source.settings as Prisma.InputJsonValue }
     });
@@ -134,6 +143,10 @@ export async function duplicateTest(user: CurrentUser, courseId: string, activit
         },
         include: { activityType: true }
       });
+      await reconcileMediaAssetReferences(tx, { activityId: child.id }, {
+        description: child.description,
+        config: child.config
+      }, { trustedCopy: true });
       await tx.testItem.create({
         data: {
           testId: duplicated.id,
@@ -169,7 +182,7 @@ export async function updateTest(user: CurrentUser, courseId: string, activityId
 
   return prisma.$transaction(async (tx) => {
     if (data.title !== undefined || data.description !== undefined || data.lifecycle !== undefined) {
-      await tx.activity.update({
+      const activity = await tx.activity.update({
         where: { id: activityId },
         data: {
           title: data.title,
@@ -177,6 +190,10 @@ export async function updateTest(user: CurrentUser, courseId: string, activityId
           lifecycle: data.lifecycle
         }
       });
+      await reconcileMediaAssetReferences(tx, { activityId }, {
+        description: activity.description,
+        config: activity.config
+      }, { actorId: user.id });
       if (data.title !== undefined) {
         await tx.courseContentItem.updateMany({ where: { activityId }, data: { titleSnapshot: data.title } });
       }

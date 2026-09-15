@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
+vi.mock("./media-assets", () => ({ reconcileMediaAssetReferences: vi.fn() }));
+
 const tx = vi.hoisted(() => ({
   activity: { create: vi.fn(), update: vi.fn(), deleteMany: vi.fn(), delete: vi.fn() },
   test: { create: vi.fn(), update: vi.fn(), findUniqueOrThrow: vi.fn() },

@@ -31,7 +31,7 @@ Cognelo has:
 
 Activity plugins own activity-specific behavior. Content type plugins own non-activity course content behavior. The platform owns generic auth, subject/activity-bank/course/activity CRUD, content tree placement, resource rows, route dispatch, activity copying, and shared UI primitives.
 
-For authored rich text display, use `MarkdownRenderer` from `@cognelo/activity-ui`. For transient confirmations and non-field-specific errors, use `useNotifications()` instead of adding a plugin-local inline “saved” banner.
+For authored rich text display, use `MarkdownRenderer` from `@cognelo/activity-ui`. Use `RichTextEditor` for visually authored Markdown instead of a plugin-local WYSIWYG: it includes equations, portable GFM tables, and authenticated image upload/editing. Images stored in generic activity descriptions or config are reference-managed automatically by core activity lifecycle operations. A plugin-private rich-text persistence boundary must explicitly integrate the core media reference service before enabling the default image uploader. For transient confirmations and non-field-specific errors, use `useNotifications()` instead of adding a plugin-local inline “saved” banner.
 
 For every plugin authoring or settings form, use `useUnsavedChangesGuard` from `@cognelo/activity-ui`. Keep a saved snapshot, compute `isDirty`, and provide `onSave` plus `onDiscard` so shared navigation can offer continue editing, save and leave, or discard and leave.
 

@@ -14,6 +14,7 @@ export * from "./errors";
 export * from "./gradebook";
 export * from "./groups";
 export * from "./materials";
+export * from "./media-assets";
 export * from "./plugins";
 export * from "./subjects";
 export * from "./tests";

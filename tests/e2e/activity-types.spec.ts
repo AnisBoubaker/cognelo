@@ -299,12 +299,29 @@ test.describe.serial("authoring and completing every activity type", () => {
     await authoredTable.locator("th").nth(2).fill("Value");
     await authoredTable.locator("tbody tr").nth(0).locator("td").nth(0).fill("Radius");
     await authoredTable.locator("tbody tr").nth(1).locator("td").nth(2).fill("3.20");
+    await promptField.getByRole("button", { name: "Add image" }).click();
+    const addImageDialog = teacherPage.getByRole("dialog", { name: "Add image" });
+    await addImageDialog.getByLabel("Image file").setInputFiles({
+      name: "velocity-diagram.png",
+      mimeType: "image/png",
+      buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")
+    });
+    await addImageDialog.getByLabel("Alternative text").fill("Velocity formula diagram");
+    await addImageDialog.getByLabel("Title (optional)").fill("Terminal velocity");
+    await addImageDialog.getByRole("button", { name: "Insert image" }).click();
+    const authoredImage = visualPrompt.getByRole("button", { name: "Edit image" });
+    await expect(authoredImage).toBeVisible();
+    await authoredImage.click();
+    const editImageDialog = teacherPage.getByRole("dialog", { name: "Edit image" });
+    await editImageDialog.getByLabel("Alternative text").fill("Terminal velocity formula diagram");
+    await editImageDialog.getByRole("button", { name: "Update image" }).click();
     await promptField.getByRole("tab", { name: "Markdown" }).click();
     const markdownPrompt = promptField.getByRole("textbox", { name: "Prompt" });
     await expect(markdownPrompt).toHaveValue(/\$\$V = \\sqrt\{\\frac\{2mg\}\{0\.5\\rho\\pi r\^2\}\}\$\$/);
     await expect(markdownPrompt).toHaveValue(/Use the formula above\./);
     await expect(markdownPrompt).toHaveValue(/\$\\pi.*\\times.*\\pi\$ Be precise; compare with \$\\sqrt\{m\}\$\./);
     await expect(markdownPrompt).toHaveValue(/\| Name \| Unit \| Value \|\n\| --- \| --- \| --- \|/);
+    await expect(markdownPrompt).toHaveValue(/!\[Terminal velocity formula diagram\]\(\/api\/media-assets\/[a-z0-9]+\/content "Terminal velocity"\)/);
     await teacherPage
       .getByText("Reference solution", { exact: true })
       .locator("..")
@@ -338,9 +355,11 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(reopenedPrompt).toHaveValue(/Use the formula above\./);
     await expect(reopenedPrompt).toHaveValue(/\$\\pi.*\\times.*\\pi\$ Be precise; compare with \$\\sqrt\{m\}\$\./);
     await expect(reopenedPrompt).toHaveValue(/\| Name \| Unit \| Value \|\n\| --- \| --- \| --- \|/);
+    await expect(reopenedPrompt).toHaveValue(/!\[Terminal velocity formula diagram\]\(\/api\/media-assets\/[a-z0-9]+\/content "Terminal velocity"\)/);
     await reopenedPromptField.getByRole("tab", { name: "Visual" }).click();
     await expect(reopenedPromptField.locator("table tr")).toHaveCount(3);
     await expect(reopenedPromptField.locator("table th")).toHaveCount(3);
+    await expect(reopenedPromptField.getByRole("button", { name: "Edit image" })).toHaveAttribute("alt", "Terminal velocity formula diagram");
     await teacherPage.getByRole("button", { name: "Visible greeting" }).click();
     await expect(teacherPage.locator("#sample-output-match-mode-1")).toHaveValue("contains_lines");
     await expect(teacherPage.getByLabel("Require lines in this order")).toBeChecked();
@@ -365,6 +384,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(studentPrompt.locator("table th")).toHaveCount(3);
     await expect(studentPrompt.locator("table")).toContainText("Radius");
     await expect(studentPrompt.locator("table")).toContainText("3.20");
+    await expect(studentPrompt.getByRole("img", { name: "Terminal velocity formula diagram" })).toBeVisible();
     await expect(studentPrompt).not.toContainText("$$");
     await expect(studentPrompt).toContainText("Use the formula above.");
     await expect(studentPrompt).toContainText("Be precise; compare with");

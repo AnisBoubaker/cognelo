@@ -95,6 +95,39 @@ export type EmailDeliveryConfiguration = {
   updatedAt: string | null;
 };
 
+export type MediaGarbageCollectionResult = {
+  dryRun: boolean;
+  candidateAssets: number;
+  expiredStagedAssets: number;
+  eligibleActiveAssets: number;
+  newlyUnreferenced: number;
+  trashDirectories: number;
+  staleStagingDirectories: number;
+  removedAssets: number;
+  trashedBlobs: number;
+  purgedTrashDirectories: number;
+  purgedStagingDirectories: number;
+};
+
+export type MediaMaintenanceOverview = {
+  storageRoot: string;
+  blobCount: number;
+  storedBytes: number;
+  assetCount: number;
+  activeAssetCount: number;
+  stagedAssetCount: number;
+  unreferencedActiveAssetCount: number;
+  referenceCount: number;
+  garbagePreview: MediaGarbageCollectionResult;
+  policy: {
+    maximumImageBytes: number;
+    stagedUploadHours: number;
+    activeGraceDays: number;
+    trashRetentionDays: number;
+    stagingDirectoryRetentionDays: number;
+  };
+};
+
 export type ActivityPluginInstallation = {
   id: string;
   key: string;
@@ -1065,6 +1098,12 @@ export const api = {
     request<{ ok: true }>("/settings/email/test", {
       method: "POST",
       body: JSON.stringify(input)
+    }),
+  mediaMaintenanceOverview: () =>
+    request<{ overview: MediaMaintenanceOverview }>("/maintenance/media"),
+  runMediaMaintenance: () =>
+    request<{ cleanup: MediaGarbageCollectionResult; overview: MediaMaintenanceOverview }>("/maintenance/media", {
+      method: "POST"
     }),
   activityPlugins: () => request<{ plugins: ActivityPluginInstallation[] }>("/plugins"),
   updateActivityPlugin: (pluginKey: string, input: ActivityPluginInstallationUpdate) =>

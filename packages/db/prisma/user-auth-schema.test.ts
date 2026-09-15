@@ -9,8 +9,8 @@ const migration = readFileSync(
 
 describe("user forced-password-change schema", () => {
   it("persists password-change requirements and token invalidation versions", () => {
-    expect(schema).toContain("mustChangePassword      Boolean                  @default(false)");
-    expect(schema).toContain("authVersion             Int                      @default(0)");
+    expect(schema).toMatch(/mustChangePassword\s+Boolean\s+@default\(false\)/);
+    expect(schema).toMatch(/authVersion\s+Int\s+@default\(0\)/);
   });
 
   it("ships the corresponding user migration", () => {

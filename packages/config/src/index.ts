@@ -9,6 +9,7 @@ const EnvSchema = z.object({
   JUDGE0_AUTH_TOKEN: z.string().min(1).default("dev-local-token"),
   JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS: z.coerce.boolean().default(true),
   WEB_DESIGN_RUNNER_URL: z.string().url().default("http://localhost:3456"),
+  MEDIA_STORAGE_ROOT: z.string().min(1).optional(),
   EMAIL_CREDENTIALS_ENCRYPTION_KEY: z
     .string()
     .regex(/^[A-Fa-f0-9]{64}$/, "EMAIL_CREDENTIALS_ENCRYPTION_KEY must contain exactly 64 hexadecimal characters.")
@@ -25,6 +26,7 @@ export function getServerEnv() {
     JUDGE0_AUTH_TOKEN: process.env.JUDGE0_AUTH_TOKEN ?? "dev-local-token",
     JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS: process.env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS ?? "true",
     WEB_DESIGN_RUNNER_URL: process.env.WEB_DESIGN_RUNNER_URL ?? "http://localhost:3456",
+    MEDIA_STORAGE_ROOT: process.env.MEDIA_STORAGE_ROOT?.trim() || undefined,
     EMAIL_CREDENTIALS_ENCRYPTION_KEY: process.env.EMAIL_CREDENTIALS_ENCRYPTION_KEY || undefined
   });
 }

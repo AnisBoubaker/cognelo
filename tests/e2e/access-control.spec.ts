@@ -98,7 +98,7 @@ test.describe.serial("global and course role boundaries", () => {
     }
   });
 
-  test("teachers get personal AI settings but explicit admin-only states for users, plugins, and email", async ({ teacherPage: page }) => {
+  test("teachers get personal AI settings but explicit admin-only states for users, plugins, email, and maintenance", async ({ teacherPage: page }) => {
     await page.goto("/settings/ai-agents");
     await expect(page.getByRole("heading", { name: "Model connections" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Your connections" })).toBeVisible();
@@ -112,14 +112,19 @@ test.describe.serial("global and course role boundaries", () => {
 
     await page.goto("/settings/email");
     await expect(page.getByText("Email delivery settings are available to administrators.")).toBeVisible();
+
+    await page.goto("/settings/maintenance/media");
+    await expect(page.getByText("Maintenance is available to administrators.")).toBeVisible();
   });
 
-  test("teacher APIs reject administrator-only user, plugin, and email operations", async () => {
+  test("teacher APIs reject administrator-only user, plugin, email, and maintenance operations", async () => {
     const api = await createAuthenticatedApi("teacher");
     try {
       expect((await api.get("/api/users")).status()).toBe(403);
       expect((await api.get("/api/plugins")).status()).toBe(403);
       expect((await api.get("/api/settings/email")).status()).toBe(403);
+      expect((await api.get("/api/maintenance/media")).status()).toBe(403);
+      expect((await api.post("/api/maintenance/media")).status()).toBe(403);
     } finally {
       await api.dispose();
     }
@@ -134,6 +139,10 @@ test.describe.serial("global and course role boundaries", () => {
     await expect(page.getByRole("heading", { name: "Email delivery" })).toBeVisible();
     await page.goto("/settings/ai-agents");
     await expect(page.getByRole("heading", { name: "Global connections" })).toBeVisible();
+    await page.goto("/settings/maintenance/media");
+    await expect(page.getByRole("heading", { name: "Rich-text media" })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "Maintenance sections" }).getByRole("link", { name: /Media/ })).toBeVisible();
+    await expect(page.getByText("Physical blobs", { exact: true })).toBeVisible();
   });
 
   test("a pure course manager can create curriculum and courses without administrator access", async ({ browser }) => {

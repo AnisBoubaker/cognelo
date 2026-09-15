@@ -47,7 +47,7 @@ Both families use explicit registry packages and admin-managed activation/enable
 - what a plugin is in Cognelo
 - how the API app and web app fit together
 - where plugin code belongs
-- how to reuse the shared code editor and renderer
+- how to reuse the shared code editor, Markdown renderer, and visual Markdown editor with equations, tables, and reference-managed images
 - how to register a plugin
 - how to add plugin-specific UI, routes, and storage
 - how to follow a complete end-to-end walkthrough

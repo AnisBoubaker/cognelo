@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
+vi.mock("./media-assets", () => ({ reconcileMediaAssetReferences: vi.fn() }));
+
 const mockPrisma = vi.hoisted(() => ({
   subject: { findUnique: vi.fn() },
   subjectKnowledgeConcept: { findFirst: vi.fn(), findUniqueOrThrow: vi.fn() },

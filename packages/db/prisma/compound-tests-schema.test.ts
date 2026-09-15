@@ -26,8 +26,8 @@ describe("compound Test schema foundation", () => {
   it("declares normalized Test and TestItem models", () => {
     expect(schema).toContain("model Test {");
     expect(schema).toContain("model TestItem {");
-    expect(schema).toContain('activity   Activity   @relation("TestShellActivity"');
-    expect(schema).toContain('activity       Activity @relation("TestItemActivity"');
+    expect(schema).toMatch(/activity\s+Activity\s+@relation\("TestShellActivity"/);
+    expect(schema).toMatch(/activity\s+Activity\s+@relation\("TestItemActivity"/);
   });
 
   it("ships relational and value constraints for Test composition", () => {
