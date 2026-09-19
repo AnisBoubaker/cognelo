@@ -38,6 +38,8 @@ vi.mock("@/lib/http", () => ({
   requireUser: mocks.requireUser
 }));
 
+vi.mock("@/lib/safe-exam-browser", () => ({ requireSafeExamBrowserAccess: vi.fn() }));
+
 const { POST } = await import("./route");
 
 describe("whole Test submission route", () => {

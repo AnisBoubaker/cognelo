@@ -6,6 +6,7 @@ import {
   saveTestItemAttemptState
 } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
+import { requireSafeExamBrowserAccess } from "@/lib/safe-exam-browser";
 
 type Params = { params: Promise<{ courseId: string; groupId: string; activityId: string; testItemId: string }> };
 
@@ -23,6 +24,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, groupId, activityId, testItemId } = await params;
+    await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId);
     const searchParams = new URL(request.url).searchParams;
     const parentAttemptId = searchParams.get("parentAttemptId");
     if (!parentAttemptId) {
@@ -47,6 +49,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, groupId, activityId, testItemId } = await params;
+    await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId);
     const input = stateInputSchema.parse(await readJson(request));
     const itemAttempt = await saveTestItemAttemptState(
       user,

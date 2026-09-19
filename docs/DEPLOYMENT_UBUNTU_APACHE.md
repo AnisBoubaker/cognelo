@@ -216,6 +216,7 @@ DATABASE_URL="postgresql://cognelo_app1:DATABASE_PASSWORD@127.0.0.1:5432/cognelo
 JWT_SECRET="PASTE_96_CHARACTER_HEX_SECRET"
 EMAIL_CREDENTIALS_ENCRYPTION_KEY="PASTE_64_CHARACTER_HEX_KEY"
 NEXT_PUBLIC_API_URL="https://app1.cognelo.org"
+API_PUBLIC_URL="https://app1.cognelo.org"
 CORS_ORIGIN="https://app1.cognelo.org"
 MEDIA_STORAGE_ROOT="./storage/media"
 
@@ -233,6 +234,8 @@ WEB_DESIGN_RUNNER_URL="http://10.80.0.2:3456"
 ```
 
 These addresses use the WireGuard inventory in Section 2. For another instance, use its allocated WireGuard subnet and sandbox ports. Leave the corresponding activity plugin disabled until that dependency is secured and reachable.
+
+`API_PUBLIC_URL` is embedded in short-lived Safe Exam Browser configuration links. In the documented same-origin Apache topology it must equal the public HTTPS application origin and `NEXT_PUBLIC_API_URL`. An internal Node address or an HTTP origin will make `sebs://` launch/configuration retrieval fail on student devices.
 
 `EMAIL_CREDENTIALS_ENCRYPTION_KEY` encrypts SMTP passwords and Microsoft Graph client secrets stored in the database and keys the HMAC hashes for one-time email-verification codes. It must be unique per Cognelo instance, must not be derived from `JWT_SECRET`, and must remain unchanged while encrypted email credentials or outstanding verification challenges exist. Losing it makes stored credentials unreadable and outstanding codes unusable; restore it together with the database or re-enter the credentials after setting a new key.
 
@@ -1465,6 +1468,7 @@ Common failure causes:
 - Rich-text media garbage collection fails: run `npm run media:gc` as the instance account, verify `MEDIA_STORAGE_ROOT`, storage ownership, and database connectivity, then inspect the service journal before retrying deletion.
 - A plugin is absent from the picker: activate and enable it in administrator settings; also verify its external dependency when applicable.
 - Browser calls the wrong hostname: rebuild the web application after correcting `NEXT_PUBLIC_API_URL`; changing it only at runtime is insufficient.
+- Safe Exam Browser does not open the selected activity: verify SEB is installed, `API_PUBLIC_URL` is the public HTTPS origin, Apache proxies `/api`, and the browser was allowed to open the external `sebs://` application. If direct launch is blocked, use the dialog's configuration download and inspect the API journal for `SAFE_EXAM_BROWSER_*` errors.
 - Email configuration cannot save or test a credential: verify that `EMAIL_CREDENTIALS_ENCRYPTION_KEY` contains the same 64 hexadecimal characters used when the secret was stored, then inspect the API journal.
 - SMTP or Microsoft Graph rejects a test: verify relay credentials and TLS settings, or the Entra tenant/application IDs, client-secret validity, `Mail.Send` administrator consent, sender-mailbox access policy, and sender address.
 - Email arrives in spam: verify SPF, DKIM, and DMARC alignment for the visible sender domain and inspect the message authentication headers; changing Cognelo's transport alone does not repair domain reputation.

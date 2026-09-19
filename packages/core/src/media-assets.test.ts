@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
   $transaction: vi.fn(),
-  mediaAsset: { count: vi.fn(), create: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
+  courseGroupActivity: { findMany: vi.fn() },
+  mediaAsset: { count: vi.fn(), create: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
   mediaAssetReference: { findMany: vi.fn(), createMany: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
   mediaBlob: { deleteMany: vi.fn(), upsert: vi.fn() }
 }));
@@ -15,12 +16,16 @@ const authorization = vi.hoisted(() => ({
   isCourseManager: vi.fn(),
   isTeacher: vi.fn()
 }));
+const groups = vi.hoisted(() => ({
+  assignmentRequiresSafeExamBrowser: vi.fn(),
+  getGroupAssignedActivity: vi.fn()
+}));
 
 vi.mock("@cognelo/db", () => ({ prisma: db, Prisma: {} }));
 vi.mock("./authorization", () => authorization);
-vi.mock("./groups", () => ({ getGroupAssignedActivity: vi.fn() }));
+vi.mock("./groups", () => groups);
 
-import { collectMediaGarbage, extractMediaAssetIds, getMediaMaintenanceOverview, reconcileMediaAssetReferences, uploadMediaImage } from "./media-assets";
+import { collectMediaGarbage, extractMediaAssetIds, getMediaAssetForDelivery, getMediaMaintenanceOverview, reconcileMediaAssetReferences, uploadMediaImage } from "./media-assets";
 
 let storageRoot = "";
 
@@ -39,6 +44,11 @@ describe("media asset references", () => {
     db.mediaAsset.updateMany.mockResolvedValue({ count: 1 });
     db.mediaBlob.deleteMany.mockResolvedValue({ count: 0 });
     authorization.isTeacher.mockReturnValue(true);
+    authorization.isAdmin.mockReturnValue(false);
+    authorization.canManageCourse.mockResolvedValue(false);
+    groups.assignmentRequiresSafeExamBrowser.mockImplementation(
+      (metadata) => (metadata as { requireSafeExamBrowser?: boolean } | undefined)?.requireSafeExamBrowser === true
+    );
   });
 
   afterEach(async () => {
@@ -106,6 +116,73 @@ describe("media asset references", () => {
       status: 400
     });
     expect(db.mediaBlob.upsert).not.toHaveBeenCalled();
+  });
+
+  it("requires an active Safe Exam Browser session before delivering protected activity media", async () => {
+    db.mediaAsset.findUnique.mockResolvedValue({
+      id: "asset-1",
+      status: "active",
+      createdById: "teacher-2",
+      expiresAt: null,
+      originalName: "diagram.png",
+      blob: { storageKey: "blobs/diagram", mimeType: "image/png" },
+      references: [{
+        subjectId: null,
+        bankActivityId: null,
+        activityVersionId: null,
+        activity: { id: "activity-1", courseId: "course-1" },
+        testRevision: null,
+        testRevisionItem: null
+      }]
+    });
+    db.courseGroupActivity.findMany.mockResolvedValue([{ activityId: "activity-1", groupId: "group-1" }]);
+    groups.getGroupAssignedActivity.mockResolvedValue({
+      assignment: { metadata: { assessmentMode: "summative", requireSafeExamBrowser: true } }
+    });
+    const hasSafeExamBrowserAccess = vi.fn().mockResolvedValue(false);
+
+    await expect(getMediaAssetForDelivery(
+      { id: "student-1", roles: ["student"] } as never,
+      "asset-1",
+      { hasSafeExamBrowserAccess }
+    )).rejects.toMatchObject({ status: 403 });
+    expect(hasSafeExamBrowserAccess).toHaveBeenCalledWith({
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1"
+    });
+  });
+
+  it("delivers protected activity media after Safe Exam Browser access is established", async () => {
+    const storageKey = `blobs/sha256/${"a".repeat(2)}/${"b".repeat(2)}/${"c".repeat(64)}`;
+    await mkdir(path.dirname(path.join(storageRoot, storageKey)), { recursive: true });
+    await writeFile(path.join(storageRoot, storageKey), "test");
+    db.mediaAsset.findUnique.mockResolvedValue({
+      id: "asset-1",
+      status: "active",
+      createdById: "teacher-2",
+      expiresAt: null,
+      originalName: "diagram.png",
+      blob: { storageKey, mimeType: "image/png" },
+      references: [{
+        subjectId: null,
+        bankActivityId: null,
+        activityVersionId: null,
+        activity: { id: "activity-1", courseId: "course-1" },
+        testRevision: null,
+        testRevisionItem: null
+      }]
+    });
+    db.courseGroupActivity.findMany.mockResolvedValue([{ activityId: "activity-1", groupId: "group-1" }]);
+    groups.getGroupAssignedActivity.mockResolvedValue({
+      assignment: { metadata: { assessmentMode: "summative", requireSafeExamBrowser: true } }
+    });
+
+    await expect(getMediaAssetForDelivery(
+      { id: "student-1", roles: ["student"] } as never,
+      "asset-1",
+      { hasSafeExamBrowserAccess: vi.fn().mockResolvedValue(true) }
+    )).resolves.toMatchObject({ byteSize: 4, mimeType: "image/png", originalName: "diagram.png" });
   });
 
   it("restricts the maintenance dashboard to administrators", async () => {

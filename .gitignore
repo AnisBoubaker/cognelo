@@ -16,3 +16,4 @@ packages/db/generated
 packages/plugin-activities/*/src/generated
 storage
 /tmp/
+/apps/web/public/_vendor/monaco/

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getGroupAssignedActivity: vi.fn(),
+  requireSafeExamBrowserAccess: vi.fn(),
   requireUser: vi.fn()
 }));
 
@@ -15,6 +16,8 @@ vi.mock("@/lib/http", () => ({
   options: () => new Response(null, { status: 204 }),
   requireUser: mocks.requireUser
 }));
+
+vi.mock("@/lib/safe-exam-browser", () => ({ requireSafeExamBrowserAccess: mocks.requireSafeExamBrowserAccess }));
 
 const { GET } = await import("./route");
 
@@ -32,6 +35,13 @@ describe("assigned group activity detail route", () => {
 
     await expect(response.json()).resolves.toEqual({ activity: { id: "activity-1", title: "Assigned" } });
     expect(mocks.getGroupAssignedActivity).toHaveBeenCalledWith(
+      { id: "teacher-1", roles: ["teacher"] },
+      "course-1",
+      "group-1",
+      "activity-1"
+    );
+    expect(mocks.requireSafeExamBrowserAccess).toHaveBeenCalledWith(
+      expect.any(Request),
       { id: "teacher-1", roles: ["teacher"] },
       "course-1",
       "group-1",

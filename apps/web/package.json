@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare:monaco": "node ./scripts/prepare-monaco-assets.mjs",
+    "predev": "npm run prepare:monaco",
     "dev": "next dev -p 3000",
+    "prebuild": "npm run prepare:monaco",
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "eslint .",

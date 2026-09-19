@@ -13,6 +13,7 @@ import {
   submitTestItemAttemptResult
 } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
+import { requireSafeExamBrowserAccess } from "@/lib/safe-exam-browser";
 
 type Params = { params: Promise<{ courseId: string; groupId: string; activityId: string }> };
 
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, groupId, activityId } = await params;
+    await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId);
     const input = inputSchema.parse(await readJson(request));
     const runtime = await getTestRuntime(user, courseId, groupId, activityId, "attempt", input.sessionId);
     if (!runtime.attempt || runtime.attempt.id !== input.parentAttemptId || runtime.attempt.lifecycle !== "started") {

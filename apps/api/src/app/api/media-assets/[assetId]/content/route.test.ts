@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createReadStream: vi.fn(),
   getMediaAssetForDelivery: vi.fn(),
+  hasSafeExamBrowserAccess: vi.fn(),
   requireUser: vi.fn()
 }));
 
@@ -11,6 +12,10 @@ vi.mock("node:fs", () => ({ createReadStream: mocks.createReadStream }));
 
 vi.mock("@cognelo/core", () => ({
   getMediaAssetForDelivery: mocks.getMediaAssetForDelivery
+}));
+
+vi.mock("@/lib/safe-exam-browser", () => ({
+  hasSafeExamBrowserAccess: mocks.hasSafeExamBrowserAccess
 }));
 
 vi.mock("@/lib/http", () => ({
@@ -39,7 +44,8 @@ describe("media asset content route", () => {
 
     expect(mocks.getMediaAssetForDelivery).toHaveBeenCalledWith(
       { id: "teacher-1", roles: ["teacher"] },
-      "asset-1"
+      "asset-1",
+      { hasSafeExamBrowserAccess: expect.any(Function) }
     );
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(response.headers.get("content-type")).toBe("image/png");

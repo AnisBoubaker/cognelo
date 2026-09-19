@@ -16,6 +16,7 @@ export * from "./groups";
 export * from "./materials";
 export * from "./media-assets";
 export * from "./plugins";
+export * from "./safe-exam-browser";
 export * from "./subjects";
 export * from "./tests";
 export * from "./test-execution";

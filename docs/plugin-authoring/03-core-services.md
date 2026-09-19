@@ -93,6 +93,8 @@ Route matching is fail-closed: every `PluginRouteDefinition` must explicitly lis
 
 Cookie-authenticated unsafe requests are protected centrally by an exact `Origin`/`CORS_ORIGIN` match, including JSON and multipart plugin mutations. Do not bypass the generic dispatcher or invent a weaker plugin-local CORS/CSRF path.
 
+Assigned summative activities may require Safe Exam Browser. The host assigned-activity dispatcher validates the activity-scoped SEB access session before resolving or invoking plugin code, and the shared draft/Test/submission/media routes do the same. Plugins should continue registering normal assigned routes and first-party media through the shared media service, and must not inspect SEB user-agent strings, Config Keys, or cookies themselves. A plugin route mounted outside the shared assigned dispatcher would need an equivalent host-level access check and therefore requires a platform review.
+
 That context includes:
 
 - the current user

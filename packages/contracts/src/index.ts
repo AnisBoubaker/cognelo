@@ -663,6 +663,7 @@ export const CourseAllGroupsActivityAssignmentInputSchema = z.object({
   availableUntil: z.string().datetime().nullable().optional(),
   enablePerGroupSettings: z.boolean().optional().default(true),
   assessmentMode: AssignedActivityAssessmentModeSchema.optional().default("formative"),
+  requireSafeExamBrowser: z.boolean().optional().default(false),
   gradebookSettings: GradebookItemSettingsInputSchema.optional(),
   contentPlacement: CourseContentPlacementInputSchema.optional()
 });

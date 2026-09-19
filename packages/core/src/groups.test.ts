@@ -144,6 +144,7 @@ const {
   getCourseMaterialForGroupDownload,
   getGroupAssignedActivity,
   hideCourseMaterialForGroup,
+  listGroupActivityAssignments,
   listCourseGroups,
   removeActivityFromAllCourseGroupsPolicy,
   updateGroupActivityAssignment
@@ -195,6 +196,14 @@ describe("group services", () => {
     mockPrisma.test.findFirst.mockResolvedValue({
       items: [{ activity: { title: "Knowledge check", activityType: { key: "mcq" } } }]
     });
+  });
+
+  it("keeps the full group assignment listing manager-only", async () => {
+    authMocks.assertCanManageCourse.mockRejectedValueOnce({ status: 403 });
+
+    await expect(listGroupActivityAssignments(studentUser, "course-1", "group-1"))
+      .rejects.toMatchObject({ status: 403 });
+    expect(mockPrisma.courseGroupActivity.findMany).not.toHaveBeenCalled();
   });
 
   it("creates groups as drafts with the creator as a teacher participant", async () => {
@@ -456,6 +465,23 @@ describe("group services", () => {
 
     expect(tx.courseGroupActivity.upsert).not.toHaveBeenCalled();
     expect(tx.gradebookItem.upsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects requiring Safe Exam Browser for a formative course-wide assignment", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      courseId: "course-1",
+      activityType: { key: "mcq" }
+    });
+
+    await expect(
+      assignActivityToAllCourseGroups(teacherUser, "course-1", "activity-1", {
+        assessmentMode: "formative",
+        requireSafeExamBrowser: true
+      })
+    ).rejects.toMatchObject({ status: 400, code: "SAFE_EXAM_BROWSER_SUMMATIVE_ONLY" });
+
+    expect(tx.courseGroupActivity.upsert).not.toHaveBeenCalled();
   });
 
   it("rejects assigning a Test whose child plugin has not opted into composite execution", async () => {
@@ -986,6 +1012,22 @@ describe("group services", () => {
         metadata: { assessmentMode: "formative" }
       })
     ).rejects.toMatchObject({ status: 400, code: "TEST_SUMMATIVE_ONLY" });
+  });
+
+  it("rejects requiring Safe Exam Browser for a formative group assignment", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      courseId: "course-1",
+      activityType: { key: "mcq" }
+    });
+
+    await expect(
+      assignActivityToGroup(teacherUser, "course-1", "group-1", {
+        activityId: "activity-1",
+        metadata: { assessmentMode: "formative", requireSafeExamBrowser: true }
+      })
+    ).rejects.toMatchObject({ status: 400, code: "SAFE_EXAM_BROWSER_SUMMATIVE_ONLY" });
   });
 
   it("assigns a Test as one summative group activity with one gradebook item", async () => {

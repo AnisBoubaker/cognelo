@@ -3,6 +3,7 @@ import { z } from "zod";
 import { resolveCompositeExecutionActionHandler } from "@cognelo/activity-sdk/server";
 import { AppError, assertActivityTypePluginEnabled, getTestItemExecutionContext } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
+import { requireSafeExamBrowserAccess } from "@/lib/safe-exam-browser";
 
 type Params = {
   params: Promise<{
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, groupId, activityId, testItemId, action } = await params;
+    await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId);
     const input = inputSchema.parse(await readJson(request));
     const context = await getTestItemExecutionContext(
       user,

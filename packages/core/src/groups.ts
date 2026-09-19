@@ -31,6 +31,7 @@ type CourseWideAssignmentMetadata = {
   availableUntil?: string | null;
   enablePerGroupSettings?: boolean;
   assessmentMode?: "formative" | "summative";
+  requireSafeExamBrowser?: boolean;
   gradebookSettings?: GradebookItemSettingsInput;
   contentPlacement?: CourseWideContentPlacement;
 };
@@ -102,11 +103,27 @@ export async function getCourseGroup(user: CurrentUser, courseId: string, groupI
           .map((item) => item.courseGroupActivityId)
           .filter((id): id is string => typeof id === "string")
       );
+  const visibleActivities = visibleAssignmentIds
+    ? group.activities.filter((assignment) => visibleAssignmentIds.has(assignment.id))
+    : group.activities;
   return {
     ...group,
-    activities: visibleAssignmentIds
-      ? group.activities.filter((assignment) => visibleAssignmentIds.has(assignment.id))
-      : group.activities,
+    activities: isManager
+      ? visibleActivities
+      : visibleActivities.map((assignment) => assignmentRequiresSafeExamBrowser(assignment.metadata)
+        ? {
+            ...assignment,
+            config: {},
+            activity: {
+              ...assignment.activity,
+              description: "",
+              config: {},
+              metadata: {},
+              bankActivity: null,
+              activityVersion: null
+            }
+          }
+        : assignment),
     participants: isManager ? group.participants : group.participants.filter((participant) => participant.userId === user.id),
     hiddenCourseMaterialIds: group.hiddenCourseMaterials.map((entry) => entry.courseMaterialId)
   };
@@ -145,6 +162,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   validateAvailability(data.availableFrom, data.availableUntil);
   const activity = await assertActivityBelongsToCourse(courseId, activityId);
   assertTestAssignmentIsSummative(activity, data.assessmentMode);
+  assertSafeExamBrowserIsSummative(data.assessmentMode, data.requireSafeExamBrowser);
   await assertTestReadyForCompositeExecution(courseId, activity);
   const availableFrom = parseDateInput(data.availableFrom);
   const availableUntil = parseDateInput(data.availableUntil);
@@ -163,6 +181,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
             availableUntil: data.availableUntil ?? null,
             enablePerGroupSettings: data.enablePerGroupSettings,
             assessmentMode: data.assessmentMode,
+            ...(data.requireSafeExamBrowser ? { requireSafeExamBrowser: true } : {}),
             ...(gradebookSettings ? { gradebookSettings } : {}),
             ...(data.contentPlacement ? { contentPlacement: data.contentPlacement } : {})
           }
@@ -184,7 +203,11 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
       groups.map((group) => {
         const existingAssignment = group.activities.find((assignment) => assignment.activityId === activityId);
         const nextPosition = existingAssignment?.position ?? group.activities.length;
-        const groupAssignmentMetadata = buildCourseWideGroupAssignmentMetadata(data.enablePerGroupSettings, data.assessmentMode);
+        const groupAssignmentMetadata = buildCourseWideGroupAssignmentMetadata(
+          data.enablePerGroupSettings,
+          data.assessmentMode,
+          data.requireSafeExamBrowser
+        );
         return tx.courseGroupActivity
           .upsert({
             where: {
@@ -499,7 +522,8 @@ export async function unhideCourseMaterialForGroup(user: CurrentUser, courseId: 
 }
 
 export async function listGroupActivityAssignments(user: CurrentUser, courseId: string, groupId: string) {
-  await assertCanViewGroup(user, courseId, groupId);
+  await assertCanManageCourse(user, courseId);
+  await assertGroupBelongsToCourse(courseId, groupId);
   return prisma.courseGroupActivity.findMany({
     where: { groupId },
     include: {
@@ -551,6 +575,22 @@ export async function getGroupAssignedActivity(user: CurrentUser, courseId: stri
       metadata: assignment.metadata,
       position: assignment.position
     }
+  };
+}
+
+export async function getGroupAssignedActivityAccess(
+  user: CurrentUser,
+  courseId: string,
+  groupId: string,
+  activityId: string
+) {
+  const activity = await getGroupAssignedActivity(user, courseId, groupId, activityId);
+  return {
+    activityId: activity.id,
+    assignmentId: activity.assignment.id,
+    title: activity.title,
+    requiresSafeExamBrowser: assignmentRequiresSafeExamBrowser(activity.assignment.metadata),
+    canBypass: isAdmin(user) || (await canManageCourse(user, courseId))
   };
 }
 
@@ -744,6 +784,7 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
   const data = CourseGroupActivityInputSchema.parse(input);
   const activity = await assertActivityBelongsToCourse(courseId, data.activityId);
   assertTestAssignmentIsSummative(activity, data.metadata.assessmentMode);
+  assertSafeExamBrowserIsSummative(data.metadata.assessmentMode, data.metadata.requireSafeExamBrowser);
   await assertTestReadyForCompositeExecution(courseId, activity);
   validateAvailability(data.availableFrom, data.availableUntil);
 
@@ -819,6 +860,8 @@ export async function updateGroupActivityAssignment(
     assignment.activity,
     data.metadata !== undefined ? data.metadata.assessmentMode : asMetadataRecord(assignment.metadata).assessmentMode
   );
+  const effectiveMetadata = data.metadata !== undefined ? data.metadata : asMetadataRecord(assignment.metadata);
+  assertSafeExamBrowserIsSummative(effectiveMetadata.assessmentMode, effectiveMetadata.requireSafeExamBrowser);
   if (isCourseWideGroupAssignment(assignment.metadata) && !isAllowedCourseWideGroupAssignmentUpdate(data, assignment.metadata)) {
     throw new AppError(400, "COURSE_WIDE_GROUP_ACTIVITY_LOCKED", "This activity is assigned to all groups from the course.");
   }
@@ -882,7 +925,11 @@ async function createCourseWideAssignmentsForGroup(
       activityId: activity.id,
       availableFrom: parseDateInput(rule.availableFrom),
       availableUntil: parseDateInput(rule.availableUntil),
-      metadata: buildCourseWideGroupAssignmentMetadata(rule.enablePerGroupSettings ?? true, assessmentMode),
+      metadata: buildCourseWideGroupAssignmentMetadata(
+        rule.enablePerGroupSettings ?? true,
+        assessmentMode,
+        rule.requireSafeExamBrowser ?? false
+      ),
       position: index
     };
   });
@@ -1078,6 +1125,16 @@ function assertTestAssignmentIsSummative(
   }
 }
 
+function assertSafeExamBrowserIsSummative(assessmentMode: unknown, requireSafeExamBrowser: unknown) {
+  if (requireSafeExamBrowser === true && assessmentMode !== "summative") {
+    throw new AppError(
+      400,
+      "SAFE_EXAM_BROWSER_SUMMATIVE_ONLY",
+      "Safe Exam Browser can only be required for a summative activity."
+    );
+  }
+}
+
 async function assertTestReadyForCompositeExecution(
   courseId: string,
   activity: { id: string; activityType?: { key: string } | null }
@@ -1195,12 +1252,24 @@ function buildGradebookItemSettingsData(settings: GradebookItemSettingsInput) {
   };
 }
 
-function buildCourseWideGroupAssignmentMetadata(enablePerGroupSettings: boolean, assessmentMode: "formative" | "summative"): Prisma.InputJsonValue {
+function buildCourseWideGroupAssignmentMetadata(
+  enablePerGroupSettings: boolean,
+  assessmentMode: "formative" | "summative",
+  requireSafeExamBrowser: boolean
+): Prisma.InputJsonValue {
   return {
     assignmentScope: COURSE_WIDE_ASSIGNMENT_SCOPE,
     enablePerGroupSettings,
-    assessmentMode
+    assessmentMode,
+    ...(requireSafeExamBrowser ? { requireSafeExamBrowser: true } : {})
   };
+}
+
+export function assignmentRequiresSafeExamBrowser(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  return (value as Record<string, unknown>).requireSafeExamBrowser === true;
 }
 
 function isCourseWideGroupAssignment(value: Prisma.JsonValue | undefined) {

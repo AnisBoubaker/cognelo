@@ -39,6 +39,7 @@ export default defineConfig([
     "**/node_modules/**",
     "**/out/**",
     "**/src/generated/**",
+    "apps/web/public/_vendor/**",
     "tmp/**"
   ])
 ]);
