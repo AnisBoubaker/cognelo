@@ -507,6 +507,16 @@ First plugin integration target:
 - Add external student ID support in exports.
 - Add course-level research-consent model and first-access consent flow.
 
+### Planned AI Feedback, Grading, And Grade Challenges
+
+The future cross-plugin design is tracked in `docs/AI_FEEDBACK_GRADING_CHALLENGES_IMPLEMENTATION_PLAN.md`.
+
+- Formative AI feedback starts immediately when the learner submits the formative activity.
+- Summative AI feedback/grading never starts automatically on submission or through the background-job worker. An authorized teacher explicitly starts it from the gradebook/review workflow.
+- Plugins own feedback configuration, rubric/model prompting, structured result validation, sanitized feedback, and deterministic/AI score composition.
+- Core retains normal attempts, grades, release, overrides, and audit events, and will add the course-wide grade-challenge workflow.
+- Append-only research capture is part of the initial implementation scope and must retain trigger identity, model/rubric/prompt versions, separate deterministic and AI grading components, failures/retries, visibility timing, and challenge outcomes.
+
 ## Testing Strategy
 
 Core service tests:

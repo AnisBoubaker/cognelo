@@ -37,6 +37,8 @@ packages/
 docs/
   ARCHITECTURE.md      Durable architecture notes
   PROJECT_MEMORY.md    Platform-level memory for future sessions
+  AI_FEEDBACK_GRADING_CHALLENGES_IMPLEMENTATION_PLAN.md
+                       Planned plugin-provided AI feedback, teacher-triggered summative grading, research data, and grade challenges
   STUDENT_MODEL_IMPLEMENTATION_PLAN.md
                        Planned stable skills, learning evidence, mastery projection, and product rollout
 ```
