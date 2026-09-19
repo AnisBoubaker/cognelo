@@ -109,13 +109,28 @@ export async function runJudge0Submission(input: Judge0SubmissionInput): Promise
   }
 
   const result = (await response.json()) as Judge0EncodedSubmissionResponse;
-  return {
+  const decodedResult = {
     ...result,
     stdout: decodeJudge0Text(result.stdout),
     stderr: decodeJudge0Text(result.stderr),
     compile_output: decodeJudge0Text(result.compile_output),
     message: decodeJudge0Text(result.message)
   };
+
+  if (decodedResult.status?.id === 13) {
+    console.error("Judge0 returned an internal sandbox error.", {
+      token: decodedResult.token,
+      status: decodedResult.status.description,
+      message: decodedResult.message
+    });
+    throw new AppError(
+      503,
+      "JUDGE0_INTERNAL_ERROR",
+      "The code execution service encountered an internal sandbox error. Please try again."
+    );
+  }
+
+  return decodedResult;
 }
 
 function encodeJudge0Text(value: string | undefined): string | undefined {

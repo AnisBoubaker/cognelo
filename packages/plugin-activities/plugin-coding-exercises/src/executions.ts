@@ -11,6 +11,7 @@ import {
   type CodingExerciseSampleTest
 } from "./coding-exercises";
 import { Prisma, prisma } from "./db-client";
+import { isCodingExerciseOperationalFailure } from "./execution-results";
 import { resolveJudge0Language, runJudge0Submission } from "./judge0";
 import {
   compareCodingExerciseOutput,
@@ -301,6 +302,10 @@ export async function listCodingExerciseAttemptHistory(params: {
       continue;
     }
 
+    if (isCodingExerciseOperationalFailure(record)) {
+      continue;
+    }
+
     attempts.push({
       submission: record,
       runs: currentRuns
@@ -322,9 +327,11 @@ export async function listCodingExerciseReviewExecutions(params: { activityId: s
   });
   const seen = new Set<string>();
   return executions.flatMap((execution) => {
+    const record = toCodingExerciseExecutionRecord(execution);
+    if (isCodingExerciseOperationalFailure(record)) return [];
     if (seen.has(execution.userId)) return [];
     seen.add(execution.userId);
-    return [toCodingExerciseExecutionRecord(execution)];
+    return [record];
   });
 }
 
