@@ -22,6 +22,7 @@ services:
       - judge0-redis
     volumes:
       - ./infra/judge0/judge0.conf:/judge0.conf:ro
+      - ./infra/judge0/isolate.dev.conf:/usr/local/etc/isolate:ro
     ports:
       - "2358:2358"
     privileged: true
@@ -39,6 +40,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - ./infra/judge0/judge0.conf:/judge0.conf:ro
+      - ./infra/judge0/isolate.dev.conf:/usr/local/etc/isolate:ro
     privileged: true
     restart: unless-stopped
 

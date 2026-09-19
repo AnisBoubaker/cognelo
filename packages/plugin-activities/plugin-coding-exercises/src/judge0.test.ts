@@ -87,4 +87,28 @@ describe("Judge0 client", () => {
 
     await expect(runJudge0Submission({ languageId: 71, sourceCode: "print('ok')" })).rejects.toThrow("Judge0 request failed");
   });
+
+  it("surfaces Judge0 internal errors as service failures instead of grading results", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      Response.json({
+        token: "submission-internal-error",
+        message: Buffer.from("No such file or directory @ rb_sysopen - /box/main.c", "utf8").toString("base64"),
+        status: { id: 13, description: "Internal Error" }
+      })
+    );
+
+    await expect(runJudge0Submission({ languageId: 50, sourceCode: "int main(void) { return 0; }" })).rejects.toMatchObject({
+      status: 503,
+      code: "JUDGE0_INTERNAL_ERROR"
+    });
+    expect(consoleError).toHaveBeenCalledWith(
+      "Judge0 returned an internal sandbox error.",
+      expect.objectContaining({
+        token: "submission-internal-error",
+        status: "Internal Error",
+        message: "No such file or directory @ rb_sysopen - /box/main.c"
+      })
+    );
+  });
 });

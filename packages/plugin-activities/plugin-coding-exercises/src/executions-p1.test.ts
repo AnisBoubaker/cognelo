@@ -178,6 +178,7 @@ vi.mock("./judge0", () => judge0Mocks);
 const {
   listCodingExerciseAttemptHistory,
   listRecentCodingExerciseExecutions,
+  listCodingExerciseReviewExecutions,
   runCodingExercise,
   submitCodingExercise,
   validateReferenceSolutionAgainstHiddenTests
@@ -584,12 +585,66 @@ describe("coding exercise executions", () => {
     });
   });
 
+  it("ignores operational failures when selecting each learner's latest review submission", async () => {
+    dbMocks.prisma.pluginCodingExerciseExecution.findMany.mockResolvedValueOnce([
+      dbMocks.executionRow({
+        id: "student-1-infrastructure-error",
+        userId: "student-1",
+        kind: "submit",
+        status: "failed",
+        judge0StatusId: 13,
+        resultSummary: { phase: "finished", tests: [{ statusId: 13 }] },
+        createdAt: new Date("2026-05-14T12:06:00.000Z")
+      }),
+      dbMocks.executionRow({
+        id: "student-1-completed",
+        userId: "student-1",
+        kind: "submit",
+        status: "completed",
+        resultSummary: { phase: "finished" },
+        createdAt: new Date("2026-05-14T12:05:00.000Z")
+      }),
+      dbMocks.executionRow({
+        id: "student-2-completed",
+        userId: "student-2",
+        kind: "submit",
+        status: "completed",
+        resultSummary: { phase: "finished" },
+        createdAt: new Date("2026-05-14T12:04:00.000Z")
+      })
+    ]);
+
+    await expect(
+      listCodingExerciseReviewExecutions({ activityId: "activity-1", userIds: ["student-1", "student-2"] })
+    ).resolves.toEqual([
+      expect.objectContaining({ id: "student-1-completed", userId: "student-1" }),
+      expect.objectContaining({ id: "student-2-completed", userId: "student-2" })
+    ]);
+  });
+
   it("groups every completed submission with the runs that preceded it", async () => {
     dbMocks.prisma.pluginCodingExerciseExecution.findMany.mockResolvedValueOnce([
       dbMocks.executionRow({ id: "run-1", createdAt: new Date("2026-05-14T12:01:00.000Z") }),
       dbMocks.executionRow({ id: "run-2", createdAt: new Date("2026-05-14T12:02:00.000Z") }),
       dbMocks.executionRow({ id: "submit-1", kind: "submit", status: "completed", sourceCode: "first", createdAt: new Date("2026-05-14T12:03:00.000Z") }),
       dbMocks.executionRow({ id: "run-3", createdAt: new Date("2026-05-14T12:04:00.000Z") }),
+      dbMocks.executionRow({
+        id: "submit-current-infrastructure-error",
+        kind: "submit",
+        status: "failed",
+        sourceCode: "retry-me",
+        resultSummary: { phase: "failed-before-result" },
+        createdAt: new Date("2026-05-14T12:04:15.000Z")
+      }),
+      dbMocks.executionRow({
+        id: "submit-legacy-infrastructure-error",
+        kind: "submit",
+        status: "failed",
+        sourceCode: "retry-me-too",
+        judge0StatusId: 13,
+        resultSummary: { phase: "finished", tests: [{ statusId: 13 }] },
+        createdAt: new Date("2026-05-14T12:04:30.000Z")
+      }),
       dbMocks.executionRow({ id: "submit-2", kind: "submit", status: "failed", sourceCode: "second", createdAt: new Date("2026-05-14T12:05:00.000Z") }),
       dbMocks.executionRow({ id: "run-current", createdAt: new Date("2026-05-14T12:06:00.000Z") })
     ]);

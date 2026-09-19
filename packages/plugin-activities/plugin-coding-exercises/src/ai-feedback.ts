@@ -10,6 +10,7 @@ import {
 } from "@cognelo/core";
 import type { PluginAiFeedbackResult, ServerActivityRecord } from "@cognelo/activity-sdk/server";
 import { parseCodingExerciseConfig, parseCodingExercisePrivateConfig } from "./coding-exercises";
+import { isCodingExerciseOperationalFailure } from "./execution-results";
 import { prisma, type Prisma } from "./db-client";
 
 const promptVersion = "coding-exercise-feedback-v1";
@@ -77,6 +78,13 @@ export async function evaluateCodingExerciseAttemptWithAi(input: {
   }
   if (!execution) {
     throw new AppError(404, "CODING_EXERCISE_EXECUTION_NOT_FOUND", "The coding exercise submission was not found.");
+  }
+  if (isCodingExerciseOperationalFailure(execution)) {
+    throw new AppError(
+      503,
+      "CODING_EXERCISE_RESULT_UNAVAILABLE",
+      "This submission was interrupted by the code execution service and cannot be graded. Delete the invalid attempt and ask the learner to submit again."
+    );
   }
   const privateConfig = execution.aiFeedbackConfigSnapshot
     ? parseCodingExercisePrivateConfig({ aiFeedback: execution.aiFeedbackConfigSnapshot })
