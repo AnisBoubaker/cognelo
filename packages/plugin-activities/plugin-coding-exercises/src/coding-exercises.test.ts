@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   alignCodingExerciseStarterCodeToTemplate,
+  balanceCodingExerciseAiRubricCriterionWeights,
   buildCodingExerciseSource,
   buildCodingExerciseStudentTemplateSource,
   buildCodingExerciseTemplateSource,
   codingExerciseHiddenTestsInputSchema,
+  createCodingExerciseAiRubricCriterionId,
   codingExerciseTemplateRequiresTestCodeMarker,
   getJudge0LanguageCandidates,
+  getCodingExerciseAiFeedbackValidationMessages,
   parseCodingExerciseConfig,
   parseCodingExercisePrivateConfig,
   splitCodingExerciseTemplateSource
@@ -76,6 +79,42 @@ describe("coding exercise config and template helpers", () => {
         criteria: [{ id: "quality", title: "Quality", description: "Readable and maintainable code.", weightPercent: 100 }]
       }
     }).aiFeedback).toMatchObject({ enabled: true, gradingEnabled: true, testWeightPercent: 60, aiWeightPercent: 40 });
+  });
+
+  it("reports incomplete rubric drafts before they are sent to the API", () => {
+    expect(getCodingExerciseAiFeedbackValidationMessages({
+      enabled: true,
+      gradingEnabled: true,
+      rubricName: "",
+      rubricVersion: "",
+      instructions: "",
+      testWeightPercent: 60,
+      aiWeightPercent: 40,
+      criteria: []
+    })).toEqual(expect.arrayContaining([
+      "A rubric name is required when AI feedback is enabled.",
+      "A rubric version is required when AI feedback is enabled.",
+      "Feedback instructions are required when AI feedback is enabled.",
+      "At least one rubric criterion is required when AI feedback is enabled."
+    ]));
+  });
+
+  it("creates unique criterion ids and keeps editor-generated weights at 100 percent", () => {
+    const criteria = [
+      { id: "criterion-1", title: "One", description: "First", weightPercent: 50 },
+      { id: "criterion-3", title: "Three", description: "Third", weightPercent: 50 }
+    ];
+    const generatedId = createCodingExerciseAiRubricCriterionId(criteria);
+    expect(generatedId).toMatch(/^criterion-/);
+    expect(criteria.map((criterion) => criterion.id)).not.toContain(generatedId);
+    expect(balanceCodingExerciseAiRubricCriterionWeights([
+      ...criteria,
+      { id: generatedId, title: "Two", description: "Second", weightPercent: 1 }
+    ])).toEqual([
+      { ...criteria[0], weightPercent: 34 },
+      { ...criteria[1], weightPercent: 33 },
+      { id: generatedId, title: "Two", description: "Second", weightPercent: 33 }
+    ]);
   });
 
   it("builds runnable source by injecting student and test code into the template", () => {
