@@ -1,0 +1,402 @@
+# AI Feedback, Grading, And Grade Challenges Implementation Plan
+
+This document records the agreed direction for plugin-provided AI feedback ("retroaction"), AI-assisted grading, and student challenges before implementation begins.
+
+Status: planning only. None of the behavior in this document is implemented yet.
+
+## Terminology
+
+- **AI feedback** is the student-facing retroaction produced from a submitted activity.
+- **AI grading** means that some or all of the activity grade is calculated from that feedback evaluation.
+- **Feedback challenge** or **grade challenge** is a student's formal contestation of released AI feedback that influenced a grade.
+- Coding Homework Grader's existing generated **challenge questions** are a separate pedagogical workflow and must not be renamed or reused as grade challenges.
+
+English product copy should prefer **AI feedback** and **Grade challenge**. French product copy should use **Rétroaction par IA** and **Contestation de la rétroaction/note**.
+
+## Goals
+
+- Let an activity plugin opt into AI feedback and, separately, AI grading.
+- Use an AI model selected and enabled for the course; students never supply the grading model or credentials.
+- Require complete plugin-specific feedback configuration whenever AI feedback is enabled on an activity.
+- Generate formative feedback immediately after the learner submits the formative activity.
+- Require an explicit teacher action to start summative AI feedback/grading.
+- Keep summative AI feedback hidden from the student until the gradebook item is released.
+- Let plugins decide whether AI feedback affects grading and how it combines with deterministic grading.
+- Preserve deterministic grading where it is authoritative, especially MCQ answer-key grading.
+- Let a student challenge any released AI feedback that contributed to an automatic grade.
+- Give teachers one course-wide challenge queue with a response and audited grade-adjustment workflow.
+- Retain reproducible, privacy-aware data for educational research, model evaluation, audit, and later student-model evidence work.
+
+## Effective Enablement
+
+AI feedback is effective only when every required layer is satisfied:
+
+```text
+course AI feedback switch is enabled
++ course feedback/grading model is selected and available
++ activity plugin declares AI feedback support
++ course activity enables AI feedback
++ the plugin validates the complete activity feedback configuration
+= effective AI feedback
+```
+
+The activity-level configuration applies to the course activity and therefore to every section/group where that activity is assigned. Per-section feedback rubrics or weights are not part of the initial scope.
+
+Bank activities may contain reusable plugin-owned feedback configuration. The plugin must copy that configuration into independent course-owned rows when the activity is added to a course, using the existing lifecycle hooks. Later bank changes must not modify the course copy.
+
+Enabling AI feedback without a complete rubric, instructions, output contract, or grading policy must fail validation. A disabled activity may retain a draft configuration, but it must not generate feedback or influence grades.
+
+## Course AI Settings
+
+Course settings should add a dedicated assessment-feedback policy under **AI settings**:
+
+- `automaticFeedbackEnabled`
+- `assessmentFeedbackAiAgentConnectionId`
+
+The setting reuses existing personal/global `AiAgentConnection` records and server-side credential handling. It should remain separate from `studentSupportAiAgentConnectionId`: a support assistant and a grading model have different cost, accountability, reproducibility, and change-control requirements. A teacher may deliberately select the same connection for both purposes.
+
+The course UI should:
+
+- require an accessible enabled model before the master switch can be enabled;
+- show how many course activities have valid AI feedback configuration;
+- explain that formative feedback runs on submission while summative evaluation waits for a teacher;
+- show a clear ineffective/configuration warning when an activity enables feedback but the course gate is disabled or its model is unavailable.
+
+The model is always resolved server-side. Provider keys, raw credentials, private prompts, hidden rubrics, reference answers, and unrestricted model output must never be sent to students.
+
+## Trigger And Execution Policy
+
+### Formative Activities
+
+- The learner's explicit formative submission starts AI feedback immediately.
+- The plugin submission route directly invokes the feedback evaluation workflow; it is not waiting for a teacher action or a scheduled scan.
+- The student UI may show a generating state while the model call runs and presents the feedback as soon as it completes.
+- Formative feedback remains plugin-owned analytics/research data and does not create a core gradebook grade.
+- Retrying a failed formative evaluation must be explicit and idempotent.
+
+### Summative Activities
+
+- Student submission stores the immutable submission and leaves it awaiting AI evaluation when the activity needs AI feedback or AI grading.
+- Submission must not automatically enqueue or run summative AI grading.
+- A teacher starts AI evaluation from the gradebook/review surface, for one attempt, selected attempts, or a bounded batch.
+- The initial implementation must not use the shared `BackgroundJob` worker to start or execute summative AI grading. The teacher action invokes the grading route directly and the UI remains responsible for showing progress and individual failures.
+- Do not add a scheduled scanner, submission-triggered job, or silent automatic retry for summative grading.
+- If later scale requires asynchronous execution, that is a new design decision requiring explicit approval. It must preserve teacher initiation and must not turn summative grading into submission-triggered automation.
+- A teacher may retry a failed evaluation. Each retry creates a new immutable evaluation version and supersedes the previous result; it never overwrites research or audit history.
+- The teacher can review generated feedback and the score breakdown before grade release.
+- Student-safe summative AI feedback is exposed only after the associated `GradebookItem` is released.
+
+Teacher-triggered batch grading must process each attempt independently. One provider or parsing failure must not erase successful results for other attempts. Batch size, request timeout, cancellation, and retry UX must be finalized before implementation.
+
+## Responsibility Boundary
+
+### Core Platform Responsibilities
+
+- course enablement and model selection;
+- secure course model resolution;
+- common activity capability and server result contracts;
+- attempt, grade, release, override, and `GradeEvent` lifecycle;
+- normalized, append-only cross-plugin research events;
+- course-wide grade-challenge persistence, authorization, APIs, and queue;
+- common student challenge status and teacher resolution controls;
+- generic visibility rules preventing unreleased summative feedback disclosure;
+- cross-plugin research export boundaries and consent filtering.
+
+### Activity Plugin Responsibilities
+
+- declaring AI feedback and AI-grading capabilities;
+- activity-level enablement and required configuration validation;
+- plugin-owned bank/course configuration and lifecycle copying;
+- immutable per-attempt snapshots of the effective rubric and grading configuration;
+- selecting the submission artifacts and context sent to the model;
+- prompt construction, prompt versioning, model-output schema validation, and bounded retries;
+- generation of a sanitized student-facing feedback result;
+- deciding whether AI feedback affects the grade;
+- composing deterministic and AI-derived grading components;
+- detailed immutable evaluation artifacts, including private raw model output;
+- plugin-specific student feedback and teacher review renderers;
+- plugin-specific granular learning/research signals where available.
+
+## Proposed Plugin Contracts
+
+Exact TypeScript names remain provisional, but activity definitions need capabilities distinct from existing deterministic automatic grading:
+
+- `supportsAiFeedback`
+- `supportsAiFeedbackGrading`
+- student feedback renderer key
+- teacher feedback review renderer key
+
+Server plugins need an evaluation handler that receives an immutable attempt/submission context plus the resolved course model and returns a validated result resembling:
+
+```ts
+type PluginAiFeedbackResult = {
+  feedbackVersion: string;
+  studentFeedback: {
+    summary?: string;
+    criteria?: Array<{
+      key: string;
+      title: string;
+      feedback: string;
+      awarded?: number;
+      possible?: number;
+    }>;
+  };
+  gradingContribution?: {
+    rawScore: number;
+    rawMaxScore: number;
+    weightPercent: number;
+  };
+  analyticsPayload?: Record<string, unknown>;
+  researchPayload?: Record<string, unknown>;
+};
+```
+
+The browser must receive only the sanitized result. Raw provider responses, grading prompts, hidden rubrics, reference solutions, hidden tests, and teacher-only rationale remain plugin-private.
+
+## Grading Semantics
+
+### Programming Exercise Example
+
+A programming exercise may configure:
+
+```text
+deterministic hidden tests: 60%
+AI rubric evaluation:       40%
+```
+
+The plugin must validate that component weights total 100%. It stores the deterministic test result, criterion-level AI result, combined raw score, and full configuration/model snapshots. If the AI portion fails, Cognelo must not silently grade the learner on only the deterministic 60%; the attempt remains submitted and needs grading until the teacher retries or records a manual grade.
+
+### MCQ Example
+
+MCQ answer-key grading remains deterministic and authoritative. AI feedback may explain errors or suggest study areas, but it does not change the MCQ score. Because the AI result did not influence the grade, the mandatory AI-grade challenge workflow does not apply. Summative MCQ feedback is still teacher-triggered and release-gated; formative MCQ feedback is generated on submission.
+
+### Regrading
+
+- Retrying the same failed model call uses the attempt's immutable rubric/configuration snapshot.
+- An explicit regrade with revised activity settings or another model creates a new result version and a `regraded` core grade event.
+- Previous model outputs, parsed results, feedback, scores, and grade snapshots remain available for audit and research.
+- Releasing, hiding, regrading, and challenging a grade are separate events; one must not overwrite another's history.
+
+## Feedback Visibility
+
+- Formative feedback is visible immediately after successful generation.
+- Summative feedback can be visible to authorized teachers before release.
+- Summative student endpoints must omit the feedback until the gradebook item is released.
+- Existing provisional-score behavior for repeatable summative activities does not automatically expose the AI narrative or private rubric.
+- A release action should surface pending/failed required feedback. The initial implementation must define whether release is blocked or requires an explicit teacher override; it must never silently claim that configured feedback is complete.
+- Student-facing result envelopes must remain sanitized and must not include provider prompts, raw responses, model credentials, hidden tests, or other learners' material.
+
+## Grade Challenges
+
+Core should own a generic `GradeChallenge` model because the teacher needs one queue across every participating plugin.
+
+Provisional fields:
+
+- course, group/section, activity, gradebook item, participant, and attempt IDs;
+- grade ID and grade-event ID where applicable;
+- plugin key and immutable plugin feedback reference/version/hash;
+- released-grade snapshot at challenge creation;
+- mandatory student explanation;
+- status: `open`, `upheld`, or `adjusted`;
+- mandatory teacher response when resolved;
+- resolver user and resolution timestamp;
+- resulting grade/event snapshot when adjusted;
+- timestamps and bounded metadata.
+
+Rules:
+
+- Only released AI feedback that contributed to grading can be challenged.
+- A student can create one challenge for each immutable feedback version.
+- The explanation is required and becomes read-only after submission.
+- A challenge does not reopen the activity attempt or permit another submission.
+- Authorized course owners, teachers, and TAs can review challenges within their grading scope.
+- Resolving a challenge requires a teacher response.
+- The teacher may uphold the result or change the final normalized grade through the existing override service.
+- A grade adjustment writes the normal audited override event with the challenge ID in metadata.
+- The student sees the challenge, status, teacher response, and resulting grade while reviewing the relevant answer/attempt.
+- Re-evaluating challenged work creates a new immutable feedback version rather than modifying the contested artifact.
+
+The course workspace receives a manager-only **Challenges** tab with open/resolved filters plus activity, section, and student filters. The detail view combines the core challenge record with the plugin-provided submission/feedback review renderer.
+
+## Compound Test Behavior
+
+Core Tests are always summative, so their AI feedback never runs automatically on Test submission.
+
+- Test submission stores deterministic child results and any child states needed for AI evaluation.
+- A teacher starts AI evaluation for the parent Test/selected attempts from the gradebook.
+- Each participating child plugin evaluates its own item and returns its component result.
+- Required AI-graded children must finish before the parent Test grade is recomputed.
+- Child feedback remains hidden until the parent Test gradebook item is released.
+- A grade challenge belongs to the released parent grade while identifying the child feedback version being contested.
+- Test revisions must snapshot child AI feedback configuration and private grading data before attempts begin.
+
+## Research And Audit Data
+
+Research capture is a requirement of the first implementation, not a later optional analytics phase.
+
+Use two complementary layers:
+
+1. Each plugin stores detailed immutable evaluation artifacts needed to reproduce and analyze its feedback and grading behavior.
+2. Core stores a normalized append-only AI-feedback research event envelope so cross-plugin and cross-activity studies do not require interpreting every plugin table.
+
+### Required Plugin-Owned Evaluation Data
+
+For every formative or summative evaluation, retain where applicable:
+
+- stable evaluation ID and version;
+- course, group/section, activity, participant, user, attempt, and plugin-submission references;
+- formative or summative assessment mode;
+- trigger kind: `formative_submission`, `teacher_single`, `teacher_selection`, or `teacher_batch`;
+- triggering teacher for summative work;
+- activity, plugin, rubric, grading-policy, prompt-template, and feedback-schema versions;
+- hashes plus immutable snapshots of the effective rubric and grading configuration;
+- AI provider, model, connection reference, and model parameters safe for audit;
+- request start/end timestamps, latency, retry count, and terminal status;
+- provider request/response identifiers and token/usage data when available;
+- raw provider response in access-controlled plugin storage;
+- validated parsed response and validation/retry diagnostics;
+- sanitized student-facing feedback;
+- criterion-level scores and feedback;
+- deterministic grading components used by the plugin;
+- AI grading contribution and configured weight;
+- combined raw score returned to core;
+- core grade/grade-event reference where one exists;
+- whether and when feedback became visible to the student;
+- teacher review, retry, regrade, manual adjustment, and release references;
+- failure category without exposing secrets in ordinary logs.
+
+### Required Core Research Events
+
+Core should record normalized append-only events for at least:
+
+- feedback requested;
+- feedback generation succeeded or failed;
+- summative AI grading started by a teacher;
+- AI grading recorded;
+- feedback released/hidden;
+- feedback viewed by the student, when product instrumentation supports it;
+- challenge opened;
+- challenge upheld;
+- challenge adjusted;
+- AI regrade performed;
+- manual replacement/override performed.
+
+The normalized event should include stable references, timestamps, assessment mode, trigger kind, model/rubric/prompt versions or hashes, grading contribution, outcome status, and bounded plugin-provided research metadata. It must not copy complete submissions, hidden tests, provider credentials, unrestricted raw prompts, or raw model responses into core.
+
+### Research Integrity
+
+- Records are append-only. Retries, regrades, manual overrides, and challenge resolutions supersede prior interpretations but do not delete the original observations.
+- Research timestamps must distinguish submission, teacher trigger, model request, model response, grade recording, release, student view, challenge, and resolution.
+- Deterministic and AI-derived score components must remain separately queryable.
+- Formative evaluations must be researchable even though they create no core grade.
+- Summative records must preserve who initiated the AI evaluation.
+- Failed, cancelled, invalid, and retried evaluations are part of the dataset and must not be discarded as noise.
+- The attempt's immutable skill mapping may later receive validated learning-evidence signals, but research events and student-model evidence remain separate contracts.
+- Gradebook late penalties and grade-selection strategy must not be confused with the raw demonstrated outcome or AI rubric score.
+
+### Privacy, Consent, And Export
+
+- Provider credentials and secrets are never research data.
+- Raw submissions, raw model prompts/responses, and hidden grading artifacts remain permission-restricted and are excluded from ordinary exports by default.
+- Research exports should support identifiable and pseudonymized/anonymized forms, external student IDs, and course/participant consent filtering when the planned consent model is implemented.
+- Withdrawing research consent affects research export eligibility, not operational grading/audit retention.
+- Access to identifiable evaluation and challenge data follows course grading authorization.
+- Retention, deletion, and anonymization rules must be documented before production research export is enabled.
+- Logs must not become an uncontrolled duplicate of research records or sensitive model content.
+
+## Failure And Safety Rules
+
+- Model output must be validated against a strict plugin schema before it can affect a grade.
+- Invalid output receives only bounded, recorded correction retries.
+- No grade may be calculated from malformed, partial, or unvalidated AI output.
+- Summative evaluation failures remain teacher-visible and retryable; students see no hidden partial feedback.
+- Formative failures show a safe retry/error state without exposing provider details.
+- Repeated teacher requests must be idempotent and must not duplicate a grade or research event for the same evaluation version.
+- Student-controlled text must be treated as untrusted model input. Plugins must delimit it and must not give the grading model tools or unrestricted data access.
+- The model may use only the context explicitly authorized by the plugin and course configuration.
+
+## Proposed Delivery Order
+
+### Phase 0 — Confirm The Contract
+
+- Confirm course settings, trigger semantics, visibility, direct teacher execution, challenge rules, and research fields.
+- Confirm whether grade release is blocked by required feedback failures.
+- Confirm bounded batch size and timeout behavior for direct teacher-triggered grading.
+
+### Phase 1 — Shared Platform Foundation
+
+- Extend course AI settings and contracts.
+- Add activity/plugin AI-feedback capabilities and server result contracts.
+- Add normalized AI-feedback research events and ingestion validation.
+- Add shared authorization and visibility helpers.
+- Add common feedback result/challenge DTOs.
+
+### Phase 2 — Programming Exercise Pilot
+
+- Add plugin-owned bank/course feedback configuration, rubrics, and copy/sync hooks.
+- Add formative submission-triggered feedback.
+- Add teacher-triggered standalone summative evaluation.
+- Add configurable deterministic-test/AI-rubric weighting.
+- Snapshot all grading inputs and record detailed research artifacts.
+- Add student and teacher feedback renderers.
+
+### Phase 3 — Grade Challenges
+
+- Add the core challenge schema and migration.
+- Add student create/read APIs and activity review panel.
+- Add the course Challenges tab, filters, detail view, and manager APIs.
+- Integrate teacher response, grade override, audit, and research events.
+
+### Phase 4 — MCQ Feedback
+
+- Add activity-level AI feedback configuration.
+- Keep deterministic MCQ grading unchanged.
+- Add formative submission-triggered explanations.
+- Add teacher-triggered summative explanations hidden until release.
+- Record evaluation/research data without marking MCQ as AI-graded.
+
+### Phase 5 — Compound Test Integration
+
+- Snapshot child feedback configuration in Test revisions.
+- Add teacher-triggered evaluation of supported children.
+- Recompute parent grades only after required child AI grading completes.
+- Add release-safe child feedback and challenge targeting.
+
+### Phase 6 — Hardening And Research Export
+
+- Add full retry/idempotency/concurrency coverage.
+- Add identifiable and privacy-filtered research exports.
+- Add operational metrics for failures, latency, model usage, and pending teacher grading.
+- Add cross-plugin E2E coverage and production documentation.
+- Update the student-model evidence plan if AI rubric dimensions become learning-evidence signals.
+
+## Verification Requirements
+
+- Activity save rejects enabled but incomplete feedback configuration.
+- Course enablement rejects an unavailable or inaccessible model.
+- Formative submission starts feedback without teacher intervention.
+- Summative submission never starts AI evaluation automatically.
+- Only an authorized teacher action starts summative evaluation.
+- Summative grading does not use the background-job worker.
+- AI feedback stays hidden from students before release.
+- Deterministic MCQ grading is unchanged by feedback generation or failure.
+- Weighted programming grades preserve deterministic and AI components separately.
+- Invalid/failed AI output cannot create a partial or silent grade.
+- Retry and regrade preserve earlier evaluation versions and research events.
+- Students can challenge only their own released AI-graded feedback.
+- Teacher resolution requires a response and records any grade change through the audited override path.
+- Course challenge filters and authorization are enforced server-side.
+- Research records cover successful, failed, retried, released, viewed, challenged, and adjusted evaluations.
+- Raw prompts, responses, hidden tests, credentials, and other students' data never appear in student DTOs or ordinary research exports.
+- Compound Tests expose child feedback only through the released parent result.
+
+## Open Decisions Before Implementation
+
+- Whether summative release is blocked while required AI feedback is pending/failed, or whether a teacher may explicitly release with a documented override.
+- Maximum number of attempts in one direct teacher-triggered batch.
+- Request timeout/cancellation behavior for direct bulk grading without a background worker.
+- Whether teachers may edit generated student-facing feedback before release, and how edited text is represented in research history.
+- Whether a teacher changes only the final normalized grade during challenge resolution or can also replace individual plugin rubric-component scores.
+- Whether a regrade after release is immediately visible or requires a hide/re-release cycle.
+- Retention and anonymization periods for raw provider responses and submitted artifacts.
+
