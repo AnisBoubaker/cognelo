@@ -207,6 +207,37 @@ export async function getCourseStudentSupportAiAgentConnection(user: CurrentUser
   return connection;
 }
 
+export async function getCourseAssessmentFeedbackAiAgentConnection(user: CurrentUser, courseId: string) {
+  await assertCanViewCourse(user, courseId);
+  const course = await prisma.course.findUnique({ where: { id: courseId }, select: { metadata: true } });
+  if (!course) {
+    throw notFound("Course");
+  }
+
+  const metadata = asMetadataRecord(course.metadata);
+  const aiSettings = asMetadataRecord(metadata.aiSettings);
+  if (aiSettings.automaticFeedbackEnabled !== true) {
+    throw new AppError(409, "AI_FEEDBACK_DISABLED", "Automatic assessment feedback is disabled for this course.");
+  }
+  const connectionId = typeof aiSettings.assessmentFeedbackAiAgentConnectionId === "string"
+    ? aiSettings.assessmentFeedbackAiAgentConnectionId
+    : null;
+  if (!connectionId) {
+    throw new AppError(409, "AI_FEEDBACK_MODEL_NOT_CONFIGURED", "No AI agent is configured for assessment feedback in this course.");
+  }
+
+  const connection = await prisma.aiAgentConnection.findFirst({
+    where: { id: connectionId, isEnabled: true }
+  });
+  if (!connection) {
+    throw notFound("AI agent connection");
+  }
+  if (!connection.apiKey && connection.provider !== "ollama") {
+    throw new AppError(400, "AI_AGENT_KEY_MISSING", "The selected AI agent connection does not have an API key.");
+  }
+  return connection;
+}
+
 export async function generateQuestionAuthoringText(
   user: CurrentUser,
   input: {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useNotifications } from "@cognelo/activity-ui";
+import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { createCodingHomeworkGraderClient, type CodingHomeworkGradebookAttemptRecord } from "@cognelo/plugin-coding-homework-grader";
 import { createMcqClient, type McqSubmission } from "@cognelo/plugin-mcq";
 import { createParsonsClient, type ParsonsGradebookAttemptRecord } from "@cognelo/plugin-parsons";
@@ -316,6 +317,65 @@ export default function GradebookActivityResultsPage() {
     }
   }
 
+  async function generateAiFeedbackForRow(row: CourseGradebookRow) {
+    const attempt = row.attempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber)
+      ?? [...row.attempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted");
+    if (!attempt) {
+      notifications.error(t("courseDetail.aiFeedbackUnavailable"));
+      return;
+    }
+    if (!window.confirm(t("courseDetail.aiFeedbackConfirm", { name: row.participantName }))) return;
+    setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:ai-feedback`);
+    try {
+      await api.generateActivityAttemptAiFeedback(courseId, attempt.id);
+      await refresh();
+      notifications.success(t("courseDetail.aiFeedbackGenerated"));
+    } catch (err) {
+      notifications.error(err instanceof Error ? err.message : t("courseDetail.aiFeedbackError"));
+    } finally {
+      setSavingGradeKey(null);
+    }
+  }
+
+  async function generateAiFeedbackForAllRows() {
+    const eligible = groupedRows.flatMap((row) => {
+      if (!supportsAiFeedback(row.activityTypeKey)) return [];
+      const attempt = row.attempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber)
+        ?? [...row.attempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted");
+      return attempt ? [{ row, attempt }] : [];
+    });
+    if (!eligible.length) {
+      notifications.error(t("courseDetail.aiFeedbackUnavailable"));
+      return;
+    }
+    if (!window.confirm(t("courseDetail.aiFeedbackAllConfirm", { count: eligible.length }))) return;
+    setSavingGradeKey("__all:ai-feedback");
+    try {
+      let completed = 0;
+      const failedNames: string[] = [];
+      for (const { row, attempt } of eligible) {
+        try {
+          await api.generateActivityAttemptAiFeedback(courseId, attempt.id, { triggerKind: "teacher_batch" });
+          completed += 1;
+        } catch {
+          failedNames.push(row.participantName);
+        }
+      }
+      await refresh();
+      if (completed) notifications.success(t("courseDetail.aiFeedbackGenerated"));
+      if (failedNames.length) {
+        notifications.error(t("courseDetail.aiFeedbackBatchFailed", {
+          count: failedNames.length,
+          names: failedNames.join(", ")
+        }));
+      }
+    } catch (err) {
+      notifications.error(err instanceof Error ? err.message : t("courseDetail.aiFeedbackError"));
+    } finally {
+      setSavingGradeKey(null);
+    }
+  }
+
   async function gradeTestItem(row: CourseGradebookRow, parentAttemptId: string, testItemId: string, score: number, reason: string | null) {
     try {
       await api.gradeTestItem(courseId, parentAttemptId, testItemId, { score, reason });
@@ -439,6 +499,11 @@ export default function GradebookActivityResultsPage() {
               <button className="button secondary" disabled={savingGradeKey === "__all:regrade"} type="button" onClick={() => void regradeAllRows()}>
                 {savingGradeKey === "__all:regrade" ? t("common.saving") : t("courseDetail.regradeAll")}
               </button>
+              {supportsAiFeedback(rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? "") ? (
+                <button className="button secondary" disabled={savingGradeKey === "__all:ai-feedback"} type="button" onClick={() => void generateAiFeedbackForAllRows()}>
+                  {savingGradeKey === "__all:ai-feedback" ? t("common.saving") : t("courseDetail.generateAiFeedbackAll")}
+                </button>
+              ) : null}
               {hasRowsWithSubmittedAttempts ? (
                 <Link
                   className="button secondary"
@@ -472,6 +537,7 @@ export default function GradebookActivityResultsPage() {
                   onOpenReview={(row) => openManualGrading(row, "review")}
                   onOpenManualGrading={(row) => openManualGrading(row, "grade")}
                   onRegrade={regradeRow}
+                  onGenerateAiFeedback={generateAiFeedbackForRow}
                   t={t}
                 />
               ))}
@@ -562,6 +628,7 @@ function GradebookStudentRow({
   onOpenManualGrading,
   onOpenReview,
   onRegrade,
+  onGenerateAiFeedback,
   t
 }: {
   manualGradingAvailable: boolean;
@@ -570,6 +637,7 @@ function GradebookStudentRow({
   onOpenManualGrading: (row: CourseGradebookRow) => Promise<void>;
   onOpenReview: (row: CourseGradebookRow) => Promise<void>;
   onRegrade: (row: CourseGradebookRow) => Promise<void>;
+  onGenerateAiFeedback: (row: CourseGradebookRow) => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const rowHasSubmittedAttempt = hasSubmittedAttempt(row);
@@ -585,6 +653,16 @@ function GradebookStudentRow({
       <strong>{rowHasSubmittedAttempt || row.score !== null ? formatGradebookScore(row.score, row.maxScore) : t("courseDetail.didNotSubmit")}</strong>
       <span className="table-meta muted">{row.submittedAttemptCount}</span>
       <div className="table-actions">
+        {supportsAiFeedback(row.activityTypeKey) ? (
+          <button
+            className="button secondary"
+            disabled={!rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:ai-feedback`}
+            type="button"
+            onClick={() => onGenerateAiFeedback(row)}
+          >
+            {t("courseDetail.generateAiFeedback")}
+          </button>
+        ) : null}
         {manualGradingAvailable ? (
           <button className="button secondary" disabled={!rowHasSubmittedAttempt} type="button" onClick={() => onOpenReview(row)}>
             {t("courseDetail.reviewGrade")}
@@ -626,6 +704,10 @@ function normalizeCodingTestResults(value: unknown): Array<{ testId: string; nam
 
 function hasSubmittedAttempt(row: CourseGradebookRow) {
   return row.attempts.some((attempt) => attempt.lifecycle === "graded" || attempt.lifecycle === "submitted");
+}
+
+function supportsAiFeedback(activityTypeKey: string) {
+  return getActivityDefinition(activityTypeKey)?.grading?.supportsAiFeedback === true;
 }
 
 

@@ -127,6 +127,31 @@ export type PluginGradingHandler = (input: {
   activity: ServerActivityRecord;
 }) => Promise<PluginGradingResult>;
 
+export type PluginAiFeedbackResult = {
+  feedbackRef: string;
+  feedbackVersion: number;
+  feedbackHash: string;
+  feedback: Record<string, unknown>;
+  gradingResult?: PluginGradingResult;
+};
+
+export type PluginAiFeedbackHandler = (input: {
+  user: CurrentUser;
+  courseId: string;
+  groupId: string;
+  activityId: string;
+  coreAttemptId: string;
+  pluginAttemptRef?: string | null;
+  activity: ServerActivityRecord;
+  triggerKind: "teacher_single" | "teacher_selection" | "teacher_batch" | "formative_submission" | "test_child";
+  testItemAttempt?: {
+    id: string;
+    parentAttemptId: string;
+    pluginAttemptRef: string | null;
+    state: Record<string, unknown>;
+  };
+}) => Promise<PluginAiFeedbackResult>;
+
 export type CompositeExecutionSubmissionHandler = (input: {
   user: CurrentUser;
   courseId: string;
@@ -155,6 +180,9 @@ export type ServerActivityPlugin = {
   routes?: readonly PluginRouteDefinition[];
   grading?: {
     gradeAttempt?: PluginGradingHandler;
+  };
+  aiFeedback?: {
+    evaluateAttempt: PluginAiFeedbackHandler;
   };
   compositeExecution?: {
     activityTypeKeys: readonly string[];
@@ -230,6 +258,12 @@ export function resolvePluginGradingHandler(activityTypeKey: string) {
   return serverPlugins.find((plugin) =>
     plugin.grading?.gradeAttempt && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
   )?.grading?.gradeAttempt ?? null;
+}
+
+export function resolvePluginAiFeedbackHandler(activityTypeKey: string) {
+  return serverPlugins.find((plugin) =>
+    plugin.aiFeedback?.evaluateAttempt && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
+  )?.aiFeedback?.evaluateAttempt ?? null;
 }
 
 export function resolveCompositeExecutionSubmissionHandler(activityTypeKey: string) {

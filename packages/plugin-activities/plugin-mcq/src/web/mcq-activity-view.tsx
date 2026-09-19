@@ -41,6 +41,7 @@ type McqActivityViewProps = {
     }>;
     save?: (activityId: string, answers: StudentAnswerState) => Promise<void>;
     submit?: (activityId: string, answers: StudentAnswerState) => Promise<{ submission: { answers: StudentAnswerState } }>;
+    feedback?: (activityId: string, answers: StudentAnswerState) => Promise<Record<string, unknown>>;
   };
   onSubmitted?: () => void;
   studentViewMode?: "attempt" | "previous";
@@ -72,6 +73,8 @@ type McqFormSnapshot = {
   aiQuestionCount: number;
   defaultCodeLanguage: string;
   randomizeChoices: boolean;
+  aiFeedbackEnabled: boolean;
+  aiFeedbackInstructions: string;
 };
 
 const fallbackConfig = {
@@ -79,7 +82,9 @@ const fallbackConfig = {
   aiGenerationInstructions: "",
   aiQuestionCount: 5,
   defaultCodeLanguage: "none",
-  randomizeChoices: false
+  randomizeChoices: false,
+  aiFeedbackEnabled: false,
+  aiFeedbackInstructions: ""
 };
 
 const copyByLocale = {
@@ -134,7 +139,13 @@ const copyByLocale = {
     points: "Points",
     correct: "Correct.",
     incorrect: "Not quite. Review your choices and try again.",
-    missedCorrectAnswer: "Missed correct answer."
+    missedCorrectAnswer: "Missed correct answer.",
+    aiFeedbackSection: "AI assessment feedback",
+    aiFeedbackEnabled: "Enable AI feedback",
+    aiFeedbackInstructions: "Feedback instructions",
+    aiFeedbackHelp: "Formative feedback is generated after Check answers. Summative feedback is started by a teacher and does not change deterministic MCQ grading.",
+    aiFeedbackResult: "AI feedback",
+    aiFeedbackError: "Answers were checked, but AI feedback could not be generated."
   },
   fr: {
     authoringTitle: "Edition des questions a choix multiples",
@@ -187,7 +198,13 @@ const copyByLocale = {
     points: "Points",
     correct: "Correct.",
     incorrect: "Pas tout a fait. Revoyez vos choix et reessayez.",
-    missedCorrectAnswer: "Reponse correcte manquee."
+    missedCorrectAnswer: "Reponse correcte manquee.",
+    aiFeedbackSection: "Rétroaction d’évaluation par IA",
+    aiFeedbackEnabled: "Activer la rétroaction IA",
+    aiFeedbackInstructions: "Consignes de rétroaction",
+    aiFeedbackHelp: "La rétroaction formative est générée après la vérification. La rétroaction sommative est lancée par un enseignant et ne modifie pas la notation déterministe.",
+    aiFeedbackResult: "Rétroaction IA",
+    aiFeedbackError: "Les réponses ont été vérifiées, mais la rétroaction IA n’a pas pu être générée."
   },
   zh: {
     authoringTitle: "选择题编辑",
@@ -240,7 +257,13 @@ const copyByLocale = {
     points: "得分",
     correct: "正确。",
     incorrect: "还不完全正确。请检查选项后再试。",
-    missedCorrectAnswer: "漏选的正确答案。"
+    missedCorrectAnswer: "漏选的正确答案。",
+    aiFeedbackSection: "AI 评估反馈",
+    aiFeedbackEnabled: "启用 AI 反馈",
+    aiFeedbackInstructions: "反馈说明",
+    aiFeedbackHelp: "形成性反馈在检查答案后生成。总结性反馈由教师启动，且不会改变确定性选择题评分。",
+    aiFeedbackResult: "AI 反馈",
+    aiFeedbackError: "答案已检查，但无法生成 AI 反馈。"
   }
 } as const;
 
@@ -274,6 +297,9 @@ export function McqActivityView({
   const [source, setSource] = useState(String(activity.config?.source ?? fallbackConfig.source));
   const [generationCodeLanguage, setGenerationCodeLanguage] = useState(String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage));
   const [randomizeChoices, setRandomizeChoices] = useState(Boolean(activity.config?.randomizeChoices ?? fallbackConfig.randomizeChoices));
+  const [aiFeedbackEnabled, setAiFeedbackEnabled] = useState(Boolean(activity.config?.aiFeedbackEnabled ?? fallbackConfig.aiFeedbackEnabled));
+  const [aiFeedbackInstructions, setAiFeedbackInstructions] = useState(String(activity.config?.aiFeedbackInstructions ?? fallbackConfig.aiFeedbackInstructions));
+  const [aiFeedback, setAiFeedback] = useState<Record<string, unknown> | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState<McqFormSnapshot>(() => snapshotFromActivity(activity));
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -306,6 +332,9 @@ export function McqActivityView({
     setSource(String(activity.config?.source ?? fallbackConfig.source));
     setGenerationCodeLanguage(String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage));
     setRandomizeChoices(Boolean(activity.config?.randomizeChoices ?? fallbackConfig.randomizeChoices));
+    setAiFeedbackEnabled(Boolean(activity.config?.aiFeedbackEnabled ?? fallbackConfig.aiFeedbackEnabled));
+    setAiFeedbackInstructions(String(activity.config?.aiFeedbackInstructions ?? fallbackConfig.aiFeedbackInstructions));
+    setAiFeedback(null);
     setSavedSnapshot(snapshotFromActivity(activity));
     setStudentAnswers({});
     setSubmitted(false);
@@ -350,9 +379,11 @@ export function McqActivityView({
       aiGenerationInstructions: aiInstructions,
       aiQuestionCount: questionCount,
       defaultCodeLanguage: generationCodeLanguage,
-      randomizeChoices
+      randomizeChoices,
+      aiFeedbackEnabled,
+      aiFeedbackInstructions
     }),
-    [aiInstructions, description, generationCodeLanguage, questionCount, randomizeChoices, source, title]
+    [aiFeedbackEnabled, aiFeedbackInstructions, aiInstructions, description, generationCodeLanguage, questionCount, randomizeChoices, source, title]
   );
   const hasUnsavedChanges = canManage && !snapshotsEqual(currentSnapshot, savedSnapshot);
 
@@ -444,6 +475,8 @@ export function McqActivityView({
     setQuestionCount(savedSnapshot.aiQuestionCount);
     setGenerationCodeLanguage(savedSnapshot.defaultCodeLanguage);
     setRandomizeChoices(savedSnapshot.randomizeChoices);
+    setAiFeedbackEnabled(savedSnapshot.aiFeedbackEnabled);
+    setAiFeedbackInstructions(savedSnapshot.aiFeedbackInstructions);
     setStudentAnswers({});
     setSubmitted(false);
     setError("");
@@ -463,7 +496,9 @@ export function McqActivityView({
           aiGenerationInstructions: aiInstructions,
           aiQuestionCount: questionCount,
           defaultCodeLanguage: generationCodeLanguage,
-          randomizeChoices
+          randomizeChoices,
+          aiFeedbackEnabled,
+          aiFeedbackInstructions
         }
       });
       setSavedSnapshot({
@@ -473,7 +508,9 @@ export function McqActivityView({
         aiGenerationInstructions: aiInstructions,
         aiQuestionCount: questionCount,
         defaultCodeLanguage: generationCodeLanguage,
-        randomizeChoices
+        randomizeChoices,
+        aiFeedbackEnabled,
+        aiFeedbackInstructions
       });
       notifications.success(copy.saved);
     } catch (err) {
@@ -483,7 +520,7 @@ export function McqActivityView({
     } finally {
       setSaving(false);
     }
-  }, [aiInstructions, copy.saveError, copy.saved, description, generationCodeLanguage, notifications, onSave, questionCount, randomizeChoices, source, title]);
+  }, [aiFeedbackEnabled, aiFeedbackInstructions, aiInstructions, copy.saveError, copy.saved, description, generationCodeLanguage, notifications, onSave, questionCount, randomizeChoices, source, title]);
 
   useUnsavedChangesGuard(
     useMemo(
@@ -571,6 +608,14 @@ export function McqActivityView({
   async function requestSubmitMcqAnswers() {
     if (!isSummativeStudentSession || !submissionClient?.submit) {
       setSubmitted(true);
+      setAiFeedback(null);
+      if (aiFeedbackEnabled && submissionClient?.feedback) {
+        try {
+          setAiFeedback(await submissionClient.feedback(activity.id, studentAnswers));
+        } catch {
+          notifications.error(copy.aiFeedbackError);
+        }
+      }
       return;
     }
     try {
@@ -714,6 +759,30 @@ export function McqActivityView({
           </span>
         </label>
 
+        <section className="inline-panel stack">
+          <div>
+            <h3>{copy.aiFeedbackSection}</h3>
+            <p className="muted">{copy.aiFeedbackHelp}</p>
+          </div>
+          <label className="checkbox-row">
+            <input checked={aiFeedbackEnabled} type="checkbox" onChange={(event) => setAiFeedbackEnabled(event.target.checked)} />
+            <span>{copy.aiFeedbackEnabled}</span>
+          </label>
+          {aiFeedbackEnabled ? (
+            <div className="field">
+              <label htmlFor="mcq-ai-feedback-instructions">{copy.aiFeedbackInstructions}</label>
+              <textarea
+                id="mcq-ai-feedback-instructions"
+                maxLength={4000}
+                required
+                rows={4}
+                value={aiFeedbackInstructions}
+                onChange={(event) => setAiFeedbackInstructions(event.target.value)}
+              />
+            </div>
+          ) : null}
+        </section>
+
         <div className="mcq-authoring-grid">
           <section className="stack mcq-authoring-preview-prompt">
             <h3>{copy.studentPreview}</h3>
@@ -782,7 +851,7 @@ export function McqActivityView({
           cancelLabel={actionCopy.cancel}
           onCancel={discardChanges}
           onSave={saveMcqChanges}
-          saveDisabled={parsedMcq.errors.length > 0 || parsedMcq.questions.length === 0}
+          saveDisabled={parsedMcq.errors.length > 0 || parsedMcq.questions.length === 0 || (aiFeedbackEnabled && !aiFeedbackInstructions.trim())}
         />
 
       </form>
@@ -843,34 +912,48 @@ export function McqActivityView({
         </section>
       ) : null}
       {studentViewMode === "attempt" ? (
-        <McqStudentView
-          studentPrompt={description}
-          parsedMcq={parsedMcq}
-          studentAnswers={studentAnswers}
-          submitted={submitted}
-          showFeedback={(!isSummativeStudentSession && submitted) || (isSummativeStudentSession && submitted && showCorrectAnswers)}
-          score={score}
-          onSubmit={() => void requestSubmitMcqAnswers()}
-          onReset={() => {
-            setStudentAnswers({});
-            setSubmitted(false);
-          }}
-          onSingleChoice={updateSingleChoice}
-          onMultipleChoice={updateMultipleChoice}
-          questionLabel={copy.question}
-          checkAnswersLabel={isSummativeStudentSession ? copy.submitAnswers : copy.checkAnswers}
-          disabled={loadingSubmissionStatus || submitting || submitted || (isSummativeStudentSession && submissionAvailability?.canStart === false)}
-          resetDisabled={loadingSubmissionStatus || (isSummativeStudentSession && (submitted || submissionAvailability?.canStart === false))}
-          resetLabel={copy.reset}
-          scoreLabel={copy.score}
-          pointsLabel={copy.points}
-          correctLabel={copy.correct}
-          incorrectLabel={copy.incorrect}
-          missedCorrectAnswerLabel={copy.missedCorrectAnswer}
-          releasedMaxScore={releasedMaxScore}
-          hideActions={deferSubmission}
-          randomizeChoices={randomizeChoices}
-        />
+        <>
+          <McqStudentView
+            studentPrompt={description}
+            parsedMcq={parsedMcq}
+            studentAnswers={studentAnswers}
+            submitted={submitted}
+            showFeedback={(!isSummativeStudentSession && submitted) || (isSummativeStudentSession && submitted && showCorrectAnswers)}
+            score={score}
+            onSubmit={() => void requestSubmitMcqAnswers()}
+            onReset={() => {
+              setStudentAnswers({});
+              setSubmitted(false);
+              setAiFeedback(null);
+            }}
+            onSingleChoice={updateSingleChoice}
+            onMultipleChoice={updateMultipleChoice}
+            questionLabel={copy.question}
+            checkAnswersLabel={isSummativeStudentSession ? copy.submitAnswers : copy.checkAnswers}
+            disabled={loadingSubmissionStatus || submitting || submitted || (isSummativeStudentSession && submissionAvailability?.canStart === false)}
+            resetDisabled={loadingSubmissionStatus || (isSummativeStudentSession && (submitted || submissionAvailability?.canStart === false))}
+            resetLabel={copy.reset}
+            scoreLabel={copy.score}
+            pointsLabel={copy.points}
+            correctLabel={copy.correct}
+            incorrectLabel={copy.incorrect}
+            missedCorrectAnswerLabel={copy.missedCorrectAnswer}
+            releasedMaxScore={releasedMaxScore}
+            hideActions={deferSubmission}
+            randomizeChoices={randomizeChoices}
+          />
+          {aiFeedback ? (
+            <section className="inline-panel stack">
+              <h3>{copy.aiFeedbackResult}</h3>
+              {typeof aiFeedback.summary === "string" ? <p>{aiFeedback.summary}</p> : null}
+              {Array.isArray(aiFeedback.questionFeedback) ? aiFeedback.questionFeedback.map((entry, index) => {
+                if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+                const value = entry as Record<string, unknown>;
+                return typeof value.explanation === "string" ? <p className="muted" key={index}>{value.explanation}</p> : null;
+              }) : null}
+            </section>
+          ) : null}
+        </>
       ) : null}
       {showSubmitConfirmDialog ? (
         <div className="dialog-backdrop" role="presentation">
@@ -1278,7 +1361,9 @@ function snapshotFromActivity(activity: ActivityLike): McqFormSnapshot {
     aiGenerationInstructions: String(activity.config?.aiGenerationInstructions ?? fallbackConfig.aiGenerationInstructions),
     aiQuestionCount: normalizeQuestionCount(activity.config?.aiQuestionCount),
     defaultCodeLanguage: String(activity.config?.defaultCodeLanguage ?? fallbackConfig.defaultCodeLanguage),
-    randomizeChoices: Boolean(activity.config?.randomizeChoices ?? fallbackConfig.randomizeChoices)
+    randomizeChoices: Boolean(activity.config?.randomizeChoices ?? fallbackConfig.randomizeChoices),
+    aiFeedbackEnabled: Boolean(activity.config?.aiFeedbackEnabled ?? fallbackConfig.aiFeedbackEnabled),
+    aiFeedbackInstructions: String(activity.config?.aiFeedbackInstructions ?? fallbackConfig.aiFeedbackInstructions)
   };
 }
 
@@ -1290,7 +1375,9 @@ function snapshotsEqual(left: McqFormSnapshot, right: McqFormSnapshot) {
     left.aiGenerationInstructions === right.aiGenerationInstructions &&
     left.aiQuestionCount === right.aiQuestionCount &&
     left.defaultCodeLanguage === right.defaultCodeLanguage &&
-    left.randomizeChoices === right.randomizeChoices
+    left.randomizeChoices === right.randomizeChoices &&
+    left.aiFeedbackEnabled === right.aiFeedbackEnabled &&
+    left.aiFeedbackInstructions === right.aiFeedbackInstructions
   );
 }
 

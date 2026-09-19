@@ -5,6 +5,7 @@ import {
   resolveCompositeExecutionActionHandler,
   resolveCompositeExecutionSubmissionHandler,
   resolvePluginGradingHandler,
+  resolvePluginAiFeedbackHandler,
   resolvePluginRoute,
   runBankActivityDeletedHooks,
   runBankActivityDeletedHooksForPlugins,
@@ -88,6 +89,12 @@ describe("server activity SDK", () => {
     expect(resolvePluginGradingHandler("parsons-problem")).toBeTypeOf("function");
     expect(resolvePluginGradingHandler("mcq")).toBeTypeOf("function");
     expect(resolvePluginGradingHandler("placeholder")).toBeNull();
+  });
+
+  it("resolves plugin-owned AI feedback handlers only for supported activity types", () => {
+    expect(resolvePluginAiFeedbackHandler("coding-exercise")).toBeTypeOf("function");
+    expect(resolvePluginAiFeedbackHandler("mcq")).toBeTypeOf("function");
+    expect(resolvePluginAiFeedbackHandler("placeholder")).toBeNull();
   });
 
   it("resolves composite execution handlers by activity type without coupling the Test runtime to a plugin", () => {

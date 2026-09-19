@@ -47,12 +47,54 @@ export const codingExerciseHiddenTestSchema = z.object({
   ...outputMatcherFields
 });
 
+export const codingExerciseAiRubricCriterionSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  title: z.string().trim().min(1).max(160),
+  description: z.string().trim().min(1).max(2000),
+  weightPercent: z.number().int().min(1).max(100)
+});
+
+export const codingExerciseAiFeedbackConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  gradingEnabled: z.boolean().default(false),
+  rubricName: z.string().trim().max(200).default(""),
+  rubricVersion: z.string().trim().max(80).default("1"),
+  instructions: z.string().trim().max(8000).default(""),
+  testWeightPercent: z.number().int().min(0).max(100).default(60),
+  aiWeightPercent: z.number().int().min(0).max(100).default(40),
+  criteria: z.array(codingExerciseAiRubricCriterionSchema).max(20).default([])
+}).superRefine((value, context) => {
+  if (!value.enabled) return;
+  if (!value.rubricName) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["rubricName"], message: "A rubric name is required when AI feedback is enabled." });
+  }
+  if (!value.instructions) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["instructions"], message: "Feedback instructions are required when AI feedback is enabled." });
+  }
+  if (value.criteria.length === 0) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["criteria"], message: "At least one rubric criterion is required when AI feedback is enabled." });
+  }
+  if (new Set(value.criteria.map((criterion) => criterion.id)).size !== value.criteria.length) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["criteria"], message: "Rubric criterion ids must be unique." });
+  }
+  if (value.criteria.reduce((total, criterion) => total + criterion.weightPercent, 0) !== 100) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["criteria"], message: "Rubric criterion weights must total 100%." });
+  }
+  if (value.gradingEnabled && value.testWeightPercent + value.aiWeightPercent !== 100) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["aiWeightPercent"], message: "Test and AI grading weights must total 100%." });
+  }
+  if (value.gradingEnabled && value.aiWeightPercent === 0) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["aiWeightPercent"], message: "The AI grading weight must be greater than zero." });
+  }
+});
+
 export const codingExercisePrivateConfigSchema = z.object({
   hiddenSupportCode: z.string().max(60000).default(""),
   templateSource: z.string().max(120000).default(""),
   templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([]),
   templatePrefix: z.string().max(60000).default(""),
-  templateSuffix: z.string().max(60000).default("")
+  templateSuffix: z.string().max(60000).default(""),
+  aiFeedback: codingExerciseAiFeedbackConfigSchema.default({})
 });
 
 export type CodingExercisePrivateConfig = z.infer<typeof codingExercisePrivateConfigSchema>;

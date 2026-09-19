@@ -92,6 +92,7 @@ export type OverrideGradebookGradeInput = {
 
 export type ActivityAttemptRegradeContext = {
   attemptId: string;
+  lifecycle: string;
   courseId: string;
   groupId: string;
   activityId: string;
@@ -653,6 +654,81 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
   });
 }
 
+export async function recordActivityAttemptAiFeedback(
+  user: CurrentUser,
+  courseId: string,
+  input: {
+    attemptId: string;
+    feedback: Record<string, unknown>;
+    feedbackRef: string;
+    feedbackVersion: number;
+    feedbackHash: string;
+  }
+) {
+  await canManageCourseOrThrow(user, courseId);
+  const attempt = await prisma.activityAttempt.findFirst({
+    where: { id: input.attemptId, courseId },
+    select: { id: true, gradebookItemId: true, participantId: true }
+  });
+  if (!attempt) throw notFound("Activity attempt");
+  const current = await prisma.grade.findUnique({
+    where: {
+      gradebookItemId_participantId: {
+        gradebookItemId: attempt.gradebookItemId,
+        participantId: attempt.participantId
+      }
+    }
+  });
+  if (!current) {
+    throw new AppError(409, "GRADE_REQUIRED_FOR_FEEDBACK", "A deterministic grade must exist before feedback-only AI feedback can be recorded.");
+  }
+  if (current.selectedAttemptId !== attempt.id) {
+    throw new AppError(409, "GRADE_ATTEMPT_NOT_SELECTED", "AI feedback can only be attached to the attempt currently selected for this grade.");
+  }
+  const currentNormalized = asJsonObject(current.normalizedResult) ?? {};
+  const studentFeedback = {
+    ...input.feedback,
+    feedbackRef: input.feedbackRef,
+    feedbackVersion: input.feedbackVersion,
+    feedbackHash: input.feedbackHash,
+    challengeAllowed: false
+  };
+  return prisma.$transaction(async (tx) => {
+    const grade = await tx.grade.update({
+      where: { id: current.id },
+      data: {
+        normalizedResult: {
+          ...currentNormalized,
+          studentFeedback
+        } as JsonInput,
+        metadata: {
+          ...(asJsonObject(current.metadata) ?? {}),
+          aiFeedbackRef: input.feedbackRef,
+          aiFeedbackVersion: input.feedbackVersion
+        } as JsonInput
+      }
+    });
+    await tx.gradeEvent.create({
+      data: {
+        gradeId: grade.id,
+        gradebookItemId: attempt.gradebookItemId,
+        participantId: attempt.participantId,
+        attemptId: attempt.id,
+        actorUserId: user.id,
+        eventType: "ai_feedback_recorded",
+        previousValue: gradeSnapshot(current) as JsonInput,
+        nextValue: gradeSnapshot(grade) as JsonInput,
+        metadata: {
+          feedbackRef: input.feedbackRef,
+          feedbackVersion: input.feedbackVersion,
+          feedbackHash: input.feedbackHash
+        } as JsonInput
+      }
+    });
+    return grade;
+  });
+}
+
 export async function getActivityAttemptRegradeContext(
   user: CurrentUser,
   courseId: string,
@@ -678,6 +754,7 @@ export async function getActivityAttemptRegradeContext(
   const activity = attempt.activity;
   return {
     attemptId: attempt.id,
+    lifecycle: attempt.lifecycle,
     courseId: attempt.courseId,
     groupId: attempt.groupId,
     activityId: attempt.activityId,
@@ -951,6 +1028,14 @@ export async function setGradebookItemRelease(
             select: { id: true }
           }
         }
+      },
+      grades: {
+        select: {
+          id: true,
+          participantId: true,
+          normalizedResult: true,
+          selectedAttempt: { select: { id: true, pluginKey: true, userId: true } }
+        }
       }
     }
   });
@@ -970,8 +1055,8 @@ export async function setGradebookItemRelease(
     });
 
     await Promise.all(
-      item.group.participants.map((participant) =>
-        tx.gradeEvent.create({
+      item.group.participants.map(async (participant) => {
+        await tx.gradeEvent.create({
           data: {
             gradebookItemId: item.id,
             participantId: participant.id,
@@ -987,8 +1072,36 @@ export async function setGradebookItemRelease(
             } as JsonInput,
             createdAt: now
           }
-        })
-      )
+        });
+        const grade = item.grades?.find((candidate) => candidate.participantId === participant.id);
+        const feedbackReferences = findAiFeedbackReferences(grade?.normalizedResult);
+        if (grade && feedbackReferences.length) {
+          await Promise.all(feedbackReferences.map((feedbackReference) => tx.aiFeedbackResearchEvent.create({
+            data: {
+              eventType: input.released ? "feedback_released" : "feedback_hidden",
+              courseId: item.courseId,
+              groupId: item.groupId,
+              activityId: feedbackReference.activityId ?? item.activityId,
+              gradebookItemId: item.id,
+              participantId: participant.id,
+              userId: grade.selectedAttempt?.userId ?? null,
+              attemptId: grade.selectedAttempt?.id ?? null,
+              actorUserId: user.id,
+              pluginKey: feedbackReference.pluginKey ?? grade.selectedAttempt?.pluginKey ?? "core",
+              feedbackRef: feedbackReference.feedbackRef,
+              feedbackVersion: feedbackReference.feedbackVersion,
+              assessmentMode: "summative",
+              triggerKind: "teacher_release",
+              outcome: input.released ? "released" : "hidden",
+              metadata: {
+                gradeId: grade.id,
+                rootActivityId: item.activityId,
+                ...(feedbackReference.testItemId ? { testItemId: feedbackReference.testItemId } : {})
+              } as JsonInput
+            }
+          })));
+        }
+      })
     );
 
     return updated;
@@ -1050,8 +1163,7 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
     orderBy: [{ titleSnapshot: "asc" }]
   });
 
-  return {
-    rows: items.flatMap((item) => {
+  const rows = items.flatMap((item) => {
       const grade = item.grades[0] ?? null;
       const activeAttempts = item.attempts.filter((attempt) => attempt.lifecycle !== "deleted");
       const submittedAttempts = activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
@@ -1084,6 +1196,7 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
         latePenaltyApplied: item.gradesReleased ? effectiveGrade?.latePenaltyApplied ?? false : latestGrade?.latePenaltyApplied ?? false,
         latePenaltyPercent: item.gradesReleased ? effectiveGrade?.latePenaltyPercent ?? null : latestGrade?.latePenaltyPercent ?? null,
         feedback: item.gradesReleased ? sanitizeStudentGradeFeedback(effectiveGrade?.normalizedResult) : sanitizeStudentGradeFeedback(latestGrade?.normalizedResult),
+        selectedAttemptId: item.gradesReleased ? effectiveGrade?.selectedAttemptId ?? null : latestGrade?.attemptId ?? null,
         selectedAttemptNumber: item.gradesReleased ? effectiveGrade?.selectedAttempt?.attemptNumber ?? null : latestGrade?.attemptNumber ?? null,
         attemptCount: activeAttempts.length,
         submittedAttemptCount: submittedAttempts.length,
@@ -1092,8 +1205,61 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
         availableUntil: item.groupActivity.availableUntil?.toISOString() ?? null,
         gradedAt: item.gradesReleased ? effectiveGrade?.gradedAt.toISOString() ?? null : null
       }];
-    })
-  };
+    });
+  return { rows };
+}
+
+export async function recordReleasedAttemptAiFeedbackViewed(user: CurrentUser, courseId: string, attemptId: string) {
+  const attempt = await prisma.activityAttempt.findFirst({
+    where: { id: attemptId, courseId },
+    include: {
+      participant: { select: { userId: true } },
+      gradebookItem: { select: { id: true, gradesReleased: true } }
+    }
+  });
+  if (!attempt) throw notFound("Activity attempt");
+  if (attempt.participant.userId !== user.id) throw forbidden();
+  if (!attempt.gradebookItem.gradesReleased) {
+    throw new AppError(409, "GRADE_NOT_RELEASED", "AI feedback is not visible before grade release.");
+  }
+  const grade = await prisma.grade.findUnique({
+    where: {
+      gradebookItemId_participantId: {
+        gradebookItemId: attempt.gradebookItemId,
+        participantId: attempt.participantId
+      }
+    }
+  });
+  if (!grade || grade.selectedAttemptId !== attempt.id) {
+    throw new AppError(409, "GRADE_ATTEMPT_NOT_SELECTED", "This attempt is not the released grade attempt.");
+  }
+  const references = findAiFeedbackReferences(grade.normalizedResult);
+  await Promise.all(references.map((reference) => prisma.aiFeedbackResearchEvent.create({
+    data: {
+      eventType: "feedback_viewed",
+      courseId,
+      groupId: attempt.groupId,
+      activityId: reference.activityId ?? attempt.activityId,
+      groupActivityId: attempt.groupActivityId,
+      gradebookItemId: attempt.gradebookItemId,
+      participantId: attempt.participantId,
+      userId: user.id,
+      attemptId: attempt.id,
+      actorUserId: user.id,
+      pluginKey: reference.pluginKey ?? attempt.pluginKey,
+      feedbackRef: reference.feedbackRef,
+      feedbackVersion: reference.feedbackVersion,
+      assessmentMode: "summative",
+      triggerKind: "student_feedback_view",
+      outcome: "viewed",
+      metadata: {
+        gradeId: grade.id,
+        rootActivityId: attempt.activityId,
+        ...(reference.testItemId ? { testItemId: reference.testItemId } : {})
+      } as JsonInput
+    }
+  })));
+  return { recorded: references.length };
 }
 
 export async function getStudentActivitySubmissionAudit(user: CurrentUser, courseId: string, groupId: string, activityId: string) {
@@ -1307,6 +1473,43 @@ function sanitizeStudentGradeFeedback(value: unknown) {
     feedbackText,
     details: details ?? {}
   };
+}
+
+function findAiFeedbackReferences(value: unknown): Array<{
+  feedbackRef: string;
+  feedbackVersion: number;
+  activityId: string | null;
+  pluginKey: string | null;
+  testItemId: string | null;
+}> {
+  const root = asJsonObject(value);
+  const feedback = asJsonObject(root?.studentFeedback);
+  if (!feedback) return [];
+  if (typeof feedback.feedbackRef === "string" && typeof feedback.feedbackVersion === "number") {
+    return [{
+      feedbackRef: feedback.feedbackRef,
+      feedbackVersion: feedback.feedbackVersion,
+      activityId: null,
+      pluginKey: null,
+      testItemId: null
+    }];
+  }
+  const details = asJsonObject(feedback.details);
+  const items = Array.isArray(details?.items) ? details.items : [];
+  return items.flatMap((item) => {
+    const itemRecord = asJsonObject(item);
+    const childFeedback = asJsonObject(asJsonObject(itemRecord?.feedback)?.aiFeedback);
+    if (typeof childFeedback?.feedbackRef === "string" && typeof childFeedback.feedbackVersion === "number") {
+      return [{
+        feedbackRef: childFeedback.feedbackRef,
+        feedbackVersion: childFeedback.feedbackVersion,
+        activityId: typeof itemRecord?.activityId === "string" ? itemRecord.activityId : null,
+        pluginKey: typeof itemRecord?.activityTypeKey === "string" ? itemRecord.activityTypeKey : null,
+        testItemId: typeof itemRecord?.testItemId === "string" ? itemRecord.testItemId : null
+      }];
+    }
+    return [];
+  });
 }
 
 function buildManualStudentFeedbackResult(feedbackText: string | null | undefined) {

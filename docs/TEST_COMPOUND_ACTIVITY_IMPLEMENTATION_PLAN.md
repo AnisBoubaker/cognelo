@@ -466,6 +466,8 @@ Coding exercise and web-design coding exercise now opt into composite execution 
 
 Each newly started Test attempt is attached to an immutable revision snapshot. Test duplication creates an independent draft shell and child rows, then invokes plugin duplication hooks for private authoring data. The no-resume policy is enforced with a browser-session identifier; returning in a new session causes the server to reject further child writes and the student shell to finalize the last saved state. A unique `TestSubmissionClaim` ensures that only one concurrent final-submit request runs child graders, while completed retries remain idempotent.
 
+Teacher-triggered AI assessment is integrated at the parent attempt boundary. Test submission never invokes AI. A teacher action dispatches every supported child through its registered AI-feedback handler, skips children whose plugin/activity/course configuration is ineffective, writes child feedback and any AI-derived normalized item score, and then recomputes the ordinary parent grade. Student-safe child feedback remains embedded in the parent normalized result and is therefore hidden until parent release. Every AI-graded child retains its own immutable feedback reference/version; students may challenge each eligible child separately while a teacher grade adjustment still applies through the audited parent-grade override path. Coding-exercise submission rows preserve their private feedback/rubric snapshot for the later Test evaluation, while public child activity state continues to follow the Test revision/attempt snapshot contracts.
+
 ## Verification Strategy
 
 Each phase requires:

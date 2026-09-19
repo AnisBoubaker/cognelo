@@ -231,7 +231,17 @@ export const CourseUpdateSchema = CourseInputSchema.partial().extend({
 export type CourseUpdate = z.infer<typeof CourseUpdateSchema>;
 
 export const CourseSettingsInputSchema = z.object({
-  studentSupportAiAgentConnectionId: z.string().cuid().nullable().optional()
+  studentSupportAiAgentConnectionId: z.string().cuid().nullable().optional(),
+  automaticFeedbackEnabled: z.boolean().optional().default(false),
+  assessmentFeedbackAiAgentConnectionId: z.string().cuid().nullable().optional()
+}).superRefine((value, context) => {
+  if (value.automaticFeedbackEnabled && !value.assessmentFeedbackAiAgentConnectionId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "An assessment-feedback AI agent is required when automatic feedback is enabled.",
+      path: ["assessmentFeedbackAiAgentConnectionId"]
+    });
+  }
 });
 export type CourseSettingsInput = z.infer<typeof CourseSettingsInputSchema>;
 

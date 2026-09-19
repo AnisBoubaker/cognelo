@@ -168,7 +168,13 @@ export async function updateCourse(user: CurrentUser, courseId: string, input: u
 export async function updateCourseSettings(user: CurrentUser, courseId: string, input: unknown) {
   await assertCanManageCourse(user, courseId);
   const data = CourseSettingsInputSchema.parse(input);
-  await assertAiAgentConnectionCanBeSelected(user, data.studentSupportAiAgentConnectionId);
+  const [, assessmentConnection] = await Promise.all([
+    assertAiAgentConnectionCanBeSelected(user, data.studentSupportAiAgentConnectionId),
+    assertAiAgentConnectionCanBeSelected(user, data.assessmentFeedbackAiAgentConnectionId)
+  ]);
+  if (data.automaticFeedbackEnabled && assessmentConnection && !assessmentConnection.apiKey && assessmentConnection.provider !== "ollama") {
+    throw new AppError(400, "AI_AGENT_KEY_MISSING", "The selected assessment-feedback AI agent connection does not have an API key.");
+  }
 
   const course = await prisma.course.findUnique({ where: { id: courseId }, select: { metadata: true } });
   if (!course) {
@@ -179,7 +185,9 @@ export async function updateCourseSettings(user: CurrentUser, courseId: string, 
   const aiSettings = asMetadataRecord(metadata.aiSettings);
   const nextAiSettings = {
     ...aiSettings,
-    studentSupportAiAgentConnectionId: data.studentSupportAiAgentConnectionId ?? null
+    studentSupportAiAgentConnectionId: data.studentSupportAiAgentConnectionId ?? null,
+    automaticFeedbackEnabled: data.automaticFeedbackEnabled,
+    assessmentFeedbackAiAgentConnectionId: data.assessmentFeedbackAiAgentConnectionId ?? null
   };
 
   return prisma.course.update({
@@ -285,7 +293,7 @@ function lastNameFromName(name: string | null) {
 
 async function assertAiAgentConnectionCanBeSelected(user: CurrentUser, connectionId: string | null | undefined) {
   if (!connectionId) {
-    return;
+    return null;
   }
   const connection = await prisma.aiAgentConnection.findFirst({
     where: {
@@ -297,6 +305,7 @@ async function assertAiAgentConnectionCanBeSelected(user: CurrentUser, connectio
   if (!connection) {
     throw notFound("AI agent connection");
   }
+  return connection;
 }
 
 function asMetadataRecord(value: Prisma.JsonValue | undefined): Record<string, Prisma.JsonValue> {

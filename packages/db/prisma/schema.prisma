@@ -109,6 +109,7 @@ enum GradeEventType {
   released
   hidden
   submission_deleted
+  ai_feedback_recorded
 }
 
 enum BackgroundJobStatus {
@@ -1221,4 +1222,120 @@ model GradeEvent {
   @@index([actorUserId])
   @@index([eventType])
   @@index([createdAt])
+}
+
+/// Append-only, platform-normalized research telemetry for AI assessment
+/// feedback. Identifiers are deliberately stored as snapshots instead of
+/// foreign keys so approved research records can survive operational data
+/// retention and plugin cleanup.
+model AiFeedbackResearchEvent {
+  id                 String   @id @default(cuid())
+  eventType          String
+  courseId           String
+  groupId            String?
+  activityId         String
+  groupActivityId    String?
+  gradebookItemId    String?
+  participantId      String?
+  userId             String?
+  attemptId          String?
+  actorUserId        String?
+  pluginKey          String
+  feedbackRef        String?
+  feedbackVersion    Int?
+  assessmentMode     String
+  triggerKind        String
+  provider           String?
+  model              String?
+  rubricVersion      String?
+  promptVersion      String?
+  schemaVersion      String?
+  submissionHash     String?
+  feedbackHash       String?
+  aiContribution     Float?
+  outcome            String?
+  metadata           Json     @default("{}")
+  createdAt          DateTime @default(now())
+
+  @@index([courseId, createdAt])
+  @@index([activityId, createdAt])
+  @@index([attemptId, createdAt])
+  @@index([participantId, createdAt])
+  @@index([feedbackRef, feedbackVersion])
+  @@index([eventType, createdAt])
+}
+
+/// A student challenge targets one immutable AI-feedback version. Like the
+/// research stream, the important identifiers and grade snapshots are kept as
+/// values so the audit trail remains intelligible if source records are later
+/// removed under their own retention policy.
+model GradeChallenge {
+  id                    String   @id @default(cuid())
+  courseId              String
+  groupId               String
+  activityId            String
+  groupActivityId       String?
+  gradebookItemId       String
+  participantId         String
+  userId                 String?
+  attemptId              String
+  gradeId                String?
+  gradeEventId           String?
+  pluginKey              String
+  feedbackRef            String
+  feedbackVersion        Int
+  feedbackHash           String?
+  releasedGradeSnapshot  Json
+  explanation            String
+  status                 String   @default("open")
+  teacherResponse        String?
+  resolvedByUserId       String?
+  resolvedAt             DateTime?
+  resultingGradeSnapshot Json?
+  metadata               Json     @default("{}")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([feedbackRef, feedbackVersion, participantId])
+  @@index([courseId, status, createdAt])
+  @@index([activityId, createdAt])
+  @@index([attemptId])
+  @@index([participantId, createdAt])
+  @@index([resolvedByUserId])
+}
+
+model PluginMcqAiEvaluation {
+  id                String   @id @default(cuid())
+  activityId        String
+  coreAttemptId     String?
+  courseId          String
+  groupId           String
+  participantId     String?
+  userId            String
+  createdByUserId   String
+  assessmentMode    String
+  triggerKind       String
+  status            String
+  version           Int
+  promptVersion     String
+  schemaVersion     String
+  provider          String
+  model             String
+  connectionId      String
+  requestPayload    Json
+  rawResponse       String?
+  parsedResponse    Json?
+  sanitizedFeedback Json?
+  submissionHash    String
+  feedbackHash      String?
+  latencyMs         Int?
+  error             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([activityId, coreAttemptId, version])
+  @@index([activityId, createdAt])
+  @@index([coreAttemptId, createdAt])
+  @@index([courseId, createdAt])
+  @@index([participantId, createdAt])
 }

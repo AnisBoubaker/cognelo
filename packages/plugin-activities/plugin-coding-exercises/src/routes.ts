@@ -4,6 +4,7 @@ import {
   assertCanManageActivityBank,
   assertCanManageCourse,
   clearActivityResponseDraft,
+  getCourseAssessmentFeedbackPolicy,
   getActivityAttemptAvailability,
   recordActivityAttemptGradingResult,
   startActivityAttempt,
@@ -33,6 +34,9 @@ import {
   replaceCodingExerciseHiddenTests
 } from "./hidden-tests";
 import { prisma, type Prisma } from "@cognelo/db";
+import { prisma as codingExercisePrisma } from "./db-client";
+import { parseCodingExercisePrivateConfig } from "./coding-exercises";
+import { evaluateCodingExerciseAttemptWithAi } from "./ai-feedback";
 
 function requireCourseId(courseId: string | undefined) {
   if (!courseId) {
@@ -176,6 +180,13 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
         activityConfig: context.activity.config,
         input
       });
+      const aiFeedbackSetup = await getEffectiveCodingExerciseAiFeedbackSetup(context);
+      await codingExercisePrisma.pluginCodingExerciseExecution.update({
+        where: { id: execution.id },
+        data: { aiFeedbackConfigSnapshot: aiFeedbackSetup.config }
+      });
+      let aiFeedback: Awaited<ReturnType<typeof evaluateCodingExerciseAttemptWithAi>> | null = null;
+      let aiFeedbackError: string | null = null;
       if (isSummativeGroupActivity(context)) {
         const earnedWeight = numberValue(execution.resultSummary.earnedWeight);
         const totalWeight = numberValue(execution.resultSummary.totalWeight);
@@ -201,21 +212,39 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
           pluginAttemptRef: execution.id,
           metadata
         });
-        await recordActivityAttemptGradingResult(context.user, {
-          attemptId: submittedAttempt.id,
-          rawScore: earnedWeight,
-          rawMaxScore: totalWeight,
-          source: "auto",
-          isPass: execution.status === "completed",
-          rawResult: {
+        if (!aiFeedbackSetup.effective || !aiFeedbackSetup.config.gradingEnabled) {
+          await recordActivityAttemptGradingResult(context.user, {
+            attemptId: submittedAttempt.id,
+            rawScore: earnedWeight,
+            rawMaxScore: totalWeight,
+            source: "auto",
+            isPass: execution.status === "completed",
+            rawResult: {
+              executionId: execution.id,
+              analyticsPayload: execution.resultSummary
+            } as Prisma.InputJsonValue,
+            normalizedResult: {
+              kind: "coding-exercise",
+              executionId: execution.id,
+              aiFeedbackPending: aiFeedbackSetup.effective
+            } as Prisma.InputJsonValue
+          });
+        }
+      } else if (context.courseId && context.groupId && aiFeedbackSetup.effective) {
+        try {
+          aiFeedback = await evaluateCodingExerciseAttemptWithAi({
+            user: context.user,
+            courseId: context.courseId,
+            groupId: context.groupId,
+            activityId: context.activity.id,
             executionId: execution.id,
-            analyticsPayload: execution.resultSummary
-          } as Prisma.InputJsonValue,
-          normalizedResult: {
-            kind: "coding-exercise",
-            executionId: execution.id
-          } as Prisma.InputJsonValue
-        });
+            activity: context.activity,
+            assessmentMode: "formative",
+            triggerKind: "formative_submission"
+          });
+        } catch (error) {
+          aiFeedbackError = error instanceof Error ? error.message : "AI feedback could not be generated.";
+        }
       }
       if (context.courseId && context.groupId) {
         await clearActivityResponseDraft(context.user, context.courseId, context.groupId, context.activity.id).catch(() => undefined);
@@ -223,6 +252,8 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
 
       return {
         execution,
+        aiFeedback,
+        aiFeedbackError,
         availability: await getCodingExerciseAttemptAvailability({
           context,
           submissionCount: existingHistory.attempts.length + 1
@@ -231,6 +262,23 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
     }
   }
 };
+
+async function getEffectiveCodingExerciseAiFeedbackSetup(context: {
+  courseId?: string;
+  user: Parameters<typeof getCourseAssessmentFeedbackPolicy>[0];
+  activity: { id: string };
+}) {
+  const reference = await codingExercisePrisma.pluginCodingExerciseReferenceSolution.findUnique({
+    where: { activityId: context.activity.id },
+    select: { privateConfig: true }
+  });
+  const config = parseCodingExercisePrivateConfig(reference?.privateConfig).aiFeedback;
+  if (!context.courseId || !config.enabled) {
+    return { effective: false, config };
+  }
+  const policy = await getCourseAssessmentFeedbackPolicy(context.user, context.courseId);
+  return { effective: policy.enabled, config };
+}
 
 export const codingExerciseHistoryRoute: PluginRouteDefinition = {
   path: "coding-exercises/history",

@@ -23,6 +23,8 @@ export type ActivityGradingCapability = {
   supportsAutoGrading?: boolean;
   supportsManualGrading?: boolean;
   supportsFeedbackRenderer?: boolean;
+  supportsAiFeedback?: boolean;
+  supportsAiFeedbackGrading?: boolean;
   supportsAnalyticsPayloads?: boolean;
   supportsCompositeExecution?: boolean;
   defaultMaxAttempts?: number | null;
@@ -67,6 +69,10 @@ export type ActivityManualGradingContract = {
   rendererKey?: string;
 };
 
+export type ActivityAiFeedbackContract = {
+  rendererKey?: string;
+};
+
 export type ActivityProvider =
   | { kind: "core"; key: string }
   | { kind: "plugin"; key: string };
@@ -83,6 +89,7 @@ export type ActivityDefinition = {
   icon?: ActivityIconName;
   grading?: ActivityGradingCapability;
   manualGrading?: ActivityManualGradingContract;
+  aiFeedback?: ActivityAiFeedbackContract;
   i18n?: Partial<Record<PluginLocale, ActivityMessages>>;
   defaultConfig?: Record<string, unknown>;
   configSchema?: z.ZodTypeAny;
@@ -135,7 +142,9 @@ const coreDefinitions: ActivityDefinition[] = [
       supportsAutoGrading: true,
       supportsManualGrading: true,
       supportsFeedbackRenderer: true,
-      supportsAnalyticsPayloads: true
+      supportsAnalyticsPayloads: true,
+      supportsAiFeedback: true,
+      supportsAiFeedbackGrading: true
     },
     manualGrading: {
       rendererKey: "test-manual-grading"

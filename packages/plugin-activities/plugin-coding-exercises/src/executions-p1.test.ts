@@ -526,7 +526,7 @@ describe("coding exercise executions", () => {
             orderIndex: 0
           }
         ],
-        privateConfig: { hiddenSupportCode: "", templateSource: "{{ STUDENT_CODE }}", templatePrefix: "", templateSuffix: "", templateVisibleLineNumbers: [] }
+        privateConfig: { hiddenSupportCode: "", templateSource: "{{ STUDENT_CODE }}", templatePrefix: "", templateSuffix: "", templateVisibleLineNumbers: [], aiFeedback: { enabled: false, gradingEnabled: false, rubricName: "", rubricVersion: "1", instructions: "", testWeightPercent: 60, aiWeightPercent: 40, criteria: [] } }
       })
     ).resolves.toMatchObject({
       accepted: true,
@@ -562,7 +562,7 @@ describe("coding exercise executions", () => {
             orderIndex: 0
           }
         ],
-        privateConfig: { hiddenSupportCode: "", templateSource: "{{ STUDENT_CODE }}", templatePrefix: "", templateSuffix: "", templateVisibleLineNumbers: [] }
+        privateConfig: { hiddenSupportCode: "", templateSource: "{{ STUDENT_CODE }}", templatePrefix: "", templateSuffix: "", templateVisibleLineNumbers: [], aiFeedback: { enabled: false, gradingEnabled: false, rubricName: "", rubricVersion: "1", instructions: "", testWeightPercent: 60, aiWeightPercent: 40, criteria: [] } }
       })
     ).resolves.toMatchObject({
       accepted: false,

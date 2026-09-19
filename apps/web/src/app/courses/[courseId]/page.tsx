@@ -21,6 +21,7 @@ import { ActivityTypeIcon, AppIcon, FolderContentIcon as SharedFolderContentIcon
 import { useAuth } from "@/components/auth-provider";
 import { CourseSettingsPanel, type CourseSettingsSection } from "@/components/course-settings-panel";
 import { CourseParticipantsPanel } from "@/components/course-participants-panel";
+import { CourseGradeChallengesPanel } from "@/components/course-grade-challenges-panel";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import {
@@ -2027,6 +2028,12 @@ export default function CourseDetailPage() {
                       )}
                     </section>
                   )
+                },
+                {
+                  href: `/courses/${courseId}?tab=challenges`,
+                  id: "challenges",
+                  label: t("courseDetail.challengesTab"),
+                  render: () => <CourseGradeChallengesPanel courseId={courseId} />
                 },
                 {
                   href: `/courses/${courseId}?tab=settings&section=${activeCourseSettingsSection}`,

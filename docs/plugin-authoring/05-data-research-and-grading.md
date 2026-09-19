@@ -91,33 +91,34 @@ Example:
 
 ## Current State Of Grading
 
-There is not yet a platform-wide gradebook service in Cognelo.
+Cognelo has a shared gradebook lifecycle for assigned summative activities. Core owns `GradebookItem`, `ActivityAttempt`, selected `Grade`, append-only `GradeEvent`, attempt/release policy, late penalties, overrides, and student visibility. A plugin submits or grades through core services and keeps its activity-specific submission/result data in plugin-owned tables.
 
-The `plugin-coding-homework-grader` package currently acts more like a scaffold than a finished grading system.
+Useful design rules:
 
-Today, if a plugin needs grading behavior, the plugin should own it.
+- always link plugin submission/evaluation data to `activityId`, the learner, and the core attempt when one exists;
+- keep raw attempts separate from selected/final grades;
+- store structured score components and timestamps;
+- keep private submissions, hidden tests, rubrics, and unrestricted feedback artifacts in plugin-owned tables;
+- return only normalized grading/feedback results to core;
+- version rubrics, prompts, schemas, and model evaluations rather than overwriting them.
 
-That might include:
+## AI Feedback And AI-Assisted Grading
 
-- submission tables
-- grading tables
-- rubric snapshots
-- instructor feedback storage
-- score summaries
+AI assessment uses an explicit core/plugin boundary:
 
-## How To Design For Future Shared Grading
+- the activity definition declares `supportsAiFeedback` and, only if applicable, `supportsAiFeedbackGrading`;
+- the server plugin registers `aiFeedback.evaluateAttempt`;
+- course settings must enable automatic feedback and select an accessible assessment-feedback AI connection;
+- the plugin must reject enabled but incomplete activity configuration;
+- formative feedback runs from the learner's explicit plugin check/submit route;
+- summative feedback/grading runs only from the teacher-triggered gradebook route, never from submission or a background job;
+- core hides summative feedback until grade release.
 
-Even though shared grading is not implemented yet, you can prepare for it.
+The handler returns an immutable `feedbackRef`, `feedbackVersion`, `feedbackHash`, sanitized feedback, and optionally a normal plugin grading result. Feedback-only plugins must omit the grading result. If AI affects the grade, core marks the released feedback challengeable; deterministic feedback such as MCQ explanations stays non-challengeable.
 
-Useful design habits:
+Store complete reproducibility artifacts privately in a plugin-owned evaluation table: the submission/config/rubric snapshot, provider and model, prompt/schema/rubric versions, raw response, parsed output, sanitized result, hashes, latency, score components, and errors. Treat learner content as untrusted prompt input and use strict structured-output validation with bounded retries. Never put credentials, hidden tests, complete submissions, unrestricted prompts, or raw responses into the normalized core research stream or student DTOs.
 
-- always link grading data to `activityId` and `userId`
-- separate raw attempts from final grades
-- store timestamps clearly
-- keep result summaries structured
-- version rubrics or grading modes when possible
-
-That way, if Cognelo later grows a shared gradebook, your plugin data will be easier to migrate.
+Core `AiFeedbackResearchEvent` records bounded append-only lifecycle envelopes across plugins. Use the shared recorder for request/completion/failure and include stable identifiers, trigger kind, assessment mode, versions/hashes, contribution, and bounded metadata. Release, view, Test parent recomputation, and challenge events are recorded by core. The manager research route pseudonymizes participant, user, actor, and attempt identifiers by default; production research still requires approved consent filtering and retention/anonymization policy.
 
 ## Example Metadata Schema
 
