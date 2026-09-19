@@ -48,6 +48,36 @@ describe("coding exercise config and template helpers", () => {
     expect(privateConfig.hiddenSupportCode).toBe("");
   });
 
+  it("requires a complete weighted rubric when AI feedback is enabled", () => {
+    expect(() => parseCodingExercisePrivateConfig({
+      templateSource: "{{ STUDENT_CODE }}",
+      aiFeedback: {
+        enabled: true,
+        gradingEnabled: true,
+        rubricName: "Code quality",
+        rubricVersion: "1",
+        instructions: "Evaluate the submitted approach.",
+        testWeightPercent: 60,
+        aiWeightPercent: 40,
+        criteria: [{ id: "quality", title: "Quality", description: "Readable and maintainable code.", weightPercent: 90 }]
+      }
+    })).toThrow("Rubric criterion weights must total 100%.");
+
+    expect(parseCodingExercisePrivateConfig({
+      templateSource: "{{ STUDENT_CODE }}",
+      aiFeedback: {
+        enabled: true,
+        gradingEnabled: true,
+        rubricName: "Code quality",
+        rubricVersion: "1",
+        instructions: "Evaluate the submitted approach.",
+        testWeightPercent: 60,
+        aiWeightPercent: 40,
+        criteria: [{ id: "quality", title: "Quality", description: "Readable and maintainable code.", weightPercent: 100 }]
+      }
+    }).aiFeedback).toMatchObject({ enabled: true, gradingEnabled: true, testWeightPercent: 60, aiWeightPercent: 40 });
+  });
+
   it("builds runnable source by injecting student and test code into the template", () => {
     expect(
       buildCodingExerciseSource({
@@ -57,7 +87,8 @@ describe("coding exercise config and template helpers", () => {
           templateSource: "def solve():\n    {{ STUDENT_CODE }}\n\n{{ TEST_CODE }}",
           templateVisibleLineNumbers: [],
           templatePrefix: "",
-          templateSuffix: ""
+          templateSuffix: "",
+          aiFeedback: { enabled: false, gradingEnabled: false, rubricName: "", rubricVersion: "1", instructions: "", testWeightPercent: 60, aiWeightPercent: 40, criteria: [] }
         },
         studentSourceCode: "return 42",
         testCode: "print(solve())"

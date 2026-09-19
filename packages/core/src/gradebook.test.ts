@@ -1288,6 +1288,7 @@ describe("gradebook attempt services", () => {
               ]
             }
           },
+          selectedAttemptId: null,
           selectedAttemptNumber: 2,
           attemptCount: 2,
           submittedAttemptCount: 2,

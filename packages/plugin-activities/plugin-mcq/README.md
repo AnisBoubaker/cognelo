@@ -33,7 +33,7 @@ The main MCQ source is written as text.
 
 ## Current State
 
-The plugin stores authored content in generic bank/course activity config and owns no private plugin tables. Assigning from an activity bank therefore uses the platform's generic config copy. Summative student submissions are persisted as core `ActivityAttempt` records and graded through the shared gradebook workflow; formative checks remain client-side.
+The plugin stores authored content in generic bank/course activity config. Assigning from an activity bank therefore uses the platform's generic config copy. Summative student submissions are persisted as core `ActivityAttempt` records and graded through the shared gradebook workflow. The plugin also owns private immutable `PluginMcqAiEvaluation` rows for generated assessment feedback artifacts; those rows are operational evaluation data, not authored activity data.
 
 Unsubmitted standalone answers autosave through the core `ActivityResponseDraft` state host for both formative and summative MCQs. Reloading or a periodic account refresh restores that draft without replacing newer in-memory answers. Final summative submission clears the draft after the graded attempt is recorded. Embedded Test MCQs remain on the Test execution host and continue to autosave into `TestItemAttempt`; they never use the standalone draft route.
 
@@ -64,6 +64,14 @@ In activity-bank lists, MCQ rows display the activity title without repeating th
 The MCQ authoring UI must stay registered with `useUnsavedChangesGuard` from `@cognelo/activity-ui`. Any new MCQ authoring option, generated-content panel, or settings form should participate in that same dirty/save/discard flow.
 
 The authoring form uses the shared responsive `EditActionBar` to display saved/unsaved status and expose Cancel/Save against that same draft snapshot.
+
+## AI Assessment Feedback
+
+MCQ declares AI-feedback support but deliberately does not declare AI-feedback-grading support. Enabling `aiFeedbackEnabled` requires non-empty `aiFeedbackInstructions` in the activity configuration, plus the course assessment-feedback master switch and an accessible dedicated model. The existing deterministic answer-key result remains authoritative regardless of AI success or failure.
+
+For formative MCQs, **Check answers** requests explanations immediately and presents the sanitized overall and per-question feedback. For summative MCQs, submission still grades deterministically and never invokes AI; a teacher starts feedback generation from the detailed gradebook, and students receive it only after grade release. Because the model output does not influence the score, MCQ feedback is not eligible for the mandatory AI-grade challenge workflow.
+
+Each `PluginMcqAiEvaluation` version stores the request snapshot, model/provider and connection identifiers, raw and parsed responses, sanitized feedback, hashes, latency, prompt/schema versions, and failure details. The evaluator requires feedback for the exact stable question IDs and permits one bounded correction retry. Raw artifacts remain private; only the sanitized result is attached to the grade.
 
 ## Contributor Workflow
 

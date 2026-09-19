@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { useAuth } from "@/components/auth-provider";
-import { api, ApiError, Activity, ActivityDefinition, Course, CourseGroup, DeletedSubmissionAudit, SafeExamBrowserAccess, SafeExamBrowserLaunch, StudentGradeFeedback, StudentReleasedGradeRow } from "@/lib/api";
+import { api, ApiError, Activity, ActivityDefinition, Course, CourseGroup, DeletedSubmissionAudit, GradeChallenge, SafeExamBrowserAccess, SafeExamBrowserLaunch, StudentGradeFeedback, StudentReleasedGradeRow } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { activityRenderers } from "@/lib/activity-renderers";
 import { readSafeExamBrowserProof } from "@/lib/safe-exam-browser";
@@ -23,6 +23,10 @@ export default function GroupActivityPage() {
   const [activity, setActivity] = useState<Activity | null>(null);
   const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
   const [releasedGrade, setReleasedGrade] = useState<StudentReleasedGradeRow | null>(null);
+  const [gradeChallenges, setGradeChallenges] = useState<GradeChallenge[]>([]);
+  const [challengeExplanation, setChallengeExplanation] = useState("");
+  const [selectedChallengeReferenceKey, setSelectedChallengeReferenceKey] = useState("");
+  const [isSubmittingChallenge, setIsSubmittingChallenge] = useState(false);
   const [deletedSubmissions, setDeletedSubmissions] = useState<DeletedSubmissionAudit[]>([]);
   const [canStartNewAttempt, setCanStartNewAttempt] = useState<boolean | null>(null);
   const [hasPreviousSubmissions, setHasPreviousSubmissions] = useState<boolean | null>(null);
@@ -36,6 +40,7 @@ export default function GroupActivityPage() {
   const [safeExamBrowserError, setSafeExamBrowserError] = useState("");
   const [error, setError] = useState("");
   const safeExamBrowserLaunchRequestRef = useRef(false);
+  const aiFeedbackViewRecordedRef = useRef("");
   const safeExamBrowserLaunchToken = searchParams.get("sebLaunch");
 
   const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
@@ -58,7 +63,10 @@ export default function GroupActivityPage() {
     setIsSafeExamBrowserGateOpen(false);
     setIsPreparingSafeExamBrowser(false);
     safeExamBrowserLaunchRequestRef.current = false;
+    aiFeedbackViewRecordedRef.current = "";
     setSafeExamBrowserError("");
+    setSelectedChallengeReferenceKey("");
+    setChallengeExplanation("");
   }, [activityId, courseId, groupId]);
 
   useEffect(() => {
@@ -145,6 +153,50 @@ export default function GroupActivityPage() {
   }, [activityId, courseId, groupId, safeExamBrowserLaunchToken, t, user]);
 
   useEffect(() => {
+    if (!releasedGrade?.selectedAttemptId) {
+      setGradeChallenges([]);
+      return;
+    }
+    api.attemptGradeChallenges(courseId, releasedGrade.selectedAttemptId)
+      .then((result) => setGradeChallenges(result.challenges))
+      .catch(() => setGradeChallenges([]));
+  }, [courseId, releasedGrade?.selectedAttemptId]);
+
+  useEffect(() => {
+    if (!releasedGrade?.selectedAttemptId || !hasAiFeedback(releasedGrade.feedback)) return;
+    const viewKey = `${releasedGrade.selectedAttemptId}:${releasedGrade.gradedAt ?? "released"}`;
+    if (aiFeedbackViewRecordedRef.current === viewKey) return;
+    aiFeedbackViewRecordedRef.current = viewKey;
+    api.recordActivityAttemptAiFeedbackViewed(courseId, releasedGrade.selectedAttemptId).catch(() => {
+      aiFeedbackViewRecordedRef.current = "";
+    });
+  }, [courseId, releasedGrade]);
+
+  async function submitGradeChallenge() {
+    const references = getAiFeedbackReferences(releasedGrade?.feedback);
+    const availableReferences = references.filter((reference) => !gradeChallenges.some(
+      (challenge) => challenge.feedbackRef === reference.feedbackRef && challenge.feedbackVersion === reference.feedbackVersion
+    ));
+    const feedbackReference = availableReferences.find((reference) => feedbackReferenceKey(reference) === selectedChallengeReferenceKey)
+      ?? availableReferences[0];
+    if (!releasedGrade?.selectedAttemptId || !feedbackReference || challengeExplanation.trim().length < 20) return;
+    setIsSubmittingChallenge(true);
+    try {
+      const result = await api.createGradeChallenge(courseId, releasedGrade.selectedAttemptId, {
+        ...feedbackReference,
+        explanation: challengeExplanation.trim()
+      });
+      setGradeChallenges((current) => [result.challenge, ...current]);
+      setChallengeExplanation("");
+      setSelectedChallengeReferenceKey("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("groupPage.challengeError"));
+    } finally {
+      setIsSubmittingChallenge(false);
+    }
+  }
+
+  useEffect(() => {
     if (!isSafeExamBrowserGateOpen || safeExamBrowserLaunch || isPreparingSafeExamBrowser || safeExamBrowserLaunchRequestRef.current) return;
     safeExamBrowserLaunchRequestRef.current = true;
     setIsPreparingSafeExamBrowser(true);
@@ -196,6 +248,8 @@ export default function GroupActivityPage() {
     return localized?.name ?? definition?.name ?? activity.activityType.name;
   }
 
+  const aiFeedbackReferences = getAiFeedbackReferences(releasedGrade?.feedback);
+
   return (
     <AppShell>
       <main className="page stack">
@@ -236,6 +290,19 @@ export default function GroupActivityPage() {
                 <p className="muted">-{releasedGrade.latePenaltyPercent}%</p>
               ) : null}
               <StudentFeedback feedback={releasedGrade.feedback} maxScore={releasedGrade.maxScore} t={t} />
+              {aiFeedbackReferences.length ? (
+                <GradeChallengePanel
+                  references={aiFeedbackReferences}
+                  challenges={gradeChallenges}
+                  explanation={challengeExplanation}
+                  isSubmitting={isSubmittingChallenge}
+                  selectedReferenceKey={selectedChallengeReferenceKey}
+                  onExplanationChange={setChallengeExplanation}
+                  onSelectedReferenceKeyChange={setSelectedChallengeReferenceKey}
+                  onSubmit={submitGradeChallenge}
+                  t={t}
+                />
+              ) : null}
             </div>
           </section>
         ) : null}
@@ -427,6 +494,7 @@ function StudentFeedback({
     return null;
   }
   const parsonsDetails = getParsonsFeedbackDetails(feedback);
+  const aiDetails = feedback.kind === "ai_assessment_feedback" ? feedback.details ?? {} : null;
 
   return (
     <div className="stack stack-tight">
@@ -434,6 +502,33 @@ function StudentFeedback({
         <div className="stack stack-tight">
           <strong>{t("groupPage.feedbackTitle")}</strong>
           <p className="muted">{feedback.feedbackText}</p>
+        </div>
+      ) : null}
+      {aiDetails ? (
+        <div className="stack stack-tight">
+          <strong>{t("groupPage.aiFeedbackTitle")}</strong>
+          {typeof aiDetails.summary === "string" ? <p>{aiDetails.summary}</p> : null}
+          {readStringArray(aiDetails.strengths).length ? (
+            <div>
+              <strong>{t("groupPage.aiFeedbackStrengths")}</strong>
+              <ul>{readStringArray(aiDetails.strengths).map((item, index) => <li key={index}>{item}</li>)}</ul>
+            </div>
+          ) : null}
+          {readStringArray(aiDetails.improvements).length ? (
+            <div>
+              <strong>{t("groupPage.aiFeedbackImprovements")}</strong>
+              <ul>{readStringArray(aiDetails.improvements).map((item, index) => <li key={index}>{item}</li>)}</ul>
+            </div>
+          ) : null}
+          {readAiCriteria(aiDetails.criteria).map((criterion) => (
+            <div className="inline-panel" key={criterion.id}>
+              <strong>{criterion.title} · {criterion.scorePercent}%</strong>
+              <p className="muted">{criterion.feedback}</p>
+            </div>
+          ))}
+          {readAiQuestionFeedback(aiDetails.questionFeedback).map((entry) => (
+            <p className="muted" key={entry.questionId}>{entry.explanation}</p>
+          ))}
         </div>
       ) : null}
       {parsonsDetails.messages.length ? (
@@ -464,6 +559,160 @@ function StudentFeedback({
       <TestGradeBreakdown feedback={feedback} heading={t("groupPage.gradingBreakdownTitle")} />
     </div>
   );
+}
+
+function GradeChallengePanel({
+  references,
+  challenges,
+  explanation,
+  isSubmitting,
+  selectedReferenceKey,
+  onExplanationChange,
+  onSelectedReferenceKeyChange,
+  onSubmit,
+  t
+}: {
+  references: AiFeedbackReference[];
+  challenges: GradeChallenge[];
+  explanation: string;
+  isSubmitting: boolean;
+  selectedReferenceKey: string;
+  onExplanationChange: (value: string) => void;
+  onSelectedReferenceKeyChange: (value: string) => void;
+  onSubmit: () => Promise<void>;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const availableReferences = references.filter((reference) => !challenges.some(
+    (challenge) => challenge.feedbackRef === reference.feedbackRef && challenge.feedbackVersion === reference.feedbackVersion
+  ));
+  const effectiveSelectedKey = availableReferences.some((reference) => feedbackReferenceKey(reference) === selectedReferenceKey)
+    ? selectedReferenceKey
+    : feedbackReferenceKey(availableReferences[0]);
+  return (
+    <section className="inline-panel stack stack-tight">
+      {challenges.map((challenge) => {
+        const reference = references.find((candidate) => candidate.feedbackRef === challenge.feedbackRef && candidate.feedbackVersion === challenge.feedbackVersion);
+        return (
+          <div className="stack stack-tight" key={challenge.id}>
+            <strong>{reference?.label ?? t("groupPage.challengeTitle")}</strong>
+            <p>{challenge.explanation}</p>
+            <p className="muted">{t(`groupPage.challengeStatus.${challenge.status}`)}</p>
+            {challenge.teacherResponse ? (
+              <div>
+                <strong>{t("groupPage.challengeTeacherResponse")}</strong>
+                <p>{challenge.teacherResponse}</p>
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+      {availableReferences.length ? (
+        <div className="stack stack-tight">
+          <strong>{t("groupPage.challengeGrade")}</strong>
+          <p className="muted">{t("groupPage.challengeHelp")}</p>
+          {availableReferences.length > 1 ? (
+            <label className="field">
+              <span>{t("groupPage.challengeFeedbackLabel")}</span>
+              <select value={effectiveSelectedKey} onChange={(event) => onSelectedReferenceKeyChange(event.target.value)}>
+                {availableReferences.map((reference) => (
+                  <option key={feedbackReferenceKey(reference)} value={feedbackReferenceKey(reference)}>
+                    {reference.label ?? t("groupPage.aiFeedbackTitle")}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <textarea
+            maxLength={8000}
+            rows={4}
+            value={explanation}
+            onChange={(event) => onExplanationChange(event.target.value)}
+          />
+          <button disabled={isSubmitting || explanation.trim().length < 20} type="button" onClick={() => void onSubmit()}>
+            {isSubmitting ? t("common.saving") : t("groupPage.submitChallenge")}
+          </button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+type AiFeedbackReference = { feedbackRef: string; feedbackVersion: number; label: string | null };
+
+function getAiFeedbackReferences(feedback: StudentGradeFeedback | null | undefined): AiFeedbackReference[] {
+  if (!feedback?.details) return [];
+  if (feedback.kind === "test" && Array.isArray(feedback.details.items)) {
+    return feedback.details.items.flatMap((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+      const itemRecord = item as Record<string, unknown>;
+      const itemFeedback = itemRecord.feedback;
+      if (!itemFeedback || typeof itemFeedback !== "object" || Array.isArray(itemFeedback)) return [];
+      const aiFeedback = (itemFeedback as Record<string, unknown>).aiFeedback;
+      if (!aiFeedback || typeof aiFeedback !== "object" || Array.isArray(aiFeedback)) return [];
+      const nested = aiFeedback as Record<string, unknown>;
+      if (typeof nested.feedbackRef === "string" && typeof nested.feedbackVersion === "number" && nested.challengeAllowed === true) {
+        return [{
+          feedbackRef: nested.feedbackRef,
+          feedbackVersion: nested.feedbackVersion,
+          label: typeof itemRecord.title === "string" ? itemRecord.title : null
+        }];
+      }
+      return [];
+    });
+  }
+  if (feedback.kind !== "ai_assessment_feedback") return [];
+  const feedbackRef = feedback.details.feedbackRef;
+  const feedbackVersion = feedback.details.feedbackVersion;
+  const challengeAllowed = feedback.details.challengeAllowed;
+  return typeof feedbackRef === "string" && typeof feedbackVersion === "number" && challengeAllowed === true
+    ? [{ feedbackRef, feedbackVersion, label: null }]
+    : [];
+}
+
+function feedbackReferenceKey(reference: AiFeedbackReference | undefined) {
+  return reference ? `${reference.feedbackRef}:${reference.feedbackVersion}` : "";
+}
+
+function hasAiFeedback(feedback: StudentGradeFeedback | null | undefined) {
+  if (!feedback?.details) return false;
+  if (feedback.kind === "ai_assessment_feedback") {
+    return typeof feedback.details.feedbackRef === "string" && typeof feedback.details.feedbackVersion === "number";
+  }
+  if (feedback.kind !== "test" || !Array.isArray(feedback.details.items)) return false;
+  return feedback.details.items.some((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+    const itemFeedback = (item as Record<string, unknown>).feedback;
+    if (!itemFeedback || typeof itemFeedback !== "object" || Array.isArray(itemFeedback)) return false;
+    const aiFeedback = (itemFeedback as Record<string, unknown>).aiFeedback;
+    if (!aiFeedback || typeof aiFeedback !== "object" || Array.isArray(aiFeedback)) return false;
+    return typeof (aiFeedback as Record<string, unknown>).feedbackRef === "string";
+  });
+}
+
+function readStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function readAiCriteria(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry, index) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+    const criterion = entry as Record<string, unknown>;
+    return typeof criterion.title === "string" && typeof criterion.feedback === "string" && typeof criterion.scorePercent === "number"
+      ? [{ id: typeof criterion.id === "string" ? criterion.id : String(index), title: criterion.title, feedback: criterion.feedback, scorePercent: criterion.scorePercent }]
+      : [];
+  });
+}
+
+function readAiQuestionFeedback(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry, index) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+    const feedback = entry as Record<string, unknown>;
+    return typeof feedback.explanation === "string"
+      ? [{ questionId: typeof feedback.questionId === "string" ? feedback.questionId : String(index), explanation: feedback.explanation }]
+      : [];
+  });
 }
 
 type ParsonsFeedbackMessage = { type: "order" | "indentation"; count: number };

@@ -86,6 +86,16 @@ type CodingAttemptAvailability = {
   reason: string | null;
 };
 
+type CodingExerciseAiFeedback = {
+  summary?: string;
+  strengths?: string[];
+  improvements?: string[];
+  criteria?: Array<{ id?: string; title?: string; scorePercent?: number; feedback?: string }>;
+  deterministicScore?: number;
+  aiScore?: number;
+  combinedScore?: number;
+};
+
 type ReferenceValidationTestResult = {
   id: string;
   name: string;
@@ -148,7 +158,12 @@ type CodingExerciseClient = {
     courseId: string,
     activityId: string,
     input: { sourceCode: string }
-  ) => Promise<{ execution: CodingExecution; availability: CodingAttemptAvailability }>;
+  ) => Promise<{
+    execution: CodingExecution;
+    availability: CodingAttemptAvailability;
+    aiFeedback?: { feedback?: CodingExerciseAiFeedback } | null;
+    aiFeedbackError?: string | null;
+  }>;
   listSubmissions: (courseId: string, activityId: string) => Promise<{ executions: CodingExecution[] }>;
   listHistory?: (
     courseId: string,
@@ -310,6 +325,8 @@ export function CodingExerciseActivityView({
   const [submissionConfirmation, setSubmissionConfirmation] = useState<{
     execution: CodingExecution;
     availability: CodingAttemptAvailability;
+    aiFeedback?: { feedback?: CodingExerciseAiFeedback } | null;
+    aiFeedbackError?: string | null;
   } | null>(null);
   const [workingAction, setWorkingAction] = useState<"run" | "submit" | null>(null);
   const [executionStateLoaded, setExecutionStateLoaded] = useState(!executionStateHost);
@@ -1311,6 +1328,150 @@ export function CodingExerciseActivityView({
             />
           </div>
 
+          <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
+            <div>
+              <h3>{t("aiFeedbackTitle")}</h3>
+              <p className="muted">{t("aiFeedbackHelp")}</p>
+            </div>
+            <label className="checkbox-row">
+              <input
+                checked={privateConfig.aiFeedback.enabled}
+                type="checkbox"
+                onChange={(event) => setPrivateConfig((current) => ({
+                  ...current,
+                  aiFeedback: {
+                    ...current.aiFeedback,
+                    enabled: event.target.checked,
+                    criteria: event.target.checked && current.aiFeedback.criteria.length === 0
+                      ? [{ id: "correctness", title: "Correctness and approach", description: "Evaluate the correctness, clarity, and suitability of the submitted approach.", weightPercent: 100 }]
+                      : current.aiFeedback.criteria
+                  }
+                }))}
+              />
+              <span>{t("aiFeedbackEnabled")}</span>
+            </label>
+            {privateConfig.aiFeedback.enabled ? (
+              <>
+                <label className="checkbox-row">
+                  <input
+                    checked={privateConfig.aiFeedback.gradingEnabled}
+                    type="checkbox"
+                    onChange={(event) => setPrivateConfig((current) => ({
+                      ...current,
+                      aiFeedback: { ...current.aiFeedback, gradingEnabled: event.target.checked }
+                    }))}
+                  />
+                  <span>{t("aiGradingEnabled")}</span>
+                </label>
+                <div className="form-grid two-columns">
+                  <div className="field">
+                    <label htmlFor="coding-ai-rubric-name">{t("rubricName")}</label>
+                    <input
+                      id="coding-ai-rubric-name"
+                      value={privateConfig.aiFeedback.rubricName}
+                      onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, rubricName: event.target.value } }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="coding-ai-rubric-version">{t("rubricVersion")}</label>
+                    <input
+                      id="coding-ai-rubric-version"
+                      value={privateConfig.aiFeedback.rubricVersion}
+                      onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, rubricVersion: event.target.value } }))}
+                    />
+                  </div>
+                </div>
+                <div className="field">
+                  <label htmlFor="coding-ai-instructions">{t("feedbackInstructions")}</label>
+                  <textarea
+                    id="coding-ai-instructions"
+                    rows={5}
+                    value={privateConfig.aiFeedback.instructions}
+                    onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, instructions: event.target.value } }))}
+                  />
+                </div>
+                {privateConfig.aiFeedback.gradingEnabled ? (
+                  <div className="form-grid two-columns">
+                    <div className="field">
+                      <label htmlFor="coding-ai-test-weight">{t("testWeightPercent")}</label>
+                      <input
+                        id="coding-ai-test-weight"
+                        min={0}
+                        max={100}
+                        type="number"
+                        value={privateConfig.aiFeedback.testWeightPercent}
+                        onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, testWeightPercent: Number(event.target.value) } }))}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="coding-ai-rubric-weight">{t("aiWeightPercent")}</label>
+                      <input
+                        id="coding-ai-rubric-weight"
+                        min={0}
+                        max={100}
+                        type="number"
+                        value={privateConfig.aiFeedback.aiWeightPercent}
+                        onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, aiWeightPercent: Number(event.target.value) } }))}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                  <h4>{t("rubricCriteria")}</h4>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => setPrivateConfig((current) => ({
+                      ...current,
+                      aiFeedback: {
+                        ...current.aiFeedback,
+                        criteria: [...current.aiFeedback.criteria, {
+                          id: `criterion-${current.aiFeedback.criteria.length + 1}`,
+                          title: "",
+                          description: "",
+                          weightPercent: 0
+                        }]
+                      }
+                    }))}
+                  >
+                    {t("addCriterion")}
+                  </button>
+                </div>
+                {privateConfig.aiFeedback.criteria.map((criterion, index) => (
+                  <section className="stack" key={`${criterion.id}-${index}`} style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 16 }}>
+                    <div className="form-grid two-columns">
+                      <div className="field">
+                        <label>{t("criterionTitle")}</label>
+                        <input value={criterion.title} onChange={(event) => setPrivateConfig((current) => ({
+                          ...current,
+                          aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value, id: item.id || `criterion-${index + 1}` } : item) }
+                        }))} />
+                      </div>
+                      <div className="field">
+                        <label>{t("criterionWeight")}</label>
+                        <input min={1} max={100} type="number" value={criterion.weightPercent} onChange={(event) => setPrivateConfig((current) => ({
+                          ...current,
+                          aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.map((item, itemIndex) => itemIndex === index ? { ...item, weightPercent: Number(event.target.value) } : item) }
+                        }))} />
+                      </div>
+                    </div>
+                    <div className="field">
+                      <label>{t("criterionDescription")}</label>
+                      <textarea rows={3} value={criterion.description} onChange={(event) => setPrivateConfig((current) => ({
+                        ...current,
+                        aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item) }
+                      }))} />
+                    </div>
+                    <button className="button danger" type="button" onClick={() => setPrivateConfig((current) => ({
+                      ...current,
+                      aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.filter((_, itemIndex) => itemIndex !== index) }
+                    }))}>{t("remove")}</button>
+                  </section>
+                ))}
+              </>
+            ) : null}
+          </section>
+
           {aiGenerationClient ? (
             <button
               className="secondary"
@@ -1793,6 +1954,26 @@ export function CodingExerciseActivityView({
                     />
                   </div>
                   <p className="muted">{t("submissionRecordedMessage")}</p>
+                  {submissionConfirmation.aiFeedback?.feedback ? (
+                    <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 16 }}>
+                      <h3>{t("aiFeedbackResult")}</h3>
+                      <p>{submissionConfirmation.aiFeedback.feedback.summary}</p>
+                      {submissionConfirmation.aiFeedback.feedback.strengths?.length ? (
+                        <div>
+                          <strong>{t("aiFeedbackStrengths")}</strong>
+                          <ul>{submissionConfirmation.aiFeedback.feedback.strengths.map((item, index) => <li key={index}>{item}</li>)}</ul>
+                        </div>
+                      ) : null}
+                      {submissionConfirmation.aiFeedback.feedback.improvements?.length ? (
+                        <div>
+                          <strong>{t("aiFeedbackImprovements")}</strong>
+                          <ul>{submissionConfirmation.aiFeedback.feedback.improvements.map((item, index) => <li key={index}>{item}</li>)}</ul>
+                        </div>
+                      ) : null}
+                    </section>
+                  ) : submissionConfirmation.aiFeedbackError ? (
+                    <p className="error-text">{t("aiFeedbackGenerationFailed")}</p>
+                  ) : null}
                   {submissionConfirmation.availability.attemptsRemaining === null ? null : submissionConfirmation.availability.canStart ? (
                     <p className="muted">
                       {t("submissionAttemptsRemaining", {

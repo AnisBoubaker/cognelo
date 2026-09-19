@@ -3,11 +3,29 @@ import { prisma } from "@cognelo/db";
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import { buildMcqGradingResultFromConfig } from "./grading";
 import { z } from "zod";
-import { mcqGenerateRoute, mcqGradebookAttemptsRoute, mcqSubmissionRoute, submittedAnswersFromMetadata } from "./routes";
+import { mcqFormativeFeedbackRoute, mcqGenerateRoute, mcqGradebookAttemptsRoute, mcqSubmissionRoute, submittedAnswersFromMetadata } from "./routes";
+import { evaluateMcqWithAi } from "./ai-feedback";
 
 export const mcqServerPlugin: ServerActivityPlugin = {
   key: "mcq",
-  routes: [mcqGenerateRoute, mcqSubmissionRoute, mcqGradebookAttemptsRoute],
+  routes: [mcqGenerateRoute, mcqSubmissionRoute, mcqFormativeFeedbackRoute, mcqGradebookAttemptsRoute],
+  aiFeedback: {
+    evaluateAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, activity, triggerKind, testItemAttempt }) => {
+      const attempt = testItemAttempt ? null : await prisma.activityAttempt.findUnique({ where: { id: coreAttemptId }, select: { metadata: true } });
+      if (!attempt && !testItemAttempt) throw new AppError(404, "MCQ_ATTEMPT_NOT_FOUND", "The MCQ attempt was not found.");
+      return evaluateMcqWithAi({
+        user,
+        courseId,
+        groupId,
+        activityId,
+        coreAttemptId,
+        activity,
+        answers: testItemAttempt ? submittedAnswersFromMetadata({ submittedAnswers: testItemAttempt.state.answers }) : submittedAnswersFromMetadata(attempt?.metadata),
+        assessmentMode: "summative",
+        triggerKind
+      });
+    }
+  },
   grading: {
     gradeAttempt: async ({ activity, coreAttemptId }) => {
       const attempt = await prisma.activityAttempt.findUnique({
@@ -31,6 +49,11 @@ export const mcqServerPlugin: ServerActivityPlugin = {
         state: { answers: input.answers },
         gradingResult: buildMcqGradingResultFromConfig(activity.config, input.answers)
       };
+    }
+  },
+  hooks: {
+    onCourseActivityDeleted: async ({ activityId, activityTypeKey }) => {
+      if (activityTypeKey === "mcq") await prisma.pluginMcqAiEvaluation.deleteMany({ where: { activityId } });
     }
   }
 } as const;

@@ -120,6 +120,16 @@ AI-generated hidden tests are capped at 15.
 
 Generated full-program tests must use inputs for which the reviewed reference solution exits successfully. The generator is explicitly told not to exercise invalid-input branches that return a non-zero status and to avoid ambiguous floating-point threshold values; execution-validation retries repeat those constraints when correcting a rejected suite.
 
+## AI Assessment Feedback And Grading
+
+Programming Exercises declare both AI-feedback and AI-feedback-grading capabilities. The activity's private reference-solution row owns `privateConfig.aiFeedback`; enabling it requires a rubric name/version, evaluator instructions, at least one uniquely identified criterion whose weights total 100, and—when AI grading is enabled—deterministic-test and AI-rubric weights that total 100. This configuration is private and is copied by the existing bank/course lifecycle hooks with the other reference data.
+
+Effective use also requires the course assessment-feedback switch and an accessible dedicated course model. A formative learner submission calls the evaluator immediately and returns sanitized summary, strengths, improvements, and criterion feedback without creating a core grade. A summative submission persists the plugin execution and core attempt but does not invoke AI. The detailed gradebook teacher action evaluates one attempt or a sequential batch directly; no background job or submission trigger runs summative AI grading.
+
+Every submitted `PluginCodingExerciseExecution` snapshots the effective private feedback configuration so later teacher evaluation cannot silently use a changed rubric. `PluginCodingExerciseAiEvaluation` stores each immutable evaluation version, including the rubric/request snapshot, provider/model, prompt/schema versions, raw response, parsed and sanitized outputs, hashes, latency, deterministic score, AI rubric score, and combined weighted score. Strict schema validation allows one bounded correction retry. Raw artifacts remain teacher/private data; student DTOs receive only the sanitized result.
+
+When AI grading is enabled, the plugin returns the configured combined score (for example, 60% deterministic hidden tests and 40% AI rubric) to the ordinary core gradebook lifecycle. Released AI-graded feedback can be challenged through the shared course workflow. Feedback-only configurations leave the deterministic test grade unchanged and are not challengeable.
+
 ## Judge0 Integration
 
 The browser should never call Judge0 directly.
@@ -183,7 +193,7 @@ For local Judge0 CE setups that run on hosts without the legacy cgroup hierarchy
 As this plugin grows, expect to add:
 
 - richer execution policies per language/runtime
-- richer score/rubric reporting
+- richer teacher-side score/rubric comparison and operational metrics
 - responsive teacher-authoring actions use the shared `EditActionBar`, with saved/unsaved status and snapshot-backed Cancel/Save
 
 ## Contributor Workflow

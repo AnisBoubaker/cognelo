@@ -46,6 +46,24 @@ type MessageKey =
   | "templateVisibleLine"
   | "lastValidationSummary"
   | "editorTimeLimit"
+  | "aiFeedbackTitle"
+  | "aiFeedbackHelp"
+  | "aiFeedbackEnabled"
+  | "aiGradingEnabled"
+  | "rubricName"
+  | "rubricVersion"
+  | "feedbackInstructions"
+  | "testWeightPercent"
+  | "aiWeightPercent"
+  | "rubricCriteria"
+  | "addCriterion"
+  | "criterionTitle"
+  | "criterionDescription"
+  | "criterionWeight"
+  | "aiFeedbackResult"
+  | "aiFeedbackStrengths"
+  | "aiFeedbackImprovements"
+  | "aiFeedbackGenerationFailed"
   | "visibleSampleTests"
   | "addSampleTest"
   | "remove"
@@ -184,6 +202,24 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     templateVisibleLine: "Toggle student-visible line {line}",
     lastValidationSummary: "Last validation: {passedCount}/{testCount} tests passed.",
     editorTimeLimit: "Editor time limit (seconds)",
+    aiFeedbackTitle: "AI feedback and grading",
+    aiFeedbackHelp: "Requires automatic assessment feedback and a model in the course settings. Formative feedback runs on submission; summative feedback is started by a teacher.",
+    aiFeedbackEnabled: "Enable AI feedback",
+    aiGradingEnabled: "Use the rubric score as part of the grade",
+    rubricName: "Rubric name",
+    rubricVersion: "Rubric version",
+    feedbackInstructions: "Feedback instructions",
+    testWeightPercent: "Deterministic tests (%)",
+    aiWeightPercent: "AI rubric (%)",
+    rubricCriteria: "Rubric criteria",
+    addCriterion: "Add criterion",
+    criterionTitle: "Criterion title",
+    criterionDescription: "Criterion description",
+    criterionWeight: "Weight (%)",
+    aiFeedbackResult: "AI feedback",
+    aiFeedbackStrengths: "Strengths",
+    aiFeedbackImprovements: "Improvements",
+    aiFeedbackGenerationFailed: "The submission was recorded, but AI feedback could not be generated.",
     visibleSampleTests: "Visible sample tests",
     addSampleTest: "Add sample test",
     remove: "Remove",
@@ -319,6 +355,24 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     templateVisibleLine: "Afficher ou masquer la ligne étudiante {line}",
     lastValidationSummary: "Dernière validation : {passedCount}/{testCount} tests réussis.",
     editorTimeLimit: "Limite de temps dans l'éditeur (secondes)",
+    aiFeedbackTitle: "Rétroaction et notation par IA",
+    aiFeedbackHelp: "Nécessite la rétroaction automatique et un modèle dans les paramètres du cours. La rétroaction formative démarre à la soumission; la rétroaction sommative est lancée par un enseignant.",
+    aiFeedbackEnabled: "Activer la rétroaction IA",
+    aiGradingEnabled: "Utiliser le résultat de la grille dans la note",
+    rubricName: "Nom de la grille",
+    rubricVersion: "Version de la grille",
+    feedbackInstructions: "Consignes de rétroaction",
+    testWeightPercent: "Tests déterministes (%)",
+    aiWeightPercent: "Grille IA (%)",
+    rubricCriteria: "Critères de la grille",
+    addCriterion: "Ajouter un critère",
+    criterionTitle: "Titre du critère",
+    criterionDescription: "Description du critère",
+    criterionWeight: "Poids (%)",
+    aiFeedbackResult: "Rétroaction IA",
+    aiFeedbackStrengths: "Points forts",
+    aiFeedbackImprovements: "Améliorations",
+    aiFeedbackGenerationFailed: "La soumission a été enregistrée, mais la rétroaction IA n’a pas pu être générée.",
     visibleSampleTests: "Tests d'exemple visibles",
     addSampleTest: "Ajouter un test d'exemple",
     remove: "Supprimer",
@@ -454,6 +508,24 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     templateVisibleLine: "切换第 {line} 行是否对学生可见",
     lastValidationSummary: "最近一次验证：通过 {passedCount}/{testCount} 个测试。",
     editorTimeLimit: "编辑器时间限制（秒）",
+    aiFeedbackTitle: "AI 反馈和评分",
+    aiFeedbackHelp: "需要在课程设置中启用自动评估反馈并选择模型。形成性反馈在提交时运行；总结性反馈由教师启动。",
+    aiFeedbackEnabled: "启用 AI 反馈",
+    aiGradingEnabled: "将量规分数计入成绩",
+    rubricName: "量规名称",
+    rubricVersion: "量规版本",
+    feedbackInstructions: "反馈说明",
+    testWeightPercent: "确定性测试（%）",
+    aiWeightPercent: "AI 量规（%）",
+    rubricCriteria: "量规标准",
+    addCriterion: "添加标准",
+    criterionTitle: "标准标题",
+    criterionDescription: "标准说明",
+    criterionWeight: "权重（%）",
+    aiFeedbackResult: "AI 反馈",
+    aiFeedbackStrengths: "优点",
+    aiFeedbackImprovements: "改进建议",
+    aiFeedbackGenerationFailed: "提交已记录，但无法生成 AI 反馈。",
     visibleSampleTests: "可见示例测试",
     addSampleTest: "添加示例测试",
     remove: "删除",

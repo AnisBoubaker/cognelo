@@ -706,6 +706,16 @@ export type CodingExerciseReferenceSolution = {
     templateVisibleLineNumbers: number[];
     templatePrefix: string;
     templateSuffix: string;
+    aiFeedback: {
+      enabled: boolean;
+      gradingEnabled: boolean;
+      rubricName: string;
+      rubricVersion: string;
+      instructions: string;
+      testWeightPercent: number;
+      aiWeightPercent: number;
+      criteria: Array<{ id: string; title: string; description: string; weightPercent: number }>;
+    };
   };
   validationSummary: Record<string, unknown>;
   createdAt: string;
@@ -750,6 +760,18 @@ export type CodingExerciseAttemptAvailability = {
   attemptsRemaining: number | null;
   canStart: boolean;
   reason: string | null;
+};
+
+export type CodingExerciseSubmitResponse = {
+  execution: CodingExerciseExecution;
+  availability: CodingExerciseAttemptAvailability;
+  aiFeedback: {
+    feedbackRef: string;
+    feedbackVersion: number;
+    feedbackHash: string;
+    feedback: Record<string, unknown>;
+  } | null;
+  aiFeedbackError: string | null;
 };
 
 export type WebDesignExerciseFile = {
@@ -917,6 +939,7 @@ export type StudentReleasedGradeRow = {
   latePenaltyApplied: boolean;
   latePenaltyPercent: number | null;
   feedback: StudentGradeFeedback | null;
+  selectedAttemptId: string | null;
   selectedAttemptNumber: number | null;
   attemptCount: number;
   submittedAttemptCount: number;
@@ -924,6 +947,30 @@ export type StudentReleasedGradeRow = {
   availableFrom: string | null;
   availableUntil: string | null;
   gradedAt: string | null;
+};
+
+export type GradeChallenge = {
+  id: string;
+  courseId: string;
+  groupId: string;
+  activityId: string;
+  gradebookItemId: string;
+  participantId: string;
+  attemptId: string;
+  pluginKey: string;
+  feedbackRef: string;
+  feedbackVersion: number;
+  explanation: string;
+  status: "open" | "upheld" | "adjusted";
+  teacherResponse: string | null;
+  releasedGradeSnapshot: Record<string, unknown>;
+  resultingGradeSnapshot: Record<string, unknown> | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  participantName?: string;
+  participantEmail?: string;
+  activityTitle?: string;
+  groupTitle?: string;
 };
 
 export type DeletedSubmissionAudit = {
@@ -967,6 +1014,7 @@ export type CourseTestAttemptReview = {
     activity: Activity;
     itemAttempt: {
       id: string;
+      pluginAttemptRef?: string | null;
       lifecycle: string;
       rawScore: number | null;
       rawMaxScore: number | null;
@@ -1297,6 +1345,30 @@ export const api = {
         body: JSON.stringify(input ?? {})
       }
     ),
+  generateActivityAttemptAiFeedback: (courseId: string, attemptId: string, input?: { triggerKind?: "teacher_single" | "teacher_selection" | "teacher_batch" }) =>
+    request<{ evaluation: { feedbackRef: string; feedbackVersion: number }; result: unknown }>(
+      `/courses/${courseId}/gradebook/attempts/${attemptId}/ai-feedback`,
+      { method: "POST", body: JSON.stringify(input ?? {}) }
+    ),
+  recordActivityAttemptAiFeedbackViewed: (courseId: string, attemptId: string) =>
+    request<{ recorded: number }>(`/courses/${courseId}/gradebook/attempts/${attemptId}/ai-feedback/view`, { method: "POST" }),
+  attemptGradeChallenges: (courseId: string, attemptId: string) =>
+    request<{ challenges: GradeChallenge[] }>(`/courses/${courseId}/gradebook/attempts/${attemptId}/challenges`),
+  createGradeChallenge: (courseId: string, attemptId: string, input: { feedbackRef: string; feedbackVersion: number; explanation: string }) =>
+    request<{ challenge: GradeChallenge }>(`/courses/${courseId}/gradebook/attempts/${attemptId}/challenges`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  courseGradeChallenges: (courseId: string, status?: "open" | "upheld" | "adjusted") =>
+    request<{ challenges: GradeChallenge[] }>(`/courses/${courseId}/grade-challenges${status ? `?status=${status}` : ""}`),
+  resolveGradeChallenge: (
+    courseId: string,
+    challengeId: string,
+    input: { status: "upheld"; teacherResponse: string } | { status: "adjusted"; teacherResponse: string; score: number; maxScore?: number }
+  ) => request<{ challenge: GradeChallenge }>(`/courses/${courseId}/grade-challenges/${challengeId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input)
+  }),
   gradeTestItem: (
     courseId: string,
     attemptId: string,
@@ -1474,7 +1546,7 @@ export const api = {
   codingExerciseRuns: (courseId: string, activityId: string) =>
     request<{ executions: CodingExerciseExecution[] }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/run`),
   submitCodingExercise: (courseId: string, activityId: string, input: { sourceCode: string }) =>
-    request<{ execution: CodingExerciseExecution; availability: CodingExerciseAttemptAvailability }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/submit`, {
+    request<CodingExerciseSubmitResponse>(`/courses/${courseId}/activities/${activityId}/coding-exercises/submit`, {
       method: "POST",
       body: JSON.stringify(input)
     }),
@@ -1972,12 +2044,17 @@ export const api = {
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/run`
     ),
   submitGroupCodingExercise: (courseId: string, groupId: string, activityId: string, input: { sourceCode: string }) =>
-    request<{ execution: CodingExerciseExecution; availability: CodingExerciseAttemptAvailability }>(
+    request<CodingExerciseSubmitResponse>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/submit`,
       {
         method: "POST",
         body: JSON.stringify(input)
       }
+    ),
+  groupMcqFormativeFeedback: (courseId: string, groupId: string, activityId: string, answers: Record<string, string[]>) =>
+    request<{ evaluation: { feedback: Record<string, unknown> } }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/mcq/feedback`,
+      { method: "POST", body: JSON.stringify({ answers }) }
     ),
   groupCodingExerciseSubmissions: (courseId: string, groupId: string, activityId: string) =>
     request<{ executions: CodingExerciseExecution[] }>(

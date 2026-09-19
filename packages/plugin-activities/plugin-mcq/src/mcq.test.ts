@@ -51,6 +51,25 @@ describe("MCQ student attempt state", () => {
   });
 });
 
+describe("MCQ AI feedback configuration", () => {
+  const definition = mcqPlugin.activities[0];
+
+  it("requires instructions when feedback is enabled and never enables AI grading", () => {
+    expect(definition.grading).toMatchObject({ supportsAiFeedback: true });
+    expect(definition.grading?.supportsAiFeedbackGrading).not.toBe(true);
+    expect(definition.configSchema?.safeParse({
+      ...definition.defaultConfig,
+      aiFeedbackEnabled: true,
+      aiFeedbackInstructions: ""
+    }).success).toBe(false);
+    expect(definition.configSchema?.safeParse({
+      ...definition.defaultConfig,
+      aiFeedbackEnabled: true,
+      aiFeedbackInstructions: "Explain each answer without changing the deterministic grade."
+    }).success).toBe(true);
+  });
+});
+
 describe("MCQ source parser", () => {
   it("parses single and multiple answer questions from markdown", () => {
     const parsed = parseMcqSource(

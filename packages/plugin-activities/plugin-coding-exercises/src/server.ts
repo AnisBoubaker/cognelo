@@ -17,6 +17,7 @@ import {
   submitCodingExercise
 } from "./executions";
 import { AppError } from "@cognelo/core";
+import { evaluateCodingExerciseAttemptWithAi, snapshotCodingExerciseAiFeedbackConfig } from "./ai-feedback";
 
 export const codingExercisesServerPlugin: ServerActivityPlugin = {
   key: "coding-exercises",
@@ -30,6 +31,24 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
     codingExerciseGenerateSolutionRoute,
     codingExerciseGenerateTestsRoute
   ],
+  aiFeedback: {
+    evaluateAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, pluginAttemptRef, activity, triggerKind }) => {
+      if (!pluginAttemptRef) {
+        throw new AppError(409, "CODING_EXERCISE_SUBMISSION_REQUIRED", "This attempt does not reference a coding exercise submission.");
+      }
+      return evaluateCodingExerciseAttemptWithAi({
+        user,
+        courseId,
+        groupId,
+        activityId,
+        coreAttemptId,
+        executionId: pluginAttemptRef,
+        activity,
+        assessmentMode: "summative",
+        triggerKind
+      });
+    }
+  },
   compositeExecution: {
     activityTypeKeys: ["coding-exercise"],
     actions: {
@@ -50,6 +69,7 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
         activityConfig: activity.config,
         input
       });
+      await snapshotCodingExerciseAiFeedbackConfig({ activityId: activity.id, executionId: execution.id });
       const earnedWeight = numberValue(execution.resultSummary.earnedWeight);
       const totalWeight = numberValue(execution.resultSummary.totalWeight);
       if (earnedWeight === null || totalWeight === null || totalWeight <= 0) {

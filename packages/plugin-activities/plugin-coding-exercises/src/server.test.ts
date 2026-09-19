@@ -13,9 +13,14 @@ const executionMocks = vi.hoisted(() => ({
   runCodingExercise: vi.fn(),
   submitCodingExercise: vi.fn()
 }));
+const aiFeedbackMocks = vi.hoisted(() => ({
+  evaluateCodingExerciseAttemptWithAi: vi.fn(),
+  snapshotCodingExerciseAiFeedbackConfig: vi.fn()
+}));
 
 vi.mock("./hidden-tests", () => hiddenTestMocks);
 vi.mock("./executions", () => executionMocks);
+vi.mock("./ai-feedback", () => aiFeedbackMocks);
 vi.mock("./routes", () => ({
   codingExerciseGeneratePromptRoute: { path: "generate-prompt", methods: {} },
   codingExerciseGenerateSolutionRoute: { path: "generate-solution", methods: {} },
@@ -32,6 +37,7 @@ const { codingExercisesServerPlugin } = await import("./server");
 describe("coding exercises server plugin lifecycle hooks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    aiFeedbackMocks.snapshotCodingExerciseAiFeedbackConfig.mockResolvedValue({ enabled: false });
   });
 
   it("copies bank-owned data when a coding exercise is assigned to a course", async () => {
@@ -126,6 +132,10 @@ describe("coding exercises server plugin lifecycle hooks", () => {
       state: { sourceCode: "print(1)", executionId: "submit-1" },
       gradingResult: expect.objectContaining({ rawScore: 3, rawMaxScore: 4 })
     }));
+    expect(aiFeedbackMocks.snapshotCodingExerciseAiFeedbackConfig).toHaveBeenCalledWith({
+      activityId: "activity-1",
+      executionId: "submit-1"
+    });
   });
 });
 

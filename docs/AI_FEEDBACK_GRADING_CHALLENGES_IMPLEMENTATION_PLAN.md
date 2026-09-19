@@ -1,8 +1,8 @@
 # AI Feedback, Grading, And Grade Challenges Implementation Plan
 
-This document records the agreed direction for plugin-provided AI feedback ("retroaction"), AI-assisted grading, and student challenges before implementation begins.
+This document records the implemented direction for plugin-provided AI feedback ("retroaction"), AI-assisted grading, and student challenges, plus the remaining production-hardening work.
 
-Status: planning only. None of the behavior in this document is implemented yet.
+Status: initial end-to-end implementation completed on 2026-09-19 for Programming Exercises, MCQ, the shared gradebook, and Compound Tests. Phase 6 privacy/operations hardening remains incomplete as listed below.
 
 ## Terminology
 
@@ -48,19 +48,19 @@ Enabling AI feedback without a complete rubric, instructions, output contract, o
 
 ## Course AI Settings
 
-Course settings should add a dedicated assessment-feedback policy under **AI settings**:
+Course settings include a dedicated assessment-feedback policy under **AI settings**:
 
 - `automaticFeedbackEnabled`
 - `assessmentFeedbackAiAgentConnectionId`
 
 The setting reuses existing personal/global `AiAgentConnection` records and server-side credential handling. It should remain separate from `studentSupportAiAgentConnectionId`: a support assistant and a grading model have different cost, accountability, reproducibility, and change-control requirements. A teacher may deliberately select the same connection for both purposes.
 
-The course UI should:
+The current course UI:
 
 - require an accessible enabled model before the master switch can be enabled;
-- show how many course activities have valid AI feedback configuration;
-- explain that formative feedback runs on submission while summative evaluation waits for a teacher;
-- show a clear ineffective/configuration warning when an activity enables feedback but the course gate is disabled or its model is unavailable.
+- explains that formative feedback runs on submission while summative evaluation waits for a teacher.
+
+An activity-count summary and proactive per-activity ineffective-configuration warnings remain UI follow-up work; server-side evaluation still fails closed when any effective-enablement layer is missing.
 
 The model is always resolved server-side. Provider keys, raw credentials, private prompts, hidden rubrics, reference answers, and unrestricted model output must never be sent to students.
 
@@ -86,7 +86,7 @@ The model is always resolved server-side. Provider keys, raw credentials, privat
 - The teacher can review generated feedback and the score breakdown before grade release.
 - Student-safe summative AI feedback is exposed only after the associated `GradebookItem` is released.
 
-Teacher-triggered batch grading must process each attempt independently. One provider or parsing failure must not erase successful results for other attempts. Batch size, request timeout, cancellation, and retry UX must be finalized before implementation.
+Teacher-triggered batch grading processes attempts sequentially and independently, so one provider or parsing failure does not erase successful results for other attempts. A durable maximum batch size plus cancellation and timeout UX remain Phase 6 hardening.
 
 ## Responsibility Boundary
 
@@ -119,7 +119,7 @@ Teacher-triggered batch grading must process each attempt independently. One pro
 
 ## Proposed Plugin Contracts
 
-Exact TypeScript names remain provisional, but activity definitions need capabilities distinct from existing deterministic automatic grading:
+The SDK now exposes capabilities distinct from existing deterministic automatic grading:
 
 - `supportsAiFeedback`
 - `supportsAiFeedbackGrading`
@@ -216,7 +216,7 @@ Rules:
 - The student sees the challenge, status, teacher response, and resulting grade while reviewing the relevant answer/attempt.
 - Re-evaluating challenged work creates a new immutable feedback version rather than modifying the contested artifact.
 
-The course workspace receives a manager-only **Challenges** tab with open/resolved filters plus activity, section, and student filters. The detail view combines the core challenge record with the plugin-provided submission/feedback review renderer.
+The course workspace has a manager-only **Challenges** tab listing open and resolved records with student, activity, section, explanation, status, response, and adjustment controls. Dedicated status/activity/section/student filter controls and plugin-provided deep-review rendering remain UI follow-up work.
 
 ## Compound Test Behavior
 
@@ -315,15 +315,19 @@ The normalized event should include stable references, timestamps, assessment mo
 - Student-controlled text must be treated as untrusted model input. Plugins must delimit it and must not give the grading model tools or unrestricted data access.
 - The model may use only the context explicitly authorized by the plugin and course configuration.
 
-## Proposed Delivery Order
+## Delivery Status
 
 ### Phase 0 — Confirm The Contract
+
+Status: complete. Grade release is not blocked automatically when feedback is pending or failed; the teacher controls evaluation and release as separate explicit actions. The web batch is bounded by the attempts currently loaded for the activity and processes them sequentially.
 
 - Confirm course settings, trigger semantics, visibility, direct teacher execution, challenge rules, and research fields.
 - Confirm whether grade release is blocked by required feedback failures.
 - Confirm bounded batch size and timeout behavior for direct teacher-triggered grading.
 
 ### Phase 1 — Shared Platform Foundation
+
+Status: complete. Course settings, SDK contracts, secure model resolution, normalized research events, gradebook feedback persistence, release gating, and common challenge DTO/services/routes are implemented.
 
 - Extend course AI settings and contracts.
 - Add activity/plugin AI-feedback capabilities and server result contracts.
@@ -332,6 +336,8 @@ The normalized event should include stable references, timestamps, assessment mo
 - Add common feedback result/challenge DTOs.
 
 ### Phase 2 — Programming Exercise Pilot
+
+Status: complete. Programming Exercises support required private rubric configuration, immediate formative evaluation, teacher-triggered summative evaluation, configurable deterministic/AI weighting, strict two-attempt structured-output validation, immutable private evaluation artifacts, and submission-time private rubric snapshots.
 
 - Add plugin-owned bank/course feedback configuration, rubrics, and copy/sync hooks.
 - Add formative submission-triggered feedback.
@@ -342,12 +348,16 @@ The normalized event should include stable references, timestamps, assessment mo
 
 ### Phase 3 — Grade Challenges
 
+Status: complete for the agreed core workflow. Students can challenge each released AI-graded feedback version with a required explanation; course managers have a Challenges tab and can uphold or adjust the grade with a required response. Adjustment uses the existing audited override service.
+
 - Add the core challenge schema and migration.
 - Add student create/read APIs and activity review panel.
 - Add the course Challenges tab, filters, detail view, and manager APIs.
 - Integrate teacher response, grade override, audit, and research events.
 
 ### Phase 4 — MCQ Feedback
+
+Status: complete. MCQ supports required explanation instructions, immediate formative explanations, teacher-triggered/release-gated summative explanations, immutable evaluation artifacts, and normalized research events. Its deterministic answer-key score remains authoritative and its AI feedback is not challengeable.
 
 - Add activity-level AI feedback configuration.
 - Keep deterministic MCQ grading unchanged.
@@ -357,6 +367,8 @@ The normalized event should include stable references, timestamps, assessment mo
 
 ### Phase 5 — Compound Test Integration
 
+Status: complete for Programming Exercise and MCQ children. A teacher-triggered parent evaluation dispatches supported children, records child feedback/scores, and recomputes the parent. Child feedback is visible only through the released parent grade, and every AI-graded child feedback version is independently challengeable.
+
 - Snapshot child feedback configuration in Test revisions.
 - Add teacher-triggered evaluation of supported children.
 - Recompute parent grades only after required child AI grading completes.
@@ -364,11 +376,15 @@ The normalized event should include stable references, timestamps, assessment mo
 
 ### Phase 6 — Hardening And Research Export
 
-- Add full retry/idempotency/concurrency coverage.
-- Add identifiable and privacy-filtered research exports.
-- Add operational metrics for failures, latency, model usage, and pending teacher grading.
-- Add cross-plugin E2E coverage and production documentation.
-- Update the student-model evidence plan if AI rubric dimensions become learning-evidence signals.
+Status: partial. The manager research endpoint is implemented with stable identifier pseudonymization on by default, and unit/regression coverage exists. The following items remain before production research use:
+
+- make repeated/concurrent teacher evaluation requests idempotent at the database boundary;
+- add course research-consent filtering and approved retention/deletion/anonymization policies;
+- define and enforce raw provider-response retention;
+- add operational dashboards for failures, latency, model usage, and pending teacher grading;
+- add challenge-list filters and plugin-provided deep-review rendering;
+- add live-provider cross-plugin browser coverage and cancellation/timeout UX for larger batches;
+- update the student-model evidence plan if AI rubric dimensions become learning-evidence signals.
 
 ## Verification Requirements
 
@@ -385,18 +401,17 @@ The normalized event should include stable references, timestamps, assessment mo
 - Retry and regrade preserve earlier evaluation versions and research events.
 - Students can challenge only their own released AI-graded feedback.
 - Teacher resolution requires a response and records any grade change through the audited override path.
-- Course challenge filters and authorization are enforced server-side.
+- Course challenge listing and resolution authorization are enforced server-side.
 - Research records cover successful, failed, retried, released, viewed, challenged, and adjusted evaluations.
 - Raw prompts, responses, hidden tests, credentials, and other students' data never appear in student DTOs or ordinary research exports.
 - Compound Tests expose child feedback only through the released parent result.
 
-## Open Decisions Before Implementation
+## Deferred Product And Policy Decisions
 
-- Whether summative release is blocked while required AI feedback is pending/failed, or whether a teacher may explicitly release with a documented override.
-- Maximum number of attempts in one direct teacher-triggered batch.
-- Request timeout/cancellation behavior for direct bulk grading without a background worker.
+- Whether summative release should later be blocked while required AI feedback is pending/failed. The current implementation permits explicit release.
+- A durable maximum batch size beyond the attempts loaded by the current detailed-gradebook view.
+- Request timeout/cancellation behavior for larger direct bulk grading without a background worker.
 - Whether teachers may edit generated student-facing feedback before release, and how edited text is represented in research history.
 - Whether a teacher changes only the final normalized grade during challenge resolution or can also replace individual plugin rubric-component scores.
 - Whether a regrade after release is immediately visible or requires a hide/re-release cycle.
 - Retention and anonymization periods for raw provider responses and submitted artifacts.
-

@@ -18,6 +18,7 @@ import { prisma, type Prisma } from "@cognelo/db";
 import { MCQ_AI_MAX_QUESTION_COUNT } from "./constants";
 import { buildMcqGradingResultFromConfig } from "./grading";
 import { parseMcqSource, type McqAnswerState, type McqParseError } from "./mcq";
+import { evaluateMcqWithAi } from "./ai-feedback";
 
 const mcqGenerateInputSchema = z.object({
   description: z.string().min(10).max(30000),
@@ -167,6 +168,34 @@ export const mcqSubmissionRoute: PluginRouteDefinition = {
           gradedAt: submittedAttempt.gradedAt
         }),
         result: gradingResult
+      };
+    }
+  }
+};
+
+export const mcqFormativeFeedbackRoute: PluginRouteDefinition = {
+  path: "mcq/feedback",
+  activityTypeKeys: ["mcq"],
+  methods: {
+    POST: async ({ context, readJson }) => {
+      if (!context.courseId || !context.groupId) {
+        throw new AppError(400, "GROUP_CONTEXT_REQUIRED", "MCQ feedback requires a group activity context.");
+      }
+      if (context.activity.assignment?.metadata?.assessmentMode === "summative") {
+        throw new AppError(409, "MCQ_SUMMATIVE_FEEDBACK_TEACHER_REQUIRED", "Summative MCQ feedback must be started by a teacher from the gradebook.");
+      }
+      const input = mcqSubmissionInputSchema.parse(await readJson());
+      return {
+        evaluation: await evaluateMcqWithAi({
+          user: context.user,
+          courseId: context.courseId,
+          groupId: context.groupId,
+          activityId: context.activity.id,
+          activity: context.activity,
+          answers: input.answers,
+          assessmentMode: "formative",
+          triggerKind: "formative_submission"
+        })
       };
     }
   }

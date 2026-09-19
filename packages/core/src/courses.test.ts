@@ -265,7 +265,9 @@ describe("course services", () => {
             theme: "quiet",
             aiSettings: {
               previous: true,
-              studentSupportAiAgentConnectionId: agentId
+              studentSupportAiAgentConnectionId: agentId,
+              automaticFeedbackEnabled: false,
+              assessmentFeedbackAiAgentConnectionId: null
             }
           }
         }
@@ -287,7 +289,9 @@ describe("course services", () => {
           metadata: {
             aiSettings: {
               previous: true,
-              studentSupportAiAgentConnectionId: null
+              studentSupportAiAgentConnectionId: null,
+              automaticFeedbackEnabled: false,
+              assessmentFeedbackAiAgentConnectionId: null
             }
           }
         }
@@ -300,5 +304,40 @@ describe("course services", () => {
         studentSupportAiAgentConnectionId: "clx0000000000000000000000"
       })
     ).rejects.toMatchObject({ status: 404, code: "NOT_FOUND" });
+  });
+
+  it("requires and persists a dedicated model when automatic assessment feedback is enabled", async () => {
+    const agentId = "clx0000000000000000000000";
+    mockPrisma.aiAgentConnection.findFirst.mockResolvedValue({ id: agentId, provider: "openai", apiKey: "secret" });
+    mockPrisma.course.findUnique.mockResolvedValue({ metadata: {} });
+    mockPrisma.course.update.mockResolvedValue({ id: "course-1" });
+
+    await expect(updateCourseSettings(teacherUser, "course-1", {
+      automaticFeedbackEnabled: true,
+      assessmentFeedbackAiAgentConnectionId: null
+    })).rejects.toMatchObject({ name: "ZodError" });
+
+    await updateCourseSettings(teacherUser, "course-1", {
+      automaticFeedbackEnabled: true,
+      assessmentFeedbackAiAgentConnectionId: agentId,
+      studentSupportAiAgentConnectionId: null
+    });
+    expect(mockPrisma.course.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: {
+        metadata: {
+          aiSettings: {
+            automaticFeedbackEnabled: true,
+            assessmentFeedbackAiAgentConnectionId: agentId,
+            studentSupportAiAgentConnectionId: null
+          }
+        }
+      }
+    }));
+
+    mockPrisma.aiAgentConnection.findFirst.mockResolvedValue({ id: agentId, provider: "openai", apiKey: null });
+    await expect(updateCourseSettings(teacherUser, "course-1", {
+      automaticFeedbackEnabled: true,
+      assessmentFeedbackAiAgentConnectionId: agentId
+    })).rejects.toMatchObject({ code: "AI_AGENT_KEY_MISSING" });
   });
 });

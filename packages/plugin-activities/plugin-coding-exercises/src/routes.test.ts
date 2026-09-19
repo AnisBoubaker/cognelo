@@ -18,7 +18,9 @@ const mocks = vi.hoisted(() => ({
   runCodingExercise: vi.fn(),
   submitCodingExercise: vi.fn(),
   prisma: {
-    course: { findUnique: vi.fn() }
+    course: { findUnique: vi.fn() },
+    pluginCodingExerciseReferenceSolution: { findUnique: vi.fn() },
+    pluginCodingExerciseExecution: { update: vi.fn() }
   }
 }));
 
@@ -37,6 +39,7 @@ vi.mock("@cognelo/core", async () => {
 });
 
 vi.mock("@cognelo/db", () => ({ prisma: mocks.prisma }));
+vi.mock("./db-client", () => ({ prisma: mocks.prisma }));
 
 vi.mock("./executions", async () => {
   const actual = await vi.importActual<typeof import("./executions")>("./executions");
@@ -102,6 +105,7 @@ describe("coding exercise plugin routes", () => {
     });
     mocks.runCodingExercise.mockResolvedValue({ id: "run-1" });
     mocks.submitCodingExercise.mockResolvedValue({ id: "submit-1" });
+    mocks.prisma.pluginCodingExerciseExecution.update.mockResolvedValue({ id: "submit-1" });
     mocks.getActivityAttemptAvailability.mockResolvedValue({
       attemptLimitMode: "max_attempts",
       gradesReleased: false,
@@ -117,6 +121,7 @@ describe("coding exercise plugin routes", () => {
     mocks.listCodingExerciseHiddenTests.mockResolvedValue({ tests: [] });
     mocks.replaceCodingExerciseHiddenTests.mockResolvedValue({ tests: [{ id: "hidden-1" }] });
     mocks.prisma.course.findUnique.mockResolvedValue({ subject: { title: "Programming", description: "Basics" } });
+    mocks.prisma.pluginCodingExerciseReferenceSolution.findUnique.mockResolvedValue(null);
     mocks.generateCodingExercisePrompt.mockResolvedValue({ prompt: "Prompt" });
     mocks.generateCodingExerciseSolution.mockResolvedValue({ referenceSolution: "print(1)" });
     mocks.generateCodingExerciseTests.mockResolvedValue({ hiddenTests: [] });
@@ -141,6 +146,8 @@ describe("coding exercise plugin routes", () => {
       })
     ).resolves.toEqual({
       execution: { id: "submit-1" },
+      aiFeedback: null,
+      aiFeedbackError: null,
       availability: {
         attemptLimitMode: "unlimited",
         gradesReleased: false,

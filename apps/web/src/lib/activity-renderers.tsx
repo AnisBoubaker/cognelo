@@ -294,7 +294,12 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
         const result = groupId
           ? await api.submitGroupCodingExercise(courseId, groupId, activityId, input)
           : await api.submitCodingExercise(courseId, activityId, input);
-        return { execution: result.execution as CodingExerciseExecution, availability: result.availability };
+        return {
+          execution: result.execution as CodingExerciseExecution,
+          availability: result.availability,
+          aiFeedback: result.aiFeedback,
+          aiFeedbackError: result.aiFeedbackError
+        };
       },
       listSubmissions: async (courseId: string, activityId: string) => {
         const result = groupId
@@ -535,6 +540,10 @@ function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView
         const result = await mcqClient.submitGroup(courseId, groupId, activityId, { answers });
         await responseDraftHost?.clear?.().catch(() => undefined);
         return { submission: result.submission };
+      },
+      feedback: async (activityId: string, answers: Record<string, string[]>) => {
+        const result = await api.groupMcqFormativeFeedback(courseId, groupId, activityId, answers);
+        return result.evaluation.feedback;
       }
     };
   }, [courseId, groupId, mcqClient, responseDraftHost]);

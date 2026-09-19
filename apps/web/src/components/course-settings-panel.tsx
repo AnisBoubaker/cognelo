@@ -24,23 +24,38 @@ export function CourseSettingsPanel({
 }) {
   const { t } = useI18n();
   const notifications = useNotifications();
-  const initialStudentSupportAgentId = getCourseAiSettings(course).studentSupportAiAgentConnectionId;
+  const initialAiSettings = getCourseAiSettings(course);
+  const initialStudentSupportAgentId = initialAiSettings.studentSupportAiAgentConnectionId;
+  const initialAssessmentFeedbackAgentId = initialAiSettings.assessmentFeedbackAiAgentConnectionId;
+  const initialAutomaticFeedbackEnabled = initialAiSettings.automaticFeedbackEnabled;
   const [studentSupportAgentId, setStudentSupportAgentId] = useState(initialStudentSupportAgentId);
   const [savedStudentSupportAgentId, setSavedStudentSupportAgentId] = useState(initialStudentSupportAgentId);
+  const [assessmentFeedbackAgentId, setAssessmentFeedbackAgentId] = useState(initialAssessmentFeedbackAgentId);
+  const [savedAssessmentFeedbackAgentId, setSavedAssessmentFeedbackAgentId] = useState(initialAssessmentFeedbackAgentId);
+  const [automaticFeedbackEnabled, setAutomaticFeedbackEnabled] = useState(initialAutomaticFeedbackEnabled);
+  const [savedAutomaticFeedbackEnabled, setSavedAutomaticFeedbackEnabled] = useState(initialAutomaticFeedbackEnabled);
   const [isSavingAiSettings, setIsSavingAiSettings] = useState(false);
 
   useEffect(() => {
     setStudentSupportAgentId(initialStudentSupportAgentId);
     setSavedStudentSupportAgentId(initialStudentSupportAgentId);
-  }, [initialStudentSupportAgentId]);
+    setAssessmentFeedbackAgentId(initialAssessmentFeedbackAgentId);
+    setSavedAssessmentFeedbackAgentId(initialAssessmentFeedbackAgentId);
+    setAutomaticFeedbackEnabled(initialAutomaticFeedbackEnabled);
+    setSavedAutomaticFeedbackEnabled(initialAutomaticFeedbackEnabled);
+  }, [initialAssessmentFeedbackAgentId, initialAutomaticFeedbackEnabled, initialStudentSupportAgentId]);
 
   const saveAiSettings = useCallback(async () => {
     setIsSavingAiSettings(true);
     try {
       const result = await api.updateCourseSettings(course.id, {
-        studentSupportAiAgentConnectionId: studentSupportAgentId || null
+        studentSupportAiAgentConnectionId: studentSupportAgentId || null,
+        automaticFeedbackEnabled,
+        assessmentFeedbackAiAgentConnectionId: assessmentFeedbackAgentId || null
       });
       setSavedStudentSupportAgentId(studentSupportAgentId);
+      setSavedAssessmentFeedbackAgentId(assessmentFeedbackAgentId);
+      setSavedAutomaticFeedbackEnabled(automaticFeedbackEnabled);
       onCourseUpdated(result.course);
       notifications.success(t("courseDetail.aiSettingsSaved"));
     } catch (error) {
@@ -50,20 +65,26 @@ export function CourseSettingsPanel({
     } finally {
       setIsSavingAiSettings(false);
     }
-  }, [course.id, notifications, onCourseUpdated, studentSupportAgentId, t]);
+  }, [assessmentFeedbackAgentId, automaticFeedbackEnabled, course.id, notifications, onCourseUpdated, studentSupportAgentId, t]);
 
   const discardAiSettings = useCallback(() => {
     setStudentSupportAgentId(savedStudentSupportAgentId);
-  }, [savedStudentSupportAgentId]);
+    setAssessmentFeedbackAgentId(savedAssessmentFeedbackAgentId);
+    setAutomaticFeedbackEnabled(savedAutomaticFeedbackEnabled);
+  }, [savedAssessmentFeedbackAgentId, savedAutomaticFeedbackEnabled, savedStudentSupportAgentId]);
+
+  const aiSettingsDirty = studentSupportAgentId !== savedStudentSupportAgentId ||
+    assessmentFeedbackAgentId !== savedAssessmentFeedbackAgentId ||
+    automaticFeedbackEnabled !== savedAutomaticFeedbackEnabled;
 
   useUnsavedChangesGuard(
     useMemo(
       () => ({
-        isDirty: studentSupportAgentId !== savedStudentSupportAgentId,
+        isDirty: aiSettingsDirty,
         onSave: saveAiSettings,
         onDiscard: discardAiSettings
       }),
-      [discardAiSettings, saveAiSettings, savedStudentSupportAgentId, studentSupportAgentId]
+      [aiSettingsDirty, discardAiSettings, saveAiSettings]
     )
   );
 
@@ -150,10 +171,41 @@ export function CourseSettingsPanel({
                 <p className="muted">{t("courseDetail.studentSupportAgentHelp")}</p>
               </div>
 
+              <label className="checkbox-row">
+                <input
+                  checked={automaticFeedbackEnabled}
+                  type="checkbox"
+                  onChange={(event) => setAutomaticFeedbackEnabled(event.target.checked)}
+                />
+                <span>
+                  <strong>{t("courseDetail.automaticFeedbackEnabled")}</strong>
+                  <span className="muted">{t("courseDetail.automaticFeedbackEnabledHelp")}</span>
+                </span>
+              </label>
+
+              <div className="field">
+                <label htmlFor="assessmentFeedbackAgent">{t("courseDetail.assessmentFeedbackAgent")}</label>
+                <select
+                  disabled={!automaticFeedbackEnabled}
+                  id="assessmentFeedbackAgent"
+                  required={automaticFeedbackEnabled}
+                  value={assessmentFeedbackAgentId}
+                  onChange={(event) => setAssessmentFeedbackAgentId(event.target.value)}
+                >
+                  <option value="">{t("courseDetail.noAiAgentSelected")}</option>
+                  {aiAgentConnections.map((connection) => (
+                    <option key={connection.id} value={connection.id}>
+                      {formatAiAgentOption(connection, t)}
+                    </option>
+                  ))}
+                </select>
+                <p className="muted">{t("courseDetail.assessmentFeedbackAgentHelp")}</p>
+              </div>
+
               {aiAgentConnections.length ? null : <p className="muted">{t("courseDetail.noAiAgentsAvailable")}</p>}
 
               <EditActionBar
-                isDirty={studentSupportAgentId !== savedStudentSupportAgentId}
+                isDirty={aiSettingsDirty}
                 isSaving={isSavingAiSettings}
                 savedLabel={t("common.savedStatus")}
                 unsavedLabel={t("common.unsavedStatus")}
@@ -174,12 +226,20 @@ export function CourseSettingsPanel({
 function getCourseAiSettings(course: Course) {
   const aiSettings = course.metadata?.aiSettings;
   if (!aiSettings || typeof aiSettings !== "object" || Array.isArray(aiSettings)) {
-    return { studentSupportAiAgentConnectionId: "" };
+    return {
+      studentSupportAiAgentConnectionId: "",
+      automaticFeedbackEnabled: false,
+      assessmentFeedbackAiAgentConnectionId: ""
+    };
   }
   const record = aiSettings as Record<string, unknown>;
   return {
     studentSupportAiAgentConnectionId: typeof record.studentSupportAiAgentConnectionId === "string"
       ? record.studentSupportAiAgentConnectionId
+      : "",
+    automaticFeedbackEnabled: record.automaticFeedbackEnabled === true,
+    assessmentFeedbackAiAgentConnectionId: typeof record.assessmentFeedbackAiAgentConnectionId === "string"
+      ? record.assessmentFeedbackAiAgentConnectionId
       : ""
   };
 }

@@ -74,31 +74,79 @@ model PluginBankCodingExerciseReferenceSolution {
 }
 
 model PluginCodingExerciseExecution {
-  id                    String                              @id @default(cuid())
-  activityId            String
-  userId                String
-  kind                  PluginCodingExerciseExecutionKind   @default(run)
-  status                PluginCodingExerciseExecutionStatus @default(pending)
-  languageKey           String
-  judge0LanguageId      Int
-  sourceCode            String
-  stdin                 String?                             @default("")
-  expectedOutput        String?                             @default("")
-  judge0Token           String?
-  stdout                String?
-  stderr                String?
-  compileOutput         String?
-  message               String?
-  timeSeconds           String?
-  memoryKb              Int?
-  judge0StatusId        Int?
-  judge0StatusLabel     String?
-  resultSummary         Json                                @default("{}")
-  createdAt             DateTime                            @default(now())
-  updatedAt             DateTime                            @updatedAt
+  id                       String                              @id @default(cuid())
+  activityId               String
+  userId                   String
+  kind                     PluginCodingExerciseExecutionKind   @default(run)
+  status                   PluginCodingExerciseExecutionStatus @default(pending)
+  languageKey              String
+  judge0LanguageId         Int
+  sourceCode               String
+  stdin                    String?                             @default("")
+  expectedOutput           String?                             @default("")
+  judge0Token              String?
+  stdout                   String?
+  stderr                   String?
+  compileOutput            String?
+  message                  String?
+  timeSeconds              String?
+  memoryKb                 Int?
+  judge0StatusId           Int?
+  judge0StatusLabel        String?
+  resultSummary            Json                                @default("{}")
+  aiFeedbackConfigSnapshot Json?
+  createdAt                DateTime                            @default(now())
+  updatedAt                DateTime                            @updatedAt
 
   @@index([activityId, userId, createdAt])
   @@index([userId, createdAt])
   @@index([activityId, kind, createdAt])
   @@index([judge0Token])
+}
+
+model PluginCodingExerciseAiEvaluation {
+  id                 String   @id @default(cuid())
+  activityId         String
+  executionId        String
+  coreAttemptId      String?
+  courseId           String
+  groupId            String?
+  participantId      String?
+  userId             String
+  createdByUserId    String
+  assessmentMode     String
+  triggerKind        String
+  status             String
+  version            Int
+  rubricSnapshot     Json
+  promptVersion      String
+  schemaVersion      String
+  provider           String
+  model              String
+  connectionId       String
+  requestPayload     Json
+  rawResponse        String?
+  parsedResponse     Json?
+  sanitizedFeedback  Json?
+  criterionScores    Json?
+  deterministicScore Float
+  aiScore            Float?
+  combinedScore      Float?
+  testWeightPercent  Int
+  aiWeightPercent    Int
+  submissionHash     String
+  feedbackHash       String?
+  latencyMs          Int?
+  tokenUsage         Json?
+  error              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([activityId, executionId, version])
+  @@index([activityId, createdAt])
+  @@index([executionId, createdAt])
+  @@index([coreAttemptId, createdAt])
+  @@index([courseId, createdAt])
+  @@index([participantId, createdAt])
+  @@index([status, createdAt])
 }
