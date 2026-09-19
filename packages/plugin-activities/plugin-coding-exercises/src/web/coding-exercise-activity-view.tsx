@@ -5,11 +5,14 @@ import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
 import { CodeEditor, CodeRenderer, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, RichTextEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   alignCodingExerciseStarterCodeToTemplate,
+  balanceCodingExerciseAiRubricCriterionWeights,
   buildCodingExerciseStudentTemplateProjectionFromSource,
   buildCodingExerciseStudentTemplateSource,
   buildCodingExerciseTemplateSource,
+  createCodingExerciseAiRubricCriterionId,
   codingExerciseTemplateRequiresTestCodeMarker,
   codingExerciseTemplateInsertionToken,
+  getCodingExerciseAiFeedbackValidationMessages,
   normalizeCodingExerciseSampleTests,
   parseCodingExercisePrivateConfig,
   splitCodingExerciseTemplateSource,
@@ -339,6 +342,7 @@ export function CodingExerciseActivityView({
   );
   const visibleSampleTests = normalizeCodingExerciseSampleTests(config.sampleTests);
   const isPersonalizedTest = selectedSampleTestId === personalizedTestId;
+  const aiFeedbackValidationMessages = getCodingExerciseAiFeedbackValidationMessages(privateConfig.aiFeedback);
 
   useEffect(() => {
     if (typeof document === "undefined" || document.getElementById("coding-exercise-spinner-style")) {
@@ -681,7 +685,11 @@ export function CodingExerciseActivityView({
     setError("");
 
     try {
-      const normalizedPrivateConfig = getPersistedPrivateConfig(privateConfig);
+      const aiFeedbackValidationMessage = getCodingExerciseAiFeedbackValidationMessages(privateConfig.aiFeedback)[0];
+      if (aiFeedbackValidationMessage) {
+        throw new Error(aiFeedbackValidationMessage);
+      }
+      const normalizedPrivateConfig = parseCodingExercisePrivateConfig(getPersistedPrivateConfig(privateConfig));
 
       if (!normalizedPrivateConfig.templateSource.includes(codingExerciseTemplateInsertionToken)) {
         throw new Error(t("templateSourceMissingMarker"));
@@ -1368,6 +1376,8 @@ export function CodingExerciseActivityView({
                     <label htmlFor="coding-ai-rubric-name">{t("rubricName")}</label>
                     <input
                       id="coding-ai-rubric-name"
+                      maxLength={200}
+                      required
                       value={privateConfig.aiFeedback.rubricName}
                       onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, rubricName: event.target.value } }))}
                     />
@@ -1376,6 +1386,8 @@ export function CodingExerciseActivityView({
                     <label htmlFor="coding-ai-rubric-version">{t("rubricVersion")}</label>
                     <input
                       id="coding-ai-rubric-version"
+                      maxLength={80}
+                      required
                       value={privateConfig.aiFeedback.rubricVersion}
                       onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, rubricVersion: event.target.value } }))}
                     />
@@ -1385,6 +1397,8 @@ export function CodingExerciseActivityView({
                   <label htmlFor="coding-ai-instructions">{t("feedbackInstructions")}</label>
                   <textarea
                     id="coding-ai-instructions"
+                    maxLength={8000}
+                    required
                     rows={5}
                     value={privateConfig.aiFeedback.instructions}
                     onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, instructions: event.target.value } }))}
@@ -1398,6 +1412,7 @@ export function CodingExerciseActivityView({
                         id="coding-ai-test-weight"
                         min={0}
                         max={100}
+                        required
                         type="number"
                         value={privateConfig.aiFeedback.testWeightPercent}
                         onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, testWeightPercent: Number(event.target.value) } }))}
@@ -1409,6 +1424,7 @@ export function CodingExerciseActivityView({
                         id="coding-ai-rubric-weight"
                         min={0}
                         max={100}
+                        required
                         type="number"
                         value={privateConfig.aiFeedback.aiWeightPercent}
                         onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, aiWeightPercent: Number(event.target.value) } }))}
@@ -1420,17 +1436,18 @@ export function CodingExerciseActivityView({
                   <h4>{t("rubricCriteria")}</h4>
                   <button
                     className="button secondary"
+                    disabled={privateConfig.aiFeedback.criteria.length >= 20}
                     type="button"
                     onClick={() => setPrivateConfig((current) => ({
                       ...current,
                       aiFeedback: {
                         ...current.aiFeedback,
-                        criteria: [...current.aiFeedback.criteria, {
-                          id: `criterion-${current.aiFeedback.criteria.length + 1}`,
+                        criteria: balanceCodingExerciseAiRubricCriterionWeights([...current.aiFeedback.criteria, {
+                          id: createCodingExerciseAiRubricCriterionId(current.aiFeedback.criteria),
                           title: "",
                           description: "",
-                          weightPercent: 0
-                        }]
+                          weightPercent: 1
+                        }])
                       }
                     }))}
                   >
@@ -1442,14 +1459,14 @@ export function CodingExerciseActivityView({
                     <div className="form-grid two-columns">
                       <div className="field">
                         <label>{t("criterionTitle")}</label>
-                        <input value={criterion.title} onChange={(event) => setPrivateConfig((current) => ({
+                        <input maxLength={160} required value={criterion.title} onChange={(event) => setPrivateConfig((current) => ({
                           ...current,
                           aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value, id: item.id || `criterion-${index + 1}` } : item) }
                         }))} />
                       </div>
                       <div className="field">
                         <label>{t("criterionWeight")}</label>
-                        <input min={1} max={100} type="number" value={criterion.weightPercent} onChange={(event) => setPrivateConfig((current) => ({
+                        <input min={1} max={100} required type="number" value={criterion.weightPercent} onChange={(event) => setPrivateConfig((current) => ({
                           ...current,
                           aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.map((item, itemIndex) => itemIndex === index ? { ...item, weightPercent: Number(event.target.value) } : item) }
                         }))} />
@@ -1457,17 +1474,29 @@ export function CodingExerciseActivityView({
                     </div>
                     <div className="field">
                       <label>{t("criterionDescription")}</label>
-                      <textarea rows={3} value={criterion.description} onChange={(event) => setPrivateConfig((current) => ({
+                      <textarea maxLength={2000} required rows={3} value={criterion.description} onChange={(event) => setPrivateConfig((current) => ({
                         ...current,
                         aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item) }
                       }))} />
                     </div>
                     <button className="button danger" type="button" onClick={() => setPrivateConfig((current) => ({
                       ...current,
-                      aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.filter((_, itemIndex) => itemIndex !== index) }
+                      aiFeedback: {
+                        ...current.aiFeedback,
+                        criteria: balanceCodingExerciseAiRubricCriterionWeights(
+                          current.aiFeedback.criteria.filter((_, itemIndex) => itemIndex !== index)
+                        )
+                      }
                     }))}>{t("remove")}</button>
                   </section>
                 ))}
+                {aiFeedbackValidationMessages.length ? (
+                  <div className="error" role="alert">
+                    <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+                      {aiFeedbackValidationMessages.map((message) => <li key={message}>{message}</li>)}
+                    </ul>
+                  </div>
+                ) : null}
               </>
             ) : null}
           </section>
@@ -1718,6 +1747,7 @@ export function CodingExerciseActivityView({
           <EditActionBar
             isDirty={hasUnsavedChanges}
             isSaving={saving}
+            saveDisabled={aiFeedbackValidationMessages.length > 0}
             savedLabel={actionCopy.saved}
             unsavedLabel={actionCopy.unsaved}
             saveLabel={t("saveCodingExercise")}

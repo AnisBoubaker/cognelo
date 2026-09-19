@@ -48,9 +48,9 @@ export const codingExerciseHiddenTestSchema = z.object({
 });
 
 export const codingExerciseAiRubricCriterionSchema = z.object({
-  id: z.string().trim().min(1).max(80),
-  title: z.string().trim().min(1).max(160),
-  description: z.string().trim().min(1).max(2000),
+  id: z.string().trim().min(1, "A rubric criterion identifier is required.").max(80),
+  title: z.string().trim().min(1, "A rubric criterion title is required.").max(160),
+  description: z.string().trim().min(1, "A rubric criterion description is required.").max(2000),
   weightPercent: z.number().int().min(1).max(100)
 });
 
@@ -67,6 +67,9 @@ export const codingExerciseAiFeedbackConfigSchema = z.object({
   if (!value.enabled) return;
   if (!value.rubricName) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["rubricName"], message: "A rubric name is required when AI feedback is enabled." });
+  }
+  if (!value.rubricVersion) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["rubricVersion"], message: "A rubric version is required when AI feedback is enabled." });
   }
   if (!value.instructions) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["instructions"], message: "Feedback instructions are required when AI feedback is enabled." });
@@ -87,6 +90,34 @@ export const codingExerciseAiFeedbackConfigSchema = z.object({
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["aiWeightPercent"], message: "The AI grading weight must be greater than zero." });
   }
 });
+
+export type CodingExerciseAiRubricCriterion = z.infer<typeof codingExerciseAiRubricCriterionSchema>;
+
+export function getCodingExerciseAiFeedbackValidationMessages(value: unknown) {
+  const result = codingExerciseAiFeedbackConfigSchema.safeParse(value);
+  if (result.success) return [];
+  return [...new Set(result.error.issues.map((issue) => issue.message))];
+}
+
+export function createCodingExerciseAiRubricCriterionId(criteria: Array<Pick<CodingExerciseAiRubricCriterion, "id">>) {
+  const usedIds = new Set(criteria.map((criterion) => criterion.id));
+  let generatedId: string;
+  do {
+    const randomId = globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    generatedId = `criterion-${randomId}`;
+  } while (usedIds.has(generatedId));
+  return generatedId;
+}
+
+export function balanceCodingExerciseAiRubricCriterionWeights<T extends CodingExerciseAiRubricCriterion>(criteria: T[]): T[] {
+  if (criteria.length === 0) return [];
+  const baseWeight = Math.floor(100 / criteria.length);
+  const remainder = 100 % criteria.length;
+  return criteria.map((criterion, index) => ({
+    ...criterion,
+    weightPercent: baseWeight + (index < remainder ? 1 : 0)
+  }));
+}
 
 export const codingExercisePrivateConfigSchema = z.object({
   hiddenSupportCode: z.string().max(60000).default(""),
