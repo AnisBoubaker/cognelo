@@ -3,7 +3,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { CodeRenderer } from "@cognelo/activity-ui";
-import { CodingExerciseActivityView } from "@cognelo/plugin-coding-exercises";
+import { CodingExerciseActivityView, CodingExerciseAiFeedbackReview } from "@cognelo/plugin-coding-exercises";
 import {
   CodingHomeworkGraderActivityView,
   CodingHomeworkManualGradingPanel,
@@ -23,6 +23,7 @@ import {
 import {
   createMcqClient,
   MarkdownBlocksView,
+  McqAiFeedbackReview,
   McqActivityView,
   McqManualGradingPanel,
   parseMcqSource,
@@ -118,6 +119,13 @@ type ManualGradingRendererContext = {
   onRegradeAttempt: () => Promise<void>;
   onDeleteSubmission: () => Promise<void>;
   onGradeTestItem?: (parentAttemptId: string, testItemId: string, score: number, reason: string | null) => Promise<void>;
+  t: (key: string, params?: Record<string, string | number>) => string;
+};
+
+export type AiFeedbackReviewRendererContext = {
+  feedback: Record<string, unknown>;
+  submission: Record<string, unknown>;
+  onFeedbackChange: (feedback: Record<string, unknown>) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
@@ -1297,4 +1305,14 @@ export const manualGradingRenderers: Record<string, (context: ManualGradingRende
 export function getManualGradingRenderer(activityTypeKey: string) {
   const rendererKey = getActivityDefinition(activityTypeKey)?.manualGrading?.rendererKey;
   return rendererKey ? manualGradingRenderers[rendererKey] ?? null : null;
+}
+
+export const aiFeedbackReviewRenderers: Record<string, (context: AiFeedbackReviewRendererContext) => ReactNode> = {
+  "coding-exercise-ai-feedback-review": (context) => <CodingExerciseAiFeedbackReview {...context} />,
+  "mcq-ai-feedback-review": (context) => <McqAiFeedbackReview {...context} />
+};
+
+export function getAiFeedbackReviewRenderer(activityTypeKey: string) {
+  const rendererKey = getActivityDefinition(activityTypeKey)?.aiFeedback?.rendererKey;
+  return rendererKey ? aiFeedbackReviewRenderers[rendererKey] ?? null : null;
 }

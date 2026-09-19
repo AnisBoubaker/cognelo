@@ -29,6 +29,64 @@ const aiResponseSchema = z.object({
   criteria: z.array(criterionResultSchema).max(20)
 }).strict();
 
+const teacherFeedbackRevisionSchema = z.object({
+  summary: z.string().trim().min(1).max(3000),
+  strengths: z.array(z.string().trim().min(1).max(1000)).max(10),
+  improvements: z.array(z.string().trim().min(1).max(1000)).max(10),
+  criteria: z.array(z.object({
+    id: z.string().min(1).max(80),
+    feedback: z.string().trim().min(1).max(2000)
+  })).max(20)
+});
+
+export async function getCodingExerciseAiFeedbackTeacherSubmission(input: {
+  activityId: string;
+  executionId: string;
+  activity: ServerActivityRecord;
+}) {
+  const execution = await prisma.pluginCodingExerciseExecution.findFirst({
+    where: { id: input.executionId, activityId: input.activityId }
+  });
+  if (!execution) {
+    throw new AppError(404, "CODING_EXERCISE_EXECUTION_NOT_FOUND", "The coding exercise submission was not found.");
+  }
+  return {
+    kind: "coding-exercise",
+    sourceCode: execution.sourceCode,
+    language: parseCodingExerciseConfig(input.activity.config).language,
+    resultSummary: toRecord(execution.resultSummary),
+    submittedAt: execution.updatedAt.toISOString()
+  };
+}
+
+export function reviseCodingExerciseAiFeedback(currentFeedback: Record<string, unknown>, value: unknown) {
+  const revision = teacherFeedbackRevisionSchema.parse(value);
+  const currentCriteria = Array.isArray(currentFeedback.criteria)
+    ? currentFeedback.criteria.map(toRecord)
+    : [];
+  const expectedIds = currentCriteria.flatMap((criterion) => typeof criterion.id === "string" ? [criterion.id] : []);
+  const revisionIds = revision.criteria.map((criterion) => criterion.id);
+  if (
+    expectedIds.length !== currentCriteria.length ||
+    revisionIds.length !== expectedIds.length ||
+    new Set(revisionIds).size !== revisionIds.length ||
+    expectedIds.some((id) => !revisionIds.includes(id))
+  ) {
+    throw new AppError(400, "AI_FEEDBACK_CRITERIA_MISMATCH", "The revised feedback must contain the original rubric criteria.");
+  }
+  const revisionById = new Map(revision.criteria.map((criterion) => [criterion.id, criterion.feedback]));
+  return {
+    ...currentFeedback,
+    summary: revision.summary,
+    strengths: revision.strengths,
+    improvements: revision.improvements,
+    criteria: currentCriteria.map((criterion) => ({
+      ...criterion,
+      feedback: revisionById.get(String(criterion.id)) ?? criterion.feedback
+    }))
+  };
+}
+
 export async function evaluateCodingExerciseAttemptWithAi(input: {
   user: CurrentUser;
   courseId: string;

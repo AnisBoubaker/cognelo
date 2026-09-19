@@ -574,7 +574,7 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
         }
       }
     });
-    const previousFeedback = sanitizeStudentGradeFeedback(previousGrade?.normalizedResult);
+    const previousFeedback = asJsonObject(asJsonObject(previousGrade?.normalizedResult)?.studentFeedback);
     const feedbackText = typeof input.feedbackText === "string" ? input.feedbackText.trim() : "";
     const nextSnapshot = {
       attemptId: null,
@@ -1495,6 +1495,15 @@ function findAiFeedbackReferences(value: unknown): Array<{
     }];
   }
   const details = asJsonObject(feedback.details);
+  if (typeof details?.feedbackRef === "string" && typeof details.feedbackVersion === "number") {
+    return [{
+      feedbackRef: details.feedbackRef,
+      feedbackVersion: details.feedbackVersion,
+      activityId: null,
+      pluginKey: null,
+      testItemId: null
+    }];
+  }
   const items = Array.isArray(details?.items) ? details.items : [];
   return items.flatMap((item) => {
     const itemRecord = asJsonObject(item);

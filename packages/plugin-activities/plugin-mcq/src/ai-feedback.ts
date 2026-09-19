@@ -22,6 +22,42 @@ const responseSchema = z.object({
   }).strict()).max(100)
 }).strict();
 
+const teacherFeedbackRevisionSchema = z.object({
+  summary: z.string().trim().min(1).max(3000),
+  questionFeedback: z.array(z.object({
+    questionId: z.string().min(1).max(120),
+    explanation: z.string().trim().min(1).max(2000)
+  })).max(100)
+});
+
+export function reviseMcqAiFeedback(currentFeedback: Record<string, unknown>, value: unknown) {
+  const revision = teacherFeedbackRevisionSchema.parse(value);
+  const currentQuestionFeedback = Array.isArray(currentFeedback.questionFeedback)
+    ? currentFeedback.questionFeedback.flatMap((entry) => {
+        const record = entry && typeof entry === "object" && !Array.isArray(entry) ? entry as Record<string, unknown> : null;
+        return record && typeof record.questionId === "string" ? [record] : [];
+      })
+    : [];
+  const expectedIds = currentQuestionFeedback.map((entry) => String(entry.questionId));
+  const revisionIds = revision.questionFeedback.map((entry) => entry.questionId);
+  if (
+    revisionIds.length !== expectedIds.length ||
+    new Set(revisionIds).size !== revisionIds.length ||
+    expectedIds.some((id) => !revisionIds.includes(id))
+  ) {
+    throw new AppError(400, "AI_FEEDBACK_QUESTION_MISMATCH", "The revised feedback must contain the original questions.");
+  }
+  const revisionById = new Map(revision.questionFeedback.map((entry) => [entry.questionId, entry.explanation]));
+  return {
+    ...currentFeedback,
+    summary: revision.summary,
+    questionFeedback: currentQuestionFeedback.map((entry) => ({
+      ...entry,
+      explanation: revisionById.get(String(entry.questionId)) ?? entry.explanation
+    }))
+  };
+}
+
 export async function evaluateMcqWithAi(input: {
   user: CurrentUser;
   courseId: string;

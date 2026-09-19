@@ -144,8 +144,8 @@ const copyByLocale = {
     aiFeedbackEnabled: "Enable AI feedback",
     aiFeedbackInstructions: "Feedback instructions",
     aiFeedbackHelp: "Formative feedback is generated after Check answers. Summative feedback is started by a teacher and does not change deterministic MCQ grading.",
-    aiFeedbackResult: "AI feedback",
-    aiFeedbackError: "Answers were checked, but AI feedback could not be generated."
+    aiFeedbackResult: "Feedback",
+    aiFeedbackError: "Answers were checked, but feedback could not be generated."
   },
   fr: {
     authoringTitle: "Edition des questions a choix multiples",
@@ -203,8 +203,8 @@ const copyByLocale = {
     aiFeedbackEnabled: "Activer la rétroaction IA",
     aiFeedbackInstructions: "Consignes de rétroaction",
     aiFeedbackHelp: "La rétroaction formative est générée après la vérification. La rétroaction sommative est lancée par un enseignant et ne modifie pas la notation déterministe.",
-    aiFeedbackResult: "Rétroaction IA",
-    aiFeedbackError: "Les réponses ont été vérifiées, mais la rétroaction IA n’a pas pu être générée."
+    aiFeedbackResult: "Rétroaction",
+    aiFeedbackError: "Les réponses ont été vérifiées, mais la rétroaction n’a pas pu être générée."
   },
   zh: {
     authoringTitle: "选择题编辑",
@@ -262,8 +262,8 @@ const copyByLocale = {
     aiFeedbackEnabled: "启用 AI 反馈",
     aiFeedbackInstructions: "反馈说明",
     aiFeedbackHelp: "形成性反馈在检查答案后生成。总结性反馈由教师启动，且不会改变确定性选择题评分。",
-    aiFeedbackResult: "AI 反馈",
-    aiFeedbackError: "答案已检查，但无法生成 AI 反馈。"
+    aiFeedbackResult: "反馈",
+    aiFeedbackError: "答案已检查，但无法生成反馈。"
   }
 } as const;
 

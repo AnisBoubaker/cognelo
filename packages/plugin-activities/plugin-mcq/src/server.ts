@@ -4,7 +4,7 @@ import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import { buildMcqGradingResultFromConfig } from "./grading";
 import { z } from "zod";
 import { mcqFormativeFeedbackRoute, mcqGenerateRoute, mcqGradebookAttemptsRoute, mcqSubmissionRoute, submittedAnswersFromMetadata } from "./routes";
-import { evaluateMcqWithAi } from "./ai-feedback";
+import { evaluateMcqWithAi, reviseMcqAiFeedback } from "./ai-feedback";
 
 export const mcqServerPlugin: ServerActivityPlugin = {
   key: "mcq",
@@ -24,6 +24,20 @@ export const mcqServerPlugin: ServerActivityPlugin = {
         assessmentMode: "summative",
         triggerKind
       });
+    },
+    teacherReview: {
+      getSubmission: async ({ coreAttemptId, activity }) => {
+        const attempt = await prisma.activityAttempt.findUnique({ where: { id: coreAttemptId }, select: { metadata: true, submittedAt: true } });
+        if (!attempt) throw new AppError(404, "MCQ_ATTEMPT_NOT_FOUND", "The MCQ attempt was not found.");
+        return {
+          kind: "mcq",
+          answers: submittedAnswersFromMetadata(attempt.metadata),
+          source: typeof activity.config?.source === "string" ? activity.config.source : "",
+          defaultCodeLanguage: typeof activity.config?.defaultCodeLanguage === "string" ? activity.config.defaultCodeLanguage : "none",
+          submittedAt: attempt.submittedAt?.toISOString() ?? null
+        };
+      },
+      reviseFeedback: ({ currentFeedback, feedback }) => reviseMcqAiFeedback(currentFeedback, feedback)
     }
   },
   grading: {

@@ -167,6 +167,9 @@ export const mcqPlugin: ActivityPlugin = {
       },
       manualGrading: {
         rendererKey: "mcq-manual-grading"
+      },
+      aiFeedback: {
+        rendererKey: "mcq-ai-feedback-review"
       }
     }
   ]

@@ -132,6 +132,8 @@ Every submitted `PluginCodingExerciseExecution` snapshots the effective private 
 
 When AI grading is enabled, the plugin returns the configured combined score (for example, 60% deterministic hidden tests and 40% AI rubric) to the ordinary core gradebook lifecycle. Released AI-graded feedback can be challenged through the shared course workflow. Feedback-only configurations leave the deterministic test grade unchanged and are not challengeable.
 
+The plugin registers a teacher feedback review renderer and server handlers. From detailed gradebook results, a teacher can review one learner or navigate the whole generated set, see the submitted source code, and edit the summary, strengths, improvements, and criterion narrative. Criterion scores and deterministic/AI/combined score components remain read-only; grade changes use the ordinary audited override. Saving creates a revised learner-visible core snapshot while the private `PluginCodingExerciseAiEvaluation` stays immutable. Core records the previous/next feedback and `feedback_teacher_revised` research event, and blocks edits after that version has been challenged. Learner-facing feedback copy deliberately says only “Feedback” and does not identify AI as the generator or grader.
+
 ## Judge0 Integration
 
 The browser should never call Judge0 directly.
