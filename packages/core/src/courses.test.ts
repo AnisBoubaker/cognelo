@@ -307,7 +307,7 @@ describe("course services", () => {
   });
 
   it("requires and persists a dedicated model when automatic assessment feedback is enabled", async () => {
-    const agentId = "clx0000000000000000000000";
+    const agentId = "seed-ai-agent-student-support";
     mockPrisma.aiAgentConnection.findFirst.mockResolvedValue({ id: agentId, provider: "openai", apiKey: "secret" });
     mockPrisma.course.findUnique.mockResolvedValue({ metadata: {} });
     mockPrisma.course.update.mockResolvedValue({ id: "course-1" });
