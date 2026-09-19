@@ -96,6 +96,7 @@ export default function CourseDetailPage() {
   const [assignAllAvailableUntil, setAssignAllAvailableUntil] = useState("");
   const [assignAllEnablePerGroupSettings, setAssignAllEnablePerGroupSettings] = useState(true);
   const [assignAllAssessmentMode, setAssignAllAssessmentMode] = useState<"formative" | "summative">("formative");
+  const [assignAllRequireSafeExamBrowser, setAssignAllRequireSafeExamBrowser] = useState(false);
   const [assignAllPointsPossible, setAssignAllPointsPossible] = useState("100");
   const [assignAllGradingMode, setAssignAllGradingMode] = useState<"points" | "pass_fail">("points");
   const [assignAllPassThresholdPoints, setAssignAllPassThresholdPoints] = useState("50");
@@ -535,6 +536,7 @@ export default function CourseDetailPage() {
     setAssignAllParentId(rule?.contentPlacement?.parentId ?? coursePlacement?.parentId ?? "");
     setAssignAllIsVisible(rule?.contentPlacement?.isVisible ?? coursePlacement?.isVisible ?? true);
     setAssignAllAssessmentMode(isTest ? "summative" : rule?.assessmentMode ?? "formative");
+    setAssignAllRequireSafeExamBrowser(rule?.requireSafeExamBrowser ?? false);
     setAssignAllPointsPossible(String(gradebookSettings?.pointsPossible ?? 100));
     setAssignAllGradingMode(gradebookSettings?.gradingMode ?? "points");
     setAssignAllPassThresholdPoints(String(gradebookSettings?.passThresholdPoints ?? 50));
@@ -581,6 +583,7 @@ export default function CourseDetailPage() {
         availableUntil: toIsoOrNull(assignAllAvailableUntil),
         enablePerGroupSettings: assignAllEnablePerGroupSettings,
         assessmentMode,
+        requireSafeExamBrowser: assessmentMode === "summative" && assignAllRequireSafeExamBrowser,
         ...(assessmentMode === "summative" ? { gradebookSettings: buildAssignAllGradebookSettings() } : {}),
         contentPlacement: {
           parentId: assignAllParentId || null,
@@ -595,6 +598,7 @@ export default function CourseDetailPage() {
       setAssignAllAvailableUntil("");
       setAssignAllEnablePerGroupSettings(true);
       setAssignAllAssessmentMode("formative");
+      setAssignAllRequireSafeExamBrowser(false);
       setAssignAllPointsPossible("100");
       setAssignAllGradingMode("points");
       setAssignAllPassThresholdPoints("50");
@@ -2173,7 +2177,11 @@ export default function CourseDetailPage() {
                             id={`settings-assign-mode-${settingsActivity.id}`}
                             value={assignAllAssessmentMode}
                             disabled={assignAllSavingActivityId === settingsActivity.id || settingsActivityIsTest}
-                            onChange={(event) => setAssignAllAssessmentMode(event.target.value as "formative" | "summative")}
+                            onChange={(event) => {
+                              const mode = event.target.value as "formative" | "summative";
+                              setAssignAllAssessmentMode(mode);
+                              if (mode === "formative") setAssignAllRequireSafeExamBrowser(false);
+                            }}
                           >
                             <option value="formative">{t("groupPage.assessmentModeFormative")}</option>
                             <option value="summative">{t("groupPage.assessmentModeSummative")}</option>
@@ -2201,7 +2209,21 @@ export default function CourseDetailPage() {
                         <span>{t("courseDetail.enablePerGroupSettings")}</span>
                       </label>
                       {assignAllAssessmentMode === "summative" ? (
-                        <div className="grid compact-form-grid">
+                        <>
+                          <label className="checkbox-row" htmlFor={`settings-assign-seb-${settingsActivity.id}`}>
+                            <input
+                              id={`settings-assign-seb-${settingsActivity.id}`}
+                              type="checkbox"
+                              checked={assignAllRequireSafeExamBrowser}
+                              disabled={assignAllSavingActivityId === settingsActivity.id}
+                              onChange={(event) => setAssignAllRequireSafeExamBrowser(event.target.checked)}
+                            />
+                            <span>
+                              {t("groupPage.requireSafeExamBrowser")}
+                              <small className="muted">{t("groupPage.requireSafeExamBrowserHelp")}</small>
+                            </span>
+                          </label>
+                          <div className="grid compact-form-grid">
                           <div className="field">
                             <label htmlFor={`settings-assign-points-${settingsActivity.id}`}>{t("groupPage.pointsPossible")}</label>
                             <input
@@ -2309,7 +2331,8 @@ export default function CourseDetailPage() {
                               <span>{t("groupPage.dropLowestAttempt")}</span>
                             </label>
                           ) : null}
-                        </div>
+                          </div>
+                        </>
                       ) : null}
                       {settingsError ? <p className="error">{settingsError}</p> : null}
                       <div className="row">
@@ -2395,6 +2418,7 @@ function getAllGroupsAssignmentRule(activity: NonNullable<Course["activities"]>[
     availableUntil: typeof record.availableUntil === "string" ? record.availableUntil : null,
     enablePerGroupSettings: record.enablePerGroupSettings !== false,
     assessmentMode: record.assessmentMode === "summative" ? "summative" as const : "formative" as const,
+    requireSafeExamBrowser: record.requireSafeExamBrowser === true,
     contentPlacement: parseContentPlacement(record.contentPlacement),
     gradebookSettings:
       record.gradebookSettings && typeof record.gradebookSettings === "object" && !Array.isArray(record.gradebookSettings)

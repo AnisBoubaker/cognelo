@@ -26,7 +26,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const user = await login(email, password);
-      router.replace(getAuthenticatedLandingPath(user));
+      router.replace(loginReturnPath() ?? getAuthenticatedLandingPath(user));
     } catch (err) {
       if (err instanceof ApiError && err.code === "PENDING_ACCOUNT_SETUP") {
         setMode("activate");
@@ -43,7 +43,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const user = await activateAccount({ email, password, confirmPassword });
-      router.replace(getAuthenticatedLandingPath(user));
+      router.replace(loginReturnPath() ?? getAuthenticatedLandingPath(user));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("login.activationError"));
     } finally {
@@ -126,4 +126,9 @@ export default function LoginPage() {
       </section>
     </main>
   );
+}
+
+function loginReturnPath() {
+  const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+  return returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : null;
 }

@@ -1,19 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { useAuth } from "@/components/auth-provider";
-import { api, ApiError, Activity, ActivityDefinition, Course, CourseGroup, DeletedSubmissionAudit, StudentGradeFeedback, StudentReleasedGradeRow } from "@/lib/api";
+import { api, ApiError, Activity, ActivityDefinition, Course, CourseGroup, DeletedSubmissionAudit, SafeExamBrowserAccess, SafeExamBrowserLaunch, StudentGradeFeedback, StudentReleasedGradeRow } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { activityRenderers } from "@/lib/activity-renderers";
+import { readSafeExamBrowserProof } from "@/lib/safe-exam-browser";
 
 export default function GroupActivityPage() {
   const params = useParams<{ courseId: string; groupId: string; activityId: string }>();
   const { courseId, groupId, activityId } = params;
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const { locale, t } = useI18n();
   const [course, setCourse] = useState<Course | null>(null);
@@ -27,7 +29,14 @@ export default function GroupActivityPage() {
   const [selectedTab, setSelectedTab] = useState<"attempt" | "previous" | "deleted">("attempt");
   const [isActivityUnavailable, setIsActivityUnavailable] = useState(false);
   const [hasQuestionAuthoringAgent, setHasQuestionAuthoringAgent] = useState(false);
+  const [safeExamBrowserAccess, setSafeExamBrowserAccess] = useState<SafeExamBrowserAccess | null>(null);
+  const [safeExamBrowserLaunch, setSafeExamBrowserLaunch] = useState<SafeExamBrowserLaunch | null>(null);
+  const [isSafeExamBrowserGateOpen, setIsSafeExamBrowserGateOpen] = useState(false);
+  const [isPreparingSafeExamBrowser, setIsPreparingSafeExamBrowser] = useState(false);
+  const [safeExamBrowserError, setSafeExamBrowserError] = useState("");
   const [error, setError] = useState("");
+  const safeExamBrowserLaunchRequestRef = useRef(false);
+  const safeExamBrowserLaunchToken = searchParams.get("sebLaunch");
 
   const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
   const canManage =
@@ -45,6 +54,11 @@ export default function GroupActivityPage() {
     setHasPreviousSubmissions(null);
     setIsActivityUnavailable(false);
     setSelectedTab("attempt");
+    setSafeExamBrowserLaunch(null);
+    setIsSafeExamBrowserGateOpen(false);
+    setIsPreparingSafeExamBrowser(false);
+    safeExamBrowserLaunchRequestRef.current = false;
+    setSafeExamBrowserError("");
   }, [activityId, courseId, groupId]);
 
   useEffect(() => {
@@ -64,6 +78,38 @@ export default function GroupActivityPage() {
 
       const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
       const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher" || role === "ta";
+      let sebAccessResult = await api.groupActivitySafeExamBrowserAccess(courseId, groupId, activityId);
+      setSafeExamBrowserAccess(sebAccessResult.access);
+      if (!userCanManage && sebAccessResult.access.requiresSafeExamBrowser && !sebAccessResult.access.accessGranted) {
+        if (safeExamBrowserLaunchToken) {
+          try {
+            const proof = await readSafeExamBrowserProof(window);
+            await api.activateGroupActivitySafeExamBrowser(courseId, groupId, activityId, {
+              token: safeExamBrowserLaunchToken,
+              ...(proof.configKeyHash ? { configKeyHash: proof.configKeyHash } : {}),
+              ...(proof.version ? { version: proof.version } : {})
+            });
+            window.history.replaceState({}, "", `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}`);
+            sebAccessResult = await api.groupActivitySafeExamBrowserAccess(courseId, groupId, activityId);
+            setSafeExamBrowserAccess(sebAccessResult.access);
+            if (!sebAccessResult.access.accessGranted) {
+              throw new Error("Safe Exam Browser access was not granted.");
+            }
+          } catch {
+            setActivity(null);
+            setIsSafeExamBrowserGateOpen(true);
+            setSafeExamBrowserError(t("groupPage.safeExamBrowserActivationError"));
+            return;
+          }
+        } else {
+          setActivity(null);
+          setReleasedGrade(null);
+          setDeletedSubmissions([]);
+          setIsSafeExamBrowserGateOpen(true);
+          setSafeExamBrowserError("");
+          return;
+        }
+      }
       let activityResult: Awaited<ReturnType<typeof api.groupActivity>>;
       try {
         activityResult = await api.groupActivity(courseId, groupId, activityId);
@@ -96,7 +142,20 @@ export default function GroupActivityPage() {
     }
 
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("activityPage.loadError")));
-  }, [activityId, courseId, groupId, t, user]);
+  }, [activityId, courseId, groupId, safeExamBrowserLaunchToken, t, user]);
+
+  useEffect(() => {
+    if (!isSafeExamBrowserGateOpen || safeExamBrowserLaunch || isPreparingSafeExamBrowser || safeExamBrowserLaunchRequestRef.current) return;
+    safeExamBrowserLaunchRequestRef.current = true;
+    setIsPreparingSafeExamBrowser(true);
+    api.launchGroupActivityInSafeExamBrowser(courseId, groupId, activityId)
+      .then((result) => {
+        if (!result.launch) throw new Error("Safe Exam Browser launch is unavailable.");
+        setSafeExamBrowserLaunch(result.launch);
+      })
+      .catch(() => setSafeExamBrowserError(t("groupPage.safeExamBrowserLaunchError")))
+      .finally(() => setIsPreparingSafeExamBrowser(false));
+  }, [activityId, courseId, groupId, isPreparingSafeExamBrowser, isSafeExamBrowserGateOpen, safeExamBrowserLaunch, t]);
 
   useEffect(() => {
     const newAttemptAvailable = canStartNewAttempt !== false;
@@ -143,7 +202,7 @@ export default function GroupActivityPage() {
         <section className="hero-panel hero-panel-compact">
           <div className="hero-meta">
             <p className="eyebrow">{localizedActivityName()}</p>
-            <h1>{activity?.title ?? t("common.loading")}</h1>
+            <h1>{activity?.title ?? safeExamBrowserAccess?.title ?? t("common.loading")}</h1>
             <p className="muted">
               {group ? group.title : t("common.loading")}
               {course ? ` · ${course.title}` : ""}
@@ -260,6 +319,49 @@ export default function GroupActivityPage() {
             </div>
             <DeletedSubmissionList deletedSubmissions={deletedSubmissions} t={t} />
           </section>
+        ) : null}
+
+        {isSafeExamBrowserGateOpen ? (
+          <div className="dialog-backdrop" role="presentation">
+            <section aria-labelledby="safe-exam-browser-dialog-title" aria-modal="true" className="dialog-panel stack" role="dialog">
+              <div>
+                <p className="eyebrow">{t("groupPage.safeExamBrowserEyebrow")}</p>
+                <h2 id="safe-exam-browser-dialog-title">{t("groupPage.safeExamBrowserTitle")}</h2>
+              </div>
+              <p>{t("groupPage.safeExamBrowserMessage")}</p>
+              <p className="muted">{t("groupPage.safeExamBrowserFallback")}</p>
+              {safeExamBrowserError ? <p className="error" role="alert">{safeExamBrowserError}</p> : null}
+              <div className="row">
+                <a
+                  className="button secondary"
+                  href={safeExamBrowserAccess?.downloadSafeExamBrowserUrl ?? "https://safeexambrowser.org/download_en.html"}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {t("groupPage.safeExamBrowserDownloadApplication")}
+                </a>
+                {safeExamBrowserLaunch ? (
+                  <a className="button secondary" href={safeExamBrowserLaunch.downloadUrl}>
+                    {t("groupPage.safeExamBrowserDownloadConfiguration")}
+                  </a>
+                ) : null}
+              </div>
+              <div className="dialog-actions">
+                <button className="secondary" type="button" onClick={() => router.push(`/courses/${courseId}/groups/${groupId}`)}>
+                  {t("common.cancel")}
+                </button>
+                <button
+                  disabled={!safeExamBrowserLaunch || isPreparingSafeExamBrowser}
+                  type="button"
+                  onClick={() => {
+                    if (safeExamBrowserLaunch) window.location.href = safeExamBrowserLaunch.launchUrl;
+                  }}
+                >
+                  {isPreparingSafeExamBrowser ? t("groupPage.safeExamBrowserOpening") : t("groupPage.safeExamBrowserOpen")}
+                </button>
+              </div>
+            </section>
+          </div>
         ) : null}
       </main>
     </AppShell>

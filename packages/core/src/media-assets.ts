@@ -5,7 +5,7 @@ import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import { canManageCourse, isAdmin, isCourseManager, isTeacher } from "./authorization";
 import { AppError, forbidden, notFound } from "./errors";
-import { getGroupAssignedActivity } from "./groups";
+import { assignmentRequiresSafeExamBrowser, getGroupAssignedActivity } from "./groups";
 
 export const MAX_MEDIA_IMAGE_BYTES = 10 * 1024 * 1024;
 export const MEDIA_ASSET_STAGING_HOURS = 24;
@@ -103,14 +103,18 @@ export async function uploadMediaImage(user: CurrentUser, file: File) {
   };
 }
 
-export async function getMediaAssetForDelivery(user: CurrentUser, assetId: string) {
+type MediaAssetDeliveryOptions = {
+  hasSafeExamBrowserAccess?: (scope: { courseId: string; groupId: string; activityId: string }) => boolean | Promise<boolean>;
+};
+
+export async function getMediaAssetForDelivery(user: CurrentUser, assetId: string, options: MediaAssetDeliveryOptions = {}) {
   const asset = await loadAssetForDelivery(assetId);
   if (!asset) {
     throw notFound("Image");
   }
 
   const stagedForCreator = asset.status === "staged" && asset.createdById === user.id && (!asset.expiresAt || asset.expiresAt > new Date());
-  if (!(isAdmin(user) || stagedForCreator || await canDeliverActiveAsset(user, asset))) {
+  if (!(isAdmin(user) || stagedForCreator || await canDeliverActiveAsset(user, asset, options))) {
     throw forbidden();
   }
 
@@ -129,7 +133,8 @@ export async function getMediaAssetForDelivery(user: CurrentUser, assetId: strin
 
 async function canDeliverActiveAsset(
   user: CurrentUser,
-  asset: NonNullable<Awaited<ReturnType<typeof loadAssetForDelivery>>>
+  asset: NonNullable<Awaited<ReturnType<typeof loadAssetForDelivery>>>,
+  options: MediaAssetDeliveryOptions
 ) {
   if (asset.status !== "active") {
     return false;
@@ -169,7 +174,17 @@ async function canDeliverActiveAsset(
     });
     for (const assignment of assignments) {
       try {
-        await getGroupAssignedActivity(user, courseId, assignment.groupId, assignment.activityId);
+        const assignedActivity = await getGroupAssignedActivity(user, courseId, assignment.groupId, assignment.activityId);
+        if (
+          assignmentRequiresSafeExamBrowser(assignedActivity.assignment.metadata) &&
+          !(await options.hasSafeExamBrowserAccess?.({
+            courseId,
+            groupId: assignment.groupId,
+            activityId: assignment.activityId
+          }))
+        ) {
+          continue;
+        }
         return true;
       } catch {
         // Try the next assignment. This preserves normal publication and visibility checks.

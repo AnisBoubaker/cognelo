@@ -563,6 +563,19 @@ export type Activity = {
   knowledgeConcepts?: ActivityKnowledgeConceptLink[];
 };
 
+export type SafeExamBrowserAccess = {
+  title: string;
+  requiresSafeExamBrowser: boolean;
+  accessGranted: boolean;
+  downloadSafeExamBrowserUrl: string;
+};
+
+export type SafeExamBrowserLaunch = {
+  launchUrl: string;
+  downloadUrl: string;
+  expiresInSeconds: number;
+};
+
 export type ActivityBankSyncStatus = {
   status: "in_sync" | "course_ahead" | "bank_ahead" | "diverged";
   attemptCount: number;
@@ -1364,6 +1377,25 @@ export const api = {
     request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}`),
   groupActivity: (courseId: string, groupId: string, activityId: string) =>
     request<{ activity: Activity }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}`),
+  groupActivitySafeExamBrowserAccess: (courseId: string, groupId: string, activityId: string) =>
+    request<{ access: SafeExamBrowserAccess }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/seb`
+    ),
+  launchGroupActivityInSafeExamBrowser: (courseId: string, groupId: string, activityId: string) =>
+    request<{ launch: SafeExamBrowserLaunch | null }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/seb`,
+      { method: "POST", body: JSON.stringify({}) }
+    ),
+  activateGroupActivitySafeExamBrowser: (
+    courseId: string,
+    groupId: string,
+    activityId: string,
+    input: { token: string; configKeyHash?: string; version?: string }
+  ) =>
+    request<{ accessGranted: true }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/seb/activate`,
+      { method: "POST", body: JSON.stringify(input) }
+    ),
   activityResponseDraft: (courseId: string, groupId: string, activityId: string) =>
     request<{ draft: ActivityResponseDraft | null }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/draft`

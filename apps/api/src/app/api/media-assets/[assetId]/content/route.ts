@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import { NextRequest, NextResponse } from "next/server";
 import { getMediaAssetForDelivery } from "@cognelo/core";
 import { handleRoute, options, requireUser } from "@/lib/http";
+import { hasSafeExamBrowserAccess } from "@/lib/safe-exam-browser";
 
 type Params = { params: Promise<{ assetId: string }> };
 
@@ -14,7 +15,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { assetId } = await params;
-    const asset = await getMediaAssetForDelivery(user, assetId);
+    const asset = await getMediaAssetForDelivery(user, assetId, {
+      hasSafeExamBrowserAccess: (scope) => hasSafeExamBrowserAccess(user, scope)
+    });
     const stream = Readable.toWeb(createReadStream(asset.filePath)) as ReadableStream;
     return new NextResponse(stream, {
       headers: {

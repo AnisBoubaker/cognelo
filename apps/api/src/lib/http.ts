@@ -25,7 +25,7 @@ function corsHeaders(init?: ResponseInit) {
   return {
     "Access-Control-Allow-Origin": env.CORS_ORIGIN,
     "Access-Control-Allow-Credentials": "true",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, X-SafeExamBrowser-ConfigKeyHash",
     "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
     "Cache-Control": "no-store",
     ...(init?.headers ?? {})

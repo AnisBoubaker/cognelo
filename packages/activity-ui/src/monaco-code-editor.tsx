@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-import Editor, { type Monaco, type OnMount } from "@monaco-editor/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Editor, { loader, type Monaco, type OnMount } from "@monaco-editor/react";
 import { normalizeMonacoLanguage } from "./code-language";
 import { getEditableMonacoValue } from "./monaco-code-editor-value";
 
 let hasRegisteredCogneloTheme = false;
+loader.config({ paths: { vs: "/_vendor/monaco/vs" } });
 
 type MonacoCodeEditorProps = {
   value: string;
@@ -36,6 +37,9 @@ export function MonacoCodeEditor({
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const decorationIdsRef = useRef<string[]>([]);
+  const [monacoLoadState, setMonacoLoadState] = useState<"loading" | "ready" | "failed">(
+    loader.__getMonacoInstance() ? "ready" : "loading"
+  );
   const displayedValue = `${readOnlyPrefix}${value}${readOnlySuffix}`;
   const hasRestrictedEditableRegion = !readOnly && (readOnlyPrefix.length > 0 || readOnlySuffix.length > 0);
   const displayedValueRef = useRef(displayedValue);
@@ -43,6 +47,28 @@ export function MonacoCodeEditor({
 
   displayedValueRef.current = displayedValue;
   editableOffsetsRef.current = getEditableOffsets(displayedValue, readOnlyPrefix, readOnlySuffix);
+
+  useEffect(() => {
+    if (loader.__getMonacoInstance()) {
+      setMonacoLoadState("ready");
+      return;
+    }
+    let active = true;
+    const initialization = loader.init();
+    void initialization
+      .then(() => {
+        if (active) setMonacoLoadState("ready");
+      })
+      .catch((error: unknown) => {
+        if (!active || (error && typeof error === "object" && "type" in error && error.type === "cancelation")) return;
+        console.warn("Monaco initialization failed; using the basic code editor.", error);
+        setMonacoLoadState("failed");
+      });
+    return () => {
+      active = false;
+      initialization.cancel();
+    };
+  }, []);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -89,17 +115,54 @@ export function MonacoCodeEditor({
     decorationIdsRef.current = model.deltaDecorations(decorationIdsRef.current, nextDecorations);
   }, [displayedValue, hasRestrictedEditableRegion, readOnlyPrefix, readOnlySuffix]);
 
+  if (monacoLoadState === "failed") {
+    return (
+      <div className="monaco-code-editor" style={editorContainerStyle(height, minHeight)}>
+        <textarea
+          aria-label={ariaLabel}
+          id={id}
+          readOnly={readOnly}
+          spellCheck={false}
+          style={{
+            background: "#f8fbff",
+            border: 0,
+            boxSizing: "border-box",
+            color: "#17233f",
+            fontFamily: '"SFMono-Regular", SFMono-Regular, ui-monospace, Menlo, Consolas, monospace',
+            fontSize: 14,
+            height: "100%",
+            minHeight,
+            padding: 12,
+            resize: "none",
+            width: "100%"
+          }}
+          value={displayedValue}
+          onChange={(event) => {
+            const nextStudentValue = getEditableMonacoValue({
+              nextValue: event.target.value,
+              readOnly,
+              readOnlyPrefix,
+              readOnlySuffix
+            });
+            if (nextStudentValue !== null) onChange(nextStudentValue);
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (monacoLoadState === "loading") {
+    return (
+      <div className="monaco-code-editor" role="status" style={editorContainerStyle(height, minHeight)}>
+        <span style={{ margin: "auto" }}>Loading editor…</span>
+      </div>
+    );
+  }
+
   return (
     <div
       className="monaco-code-editor"
-      style={{
-        background: "rgba(248, 251, 255, 0.94)",
-        border: "1px solid color-mix(in srgb, var(--brand-blue), white 72%)",
-        borderRadius: 8,
-        height,
-        minHeight,
-        overflow: "hidden"
-      }}
+      style={editorContainerStyle(height, minHeight)}
     >
       <Editor
         beforeMount={configureMonaco}
@@ -208,6 +271,18 @@ export function MonacoCodeEditor({
       editor.setPosition(nextPosition);
     });
   }
+}
+
+function editorContainerStyle(height: number | string | undefined, minHeight: number) {
+  return {
+    background: "rgba(248, 251, 255, 0.94)",
+    border: "1px solid color-mix(in srgb, var(--brand-blue), white 72%)",
+    borderRadius: 8,
+    display: "flex",
+    height,
+    minHeight,
+    overflow: "hidden"
+  };
 }
 
 function configureMonaco(monaco: Monaco) {

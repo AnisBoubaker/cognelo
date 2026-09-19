@@ -22,6 +22,8 @@ vi.mock("@/lib/http", () => ({
   requireUser: mocks.requireUser
 }));
 
+vi.mock("@/lib/safe-exam-browser", () => ({ requireSafeExamBrowserAccess: vi.fn() }));
+
 const { DELETE, GET, PUT } = await import("./route");
 const params = {
   params: Promise.resolve({ courseId: "course-1", groupId: "group-1", activityId: "activity-1" })

@@ -35,6 +35,8 @@ vi.mock("@/lib/http", () => ({
   requireUser: mocks.requireUser
 }));
 
+vi.mock("@/lib/safe-exam-browser", () => ({ requireSafeExamBrowserAccess: vi.fn() }));
+
 const { GET, POST } = await import("./route");
 
 describe("assigned group activity plugin dispatch route", () => {

@@ -21,6 +21,8 @@ vi.mock("@/lib/http", () => ({
   requireUser: mocks.requireUser
 }));
 
+vi.mock("@/lib/safe-exam-browser", () => ({ requireSafeExamBrowserAccess: vi.fn() }));
+
 const { GET, PUT } = await import("./route");
 
 describe("Test child state route", () => {

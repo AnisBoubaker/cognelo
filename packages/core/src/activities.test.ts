@@ -43,8 +43,7 @@ const mockPrisma = vi.hoisted(() => ({
 }));
 
 const authMocks = vi.hoisted(() => ({
-  assertCanManageCourse: vi.fn(),
-  assertCanViewCourse: vi.fn()
+  assertCanManageCourse: vi.fn()
 }));
 
 const pluginMocks = vi.hoisted(() => ({
@@ -67,7 +66,7 @@ vi.mock("@cognelo/activity-sdk", () => ({
 vi.mock("./authorization", () => authMocks);
 vi.mock("./plugins", () => pluginMocks);
 
-const { createActivity, deleteActivity } = await import("./activities");
+const { createActivity, deleteActivity, getActivity, listActivities } = await import("./activities");
 const { updateActivity } = await import("./activities");
 
 const teacherUser: CurrentUser = {
@@ -87,6 +86,18 @@ describe("activity services", () => {
     tx.activity.update.mockImplementation((...args) => mockPrisma.activity.update(...args));
     tx.courseContentItem.count.mockResolvedValue(0);
     mockPrisma.activityAttempt.count.mockResolvedValue(0);
+  });
+
+  it("keeps course activity authoring detail and listings manager-only", async () => {
+    authMocks.assertCanManageCourse.mockRejectedValueOnce({ status: 403 });
+
+    await expect(getActivity({ ...teacherUser, roles: ["student"] }, "course-1", "activity-1"))
+      .rejects.toMatchObject({ status: 403 });
+    expect(mockPrisma.activity.findFirst).not.toHaveBeenCalled();
+
+    authMocks.assertCanManageCourse.mockRejectedValueOnce({ status: 403 });
+    await expect(listActivities({ ...teacherUser, roles: ["student"] }, "course-1"))
+      .rejects.toMatchObject({ status: 403 });
   });
 
   it("creates a local course activity only for enabled activity types", async () => {

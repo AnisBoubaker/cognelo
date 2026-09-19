@@ -49,6 +49,20 @@ function buildVisibleStudentGroupWhere(userId: string) {
 function buildCourseIncludeForStudent(userId: string) {
   return {
     ...courseInclude,
+    activities: {
+      where: { testItem: null },
+      select: {
+        id: true,
+        bankActivityId: true,
+        activityVersionId: true,
+        title: true,
+        description: true,
+        lifecycle: true,
+        position: true,
+        activityType: true
+      },
+      orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }]
+    },
     groups: {
       where: buildVisibleStudentGroupWhere(userId),
       orderBy: [{ updatedAt: "desc" as const }, { createdAt: "desc" as const }]
@@ -71,7 +85,7 @@ export async function listCourses(user: CurrentUser) {
     });
   }
 
-  return prisma.course.findMany({
+  const courses = await prisma.course.findMany({
     where: {
       memberships: { some: { userId: user.id, role: "student" } },
       groups: { some: buildVisibleStudentGroupWhere(user.id) }
@@ -79,6 +93,7 @@ export async function listCourses(user: CurrentUser) {
     include: buildCourseIncludeForStudent(user.id),
     orderBy: { updatedAt: "desc" }
   });
+  return courses.map(stripStudentCourseActivityContent);
 }
 
 export async function getCourse(user: CurrentUser, courseId: string) {
@@ -90,7 +105,14 @@ export async function getCourse(user: CurrentUser, courseId: string) {
   if (!course) {
     throw notFound("Course");
   }
-  return course;
+  return isAdmin(user) || isTeacher(user) || isCourseManager(user) ? course : stripStudentCourseActivityContent(course);
+}
+
+function stripStudentCourseActivityContent<T extends { activities: Array<{ description: string }> }>(course: T) {
+  return {
+    ...course,
+    activities: course.activities.map((activity) => ({ ...activity, description: "" }))
+  };
 }
 
 export async function createCourse(user: CurrentUser, input: unknown) {
