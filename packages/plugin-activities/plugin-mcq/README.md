@@ -73,6 +73,8 @@ For formative MCQs, **Check answers** requests explanations immediately and pres
 
 Each `PluginMcqAiEvaluation` version stores the request snapshot, model/provider and connection identifiers, raw and parsed responses, sanitized feedback, hashes, latency, prompt/schema versions, and failure details. The evaluator requires feedback for the exact stable question IDs and permits one bounded correction retry. Raw artifacts remain private; only the sanitized result is attached to the grade.
 
+MCQ registers a teacher feedback review renderer and server handlers. The detailed gradebook lets a teacher review one learner or navigate the whole generated set, see the submitted choices, and edit the overall summary and per-question explanations. The deterministic score and answer-key grading remain read-only and authoritative. Saving revises only the learner-visible core snapshot; the original `PluginMcqAiEvaluation` remains immutable and core records grade/research audit history. Learner-facing headings and errors use neutral “Feedback” wording rather than identifying AI as the source.
+
 ## Contributor Workflow
 
 Standalone MCQ gradebook results expose **Review all** and reuse the Test aggregate report: correct choices, response counts, exact-answer accuracy, score statistics, and hoverable respondent names per choice.

@@ -152,6 +152,26 @@ export type PluginAiFeedbackHandler = (input: {
   };
 }) => Promise<PluginAiFeedbackResult>;
 
+export type PluginAiFeedbackTeacherReviewContext = {
+  user: CurrentUser;
+  courseId: string;
+  groupId: string;
+  activityId: string;
+  coreAttemptId: string;
+  pluginAttemptRef?: string | null;
+  activity: ServerActivityRecord;
+};
+
+export type PluginAiFeedbackTeacherReviewHandler = {
+  getSubmission: (input: PluginAiFeedbackTeacherReviewContext) => Promise<Record<string, unknown>>;
+  reviseFeedback: (
+    input: PluginAiFeedbackTeacherReviewContext & {
+      currentFeedback: Record<string, unknown>;
+      feedback: unknown;
+    }
+  ) => Promise<Record<string, unknown>> | Record<string, unknown>;
+};
+
 export type CompositeExecutionSubmissionHandler = (input: {
   user: CurrentUser;
   courseId: string;
@@ -183,6 +203,7 @@ export type ServerActivityPlugin = {
   };
   aiFeedback?: {
     evaluateAttempt: PluginAiFeedbackHandler;
+    teacherReview?: PluginAiFeedbackTeacherReviewHandler;
   };
   compositeExecution?: {
     activityTypeKeys: readonly string[];
@@ -264,6 +285,12 @@ export function resolvePluginAiFeedbackHandler(activityTypeKey: string) {
   return serverPlugins.find((plugin) =>
     plugin.aiFeedback?.evaluateAttempt && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
   )?.aiFeedback?.evaluateAttempt ?? null;
+}
+
+export function resolvePluginAiFeedbackTeacherReviewHandler(activityTypeKey: string) {
+  return serverPlugins.find((plugin) =>
+    plugin.aiFeedback?.teacherReview && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
+  )?.aiFeedback?.teacherReview ?? null;
 }
 
 export function resolveCompositeExecutionSubmissionHandler(activityTypeKey: string) {

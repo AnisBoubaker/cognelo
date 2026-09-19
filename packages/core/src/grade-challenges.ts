@@ -246,20 +246,21 @@ function readFeedbackReferences(value: unknown) {
   const candidate = root.studentFeedback && typeof root.studentFeedback === "object" && !Array.isArray(root.studentFeedback)
     ? root.studentFeedback as Record<string, unknown>
     : root;
-  const direct = typeof candidate.feedbackRef === "string" && typeof candidate.feedbackVersion === "number" && candidate.challengeAllowed === true
+  const details = candidate.details && typeof candidate.details === "object" && !Array.isArray(candidate.details)
+    ? candidate.details as Record<string, unknown>
+    : null;
+  const directCandidate = typeof candidate.feedbackRef === "string" ? candidate : details ?? candidate;
+  const direct = typeof directCandidate.feedbackRef === "string" && typeof directCandidate.feedbackVersion === "number" && directCandidate.challengeAllowed === true
     ? {
-        feedbackRef: candidate.feedbackRef,
-        feedbackVersion: candidate.feedbackVersion,
-        feedbackHash: typeof candidate.feedbackHash === "string" ? candidate.feedbackHash : null,
+        feedbackRef: directCandidate.feedbackRef,
+        feedbackVersion: directCandidate.feedbackVersion,
+        feedbackHash: typeof directCandidate.feedbackHash === "string" ? directCandidate.feedbackHash : null,
         activityId: null,
         pluginKey: null,
         testItemId: null
       }
     : null;
   if (direct) return [direct];
-  const details = candidate.details && typeof candidate.details === "object" && !Array.isArray(candidate.details)
-    ? candidate.details as Record<string, unknown>
-    : null;
   const items = Array.isArray(details?.items) ? details.items : [];
   return items.flatMap((item) => {
     if (!item || typeof item !== "object" || Array.isArray(item)) return [];

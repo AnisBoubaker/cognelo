@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { resolvePluginAiFeedbackHandler } from "@cognelo/activity-sdk/server";
-import { AppError, getActivityAttemptRegradeContext, getTestAttemptReview, recordActivityAttemptAiFeedback, recordActivityAttemptGradingResult, recordAiFeedbackResearchEvent, recordTestItemAiFeedback, regradeTestAttempt } from "@cognelo/core";
+import { resolvePluginAiFeedbackHandler, resolvePluginAiFeedbackTeacherReviewHandler } from "@cognelo/activity-sdk/server";
+import { AppError, getActivityAttemptRegradeContext, getTeacherAttemptAiFeedbackReview, getTestAttemptReview, recordActivityAttemptAiFeedback, recordActivityAttemptGradingResult, recordAiFeedbackResearchEvent, recordTestItemAiFeedback, regradeTestAttempt, reviseTeacherAttemptAiFeedback } from "@cognelo/core";
 import type { Prisma } from "@cognelo/db";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
@@ -8,6 +8,57 @@ type Params = { params: Promise<{ courseId: string; attemptId: string }> };
 
 export function OPTIONS() {
   return options();
+}
+
+export async function GET(_request: NextRequest, { params }: Params) {
+  return handleRoute(async () => {
+    const user = await requireUser();
+    const { courseId, attemptId } = await params;
+    const context = await getActivityAttemptRegradeContext(user, courseId, attemptId);
+    const teacherReview = resolvePluginAiFeedbackTeacherReviewHandler(context.activityTypeKey);
+    if (!teacherReview) {
+      throw new AppError(409, "PLUGIN_AI_FEEDBACK_REVIEW_UNAVAILABLE", "This activity type does not provide a feedback review interface.");
+    }
+    const [review, submission] = await Promise.all([
+      getTeacherAttemptAiFeedbackReview(user, courseId, attemptId),
+      teacherReview.getSubmission({
+        user,
+        courseId: context.courseId,
+        groupId: context.groupId,
+        activityId: context.activityId,
+        coreAttemptId: context.attemptId,
+        pluginAttemptRef: context.pluginAttemptRef,
+        activity: context.activity
+      })
+    ]);
+    return json({ review: { ...review, activityTypeKey: context.activityTypeKey, submission } });
+  });
+}
+
+export async function PATCH(request: NextRequest, { params }: Params) {
+  return handleRoute(async () => {
+    const user = await requireUser();
+    const { courseId, attemptId } = await params;
+    const body = await readJson(request) as { feedback?: unknown };
+    const context = await getActivityAttemptRegradeContext(user, courseId, attemptId);
+    const teacherReview = resolvePluginAiFeedbackTeacherReviewHandler(context.activityTypeKey);
+    if (!teacherReview) {
+      throw new AppError(409, "PLUGIN_AI_FEEDBACK_REVIEW_UNAVAILABLE", "This activity type does not provide a feedback review interface.");
+    }
+    const current = await getTeacherAttemptAiFeedbackReview(user, courseId, attemptId);
+    const feedback = await teacherReview.reviseFeedback({
+      user,
+      courseId: context.courseId,
+      groupId: context.groupId,
+      activityId: context.activityId,
+      coreAttemptId: context.attemptId,
+      pluginAttemptRef: context.pluginAttemptRef,
+      activity: context.activity,
+      currentFeedback: current.feedback,
+      feedback: body.feedback
+    });
+    return json(await reviseTeacherAttemptAiFeedback(user, courseId, attemptId, feedback));
+  });
 }
 
 export async function POST(request: NextRequest, { params }: Params) {

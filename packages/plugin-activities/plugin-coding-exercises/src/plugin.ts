@@ -24,6 +24,9 @@ export const codingExercisesPlugin: ActivityPlugin = {
         supportsCompositeExecution: true,
         defaultMaxAttempts: null
       },
+      aiFeedback: {
+        rendererKey: "coding-exercise-ai-feedback-review"
+      },
       i18n: {
         en: {
           name: "Coding exercise",

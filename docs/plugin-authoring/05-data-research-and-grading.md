@@ -108,6 +108,7 @@ AI assessment uses an explicit core/plugin boundary:
 
 - the activity definition declares `supportsAiFeedback` and, only if applicable, `supportsAiFeedbackGrading`;
 - the server plugin registers `aiFeedback.evaluateAttempt`;
+- the activity definition registers `aiFeedback.rendererKey`, and the server plugin registers `aiFeedback.teacherReview.getSubmission` plus `reviseFeedback` so teachers can inspect the plugin-specific answer and edit learner-visible feedback;
 - course settings must enable automatic feedback and select an accessible assessment-feedback AI connection;
 - the plugin must reject enabled but incomplete activity configuration;
 - formative feedback runs from the learner's explicit plugin check/submit route;
@@ -116,9 +117,11 @@ AI assessment uses an explicit core/plugin boundary:
 
 The handler returns an immutable `feedbackRef`, `feedbackVersion`, `feedbackHash`, sanitized feedback, and optionally a normal plugin grading result. Feedback-only plugins must omit the grading result. If AI affects the grade, core marks the released feedback challengeable; deterministic feedback such as MCQ explanations stays non-challengeable.
 
+Teacher review is a required capability whenever a plugin declares AI feedback. The web renderer owns the plugin-specific answer and feedback form; the server revision handler must whitelist editable narrative fields and preserve rubric IDs, question IDs, score components, and grading policy. Core stores the revised student-facing snapshot, not a replacement model artifact. It records previous/next feedback and append-only research telemetry. A released result remains editable until that exact feedback version is challenged; grade changes use the ordinary override workflow. Student product copy must describe feedback and grading without claiming that AI produced either result.
+
 Store complete reproducibility artifacts privately in a plugin-owned evaluation table: the submission/config/rubric snapshot, provider and model, prompt/schema/rubric versions, raw response, parsed output, sanitized result, hashes, latency, score components, and errors. Treat learner content as untrusted prompt input and use strict structured-output validation with bounded retries. Never put credentials, hidden tests, complete submissions, unrestricted prompts, or raw responses into the normalized core research stream or student DTOs.
 
-Core `AiFeedbackResearchEvent` records bounded append-only lifecycle envelopes across plugins. Use the shared recorder for request/completion/failure and include stable identifiers, trigger kind, assessment mode, versions/hashes, contribution, and bounded metadata. Release, view, Test parent recomputation, and challenge events are recorded by core. The manager research route pseudonymizes participant, user, actor, and attempt identifiers by default; production research still requires approved consent filtering and retention/anonymization policy.
+Core `AiFeedbackResearchEvent` records bounded append-only lifecycle envelopes across plugins. Use the shared recorder for request/completion/failure and include stable identifiers, trigger kind, assessment mode, versions/hashes, contribution, and bounded metadata. Release, view, teacher revision, Test parent recomputation, and challenge events are recorded by core. The manager research route pseudonymizes participant, user, actor, and attempt identifiers by default; production research still requires approved consent filtering and retention/anonymization policy.
 
 ## Example Metadata Schema
 

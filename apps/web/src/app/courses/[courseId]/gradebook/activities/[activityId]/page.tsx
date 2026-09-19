@@ -19,9 +19,10 @@ import {
   CourseGradebookRow,
   CourseTestAttemptReview,
   GradebookMutationAttempt,
-  GradebookMutationGrade
+  GradebookMutationGrade,
+  TeacherAiFeedbackReview
 } from "@/lib/api";
-import { getManualGradingRenderer, renderTestReviewAllItem } from "@/lib/activity-renderers";
+import { getAiFeedbackReviewRenderer, getManualGradingRenderer, renderTestReviewAllItem } from "@/lib/activity-renderers";
 import { useI18n } from "@/lib/i18n";
 import { latestCompletedTestAttempt, type TestReviewAllSubmission } from "@/lib/test-review-all";
 
@@ -60,6 +61,15 @@ export default function GradebookActivityResultsPage() {
     solution?: unknown;
     tests?: Array<{ id: string; name: string }>;
     mcqContext?: Parameters<typeof renderTestReviewAllItem>[0];
+  } | null>(null);
+  const [feedbackReview, setFeedbackReview] = useState<{
+    rows: CourseGradebookRow[];
+    selectedIndex: number;
+    review: TeacherAiFeedbackReview | null;
+    draft: Record<string, unknown> | null;
+    loading: boolean;
+    saving: boolean;
+    error: string;
   } | null>(null);
 
   async function refresh() {
@@ -376,6 +386,53 @@ export default function GradebookActivityResultsPage() {
     }
   }
 
+  async function openFeedbackReview(targetRows: CourseGradebookRow[], selectedIndex = 0) {
+    const eligibleRows = targetRows.filter((row) => hasReviewableAiFeedback(row.feedback) && getAiFeedbackReviewRenderer(row.activityTypeKey));
+    if (!eligibleRows.length) {
+      notifications.error(t("courseDetail.feedbackReviewUnavailable"));
+      return;
+    }
+    await loadFeedbackReview(eligibleRows, Math.min(selectedIndex, eligibleRows.length - 1));
+  }
+
+  async function loadFeedbackReview(targetRows: CourseGradebookRow[], selectedIndex: number) {
+    const row = targetRows[selectedIndex];
+    const attempt = selectedFeedbackAttempt(row);
+    if (!attempt) {
+      notifications.error(t("courseDetail.feedbackReviewUnavailable"));
+      return;
+    }
+    setFeedbackReview({ rows: targetRows, selectedIndex, review: null, draft: null, loading: true, saving: false, error: "" });
+    try {
+      const result = await api.activityAttemptAiFeedbackReview(courseId, attempt.id);
+      setFeedbackReview({ rows: targetRows, selectedIndex, review: result.review, draft: result.review.feedback, loading: false, saving: false, error: "" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("courseDetail.feedbackReviewLoadError");
+      setFeedbackReview({ rows: targetRows, selectedIndex, review: null, draft: null, loading: false, saving: false, error: message });
+      notifications.error(message);
+    }
+  }
+
+  async function saveFeedbackReview() {
+    if (!feedbackReview?.review || !feedbackReview.draft) return;
+    setFeedbackReview((current) => current ? { ...current, saving: true, error: "" } : current);
+    try {
+      const result = await api.reviseActivityAttemptAiFeedback(courseId, feedbackReview.review.attemptId, feedbackReview.draft);
+      setFeedbackReview((current) => current ? {
+        ...current,
+        saving: false,
+        review: current.review ? { ...current.review, feedback: result.feedback } : current.review,
+        draft: result.feedback
+      } : current);
+      await refresh();
+      notifications.success(t("courseDetail.feedbackReviewSaved"));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("courseDetail.feedbackReviewSaveError");
+      setFeedbackReview((current) => current ? { ...current, saving: false, error: message } : current);
+      notifications.error(message);
+    }
+  }
+
   async function gradeTestItem(row: CourseGradebookRow, parentAttemptId: string, testItemId: string, score: number, reason: string | null) {
     try {
       await api.gradeTestItem(courseId, parentAttemptId, testItemId, { score, reason });
@@ -504,6 +561,11 @@ export default function GradebookActivityResultsPage() {
                   {savingGradeKey === "__all:ai-feedback" ? t("common.saving") : t("courseDetail.generateAiFeedbackAll")}
                 </button>
               ) : null}
+              {supportsAiFeedbackReview(rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? "") ? (
+                <button className="button secondary" type="button" onClick={() => void openFeedbackReview(groupedRows)}>
+                  {t("courseDetail.feedbackReviewAll")}
+                </button>
+              ) : null}
               {hasRowsWithSubmittedAttempts ? (
                 <Link
                   className="button secondary"
@@ -538,6 +600,7 @@ export default function GradebookActivityResultsPage() {
                   onOpenManualGrading={(row) => openManualGrading(row, "grade")}
                   onRegrade={regradeRow}
                   onGenerateAiFeedback={generateAiFeedbackForRow}
+                  onReviewFeedback={(row) => openFeedbackReview([row])}
                   t={t}
                 />
               ))}
@@ -616,9 +679,98 @@ export default function GradebookActivityResultsPage() {
             />}
           </div>
         ) : null}
+        {feedbackReview ? (
+          <div
+            className="dialog-backdrop"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && canLeaveFeedbackReview(feedbackReview, t("courseDetail.feedbackReviewDiscardConfirm"))) setFeedbackReview(null);
+            }}
+          >
+            <AiFeedbackReviewPanel
+              state={feedbackReview}
+              onClose={() => {
+                if (canLeaveFeedbackReview(feedbackReview, t("courseDetail.feedbackReviewDiscardConfirm"))) setFeedbackReview(null);
+              }}
+              onFeedbackChange={(draft) => setFeedbackReview((current) => current ? { ...current, draft } : current)}
+              onSelectIndex={(selectedIndex) => {
+                if (canLeaveFeedbackReview(feedbackReview, t("courseDetail.feedbackReviewDiscardConfirm"))) void loadFeedbackReview(feedbackReview.rows, selectedIndex);
+              }}
+              onSave={saveFeedbackReview}
+              t={t}
+            />
+          </div>
+        ) : null}
       </main>
     </AppShell>
   );
+}
+
+type AiFeedbackReviewState = {
+  rows: CourseGradebookRow[];
+  selectedIndex: number;
+  review: TeacherAiFeedbackReview | null;
+  draft: Record<string, unknown> | null;
+  loading: boolean;
+  saving: boolean;
+  error: string;
+};
+
+function AiFeedbackReviewPanel({ state, onClose, onFeedbackChange, onSelectIndex, onSave, t }: {
+  state: AiFeedbackReviewState;
+  onClose: () => void;
+  onFeedbackChange: (feedback: Record<string, unknown>) => void;
+  onSelectIndex: (index: number) => void;
+  onSave: () => Promise<void>;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const row = state.rows[state.selectedIndex];
+  const renderer = state.review ? getAiFeedbackReviewRenderer(state.review.activityTypeKey) : null;
+  const teacherRevision = state.review && typeof state.review.feedback.teacherRevision === "number" ? state.review.feedback.teacherRevision : 0;
+  return (
+    <section className="dialog-panel answer-overlay test-review-overlay stack" role="dialog" aria-modal="true">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">{row?.groupTitle}</p>
+          <h2>{t("courseDetail.feedbackReview")}</h2>
+          <p className="muted">
+            {row?.participantName} · {state.selectedIndex + 1} / {state.rows.length}
+          </p>
+        </div>
+        <button className="button secondary" type="button" onClick={onClose}>{t("common.close")}</button>
+      </div>
+      {state.rows.length > 1 ? (
+        <div className="row wrap">
+          <button className="button secondary" disabled={state.loading || state.selectedIndex === 0} type="button" onClick={() => onSelectIndex(state.selectedIndex - 1)}>
+            {t("courseDetail.feedbackReviewPrevious")}
+          </button>
+          <button className="button secondary" disabled={state.loading || state.selectedIndex >= state.rows.length - 1} type="button" onClick={() => onSelectIndex(state.selectedIndex + 1)}>
+            {t("courseDetail.feedbackReviewNext")}
+          </button>
+        </div>
+      ) : null}
+      {state.loading ? <p className="muted">{t("courseDetail.loadingStudentAnswers")}</p> : null}
+      {state.error ? <p className="error-text">{state.error}</p> : null}
+      {state.review?.gradesReleased ? <p className="inline-panel muted">{t("courseDetail.feedbackReviewReleasedNote")}</p> : null}
+      {teacherRevision > 0 ? <p className="muted">{t("courseDetail.feedbackReviewRevision", { number: teacherRevision })}</p> : null}
+      {!state.loading && state.review && state.draft && renderer
+        ? renderer({ feedback: state.draft, submission: state.review.submission, onFeedbackChange, t })
+        : null}
+      {!state.loading && state.review && !renderer ? <p className="error-text">{t("courseDetail.feedbackReviewUnavailable")}</p> : null}
+      {!state.loading && state.review && state.draft && renderer ? (
+        <div className="row wrap dialog-actions">
+          <button className="button primary" disabled={state.saving} type="button" onClick={() => void onSave()}>
+            {state.saving ? t("common.saving") : t("courseDetail.feedbackReviewSave")}
+          </button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function canLeaveFeedbackReview(state: AiFeedbackReviewState, confirmMessage: string) {
+  if (!state.review || !state.draft || JSON.stringify(state.review.feedback) === JSON.stringify(state.draft)) return true;
+  return window.confirm(confirmMessage);
 }
 
 function GradebookStudentRow({
@@ -629,6 +781,7 @@ function GradebookStudentRow({
   onOpenReview,
   onRegrade,
   onGenerateAiFeedback,
+  onReviewFeedback,
   t
 }: {
   manualGradingAvailable: boolean;
@@ -638,6 +791,7 @@ function GradebookStudentRow({
   onOpenReview: (row: CourseGradebookRow) => Promise<void>;
   onRegrade: (row: CourseGradebookRow) => Promise<void>;
   onGenerateAiFeedback: (row: CourseGradebookRow) => Promise<void>;
+  onReviewFeedback: (row: CourseGradebookRow) => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const rowHasSubmittedAttempt = hasSubmittedAttempt(row);
@@ -661,6 +815,11 @@ function GradebookStudentRow({
             onClick={() => onGenerateAiFeedback(row)}
           >
             {t("courseDetail.generateAiFeedback")}
+          </button>
+        ) : null}
+        {supportsAiFeedbackReview(row.activityTypeKey) ? (
+          <button className="button secondary" disabled={!hasReviewableAiFeedback(row.feedback)} type="button" onClick={() => onReviewFeedback(row)}>
+            {t("courseDetail.feedbackReview")}
           </button>
         ) : null}
         {manualGradingAvailable ? (
@@ -708,6 +867,22 @@ function hasSubmittedAttempt(row: CourseGradebookRow) {
 
 function supportsAiFeedback(activityTypeKey: string) {
   return getActivityDefinition(activityTypeKey)?.grading?.supportsAiFeedback === true;
+}
+
+function supportsAiFeedbackReview(activityTypeKey: string) {
+  return Boolean(getAiFeedbackReviewRenderer(activityTypeKey));
+}
+
+function selectedFeedbackAttempt(row: CourseGradebookRow) {
+  return row.attempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber)
+    ?? [...row.attempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted")
+    ?? null;
+}
+
+function hasReviewableAiFeedback(feedback: CourseGradebookRow["feedback"]) {
+  return feedback?.kind === "ai_assessment_feedback"
+    && typeof feedback.details?.feedbackRef === "string"
+    && typeof feedback.details?.feedbackVersion === "number";
 }
 
 

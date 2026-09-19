@@ -514,8 +514,9 @@ The implemented cross-plugin design and remaining hardening work are tracked in 
 - Formative AI feedback starts immediately when the learner submits the formative activity.
 - Summative AI feedback/grading never starts automatically on submission or through the background-job worker. An authorized teacher explicitly starts it from the gradebook/review workflow.
 - Plugins own feedback configuration, rubric/model prompting, structured result validation, sanitized feedback, and deterministic/AI score composition.
+- Feedback-capable plugins own a teacher review renderer plus answer-loading/revision validation handlers. The detailed activity gradebook supports one-student review and whole-class previous/next navigation, and teachers may revise narrative feedback without mutating the original evaluation or score components.
 - Core retains normal attempts, grades, release, overrides, and audit events and now owns the course-wide `GradeChallenge` workflow. Only released feedback versions that influenced a grade can be challenged; a required teacher response can uphold the result or invoke the existing audited override path.
-- Core records append-only `AiFeedbackResearchEvent` envelopes containing trigger identity, model/rubric/prompt versions, separate deterministic and AI grading components, failures/retries, visibility timing, and challenge outcomes. The course-manager endpoint pseudonymizes participant, user, actor, and attempt identifiers by default; consent-aware production export remains Phase 9 work.
+- Core records append-only `AiFeedbackResearchEvent` envelopes containing trigger identity, model/rubric/prompt versions, separate deterministic and AI grading components, failures/retries, teacher revisions, visibility timing, and challenge outcomes. The course-manager endpoint pseudonymizes participant, user, actor, and attempt identifiers by default; consent-aware production export remains Phase 9 work. Learner-facing copy remains neutral about the grading/feedback mechanism.
 
 ## Testing Strategy
 

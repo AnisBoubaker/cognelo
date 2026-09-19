@@ -125,4 +125,29 @@ describe("grade challenges", () => {
 
     expect(mockPrisma.gradeChallenge.create).not.toHaveBeenCalled();
   });
+
+  it("recognizes challengeable feedback preserved in a canonical details envelope", async () => {
+    mockPrisma.grade.findUnique.mockResolvedValue({
+      ...grade,
+      normalizedResult: {
+        studentFeedback: {
+          kind: "ai_assessment_feedback",
+          feedbackText: null,
+          details: {
+            feedbackRef: "feedback-3",
+            feedbackVersion: 2,
+            feedbackHash: "hash-3",
+            challengeAllowed: true,
+            summary: "Reviewed feedback"
+          }
+        }
+      }
+    });
+
+    await expect(createGradeChallenge(student, "course-1", "attempt-1", {
+      feedbackRef: "feedback-3",
+      feedbackVersion: 2,
+      explanation: "The released rubric feedback does not match the submitted answer."
+    })).resolves.toMatchObject({ feedbackHash: "hash-3" });
+  });
 });

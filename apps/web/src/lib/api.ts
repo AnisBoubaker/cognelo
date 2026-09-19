@@ -999,6 +999,20 @@ export type StudentGradeFeedback = {
   details?: Record<string, unknown>;
 };
 
+export type TeacherAiFeedbackReview = {
+  attemptId: string;
+  gradeId: string;
+  gradesReleased: boolean;
+  activityTypeKey: string;
+  participant: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  feedback: Record<string, unknown>;
+  submission: Record<string, unknown>;
+};
+
 export type CourseTestAttemptReview = {
   id: string;
   attemptNumber: number;
@@ -1349,6 +1363,13 @@ export const api = {
     request<{ evaluation: { feedbackRef: string; feedbackVersion: number }; result: unknown }>(
       `/courses/${courseId}/gradebook/attempts/${attemptId}/ai-feedback`,
       { method: "POST", body: JSON.stringify(input ?? {}) }
+    ),
+  activityAttemptAiFeedbackReview: (courseId: string, attemptId: string) =>
+    request<{ review: TeacherAiFeedbackReview }>(`/courses/${courseId}/gradebook/attempts/${attemptId}/ai-feedback`),
+  reviseActivityAttemptAiFeedback: (courseId: string, attemptId: string, feedback: unknown) =>
+    request<{ feedback: Record<string, unknown>; teacherRevision: number; feedbackHash: string }>(
+      `/courses/${courseId}/gradebook/attempts/${attemptId}/ai-feedback`,
+      { method: "PATCH", body: JSON.stringify({ feedback }) }
     ),
   recordActivityAttemptAiFeedbackViewed: (courseId: string, attemptId: string) =>
     request<{ recorded: number }>(`/courses/${courseId}/gradebook/attempts/${attemptId}/ai-feedback/view`, { method: "POST" }),
