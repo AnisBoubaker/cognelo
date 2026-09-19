@@ -153,7 +153,7 @@ export function CourseSettingsPanel({
               </div>
             </div>
 
-            <form className="form" onSubmit={handleAiSubmit}>
+            <form className="form" id="course-ai-settings-form" onSubmit={handleAiSubmit}>
               <div className="field">
                 <label htmlFor="studentSupportAgent">{t("courseDetail.studentSupportAgent")}</label>
                 <select
@@ -205,6 +205,7 @@ export function CourseSettingsPanel({
               {aiAgentConnections.length ? null : <p className="muted">{t("courseDetail.noAiAgentsAvailable")}</p>}
 
               <EditActionBar
+                form="course-ai-settings-form"
                 isDirty={aiSettingsDirty}
                 isSaving={isSavingAiSettings}
                 savedLabel={t("common.savedStatus")}
@@ -213,7 +214,6 @@ export function CourseSettingsPanel({
                 savingLabel={t("common.saving")}
                 cancelLabel={t("common.cancel")}
                 onCancel={discardAiSettings}
-                onSave={saveAiSettings}
               />
             </form>
           </section>

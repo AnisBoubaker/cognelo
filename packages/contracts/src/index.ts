@@ -156,7 +156,7 @@ export const AiAgentConnectionUpdateSchema = AiAgentConnectionInputSchema.partia
 export type AiAgentConnectionUpdate = z.infer<typeof AiAgentConnectionUpdateSchema>;
 
 export const AiAgentPreferencesInputSchema = z.object({
-  questionAuthoringAiAgentConnectionId: z.string().cuid().nullable().optional()
+  questionAuthoringAiAgentConnectionId: RecordIdSchema.nullable().optional()
 });
 export type AiAgentPreferencesInput = z.infer<typeof AiAgentPreferencesInputSchema>;
 
@@ -231,9 +231,9 @@ export const CourseUpdateSchema = CourseInputSchema.partial().extend({
 export type CourseUpdate = z.infer<typeof CourseUpdateSchema>;
 
 export const CourseSettingsInputSchema = z.object({
-  studentSupportAiAgentConnectionId: z.string().cuid().nullable().optional(),
+  studentSupportAiAgentConnectionId: RecordIdSchema.nullable().optional(),
   automaticFeedbackEnabled: z.boolean().optional().default(false),
-  assessmentFeedbackAiAgentConnectionId: z.string().cuid().nullable().optional()
+  assessmentFeedbackAiAgentConnectionId: RecordIdSchema.nullable().optional()
 }).superRefine((value, context) => {
   if (value.automaticFeedbackEnabled && !value.assessmentFeedbackAiAgentConnectionId) {
     context.addIssue({

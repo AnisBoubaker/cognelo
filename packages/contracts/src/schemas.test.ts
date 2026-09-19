@@ -13,6 +13,7 @@ import {
   CourseGroupInputSchema,
   CourseGroupUpdateSchema,
   CourseInputSchema,
+  CourseSettingsInputSchema,
   CourseUpdateSchema,
   CourseMaterialInputSchema,
   CourseMaterialUpdateSchema,
@@ -269,6 +270,23 @@ describe("shared contract schemas", () => {
         questionAuthoringAiAgentConnectionId: null
       })
     ).toEqual({ questionAuthoringAiAgentConnectionId: null });
+    expect(
+      AiAgentPreferencesInputSchema.parse({
+        questionAuthoringAiAgentConnectionId: "seed-ai-agent-student-support"
+      })
+    ).toEqual({ questionAuthoringAiAgentConnectionId: "seed-ai-agent-student-support" });
+
+    expect(
+      CourseSettingsInputSchema.parse({
+        studentSupportAiAgentConnectionId: "seed-ai-agent-student-support",
+        automaticFeedbackEnabled: true,
+        assessmentFeedbackAiAgentConnectionId: "seed-ai-agent-student-support"
+      })
+    ).toEqual({
+      studentSupportAiAgentConnectionId: "seed-ai-agent-student-support",
+      automaticFeedbackEnabled: true,
+      assessmentFeedbackAiAgentConnectionId: "seed-ai-agent-student-support"
+    });
 
     expect(ActivityPluginInstallationUpdateSchema.parse({ action: "activate", restoreBackupId: null })).toEqual({
       action: "activate",
