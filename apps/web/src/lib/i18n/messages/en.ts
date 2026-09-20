@@ -1080,7 +1080,7 @@ export const enMessages = {
       aiFeedbackGenerated: "AI feedback generated.",
       aiFeedbackUnavailable: "No submitted attempt is available for AI feedback.",
       aiFeedbackError: "Unable to generate AI feedback.",
-      aiFeedbackBatchFailed: "AI feedback failed for {count} learner(s): {names}",
+      aiFeedbackBatchFailed: "AI feedback failed for {count} learner(s). {reason}",
       feedbackReview: "Feedback",
       feedbackReviewAll: "Review feedback for all",
       feedbackReviewUnavailable: "Feedback is unavailable for this submission.",

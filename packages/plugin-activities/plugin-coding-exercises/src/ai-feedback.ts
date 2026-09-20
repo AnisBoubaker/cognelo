@@ -385,7 +385,7 @@ export async function evaluateCodingExerciseAttemptWithAi(input: {
       data: { status: "failed", error: message.slice(0, 8000), latencyMs: Date.now() - startedAt }
     });
     await recordAiFeedbackResearchEvent(researchEventBase({ input, attempt, evaluation, connection, submissionHash, eventType: "feedback_failed", outcome: "failed", metadata: { error: message.slice(0, 1000) } }));
-    throw new AppError(502, "AI_FEEDBACK_GENERATION_FAILED", "AI feedback could not be generated. The submission remains available for retry or manual grading.");
+    throw teacherFacingFeedbackFailure(error, connection.model, input.triggerKind);
   }
 }
 
@@ -442,6 +442,64 @@ function teachingLanguageName(language: "en" | "fr" | "zh" | "ar") {
   if (language === "zh") return "Chinese";
   if (language === "ar") return "Arabic";
   return "English";
+}
+
+function teacherFacingFeedbackFailure(
+  error: unknown,
+  model: string,
+  triggerKind: Parameters<typeof evaluateCodingExerciseAttemptWithAi>[0]["triggerKind"]
+) {
+  const generic = new AppError(
+    502,
+    "AI_FEEDBACK_GENERATION_FAILED",
+    "Assessment feedback could not be generated. The submission remains available for retry or manual grading."
+  );
+  if (triggerKind === "formative_submission") {
+    return generic;
+  }
+  if (error instanceof AppError && error.code === "AI_AGENT_REQUEST_FAILED") {
+    if (error.status === 404 || /model[^\n]*not found/i.test(error.message)) {
+      return new AppError(
+        502,
+        "AI_FEEDBACK_MODEL_UNAVAILABLE",
+        `The configured assessment feedback model "${model}" is unavailable. Select an available model in the course AI settings and retry.`
+      );
+    }
+    if (error.status === 401 || error.status === 403) {
+      return new AppError(
+        502,
+        "AI_FEEDBACK_PROVIDER_AUTH_FAILED",
+        "The assessment feedback provider rejected its credentials. Update the AI connection and retry."
+      );
+    }
+    if (error.status === 429) {
+      return new AppError(
+        502,
+        "AI_FEEDBACK_PROVIDER_RATE_LIMITED",
+        "The assessment feedback provider is rate-limiting requests. Wait briefly and retry."
+      );
+    }
+    return new AppError(
+      502,
+      "AI_FEEDBACK_PROVIDER_FAILED",
+      "The assessment feedback provider rejected the request. Verify the course model configuration and retry."
+    );
+  }
+  if (error instanceof TypeError) {
+    return new AppError(
+      502,
+      "AI_FEEDBACK_PROVIDER_UNREACHABLE",
+      "The assessment feedback provider could not be reached. Check its service and base URL, then retry."
+    );
+  }
+  if (error instanceof Error && error.message.startsWith("The model did not return valid structured feedback:")) {
+    return new AppError(
+      502,
+      "AI_FEEDBACK_RESPONSE_INVALID",
+      "The model did not return feedback in the required rubric format after two attempts. Retry this submission or grade it manually."
+    );
+  }
+  return generic;
 }
 
 function parseAiResponse(raw: string, expectedCriterionIds: string[]) {

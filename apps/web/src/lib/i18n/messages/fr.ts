@@ -1048,7 +1048,7 @@ export const frMessages = {
       aiFeedbackGenerated: "Rétroaction IA générée.",
       aiFeedbackUnavailable: "Aucune tentative soumise n’est disponible pour la rétroaction IA.",
       aiFeedbackError: "Impossible de générer la rétroaction IA.",
-      aiFeedbackBatchFailed: "La rétroaction IA a échoué pour {count} personne(s) : {names}",
+      aiFeedbackBatchFailed: "La rétroaction IA a échoué pour {count} personne(s). {reason}",
       feedbackReview: "Rétroaction",
       feedbackReviewAll: "Réviser la rétroaction de tout le groupe",
       feedbackReviewUnavailable: "La rétroaction n’est pas disponible pour cette remise.",
