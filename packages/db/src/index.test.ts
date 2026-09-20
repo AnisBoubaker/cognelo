@@ -14,11 +14,13 @@ afterEach(async () => {
   delete prismaGlobalCache.prismaSchemaSignature;
   await Promise.all([...clients].map((client) => client.$disconnect()));
   clients.clear();
+  vi.unstubAllEnvs();
   vi.resetModules();
 });
 
 describe("shared Prisma client", () => {
   it("reuses only a client cached for the current generated schema", async () => {
+    vi.stubEnv("NODE_ENV", "development");
     const firstModule = await import("./index");
     clients.add(firstModule.prisma);
 
