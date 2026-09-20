@@ -6,6 +6,7 @@ import { assertCanViewCourse } from "./authorization";
 import { AppError, notFound } from "./errors";
 
 type JsonInput = Prisma.InputJsonValue;
+const ATTEMPT_TEACHER_FEEDBACK_KEY = "teacherFeedback";
 
 export type AiFeedbackResearchEventInput = {
   eventType: string;
@@ -81,6 +82,9 @@ export async function getTeacherAttemptAiFeedbackReview(user: CurrentUser, cours
     }
   });
   if (!attempt) throw notFound("Activity attempt");
+  if (attempt.lifecycle !== "submitted" && attempt.lifecycle !== "graded") {
+    throw new AppError(409, "FEEDBACK_SUBMISSION_REQUIRED", "Feedback is available only after the learner submits the activity.");
+  }
   const grade = await prisma.grade.findUnique({
     where: {
       gradebookItemId_participantId: {
@@ -89,16 +93,17 @@ export async function getTeacherAttemptAiFeedbackReview(user: CurrentUser, cours
       }
     }
   });
-  if (!grade || grade.selectedAttemptId !== attempt.id) {
-    throw new AppError(409, "GRADE_ATTEMPT_NOT_SELECTED", "Feedback can only be reviewed for the attempt selected for this grade.");
-  }
-  const feedback = readStoredStudentFeedback(grade.normalizedResult);
-  if (!feedback.kind || typeof feedback.feedbackRef !== "string" || typeof feedback.feedbackVersion !== "number") {
-    throw new AppError(409, "AI_FEEDBACK_NOT_GENERATED", "Assessment feedback has not been generated for this attempt.");
-  }
+  const selectedGrade = grade?.selectedAttemptId === attempt.id ? grade : null;
+  const gradeFeedback = selectedGrade ? readStoredStudentFeedback(selectedGrade.normalizedResult) : {};
+  const attemptFeedback = readAttemptTeacherFeedback(attempt.metadata);
+  const feedback = isStoredTeacherFeedback(gradeFeedback)
+    ? gradeFeedback
+    : isStoredTeacherFeedback(attemptFeedback)
+      ? attemptFeedback
+      : null;
   return {
     attemptId: attempt.id,
-    gradeId: grade.id,
+    gradeId: selectedGrade?.id ?? null,
     gradesReleased: attempt.gradebookItem.gradesReleased,
     participant: {
       id: attempt.participant.id,
@@ -121,6 +126,9 @@ export async function reviseTeacherAttemptAiFeedback(
     include: { gradebookItem: { select: { id: true, gradesReleased: true } } }
   });
   if (!attempt) throw notFound("Activity attempt");
+  if (attempt.lifecycle !== "submitted" && attempt.lifecycle !== "graded") {
+    throw new AppError(409, "FEEDBACK_SUBMISSION_REQUIRED", "Feedback is available only after the learner submits the activity.");
+  }
   const grade = await prisma.grade.findUnique({
     where: {
       gradebookItemId_participantId: {
@@ -129,22 +137,30 @@ export async function reviseTeacherAttemptAiFeedback(
       }
     }
   });
-  if (!grade || grade.selectedAttemptId !== attempt.id) {
-    throw new AppError(409, "GRADE_ATTEMPT_NOT_SELECTED", "Feedback can only be revised for the attempt selected for this grade.");
-  }
-  const normalizedResult = asRecord(grade.normalizedResult);
-  const currentFeedback = readStoredStudentFeedback(grade.normalizedResult);
-  const feedbackRef = typeof currentFeedback.feedbackRef === "string" ? currentFeedback.feedbackRef : null;
-  const feedbackVersion = typeof currentFeedback.feedbackVersion === "number" ? currentFeedback.feedbackVersion : null;
-  if (!currentFeedback.kind || !feedbackRef || feedbackVersion === null) {
-    throw new AppError(409, "AI_FEEDBACK_NOT_GENERATED", "Assessment feedback has not been generated for this attempt.");
-  }
-  const existingChallenge = await prisma.gradeChallenge.findFirst({
-    where: { participantId: attempt.participantId, feedbackRef, feedbackVersion },
-    select: { id: true }
-  });
-  if (existingChallenge) {
-    throw new AppError(409, "AI_FEEDBACK_ALREADY_CHALLENGED", "Feedback cannot be edited after a learner has challenged this version.");
+  const selectedGrade = grade?.selectedAttemptId === attempt.id ? grade : null;
+  const normalizedResult = asRecord(selectedGrade?.normalizedResult);
+  const gradeFeedback = selectedGrade ? readStoredStudentFeedback(selectedGrade.normalizedResult) : {};
+  const attemptFeedback = readAttemptTeacherFeedback(attempt.metadata);
+  const currentFeedback = isStoredTeacherFeedback(gradeFeedback)
+    ? gradeFeedback
+    : isStoredTeacherFeedback(attemptFeedback)
+      ? attemptFeedback
+      : {};
+  const hasCurrentFeedback = isStoredTeacherFeedback(currentFeedback);
+  const feedbackRef = hasCurrentFeedback
+    ? String(currentFeedback.feedbackRef)
+    : `teacher-feedback:${attempt.id}`;
+  const feedbackVersion = hasCurrentFeedback
+    ? Number(currentFeedback.feedbackVersion)
+    : 1;
+  if (hasCurrentFeedback) {
+    const existingChallenge = await prisma.gradeChallenge.findFirst({
+      where: { participantId: attempt.participantId, feedbackRef, feedbackVersion },
+      select: { id: true }
+    });
+    if (existingChallenge) {
+      throw new AppError(409, "AI_FEEDBACK_ALREADY_CHALLENGED", "Feedback cannot be edited after a learner has challenged this version.");
+    }
   }
 
   const now = new Date();
@@ -156,74 +172,113 @@ export async function reviseTeacherAttemptAiFeedback(
     "feedbackVersion",
     "feedbackHash",
     "challengeAllowed",
+    "kind",
+    "feedbackOrigin",
+    "authoredByTeacher",
+    "authoredAt",
     "teacherRevision",
     "reviewedByTeacher",
     "reviewedAt"
   ].includes(key)));
+  const kind = hasCurrentFeedback && typeof currentFeedback.kind === "string"
+    ? currentFeedback.kind
+    : typeof revisedFeedback.kind === "string" && revisedFeedback.kind.trim()
+      ? revisedFeedback.kind.trim()
+      : "assessment_feedback";
+  const feedbackOrigin = typeof currentFeedback.feedbackOrigin === "string"
+    ? currentFeedback.feedbackOrigin
+    : kind === "ai_assessment_feedback"
+      ? "generated"
+      : "teacher";
+  const challengeAllowed = hasCurrentFeedback && currentFeedback.challengeAllowed === true;
   const feedbackForHash = {
     ...revisedContent,
+    kind,
     feedbackRef,
     feedbackVersion,
-    challengeAllowed: currentFeedback.challengeAllowed === true
+    challengeAllowed
   };
-  const previousFeedbackHash = typeof currentFeedback.feedbackHash === "string"
+  const previousFeedbackHash = hasCurrentFeedback && typeof currentFeedback.feedbackHash === "string"
     ? currentFeedback.feedbackHash
-    : hashAiFeedbackValue(currentFeedback);
+    : hasCurrentFeedback
+      ? hashAiFeedbackValue(currentFeedback)
+      : null;
   const feedbackHash = hashAiFeedbackValue(feedbackForHash);
   const nextFeedback = {
     ...revisedContent,
-    kind: currentFeedback.kind,
+    kind,
     feedbackRef,
     feedbackVersion,
     feedbackHash,
-    challengeAllowed: currentFeedback.challengeAllowed === true,
+    challengeAllowed,
+    feedbackOrigin,
+    ...(feedbackOrigin === "teacher" ? {
+      authoredByTeacher: true,
+      authoredAt: typeof currentFeedback.authoredAt === "string" ? currentFeedback.authoredAt : now.toISOString()
+    } : {}),
     teacherRevision,
     reviewedByTeacher: true,
     reviewedAt: now.toISOString()
   };
   const nextNormalizedResult = { ...normalizedResult, studentFeedback: nextFeedback };
-  const gradeSnapshot = {
-    attemptId: grade.selectedAttemptId,
-    rawScore: grade.rawScore,
-    rawMaxScore: grade.rawMaxScore,
-    normalizedScore: grade.normalizedScore,
-    normalizedMaxScore: grade.normalizedMaxScore,
-    isPass: grade.isPass,
-    source: grade.source
-  };
+  const gradeSnapshot = selectedGrade
+    ? {
+        attemptId: selectedGrade.selectedAttemptId,
+        rawScore: selectedGrade.rawScore,
+        rawMaxScore: selectedGrade.rawMaxScore,
+        normalizedScore: selectedGrade.normalizedScore,
+        normalizedMaxScore: selectedGrade.normalizedMaxScore,
+        isPass: selectedGrade.isPass,
+        source: selectedGrade.source
+      }
+    : { attemptId: attempt.id, lifecycle: attempt.lifecycle };
 
   await prisma.$transaction(async (tx) => {
-    await tx.grade.update({
-      where: { id: grade.id },
+    await tx.activityAttempt.update({
+      where: { id: attempt.id },
       data: {
-        normalizedResult: nextNormalizedResult as JsonInput,
         metadata: {
-          ...asRecord(grade.metadata),
-          aiFeedbackRef: feedbackRef,
-          aiFeedbackVersion: feedbackVersion,
-          teacherFeedbackRevision: teacherRevision,
-          reviewedByUserId: user.id,
-          reviewedAt: now.toISOString()
+          ...asRecord(attempt.metadata),
+          [ATTEMPT_TEACHER_FEEDBACK_KEY]: nextFeedback
         } as JsonInput
       }
     });
+    if (selectedGrade) {
+      await tx.grade.update({
+        where: { id: selectedGrade.id },
+        data: {
+          normalizedResult: nextNormalizedResult as JsonInput,
+          metadata: {
+            ...asRecord(selectedGrade.metadata),
+            aiFeedbackRef: feedbackRef,
+            aiFeedbackVersion: feedbackVersion,
+            teacherFeedbackRevision: teacherRevision,
+            reviewedByUserId: user.id,
+            reviewedAt: now.toISOString()
+          } as JsonInput
+        }
+      });
+    }
     await tx.gradeEvent.create({
       data: {
-        gradeId: grade.id,
+        gradeId: selectedGrade?.id ?? null,
         gradebookItemId: attempt.gradebookItemId,
         participantId: attempt.participantId,
         attemptId: attempt.id,
         actorUserId: user.id,
         eventType: "ai_feedback_recorded",
-        previousValue: { ...gradeSnapshot, studentFeedback: currentFeedback } as JsonInput,
+        previousValue: hasCurrentFeedback
+          ? { ...gradeSnapshot, studentFeedback: currentFeedback } as JsonInput
+          : gradeSnapshot as JsonInput,
         nextValue: { ...gradeSnapshot, studentFeedback: nextFeedback } as JsonInput,
-        reason: "Teacher feedback revision",
+        reason: hasCurrentFeedback ? "Teacher feedback revision" : "Teacher feedback authored",
         metadata: {
-          action: "teacher_revision",
+          action: hasCurrentFeedback ? "teacher_revision" : "teacher_authored",
+          feedbackOrigin,
           feedbackRef,
           feedbackVersion,
           teacherRevision,
-          previousFeedbackHash,
+          ...(previousFeedbackHash ? { previousFeedbackHash } : {}),
           feedbackHash,
           gradesReleased: attempt.gradebookItem.gradesReleased
         } as JsonInput,
@@ -232,7 +287,7 @@ export async function reviseTeacherAttemptAiFeedback(
     });
     await tx.aiFeedbackResearchEvent.create({
       data: {
-        eventType: "feedback_teacher_revised",
+        eventType: hasCurrentFeedback ? "feedback_teacher_revised" : "feedback_teacher_authored",
         courseId,
         groupId: attempt.groupId,
         activityId: attempt.activityId,
@@ -248,12 +303,13 @@ export async function reviseTeacherAttemptAiFeedback(
         feedbackHash,
         assessmentMode: "summative",
         triggerKind: "teacher_feedback_review",
-        outcome: "revised",
+        outcome: hasCurrentFeedback ? "revised" : "authored",
         metadata: {
           teacherRevision,
-          previousFeedbackHash,
+          feedbackOrigin,
+          ...(previousFeedbackHash ? { previousFeedbackHash } : {}),
           gradesReleased: attempt.gradebookItem.gradesReleased,
-          gradeId: grade.id
+          ...(selectedGrade ? { gradeId: selectedGrade.id } : {})
         } as JsonInput,
         createdAt: now
       }
@@ -294,4 +350,14 @@ function readStoredStudentFeedback(value: unknown) {
     };
   }
   return feedback;
+}
+
+function readAttemptTeacherFeedback(value: unknown) {
+  return asRecord(asRecord(value)[ATTEMPT_TEACHER_FEEDBACK_KEY]);
+}
+
+function isStoredTeacherFeedback(value: Record<string, unknown>) {
+  return typeof value.kind === "string"
+    && typeof value.feedbackRef === "string"
+    && typeof value.feedbackVersion === "number";
 }

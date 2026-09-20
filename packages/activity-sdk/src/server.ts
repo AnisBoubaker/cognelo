@@ -164,6 +164,9 @@ export type PluginAiFeedbackTeacherReviewContext = {
 
 export type PluginAiFeedbackTeacherReviewHandler = {
   getSubmission: (input: PluginAiFeedbackTeacherReviewContext) => Promise<Record<string, unknown>>;
+  createFeedbackDraft: (
+    input: PluginAiFeedbackTeacherReviewContext
+  ) => Promise<Record<string, unknown>> | Record<string, unknown>;
   reviseFeedback: (
     input: PluginAiFeedbackTeacherReviewContext & {
       currentFeedback: Record<string, unknown>;

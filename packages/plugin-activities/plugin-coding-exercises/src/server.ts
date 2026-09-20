@@ -49,6 +49,13 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
       });
     },
     teacherReview: {
+      createFeedbackDraft: () => ({
+        kind: "assessment_feedback",
+        summary: "",
+        strengths: [],
+        improvements: [],
+        criteria: []
+      }),
       getSubmission: async ({ activityId, pluginAttemptRef, activity }) => {
         if (!pluginAttemptRef) {
           throw new AppError(409, "CODING_EXERCISE_SUBMISSION_REQUIRED", "This attempt does not reference a coding exercise submission.");

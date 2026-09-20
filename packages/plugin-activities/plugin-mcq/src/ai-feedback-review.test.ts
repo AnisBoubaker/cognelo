@@ -13,6 +13,21 @@ const current = {
 };
 
 describe("MCQ feedback revision", () => {
+  it("accepts teacher-authored feedback when no generated explanations exist", () => {
+    expect(reviseMcqAiFeedback({
+      kind: "assessment_feedback",
+      summary: "",
+      questionFeedback: []
+    }, {
+      summary: "Review the distinction between the two concepts.",
+      questionFeedback: []
+    })).toMatchObject({
+      kind: "assessment_feedback",
+      summary: "Review the distinction between the two concepts.",
+      questionFeedback: []
+    });
+  });
+
   it("edits explanations without changing deterministic grading", () => {
     expect(reviseMcqAiFeedback(current, {
       ...current,

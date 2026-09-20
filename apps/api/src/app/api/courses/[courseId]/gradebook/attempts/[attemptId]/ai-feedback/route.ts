@@ -19,19 +19,21 @@ export async function GET(_request: NextRequest, { params }: Params) {
     if (!teacherReview) {
       throw new AppError(409, "PLUGIN_AI_FEEDBACK_REVIEW_UNAVAILABLE", "This activity type does not provide a feedback review interface.");
     }
+    const teacherReviewContext = {
+      user,
+      courseId: context.courseId,
+      groupId: context.groupId,
+      activityId: context.activityId,
+      coreAttemptId: context.attemptId,
+      pluginAttemptRef: context.pluginAttemptRef,
+      activity: context.activity
+    };
     const [review, submission] = await Promise.all([
       getTeacherAttemptAiFeedbackReview(user, courseId, attemptId),
-      teacherReview.getSubmission({
-        user,
-        courseId: context.courseId,
-        groupId: context.groupId,
-        activityId: context.activityId,
-        coreAttemptId: context.attemptId,
-        pluginAttemptRef: context.pluginAttemptRef,
-        activity: context.activity
-      })
+      teacherReview.getSubmission(teacherReviewContext)
     ]);
-    return json({ review: { ...review, activityTypeKey: context.activityTypeKey, submission } });
+    const feedback = review.feedback ?? await teacherReview.createFeedbackDraft(teacherReviewContext);
+    return json({ review: { ...review, activityTypeKey: context.activityTypeKey, submission, feedback } });
   });
 }
 
@@ -45,16 +47,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (!teacherReview) {
       throw new AppError(409, "PLUGIN_AI_FEEDBACK_REVIEW_UNAVAILABLE", "This activity type does not provide a feedback review interface.");
     }
-    const current = await getTeacherAttemptAiFeedbackReview(user, courseId, attemptId);
-    const feedback = await teacherReview.reviseFeedback({
+    const teacherReviewContext = {
       user,
       courseId: context.courseId,
       groupId: context.groupId,
       activityId: context.activityId,
       coreAttemptId: context.attemptId,
       pluginAttemptRef: context.pluginAttemptRef,
-      activity: context.activity,
-      currentFeedback: current.feedback,
+      activity: context.activity
+    };
+    const current = await getTeacherAttemptAiFeedbackReview(user, courseId, attemptId);
+    const currentFeedback = current.feedback ?? await teacherReview.createFeedbackDraft(teacherReviewContext);
+    const feedback = await teacherReview.reviseFeedback({
+      ...teacherReviewContext,
+      currentFeedback,
       feedback: body.feedback
     });
     return json(await reviseTeacherAttemptAiFeedback(user, courseId, attemptId, feedback));

@@ -2,7 +2,7 @@
 
 This document records the implemented direction for plugin-provided AI feedback ("retroaction"), AI-assisted grading, and student challenges, plus the remaining production-hardening work.
 
-Status: initial end-to-end implementation completed on 2026-09-19 for Programming Exercises, MCQ, the shared gradebook, and Compound Tests. Plugin-owned standalone teacher feedback review/editing is also complete. Phase 6 privacy/operations hardening remains incomplete as listed below.
+Status: initial end-to-end implementation completed on 2026-09-19 for Programming Exercises, MCQ, the shared gradebook, and Compound Tests. Plugin-owned standalone feedback authoring/review/editing is also complete for every submitted attempt and does not require an AI result. Phase 6 privacy/operations hardening remains incomplete as listed below.
 
 ## Terminology
 
@@ -25,6 +25,7 @@ Teacher/admin product copy may use **AI feedback** and **Grade challenge** (Fren
 - Preserve deterministic grading where it is authoritative, especially MCQ answer-key grading.
 - Let a student challenge any released AI feedback that contributed to an automatic grade.
 - Give teachers one course-wide challenge queue with a response and audited grade-adjustment workflow.
+- Let teachers author learner feedback directly, whether or not AI feedback is enabled or generated.
 - Retain reproducible, privacy-aware data for educational research, model evaluation, audit, and later student-model evidence work.
 
 ## Effective Enablement
@@ -84,7 +85,7 @@ The model is always resolved server-side. Provider keys, raw credentials, privat
 - If later scale requires asynchronous execution, that is a new design decision requiring explicit approval. It must preserve teacher initiation and must not turn summative grading into submission-triggered automation.
 - A teacher may retry a failed evaluation. Each retry creates a new immutable evaluation version and supersedes the previous result; it never overwrites research or audit history.
 - The teacher can review generated feedback and the score breakdown before grade release.
-- The detailed gradebook offers an individual review action and a whole-class review flow with previous/next learner navigation. The activity plugin renders the submitted answer and editable feedback fields.
+- The detailed gradebook offers **Feedback** for every submitted attempt and a whole-class review flow across all submitted learners. The activity plugin renders the submitted answer and editable feedback fields. Generated feedback pre-populates the form; otherwise the plugin supplies an empty teacher-authoring draft.
 - Teacher revisions may update learner-visible narrative feedback before or after release, but do not change model-derived score components or the grade. Core preserves the immutable evaluation artifact, records previous/next feedback and research telemetry, and blocks further edits after that feedback version is challenged.
 - Student-safe summative AI feedback is exposed only after the associated `GradebookItem` is released.
 
@@ -128,6 +129,7 @@ The SDK now exposes capabilities distinct from existing deterministic automatic 
 - `supportsAiFeedbackGrading`
 - `aiFeedback.rendererKey` for the teacher feedback review renderer
 - `aiFeedback.teacherReview.getSubmission` for the plugin-specific submitted answer
+- `aiFeedback.teacherReview.createFeedbackDraft` for a valid empty plugin-owned teacher feedback shape
 - `aiFeedback.teacherReview.reviseFeedback` for whitelisting and validating editable narrative fields while preserving score components
 
 Server plugins need an evaluation handler that receives an immutable attempt/submission context plus the resolved course model and returns a validated result resembling:
@@ -412,6 +414,7 @@ Status: partial. The manager research endpoint is implemented with stable identi
 - Research records cover successful, failed, retried, released, viewed, challenged, and adjusted evaluations.
 - Teacher feedback revisions preserve the original evaluation, keep score components unchanged, and record previous/next snapshots plus normalized research telemetry.
 - Every standalone feedback-capable plugin provides a teacher answer/feedback review renderer and a server-side revision validator.
+- Individual and whole-group feedback review include every submitted attempt, even when no AI result exists, and the first teacher save records `feedback_teacher_authored`.
 - Learner-facing feedback and challenge copy does not identify AI as the generating or grading mechanism.
 - Raw prompts, responses, hidden tests, credentials, and other students' data never appear in student DTOs or ordinary research exports.
 - Compound Tests expose child feedback only through the released parent result.

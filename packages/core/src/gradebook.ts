@@ -300,7 +300,18 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
       orderBy: [{ createdAt: "asc" }]
     });
     const eventCandidates = gradeCandidatesFromEvents(previousEvents);
-    const gradedCandidate = buildGradedAttemptCandidate(input, attempt);
+    const normalizedResult = asJsonObject(input.normalizedResult) ?? {};
+    const attemptTeacherFeedback = readAttemptTeacherFeedback(attempt.metadata);
+    const gradingInput = attemptTeacherFeedback && !asJsonObject(normalizedResult.studentFeedback)
+      ? {
+          ...input,
+          normalizedResult: {
+            ...normalizedResult,
+            studentFeedback: attemptTeacherFeedback
+          } as JsonInput
+        }
+      : input;
+    const gradedCandidate = buildGradedAttemptCandidate(gradingInput, attempt);
     const selectedGrade = selectGradebookGrade({
       gradebookItem: attempt.gradebookItem,
       candidates: [
@@ -574,7 +585,18 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
         }
       }
     });
+    const latestAttempt = await tx.activityAttempt.findFirst({
+      where: {
+        gradebookItemId: item.id,
+        participantId: participant.id,
+        lifecycle: { in: ["submitted", "graded"] }
+      },
+      orderBy: { attemptNumber: "desc" },
+      select: { metadata: true }
+    });
     const previousFeedback = asJsonObject(asJsonObject(previousGrade?.normalizedResult)?.studentFeedback);
+    const attemptTeacherFeedback = readAttemptTeacherFeedback(latestAttempt?.metadata);
+    const existingFeedback = previousFeedback ?? attemptTeacherFeedback;
     const feedbackText = typeof input.feedbackText === "string" ? input.feedbackText.trim() : "";
     const nextSnapshot = {
       attemptId: null,
@@ -586,8 +608,8 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
       latePenaltyApplied: false,
       latePenaltyPercent: null,
       source: "override",
-      ...(previousFeedback
-        ? { studentFeedback: { ...previousFeedback, ...(feedbackText ? { feedbackText } : {}) } }
+      ...(existingFeedback
+        ? { studentFeedback: { ...existingFeedback, ...(feedbackText ? { feedbackText } : {}) } }
         : buildManualStudentFeedbackResult(input.feedbackText))
     };
 
@@ -1996,6 +2018,16 @@ function clamp(value: number, min: number, max: number) {
 
 function asJsonObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function readAttemptTeacherFeedback(value: unknown): Record<string, unknown> | null {
+  const feedback = asJsonObject(asJsonObject(value)?.teacherFeedback);
+  return feedback
+    && typeof feedback.kind === "string"
+    && typeof feedback.feedbackRef === "string"
+    && typeof feedback.feedbackVersion === "number"
+    ? feedback
+    : null;
 }
 
 function stringArray(value: unknown) {
