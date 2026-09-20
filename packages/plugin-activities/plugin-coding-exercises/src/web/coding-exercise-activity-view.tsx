@@ -52,6 +52,7 @@ type HiddenTest = {
 };
 
 type SampleTest = CodingExerciseConfig["sampleTests"][number];
+type RubricCriterion = CodingExercisePrivateConfig["aiFeedback"]["criteria"][number];
 
 type CodingExerciseSnapshot = {
   title: string;
@@ -229,6 +230,15 @@ type CodingExerciseAiGenerationClient = {
         attempts: number;
       }
   >;
+  generateRubric: (input: {
+    title: string;
+    description: string;
+    prompt: string;
+    referenceSolution: string;
+    language: string;
+    locale: CodingExercisesLocale;
+    knowledge: ActivityKnowledgeGenerationRequest;
+  }) => Promise<{ criteria: RubricCriterion[]; attempts: number }>;
 };
 
 type CodingExerciseActivityViewProps = {
@@ -312,7 +322,9 @@ export function CodingExerciseActivityView({
   const [generatingPrompt, setGeneratingPrompt] = useState(false);
   const [generatingSolution, setGeneratingSolution] = useState(false);
   const [generatingTests, setGeneratingTests] = useState(false);
-  const [replacementDialog, setReplacementDialog] = useState<"prompt" | "solution" | "tests" | null>(null);
+  const [generatingRubric, setGeneratingRubric] = useState(false);
+  const [gradingSection, setGradingSection] = useState<"rubric" | "tests">("rubric");
+  const [replacementDialog, setReplacementDialog] = useState<"prompt" | "solution" | "rubric" | "tests" | null>(null);
   const [error, setError] = useState("");
   const [editorCode, setEditorCode] = useState(() => getCodingExerciseInitialStudentSource(activity.config));
   const [sampleInput, setSampleInput] = useState("");
@@ -997,6 +1009,51 @@ export function CodingExerciseActivityView({
     }
   }
 
+  function requestRubricGeneration() {
+    if (!aiGenerationClient) {
+      return;
+    }
+    if (!title.trim() || config.prompt.trim().length < 10 || !referenceSolution.trim()) {
+      notifications.error(t("generateRubricRequirements"));
+      return;
+    }
+    if (privateConfig.aiFeedback.criteria.length > 0) {
+      setReplacementDialog("rubric");
+      return;
+    }
+    void generateRubric();
+  }
+
+  async function generateRubric() {
+    if (!aiGenerationClient) {
+      return;
+    }
+
+    setGeneratingRubric(true);
+    setReplacementDialog(null);
+    setError("");
+    try {
+      const result = await aiGenerationClient.generateRubric({
+        title,
+        description,
+        prompt: config.prompt,
+        referenceSolution,
+        language: config.language,
+        locale: pluginLocale,
+        knowledge: knowledgeGeneration.request
+      });
+      setPrivateConfig((current) => ({
+        ...current,
+        aiFeedback: { ...current.aiFeedback, criteria: result.criteria }
+      }));
+      notifications.success(result.attempts > 1 ? `${t("generatedRubric")} (${result.attempts})` : t("generatedRubric"));
+    } catch (err) {
+      notifications.error(err instanceof Error ? err.message : t("generateRubricError"));
+    } finally {
+      setGeneratingRubric(false);
+    }
+  }
+
   async function runCode() {
     if (!course?.id || !codingClient || !editorCode.trim()) {
       return;
@@ -1082,6 +1139,9 @@ export function CodingExerciseActivityView({
     if (replacementDialog === "solution") {
       return t("generateSolution");
     }
+    if (replacementDialog === "rubric") {
+      return t("generateRubric");
+    }
     return t("generateTests");
   }
 
@@ -1091,6 +1151,9 @@ export function CodingExerciseActivityView({
     }
     if (replacementDialog === "solution") {
       return t("replaceSolutionTitle");
+    }
+    if (replacementDialog === "rubric") {
+      return t("replaceRubricTitle");
     }
     return t("replaceTestsTitle");
   }
@@ -1102,6 +1165,9 @@ export function CodingExerciseActivityView({
     if (replacementDialog === "solution") {
       return t("replaceSolutionMessage");
     }
+    if (replacementDialog === "rubric") {
+      return t("replaceRubricMessage");
+    }
     return t("replaceTestsMessage");
   }
 
@@ -1111,6 +1177,9 @@ export function CodingExerciseActivityView({
     }
     if (replacementDialog === "solution") {
       return t("keepCurrentSolution");
+    }
+    if (replacementDialog === "rubric") {
+      return t("keepCurrentRubric");
     }
     return t("keepCurrentTests");
   }
@@ -1122,6 +1191,9 @@ export function CodingExerciseActivityView({
     if (replacementDialog === "solution") {
       return t("replaceCurrentSolution");
     }
+    if (replacementDialog === "rubric") {
+      return t("replaceCurrentRubric");
+    }
     return t("replaceCurrentTests");
   }
 
@@ -1132,6 +1204,10 @@ export function CodingExerciseActivityView({
     }
     if (replacementDialog === "solution") {
       void generateSolution();
+      return;
+    }
+    if (replacementDialog === "rubric") {
+      void generateRubric();
       return;
     }
     void generateTests();
@@ -1225,7 +1301,7 @@ export function CodingExerciseActivityView({
             </button>
           ) : null}
 
-          {replacementDialog ? (
+          {replacementDialog && typeof document !== "undefined" ? createPortal(
             <div className="dialog-backdrop" role="presentation">
               <div
                 aria-modal="true"
@@ -1247,7 +1323,8 @@ export function CodingExerciseActivityView({
                   </button>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
           ) : null}
 
           <div className="stack">
@@ -1345,11 +1422,40 @@ export function CodingExerciseActivityView({
           </div>
 
           {renderAuthoringGrading(<div className="stack">
+            <div>
+              <h2>{t("gradingTitle")}</h2>
+              <p className="muted">{t("gradingHelp")}</p>
+            </div>
+            <div className="settings-layout coding-exercise-grading-layout">
+              <aside className="settings-nav coding-exercise-grading-nav" aria-label={t("gradingSections")} role="tablist">
+                <button
+                  aria-controls="coding-exercise-rubric-panel"
+                  aria-selected={gradingSection === "rubric"}
+                  className={gradingSection === "rubric" ? "is-active" : ""}
+                  role="tab"
+                  type="button"
+                  onClick={() => setGradingSection("rubric")}
+                >
+                  <span>{t("rubricSectionTab")}</span>
+                </button>
+                <button
+                  aria-controls="coding-exercise-tests-panel"
+                  aria-selected={gradingSection === "tests"}
+                  className={gradingSection === "tests" ? "is-active" : ""}
+                  role="tab"
+                  type="button"
+                  onClick={() => setGradingSection("tests")}
+                >
+                  <span>{t("testCasesSectionTab")}</span>
+                </button>
+              </aside>
+              <div
+                className="stack"
+                hidden={gradingSection !== "rubric"}
+                id="coding-exercise-rubric-panel"
+                role="tabpanel"
+              >
             <section className="stack">
-              <div>
-                <h2>{t("gradingTitle")}</h2>
-                <p className="muted">{t("gradingHelp")}</p>
-              </div>
               <label className="checkbox-row">
                 <input
                   checked={privateConfig.aiFeedback.gradingEnabled}
@@ -1402,44 +1508,64 @@ export function CodingExerciseActivityView({
                 <h3>{t("rubricTitle")}</h3>
                 <p className="muted">{t("rubricHelp")}</p>
               </div>
-              <div className="field">
-                <label htmlFor="coding-ai-rubric-name">{t("rubricName")}</label>
-                <input
-                  id="coding-ai-rubric-name"
-                  maxLength={200}
-                  required={privateConfig.aiFeedback.enabled || privateConfig.aiFeedback.gradingEnabled || privateConfig.aiFeedback.criteria.length > 0}
-                  value={privateConfig.aiFeedback.rubricName}
-                  onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, rubricName: event.target.value } }))}
-                />
-              </div>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                 <h4>{t("rubricCriteria")}</h4>
-                <button
-                  className="button secondary"
-                  disabled={privateConfig.aiFeedback.criteria.length >= 20}
-                  type="button"
-                  onClick={() => setPrivateConfig((current) => ({
-                    ...current,
-                    aiFeedback: {
-                      ...current.aiFeedback,
-                      criteria: balanceCodingExerciseAiRubricCriterionWeights([...current.aiFeedback.criteria, {
-                        id: createCodingExerciseAiRubricCriterionId(current.aiFeedback.criteria),
-                        title: "",
-                        description: "",
-                        weightPercent: 1
-                      }])
-                    }
-                  }))}
-                >
-                  {t("addCriterion")}
-                </button>
+                <div className="row">
+                  {aiGenerationClient ? (
+                    <button
+                      className="button secondary"
+                      disabled={generatingRubric || !title.trim() || config.prompt.trim().length < 10 || !referenceSolution.trim()}
+                      title={!title.trim() || config.prompt.trim().length < 10 || !referenceSolution.trim() ? t("generateRubricRequirements") : undefined}
+                      type="button"
+                      onClick={requestRubricGeneration}
+                    >
+                      {generatingRubric ? t("generatingRubric") : t("generateRubric")}
+                    </button>
+                  ) : null}
+                  <button
+                    className="button secondary"
+                    disabled={privateConfig.aiFeedback.criteria.length >= 20}
+                    type="button"
+                    onClick={() => setPrivateConfig((current) => ({
+                      ...current,
+                      aiFeedback: {
+                        ...current.aiFeedback,
+                        criteria: balanceCodingExerciseAiRubricCriterionWeights([...current.aiFeedback.criteria, {
+                          id: createCodingExerciseAiRubricCriterionId(current.aiFeedback.criteria),
+                          title: "",
+                          description: "",
+                          weightPercent: 1
+                        }])
+                      }
+                    }))}
+                  >
+                    {t("addCriterion")}
+                  </button>
+                </div>
               </div>
               {privateConfig.aiFeedback.criteria.map((criterion, index) => (
                 <section className="stack" key={`${criterion.id}-${index}`} style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 16 }}>
                   <div className="form-grid two-columns">
                     <div className="field">
-                      <label>{t("criterionTitle")}</label>
-                      <input maxLength={160} required value={criterion.title} onChange={(event) => setPrivateConfig((current) => ({
+                      <div className="row coding-exercise-criterion-title-row">
+                        <label htmlFor={`coding-rubric-criterion-title-${index}`}>{t("criterionTitle")}</label>
+                        <button
+                          aria-label={t("removeCriterion")}
+                          className="button danger coding-exercise-criterion-remove"
+                          title={t("removeCriterion")}
+                          type="button"
+                          onClick={() => setPrivateConfig((current) => ({
+                            ...current,
+                            aiFeedback: {
+                              ...current.aiFeedback,
+                              criteria: balanceCodingExerciseAiRubricCriterionWeights(
+                                current.aiFeedback.criteria.filter((_, itemIndex) => itemIndex !== index)
+                              )
+                            }
+                          }))}
+                        >−</button>
+                      </div>
+                      <input id={`coding-rubric-criterion-title-${index}`} maxLength={160} required value={criterion.title} onChange={(event) => setPrivateConfig((current) => ({
                         ...current,
                         aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value, id: item.id || `criterion-${index + 1}` } : item) }
                       }))} />
@@ -1459,15 +1585,6 @@ export function CodingExerciseActivityView({
                       aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item) }
                     }))} />
                   </div>
-                  <button className="button danger" type="button" onClick={() => setPrivateConfig((current) => ({
-                    ...current,
-                    aiFeedback: {
-                      ...current.aiFeedback,
-                      criteria: balanceCodingExerciseAiRubricCriterionWeights(
-                        current.aiFeedback.criteria.filter((_, itemIndex) => itemIndex !== index)
-                      )
-                    }
-                  }))}>{t("remove")}</button>
                 </section>
               ))}
             </section>
@@ -1515,6 +1632,14 @@ export function CodingExerciseActivityView({
                 </div>
               ) : null}
             </section>
+
+              </div>
+              <div
+                className="stack"
+                hidden={gradingSection !== "tests"}
+                id="coding-exercise-tests-panel"
+                role="tabpanel"
+              >
 
           {aiGenerationClient ? (
             <button
@@ -1757,6 +1882,8 @@ export function CodingExerciseActivityView({
               </section>
             ))}
           </section>
+              </div>
+            </div>
           {authoringGradingPortalTarget !== undefined ? (
             <>
               {error ? <p className="error">{error}</p> : null}

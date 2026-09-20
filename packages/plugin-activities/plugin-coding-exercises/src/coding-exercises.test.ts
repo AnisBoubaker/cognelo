@@ -57,7 +57,6 @@ describe("coding exercise config and template helpers", () => {
       aiFeedback: {
         enabled: true,
         gradingEnabled: true,
-        rubricName: "Code quality",
         instructions: "Evaluate the submitted approach.",
         testWeightPercent: 60,
         aiWeightPercent: 40,
@@ -70,7 +69,6 @@ describe("coding exercise config and template helpers", () => {
       aiFeedback: {
         enabled: true,
         gradingEnabled: true,
-        rubricName: "Code quality",
         instructions: "Evaluate the submitted approach.",
         testWeightPercent: 60,
         aiWeightPercent: 40,
@@ -85,26 +83,23 @@ describe("coding exercise config and template helpers", () => {
       aiFeedback: {
         enabled: false,
         gradingEnabled: true,
-        rubricName: "Teacher rubric",
         instructions: "",
         testWeightPercent: 70,
         aiWeightPercent: 30,
         criteria: [{ id: "quality", title: "Quality", description: "Evaluate the submitted approach.", weightPercent: 100 }]
       }
-    }).aiFeedback).toMatchObject({ enabled: false, gradingEnabled: true, rubricName: "Teacher rubric" });
+    }).aiFeedback).toMatchObject({ enabled: false, gradingEnabled: true });
   });
 
   it("reports incomplete rubric drafts before they are sent to the API", () => {
     expect(getCodingExerciseAiFeedbackValidationMessages({
       enabled: true,
       gradingEnabled: true,
-      rubricName: "",
       instructions: "",
       testWeightPercent: 60,
       aiWeightPercent: 40,
       criteria: []
     })).toEqual(expect.arrayContaining([
-      "A rubric name is required when rubric feedback or grading is configured.",
       "Feedback instructions are required when AI feedback is enabled.",
       "At least one rubric criterion is required when rubric feedback or grading is enabled."
     ]));
@@ -138,7 +133,7 @@ describe("coding exercise config and template helpers", () => {
           templateVisibleLineNumbers: [],
           templatePrefix: "",
           templateSuffix: "",
-          aiFeedback: { enabled: false, gradingEnabled: false, rubricName: "", instructions: "", testWeightPercent: 60, aiWeightPercent: 40, criteria: [] }
+          aiFeedback: { enabled: false, gradingEnabled: false, instructions: "", testWeightPercent: 60, aiWeightPercent: 40, criteria: [] }
         },
         studentSourceCode: "return 42",
         testCode: "print(solve())"

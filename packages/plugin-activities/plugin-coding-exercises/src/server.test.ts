@@ -25,6 +25,7 @@ vi.mock("./executions", () => executionMocks);
 vi.mock("./ai-feedback", () => aiFeedbackMocks);
 vi.mock("./routes", () => ({
   codingExerciseGeneratePromptRoute: { path: "generate-prompt", methods: {} },
+  codingExerciseGenerateRubricRoute: { path: "generate-rubric", methods: {} },
   codingExerciseGenerateSolutionRoute: { path: "generate-solution", methods: {} },
   codingExerciseGenerateTestsRoute: { path: "generate-tests", methods: {} },
   codingExerciseHistoryRoute: { path: "history", methods: {} },

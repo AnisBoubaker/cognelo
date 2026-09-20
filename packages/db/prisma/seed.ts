@@ -978,7 +978,6 @@ async function main() {
   const medianCodingAiFeedbackConfig = {
     enabled: true,
     gradingEnabled: true,
-    rubricName: "Median program quality",
     instructions: [
       "Evaluate the submitted C program against the activity requirements and deterministic test results.",
       "Explain the most important correction concretely and concisely.",

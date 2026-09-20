@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { activityGenerationKnowledgeSchema, activityKnowledgeGenerationPrompt, AppError, generateQuestionAuthoringText, suggestActivityKnowledgeSelections, type ActivityGenerationKnowledge } from "@cognelo/core";
 import {
+  createCodingExerciseAiRubricCriterionId,
   codingExerciseHiddenTestSchema,
   codingExerciseTestInsertionToken,
   codingExerciseTemplateInsertionToken,
@@ -39,6 +40,16 @@ export const codingExerciseTestsGenerationInputSchema = z.object({
   referenceSolution: z.string().min(1).max(60000),
   templateSource: z.string().min(1).max(120000),
   templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([]),
+  knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
+});
+
+export const codingExerciseRubricGenerationInputSchema = z.object({
+  title: z.string().trim().min(1).max(300),
+  description: z.string().max(4000).default(""),
+  prompt: z.string().min(10).max(12000),
+  referenceSolution: z.string().trim().min(1).max(60000),
+  language: z.string().min(1).max(40),
+  locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
   knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
 });
 
@@ -81,6 +92,22 @@ const generatedTestsSchema = z
       });
     }
   });
+
+const generatedRubricSchema = z.object({
+  criteria: z.array(z.object({
+    title: z.string().trim().min(1).max(160),
+    description: z.string().trim().min(1).max(2000),
+    weightPercent: z.number().int().min(1).max(100)
+  }).strict()).min(1).max(10)
+}).strict().superRefine((rubric, context) => {
+  if (rubric.criteria.reduce((total, criterion) => total + criterion.weightPercent, 0) !== 100) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["criteria"],
+      message: "Rubric criterion weights must total 100%."
+    });
+  }
+});
 
 export async function generateCodingExercisePrompt(input: {
   user: Parameters<typeof generateQuestionAuthoringText>[0];
@@ -278,6 +305,80 @@ export async function generateCodingExerciseTests(input: {
   });
 }
 
+export async function generateCodingExerciseRubric(input: {
+  user: Parameters<typeof generateQuestionAuthoringText>[0];
+  title: string;
+  description: string;
+  prompt: string;
+  referenceSolution: string;
+  language: string;
+  locale: GenerationLocale;
+  subject: SubjectContext;
+  knowledge?: ActivityGenerationKnowledge;
+}) {
+  const systemPrompt = buildRubricGenerationSystemPrompt(input);
+  let userPrompt = [
+    "Generate a grading rubric for this coding exercise.",
+    "",
+    "Activity title:",
+    input.title.trim(),
+    "",
+    "Activity description:",
+    input.description.trim() || "No separate description provided.",
+    "",
+    "Student-facing prompt:",
+    input.prompt.trim(),
+    "",
+    "Teacher reference solution:",
+    "<reference_solution>",
+    input.referenceSolution,
+    "</reference_solution>"
+  ].join("\n");
+  let lastPayload: unknown = null;
+  let lastIssues: string[] = [];
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const raw = await generateQuestionAuthoringText(input.user, {
+      systemPrompt,
+      userPrompt,
+      maxOutputTokens: 3500
+    });
+    const parsed = parseGeneratedJson(raw);
+    if (!parsed.ok) {
+      lastPayload = raw;
+      lastIssues = [parsed.issue];
+      userPrompt = buildCorrectionPrompt("JSON payload", raw, lastIssues);
+      continue;
+    }
+
+    const validation = generatedRubricSchema.safeParse(parsed.value);
+    if (validation.success) {
+      const criteria: Array<{
+        id: string;
+        title: string;
+        description: string;
+        weightPercent: number;
+      }> = [];
+      for (const criterion of validation.data.criteria) {
+        criteria.push({
+          id: createCodingExerciseAiRubricCriterionId(criteria),
+          ...criterion
+        });
+      }
+      return { criteria, attempts: attempt };
+    }
+
+    lastPayload = parsed.value;
+    lastIssues = validation.error.issues.map((issue) => `${issue.path.join(".") || "payload"}: ${issue.message}`);
+    userPrompt = buildCorrectionPrompt("JSON payload", JSON.stringify(parsed.value, null, 2), lastIssues);
+  }
+
+  throw new AppError(422, "CODING_EXERCISE_RUBRIC_GENERATION_INVALID", "The AI agent could not generate a valid rubric.", {
+    issues: lastIssues,
+    payload: lastPayload
+  });
+}
+
 function buildPromptGenerationSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext; knowledge?: ActivityGenerationKnowledge }) {
   return [
     "You generate student-facing prompts for Cognelo coding exercises.",
@@ -397,6 +498,37 @@ function buildTestsGenerationSystemPrompt(input: { language: string; locale: Gen
     "",
     `Current UI/content language: ${localeName(input.locale)}.`,
     "Use that language for test names/titles.",
+    "",
+    "Subject context:",
+    `Title: ${input.subject.title}`,
+    `Description: ${input.subject.description || "No subject description provided."}`,
+    "",
+    activityKnowledgeGenerationPrompt(input.knowledge ?? { mode: "ignore", concepts: [] })
+  ].join("\n");
+}
+
+function buildRubricGenerationSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext; knowledge?: ActivityGenerationKnowledge }) {
+  return [
+    "You generate concise grading rubrics for Cognelo coding exercises.",
+    "Return only valid JSON. Do not wrap the JSON in Markdown fences. Do not add explanations.",
+    "",
+    "Required JSON shape:",
+    "{",
+    '  "criteria": [',
+    '    {"title":"...","description":"...","weightPercent":40}',
+    "  ]",
+    "}",
+    "",
+    "Rules:",
+    "- Generate between 2 and 6 criteria unless the exercise genuinely needs only one.",
+    "- Criterion weights must be whole numbers and total exactly 100.",
+    "- Each criterion must measure a distinct, observable aspect of the submitted work.",
+    "- Align the rubric with the student-facing requirements and the selected programming language.",
+    "- Do not include deterministic test pass rates as a criterion; tests are scored separately.",
+    "- Include code quality or approach only when it is relevant to the stated task.",
+    "- Do not include a rubric name or criterion identifiers; Cognelo assigns identifiers.",
+    `- Programming language: ${input.language}.`,
+    `- Write titles and descriptions in ${localeName(input.locale)}.`,
     "",
     "Subject context:",
     `Title: ${input.subject.title}`,

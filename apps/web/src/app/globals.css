@@ -1462,27 +1462,64 @@ a.card:hover,
   padding: 6px;
 }
 
-.settings-nav a {
+.settings-nav a,
+.settings-nav button {
+  align-items: start;
+  background: transparent;
   border: 1px solid transparent;
   border-radius: 6px;
+  box-shadow: none;
+  color: inherit;
   display: grid;
   gap: 3px;
+  justify-content: stretch;
+  min-height: 0;
   padding: 10px 12px;
+  text-align: start;
+  transform: none;
+  width: 100%;
 }
 
 .settings-nav a:hover,
-.settings-nav a.is-active {
+.settings-nav a.is-active,
+.settings-nav button:hover,
+.settings-nav button.is-active {
   background: var(--surface);
   border-color: color-mix(in srgb, var(--brand-blue), white 70%);
+  box-shadow: none;
+  transform: none;
 }
 
-.settings-nav a span {
+.settings-nav a span,
+.settings-nav button span {
   font-weight: 800;
 }
 
-.settings-nav a small {
+.settings-nav a small,
+.settings-nav button small {
   color: var(--muted);
   line-height: 1.35;
+}
+
+.coding-exercise-grading-layout > [role="tabpanel"][hidden] {
+  display: none !important;
+}
+
+.coding-exercise-criterion-title-row {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.coding-exercise-criterion-remove.button {
+  align-items: center;
+  display: inline-flex;
+  font-size: 1.2rem;
+  height: 30px;
+  justify-content: center;
+  min-height: 30px;
+  min-width: 30px;
+  padding: 0 8px;
+  width: auto;
 }
 
 .maintenance-metric-grid {

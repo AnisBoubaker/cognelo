@@ -21,9 +21,11 @@ import {
 } from "./executions";
 import {
   codingExercisePromptGenerationInputSchema,
+  codingExerciseRubricGenerationInputSchema,
   codingExerciseSolutionGenerationInputSchema,
   codingExerciseTestsGenerationInputSchema,
   generateCodingExercisePrompt,
+  generateCodingExerciseRubric,
   generateCodingExerciseSolution,
   generateCodingExerciseTests
 } from "./generation";
@@ -55,7 +57,12 @@ function requireActivityBankId(activityBankId: string | undefined) {
 type SubjectContext = {
   title: string;
   description: string;
+  teachingLanguage: "en" | "fr" | "zh" | "ar";
 };
+
+function normalizeTeachingLanguage(value: string): SubjectContext["teachingLanguage"] {
+  return value === "fr" || value === "zh" || value === "ar" ? value : "en";
+}
 
 export const codingExerciseReviewAllRoute: PluginRouteDefinition = {
   path: "coding-exercises/review-all",
@@ -86,7 +93,8 @@ async function resolveSubjectContext(activityBankId: string | undefined, courseI
     }
     return {
       title: bank.subject.title,
-      description: bank.subject.description
+      description: bank.subject.description,
+      teachingLanguage: normalizeTeachingLanguage(bank.subject.teachingLanguage)
     };
   }
 
@@ -100,7 +108,8 @@ async function resolveSubjectContext(activityBankId: string | undefined, courseI
     }
     return {
       title: course.subject.title,
-      description: course.subject.description
+      description: course.subject.description,
+      teachingLanguage: normalizeTeachingLanguage(course.subject.teachingLanguage)
     };
   }
 
@@ -467,6 +476,30 @@ export const codingExerciseGenerateTestsRoute: PluginRouteDefinition = {
         referenceSolution: input.referenceSolution,
         templateSource: input.templateSource,
         templateVisibleLineNumbers: input.templateVisibleLineNumbers,
+        knowledge: input.knowledge
+      });
+    }
+  }
+};
+
+export const codingExerciseGenerateRubricRoute: PluginRouteDefinition = {
+  path: "coding-exercises/generate-rubric",
+  activityTypeKeys: ["coding-exercise"],
+  methods: {
+    POST: async ({ context, readJson }) => {
+      const input = codingExerciseRubricGenerationInputSchema.parse(await readJson());
+      await assertCanManageGenerationContext(context);
+      const subject = await resolveSubjectContext(context.activityBankId, context.courseId);
+
+      return generateCodingExerciseRubric({
+        user: context.user,
+        title: input.title,
+        description: input.description,
+        prompt: input.prompt,
+        referenceSolution: input.referenceSolution,
+        language: input.language,
+        locale: subject.teachingLanguage,
+        subject,
         knowledge: input.knowledge
       });
     }
