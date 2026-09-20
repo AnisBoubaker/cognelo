@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   startActivityAttempt: vi.fn(),
   submitActivityAttempt: vi.fn(),
   generateCodingExercisePrompt: vi.fn(),
+  generateCodingExerciseRubric: vi.fn(),
   generateCodingExerciseSolution: vi.fn(),
   generateCodingExerciseTests: vi.fn(),
   listCodingExerciseHiddenTests: vi.fn(),
@@ -64,6 +65,7 @@ vi.mock("./generation", async () => {
   return {
     ...actual,
     generateCodingExercisePrompt: mocks.generateCodingExercisePrompt,
+    generateCodingExerciseRubric: mocks.generateCodingExerciseRubric,
     generateCodingExerciseSolution: mocks.generateCodingExerciseSolution,
     generateCodingExerciseTests: mocks.generateCodingExerciseTests
   };
@@ -71,6 +73,7 @@ vi.mock("./generation", async () => {
 
 const {
   codingExerciseGeneratePromptRoute,
+  codingExerciseGenerateRubricRoute,
   codingExerciseGenerateSolutionRoute,
   codingExerciseGenerateTestsRoute,
   codingExerciseHistoryRoute,
@@ -120,9 +123,10 @@ describe("coding exercise plugin routes", () => {
     mocks.recordActivityAttemptGradingResult.mockResolvedValue({});
     mocks.listCodingExerciseHiddenTests.mockResolvedValue({ tests: [] });
     mocks.replaceCodingExerciseHiddenTests.mockResolvedValue({ tests: [{ id: "hidden-1" }] });
-    mocks.prisma.course.findUnique.mockResolvedValue({ subject: { title: "Programming", description: "Basics" } });
+    mocks.prisma.course.findUnique.mockResolvedValue({ subject: { title: "Programming", description: "Basics", teachingLanguage: "fr" } });
     mocks.prisma.pluginCodingExerciseReferenceSolution.findUnique.mockResolvedValue(null);
     mocks.generateCodingExercisePrompt.mockResolvedValue({ prompt: "Prompt" });
+    mocks.generateCodingExerciseRubric.mockResolvedValue({ criteria: [] });
     mocks.generateCodingExerciseSolution.mockResolvedValue({ referenceSolution: "print(1)" });
     mocks.generateCodingExerciseTests.mockResolvedValue({ hiddenTests: [] });
   });
@@ -294,7 +298,7 @@ describe("coding exercise plugin routes", () => {
     expect(mocks.assertCanManageCourse).toHaveBeenCalledWith(context.user, "course-1");
   });
 
-  it("generates prompt, solution, and tests with subject context", async () => {
+  it("generates prompt, solution, tests, and rubrics with subject context", async () => {
     await expect(
       codingExerciseGeneratePromptRoute.methods.POST?.({
         request: new Request("http://test.local"),
@@ -325,5 +329,44 @@ describe("coding exercise plugin routes", () => {
         })
       })
     ).resolves.toEqual({ hiddenTests: [] });
+
+    await expect(
+      codingExerciseGenerateRubricRoute.methods.POST?.({
+        request: new Request("http://test.local"),
+        context,
+        readJson: async () => ({
+          title: "Smallest value",
+          prompt: "Write code that displays the smallest value.",
+          description: "Generate a list exercise.",
+          referenceSolution: "print(1)",
+          language: "python",
+          locale: "en"
+        })
+      })
+    ).resolves.toEqual({ criteria: [] });
+    expect(mocks.generateCodingExerciseRubric).toHaveBeenCalledWith(expect.objectContaining({
+      locale: "fr",
+      title: "Smallest value",
+      referenceSolution: "print(1)",
+      subject: expect.objectContaining({ teachingLanguage: "fr" })
+    }));
+  });
+
+  it("rejects rubric generation without title, prompt, and reference solution", async () => {
+    await expect(
+      codingExerciseGenerateRubricRoute.methods.POST?.({
+        request: new Request("http://test.local"),
+        context,
+        readJson: async () => ({
+          title: "",
+          prompt: "",
+          description: "",
+          referenceSolution: "",
+          language: "python",
+          locale: "en"
+        })
+      })
+    ).rejects.toThrow();
+    expect(mocks.generateCodingExerciseRubric).not.toHaveBeenCalled();
   });
 });

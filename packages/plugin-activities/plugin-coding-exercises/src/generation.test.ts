@@ -17,7 +17,7 @@ vi.mock("./executions", () => ({
   validateReferenceSolutionAgainstHiddenTests: mocks.validateReferenceSolutionAgainstHiddenTests
 }));
 
-const { generateCodingExercisePrompt, generateCodingExerciseSolution, generateCodingExerciseTests } = await import("./generation");
+const { generateCodingExercisePrompt, generateCodingExerciseRubric, generateCodingExerciseSolution, generateCodingExerciseTests } = await import("./generation");
 
 const user = {
   id: "teacher-1",
@@ -154,5 +154,39 @@ describe("coding exercise AI generation", () => {
       templateVisibleLineNumbers: []
     })).rejects.toMatchObject({ status: 422, code: "REFERENCE_SOLUTION_COMPILATION_FAILED" });
     expect(mocks.generateQuestionAuthoringText).toHaveBeenCalledTimes(1);
+  });
+
+  it("generates a weighted rubric from the title, prompt, and reference solution", async () => {
+    mocks.generateQuestionAuthoringText
+      .mockResolvedValueOnce(JSON.stringify({
+        criteria: [{ title: "Correctness", description: "Evaluate the result.", weightPercent: 90 }]
+      }))
+      .mockResolvedValueOnce(JSON.stringify({
+        criteria: [
+          { title: "Correctness", description: "Evaluate the result and required behavior.", weightPercent: 70 },
+          { title: "Clarity", description: "Evaluate code clarity and approach.", weightPercent: 30 }
+        ]
+      }));
+
+    await expect(generateCodingExerciseRubric({
+      user,
+      title: "Find the smallest value",
+      description: "Compare three values.",
+      prompt: "Read three values and display the smallest value.",
+      referenceSolution: "print(min(map(float, input().split())))",
+      language: "python",
+      locale: "fr",
+      subject
+    })).resolves.toMatchObject({
+      attempts: 2,
+      criteria: [
+        { id: expect.stringMatching(/^criterion-/), title: "Correctness", weightPercent: 70 },
+        { id: expect.stringMatching(/^criterion-/), title: "Clarity", weightPercent: 30 }
+      ]
+    });
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("French");
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("Do not include a rubric name");
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.userPrompt).toContain("Find the smallest value");
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.userPrompt).toContain("<reference_solution>");
   });
 });

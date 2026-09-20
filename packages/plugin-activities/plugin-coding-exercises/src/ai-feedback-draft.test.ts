@@ -34,7 +34,6 @@ describe("coding exercise teacher feedback drafts", () => {
       aiFeedbackConfigSnapshot: {
         enabled: false,
         gradingEnabled: true,
-        rubricName: "Programming rubric",
         instructions: "",
         testWeightPercent: 60,
         aiWeightPercent: 40,
@@ -44,7 +43,6 @@ describe("coding exercise teacher feedback drafts", () => {
 
     await expect(createCodingExerciseTeacherFeedbackDraft({ activityId: "activity-1", executionId: "execution-1" })).resolves.toMatchObject({
       kind: "assessment_feedback",
-      rubricName: "Programming rubric",
       deterministicScore: 75,
       aiScore: 0,
       combinedScore: 45,
@@ -59,7 +57,6 @@ describe("coding exercise teacher feedback drafts", () => {
       aiFeedbackConfigSnapshot: {
         enabled: false,
         gradingEnabled: false,
-        rubricName: "",
         instructions: "",
         testWeightPercent: 60,
         aiWeightPercent: 40,
@@ -71,7 +68,6 @@ describe("coding exercise teacher feedback drafts", () => {
         aiFeedback: {
           enabled: false,
           gradingEnabled: true,
-          rubricName: "Current rubric",
           instructions: "",
           testWeightPercent: 50,
           aiWeightPercent: 50,
@@ -81,7 +77,6 @@ describe("coding exercise teacher feedback drafts", () => {
     });
 
     await expect(createCodingExerciseTeacherFeedbackDraft({ activityId: "activity-1", executionId: "execution-1" })).resolves.toMatchObject({
-      rubricName: "Current rubric",
       deterministicScore: 50,
       combinedScore: 25,
       criteria: [{ id: "quality", scorePercent: 0 }]

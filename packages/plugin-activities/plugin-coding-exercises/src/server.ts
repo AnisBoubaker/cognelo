@@ -1,6 +1,7 @@
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import {
   codingExerciseGeneratePromptRoute,
+  codingExerciseGenerateRubricRoute,
   codingExerciseGenerateSolutionRoute,
   codingExerciseGenerateTestsRoute,
   codingExerciseHistoryRoute,
@@ -29,6 +30,7 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
     codingExerciseHiddenTestsRoute,
     codingExerciseGeneratePromptRoute,
     codingExerciseGenerateSolutionRoute,
+    codingExerciseGenerateRubricRoute,
     codingExerciseGenerateTestsRoute
   ],
   aiFeedback: {

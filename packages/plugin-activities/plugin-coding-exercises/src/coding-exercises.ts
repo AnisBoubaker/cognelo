@@ -57,16 +57,12 @@ export const codingExerciseAiRubricCriterionSchema = z.object({
 export const codingExerciseAiFeedbackConfigSchema = z.object({
   enabled: z.boolean().default(false),
   gradingEnabled: z.boolean().default(false),
-  rubricName: z.string().trim().max(200).default(""),
   instructions: z.string().trim().max(8000).default(""),
   testWeightPercent: z.number().int().min(0).max(100).default(60),
   aiWeightPercent: z.number().int().min(0).max(100).default(40),
   criteria: z.array(codingExerciseAiRubricCriterionSchema).max(20).default([])
 }).superRefine((value, context) => {
-  const rubricConfigured = value.enabled || value.gradingEnabled || value.criteria.length > 0 || Boolean(value.rubricName);
-  if (rubricConfigured && !value.rubricName) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ["rubricName"], message: "A rubric name is required when rubric feedback or grading is configured." });
-  }
+  const rubricConfigured = value.enabled || value.gradingEnabled || value.criteria.length > 0;
   if (value.enabled && !value.instructions) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["instructions"], message: "Feedback instructions are required when AI feedback is enabled." });
   }

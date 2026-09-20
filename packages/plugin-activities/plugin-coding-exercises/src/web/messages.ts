@@ -25,6 +25,15 @@ type MessageKey =
   | "replaceSolutionMessage"
   | "keepCurrentSolution"
   | "replaceCurrentSolution"
+  | "generateRubric"
+  | "generatingRubric"
+  | "generatedRubric"
+  | "generateRubricRequirements"
+  | "generateRubricError"
+  | "replaceRubricTitle"
+  | "replaceRubricMessage"
+  | "keepCurrentRubric"
+  | "replaceCurrentRubric"
   | "generateTests"
   | "generatingTests"
   | "generatedTests"
@@ -48,13 +57,15 @@ type MessageKey =
   | "editorTimeLimit"
   | "gradingTitle"
   | "gradingHelp"
+  | "gradingSections"
+  | "rubricSectionTab"
+  | "testCasesSectionTab"
   | "rubricTitle"
   | "rubricHelp"
   | "aiFeedbackTitle"
   | "aiFeedbackHelp"
   | "aiFeedbackEnabled"
   | "aiGradingEnabled"
-  | "rubricName"
   | "feedbackInstructions"
   | "testWeightPercent"
   | "aiWeightPercent"
@@ -63,6 +74,7 @@ type MessageKey =
   | "criterionTitle"
   | "criterionDescription"
   | "criterionWeight"
+  | "removeCriterion"
   | "aiFeedbackResult"
   | "aiFeedbackStrengths"
   | "aiFeedbackImprovements"
@@ -184,6 +196,15 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     replaceSolutionMessage: "Generating a solution will clear starter code and replace the reference solution and template.",
     keepCurrentSolution: "Keep current solution",
     replaceCurrentSolution: "Replace solution",
+    generateRubric: "Generate rubric automatically",
+    generatingRubric: "Generating rubric...",
+    generatedRubric: "Rubric generated.",
+    generateRubricRequirements: "Add an activity title, a student prompt, and a reference solution before generating a rubric.",
+    generateRubricError: "Unable to generate a valid rubric right now.",
+    replaceRubricTitle: "Replace the existing rubric?",
+    replaceRubricMessage: "Generating a rubric will replace all current rubric criteria.",
+    keepCurrentRubric: "Keep current rubric",
+    replaceCurrentRubric: "Replace rubric",
     generateTests: "Generate test cases automatically",
     generatingTests: "Generating test cases...",
     generatedTests: "Test cases generated.",
@@ -207,13 +228,15 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     editorTimeLimit: "Editor time limit (seconds)",
     gradingTitle: "Grading",
     gradingHelp: "Configure deterministic tests and an optional rubric. Teachers can complete and edit rubric feedback even when automatic feedback is off.",
+    gradingSections: "Grading sections",
+    rubricSectionTab: "Rubric",
+    testCasesSectionTab: "Test cases",
     rubricTitle: "Rubric",
     rubricHelp: "This rubric is available in teacher feedback review for every submitted answer. Automatic feedback may fill it when enabled.",
     aiFeedbackTitle: "Automatic feedback",
     aiFeedbackHelp: "Requires automatic assessment feedback and a model in the course settings. Formative feedback runs on submission; summative feedback is started by a teacher.",
     aiFeedbackEnabled: "Enable AI feedback",
     aiGradingEnabled: "Use the rubric score as part of the grade",
-    rubricName: "Rubric name",
     feedbackInstructions: "Feedback instructions",
     testWeightPercent: "Deterministic tests (%)",
     aiWeightPercent: "Rubric (%)",
@@ -222,6 +245,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     criterionTitle: "Criterion title",
     criterionDescription: "Criterion description",
     criterionWeight: "Weight (%)",
+    removeCriterion: "Remove criterion",
     aiFeedbackResult: "Feedback",
     aiFeedbackStrengths: "Strengths",
     aiFeedbackImprovements: "Improvements",
@@ -340,6 +364,15 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     replaceSolutionMessage: "La generation effacera le code de depart et remplacera la solution de reference et le gabarit.",
     keepCurrentSolution: "Conserver la solution",
     replaceCurrentSolution: "Remplacer la solution",
+    generateRubric: "Générer la grille automatiquement",
+    generatingRubric: "Génération de la grille...",
+    generatedRubric: "Grille générée.",
+    generateRubricRequirements: "Ajoutez un titre d’activité, une consigne étudiante et une solution de référence avant de générer une grille.",
+    generateRubricError: "Impossible de générer une grille valide pour le moment.",
+    replaceRubricTitle: "Remplacer la grille existante?",
+    replaceRubricMessage: "La génération remplacera tous les critères actuels de la grille.",
+    keepCurrentRubric: "Conserver la grille actuelle",
+    replaceCurrentRubric: "Remplacer la grille",
     generateTests: "Generer les cas de test automatiquement",
     generatingTests: "Generation des cas de test...",
     generatedTests: "Cas de test generes.",
@@ -363,13 +396,15 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     editorTimeLimit: "Limite de temps dans l'éditeur (secondes)",
     gradingTitle: "Évaluation",
     gradingHelp: "Configurez les tests déterministes et une grille facultative. L’enseignant peut remplir et modifier la rétroaction de la grille même si la rétroaction automatique est désactivée.",
+    gradingSections: "Sections d’évaluation",
+    rubricSectionTab: "Grille",
+    testCasesSectionTab: "Cas de test",
     rubricTitle: "Grille d’évaluation",
     rubricHelp: "Cette grille est disponible dans la révision de la rétroaction pour chaque réponse soumise. La rétroaction automatique peut la remplir lorsqu’elle est activée.",
     aiFeedbackTitle: "Rétroaction automatique",
     aiFeedbackHelp: "Nécessite la rétroaction automatique et un modèle dans les paramètres du cours. La rétroaction formative démarre à la soumission; la rétroaction sommative est lancée par un enseignant.",
     aiFeedbackEnabled: "Activer la rétroaction IA",
     aiGradingEnabled: "Utiliser le résultat de la grille dans la note",
-    rubricName: "Nom de la grille",
     feedbackInstructions: "Consignes de rétroaction",
     testWeightPercent: "Tests déterministes (%)",
     aiWeightPercent: "Grille (%)",
@@ -378,6 +413,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     criterionTitle: "Titre du critère",
     criterionDescription: "Description du critère",
     criterionWeight: "Poids (%)",
+    removeCriterion: "Supprimer le critère",
     aiFeedbackResult: "Rétroaction",
     aiFeedbackStrengths: "Points forts",
     aiFeedbackImprovements: "Améliorations",
@@ -496,6 +532,15 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     replaceSolutionMessage: "生成答案会清空起始代码，并替换参考答案和模板。",
     keepCurrentSolution: "保留当前答案",
     replaceCurrentSolution: "替换答案",
+    generateRubric: "自动生成量规",
+    generatingRubric: "正在生成量规...",
+    generatedRubric: "量规已生成。",
+    generateRubricRequirements: "请先添加活动标题、学生题目和参考答案，再生成量规。",
+    generateRubricError: "暂时无法生成有效量规。",
+    replaceRubricTitle: "替换现有量规？",
+    replaceRubricMessage: "生成量规会替换当前所有量规标准。",
+    keepCurrentRubric: "保留当前量规",
+    replaceCurrentRubric: "替换量规",
     generateTests: "自动生成测试用例",
     generatingTests: "正在生成测试用例...",
     generatedTests: "测试用例已生成。",
@@ -519,13 +564,15 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     editorTimeLimit: "编辑器时间限制（秒）",
     gradingTitle: "评分",
     gradingHelp: "配置确定性测试和可选量规。即使关闭自动反馈，教师也可以填写和编辑量规反馈。",
+    gradingSections: "评分区域",
+    rubricSectionTab: "量规",
+    testCasesSectionTab: "测试用例",
     rubricTitle: "量规",
     rubricHelp: "每份已提交答案都可在教师反馈审阅中使用此量规；启用自动反馈后可由系统填写。",
     aiFeedbackTitle: "自动反馈",
     aiFeedbackHelp: "需要在课程设置中启用自动评估反馈并选择模型。形成性反馈在提交时运行；总结性反馈由教师启动。",
     aiFeedbackEnabled: "启用 AI 反馈",
     aiGradingEnabled: "将量规分数计入成绩",
-    rubricName: "量规名称",
     feedbackInstructions: "反馈说明",
     testWeightPercent: "确定性测试（%）",
     aiWeightPercent: "量规（%）",
@@ -534,6 +581,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     criterionTitle: "标准标题",
     criterionDescription: "标准说明",
     criterionWeight: "权重（%）",
+    removeCriterion: "删除标准",
     aiFeedbackResult: "反馈",
     aiFeedbackStrengths: "优点",
     aiFeedbackImprovements: "改进建议",

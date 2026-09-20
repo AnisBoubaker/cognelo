@@ -228,6 +228,21 @@ export type CodingExerciseTestsGenerationInput = CodingExerciseGenerationBaseInp
   templateVisibleLineNumbers: number[];
 };
 
+export type CodingExerciseRubricGenerationInput = CodingExerciseGenerationBaseInput & {
+  title: string;
+  referenceSolution: string;
+};
+
+export type CodingExerciseRubricGenerationResult = {
+  criteria: Array<{
+    id: string;
+    title: string;
+    description: string;
+    weightPercent: number;
+  }>;
+  attempts: number;
+};
+
 export type CodingExerciseSolutionGenerationResult =
   | {
       status?: "ok" | "warning";
@@ -712,7 +727,6 @@ export type CodingExerciseReferenceSolution = {
     aiFeedback: {
       enabled: boolean;
       gradingEnabled: boolean;
-      rubricName: string;
       instructions: string;
       testWeightPercent: number;
       aiWeightPercent: number;
@@ -1594,6 +1608,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input)
     }),
+  generateCodingExerciseRubric: (courseId: string, activityId: string, input: CodingExerciseRubricGenerationInput) =>
+    request<CodingExerciseRubricGenerationResult>(`/courses/${courseId}/activities/${activityId}/coding-exercises/generate-rubric`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
   bankCodingExerciseHiddenTests: (activityBankId: string, bankActivityId: string) =>
     request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
       `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-exercises/hidden-tests`
@@ -1644,6 +1663,14 @@ export const api = {
   generateBankCodingExerciseTests: (activityBankId: string, bankActivityId: string, input: CodingExerciseTestsGenerationInput) =>
     request<CodingExerciseTestsGenerationResult>(
       `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-exercises/generate-tests`,
+      {
+        method: "POST",
+        body: JSON.stringify(input)
+      }
+    ),
+  generateBankCodingExerciseRubric: (activityBankId: string, bankActivityId: string, input: CodingExerciseRubricGenerationInput) =>
+    request<CodingExerciseRubricGenerationResult>(
+      `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-exercises/generate-rubric`,
       {
         method: "POST",
         body: JSON.stringify(input)
