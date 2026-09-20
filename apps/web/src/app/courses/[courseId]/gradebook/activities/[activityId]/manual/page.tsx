@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { useNotifications } from "@cognelo/activity-ui";
+import { CodeRenderer, useNotifications } from "@cognelo/activity-ui";
 import { createCodingHomeworkGraderClient, type CodingHomeworkGradebookAttemptRecord } from "@cognelo/plugin-coding-homework-grader";
 import {
   createMcqClient,
@@ -17,7 +17,7 @@ import { createParsonsClient, type ParsonsAttemptEvaluation, type ParsonsGradebo
 import { AppShell } from "@/components/app-shell";
 import { AppIcon } from "@/components/app-icon";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
-import { api, apiRequest, Course, CourseGradebook, CourseGradebookRow } from "@/lib/api";
+import { api, apiRequest, type CodingExerciseExecution, Course, CourseGradebook, CourseGradebookRow } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -29,7 +29,7 @@ type DraftGrade = {
   questionScores?: Record<string, string>;
 };
 
-type ManualGradingAttempt = ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord;
+type ManualGradingAttempt = ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CodingExerciseExecution;
 
 export default function ManualActivityGradingPage() {
   const params = useParams<{ courseId: string; activityId: string }>();
@@ -87,6 +87,9 @@ export default function ManualActivityGradingPage() {
 
     let cancelled = false;
     setLoadingAttempts(true);
+    const codingExerciseReview = pageRows.some((row) => row.activityTypeKey === "coding-exercise")
+      ? api.codingExerciseReviewAll(courseId, activityId)
+      : null;
 
     Promise.all(
       pageRows.map(async (row) => {
@@ -102,6 +105,14 @@ export default function ManualActivityGradingPage() {
             api.groupActivity(courseId, row.groupId, row.activityId)
           ]);
           return { row, attempts: sortAttemptsByDisplayedTimestamp(result.attempts), activityConfig: activityResult.activity.config ?? {} };
+        }
+        if (row.activityTypeKey === "coding-exercise") {
+          const [review, activityResult] = await Promise.all([
+            codingExerciseReview!,
+            api.groupActivity(courseId, row.groupId, row.activityId)
+          ]);
+          const execution = review.submissions.find((submission) => submission.participantId === row.participantId)?.execution;
+          return { row, attempts: execution ? [execution] : [], activityConfig: activityResult.activity.config ?? {} };
         }
         if (row.activityTypeKey === "coding-homework-grader") {
           const [result, activityResult] = await Promise.all([
@@ -154,7 +165,9 @@ export default function ManualActivityGradingPage() {
               row.score ??
               (selectedAttempt && "answers" in selectedAttempt
                 ? scoreFromMcqAttempt(activityConfig, selectedAttempt, row.maxScore)
-                : scoreFromEvaluation(evaluation, row.maxScore));
+                : selectedAttempt && "sourceCode" in selectedAttempt
+                  ? scoreFromCodingExecution(selectedAttempt, row.maxScore)
+                  : scoreFromEvaluation(evaluation, row.maxScore));
             next[key] = {
               score: initialScore === null ? "" : formatGradeNumber(initialScore),
               questionScores:
@@ -181,7 +194,7 @@ export default function ManualActivityGradingPage() {
     return () => {
       cancelled = true;
     };
-  }, [codingHomeworkClient, courseId, mcqClient, notifications, pageRows, parsonsClient, t]);
+  }, [activityId, codingHomeworkClient, courseId, mcqClient, notifications, pageRows, parsonsClient, t]);
 
   async function saveCurrentPage() {
     setSaving(true);
@@ -418,6 +431,11 @@ export default function ManualActivityGradingPage() {
                           </article>
                         ))}
                       </div>
+                    ) : selectedAttempt && "sourceCode" in selectedAttempt ? (
+                      <div className="stack">
+                        <p className="eyebrow">{t("courseDetail.feedbackReviewSubmission")}</p>
+                        <CodeRenderer code={selectedAttempt.sourceCode} language={selectedAttempt.languageKey} showLineNumbers />
+                      </div>
                     ) : selectedAttempt && "latestState" in selectedAttempt ? (
                       <div className="parsons-answer-lines">
                         {selectedAttempt.latestState.blocks.map((block) => (
@@ -492,6 +510,12 @@ function scoreFromEvaluation(evaluation: ParsonsAttemptEvaluation | null, maxSco
   }
   const rawScore = evaluation.isCorrect ? 1 : (evaluation.orderCorrect ? 0.7 : 0) + (evaluation.indentationCorrect ? 0.3 : 0);
   return rawScore * maxScore;
+}
+
+function scoreFromCodingExecution(execution: CodingExerciseExecution, maxScore: number) {
+  const earnedWeight = typeof execution.resultSummary.earnedWeight === "number" ? execution.resultSummary.earnedWeight : null;
+  const totalWeight = typeof execution.resultSummary.totalWeight === "number" ? execution.resultSummary.totalWeight : null;
+  return earnedWeight !== null && totalWeight !== null && totalWeight > 0 ? earnedWeight / totalWeight * maxScore : null;
 }
 
 function scoreFromMcqAttempt(activityConfig: Record<string, unknown>, attempt: McqSubmission, maxScore: number) {
@@ -646,7 +670,9 @@ function sortAttemptsByDisplayedTimestamp<T extends ManualGradingAttempt>(attemp
 
 function attemptDisplayTime(attempt: ManualGradingAttempt) {
   const value =
-    "completedAt" in attempt
+    "createdAt" in attempt
+      ? attempt.createdAt
+      : "completedAt" in attempt
       ? attempt.completedAt ?? attempt.lastInteractionAt
       : attempt.submittedAt ?? attempt.gradedAt;
   return value ? new Date(value).getTime() : 0;

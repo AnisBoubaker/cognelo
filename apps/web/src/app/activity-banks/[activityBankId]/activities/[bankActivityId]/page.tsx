@@ -215,6 +215,7 @@ export default function BankActivityAuthoringPage() {
             onConceptDraftChange={updateConceptDraft}
             t={t}
             locale={locale}
+            showGradingTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.gradingTab === true}
           >
             {renderAuthoring()}
           </ActivityEditorTabs>

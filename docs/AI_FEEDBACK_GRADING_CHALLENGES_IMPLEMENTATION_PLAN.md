@@ -288,7 +288,7 @@ Core should record normalized append-only events for at least:
 - manual replacement/override performed.
 - teacher feedback revision performed.
 
-The normalized event should include stable references, timestamps, assessment mode, trigger kind, model/rubric/prompt versions or hashes, grading contribution, outcome status, and bounded plugin-provided research metadata. It must not copy complete submissions, hidden tests, provider credentials, unrestricted raw prompts, or raw model responses into core.
+The normalized event should include stable references, timestamps, assessment mode, trigger kind, model identity, immutable rubric hashes, prompt/schema versions, grading contribution, outcome status, and bounded plugin-provided research metadata. It must not copy complete submissions, hidden tests, provider credentials, unrestricted raw prompts, or raw model responses into core.
 
 ### Research Integrity
 
@@ -344,7 +344,7 @@ Status: complete. Course settings, SDK contracts, secure model resolution, norma
 
 ### Phase 2 — Programming Exercise Pilot
 
-Status: complete. Programming Exercises support required private rubric configuration, immediate formative evaluation, teacher-triggered summative evaluation, configurable deterministic/AI weighting, strict two-attempt structured-output validation, immutable private evaluation artifacts, submission-time private rubric snapshots, and teacher review of submitted code plus editable summary/strength/improvement/criterion narrative.
+Status: complete. Programming Exercises support a private general grading rubric that remains available to teachers without automatic feedback, immediate formative evaluation when automation is enabled, teacher-triggered summative evaluation, configurable deterministic/rubric weighting, strict two-attempt structured-output validation, immutable private evaluation artifacts, submission-time private rubric snapshots, and teacher review of submitted code plus editable summary/strength/improvement/criterion scores and narrative. Course and bank editors expose grading policy, rubric, automation, and tests in a dedicated host Grading tab after Concepts.
 
 The development seed includes a reproducible two-section Programming Exercise batch at the submitted-but-not-evaluated boundary. This permits teacher single/batch generation, review, editing, release, learner review, challenge, and research-event testing without requiring Judge0 to execute dozens of fixture submissions during seeding.
 
@@ -415,6 +415,7 @@ Status: partial. The manager research endpoint is implemented with stable identi
 - Teacher feedback revisions preserve the original evaluation and record previous/next snapshots plus normalized research telemetry; rubric-score revisions preserve deterministic components/configured weights and use the audited regrade path.
 - Every standalone feedback-capable plugin provides a teacher answer/feedback review renderer and a server-side revision validator.
 - Individual and whole-group feedback review include every submitted attempt, even when no AI result exists, and the first teacher save records `feedback_teacher_authored`.
+- Programming Exercise feedback drafts include the configured rubric and editable criterion scores before any automatic evaluation; manual rubric score changes use the same audited grade recomposition path.
 - Learner-facing feedback and challenge copy does not identify AI as the generating or grading mechanism.
 - Raw prompts, responses, hidden tests, credentials, and other students' data never appear in student DTOs or ordinary research exports.
 - Compound Tests expose child feedback only through the released parent result.

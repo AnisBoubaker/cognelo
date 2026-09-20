@@ -58,36 +58,32 @@ export const codingExerciseAiFeedbackConfigSchema = z.object({
   enabled: z.boolean().default(false),
   gradingEnabled: z.boolean().default(false),
   rubricName: z.string().trim().max(200).default(""),
-  rubricVersion: z.string().trim().max(80).default("1"),
   instructions: z.string().trim().max(8000).default(""),
   testWeightPercent: z.number().int().min(0).max(100).default(60),
   aiWeightPercent: z.number().int().min(0).max(100).default(40),
   criteria: z.array(codingExerciseAiRubricCriterionSchema).max(20).default([])
 }).superRefine((value, context) => {
-  if (!value.enabled) return;
-  if (!value.rubricName) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ["rubricName"], message: "A rubric name is required when AI feedback is enabled." });
+  const rubricConfigured = value.enabled || value.gradingEnabled || value.criteria.length > 0 || Boolean(value.rubricName);
+  if (rubricConfigured && !value.rubricName) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["rubricName"], message: "A rubric name is required when rubric feedback or grading is configured." });
   }
-  if (!value.rubricVersion) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ["rubricVersion"], message: "A rubric version is required when AI feedback is enabled." });
-  }
-  if (!value.instructions) {
+  if (value.enabled && !value.instructions) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["instructions"], message: "Feedback instructions are required when AI feedback is enabled." });
   }
-  if (value.criteria.length === 0) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ["criteria"], message: "At least one rubric criterion is required when AI feedback is enabled." });
+  if (rubricConfigured && value.criteria.length === 0) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["criteria"], message: "At least one rubric criterion is required when rubric feedback or grading is enabled." });
   }
-  if (new Set(value.criteria.map((criterion) => criterion.id)).size !== value.criteria.length) {
+  if (rubricConfigured && new Set(value.criteria.map((criterion) => criterion.id)).size !== value.criteria.length) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["criteria"], message: "Rubric criterion ids must be unique." });
   }
-  if (value.criteria.reduce((total, criterion) => total + criterion.weightPercent, 0) !== 100) {
+  if (value.criteria.length > 0 && value.criteria.reduce((total, criterion) => total + criterion.weightPercent, 0) !== 100) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["criteria"], message: "Rubric criterion weights must total 100%." });
   }
   if (value.gradingEnabled && value.testWeightPercent + value.aiWeightPercent !== 100) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ["aiWeightPercent"], message: "Test and AI grading weights must total 100%." });
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["aiWeightPercent"], message: "Test and rubric grading weights must total 100%." });
   }
   if (value.gradingEnabled && value.aiWeightPercent === 0) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ["aiWeightPercent"], message: "The AI grading weight must be greater than zero." });
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["aiWeightPercent"], message: "The rubric grading weight must be greater than zero." });
   }
 });
 

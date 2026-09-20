@@ -101,6 +101,7 @@ export default function ActivityPage() {
             onConceptDraftChange={updateConceptDraft}
             t={t}
             locale={locale}
+            showGradingTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.gradingTab === true}
           >
           <ActivityRenderer
             activity={activity}
@@ -133,6 +134,7 @@ export default function ActivityPage() {
             onConceptDraftChange={updateConceptDraft}
             t={t}
             locale={locale}
+            showGradingTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.gradingTab === true}
           >
             <section className="section stack">
               <h2>{t("parsons.unsupportedTitle")}</h2>

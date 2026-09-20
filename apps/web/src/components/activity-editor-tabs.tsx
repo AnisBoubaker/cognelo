@@ -1,7 +1,7 @@
 "use client";
 
 import { ActivityKnowledgeGenerationProvider, EditActionBar, getEditActionBarCopy, useNotifications, useUnsavedChangesActions, useUnsavedChangesGuard, type ActivityKnowledgeGenerationMode, type ActivityKnowledgeGenerationRequest } from "@cognelo/activity-ui";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ActivityKnowledgeConceptSelection } from "@cognelo/contracts";
 import type { SubjectKnowledgeConcept, SubjectKnowledgePrerequisite } from "@/lib/api";
 
@@ -14,7 +14,14 @@ type ActivityEditorTabsProps = {
   onConceptDraftChange?: (selections: ActivityKnowledgeConceptSelection[]) => void;
   t: (key: string, values?: Record<string, string | number>) => string;
   locale: string;
+  showGradingTab?: boolean;
 };
+
+const ActivityEditorGradingPortalContext = createContext<HTMLElement | null | undefined>(undefined);
+
+export function useActivityEditorGradingPortalTarget() {
+  return useContext(ActivityEditorGradingPortalContext);
+}
 
 function conceptSkills(concept: SubjectKnowledgeConcept) {
   return concept.skillRecords?.length ? concept.skillRecords.map((skill) => skill.title) : concept.skills.split(/\r?\n/).map((skill) => skill.trim()).filter(Boolean);
@@ -32,10 +39,11 @@ function ConceptCheckbox({ checked, partial, label, onChange }: { checked: boole
   return <input ref={ref} type="checkbox" checked={checked} aria-label={label} onChange={(event) => onChange(event.target.checked)} />;
 }
 
-export function ActivityEditorTabs({ children, concepts, prerequisites, selectedConcepts, onSaveConcepts, onConceptDraftChange, t, locale }: ActivityEditorTabsProps) {
+export function ActivityEditorTabs({ children, concepts, prerequisites, selectedConcepts, onSaveConcepts, onConceptDraftChange, t, locale, showGradingTab = false }: ActivityEditorTabsProps) {
   const notifications = useNotifications();
   const unsavedActions = useUnsavedChangesActions();
-  const [activeTab, setActiveTab] = useState<"activity" | "concepts">("activity");
+  const [activeTab, setActiveTab] = useState<"activity" | "concepts" | "grading">("activity");
+  const [gradingPortalTarget, setGradingPortalTarget] = useState<HTMLDivElement | null>(null);
   const [draftSelections, setDraftSelections] = useState(selectedConcepts);
   const [savedSelections, setSavedSelections] = useState(selectedConcepts);
   const [activeConceptId, setActiveConceptId] = useState<string | null>(null);
@@ -45,6 +53,9 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
   const skillsPaneRef = useRef<HTMLDivElement | null>(null);
   const selectedConceptsKeyRef = useRef(canonicalSelections(selectedConcepts));
   const isDirty = canonicalSelections(draftSelections) !== canonicalSelections(savedSelections);
+  const gradingPortalRef = useCallback((node: HTMLDivElement | null) => {
+    setGradingPortalTarget((current) => current === node ? current : node);
+  }, []);
 
   const orderedConcepts = useMemo(() => {
     const directPrerequisites = new Map<string, string[]>();
@@ -162,6 +173,7 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
   }
 
   return (
+    <ActivityEditorGradingPortalContext.Provider value={showGradingTab ? gradingPortalTarget : undefined}>
     <ActivityKnowledgeGenerationProvider value={{
       mode: generationMode,
       setMode: setGenerationMode,
@@ -174,6 +186,11 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
         <button type="button" role="tab" aria-selected={activeTab === "concepts"} onClick={() => setActiveTab("concepts")}>
           {t("activityConcepts.conceptsTab")}{savedSelections.length ? ` (${savedSelections.length})` : ""}
         </button>
+        {showGradingTab ? (
+          <button type="button" role="tab" aria-selected={activeTab === "grading"} onClick={() => setActiveTab("grading")}>
+            {t("activityConcepts.gradingTab")}
+          </button>
+        ) : null}
       </div>
 
       <div role="tabpanel" hidden={activeTab !== "activity"}>{children}</div>
@@ -232,7 +249,9 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
           </section>
         )}
       </div>
+      {showGradingTab ? <div role="tabpanel" hidden={activeTab !== "grading"} ref={gradingPortalRef} /> : null}
     </div>
     </ActivityKnowledgeGenerationProvider>
+    </ActivityEditorGradingPortalContext.Provider>
   );
 }

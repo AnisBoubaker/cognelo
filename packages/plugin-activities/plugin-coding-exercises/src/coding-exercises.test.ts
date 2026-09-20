@@ -51,14 +51,13 @@ describe("coding exercise config and template helpers", () => {
     expect(privateConfig.hiddenSupportCode).toBe("");
   });
 
-  it("requires a complete weighted rubric when AI feedback is enabled", () => {
+  it("requires a complete weighted rubric when automatic feedback or rubric grading is enabled", () => {
     expect(() => parseCodingExercisePrivateConfig({
       templateSource: "{{ STUDENT_CODE }}",
       aiFeedback: {
         enabled: true,
         gradingEnabled: true,
         rubricName: "Code quality",
-        rubricVersion: "1",
         instructions: "Evaluate the submitted approach.",
         testWeightPercent: 60,
         aiWeightPercent: 40,
@@ -72,7 +71,6 @@ describe("coding exercise config and template helpers", () => {
         enabled: true,
         gradingEnabled: true,
         rubricName: "Code quality",
-        rubricVersion: "1",
         instructions: "Evaluate the submitted approach.",
         testWeightPercent: 60,
         aiWeightPercent: 40,
@@ -81,21 +79,34 @@ describe("coding exercise config and template helpers", () => {
     }).aiFeedback).toMatchObject({ enabled: true, gradingEnabled: true, testWeightPercent: 60, aiWeightPercent: 40 });
   });
 
+  it("keeps a teacher-authored rubric valid when automatic feedback is disabled", () => {
+    expect(parseCodingExercisePrivateConfig({
+      templateSource: "{{ STUDENT_CODE }}",
+      aiFeedback: {
+        enabled: false,
+        gradingEnabled: true,
+        rubricName: "Teacher rubric",
+        instructions: "",
+        testWeightPercent: 70,
+        aiWeightPercent: 30,
+        criteria: [{ id: "quality", title: "Quality", description: "Evaluate the submitted approach.", weightPercent: 100 }]
+      }
+    }).aiFeedback).toMatchObject({ enabled: false, gradingEnabled: true, rubricName: "Teacher rubric" });
+  });
+
   it("reports incomplete rubric drafts before they are sent to the API", () => {
     expect(getCodingExerciseAiFeedbackValidationMessages({
       enabled: true,
       gradingEnabled: true,
       rubricName: "",
-      rubricVersion: "",
       instructions: "",
       testWeightPercent: 60,
       aiWeightPercent: 40,
       criteria: []
     })).toEqual(expect.arrayContaining([
-      "A rubric name is required when AI feedback is enabled.",
-      "A rubric version is required when AI feedback is enabled.",
+      "A rubric name is required when rubric feedback or grading is configured.",
       "Feedback instructions are required when AI feedback is enabled.",
-      "At least one rubric criterion is required when AI feedback is enabled."
+      "At least one rubric criterion is required when rubric feedback or grading is enabled."
     ]));
   });
 
@@ -127,7 +138,7 @@ describe("coding exercise config and template helpers", () => {
           templateVisibleLineNumbers: [],
           templatePrefix: "",
           templateSuffix: "",
-          aiFeedback: { enabled: false, gradingEnabled: false, rubricName: "", rubricVersion: "1", instructions: "", testWeightPercent: 60, aiWeightPercent: 40, criteria: [] }
+          aiFeedback: { enabled: false, gradingEnabled: false, rubricName: "", instructions: "", testWeightPercent: 60, aiWeightPercent: 40, criteria: [] }
         },
         studentSourceCode: "return 42",
         testCode: "print(solve())"

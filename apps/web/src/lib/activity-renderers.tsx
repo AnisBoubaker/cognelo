@@ -32,6 +32,7 @@ import {
 import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
 import { TestActivityView, type TestStudentItemRendererContext } from "@/components/test-activity-view";
 import { TestManualGradingPanel } from "@/components/test-manual-grading-panel";
+import { useActivityEditorGradingPortalTarget } from "@/components/activity-editor-tabs";
 import { createStandaloneActivityDraftHost } from "@/lib/activity-response-draft-host";
 import type { Locale } from "@/lib/i18n";
 import {
@@ -228,6 +229,7 @@ function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActi
 }
 
 function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof CodingExerciseActivityView>) {
+  const authoringGradingPortalTarget = useActivityEditorGradingPortalTarget();
   const {
     activityRouteCourseId,
     groupId,
@@ -334,6 +336,7 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
       onNewAttemptAvailabilityChange={onNewAttemptAvailabilityChange}
       onPreviousSubmissionsAvailabilityChange={onPreviousSubmissionsAvailabilityChange}
       onSubmitted={onSubmitted}
+      authoringGradingPortalTarget={authoringGradingPortalTarget}
     />
   );
 }
@@ -1142,6 +1145,7 @@ function ParsonsBankActivityRenderer(context: BankActivityRendererContext) {
 }
 
 function CodingExerciseBankActivityRenderer(context: BankActivityRendererContext) {
+  const authoringGradingPortalTarget = useActivityEditorGradingPortalTarget();
   return (
     <CodingExerciseActivityView
       activity={context.activity}
@@ -1149,6 +1153,7 @@ function CodingExerciseBankActivityRenderer(context: BankActivityRendererContext
       course={{ id: context.activityBankId, title: context.bankTitle }}
       onSave={context.onSave}
       locale={context.locale}
+      authoringGradingPortalTarget={authoringGradingPortalTarget}
       codingClient={{
         listHiddenTests: async (_courseId, activityId) => api.bankCodingExerciseHiddenTests(context.activityBankId, activityId),
         saveHiddenTests: async (_courseId, activityId, input) => api.saveBankCodingExerciseHiddenTests(context.activityBankId, activityId, input),

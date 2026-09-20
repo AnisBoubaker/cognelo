@@ -70,6 +70,17 @@ describe("coding exercise feedback revision", () => {
     });
   });
 
+  it("allows a teacher to score a configured rubric without writing criterion comments", () => {
+    expect(reviseCodingExerciseAiFeedback(current, {
+      ...current,
+      criteria: [{ ...current.criteria[0], scorePercent: 75, feedback: "" }]
+    })).toMatchObject({
+      criteria: [{ scorePercent: 75, feedback: "" }],
+      aiScore: 75,
+      combinedScore: 90
+    });
+  });
+
   it("rejects a revision that changes the rubric criterion set", () => {
     expect(() => reviseCodingExerciseAiFeedback(current, {
       summary: "Reviewed",
