@@ -991,7 +991,7 @@ export const arMessages = {
       aiFeedbackGenerated: "تم إنشاء التغذية الراجعة بالذكاء الاصطناعي.",
       aiFeedbackUnavailable: "لا توجد محاولة مسلّمة متاحة للتغذية الراجعة.",
       aiFeedbackError: "تعذر إنشاء التغذية الراجعة بالذكاء الاصطناعي.",
-      aiFeedbackBatchFailed: "فشلت التغذية الراجعة بالذكاء الاصطناعي لـ {count} متعلم(ين): {names}",
+      aiFeedbackBatchFailed: "فشلت التغذية الراجعة بالذكاء الاصطناعي لـ {count} متعلم(ين). {reason}",
       feedbackReview: "التغذية الراجعة",
       feedbackReviewAll: "مراجعة تغذية المجموعة كلها",
       feedbackReviewUnavailable: "التغذية الراجعة غير متاحة لهذا التسليم.",

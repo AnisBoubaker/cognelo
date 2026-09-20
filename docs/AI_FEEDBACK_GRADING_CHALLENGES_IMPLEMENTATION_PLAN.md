@@ -89,7 +89,7 @@ The model is always resolved server-side. Provider keys, raw credentials, privat
 - Teacher revisions may update learner-visible narrative feedback before or after release. A plugin may also expose editable rubric percentages and return a validated grading result; Programming Exercises then recompute the AI and combined scores with the immutable deterministic result and configured weights, and core records the change through its audited regrade path. Core preserves the immutable original evaluation artifact, records previous/next feedback and research telemetry, and blocks further edits after that feedback version is challenged.
 - Student-safe summative AI feedback is exposed only after the associated `GradebookItem` is released.
 
-Teacher-triggered batch grading processes attempts sequentially and independently, so one provider or parsing failure does not erase successful results for other attempts. A durable maximum batch size plus cancellation and timeout UX remain Phase 6 hardening.
+Teacher-triggered batch grading processes attempts sequentially and independently, so one provider or parsing failure does not erase successful results for other attempts. The completion notice reports the failure count and most common actionable reason rather than expanding every learner name. A durable maximum batch size plus cancellation and timeout UX remain Phase 6 hardening.
 
 ## Responsibility Boundary
 
@@ -346,7 +346,7 @@ Status: complete. Course settings, SDK contracts, secure model resolution, norma
 
 Status: complete. Programming Exercises support a private unnamed general grading rubric that remains available to teachers without automatic feedback, immediate formative evaluation when automation is enabled, teacher-triggered summative evaluation, configurable deterministic/rubric weighting, strict two-attempt structured-output validation, immutable private evaluation artifacts, submission-time private rubric snapshots, and teacher review of submitted code plus editable summary/strength/improvement/criterion scores and narrative. Course and bank editors expose a dedicated host Grading tab after Concepts with nested Rubric and Test cases side tabs. Rubrics may be generated only from a title, student prompt, and reference solution; both rubric and assessment-feedback generation resolve the Subject teaching language server-side.
 
-The development seed includes a reproducible two-section Programming Exercise batch at the submitted-but-not-evaluated boundary. This permits teacher single/batch generation, review, editing, release, learner review, challenge, and research-event testing without requiring Judge0 to execute dozens of fixture submissions during seeding.
+The development seed includes a reproducible two-section Programming Exercise batch at the submitted-but-not-evaluated boundary. This permits teacher single/batch generation, review, editing, release, learner review, challenge, and research-event testing without requiring Judge0 to execute dozens of fixture submissions during seeding. A clean course receives the fallback seed model, while reseeding preserves a teacher-selected assessment-feedback model and explicit feedback switch.
 
 - Add plugin-owned bank/course feedback configuration, rubrics, and copy/sync hooks.
 - Add formative submission-triggered feedback.

@@ -1047,7 +1047,7 @@ export const zhMessages = {
       aiFeedbackGenerated: "AI 反馈已生成。",
       aiFeedbackUnavailable: "没有可用于 AI 反馈的已提交尝试。",
       aiFeedbackError: "无法生成 AI 反馈。",
-      aiFeedbackBatchFailed: "{count} 名学习者的 AI 反馈失败：{names}",
+      aiFeedbackBatchFailed: "{count} 名学习者的 AI 反馈失败。{reason}",
       feedbackReview: "反馈",
       feedbackReviewAll: "审核全组反馈",
       feedbackReviewUnavailable: "此提交没有可用的反馈。",

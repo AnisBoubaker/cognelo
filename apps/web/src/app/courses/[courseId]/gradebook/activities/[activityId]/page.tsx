@@ -362,21 +362,27 @@ export default function GradebookActivityResultsPage() {
     setSavingGradeKey("__all:ai-feedback");
     try {
       let completed = 0;
-      const failedNames: string[] = [];
-      for (const { row, attempt } of eligible) {
+      const failureReasons: string[] = [];
+      for (const { attempt } of eligible) {
         try {
           await api.generateActivityAttemptAiFeedback(courseId, attempt.id, { triggerKind: "teacher_batch" });
           completed += 1;
-        } catch {
-          failedNames.push(row.participantName);
+        } catch (err) {
+          failureReasons.push(err instanceof Error ? err.message : t("courseDetail.aiFeedbackError"));
         }
       }
       await refresh();
       if (completed) notifications.success(t("courseDetail.aiFeedbackGenerated"));
-      if (failedNames.length) {
+      if (failureReasons.length) {
+        const reasonCounts = new Map<string, number>();
+        for (const reason of failureReasons) {
+          reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1);
+        }
+        const mostCommonReason = [...reasonCounts].sort((left, right) => right[1] - left[1])[0]?.[0]
+          ?? t("courseDetail.aiFeedbackError");
         notifications.error(t("courseDetail.aiFeedbackBatchFailed", {
-          count: failedNames.length,
-          names: failedNames.join(", ")
+          count: failureReasons.length,
+          reason: mostCommonReason
         }));
       }
     } catch (err) {

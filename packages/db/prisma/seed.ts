@@ -10,6 +10,7 @@ import { listContentTypePlugins } from "@cognelo/content-type-sdk";
 import { prisma as codingExercisesPrisma } from "../../plugin-activities/plugin-coding-exercises/src/db-client";
 import { prisma as codingHomeworkGraderPrisma } from "../../plugin-activities/plugin-coding-homework-grader/src/db-client";
 import { prisma as webDesignCodingExercisesPrisma } from "../../plugin-activities/plugin-web-design-coding-exercises/src/db-client";
+import { mergeSeedCourseAiSettings } from "../src/seed-ai-settings";
 
 const prisma = new PrismaClient();
 const execFileAsync = promisify(execFile);
@@ -1182,12 +1183,7 @@ async function main() {
     data: {
       metadata: {
         ...courseMetadata,
-        aiSettings: {
-          ...courseAiSettings,
-          studentSupportAiAgentConnectionId: seedAiConnection.id,
-          automaticFeedbackEnabled: true,
-          assessmentFeedbackAiAgentConnectionId: seedAiConnection.id
-        }
+        aiSettings: mergeSeedCourseAiSettings(courseAiSettings, seedAiConnection.id)
       } as Prisma.InputJsonValue
     }
   });

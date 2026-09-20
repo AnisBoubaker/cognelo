@@ -42,7 +42,34 @@ vi.mock("./db-client", () => ({
   }
 }));
 
+const { AppError } = await import("@cognelo/core");
 const { evaluateCodingExerciseAttemptWithAi } = await import("./ai-feedback");
+
+function evaluationInput(triggerKind: "teacher_single" | "formative_submission" = "teacher_single") {
+  return {
+    user: {
+      id: "teacher-1",
+      email: "teacher@example.test",
+      name: null,
+      firstName: null,
+      lastName: null,
+      roles: ["teacher" as const]
+    },
+    courseId: "course-1",
+    activityId: "activity-1",
+    executionId: "execution-1",
+    activity: {
+      id: "activity-1",
+      title: "Minimum",
+      description: "Comparer des valeurs.",
+      lifecycle: "published" as const,
+      config: { language: "python", prompt: "Afficher la plus petite valeur." },
+      activityType: { key: "coding-exercise", name: "Programmation", description: "" }
+    },
+    assessmentMode: triggerKind === "formative_submission" ? "formative" as const : "summative" as const,
+    triggerKind
+  };
+}
 
 describe("coding exercise generated feedback language", () => {
   beforeEach(() => {
@@ -87,29 +114,9 @@ describe("coding exercise generated feedback language", () => {
   });
 
   it("makes the subject teaching language authoritative", async () => {
-    await expect(evaluateCodingExerciseAttemptWithAi({
-      user: {
-        id: "teacher-1",
-        email: "teacher@example.test",
-        name: null,
-        firstName: null,
-        lastName: null,
-        roles: ["teacher"]
-      },
-      courseId: "course-1",
-      activityId: "activity-1",
-      executionId: "execution-1",
-      activity: {
-        id: "activity-1",
-        title: "Minimum",
-        description: "Comparer des valeurs.",
-        lifecycle: "published",
-        config: { language: "python", prompt: "Afficher la plus petite valeur." },
-        activityType: { key: "coding-exercise", name: "Programmation", description: "" }
-      },
-      assessmentMode: "summative",
-      triggerKind: "teacher_single"
-    })).resolves.toMatchObject({ feedback: { summary: "Bonne solution." } });
+    await expect(evaluateCodingExerciseAttemptWithAi(evaluationInput())).resolves.toMatchObject({
+      feedback: { summary: "Bonne solution." }
+    });
 
     expect(mocks.generateAiAgentText).toHaveBeenCalledWith(
       expect.anything(),
@@ -124,5 +131,34 @@ describe("coding exercise generated feedback language", () => {
         })
       })
     }));
+  });
+
+  it("gives teachers an actionable error when the configured model is unavailable", async () => {
+    mocks.generateAiAgentText.mockRejectedValue(new AppError(
+      404,
+      "AI_AGENT_REQUEST_FAILED",
+      "The AI agent request failed: model not found"
+    ));
+
+    await expect(evaluateCodingExerciseAttemptWithAi(evaluationInput())).rejects.toMatchObject({
+      code: "AI_FEEDBACK_MODEL_UNAVAILABLE",
+      message: expect.stringContaining('model "feedback-model" is unavailable')
+    });
+    expect(mocks.evaluationUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "failed" })
+    }));
+  });
+
+  it("keeps provider details out of formative learner failures", async () => {
+    mocks.generateAiAgentText.mockRejectedValue(new AppError(
+      404,
+      "AI_AGENT_REQUEST_FAILED",
+      "The AI agent request failed: model not found"
+    ));
+
+    await expect(evaluateCodingExerciseAttemptWithAi(evaluationInput("formative_submission"))).rejects.toMatchObject({
+      code: "AI_FEEDBACK_GENERATION_FAILED",
+      message: "Assessment feedback could not be generated. The submission remains available for retry or manual grading."
+    });
   });
 });
