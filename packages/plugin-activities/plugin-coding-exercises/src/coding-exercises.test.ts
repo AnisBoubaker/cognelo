@@ -10,6 +10,7 @@ import {
   codingExerciseTemplateRequiresTestCodeMarker,
   getJudge0LanguageCandidates,
   getCodingExerciseAiFeedbackValidationMessages,
+  mergeCodingExerciseGeneratedSolutionPrivateConfig,
   parseCodingExerciseConfig,
   parseCodingExercisePrivateConfig,
   splitCodingExerciseTemplateSource
@@ -89,6 +90,30 @@ describe("coding exercise config and template helpers", () => {
         criteria: [{ id: "quality", title: "Quality", description: "Evaluate the submitted approach.", weightPercent: 100 }]
       }
     }).aiFeedback).toMatchObject({ enabled: false, gradingEnabled: true });
+  });
+
+  it("preserves the rubric when a generated solution replaces the private template", () => {
+    const current = parseCodingExercisePrivateConfig({
+      templateSource: "old\n{{ STUDENT_CODE }}",
+      templateVisibleLineNumbers: [0],
+      aiFeedback: {
+        enabled: true,
+        gradingEnabled: true,
+        instructions: "Evaluate the solution.",
+        testWeightPercent: 60,
+        aiWeightPercent: 40,
+        criteria: [{ id: "quality", title: "Quality", description: "Evaluate code quality.", weightPercent: 100 }]
+      }
+    });
+
+    const merged = mergeCodingExerciseGeneratedSolutionPrivateConfig(current, {
+      templateSource: "new\n{{ STUDENT_CODE }}\n{{ TEST_CODE }}",
+      templateVisibleLineNumbers: [0, 2]
+    });
+
+    expect(merged.templateSource).toBe("new\n{{ STUDENT_CODE }}\n{{ TEST_CODE }}");
+    expect(merged.templateVisibleLineNumbers).toEqual([0, 2]);
+    expect(merged.aiFeedback).toEqual(current.aiFeedback);
   });
 
   it("reports incomplete rubric drafts before they are sent to the API", () => {

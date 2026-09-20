@@ -236,6 +236,17 @@ export function parseCodingExercisePrivateConfig(value: unknown) {
   };
 }
 
+export function mergeCodingExerciseGeneratedSolutionPrivateConfig(
+  current: CodingExercisePrivateConfig,
+  generated: { templateSource: string; templateVisibleLineNumbers: number[] }
+): CodingExercisePrivateConfig {
+  return parseCodingExercisePrivateConfig({
+    ...current,
+    templateSource: generated.templateSource,
+    templateVisibleLineNumbers: generated.templateVisibleLineNumbers
+  });
+}
+
 export function buildCodingExerciseSource(params: {
   config: Pick<CodingExerciseConfig, "executionMode" | "language">;
   privateConfig: CodingExercisePrivateConfig;
