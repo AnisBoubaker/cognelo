@@ -378,6 +378,55 @@ describe("gradebook attempt services", () => {
     });
   });
 
+  it("carries teacher-authored submission feedback into a later grade", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    mockPrisma.activityAttempt.findUnique.mockResolvedValue({
+      id: "attempt-1",
+      courseId: "course-1",
+      gradebookItemId: "gradebook-item-1",
+      participantId: "participant-1",
+      userId: "student-1",
+      attemptNumber: 1,
+      isLate: false,
+      lateBySeconds: null,
+      submittedAt: new Date("2026-05-18T15:00:00.000Z"),
+      metadata: {
+        teacherFeedback: {
+          kind: "assessment_feedback",
+          summary: "Review the output format.",
+          feedbackRef: "teacher-feedback:attempt-1",
+          feedbackVersion: 1,
+          challengeAllowed: false
+        }
+      },
+      participant,
+      gradebookItem: {
+        ...groupActivity.gradebookItem,
+        id: "gradebook-item-1"
+      }
+    });
+
+    await recordActivityAttemptGradingResult(teacherUser, {
+      attemptId: "attempt-1",
+      rawScore: 7,
+      rawMaxScore: 10,
+      source: "manual",
+      normalizedResult: { percent: 70 }
+    });
+
+    expect(tx.grade.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        normalizedResult: expect.objectContaining({
+          percent: 70,
+          studentFeedback: expect.objectContaining({
+            feedbackRef: "teacher-feedback:attempt-1",
+            summary: "Review the output format."
+          })
+        })
+      })
+    }));
+  });
+
   it("normalizes raw scores, computes pass/fail, and applies late penalties", async () => {
     authMocks.canManageCourse.mockResolvedValueOnce(true);
     mockPrisma.activityAttempt.findUnique.mockResolvedValue({

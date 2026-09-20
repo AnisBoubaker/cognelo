@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
 const mockPrisma = vi.hoisted(() => ({
-  activityAttempt: { findFirst: vi.fn() },
+  activityAttempt: { findFirst: vi.fn(), update: vi.fn() },
   grade: { findUnique: vi.fn(), update: vi.fn() },
   gradeChallenge: { findFirst: vi.fn() },
   gradeEvent: { create: vi.fn() },
@@ -53,6 +53,8 @@ describe("teacher AI feedback review", () => {
       participantId: "participant-1",
       userId: "student-1",
       pluginKey: "coding-exercise",
+      lifecycle: "submitted",
+      metadata: {},
       gradebookItem: { id: "item-1", gradesReleased: false },
       participant: { id: "participant-1", firstName: "Student", lastName: "One", email: "student@example.test" }
     });
@@ -69,6 +71,7 @@ describe("teacher AI feedback review", () => {
       metadata: {}
     });
     mockPrisma.gradeChallenge.findFirst.mockResolvedValue(null);
+    mockPrisma.activityAttempt.update.mockResolvedValue({ id: "attempt-1" });
     mockPrisma.grade.update.mockResolvedValue({ id: "grade-1" });
     mockPrisma.gradeEvent.create.mockResolvedValue({ id: "event-1" });
     mockPrisma.aiFeedbackResearchEvent.create.mockResolvedValue({ id: "research-1" });
@@ -104,6 +107,71 @@ describe("teacher AI feedback review", () => {
     });
     await expect(getTeacherAttemptAiFeedbackReview(teacher, "course-1", "attempt-1")).resolves.toMatchObject({
       feedback: { feedbackRef: "evaluation-1", summary: "Original summary" }
+    });
+  });
+
+  it("returns an empty feedback slot when the submission has not been graded or reviewed", async () => {
+    mockPrisma.grade.findUnique.mockResolvedValue(null);
+
+    await expect(getTeacherAttemptAiFeedbackReview(teacher, "course-1", "attempt-1")).resolves.toMatchObject({
+      attemptId: "attempt-1",
+      gradeId: null,
+      feedback: null
+    });
+  });
+
+  it("does not open feedback before the learner submits", async () => {
+    mockPrisma.activityAttempt.findFirst.mockResolvedValue({
+      id: "attempt-1",
+      lifecycle: "started"
+    });
+
+    await expect(getTeacherAttemptAiFeedbackReview(teacher, "course-1", "attempt-1"))
+      .rejects.toMatchObject({ code: "FEEDBACK_SUBMISSION_REQUIRED" });
+  });
+
+  it("stores teacher-authored feedback on an ungraded submission", async () => {
+    mockPrisma.grade.findUnique.mockResolvedValue(null);
+
+    const result = await reviseTeacherAttemptAiFeedback(teacher, "course-1", "attempt-1", {
+      kind: "assessment_feedback",
+      summary: "Check the boundary condition.",
+      strengths: [],
+      improvements: ["Trace the equal-value case."],
+      criteria: []
+    });
+
+    expect(result).toMatchObject({
+      feedback: {
+        kind: "assessment_feedback",
+        feedbackOrigin: "teacher",
+        feedbackRef: "teacher-feedback:attempt-1",
+        feedbackVersion: 1,
+        challengeAllowed: false,
+        summary: "Check the boundary condition.",
+        authoredByTeacher: true
+      }
+    });
+    expect(mockPrisma.activityAttempt.update).toHaveBeenCalledWith({
+      where: { id: "attempt-1" },
+      data: {
+        metadata: expect.objectContaining({
+          teacherFeedback: expect.objectContaining({
+            feedbackRef: "teacher-feedback:attempt-1",
+            summary: "Check the boundary condition."
+          })
+        })
+      }
+    });
+    expect(mockPrisma.grade.update).not.toHaveBeenCalled();
+    expect(mockPrisma.gradeEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        gradeId: null,
+        metadata: expect.objectContaining({ action: "teacher_authored" })
+      })
+    });
+    expect(mockPrisma.aiFeedbackResearchEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ eventType: "feedback_teacher_authored" })
     });
   });
 

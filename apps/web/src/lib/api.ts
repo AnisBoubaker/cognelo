@@ -1001,7 +1001,7 @@ export type StudentGradeFeedback = {
 
 export type TeacherAiFeedbackReview = {
   attemptId: string;
-  gradeId: string;
+  gradeId: string | null;
   gradesReleased: boolean;
   activityTypeKey: string;
   participant: {

@@ -15,6 +15,25 @@ const current = {
 };
 
 describe("coding exercise feedback revision", () => {
+  it("accepts teacher-authored narrative when no generated rubric feedback exists", () => {
+    expect(reviseCodingExerciseAiFeedback({
+      kind: "assessment_feedback",
+      summary: "",
+      strengths: [],
+      improvements: [],
+      criteria: []
+    }, {
+      summary: "Your approach is clear, but the output format needs correction.",
+      strengths: ["Readable control flow"],
+      improvements: ["Match the required output exactly"],
+      criteria: []
+    })).toMatchObject({
+      kind: "assessment_feedback",
+      summary: "Your approach is clear, but the output format needs correction.",
+      criteria: []
+    });
+  });
+
   it("edits narrative feedback while preserving score components", () => {
     expect(reviseCodingExerciseAiFeedback(current, {
       ...current,

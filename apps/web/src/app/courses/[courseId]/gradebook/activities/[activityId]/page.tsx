@@ -387,7 +387,7 @@ export default function GradebookActivityResultsPage() {
   }
 
   async function openFeedbackReview(targetRows: CourseGradebookRow[], selectedIndex = 0) {
-    const eligibleRows = targetRows.filter((row) => hasReviewableAiFeedback(row.feedback) && getAiFeedbackReviewRenderer(row.activityTypeKey));
+    const eligibleRows = targetRows.filter((row) => selectedFeedbackAttempt(row) && getAiFeedbackReviewRenderer(row.activityTypeKey));
     if (!eligibleRows.length) {
       notifications.error(t("courseDetail.feedbackReviewUnavailable"));
       return;
@@ -562,7 +562,7 @@ export default function GradebookActivityResultsPage() {
                 </button>
               ) : null}
               {supportsAiFeedbackReview(rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? "") ? (
-                <button className="button secondary" type="button" onClick={() => void openFeedbackReview(groupedRows)}>
+                <button className="button secondary" disabled={!hasRowsWithSubmittedAttempts} type="button" onClick={() => void openFeedbackReview(groupedRows)}>
                   {t("courseDetail.feedbackReviewAll")}
                 </button>
               ) : null}
@@ -818,7 +818,7 @@ function GradebookStudentRow({
           </button>
         ) : null}
         {supportsAiFeedbackReview(row.activityTypeKey) ? (
-          <button className="button secondary" disabled={!hasReviewableAiFeedback(row.feedback)} type="button" onClick={() => onReviewFeedback(row)}>
+          <button className="button secondary" disabled={!rowHasSubmittedAttempt} type="button" onClick={() => onReviewFeedback(row)}>
             {t("courseDetail.feedbackReview")}
           </button>
         ) : null}
@@ -878,13 +878,6 @@ function selectedFeedbackAttempt(row: CourseGradebookRow) {
     ?? [...row.attempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted")
     ?? null;
 }
-
-function hasReviewableAiFeedback(feedback: CourseGradebookRow["feedback"]) {
-  return feedback?.kind === "ai_assessment_feedback"
-    && typeof feedback.details?.feedbackRef === "string"
-    && typeof feedback.details?.feedbackVersion === "number";
-}
-
 
 function formatGradebookScore(score: number | null, maxScore: number) {
   if (score === null) {

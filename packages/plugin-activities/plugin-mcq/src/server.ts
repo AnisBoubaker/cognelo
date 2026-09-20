@@ -26,6 +26,11 @@ export const mcqServerPlugin: ServerActivityPlugin = {
       });
     },
     teacherReview: {
+      createFeedbackDraft: () => ({
+        kind: "assessment_feedback",
+        summary: "",
+        questionFeedback: []
+      }),
       getSubmission: async ({ coreAttemptId, activity }) => {
         const attempt = await prisma.activityAttempt.findUnique({ where: { id: coreAttemptId }, select: { metadata: true, submittedAt: true } });
         if (!attempt) throw new AppError(404, "MCQ_ATTEMPT_NOT_FOUND", "The MCQ attempt was not found.");
