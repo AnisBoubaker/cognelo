@@ -9,6 +9,11 @@ export type SafeExamBrowserWindow = {
   setTimeout: (callback: () => void, delay: number) => number;
 };
 
+export function assignmentRequiresSafeExamBrowser(metadata: unknown) {
+  return Boolean(metadata) && typeof metadata === "object" &&
+    (metadata as Record<string, unknown>).requireSafeExamBrowser === true;
+}
+
 export async function readSafeExamBrowserProof(browserWindow: SafeExamBrowserWindow) {
   const seb = browserWindow.SafeExamBrowser;
   const security = seb?.security;
