@@ -344,6 +344,8 @@ Status: complete. Course settings, SDK contracts, secure model resolution, norma
 
 Status: complete. Programming Exercises support required private rubric configuration, immediate formative evaluation, teacher-triggered summative evaluation, configurable deterministic/AI weighting, strict two-attempt structured-output validation, immutable private evaluation artifacts, submission-time private rubric snapshots, and teacher review of submitted code plus editable summary/strength/improvement/criterion narrative.
 
+The development seed includes a reproducible two-section Programming Exercise batch at the submitted-but-not-evaluated boundary. This permits teacher single/batch generation, review, editing, release, learner review, challenge, and research-event testing without requiring Judge0 to execute dozens of fixture submissions during seeding.
+
 - Add plugin-owned bank/course feedback configuration, rubrics, and copy/sync hooks.
 - Add formative submission-triggered feedback.
 - Add teacher-triggered standalone summative evaluation.

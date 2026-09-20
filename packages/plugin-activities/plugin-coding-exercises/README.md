@@ -134,6 +134,10 @@ When AI grading is enabled, the plugin returns the configured combined score (fo
 
 The plugin registers a teacher feedback review renderer and server handlers. From detailed gradebook results, a teacher can review one learner or navigate the whole generated set, see the submitted source code, and edit the summary, strengths, improvements, and criterion narrative. Criterion scores and deterministic/AI/combined score components remain read-only; grade changes use the ordinary audited override. Saving creates a revised learner-visible core snapshot while the private `PluginCodingExerciseAiEvaluation` stays immutable. Core records the previous/next feedback and `feedback_teacher_revised` research event, and blocks edits after that version has been challenged. Learner-facing feedback copy deliberately says only “Feedback” and does not identify AI as the generator or grader.
 
+### Development feedback-review fixture
+
+The root Prisma seed publishes `C exercise: Median of three integers` as `seed-bank-activity-c-median-feedback` in the Programming basics bank and as `seed-activity-c-median-feedback` in Programming 101. It includes five exact-output hidden tests plus a private rubric that combines deterministic tests at 60% with rubric assessment at 40%. The activity is assigned summatively to all course sections. A clean seed creates 36 submitted attempts across Sections A and B: six correct programs, three programs with compilation errors, and varied programs with logic or exact-output-contract errors. If other linked students already exist in either section, the seed gives them submissions too. Executions snapshot the rubric, but evaluations and grades are intentionally absent until a teacher invokes the normal summative batch action.
+
 ## Judge0 Integration
 
 The browser should never call Judge0 directly.

@@ -18,6 +18,228 @@ const CODING_HOMEWORK_BANK_ACTIVITY_ID = "seed-bank-activity-coding-homework-gra
 const CODING_HOMEWORK_BANK_PDF_ATTACHMENT_ID = "seed-coding-homework-assignment-pdf-bank";
 const CODING_HOMEWORK_COURSE_PDF_ATTACHMENT_ID = "seed-coding-homework-assignment-pdf-course";
 const SEED_AI_CONNECTION_ID = "seed-ai-agent-student-support";
+const MEDIAN_CODING_BANK_ACTIVITY_ID = "seed-bank-activity-c-median-feedback";
+const MEDIAN_CODING_ACTIVITY_ID = "seed-activity-c-median-feedback";
+const PROGRAMMING_SECTION_B_ID = "seed-group-programming-101-section-b";
+
+const programmingSectionAStudentNames = [
+  "Avery Martin",
+  "Jordan Lee",
+  "Riley Chen",
+  "Casey Nguyen",
+  "Morgan Patel",
+  "Taylor Wilson",
+  "Cameron Brown",
+  "Quinn Davis",
+  "Alex Garcia",
+  "Jamie Roy",
+  "Sydney Tremblay",
+  "Robin Kim",
+  "Drew Singh",
+  "Parker Clark",
+  "Reese Bouchard",
+  "Hayden Lewis",
+  "Rowan Scott",
+  "Emery Gagnon",
+  "Finley Moore",
+  "Dakota Young"
+] as const;
+
+const programmingSectionBStudentNames = [
+  "Maya Anderson",
+  "Noah Thomas",
+  "Chloe Jackson",
+  "Ethan White",
+  "Sofia Harris",
+  "Lucas Thompson",
+  "Zoe Martinez",
+  "Leo Robinson",
+  "Mila Walker",
+  "Owen Hall",
+  "Nora Allen",
+  "Eli King",
+  "Layla Wright",
+  "Isaac Green",
+  "Aria Baker"
+] as const;
+
+const medianReferenceSource = [
+  "#include <stdio.h>",
+  "",
+  "int main(void) {",
+  "  int a, b, c, temporary;",
+  "  if (scanf(\"%d %d %d\", &a, &b, &c) != 3) return 1;",
+  "  if (a > b) { temporary = a; a = b; b = temporary; }",
+  "  if (b > c) { temporary = b; b = c; c = temporary; }",
+  "  if (a > b) { temporary = a; a = b; b = temporary; }",
+  "  printf(\"Median: %d\\n\", b);",
+  "  return 0;",
+  "}"
+].join("\n");
+
+type MedianSubmissionVariant = {
+  key: string;
+  sourceCode: string;
+  passedTestIndexes: number[];
+  stdout: string | null;
+  compileOutput?: string;
+};
+
+function medianSubmissionVariant(index: number): MedianSubmissionVariant {
+  if ([0, 6, 12, 18, 24, 30].includes(index)) {
+    return {
+      key: "correct-sort",
+      sourceCode: medianReferenceSource,
+      passedTestIndexes: [0, 1, 2, 3, 4],
+      stdout: "Median: -4\n"
+    };
+  }
+
+  if ([8, 19, 31].includes(index)) {
+    return {
+      key: "syntax-missing-semicolon",
+      sourceCode: [
+        "#include <stdio.h>",
+        "int main(void) {",
+        "  int a, b, c;",
+        "  scanf(\"%d %d %d\", &a, &b, &c)",
+        "  printf(\"Median: %d\\n\", b);",
+        "  return 0;",
+        "}"
+      ].join("\n"),
+      passedTestIndexes: [],
+      stdout: null,
+      compileOutput: "main.c:5:3: error: expected ';' before 'printf'"
+    };
+  }
+
+  const wrongVariants: MedianSubmissionVariant[] = [
+    {
+      key: "minimum-instead-of-median",
+      sourceCode: [
+        "#include <stdio.h>",
+        "int main(void) {",
+        "  int a, b, c, answer;",
+        "  scanf(\"%d %d %d\", &a, &b, &c);",
+        "  answer = a < b ? a : b;",
+        "  if (c < answer) answer = c;",
+        "  printf(\"Median: %d\\n\", answer);",
+        "  return 0;",
+        "}"
+      ].join("\n"),
+      passedTestIndexes: [4],
+      stdout: "Median: -4\n"
+    },
+    {
+      key: "maximum-instead-of-median",
+      sourceCode: [
+        "#include <stdio.h>",
+        "int main(void) {",
+        "  int a, b, c, answer;",
+        "  scanf(\"%d %d %d\", &a, &b, &c);",
+        "  answer = a > b ? a : b;",
+        "  if (c > answer) answer = c;",
+        "  printf(\"Median: %d\\n\", answer);",
+        "  return 0;",
+        "}"
+      ].join("\n"),
+      passedTestIndexes: [2, 3, 4],
+      stdout: "Median: -4\n"
+    },
+    {
+      key: "integer-average",
+      sourceCode: [
+        "#include <stdio.h>",
+        "int main(void) {",
+        "  int a, b, c;",
+        "  scanf(\"%d %d %d\", &a, &b, &c);",
+        "  printf(\"Median: %d\\n\", (a + b + c) / 3);",
+        "  return 0;",
+        "}"
+      ].join("\n"),
+      passedTestIndexes: [0, 1, 4],
+      stdout: "Median: -4\n"
+    },
+    {
+      key: "middle-input-only",
+      sourceCode: [
+        "#include <stdio.h>",
+        "int main(void) {",
+        "  int a, b, c;",
+        "  scanf(\"%d %d %d\", &a, &b, &c);",
+        "  printf(\"Median: %d\\n\", b);",
+        "  return 0;",
+        "}"
+      ].join("\n"),
+      passedTestIndexes: [2, 4],
+      stdout: "Median: -4\n"
+    },
+    {
+      key: "incomplete-sort",
+      sourceCode: [
+        "#include <stdio.h>",
+        "int main(void) {",
+        "  int a, b, c, temporary;",
+        "  scanf(\"%d %d %d\", &a, &b, &c);",
+        "  if (a > b) { temporary = a; a = b; b = temporary; }",
+        "  if (b > c) { temporary = b; b = c; c = temporary; }",
+        "  printf(\"Median: %d\\n\", b);",
+        "  return 0;",
+        "}"
+      ].join("\n"),
+      passedTestIndexes: [0, 1, 3, 4],
+      stdout: "Median: -4\n"
+    },
+    {
+      key: "wrong-label",
+      sourceCode: medianReferenceSource.replace('printf("Median: %d\\n", b);', 'printf("median = %d\\n", b);'),
+      passedTestIndexes: [],
+      stdout: "median = -4\n"
+    },
+    {
+      key: "extra-explanatory-output",
+      sourceCode: medianReferenceSource.replace('printf("Median: %d\\n", b);', 'printf("The median is %d\\n", b);'),
+      passedTestIndexes: [],
+      stdout: "The median is -4\n"
+    },
+    {
+      key: "hard-coded-sample",
+      sourceCode: [
+        "#include <stdio.h>",
+        "int main(void) {",
+        "  int a, b, c;",
+        "  scanf(\"%d %d %d\", &a, &b, &c);",
+        "  printf(\"Median: 2\\n\");",
+        "  return 0;",
+        "}"
+      ].join("\n"),
+      passedTestIndexes: [0],
+      stdout: "Median: 2\n"
+    },
+    {
+      key: "sum-instead-of-median",
+      sourceCode: [
+        "#include <stdio.h>",
+        "int main(void) {",
+        "  int a, b, c;",
+        "  scanf(\"%d %d %d\", &a, &b, &c);",
+        "  printf(\"Median: %d\\n\", a + b + c);",
+        "  return 0;",
+        "}"
+      ].join("\n"),
+      passedTestIndexes: [],
+      stdout: "Median: -12\n"
+    },
+    {
+      key: "sorted-list-output",
+      sourceCode: medianReferenceSource.replace('printf("Median: %d\\n", b);', 'printf("%d %d %d\\n", a, b, c);'),
+      passedTestIndexes: [],
+      stdout: "-4 -4 -4\n"
+    }
+  ];
+
+  return wrongVariants[(index * 7) % wrongVariants.length];
+}
 
 type SeedAiAgentProvider = "ollama" | "openai" | "codex" | "claude";
 
@@ -719,6 +941,98 @@ async function main() {
     position: 2
   });
 
+  const medianCodingConfig = {
+    prompt: [
+      "Read three integers from standard input and determine their median (the middle value after sorting).",
+      "Print exactly `Median: X`, followed by a newline, where `X` is the median.",
+      "Do not print prompts or any other explanatory text. Your program must handle negative values and repeated values."
+    ].join("\n\n"),
+    language: "c",
+    executionMode: "template",
+    starterCode: [
+      "#include <stdio.h>",
+      "",
+      "int main(void) {",
+      "  int a, b, c;",
+      "  if (scanf(\"%d %d %d\", &a, &b, &c) != 3) return 1;",
+      "",
+      "  // Determine and print the median.",
+      "",
+      "  return 0;",
+      "}"
+    ].join("\n"),
+    studentTemplateSource: "{{ STUDENT_CODE }}",
+    sampleTests: [
+      {
+        id: "sample-median-1",
+        input: "10 4 7\n",
+        output: "Median: 7",
+        testCode: "",
+        title: "Three distinct positive integers",
+        outputMatchMode: "exact",
+        containsLinesOrderMatters: false
+      }
+    ],
+    maxEditorSeconds: 1800
+  };
+  const medianCodingAiFeedbackConfig = {
+    enabled: true,
+    gradingEnabled: true,
+    rubricName: "Median program quality",
+    rubricVersion: "1",
+    instructions: [
+      "Evaluate the submitted C program against the activity requirements and deterministic test results.",
+      "Explain the most important correction concretely and concisely.",
+      "Do not identify the mechanism that produced the feedback."
+    ].join(" "),
+    testWeightPercent: 60,
+    aiWeightPercent: 40,
+    criteria: [
+      {
+        id: "algorithm-correctness",
+        title: "Algorithm correctness",
+        description: "The program computes the median for every ordering, including repeated and negative values.",
+        weightPercent: 50
+      },
+      {
+        id: "c-quality",
+        title: "C implementation quality",
+        description: "The solution is valid, readable C and handles the required input without unsafe or irrelevant behavior.",
+        weightPercent: 30
+      },
+      {
+        id: "output-contract",
+        title: "Output contract",
+        description: "The program prints exactly the requested label and value with no prompts or extra text.",
+        weightPercent: 20
+      }
+    ]
+  };
+  const medianCodingHiddenTests = [
+    { id: "seed-hidden-median-1", name: "Unordered positive values", stdin: "3 1 2\n", expectedOutput: "Median: 2", orderIndex: 0 },
+    { id: "seed-hidden-median-2", name: "Negative values", stdin: "-5 -1 -3\n", expectedOutput: "Median: -3", orderIndex: 1 },
+    { id: "seed-hidden-median-3", name: "First and second values tied", stdin: "7 7 2\n", expectedOutput: "Median: 7", orderIndex: 2 },
+    { id: "seed-hidden-median-4", name: "First and third values tied", stdin: "9 1 9\n", expectedOutput: "Median: 9", orderIndex: 3 },
+    { id: "seed-hidden-median-5", name: "All values equal", stdin: "-4 -4 -4\n", expectedOutput: "Median: -4", orderIndex: 4 }
+  ];
+  const medianCodingSeed = await upsertBankActivityWithVersion({
+    id: MEDIAN_CODING_BANK_ACTIVITY_ID,
+    bankId: programmingBasicsBank.id,
+    activityTypeId: codingExerciseType.id,
+    title: "C exercise: Median of three integers",
+    description: "Read three integers and print their median using the exact required output format.",
+    lifecycle: "published",
+    config: medianCodingConfig,
+    metadata: {
+      researchTags: ["coding-exercise", "c", "conditionals", "ai-feedback-fixture"],
+      instrumented: true,
+      seedFixture: "programming-ai-feedback-review",
+      plugin: pluginKeyByActivityKey.get("coding-exercise")
+    },
+    createdById: teacher.id,
+    position: 3
+  });
+
   const webDesignFiles = [
     {
       id: "index-html",
@@ -872,7 +1186,9 @@ async function main() {
         ...courseMetadata,
         aiSettings: {
           ...courseAiSettings,
-          studentSupportAiAgentConnectionId: seedAiConnection.id
+          studentSupportAiAgentConnectionId: seedAiConnection.id,
+          automaticFeedbackEnabled: true,
+          assessmentFeedbackAiAgentConnectionId: seedAiConnection.id
         }
       } as Prisma.InputJsonValue
     }
@@ -880,9 +1196,16 @@ async function main() {
 
   const seededCodingActivityIds = [
     CODING_HOMEWORK_ACTIVITY_ID,
-    "seed-activity-coding-template"
+    "seed-activity-coding-template",
+    MEDIAN_CODING_ACTIVITY_ID
   ] as const;
 
+  await codingExercisesPrisma.pluginCodingExerciseAiEvaluation.deleteMany({
+    where: { activityId: MEDIAN_CODING_ACTIVITY_ID }
+  });
+  await codingExercisesPrisma.pluginCodingExerciseExecution.deleteMany({
+    where: { activityId: MEDIAN_CODING_ACTIVITY_ID }
+  });
   await codingHomeworkGraderPrisma.pluginCodingHomeworkSubmission.deleteMany({
     where: { activityId: CODING_HOMEWORK_ACTIVITY_ID }
   });
@@ -916,6 +1239,28 @@ async function main() {
         userId: membership.userId,
         role: membership.role
       }
+    });
+  }
+
+  const sectionAStudentUsers = [];
+  for (const [index, name] of programmingSectionAStudentNames.entries()) {
+    const user = await upsertUser(`programming.a${String(index + 1).padStart(2, "0")}@cognelo.local`, name, ["student"]);
+    sectionAStudentUsers.push(user);
+    await prisma.courseMembership.upsert({
+      where: { courseId_userId_role: { courseId: course.id, userId: user.id, role: "student" } },
+      update: {},
+      create: { courseId: course.id, userId: user.id, role: "student" }
+    });
+  }
+
+  const sectionBStudentUsers = [];
+  for (const [index, name] of programmingSectionBStudentNames.entries()) {
+    const user = await upsertUser(`programming.b${String(index + 1).padStart(2, "0")}@cognelo.local`, name, ["student"]);
+    sectionBStudentUsers.push(user);
+    await prisma.courseMembership.upsert({
+      where: { courseId_userId_role: { courseId: course.id, userId: user.id, role: "student" } },
+      update: {},
+      create: { courseId: course.id, userId: user.id, role: "student" }
     });
   }
 
@@ -1288,6 +1633,43 @@ async function main() {
   });
 
   await prisma.activity.upsert({
+    where: { id: MEDIAN_CODING_ACTIVITY_ID },
+    update: {
+      title: "C exercise: Median of three integers",
+      description: "Read three integers and print their median using the exact required output format.",
+      lifecycle: "published",
+      config: medianCodingConfig,
+      bankActivityId: medianCodingSeed.bankActivity.id,
+      activityVersionId: medianCodingSeed.version.id,
+      metadata: {
+        researchTags: ["coding-exercise", "c", "conditionals", "ai-feedback-fixture"],
+        instrumented: true,
+        seedFixture: "programming-ai-feedback-review",
+        plugin: pluginKeyByActivityKey.get("coding-exercise")
+      }
+    },
+    create: {
+      id: MEDIAN_CODING_ACTIVITY_ID,
+      courseId: course.id,
+      activityTypeId: codingExerciseType.id,
+      title: "C exercise: Median of three integers",
+      description: "Read three integers and print their median using the exact required output format.",
+      lifecycle: "published",
+      config: medianCodingConfig,
+      bankActivityId: medianCodingSeed.bankActivity.id,
+      activityVersionId: medianCodingSeed.version.id,
+      metadata: {
+        researchTags: ["coding-exercise", "c", "conditionals", "ai-feedback-fixture"],
+        instrumented: true,
+        seedFixture: "programming-ai-feedback-review",
+        plugin: pluginKeyByActivityKey.get("coding-exercise")
+      },
+      createdById: teacher.id,
+      position: 3
+    }
+  });
+
+  await prisma.activity.upsert({
     where: { id: "seed-activity-web-design-profile-card" },
     update: {
       title: "Responsive profile card",
@@ -1552,6 +1934,105 @@ async function main() {
     });
   }
 
+  const medianCodingPrivateConfig = {
+    hiddenSupportCode: "",
+    templateSource: "{{ STUDENT_CODE }}",
+    templateVisibleLineNumbers: [],
+    templatePrefix: "",
+    templateSuffix: "",
+    aiFeedback: medianCodingAiFeedbackConfig
+  };
+  const medianCodingValidationSummary = {
+    status: "ready",
+    validatedBy: "seed-fixture",
+    hiddenTestCount: medianCodingHiddenTests.length
+  };
+  await codingExercisesPrisma.pluginCodingExerciseReferenceSolution.upsert({
+    where: { activityId: MEDIAN_CODING_ACTIVITY_ID },
+    update: {
+      sourceCode: medianReferenceSource,
+      privateConfig: medianCodingPrivateConfig,
+      validationSummary: medianCodingValidationSummary
+    },
+    create: {
+      activityId: MEDIAN_CODING_ACTIVITY_ID,
+      sourceCode: medianReferenceSource,
+      privateConfig: medianCodingPrivateConfig,
+      validationSummary: medianCodingValidationSummary
+    }
+  });
+  await codingExercisesPrisma.pluginBankCodingExerciseReferenceSolution.upsert({
+    where: { bankActivityId: MEDIAN_CODING_BANK_ACTIVITY_ID },
+    update: {
+      sourceCode: medianReferenceSource,
+      privateConfig: medianCodingPrivateConfig,
+      validationSummary: medianCodingValidationSummary
+    },
+    create: {
+      bankActivityId: MEDIAN_CODING_BANK_ACTIVITY_ID,
+      sourceCode: medianReferenceSource,
+      privateConfig: medianCodingPrivateConfig,
+      validationSummary: medianCodingValidationSummary
+    }
+  });
+
+  for (const hiddenTest of medianCodingHiddenTests) {
+    const metadata = {
+      stableId: hiddenTest.id,
+      testCode: "",
+      outputMatchMode: "exact",
+      containsLinesOrderMatters: false
+    };
+    await codingExercisesPrisma.pluginCodingExerciseHiddenTest.upsert({
+      where: { id: hiddenTest.id },
+      update: {
+        activityId: MEDIAN_CODING_ACTIVITY_ID,
+        name: hiddenTest.name,
+        stdin: hiddenTest.stdin,
+        expectedOutput: hiddenTest.expectedOutput,
+        orderIndex: hiddenTest.orderIndex,
+        isEnabled: true,
+        weight: 1,
+        metadata
+      },
+      create: {
+        id: hiddenTest.id,
+        activityId: MEDIAN_CODING_ACTIVITY_ID,
+        name: hiddenTest.name,
+        stdin: hiddenTest.stdin,
+        expectedOutput: hiddenTest.expectedOutput,
+        orderIndex: hiddenTest.orderIndex,
+        isEnabled: true,
+        weight: 1,
+        metadata
+      }
+    });
+    await codingExercisesPrisma.pluginBankCodingExerciseHiddenTest.upsert({
+      where: { id: `bank-${hiddenTest.id}` },
+      update: {
+        bankActivityId: MEDIAN_CODING_BANK_ACTIVITY_ID,
+        name: hiddenTest.name,
+        stdin: hiddenTest.stdin,
+        expectedOutput: hiddenTest.expectedOutput,
+        orderIndex: hiddenTest.orderIndex,
+        isEnabled: true,
+        weight: 1,
+        metadata
+      },
+      create: {
+        id: `bank-${hiddenTest.id}`,
+        bankActivityId: MEDIAN_CODING_BANK_ACTIVITY_ID,
+        name: hiddenTest.name,
+        stdin: hiddenTest.stdin,
+        expectedOutput: hiddenTest.expectedOutput,
+        orderIndex: hiddenTest.orderIndex,
+        isEnabled: true,
+        weight: 1,
+        metadata
+      }
+    });
+  }
+
   await webDesignCodingExercisesPrisma.pluginWebDesignExerciseReferenceBundle.upsert({
     where: { activityId: "seed-activity-web-design-profile-card" },
     update: {
@@ -1663,8 +2144,8 @@ async function main() {
       title: "Section A",
       description: "Monday lab group with its own launch notes and activity schedule.",
       status: "published",
-      availableFrom: new Date("2026-04-20T13:00:00.000Z"),
-      availableUntil: new Date("2026-07-31T03:59:00.000Z")
+      availableFrom: new Date("2026-09-01T12:00:00.000Z"),
+      availableUntil: new Date("2027-01-31T04:59:00.000Z")
     },
     create: {
       id: "seed-group-programming-101-section-a",
@@ -1672,8 +2153,8 @@ async function main() {
       title: "Section A",
       description: "Monday lab group with its own launch notes and activity schedule.",
       status: "published",
-      availableFrom: new Date("2026-04-20T13:00:00.000Z"),
-      availableUntil: new Date("2026-07-31T03:59:00.000Z"),
+      availableFrom: new Date("2026-09-01T12:00:00.000Z"),
+      availableUntil: new Date("2027-01-31T04:59:00.000Z"),
       createdById: teacher.id
     }
   });
@@ -1702,6 +2183,70 @@ async function main() {
       externalId: "S1001"
     }
   });
+
+  for (const [index, user] of sectionAStudentUsers.entries()) {
+    await prisma.courseGroupParticipant.upsert({
+      where: { groupId_email: { groupId: group.id, email: user.email } },
+      update: {
+        userId: user.id,
+        role: "student",
+        firstName: user.firstName ?? programmingSectionAStudentNames[index].split(" ")[0],
+        lastName: user.lastName ?? programmingSectionAStudentNames[index].split(" ").slice(1).join(" "),
+        externalId: `A${String(index + 1).padStart(4, "0")}`
+      },
+      create: {
+        groupId: group.id,
+        userId: user.id,
+        role: "student",
+        firstName: user.firstName ?? programmingSectionAStudentNames[index].split(" ")[0],
+        lastName: user.lastName ?? programmingSectionAStudentNames[index].split(" ").slice(1).join(" "),
+        email: user.email,
+        externalId: `A${String(index + 1).padStart(4, "0")}`
+      }
+    });
+  }
+
+  const sectionB = await prisma.courseGroup.upsert({
+    where: { id: PROGRAMMING_SECTION_B_ID },
+    update: {
+      title: "Section B",
+      description: "Wednesday lab group used for programming assessment and feedback review.",
+      status: "published",
+      availableFrom: new Date("2026-09-01T12:00:00.000Z"),
+      availableUntil: new Date("2027-01-31T04:59:00.000Z")
+    },
+    create: {
+      id: PROGRAMMING_SECTION_B_ID,
+      courseId: course.id,
+      title: "Section B",
+      description: "Wednesday lab group used for programming assessment and feedback review.",
+      status: "published",
+      availableFrom: new Date("2026-09-01T12:00:00.000Z"),
+      availableUntil: new Date("2027-01-31T04:59:00.000Z"),
+      createdById: teacher.id
+    }
+  });
+  for (const [index, user] of sectionBStudentUsers.entries()) {
+    await prisma.courseGroupParticipant.upsert({
+      where: { groupId_email: { groupId: sectionB.id, email: user.email } },
+      update: {
+        userId: user.id,
+        role: "student",
+        firstName: user.firstName ?? programmingSectionBStudentNames[index].split(" ")[0],
+        lastName: user.lastName ?? programmingSectionBStudentNames[index].split(" ").slice(1).join(" "),
+        externalId: `B${String(index + 1).padStart(4, "0")}`
+      },
+      create: {
+        groupId: sectionB.id,
+        userId: user.id,
+        role: "student",
+        firstName: user.firstName ?? programmingSectionBStudentNames[index].split(" ")[0],
+        lastName: user.lastName ?? programmingSectionBStudentNames[index].split(" ").slice(1).join(" "),
+        email: user.email,
+        externalId: `B${String(index + 1).padStart(4, "0")}`
+      }
+    });
+  }
 
   await prisma.courseGroupMaterial.upsert({
     where: { id: "seed-group-material-checklist" },
@@ -1854,6 +2399,282 @@ async function main() {
       metadata: { seed: true, plugin: "coding-homework-grader", assignment: "INF155-A2023-TP1" }
     }
   });
+
+  const medianAvailableFrom = new Date("2026-09-01T12:00:00.000Z");
+  const medianAvailableUntil = new Date("2027-01-31T04:59:00.000Z");
+  const medianGradebookSettings = {
+    pointsPossible: 100,
+    gradingMode: "points" as const,
+    passThresholdPoints: null,
+    passThresholdOutOf: null,
+    attemptLimitMode: "max_attempts" as const,
+    maxAttempts: 1,
+    gradeStrategy: "latest" as const,
+    dropLowestAttempt: false
+  };
+  const medianActivity = await prisma.activity.findUniqueOrThrow({ where: { id: MEDIAN_CODING_ACTIVITY_ID } });
+  await prisma.activity.update({
+    where: { id: medianActivity.id },
+    data: {
+      metadata: {
+        ...asJsonRecord(medianActivity.metadata),
+        allGroupsAssignment: {
+          enabled: true,
+          availableFrom: medianAvailableFrom.toISOString(),
+          availableUntil: medianAvailableUntil.toISOString(),
+          enablePerGroupSettings: false,
+          assessmentMode: "summative",
+          gradebookSettings: medianGradebookSettings
+        }
+      } as Prisma.InputJsonValue
+    }
+  });
+
+  const medianAssignmentsByGroupId = new Map<string, { id: string; groupId: string }>();
+  const programmingGroups = await prisma.courseGroup.findMany({
+    where: { courseId: course.id },
+    orderBy: [{ title: "asc" }, { createdAt: "asc" }]
+  });
+  for (const [index, programmingGroup] of programmingGroups.entries()) {
+    const assignment = await prisma.courseGroupActivity.upsert({
+      where: {
+        groupId_activityId: {
+          groupId: programmingGroup.id,
+          activityId: MEDIAN_CODING_ACTIVITY_ID
+        }
+      },
+      update: {
+        availableFrom: medianAvailableFrom,
+        availableUntil: medianAvailableUntil,
+        metadata: {
+          assignmentScope: "course_all_groups",
+          enablePerGroupSettings: false,
+          assessmentMode: "summative"
+        },
+        position: 5 + index
+      },
+      create: {
+        groupId: programmingGroup.id,
+        activityId: MEDIAN_CODING_ACTIVITY_ID,
+        availableFrom: medianAvailableFrom,
+        availableUntil: medianAvailableUntil,
+        metadata: {
+          assignmentScope: "course_all_groups",
+          enablePerGroupSettings: false,
+          assessmentMode: "summative"
+        },
+        position: 5 + index
+      }
+    });
+    medianAssignmentsByGroupId.set(programmingGroup.id, assignment);
+    await prisma.gradebookItem.upsert({
+      where: { groupActivityId: assignment.id },
+      update: {
+        titleSnapshot: "C exercise: Median of three integers",
+        ...medianGradebookSettings,
+        gradesReleased: false,
+        metadata: {
+          seed: true,
+          plugin: "coding-exercises",
+          fixture: "programming-ai-feedback-review"
+        }
+      },
+      create: {
+        courseId: course.id,
+        groupId: programmingGroup.id,
+        groupActivityId: assignment.id,
+        activityId: MEDIAN_CODING_ACTIVITY_ID,
+        titleSnapshot: "C exercise: Median of three integers",
+        ...medianGradebookSettings,
+        metadata: {
+          seed: true,
+          plugin: "coding-exercises",
+          fixture: "programming-ai-feedback-review"
+        }
+      }
+    });
+  }
+
+  const [sectionASubmissionParticipants, sectionBSubmissionParticipants] = await Promise.all([
+    prisma.courseGroupParticipant.findMany({
+      where: { groupId: group.id, role: "student", userId: { not: null } },
+      orderBy: [{ email: "asc" }, { createdAt: "asc" }]
+    }),
+    prisma.courseGroupParticipant.findMany({
+      where: { groupId: sectionB.id, role: "student", userId: { not: null } },
+      orderBy: [{ email: "asc" }, { createdAt: "asc" }]
+    })
+  ]);
+  const seededMedianParticipants = [
+    ...sectionASubmissionParticipants.map((participant) => ({ participant, groupId: group.id })),
+    ...sectionBSubmissionParticipants.map((participant) => ({ participant, groupId: sectionB.id }))
+  ];
+  const medianActivityConfigFingerprint = createHash("sha256")
+    .update(JSON.stringify(medianCodingConfig))
+    .digest("hex");
+  for (const [index, { participant, groupId }] of seededMedianParticipants.entries()) {
+    if (!participant.userId) {
+      throw new Error(`The seeded programming participant ${participant.email} is not linked to a user.`);
+    }
+    const assignment = medianAssignmentsByGroupId.get(groupId);
+    if (!assignment) {
+      throw new Error(`The median coding exercise is not assigned to group ${groupId}.`);
+    }
+    const gradebookItem = await prisma.gradebookItem.findUniqueOrThrow({
+      where: { groupActivityId: assignment.id }
+    });
+    const variant = medianSubmissionVariant(index);
+    const passedIndexes = new Set(variant.passedTestIndexes);
+    const compileFailed = Boolean(variant.compileOutput);
+    const accepted = variant.passedTestIndexes.length === medianCodingHiddenTests.length;
+    const testResults = medianCodingHiddenTests.map((hiddenTest, testIndex) => {
+      const passed = passedIndexes.has(testIndex);
+      return {
+        id: hiddenTest.id,
+        name: hiddenTest.name,
+        passed,
+        weight: 1,
+        statusId: compileFailed ? 6 : passed ? 3 : 4,
+        statusLabel: compileFailed ? "Compilation Error" : passed ? "Accepted" : "Wrong Answer",
+        message: compileFailed
+          ? variant.compileOutput
+          : passed
+            ? null
+            : "Program output did not match the expected output.",
+        outputMatchMode: "exact",
+        containsLinesOrderMatters: false,
+        timeSeconds: compileFailed ? null : "0.01",
+        memoryKb: compileFailed ? null : 2048
+      };
+    });
+    const executionId = `seed-execution-c-median-${participant.id}`;
+    const startedAt = new Date(Date.UTC(2026, 8, 15, 13, index * 5));
+    const submittedAt = new Date(startedAt.getTime() + (6 + index % 13) * 60_000);
+    const resultSummary = {
+      judge0LanguageName: "C (GCC 13.2.0)",
+      executionMode: "template",
+      phase: "finished",
+      accepted,
+      testCount: medianCodingHiddenTests.length,
+      passedCount: variant.passedTestIndexes.length,
+      earnedWeight: variant.passedTestIndexes.length,
+      totalWeight: medianCodingHiddenTests.length,
+      tests: testResults,
+      seedFixture: "programming-ai-feedback-review",
+      submissionVariant: variant.key
+    };
+    const execution = await codingExercisesPrisma.pluginCodingExerciseExecution.upsert({
+      where: { id: executionId },
+      update: {
+        activityId: MEDIAN_CODING_ACTIVITY_ID,
+        userId: participant.userId,
+        kind: "submit",
+        status: accepted ? "completed" : "failed",
+        languageKey: "c",
+        judge0LanguageId: 103,
+        sourceCode: variant.sourceCode,
+        stdin: "",
+        expectedOutput: "",
+        judge0Token: null,
+        stdout: variant.stdout,
+        stderr: compileFailed ? variant.compileOutput ?? null : null,
+        compileOutput: variant.compileOutput ?? null,
+        message: accepted
+          ? null
+          : compileFailed
+            ? variant.compileOutput ?? "Compilation failed."
+            : "One or more hidden tests did not match the expected output.",
+        timeSeconds: compileFailed ? null : "0.01",
+        memoryKb: compileFailed ? null : 2048,
+        judge0StatusId: compileFailed ? 6 : accepted ? 3 : 4,
+        judge0StatusLabel: compileFailed ? "Compilation Error" : accepted ? "Accepted" : "Wrong Answer",
+        resultSummary,
+        aiFeedbackConfigSnapshot: medianCodingAiFeedbackConfig,
+        createdAt: submittedAt
+      },
+      create: {
+        id: executionId,
+        activityId: MEDIAN_CODING_ACTIVITY_ID,
+        userId: participant.userId,
+        kind: "submit",
+        status: accepted ? "completed" : "failed",
+        languageKey: "c",
+        judge0LanguageId: 103,
+        sourceCode: variant.sourceCode,
+        stdin: "",
+        expectedOutput: "",
+        stdout: variant.stdout,
+        stderr: compileFailed ? variant.compileOutput ?? null : null,
+        compileOutput: variant.compileOutput ?? null,
+        message: accepted
+          ? null
+          : compileFailed
+            ? variant.compileOutput ?? "Compilation failed."
+            : "One or more hidden tests did not match the expected output.",
+        timeSeconds: compileFailed ? null : "0.01",
+        memoryKb: compileFailed ? null : 2048,
+        judge0StatusId: compileFailed ? 6 : accepted ? 3 : 4,
+        judge0StatusLabel: compileFailed ? "Compilation Error" : accepted ? "Accepted" : "Wrong Answer",
+        resultSummary,
+        aiFeedbackConfigSnapshot: medianCodingAiFeedbackConfig,
+        createdAt: submittedAt
+      }
+    });
+    const attemptMetadata = {
+      mode: "summative",
+      executionId: execution.id,
+      submittedSourceCode: variant.sourceCode,
+      seedFixture: "programming-ai-feedback-review",
+      submissionVariant: variant.key
+    };
+    await prisma.activityAttempt.upsert({
+      where: { id: `seed-attempt-c-median-${participant.id}` },
+      update: {
+        courseId: course.id,
+        groupId,
+        groupActivityId: assignment.id,
+        activityId: MEDIAN_CODING_ACTIVITY_ID,
+        gradebookItemId: gradebookItem.id,
+        participantId: participant.id,
+        userId: participant.userId,
+        attemptNumber: 1,
+        lifecycle: "submitted",
+        startedAt,
+        submittedAt,
+        gradedAt: null,
+        durationSeconds: Math.round((submittedAt.getTime() - startedAt.getTime()) / 1000),
+        isLate: false,
+        lateBySeconds: null,
+        activityVersionId: medianCodingSeed.version.id,
+        activityConfigFingerprint: medianActivityConfigFingerprint,
+        pluginKey: "coding-exercises",
+        pluginVersion: "0.1.0",
+        pluginAttemptRef: execution.id,
+        metadata: attemptMetadata
+      },
+      create: {
+        id: `seed-attempt-c-median-${participant.id}`,
+        courseId: course.id,
+        groupId,
+        groupActivityId: assignment.id,
+        activityId: MEDIAN_CODING_ACTIVITY_ID,
+        gradebookItemId: gradebookItem.id,
+        participantId: participant.id,
+        userId: participant.userId,
+        attemptNumber: 1,
+        lifecycle: "submitted",
+        startedAt,
+        submittedAt,
+        durationSeconds: Math.round((submittedAt.getTime() - startedAt.getTime()) / 1000),
+        activityVersionId: medianCodingSeed.version.id,
+        activityConfigFingerprint: medianActivityConfigFingerprint,
+        pluginKey: "coding-exercises",
+        pluginVersion: "0.1.0",
+        pluginAttemptRef: execution.id,
+        metadata: attemptMetadata
+      }
+    });
+  }
 
   await prisma.courseContentItem.deleteMany({
     where: {
@@ -2030,6 +2851,21 @@ async function main() {
     activityId: CODING_HOMEWORK_ACTIVITY_ID,
     courseGroupActivityId: codingHomeworkAssignment.id,
     metadata: { seed: true }
+  });
+
+  await upsertCourseContentItem({
+    id: "seed-content-c-median-feedback",
+    courseId: course.id,
+    parentId: week3Folder.id,
+    kind: "activity",
+    titleSnapshot: "C exercise: Median of three integers",
+    position: 3,
+    activityId: MEDIAN_CODING_ACTIVITY_ID,
+    metadata: {
+      seed: true,
+      fixture: "programming-ai-feedback-review",
+      assignedToAllGroups: true
+    }
   });
 
   await codingHomeworkGraderPrisma.pluginCodingHomeworkDocumentationSnapshot.upsert({
