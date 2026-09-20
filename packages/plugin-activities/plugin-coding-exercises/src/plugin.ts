@@ -27,6 +27,9 @@ export const codingExercisesPlugin: ActivityPlugin = {
       aiFeedback: {
         rendererKey: "coding-exercise-ai-feedback-review"
       },
+      authoring: {
+        gradingTab: true
+      },
       i18n: {
         en: {
           name: "Coding exercise",

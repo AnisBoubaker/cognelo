@@ -1247,7 +1247,6 @@ model AiFeedbackResearchEvent {
   triggerKind        String
   provider           String?
   model              String?
-  rubricVersion      String?
   promptVersion      String?
   schemaVersion      String?
   submissionHash     String?

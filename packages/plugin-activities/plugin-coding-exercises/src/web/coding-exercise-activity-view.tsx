@@ -1,6 +1,7 @@
 "use client";
 
-import { type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
 import { CodeEditor, CodeRenderer, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, RichTextEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
@@ -238,6 +239,7 @@ type CodingExerciseActivityViewProps = {
   codingClient?: CodingExerciseClient;
   aiGenerationClient?: CodingExerciseAiGenerationClient;
   locale?: string;
+  authoringGradingPortalTarget?: HTMLElement | null;
   executionStateHost?: ActivityExecutionStateHost<Record<string, unknown>>;
   deferSubmission?: boolean;
   readOnly?: boolean;
@@ -261,6 +263,7 @@ export function CodingExerciseActivityView({
   codingClient,
   aiGenerationClient,
   locale,
+  authoringGradingPortalTarget,
   executionStateHost,
   deferSubmission = false,
   readOnly = false,
@@ -1134,6 +1137,11 @@ export function CodingExerciseActivityView({
     void generateTests();
   }
 
+  function renderAuthoringGrading(content: ReactNode) {
+    if (authoringGradingPortalTarget === undefined) return content;
+    return authoringGradingPortalTarget ? createPortal(content, authoringGradingPortalTarget) : null;
+  }
+
   return (
     <section className="section stack">
       {canManage ? (
@@ -1336,63 +1344,157 @@ export function CodingExerciseActivityView({
             />
           </div>
 
-          <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
-            <div>
-              <h3>{t("aiFeedbackTitle")}</h3>
-              <p className="muted">{t("aiFeedbackHelp")}</p>
-            </div>
-            <label className="checkbox-row">
-              <input
-                checked={privateConfig.aiFeedback.enabled}
-                type="checkbox"
-                onChange={(event) => setPrivateConfig((current) => ({
-                  ...current,
-                  aiFeedback: {
-                    ...current.aiFeedback,
-                    enabled: event.target.checked,
-                    criteria: event.target.checked && current.aiFeedback.criteria.length === 0
-                      ? [{ id: "correctness", title: "Correctness and approach", description: "Evaluate the correctness, clarity, and suitability of the submitted approach.", weightPercent: 100 }]
-                      : current.aiFeedback.criteria
-                  }
-                }))}
-              />
-              <span>{t("aiFeedbackEnabled")}</span>
-            </label>
-            {privateConfig.aiFeedback.enabled ? (
-              <>
-                <label className="checkbox-row">
-                  <input
-                    checked={privateConfig.aiFeedback.gradingEnabled}
-                    type="checkbox"
-                    onChange={(event) => setPrivateConfig((current) => ({
-                      ...current,
-                      aiFeedback: { ...current.aiFeedback, gradingEnabled: event.target.checked }
-                    }))}
-                  />
-                  <span>{t("aiGradingEnabled")}</span>
-                </label>
+          {renderAuthoringGrading(<div className="stack">
+            <section className="stack">
+              <div>
+                <h2>{t("gradingTitle")}</h2>
+                <p className="muted">{t("gradingHelp")}</p>
+              </div>
+              <label className="checkbox-row">
+                <input
+                  checked={privateConfig.aiFeedback.gradingEnabled}
+                  type="checkbox"
+                  onChange={(event) => setPrivateConfig((current) => ({
+                    ...current,
+                    aiFeedback: {
+                      ...current.aiFeedback,
+                      gradingEnabled: event.target.checked,
+                      criteria: event.target.checked && current.aiFeedback.criteria.length === 0
+                        ? [{ id: "correctness", title: "Correctness and approach", description: "Evaluate the correctness, clarity, and suitability of the submitted approach.", weightPercent: 100 }]
+                        : current.aiFeedback.criteria
+                    }
+                  }))}
+                />
+                <span>{t("aiGradingEnabled")}</span>
+              </label>
+              {privateConfig.aiFeedback.gradingEnabled ? (
                 <div className="form-grid two-columns">
                   <div className="field">
-                    <label htmlFor="coding-ai-rubric-name">{t("rubricName")}</label>
+                    <label htmlFor="coding-ai-test-weight">{t("testWeightPercent")}</label>
                     <input
-                      id="coding-ai-rubric-name"
-                      maxLength={200}
+                      id="coding-ai-test-weight"
+                      min={0}
+                      max={100}
                       required
-                      value={privateConfig.aiFeedback.rubricName}
-                      onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, rubricName: event.target.value } }))}
+                      type="number"
+                      value={privateConfig.aiFeedback.testWeightPercent}
+                      onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, testWeightPercent: Number(event.target.value) } }))}
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor="coding-ai-rubric-version">{t("rubricVersion")}</label>
+                    <label htmlFor="coding-ai-rubric-weight">{t("aiWeightPercent")}</label>
                     <input
-                      id="coding-ai-rubric-version"
-                      maxLength={80}
+                      id="coding-ai-rubric-weight"
+                      min={0}
+                      max={100}
                       required
-                      value={privateConfig.aiFeedback.rubricVersion}
-                      onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, rubricVersion: event.target.value } }))}
+                      type="number"
+                      value={privateConfig.aiFeedback.aiWeightPercent}
+                      onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, aiWeightPercent: Number(event.target.value) } }))}
                     />
                   </div>
                 </div>
+              ) : null}
+            </section>
+
+            <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
+              <div>
+                <h3>{t("rubricTitle")}</h3>
+                <p className="muted">{t("rubricHelp")}</p>
+              </div>
+              <div className="field">
+                <label htmlFor="coding-ai-rubric-name">{t("rubricName")}</label>
+                <input
+                  id="coding-ai-rubric-name"
+                  maxLength={200}
+                  required={privateConfig.aiFeedback.enabled || privateConfig.aiFeedback.gradingEnabled || privateConfig.aiFeedback.criteria.length > 0}
+                  value={privateConfig.aiFeedback.rubricName}
+                  onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, rubricName: event.target.value } }))}
+                />
+              </div>
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                <h4>{t("rubricCriteria")}</h4>
+                <button
+                  className="button secondary"
+                  disabled={privateConfig.aiFeedback.criteria.length >= 20}
+                  type="button"
+                  onClick={() => setPrivateConfig((current) => ({
+                    ...current,
+                    aiFeedback: {
+                      ...current.aiFeedback,
+                      criteria: balanceCodingExerciseAiRubricCriterionWeights([...current.aiFeedback.criteria, {
+                        id: createCodingExerciseAiRubricCriterionId(current.aiFeedback.criteria),
+                        title: "",
+                        description: "",
+                        weightPercent: 1
+                      }])
+                    }
+                  }))}
+                >
+                  {t("addCriterion")}
+                </button>
+              </div>
+              {privateConfig.aiFeedback.criteria.map((criterion, index) => (
+                <section className="stack" key={`${criterion.id}-${index}`} style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 16 }}>
+                  <div className="form-grid two-columns">
+                    <div className="field">
+                      <label>{t("criterionTitle")}</label>
+                      <input maxLength={160} required value={criterion.title} onChange={(event) => setPrivateConfig((current) => ({
+                        ...current,
+                        aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value, id: item.id || `criterion-${index + 1}` } : item) }
+                      }))} />
+                    </div>
+                    <div className="field">
+                      <label>{t("criterionWeight")}</label>
+                      <input min={1} max={100} required type="number" value={criterion.weightPercent} onChange={(event) => setPrivateConfig((current) => ({
+                        ...current,
+                        aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.map((item, itemIndex) => itemIndex === index ? { ...item, weightPercent: Number(event.target.value) } : item) }
+                      }))} />
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label>{t("criterionDescription")}</label>
+                    <textarea maxLength={2000} required rows={3} value={criterion.description} onChange={(event) => setPrivateConfig((current) => ({
+                      ...current,
+                      aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item) }
+                    }))} />
+                  </div>
+                  <button className="button danger" type="button" onClick={() => setPrivateConfig((current) => ({
+                    ...current,
+                    aiFeedback: {
+                      ...current.aiFeedback,
+                      criteria: balanceCodingExerciseAiRubricCriterionWeights(
+                        current.aiFeedback.criteria.filter((_, itemIndex) => itemIndex !== index)
+                      )
+                    }
+                  }))}>{t("remove")}</button>
+                </section>
+              ))}
+            </section>
+
+            <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
+              <div>
+                <h3>{t("aiFeedbackTitle")}</h3>
+                <p className="muted">{t("aiFeedbackHelp")}</p>
+              </div>
+              <label className="checkbox-row">
+                <input
+                  checked={privateConfig.aiFeedback.enabled}
+                  type="checkbox"
+                  onChange={(event) => setPrivateConfig((current) => ({
+                    ...current,
+                    aiFeedback: {
+                      ...current.aiFeedback,
+                      enabled: event.target.checked,
+                      criteria: event.target.checked && current.aiFeedback.criteria.length === 0
+                        ? [{ id: "correctness", title: "Correctness and approach", description: "Evaluate the correctness, clarity, and suitability of the submitted approach.", weightPercent: 100 }]
+                        : current.aiFeedback.criteria
+                    }
+                  }))}
+                />
+                <span>{t("aiFeedbackEnabled")}</span>
+              </label>
+              {privateConfig.aiFeedback.enabled ? (
                 <div className="field">
                   <label htmlFor="coding-ai-instructions">{t("feedbackInstructions")}</label>
                   <textarea
@@ -1404,102 +1506,15 @@ export function CodingExerciseActivityView({
                     onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, instructions: event.target.value } }))}
                   />
                 </div>
-                {privateConfig.aiFeedback.gradingEnabled ? (
-                  <div className="form-grid two-columns">
-                    <div className="field">
-                      <label htmlFor="coding-ai-test-weight">{t("testWeightPercent")}</label>
-                      <input
-                        id="coding-ai-test-weight"
-                        min={0}
-                        max={100}
-                        required
-                        type="number"
-                        value={privateConfig.aiFeedback.testWeightPercent}
-                        onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, testWeightPercent: Number(event.target.value) } }))}
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="coding-ai-rubric-weight">{t("aiWeightPercent")}</label>
-                      <input
-                        id="coding-ai-rubric-weight"
-                        min={0}
-                        max={100}
-                        required
-                        type="number"
-                        value={privateConfig.aiFeedback.aiWeightPercent}
-                        onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, aiWeightPercent: Number(event.target.value) } }))}
-                      />
-                    </div>
-                  </div>
-                ) : null}
-                <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                  <h4>{t("rubricCriteria")}</h4>
-                  <button
-                    className="button secondary"
-                    disabled={privateConfig.aiFeedback.criteria.length >= 20}
-                    type="button"
-                    onClick={() => setPrivateConfig((current) => ({
-                      ...current,
-                      aiFeedback: {
-                        ...current.aiFeedback,
-                        criteria: balanceCodingExerciseAiRubricCriterionWeights([...current.aiFeedback.criteria, {
-                          id: createCodingExerciseAiRubricCriterionId(current.aiFeedback.criteria),
-                          title: "",
-                          description: "",
-                          weightPercent: 1
-                        }])
-                      }
-                    }))}
-                  >
-                    {t("addCriterion")}
-                  </button>
+              ) : null}
+              {aiFeedbackValidationMessages.length ? (
+                <div className="error" role="alert">
+                  <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+                    {aiFeedbackValidationMessages.map((message) => <li key={message}>{message}</li>)}
+                  </ul>
                 </div>
-                {privateConfig.aiFeedback.criteria.map((criterion, index) => (
-                  <section className="stack" key={`${criterion.id}-${index}`} style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 16 }}>
-                    <div className="form-grid two-columns">
-                      <div className="field">
-                        <label>{t("criterionTitle")}</label>
-                        <input maxLength={160} required value={criterion.title} onChange={(event) => setPrivateConfig((current) => ({
-                          ...current,
-                          aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value, id: item.id || `criterion-${index + 1}` } : item) }
-                        }))} />
-                      </div>
-                      <div className="field">
-                        <label>{t("criterionWeight")}</label>
-                        <input min={1} max={100} required type="number" value={criterion.weightPercent} onChange={(event) => setPrivateConfig((current) => ({
-                          ...current,
-                          aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.map((item, itemIndex) => itemIndex === index ? { ...item, weightPercent: Number(event.target.value) } : item) }
-                        }))} />
-                      </div>
-                    </div>
-                    <div className="field">
-                      <label>{t("criterionDescription")}</label>
-                      <textarea maxLength={2000} required rows={3} value={criterion.description} onChange={(event) => setPrivateConfig((current) => ({
-                        ...current,
-                        aiFeedback: { ...current.aiFeedback, criteria: current.aiFeedback.criteria.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item) }
-                      }))} />
-                    </div>
-                    <button className="button danger" type="button" onClick={() => setPrivateConfig((current) => ({
-                      ...current,
-                      aiFeedback: {
-                        ...current.aiFeedback,
-                        criteria: balanceCodingExerciseAiRubricCriterionWeights(
-                          current.aiFeedback.criteria.filter((_, itemIndex) => itemIndex !== index)
-                        )
-                      }
-                    }))}>{t("remove")}</button>
-                  </section>
-                ))}
-                {aiFeedbackValidationMessages.length ? (
-                  <div className="error" role="alert">
-                    <ul style={{ margin: 0, paddingInlineStart: 20 }}>
-                      {aiFeedbackValidationMessages.map((message) => <li key={message}>{message}</li>)}
-                    </ul>
-                  </div>
-                ) : null}
-              </>
-            ) : null}
-          </section>
+              ) : null}
+            </section>
 
           {aiGenerationClient ? (
             <button
@@ -1742,6 +1757,24 @@ export function CodingExerciseActivityView({
               </section>
             ))}
           </section>
+          {authoringGradingPortalTarget !== undefined ? (
+            <>
+              {error ? <p className="error">{error}</p> : null}
+              <EditActionBar
+                isDirty={hasUnsavedChanges}
+                isSaving={saving}
+                saveDisabled={aiFeedbackValidationMessages.length > 0}
+                savedLabel={actionCopy.saved}
+                unsavedLabel={actionCopy.unsaved}
+                saveLabel={t("saveCodingExercise")}
+                savingLabel={t("saving")}
+                cancelLabel={actionCopy.cancel}
+                onCancel={discardChanges}
+                onSave={saveCodingExercise}
+              />
+            </>
+          ) : null}
+          </div>)}
 
           {error ? <p className="error">{error}</p> : null}
           <EditActionBar

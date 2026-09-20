@@ -19,7 +19,6 @@ CREATE TABLE "AiFeedbackResearchEvent" (
   "triggerKind" TEXT NOT NULL,
   "provider" TEXT,
   "model" TEXT,
-  "rubricVersion" TEXT,
   "promptVersion" TEXT,
   "schemaVersion" TEXT,
   "submissionHash" TEXT,

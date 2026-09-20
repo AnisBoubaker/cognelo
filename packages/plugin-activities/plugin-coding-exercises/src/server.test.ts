@@ -14,6 +14,7 @@ const executionMocks = vi.hoisted(() => ({
   submitCodingExercise: vi.fn()
 }));
 const aiFeedbackMocks = vi.hoisted(() => ({
+  createCodingExerciseTeacherFeedbackDraft: vi.fn(),
   evaluateCodingExerciseAttemptWithAi: vi.fn(),
   reviseCodingExerciseAiFeedback: vi.fn(),
   snapshotCodingExerciseAiFeedbackConfig: vi.fn()
@@ -39,6 +40,7 @@ describe("coding exercises server plugin lifecycle hooks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     aiFeedbackMocks.snapshotCodingExerciseAiFeedbackConfig.mockResolvedValue({ enabled: false });
+    aiFeedbackMocks.createCodingExerciseTeacherFeedbackDraft.mockResolvedValue({ kind: "assessment_feedback", criteria: [] });
   });
 
   it("copies bank-owned data when a coding exercise is assigned to a course", async () => {
@@ -173,6 +175,22 @@ describe("coding exercises server plugin lifecycle hooks", () => {
           combinedScore: 84
         }
       }
+    });
+  });
+
+  it("builds teacher feedback drafts from the submission rubric", async () => {
+    await expect(codingExercisesServerPlugin.aiFeedback?.teacherReview?.createFeedbackDraft({
+      user: testUser(),
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      coreAttemptId: "attempt-1",
+      pluginAttemptRef: "execution-1",
+      activity: testActivity("coding-exercise")
+    })).resolves.toEqual({ kind: "assessment_feedback", criteria: [] });
+    expect(aiFeedbackMocks.createCodingExerciseTeacherFeedbackDraft).toHaveBeenCalledWith({
+      activityId: "activity-1",
+      executionId: "execution-1"
     });
   });
 

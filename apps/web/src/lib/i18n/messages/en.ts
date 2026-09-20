@@ -614,7 +614,7 @@ export const enMessages = {
       versionNote: "Draft saves update the mutable activity without creating a version. Saving while Published creates a new version only when authored content changed."
     },
     activityConcepts: {
-      tabsLabel: "Activity editor", activityTab: "Activity", conceptsTab: "Concepts", title: "Knowledge concepts",
+      tabsLabel: "Activity editor", activityTab: "Activity", conceptsTab: "Concepts", gradingTab: "Grading", title: "Knowledge concepts",
       description: "Select the subject concepts this activity helps learners practice or demonstrate.", search: "Search concepts",
       empty: "This subject does not have any knowledge concepts yet. Add concepts to the subject knowledge graph first.",
       noMatches: "No concepts match this search.", saved: "Knowledge concept links saved.", saveError: "Unable to save knowledge concept links.",

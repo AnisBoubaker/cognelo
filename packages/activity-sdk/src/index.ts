@@ -73,6 +73,10 @@ export type ActivityAiFeedbackContract = {
   rendererKey?: string;
 };
 
+export type ActivityAuthoringContract = {
+  gradingTab?: boolean;
+};
+
 export type ActivityProvider =
   | { kind: "core"; key: string }
   | { kind: "plugin"; key: string };
@@ -90,6 +94,7 @@ export type ActivityDefinition = {
   grading?: ActivityGradingCapability;
   manualGrading?: ActivityManualGradingContract;
   aiFeedback?: ActivityAiFeedbackContract;
+  authoring?: ActivityAuthoringContract;
   i18n?: Partial<Record<PluginLocale, ActivityMessages>>;
   defaultConfig?: Record<string, unknown>;
   configSchema?: z.ZodTypeAny;

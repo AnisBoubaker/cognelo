@@ -614,7 +614,7 @@ export const frMessages = {
       versionNote: "L'enregistrement d'un brouillon met à jour l'activité modifiable sans créer de version. Un enregistrement avec le statut Publié crée une version seulement si le contenu rédigé a changé."
     },
     activityConcepts: {
-      tabsLabel: "Éditeur d’activité", activityTab: "Activité", conceptsTab: "Concepts", title: "Concepts de connaissances",
+      tabsLabel: "Éditeur d’activité", activityTab: "Activité", conceptsTab: "Concepts", gradingTab: "Évaluation", title: "Concepts de connaissances",
       description: "Sélectionnez les concepts de la matière que cette activité permet de pratiquer ou de démontrer.", search: "Rechercher des concepts",
       empty: "Cette matière ne contient encore aucun concept. Ajoutez-en d’abord au graphe de connaissances.",
       noMatches: "Aucun concept ne correspond à cette recherche.", saved: "Liens vers les concepts enregistrés.", saveError: "Impossible d’enregistrer les liens vers les concepts.",

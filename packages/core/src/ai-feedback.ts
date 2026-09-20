@@ -26,7 +26,6 @@ export type AiFeedbackResearchEventInput = {
   triggerKind: string;
   provider?: string | null;
   model?: string | null;
-  rubricVersion?: string | null;
   promptVersion?: string | null;
   schemaVersion?: string | null;
   submissionHash?: string | null;

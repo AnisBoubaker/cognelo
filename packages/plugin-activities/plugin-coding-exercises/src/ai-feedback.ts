@@ -36,9 +36,67 @@ const teacherFeedbackRevisionSchema = z.object({
   criteria: z.array(z.object({
     id: z.string().min(1).max(80),
     scorePercent: z.number().min(0).max(100),
-    feedback: z.string().trim().min(1).max(2000)
+    feedback: z.string().trim().max(2000)
   })).max(20)
 });
+
+export async function createCodingExerciseTeacherFeedbackDraft(input: {
+  activityId: string;
+  executionId: string;
+}) {
+  const [execution, reference] = await Promise.all([
+    prisma.pluginCodingExerciseExecution.findFirst({
+      where: { id: input.executionId, activityId: input.activityId },
+      select: { resultSummary: true, aiFeedbackConfigSnapshot: true }
+    }),
+    prisma.pluginCodingExerciseReferenceSolution.findUnique({
+      where: { activityId: input.activityId },
+      select: { privateConfig: true }
+    })
+  ]);
+  if (!execution) {
+    throw new AppError(404, "CODING_EXERCISE_EXECUTION_NOT_FOUND", "The coding exercise submission was not found.");
+  }
+  const currentFeedbackConfig = parseCodingExercisePrivateConfig(reference?.privateConfig).aiFeedback;
+  const snapshotFeedbackConfig = execution.aiFeedbackConfigSnapshot
+    ? parseCodingExercisePrivateConfig({ aiFeedback: execution.aiFeedbackConfigSnapshot }).aiFeedback
+    : null;
+  const feedbackConfig = snapshotFeedbackConfig?.criteria.length ? snapshotFeedbackConfig : currentFeedbackConfig;
+  const resultSummary = toRecord(execution.resultSummary);
+  const earnedWeight = finiteNumber(resultSummary.earnedWeight);
+  const totalWeight = finiteNumber(resultSummary.totalWeight);
+  const deterministicScore = earnedWeight !== null && totalWeight !== null && totalWeight > 0
+    ? clampPercent(earnedWeight / totalWeight * 100)
+    : null;
+  const rubricScore = feedbackConfig.criteria.length ? 0 : null;
+  const combinedScore = feedbackConfig.gradingEnabled && deterministicScore !== null && rubricScore !== null
+    ? clampPercent(
+        deterministicScore * feedbackConfig.testWeightPercent / 100
+        + rubricScore * feedbackConfig.aiWeightPercent / 100
+      )
+    : deterministicScore;
+
+  return {
+    kind: "assessment_feedback",
+    summary: "",
+    strengths: [],
+    improvements: [],
+    rubricName: feedbackConfig.rubricName,
+    criteria: feedbackConfig.criteria.map((criterion) => ({
+      id: criterion.id,
+      title: criterion.title,
+      weightPercent: criterion.weightPercent,
+      scorePercent: 0,
+      feedback: ""
+    })),
+    ...(deterministicScore !== null ? { deterministicScore } : {}),
+    ...(rubricScore !== null ? { aiScore: rubricScore } : {}),
+    ...(combinedScore !== null ? { combinedScore } : {}),
+    gradingEnabled: feedbackConfig.gradingEnabled,
+    testWeightPercent: feedbackConfig.gradingEnabled ? feedbackConfig.testWeightPercent : 100,
+    aiWeightPercent: feedbackConfig.gradingEnabled ? feedbackConfig.aiWeightPercent : 0
+  };
+}
 
 export async function getCodingExerciseAiFeedbackTeacherSubmission(input: {
   activityId: string;
@@ -190,7 +248,6 @@ export async function evaluateCodingExerciseAttemptWithAi(input: {
   const version = (previous?.version ?? 0) + 1;
   const rubricSnapshot = {
     name: feedbackConfig.rubricName,
-    version: feedbackConfig.rubricVersion,
     instructions: feedbackConfig.instructions,
     criteria: feedbackConfig.criteria,
     testWeightPercent: feedbackConfig.testWeightPercent,
@@ -234,7 +291,7 @@ export async function evaluateCodingExerciseAttemptWithAi(input: {
     }
   });
 
-  await recordAiFeedbackResearchEvent(researchEventBase({ input, attempt, evaluation, connection, submissionHash, rubricVersion: feedbackConfig.rubricVersion, eventType: "feedback_requested", outcome: "pending" }));
+  await recordAiFeedbackResearchEvent(researchEventBase({ input, attempt, evaluation, connection, submissionHash, eventType: "feedback_requested", outcome: "pending" }));
   const startedAt = Date.now();
   try {
     const rawResponse = await requestStrictFeedback(connection, requestPayload, feedbackConfig.criteria.map((criterion) => criterion.id));
@@ -287,7 +344,6 @@ export async function evaluateCodingExerciseAttemptWithAi(input: {
       evaluation: completed,
       connection,
       submissionHash,
-      rubricVersion: feedbackConfig.rubricVersion,
       eventType: "feedback_completed",
       outcome: "completed",
       feedbackHash,
@@ -314,7 +370,7 @@ export async function evaluateCodingExerciseAttemptWithAi(input: {
       where: { id: evaluation.id },
       data: { status: "failed", error: message.slice(0, 8000), latencyMs: Date.now() - startedAt }
     });
-    await recordAiFeedbackResearchEvent(researchEventBase({ input, attempt, evaluation, connection, submissionHash, rubricVersion: feedbackConfig.rubricVersion, eventType: "feedback_failed", outcome: "failed", metadata: { error: message.slice(0, 1000) } }));
+    await recordAiFeedbackResearchEvent(researchEventBase({ input, attempt, evaluation, connection, submissionHash, eventType: "feedback_failed", outcome: "failed", metadata: { error: message.slice(0, 1000) } }));
     throw new AppError(502, "AI_FEEDBACK_GENERATION_FAILED", "AI feedback could not be generated. The submission remains available for retry or manual grading.");
   }
 }
@@ -377,7 +433,6 @@ function researchEventBase(params: {
   evaluation: { id: string; version: number };
   connection: { id: string; provider: string; model: string };
   submissionHash: string;
-  rubricVersion: string;
   eventType: string;
   outcome: string;
   feedbackHash?: string;
@@ -402,7 +457,6 @@ function researchEventBase(params: {
     triggerKind: params.input.triggerKind,
     provider: params.connection.provider,
     model: params.connection.model,
-    rubricVersion: params.rubricVersion,
     promptVersion,
     schemaVersion,
     submissionHash: params.submissionHash,

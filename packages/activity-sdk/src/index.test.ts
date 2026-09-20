@@ -105,6 +105,7 @@ describe("activity SDK registry", () => {
       })
     );
     expect(getActivityDefinition("coding-exercise")?.grading?.supportsCompositeExecution).toBe(true);
+    expect(getActivityDefinition("coding-exercise")?.authoring?.gradingTab).toBe(true);
     expect(getActivityDefinition("web-design-coding-exercise")?.grading?.supportsCompositeExecution).toBe(true);
     expect(getActivityDefinition("coding-homework-grader")?.grading?.supportsCompositeExecution).not.toBe(true);
   });

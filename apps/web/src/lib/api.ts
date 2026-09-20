@@ -527,6 +527,9 @@ export type ActivityDefinition = {
     supportsManualGrading?: boolean;
     supportsCompositeExecution?: boolean;
   };
+  authoring?: {
+    gradingTab?: boolean;
+  };
   i18n?: Partial<
     Record<
       "en" | "fr" | "zh" | "ar",
@@ -710,7 +713,6 @@ export type CodingExerciseReferenceSolution = {
       enabled: boolean;
       gradingEnabled: boolean;
       rubricName: string;
-      rubricVersion: string;
       instructions: string;
       testWeightPercent: number;
       aiWeightPercent: number;

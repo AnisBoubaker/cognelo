@@ -46,12 +46,15 @@ type MessageKey =
   | "templateVisibleLine"
   | "lastValidationSummary"
   | "editorTimeLimit"
+  | "gradingTitle"
+  | "gradingHelp"
+  | "rubricTitle"
+  | "rubricHelp"
   | "aiFeedbackTitle"
   | "aiFeedbackHelp"
   | "aiFeedbackEnabled"
   | "aiGradingEnabled"
   | "rubricName"
-  | "rubricVersion"
   | "feedbackInstructions"
   | "testWeightPercent"
   | "aiWeightPercent"
@@ -202,15 +205,18 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     templateVisibleLine: "Toggle student-visible line {line}",
     lastValidationSummary: "Last validation: {passedCount}/{testCount} tests passed.",
     editorTimeLimit: "Editor time limit (seconds)",
-    aiFeedbackTitle: "AI feedback and grading",
+    gradingTitle: "Grading",
+    gradingHelp: "Configure deterministic tests and an optional rubric. Teachers can complete and edit rubric feedback even when automatic feedback is off.",
+    rubricTitle: "Rubric",
+    rubricHelp: "This rubric is available in teacher feedback review for every submitted answer. Automatic feedback may fill it when enabled.",
+    aiFeedbackTitle: "Automatic feedback",
     aiFeedbackHelp: "Requires automatic assessment feedback and a model in the course settings. Formative feedback runs on submission; summative feedback is started by a teacher.",
     aiFeedbackEnabled: "Enable AI feedback",
     aiGradingEnabled: "Use the rubric score as part of the grade",
     rubricName: "Rubric name",
-    rubricVersion: "Rubric version",
     feedbackInstructions: "Feedback instructions",
     testWeightPercent: "Deterministic tests (%)",
-    aiWeightPercent: "AI rubric (%)",
+    aiWeightPercent: "Rubric (%)",
     rubricCriteria: "Rubric criteria",
     addCriterion: "Add criterion",
     criterionTitle: "Criterion title",
@@ -355,15 +361,18 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     templateVisibleLine: "Afficher ou masquer la ligne étudiante {line}",
     lastValidationSummary: "Dernière validation : {passedCount}/{testCount} tests réussis.",
     editorTimeLimit: "Limite de temps dans l'éditeur (secondes)",
-    aiFeedbackTitle: "Rétroaction et notation par IA",
+    gradingTitle: "Évaluation",
+    gradingHelp: "Configurez les tests déterministes et une grille facultative. L’enseignant peut remplir et modifier la rétroaction de la grille même si la rétroaction automatique est désactivée.",
+    rubricTitle: "Grille d’évaluation",
+    rubricHelp: "Cette grille est disponible dans la révision de la rétroaction pour chaque réponse soumise. La rétroaction automatique peut la remplir lorsqu’elle est activée.",
+    aiFeedbackTitle: "Rétroaction automatique",
     aiFeedbackHelp: "Nécessite la rétroaction automatique et un modèle dans les paramètres du cours. La rétroaction formative démarre à la soumission; la rétroaction sommative est lancée par un enseignant.",
     aiFeedbackEnabled: "Activer la rétroaction IA",
     aiGradingEnabled: "Utiliser le résultat de la grille dans la note",
     rubricName: "Nom de la grille",
-    rubricVersion: "Version de la grille",
     feedbackInstructions: "Consignes de rétroaction",
     testWeightPercent: "Tests déterministes (%)",
-    aiWeightPercent: "Grille IA (%)",
+    aiWeightPercent: "Grille (%)",
     rubricCriteria: "Critères de la grille",
     addCriterion: "Ajouter un critère",
     criterionTitle: "Titre du critère",
@@ -508,15 +517,18 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     templateVisibleLine: "切换第 {line} 行是否对学生可见",
     lastValidationSummary: "最近一次验证：通过 {passedCount}/{testCount} 个测试。",
     editorTimeLimit: "编辑器时间限制（秒）",
-    aiFeedbackTitle: "AI 反馈和评分",
+    gradingTitle: "评分",
+    gradingHelp: "配置确定性测试和可选量规。即使关闭自动反馈，教师也可以填写和编辑量规反馈。",
+    rubricTitle: "量规",
+    rubricHelp: "每份已提交答案都可在教师反馈审阅中使用此量规；启用自动反馈后可由系统填写。",
+    aiFeedbackTitle: "自动反馈",
     aiFeedbackHelp: "需要在课程设置中启用自动评估反馈并选择模型。形成性反馈在提交时运行；总结性反馈由教师启动。",
     aiFeedbackEnabled: "启用 AI 反馈",
     aiGradingEnabled: "将量规分数计入成绩",
     rubricName: "量规名称",
-    rubricVersion: "量规版本",
     feedbackInstructions: "反馈说明",
     testWeightPercent: "确定性测试（%）",
-    aiWeightPercent: "AI 量规（%）",
+    aiWeightPercent: "量规（%）",
     rubricCriteria: "量规标准",
     addCriterion: "添加标准",
     criterionTitle: "标准标题",
