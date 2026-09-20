@@ -34,6 +34,7 @@ import {
 import { ContentTypeIcon as MaterialTypeIcon } from "@/lib/content-type-renderers";
 import { normalizeStudentFolderTabDepth, resolveStudentContentLayout } from "@/lib/course-settings";
 import { useI18n } from "@/lib/i18n";
+import { assignmentRequiresSafeExamBrowser } from "@/lib/safe-exam-browser";
 
 type ContentDropPlacement = "after" | "before" | "inside";
 type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
@@ -121,6 +122,7 @@ export default function CourseGroupPage() {
   }, [canManage, courseId, group, groupId, router]);
 
   async function refresh() {
+    setError("");
     setContentLoaded(false);
     const [courseResult, groupResult, typeResult] = await Promise.all([
       api.course(courseId),
@@ -160,10 +162,14 @@ export default function CourseGroupPage() {
       const [gradesResult, submissionAudits] = await Promise.all([
         api.studentGroupGrades(courseId, groupId),
         Promise.all(
-          (groupResult.group.activities ?? []).map(async (assignment) => ({
-            activityId: assignment.activity.id,
-            audit: await api.studentActivitySubmissions(courseId, groupId, assignment.activity.id)
-          }))
+          (groupResult.group.activities ?? [])
+            // Submission history is activity-scoped protected content. The ordinary-browser
+            // course overview must let the selected activity's SEB launcher gate that request.
+            .filter((assignment) => !assignmentRequiresSafeExamBrowser(assignment.metadata))
+            .map(async (assignment) => ({
+              activityId: assignment.activity.id,
+              audit: await api.studentActivitySubmissions(courseId, groupId, assignment.activity.id)
+            }))
         )
       ]);
       setStudentGrades(gradesResult.grades);

@@ -1,5 +1,27 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { readSafeExamBrowserProof, type SafeExamBrowserWindow } from "./safe-exam-browser";
+import {
+  assignmentRequiresSafeExamBrowser,
+  readSafeExamBrowserProof,
+  type SafeExamBrowserWindow
+} from "./safe-exam-browser";
+
+const groupPageSource = readFileSync("apps/web/src/app/courses/[courseId]/groups/[groupId]/page.tsx", "utf8");
+
+describe("Safe Exam Browser assignment metadata", () => {
+  it("recognizes only assignments that explicitly require Safe Exam Browser", () => {
+    expect(assignmentRequiresSafeExamBrowser({ requireSafeExamBrowser: true })).toBe(true);
+    expect(assignmentRequiresSafeExamBrowser({ requireSafeExamBrowser: false })).toBe(false);
+    expect(assignmentRequiresSafeExamBrowser({})).toBe(false);
+    expect(assignmentRequiresSafeExamBrowser(null)).toBe(false);
+  });
+
+  it("does not probe protected submission history from the ordinary course overview", () => {
+    expect(groupPageSource).toContain(
+      ".filter((assignment) => !assignmentRequiresSafeExamBrowser(assignment.metadata))"
+    );
+  });
+});
 
 describe("Safe Exam Browser JavaScript proof", () => {
   it("uses keys already injected by current SEB clients without refreshing them", async () => {
