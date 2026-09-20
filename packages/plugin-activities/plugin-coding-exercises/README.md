@@ -94,7 +94,7 @@ Bank-version comparison currently shows public generic configuration but not pri
 
 Generic versions are created only for changed Published saves. Draft saves update mutable public and private bank authoring without creating a version; private rows remain outside immutable snapshots.
 
-Duplicating a coding exercise inside an activity bank invokes the platform bank-duplication hook and copies its bank-owned reference solution and hidden tests to the new independent bank activity. Moving a bank activity keeps its ID, so its plugin-owned rows move with it without copying.
+Duplicating a coding exercise inside an activity bank invokes the platform bank-duplication hook and copies its bank-owned reference solution, complete private configuration (including rubric and automatic-feedback settings), and hidden tests to the new independent bank activity. Generating a replacement reference solution changes the solution and template fields while preserving that rubric configuration. Moving a bank activity keeps its ID, so its plugin-owned rows move with it without copying.
 
 ## Authoring UX
 
@@ -169,7 +169,7 @@ GET    /api/courses/:courseId/activities/:activityId/coding-exercises/hidden-tes
 PUT    /api/courses/:courseId/activities/:activityId/coding-exercises/hidden-tests
 ```
 
-The run/submit routes are also available through group-scoped assigned activity dispatch. Hidden-test management is course-authoring-only for now; activity-bank authoring currently edits public config, while course copies own the private reference solution and hidden tests.
+The run/submit routes are also available through group-scoped assigned activity dispatch. Course and activity-bank authoring both manage private reference solutions, templates, rubrics, and hidden tests in their respective plugin-owned tables.
 
 Plugin routes are declared in this package and mounted by the platform's generic dispatchers. Do not add coding-exercise-specific API route files in `apps/api`.
 

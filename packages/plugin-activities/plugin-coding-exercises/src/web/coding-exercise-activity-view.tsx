@@ -14,6 +14,7 @@ import {
   codingExerciseTemplateRequiresTestCodeMarker,
   codingExerciseTemplateInsertionToken,
   getCodingExerciseAiFeedbackValidationMessages,
+  mergeCodingExerciseGeneratedSolutionPrivateConfig,
   normalizeCodingExerciseSampleTests,
   parseCodingExercisePrivateConfig,
   splitCodingExerciseTemplateSource,
@@ -900,19 +901,12 @@ export function CodingExerciseActivityView({
         studentTemplateSource: result.templateSource
       }));
       setReferenceSolution(result.referenceSolution);
-      setPrivateConfig(
-        parseCodingExercisePrivateConfig({
-          templateSource: result.templateSource,
-          templateVisibleLineNumbers: result.templateVisibleLineNumbers
-        })
-      );
+      const generatedPrivateConfig = mergeCodingExerciseGeneratedSolutionPrivateConfig(privateConfig, result);
+      setPrivateConfig(generatedPrivateConfig);
       aiGenerationDraftRef.current = {
         prompt: config.prompt,
         referenceSolution: result.referenceSolution,
-        privateConfig: parseCodingExercisePrivateConfig({
-          templateSource: result.templateSource,
-          templateVisibleLineNumbers: result.templateVisibleLineNumbers
-        }),
+        privateConfig: generatedPrivateConfig,
         language: config.language
       };
       setReferenceValidationSummary(null);

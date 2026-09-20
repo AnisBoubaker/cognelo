@@ -36,7 +36,30 @@ const dbMocks = vi.hoisted(() => {
   ];
   const bankReference = {
     sourceCode: "def double(n): return n * 2",
-    privateConfig: { templateSource: "{{ STUDENT_CODE }}\n{{ TEST_CODE }}" },
+    privateConfig: {
+      templateSource: "{{ STUDENT_CODE }}\n{{ TEST_CODE }}",
+      aiFeedback: {
+        enabled: true,
+        gradingEnabled: true,
+        instructions: "Evaluate the submitted solution against this rubric.",
+        testWeightPercent: 60,
+        aiWeightPercent: 40,
+        criteria: [
+          {
+            id: "correctness",
+            title: "Correctness",
+            description: "Evaluate whether the solution meets the requirements.",
+            weightPercent: 70
+          },
+          {
+            id: "clarity",
+            title: "Clarity",
+            description: "Evaluate whether the code is clear and maintainable.",
+            weightPercent: 30
+          }
+        ]
+      }
+    },
     validationSummary: { accepted: true },
     createdAt: new Date("2026-05-14T12:00:00.000Z"),
     updatedAt: new Date("2026-05-14T12:00:00.000Z")
@@ -57,6 +80,7 @@ const dbMocks = vi.hoisted(() => {
     },
     pluginBankCodingExerciseReferenceSolution: {
       deleteMany: vi.fn(),
+      create: vi.fn(),
       upsert: vi.fn()
     }
   };
@@ -131,6 +155,7 @@ vi.mock("@cognelo/core", () => coreMocks);
 vi.mock("./executions", () => executionMocks);
 
 const {
+  copyBankCodingExerciseData,
   copyBankCodingExerciseDataToCourseActivity,
   listBankCodingExerciseHiddenTests,
   listCodingExerciseHiddenTests,
@@ -280,8 +305,27 @@ describe("coding exercise hidden test persistence", () => {
       data: expect.objectContaining({
         activityId: "course-activity-1",
         sourceCode: "def double(n): return n * 2",
-        privateConfig: { templateSource: "{{ STUDENT_CODE }}\n{{ TEST_CODE }}" }
+        privateConfig: dbMocks.bankReference.privateConfig
       })
     });
+  });
+
+  it("copies the complete bank rubric when a programming exercise is duplicated", async () => {
+    await copyBankCodingExerciseData({
+      sourceBankActivityId: "bank-activity-1",
+      bankActivityId: "bank-activity-copy"
+    });
+
+    expect(dbMocks.transaction.pluginBankCodingExerciseReferenceSolution.create).toHaveBeenCalledWith({
+      data: {
+        bankActivityId: "bank-activity-copy",
+        sourceCode: "def double(n): return n * 2",
+        privateConfig: dbMocks.bankReference.privateConfig,
+        validationSummary: { accepted: true }
+      }
+    });
+    expect(dbMocks.transaction.pluginBankCodingExerciseReferenceSolution.create.mock.calls[0]?.[0]?.data.privateConfig.aiFeedback.criteria).toEqual(
+      dbMocks.bankReference.privateConfig.aiFeedback.criteria
+    );
   });
 });
