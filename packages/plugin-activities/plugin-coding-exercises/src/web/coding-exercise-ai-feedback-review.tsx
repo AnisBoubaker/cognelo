@@ -12,6 +12,9 @@ export type CodingExerciseAiFeedbackReviewProps = {
 export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbackChange, t }: CodingExerciseAiFeedbackReviewProps) {
   const sourceCode = typeof submission.sourceCode === "string" ? submission.sourceCode : "";
   const language = typeof submission.language === "string" ? submission.language : "text";
+  const resultSummary = recordValue(submission.resultSummary);
+  const tests = recordArray(resultSummary.tests);
+  const passedCount = tests.filter((test) => test.passed === true).length;
   const strengths = stringArray(feedback.strengths).join("\n\n");
   const improvements = stringArray(feedback.improvements).join("\n\n");
   const criteria = recordArray(feedback.criteria);
@@ -21,6 +24,41 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
       <section className="inline-panel stack stack-tight">
         <h3>{t("courseDetail.feedbackReviewSubmission")}</h3>
         {sourceCode ? <CodeRenderer code={sourceCode} language={language} showLineNumbers /> : <p className="muted">{t("courseDetail.answerUnavailable")}</p>}
+        {tests.length ? (
+          <section className="stack stack-tight">
+            <div className="row" style={{ alignItems: "baseline", justifyContent: "space-between" }}>
+              <h4 style={{ margin: 0 }}>{t("courseDetail.feedbackReviewTestResults")}</h4>
+              <span className="muted">{t("courseDetail.feedbackReviewTestScore", { passed: passedCount, total: tests.length })}</span>
+            </div>
+            {tests.map((test, index) => {
+              const passed = typeof test.passed === "boolean" ? test.passed : null;
+              const outcomeLabel = passed === null
+                ? stringValue(test.statusLabel)
+                : t(passed ? "courseDetail.feedbackReviewTestPassed" : "courseDetail.feedbackReviewTestFailed");
+              const detail = firstNonEmptyString(test.message, passed === false ? test.statusLabel : null);
+              return (
+                <div className="stack stack-tight" key={stringValue(test.id) || `${stringValue(test.name)}-${index}`}>
+                  <div className="row" style={{ alignItems: "center", gap: 12, justifyContent: "space-between" }}>
+                    <span>{stringValue(test.name) || t("courseDetail.feedbackReviewTest", { number: index + 1 })}</span>
+                    {passed === null ? (
+                      outcomeLabel ? <span className="muted">{outcomeLabel}</span> : null
+                    ) : (
+                      <span
+                        aria-label={outcomeLabel}
+                        role="img"
+                        style={{ color: passed ? "#157347" : "#b42318", fontSize: 20, fontWeight: 700, lineHeight: 1 }}
+                        title={outcomeLabel}
+                      >
+                        {passed ? "✓" : "✕"}
+                      </span>
+                    )}
+                  </div>
+                  {detail ? <p className="muted" style={{ margin: 0, overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>{detail}</p> : null}
+                </div>
+              );
+            })}
+          </section>
+        ) : null}
       </section>
       <label className="field">
         <span>{t("courseDetail.feedbackReviewSummary")}</span>
@@ -77,6 +115,17 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
 
 function stringValue(value: unknown) {
   return typeof value === "string" ? value : "";
+}
+
+function firstNonEmptyString(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return "";
+}
+
+function recordValue(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
 function stringArray(value: unknown) {
