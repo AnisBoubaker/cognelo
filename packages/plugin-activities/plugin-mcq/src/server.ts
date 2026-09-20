@@ -42,7 +42,7 @@ export const mcqServerPlugin: ServerActivityPlugin = {
           submittedAt: attempt.submittedAt?.toISOString() ?? null
         };
       },
-      reviseFeedback: ({ currentFeedback, feedback }) => reviseMcqAiFeedback(currentFeedback, feedback)
+      reviseFeedback: ({ currentFeedback, feedback }) => ({ feedback: reviseMcqAiFeedback(currentFeedback, feedback) })
     }
   },
   grading: {

@@ -494,39 +494,53 @@ function StudentFeedback({
     return null;
   }
   const parsonsDetails = getParsonsFeedbackDetails(feedback);
-  const aiDetails = feedback.kind === "ai_assessment_feedback" ? feedback.details ?? {} : null;
+  const assessmentDetails = feedback.kind === "ai_assessment_feedback" || feedback.kind === "assessment_feedback"
+    ? feedback.details ?? {}
+    : null;
+  const assessmentSummary = typeof assessmentDetails?.summary === "string" ? assessmentDetails.summary.trim() : "";
+  const assessmentStrengths = readStringArray(assessmentDetails?.strengths);
+  const assessmentImprovements = readStringArray(assessmentDetails?.improvements);
+  const assessmentCriteria = readAiCriteria(assessmentDetails?.criteria);
+  const assessmentQuestionFeedback = readAiQuestionFeedback(assessmentDetails?.questionFeedback);
+  const hasAssessmentFeedback = Boolean(
+    assessmentSummary
+    || assessmentStrengths.length
+    || assessmentImprovements.length
+    || assessmentCriteria.length
+    || assessmentQuestionFeedback.length
+  );
 
   return (
     <div className="stack stack-tight">
-      {feedback.feedbackText ? (
+      {feedback.feedbackText?.trim() ? (
         <div className="stack stack-tight">
           <strong>{t("groupPage.feedbackTitle")}</strong>
           <p className="muted">{feedback.feedbackText}</p>
         </div>
       ) : null}
-      {aiDetails ? (
+      {assessmentDetails && hasAssessmentFeedback ? (
         <div className="stack stack-tight">
           <strong>{t("groupPage.aiFeedbackTitle")}</strong>
-          {typeof aiDetails.summary === "string" ? <p>{aiDetails.summary}</p> : null}
-          {readStringArray(aiDetails.strengths).length ? (
+          {assessmentSummary ? <p style={{ whiteSpace: "pre-wrap" }}>{assessmentSummary}</p> : null}
+          {assessmentStrengths.length ? (
             <div>
               <strong>{t("groupPage.aiFeedbackStrengths")}</strong>
-              <ul>{readStringArray(aiDetails.strengths).map((item, index) => <li key={index}>{item}</li>)}</ul>
+              {assessmentStrengths.map((item, index) => <p className="muted" key={index} style={{ whiteSpace: "pre-wrap" }}>{item}</p>)}
             </div>
           ) : null}
-          {readStringArray(aiDetails.improvements).length ? (
+          {assessmentImprovements.length ? (
             <div>
               <strong>{t("groupPage.aiFeedbackImprovements")}</strong>
-              <ul>{readStringArray(aiDetails.improvements).map((item, index) => <li key={index}>{item}</li>)}</ul>
+              {assessmentImprovements.map((item, index) => <p className="muted" key={index} style={{ whiteSpace: "pre-wrap" }}>{item}</p>)}
             </div>
           ) : null}
-          {readAiCriteria(aiDetails.criteria).map((criterion) => (
+          {assessmentCriteria.map((criterion) => (
             <div className="inline-panel" key={criterion.id}>
               <strong>{criterion.title} · {criterion.scorePercent}%</strong>
-              <p className="muted">{criterion.feedback}</p>
+              {criterion.feedback.trim() ? <p className="muted">{criterion.feedback}</p> : null}
             </div>
           ))}
-          {readAiQuestionFeedback(aiDetails.questionFeedback).map((entry) => (
+          {assessmentQuestionFeedback.map((entry) => (
             <p className="muted" key={entry.questionId}>{entry.explanation}</p>
           ))}
         </div>
@@ -690,7 +704,9 @@ function hasAiFeedback(feedback: StudentGradeFeedback | null | undefined) {
 }
 
 function readStringArray(value: unknown) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  return Array.isArray(value)
+    ? value.flatMap((item) => typeof item === "string" && item.trim() ? [item.trim()] : [])
+    : [];
 }
 
 function readAiCriteria(value: unknown) {

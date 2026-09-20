@@ -12,14 +12,9 @@ export type CodingExerciseAiFeedbackReviewProps = {
 export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbackChange, t }: CodingExerciseAiFeedbackReviewProps) {
   const sourceCode = typeof submission.sourceCode === "string" ? submission.sourceCode : "";
   const language = typeof submission.language === "string" ? submission.language : "text";
-  const strengths = stringArray(feedback.strengths);
-  const improvements = stringArray(feedback.improvements);
+  const strengths = stringArray(feedback.strengths).join("\n\n");
+  const improvements = stringArray(feedback.improvements).join("\n\n");
   const criteria = recordArray(feedback.criteria);
-
-  function updateList(key: "strengths" | "improvements", index: number, value: string) {
-    const items = key === "strengths" ? strengths : improvements;
-    onFeedbackChange({ ...feedback, [key]: items.map((item, itemIndex) => itemIndex === index ? value : item) });
-  }
 
   return (
     <div className="stack">
@@ -31,36 +26,49 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
         <span>{t("courseDetail.feedbackReviewSummary")}</span>
         <textarea maxLength={3000} rows={5} value={stringValue(feedback.summary)} onChange={(event) => onFeedbackChange({ ...feedback, summary: event.target.value })} />
       </label>
-      {strengths.length ? <section className="stack stack-tight">
-        <h3>{t("courseDetail.feedbackReviewStrengths")}</h3>
-        {strengths.map((item, index) => (
-          <textarea key={index} maxLength={1000} rows={3} value={item} onChange={(event) => updateList("strengths", index, event.target.value)} />
-        ))}
-      </section> : null}
-      {improvements.length ? <section className="stack stack-tight">
-        <h3>{t("courseDetail.feedbackReviewImprovements")}</h3>
-        {improvements.map((item, index) => (
-          <textarea key={index} maxLength={1000} rows={3} value={item} onChange={(event) => updateList("improvements", index, event.target.value)} />
-        ))}
-      </section> : null}
+      <label className="field">
+        <span>{t("courseDetail.feedbackReviewStrengths")}</span>
+        <textarea maxLength={10000} rows={5} value={strengths} onChange={(event) => onFeedbackChange({ ...feedback, strengths: [event.target.value] })} />
+      </label>
+      <label className="field">
+        <span>{t("courseDetail.feedbackReviewImprovements")}</span>
+        <textarea maxLength={10000} rows={5} value={improvements} onChange={(event) => onFeedbackChange({ ...feedback, improvements: [event.target.value] })} />
+      </label>
       {criteria.length ? <section className="stack stack-tight">
         <h3>{t("courseDetail.feedbackReviewCriteria")}</h3>
         {criteria.map((criterion, index) => (
-          <label className="field inline-panel" key={stringValue(criterion.id) || index}>
-            <span>
-              {stringValue(criterion.title)}
-              {typeof criterion.scorePercent === "number" ? ` · ${criterion.scorePercent}%` : ""}
-            </span>
-            <textarea
-              maxLength={2000}
-              rows={4}
-              value={stringValue(criterion.feedback)}
-              onChange={(event) => onFeedbackChange({
-                ...feedback,
-                criteria: criteria.map((entry, itemIndex) => itemIndex === index ? { ...entry, feedback: event.target.value } : entry)
-              })}
-            />
-          </label>
+          <section className="stack stack-tight inline-panel" key={stringValue(criterion.id) || index}>
+            <strong>{stringValue(criterion.title)}</strong>
+            <label className="field">
+              <span>{t("courseDetail.feedbackReviewCriterionScore")}</span>
+              <input
+                max={100}
+                min={0}
+                step="0.01"
+                type="number"
+                value={typeof criterion.scorePercent === "number" || typeof criterion.scorePercent === "string" ? criterion.scorePercent : ""}
+                onChange={(event) => onFeedbackChange({
+                  ...feedback,
+                  criteria: criteria.map((entry, itemIndex) => itemIndex === index ? {
+                    ...entry,
+                    scorePercent: event.target.value === "" ? "" : Number(event.target.value)
+                  } : entry)
+                })}
+              />
+            </label>
+            <label className="field">
+              <span>{t("courseDetail.feedbackReviewCriterionFeedback")}</span>
+              <textarea
+                maxLength={2000}
+                rows={4}
+                value={stringValue(criterion.feedback)}
+                onChange={(event) => onFeedbackChange({
+                  ...feedback,
+                  criteria: criteria.map((entry, itemIndex) => itemIndex === index ? { ...entry, feedback: event.target.value } : entry)
+                })}
+              />
+            </label>
+          </section>
         ))}
       </section> : null}
     </div>

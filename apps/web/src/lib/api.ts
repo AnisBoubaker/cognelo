@@ -1367,7 +1367,7 @@ export const api = {
   activityAttemptAiFeedbackReview: (courseId: string, attemptId: string) =>
     request<{ review: TeacherAiFeedbackReview }>(`/courses/${courseId}/gradebook/attempts/${attemptId}/ai-feedback`),
   reviseActivityAttemptAiFeedback: (courseId: string, attemptId: string, feedback: unknown) =>
-    request<{ feedback: Record<string, unknown>; teacherRevision: number; feedbackHash: string }>(
+    request<{ feedback: Record<string, unknown>; teacherRevision: number; feedbackHash: string; grade: GradebookMutationGrade | null }>(
       `/courses/${courseId}/gradebook/attempts/${attemptId}/ai-feedback`,
       { method: "PATCH", body: JSON.stringify({ feedback }) }
     ),

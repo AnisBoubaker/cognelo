@@ -15,6 +15,7 @@ const executionMocks = vi.hoisted(() => ({
 }));
 const aiFeedbackMocks = vi.hoisted(() => ({
   evaluateCodingExerciseAttemptWithAi: vi.fn(),
+  reviseCodingExerciseAiFeedback: vi.fn(),
   snapshotCodingExerciseAiFeedbackConfig: vi.fn()
 }));
 
@@ -136,6 +137,68 @@ describe("coding exercises server plugin lifecycle hooks", () => {
       activityId: "activity-1",
       executionId: "submit-1"
     });
+  });
+
+  it("returns a grading result when a teacher changes an AI-graded rubric", async () => {
+    aiFeedbackMocks.reviseCodingExerciseAiFeedback.mockReturnValue({
+      kind: "ai_assessment_feedback",
+      feedbackRef: "evaluation-1",
+      gradingEnabled: true,
+      deterministicScore: 80,
+      aiScore: 90,
+      combinedScore: 84,
+      criteria: [{ id: "correctness", scorePercent: 90 }]
+    });
+
+    const revision = await codingExercisesServerPlugin.aiFeedback?.teacherReview?.reviseFeedback({
+      user: testUser(),
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      coreAttemptId: "attempt-1",
+      pluginAttemptRef: "execution-1",
+      activity: testActivity("coding-exercise"),
+      currentFeedback: { criteria: [{ id: "correctness", scorePercent: 70 }] },
+      feedback: {}
+    });
+    expect(revision).toMatchObject({
+      feedback: { combinedScore: 84 },
+      gradingResult: {
+        rawScore: 84,
+        rawMaxScore: 100,
+        metadata: {
+          executionId: "execution-1",
+          deterministicScore: 80,
+          aiScore: 90,
+          combinedScore: 84
+        }
+      }
+    });
+  });
+
+  it("does not regrade when a teacher changes narrative feedback only", async () => {
+    aiFeedbackMocks.reviseCodingExerciseAiFeedback.mockReturnValue({
+      kind: "ai_assessment_feedback",
+      gradingEnabled: true,
+      deterministicScore: 80,
+      aiScore: 70,
+      combinedScore: 76,
+      criteria: [{ id: "correctness", scorePercent: 70 }]
+    });
+
+    const revision = await codingExercisesServerPlugin.aiFeedback?.teacherReview?.reviseFeedback({
+      user: testUser(),
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      coreAttemptId: "attempt-1",
+      pluginAttemptRef: "execution-1",
+      activity: testActivity("coding-exercise"),
+      currentFeedback: { criteria: [{ id: "correctness", scorePercent: 70 }] },
+      feedback: { summary: "Narrative only" }
+    });
+
+    expect(revision).not.toHaveProperty("gradingResult");
   });
 });
 
