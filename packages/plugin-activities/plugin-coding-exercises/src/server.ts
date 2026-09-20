@@ -62,7 +62,33 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
         }
         return getCodingExerciseAiFeedbackTeacherSubmission({ activityId, executionId: pluginAttemptRef, activity });
       },
-      reviseFeedback: ({ currentFeedback, feedback }) => reviseCodingExerciseAiFeedback(currentFeedback, feedback)
+      reviseFeedback: ({ currentFeedback, feedback, pluginAttemptRef }) => {
+        const revisedFeedback = reviseCodingExerciseAiFeedback(currentFeedback, feedback);
+        const combinedScore = numberValue(revisedFeedback.combinedScore);
+        const rubricScoreChanged = haveRubricScoresChanged(currentFeedback.criteria, revisedFeedback.criteria);
+        return {
+          feedback: revisedFeedback,
+          ...(revisedFeedback.gradingEnabled === true && combinedScore !== null && rubricScoreChanged ? {
+            gradingResult: {
+              rawScore: combinedScore,
+              rawMaxScore: 100,
+              analyticsPayload: {
+                deterministicScore: revisedFeedback.deterministicScore,
+                aiScore: revisedFeedback.aiScore,
+                combinedScore,
+                feedbackRef: revisedFeedback.feedbackRef
+              },
+              metadata: {
+                kind: "coding-exercise",
+                ...(pluginAttemptRef ? { executionId: pluginAttemptRef } : {}),
+                deterministicScore: revisedFeedback.deterministicScore,
+                aiScore: revisedFeedback.aiScore,
+                combinedScore
+              }
+            }
+          } : {})
+        };
+      }
     }
   },
   compositeExecution: {
@@ -143,4 +169,22 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
 
 function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function haveRubricScoresChanged(currentValue: unknown, revisedValue: unknown) {
+  const current = rubricScoresById(currentValue);
+  const revised = rubricScoresById(revisedValue);
+  return revised.size !== current.size || [...revised].some(([id, score]) => current.get(id) !== score);
+}
+
+function rubricScoresById(value: unknown) {
+  const scores = new Map<string, number>();
+  if (!Array.isArray(value)) return scores;
+  value.forEach((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return;
+    const criterion = entry as Record<string, unknown>;
+    const score = numberValue(criterion.scorePercent);
+    if (typeof criterion.id === "string" && score !== null) scores.set(criterion.id, score);
+  });
+  return scores;
 }

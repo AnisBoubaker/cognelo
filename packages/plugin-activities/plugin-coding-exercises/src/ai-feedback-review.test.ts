@@ -7,11 +7,14 @@ const current = {
   strengths: ["One"],
   improvements: ["Two"],
   criteria: [
-    { id: "correctness", title: "Correctness", scorePercent: 90, feedback: "Original criterion feedback" }
+    { id: "correctness", title: "Correctness", weightPercent: 100, scorePercent: 90, feedback: "Original criterion feedback" }
   ],
   deterministicScore: 100,
   aiScore: 90,
-  combinedScore: 96
+  combinedScore: 96,
+  gradingEnabled: true,
+  testWeightPercent: 60,
+  aiWeightPercent: 40
 };
 
 describe("coding exercise feedback revision", () => {
@@ -34,17 +37,36 @@ describe("coding exercise feedback revision", () => {
     });
   });
 
-  it("edits narrative feedback while preserving score components", () => {
+  it("keeps empty narrative sections empty and consolidates each populated section", () => {
+    expect(reviseCodingExerciseAiFeedback({
+      kind: "assessment_feedback",
+      summary: "",
+      strengths: [],
+      improvements: [],
+      criteria: []
+    }, {
+      summary: "   ",
+      strengths: ["Clear naming", "Small functions"],
+      improvements: ["   "],
+      criteria: []
+    })).toMatchObject({
+      summary: "",
+      strengths: ["Clear naming\n\nSmall functions"],
+      improvements: []
+    });
+  });
+
+  it("edits narrative feedback and recomputes rubric and combined scores", () => {
     expect(reviseCodingExerciseAiFeedback(current, {
       ...current,
       summary: "Reviewed",
       criteria: [{ ...current.criteria[0], scorePercent: 0, feedback: "Reviewed criterion feedback" }]
     })).toMatchObject({
       summary: "Reviewed",
-      criteria: [{ scorePercent: 90, feedback: "Reviewed criterion feedback" }],
+      criteria: [{ scorePercent: 0, feedback: "Reviewed criterion feedback" }],
       deterministicScore: 100,
-      aiScore: 90,
-      combinedScore: 96
+      aiScore: 0,
+      combinedScore: 60
     });
   });
 
@@ -53,7 +75,7 @@ describe("coding exercise feedback revision", () => {
       summary: "Reviewed",
       strengths: [],
       improvements: [],
-      criteria: [{ id: "different", feedback: "No" }]
+      criteria: [{ id: "different", scorePercent: 50, feedback: "No" }]
     })).toThrow("original rubric criteria");
   });
 });

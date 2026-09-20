@@ -86,7 +86,7 @@ The model is always resolved server-side. Provider keys, raw credentials, privat
 - A teacher may retry a failed evaluation. Each retry creates a new immutable evaluation version and supersedes the previous result; it never overwrites research or audit history.
 - The teacher can review generated feedback and the score breakdown before grade release.
 - The detailed gradebook offers **Feedback** for every submitted attempt and a whole-class review flow across all submitted learners. The activity plugin renders the submitted answer and editable feedback fields. Generated feedback pre-populates the form; otherwise the plugin supplies an empty teacher-authoring draft.
-- Teacher revisions may update learner-visible narrative feedback before or after release, but do not change model-derived score components or the grade. Core preserves the immutable evaluation artifact, records previous/next feedback and research telemetry, and blocks further edits after that feedback version is challenged.
+- Teacher revisions may update learner-visible narrative feedback before or after release. A plugin may also expose editable rubric percentages and return a validated grading result; Programming Exercises then recompute the AI and combined scores with the immutable deterministic result and configured weights, and core records the change through its audited regrade path. Core preserves the immutable original evaluation artifact, records previous/next feedback and research telemetry, and blocks further edits after that feedback version is challenged.
 - Student-safe summative AI feedback is exposed only after the associated `GradebookItem` is released.
 
 Teacher-triggered batch grading processes attempts sequentially and independently, so one provider or parsing failure does not erase successful results for other attempts. A durable maximum batch size plus cancellation and timeout UX remain Phase 6 hardening.
@@ -130,7 +130,7 @@ The SDK now exposes capabilities distinct from existing deterministic automatic 
 - `aiFeedback.rendererKey` for the teacher feedback review renderer
 - `aiFeedback.teacherReview.getSubmission` for the plugin-specific submitted answer
 - `aiFeedback.teacherReview.createFeedbackDraft` for a valid empty plugin-owned teacher feedback shape
-- `aiFeedback.teacherReview.reviseFeedback` for whitelisting and validating editable narrative fields while preserving score components
+- `aiFeedback.teacherReview.reviseFeedback` for whitelisting and validating editable feedback fields and optionally returning a plugin grading result when rubric scores are teacher-editable
 
 Server plugins need an evaluation handler that receives an immutable attempt/submission context plus the resolved course model and returns a validated result resembling:
 
@@ -412,7 +412,7 @@ Status: partial. The manager research endpoint is implemented with stable identi
 - Teacher resolution requires a response and records any grade change through the audited override path.
 - Course challenge listing and resolution authorization are enforced server-side.
 - Research records cover successful, failed, retried, released, viewed, challenged, and adjusted evaluations.
-- Teacher feedback revisions preserve the original evaluation, keep score components unchanged, and record previous/next snapshots plus normalized research telemetry.
+- Teacher feedback revisions preserve the original evaluation and record previous/next snapshots plus normalized research telemetry; rubric-score revisions preserve deterministic components/configured weights and use the audited regrade path.
 - Every standalone feedback-capable plugin provides a teacher answer/feedback review renderer and a server-side revision validator.
 - Individual and whole-group feedback review include every submitted attempt, even when no AI result exists, and the first teacher save records `feedback_teacher_authored`.
 - Learner-facing feedback and challenge copy does not identify AI as the generating or grading mechanism.

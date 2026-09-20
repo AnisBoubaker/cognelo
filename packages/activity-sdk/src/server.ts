@@ -172,7 +172,13 @@ export type PluginAiFeedbackTeacherReviewHandler = {
       currentFeedback: Record<string, unknown>;
       feedback: unknown;
     }
-  ) => Promise<Record<string, unknown>> | Record<string, unknown>;
+  ) => Promise<{
+    feedback: Record<string, unknown>;
+    gradingResult?: PluginGradingResult;
+  }> | {
+    feedback: Record<string, unknown>;
+    gradingResult?: PluginGradingResult;
+  };
 };
 
 export type CompositeExecutionSubmissionHandler = (input: {

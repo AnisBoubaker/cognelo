@@ -30,11 +30,12 @@ const aiResponseSchema = z.object({
 }).strict();
 
 const teacherFeedbackRevisionSchema = z.object({
-  summary: z.string().trim().min(1).max(3000),
-  strengths: z.array(z.string().trim().min(1).max(1000)).max(10),
-  improvements: z.array(z.string().trim().min(1).max(1000)).max(10),
+  summary: z.string().max(3000),
+  strengths: z.array(z.string().max(10000)).max(10),
+  improvements: z.array(z.string().max(10000)).max(10),
   criteria: z.array(z.object({
     id: z.string().min(1).max(80),
+    scorePercent: z.number().min(0).max(100),
     feedback: z.string().trim().min(1).max(2000)
   })).max(20)
 });
@@ -59,7 +60,7 @@ export async function getCodingExerciseAiFeedbackTeacherSubmission(input: {
   };
 }
 
-export function reviseCodingExerciseAiFeedback(currentFeedback: Record<string, unknown>, value: unknown) {
+export function reviseCodingExerciseAiFeedback(currentFeedback: Record<string, unknown>, value: unknown): Record<string, unknown> {
   const revision = teacherFeedbackRevisionSchema.parse(value);
   const currentCriteria = Array.isArray(currentFeedback.criteria)
     ? currentFeedback.criteria.map(toRecord)
@@ -74,16 +75,37 @@ export function reviseCodingExerciseAiFeedback(currentFeedback: Record<string, u
   ) {
     throw new AppError(400, "AI_FEEDBACK_CRITERIA_MISMATCH", "The revised feedback must contain the original rubric criteria.");
   }
-  const revisionById = new Map(revision.criteria.map((criterion) => [criterion.id, criterion.feedback]));
+  const revisionById = new Map(revision.criteria.map((criterion) => [criterion.id, criterion]));
+  const revisedCriteria: Record<string, unknown>[] = currentCriteria.map((criterion) => ({
+    ...criterion,
+    scorePercent: revisionById.get(String(criterion.id))?.scorePercent ?? criterion.scorePercent,
+    feedback: revisionById.get(String(criterion.id))?.feedback ?? criterion.feedback
+  }));
+  const totalCriterionWeight = revisedCriteria.reduce((total, criterion) => total + (finiteNumber(criterion.weightPercent) ?? 0), 0);
+  const aiScore = totalCriterionWeight > 0
+    ? clampPercent(revisedCriteria.reduce(
+        (total, criterion) => total + (finiteNumber(criterion.scorePercent) ?? 0) * (finiteNumber(criterion.weightPercent) ?? 0),
+        0
+      ) / totalCriterionWeight)
+    : finiteNumber(currentFeedback.aiScore);
+  const deterministicScore = finiteNumber(currentFeedback.deterministicScore);
+  const testWeightPercent = finiteNumber(currentFeedback.testWeightPercent);
+  const aiWeightPercent = finiteNumber(currentFeedback.aiWeightPercent);
+  const combinedScore = currentFeedback.gradingEnabled === true
+    && deterministicScore !== null
+    && aiScore !== null
+    && testWeightPercent !== null
+    && aiWeightPercent !== null
+    ? clampPercent(deterministicScore * testWeightPercent / 100 + aiScore * aiWeightPercent / 100)
+    : finiteNumber(currentFeedback.combinedScore);
   return {
     ...currentFeedback,
-    summary: revision.summary,
-    strengths: revision.strengths,
-    improvements: revision.improvements,
-    criteria: currentCriteria.map((criterion) => ({
-      ...criterion,
-      feedback: revisionById.get(String(criterion.id)) ?? criterion.feedback
-    }))
+    summary: revision.summary.trim(),
+    strengths: collapseNarrativeList(revision.strengths),
+    improvements: collapseNarrativeList(revision.improvements),
+    criteria: revisedCriteria,
+    ...(aiScore !== null ? { aiScore } : {}),
+    ...(combinedScore !== null ? { combinedScore } : {})
   };
 }
 
@@ -397,6 +419,11 @@ function toRecord(value: unknown): Record<string, unknown> {
 
 function finiteNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function collapseNarrativeList(value: string[]) {
+  const text = value.map((item) => item.trim()).filter(Boolean).join("\n\n");
+  return text ? [text] : [];
 }
 
 function clampPercent(value: number) {
