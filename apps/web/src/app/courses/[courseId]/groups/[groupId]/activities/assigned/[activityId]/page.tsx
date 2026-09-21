@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { AppShell } from "@/components/app-shell";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { useAuth } from "@/components/auth-provider";
@@ -40,6 +41,7 @@ export default function GroupActivityPage() {
   const [safeExamBrowserError, setSafeExamBrowserError] = useState("");
   const [error, setError] = useState("");
   const safeExamBrowserLaunchRequestRef = useRef(false);
+  const safeExamBrowserLaunchDismissedRef = useRef(false);
   const aiFeedbackViewRecordedRef = useRef("");
   const safeExamBrowserLaunchToken = searchParams.get("sebLaunch");
 
@@ -63,6 +65,7 @@ export default function GroupActivityPage() {
     setIsSafeExamBrowserGateOpen(false);
     setIsPreparingSafeExamBrowser(false);
     safeExamBrowserLaunchRequestRef.current = false;
+    safeExamBrowserLaunchDismissedRef.current = false;
     aiFeedbackViewRecordedRef.current = "";
     setSafeExamBrowserError("");
     setSelectedChallengeReferenceKey("");
@@ -113,6 +116,10 @@ export default function GroupActivityPage() {
           setActivity(null);
           setReleasedGrade(null);
           setDeletedSubmissions([]);
+          if (safeExamBrowserLaunchDismissedRef.current) {
+            setIsSafeExamBrowserGateOpen(false);
+            return;
+          }
           setIsSafeExamBrowserGateOpen(true);
           setSafeExamBrowserError("");
           return;
@@ -194,6 +201,13 @@ export default function GroupActivityPage() {
     } finally {
       setIsSubmittingChallenge(false);
     }
+  }
+
+  function openActivityInSafeExamBrowser() {
+    if (!safeExamBrowserLaunch) return;
+    safeExamBrowserLaunchDismissedRef.current = true;
+    flushSync(() => setIsSafeExamBrowserGateOpen(false));
+    window.location.href = safeExamBrowserLaunch.launchUrl;
   }
 
   useEffect(() => {
@@ -420,9 +434,7 @@ export default function GroupActivityPage() {
                 <button
                   disabled={!safeExamBrowserLaunch || isPreparingSafeExamBrowser}
                   type="button"
-                  onClick={() => {
-                    if (safeExamBrowserLaunch) window.location.href = safeExamBrowserLaunch.launchUrl;
-                  }}
+                  onClick={openActivityInSafeExamBrowser}
                 >
                   {isPreparingSafeExamBrowser ? t("groupPage.safeExamBrowserOpening") : t("groupPage.safeExamBrowserOpen")}
                 </button>
