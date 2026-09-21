@@ -7,6 +7,10 @@ import {
 } from "./safe-exam-browser";
 
 const groupPageSource = readFileSync("apps/web/src/app/courses/[courseId]/groups/[groupId]/page.tsx", "utf8");
+const assignedActivityPageSource = readFileSync(
+  "apps/web/src/app/courses/[courseId]/groups/[groupId]/activities/assigned/[activityId]/page.tsx",
+  "utf8"
+);
 
 describe("Safe Exam Browser assignment metadata", () => {
   it("recognizes only assignments that explicitly require Safe Exam Browser", () => {
@@ -20,6 +24,29 @@ describe("Safe Exam Browser assignment metadata", () => {
     expect(groupPageSource).toContain(
       ".filter((assignment) => !assignmentRequiresSafeExamBrowser(assignment.metadata))"
     );
+  });
+
+  it("closes the launch dialog before handing the configuration to Safe Exam Browser", () => {
+    const handlerStart = assignedActivityPageSource.indexOf("function openActivityInSafeExamBrowser()");
+    const closeGate = assignedActivityPageSource.indexOf(
+      "flushSync(() => setIsSafeExamBrowserGateOpen(false));",
+      handlerStart
+    );
+    const rememberDismissal = assignedActivityPageSource.indexOf(
+      "safeExamBrowserLaunchDismissedRef.current = true;",
+      handlerStart
+    );
+    const launchBrowser = assignedActivityPageSource.indexOf(
+      "window.location.href = safeExamBrowserLaunch.launchUrl;",
+      handlerStart
+    );
+
+    expect(handlerStart).toBeGreaterThan(-1);
+    expect(rememberDismissal).toBeGreaterThan(handlerStart);
+    expect(closeGate).toBeGreaterThan(rememberDismissal);
+    expect(launchBrowser).toBeGreaterThan(closeGate);
+    expect(assignedActivityPageSource).toContain("onClick={openActivityInSafeExamBrowser}");
+    expect(assignedActivityPageSource).toContain("if (safeExamBrowserLaunchDismissedRef.current)");
   });
 });
 
