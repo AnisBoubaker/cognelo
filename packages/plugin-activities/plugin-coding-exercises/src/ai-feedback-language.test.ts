@@ -10,7 +10,8 @@ const mocks = vi.hoisted(() => ({
   executionFindFirst: vi.fn(),
   evaluationFindFirst: vi.fn(),
   evaluationCreate: vi.fn(),
-  evaluationUpdate: vi.fn()
+  evaluationUpdate: vi.fn(),
+  getLatestTests: vi.fn()
 }));
 
 vi.mock("@cognelo/core", async () => {
@@ -40,6 +41,9 @@ vi.mock("./db-client", () => ({
       update: mocks.evaluationUpdate
     }
   }
+}));
+vi.mock("./executions", () => ({
+  getLatestCodingExerciseTestResult: mocks.getLatestTests
 }));
 
 const { AppError } = await import("@cognelo/core");
@@ -81,6 +85,7 @@ describe("coding exercise generated feedback language", () => {
     });
     mocks.courseFindUnique.mockResolvedValue({ subject: { teachingLanguage: "fr" } });
     mocks.referenceFindUnique.mockResolvedValue({
+      sourceCode: "print('reference')",
       privateConfig: {
         aiFeedback: {
           enabled: true,
@@ -101,6 +106,10 @@ describe("coding exercise generated feedback language", () => {
       judge0StatusId: 3
     });
     mocks.evaluationFindFirst.mockResolvedValue(null);
+    mocks.getLatestTests.mockImplementation(async (input: { originalResultSummary: unknown }) => ({
+      resultSummary: input.originalResultSummary,
+      testEvaluationId: null
+    }));
     mocks.evaluationCreate.mockResolvedValue({ id: "evaluation-1", version: 1 });
     mocks.evaluationUpdate.mockResolvedValue({ id: "evaluation-1", version: 1 });
     mocks.hashAiFeedbackValue.mockReturnValue("hash");
@@ -128,6 +137,46 @@ describe("coding exercise generated feedback language", () => {
       data: expect.objectContaining({
         requestPayload: expect.objectContaining({
           activity: expect.objectContaining({ teachingLanguage: "fr" })
+        })
+      })
+    }));
+  });
+
+  it("uses the current rubric and latest saved tests for a teacher-triggered evaluation", async () => {
+    mocks.executionFindFirst.mockResolvedValue({
+      id: "execution-1",
+      userId: "student-1",
+      sourceCode: "print(1)",
+      resultSummary: { earnedWeight: 1, totalWeight: 1 },
+      aiFeedbackConfigSnapshot: {
+        enabled: true,
+        gradingEnabled: true,
+        instructions: "Old rubric",
+        testWeightPercent: 90,
+        aiWeightPercent: 10,
+        criteria: [{ id: "old", title: "Old", description: "Old", weightPercent: 100 }]
+      }
+    });
+    mocks.getLatestTests.mockResolvedValue({
+      resultSummary: { earnedWeight: 1, totalWeight: 2, tests: [{ id: "new-test", passed: false }] },
+      testEvaluationId: "test-regrade-1"
+    });
+
+    await expect(evaluateCodingExerciseAttemptWithAi(evaluationInput())).resolves.toMatchObject({
+      feedback: { deterministicScore: 50, aiScore: 100, combinedScore: 70 }
+    });
+    expect(mocks.evaluationCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        deterministicScore: 50,
+        testWeightPercent: 60,
+        aiWeightPercent: 40,
+        rubricSnapshot: expect.objectContaining({ criteria: [expect.objectContaining({ id: "correctness" })] }),
+        requestPayload: expect.objectContaining({
+          activity: expect.objectContaining({ referenceSolution: "print('reference')" }),
+          submission: expect.objectContaining({
+            testEvaluationId: "test-regrade-1",
+            deterministicTests: expect.objectContaining({ earnedWeight: 1, totalWeight: 2 })
+          })
         })
       })
     }));

@@ -380,6 +380,7 @@ export async function deleteBankCodingExerciseData(params: { bankActivityId: str
 
 export async function deleteCourseCodingExerciseData(params: { activityId: string }) {
   await prisma.$transaction(async (transaction) => {
+    await transaction.pluginCodingExerciseTestEvaluation.deleteMany({ where: { activityId: params.activityId } });
     await transaction.pluginCodingExerciseAiEvaluation.deleteMany({ where: { activityId: params.activityId } });
     await transaction.pluginCodingExerciseExecution.deleteMany({ where: { activityId: params.activityId } });
     await transaction.pluginCodingExerciseHiddenTest.deleteMany({ where: { activityId: params.activityId } });

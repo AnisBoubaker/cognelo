@@ -23,6 +23,7 @@ const aiFeedbackMocks = vi.hoisted(() => ({
 vi.mock("./hidden-tests", () => hiddenTestMocks);
 vi.mock("./executions", () => executionMocks);
 vi.mock("./ai-feedback", () => aiFeedbackMocks);
+vi.mock("./regrading", () => ({ regradeCodingExerciseAttempt: vi.fn() }));
 vi.mock("./routes", () => ({
   codingExerciseGeneratePromptRoute: { path: "generate-prompt", methods: {} },
   codingExerciseGenerateRubricRoute: { path: "generate-rubric", methods: {} },

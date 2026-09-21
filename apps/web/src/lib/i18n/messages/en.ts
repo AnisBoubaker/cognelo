@@ -863,6 +863,8 @@ export const enMessages = {
       regradeReason: "Teacher requested regrade",
       regradeUnavailable: "No submitted attempt is available to regrade.",
       regradeError: "Unable to regrade this attempt.",
+      regradeAwaitingRubric: "Tests were regraded. Generate or enter a rubric score to calculate the final grade.",
+      regradeBatchSummary: "Regrade complete: {graded} graded, {pending} awaiting rubric grading, {failed} failed.",
       deleteSubmission: "Delete submission",
       deleteSubmissionPrompt: "Enter the reason for deleting this submission. The reason will be visible to the student.",
       deleteSubmissionConfirm: "Delete submission #{number} for {name}?",

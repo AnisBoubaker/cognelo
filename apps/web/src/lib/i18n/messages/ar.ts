@@ -792,6 +792,8 @@ export const arMessages = {
       regradeReason: "طلب المعلم إعادة التصحيح",
       regradeUnavailable: "لا توجد محاولة مسلمة متاحة لإعادة التصحيح.",
       regradeError: "تعذر إعادة تصحيح هذه المحاولة.",
+      regradeAwaitingRubric: "أُعيد تصحيح الاختبارات. أنشئ درجة المعيار أو أدخلها لحساب الدرجة النهائية.",
+      regradeBatchSummary: "اكتملت إعادة التصحيح: {graded} مصححة، {pending} بانتظار درجة المعيار، {failed} فشلت.",
       overrideGrade: "تصحيح يدوي",
       gradeAllManually: "تصحيح الكل يدويا",
       manualGradingPagePosition: "الصفحة {current} من {total}",

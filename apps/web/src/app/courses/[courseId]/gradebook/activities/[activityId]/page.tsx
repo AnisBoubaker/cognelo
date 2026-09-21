@@ -319,7 +319,8 @@ export default function GradebookActivityResultsPage() {
     try {
       const result = await api.regradeActivityAttempt(courseId, attempt.id, { reason: t("courseDetail.regradeReason") });
       await refresh();
-      applyUpdatedGrade(row, result.result.grade, result.result.attempt);
+      if (result.result) applyUpdatedGrade(row, result.result.grade, result.result.attempt);
+      else notifications.success(t("courseDetail.regradeAwaitingRubric"));
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : t("courseDetail.regradeError"));
     } finally {
@@ -507,15 +508,25 @@ export default function GradebookActivityResultsPage() {
 
     setSavingGradeKey("__all:regrade");
     try {
+      let graded = 0;
+      let pending = 0;
+      let failed = 0;
       for (const row of rowsWithAttempts) {
         const attempt =
           row.attempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber) ??
           [...row.attempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted");
         if (attempt) {
-          await api.regradeActivityAttempt(courseId, attempt.id, { reason: t("courseDetail.regradeReason") });
+          try {
+            const response = await api.regradeActivityAttempt(courseId, attempt.id, { reason: t("courseDetail.regradeReason") });
+            if (response.result) graded += 1;
+            else pending += 1;
+          } catch {
+            failed += 1;
+          }
         }
       }
       await refresh();
+      notifications.success(t("courseDetail.regradeBatchSummary", { graded, pending, failed }));
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : t("courseDetail.regradeError"));
     } finally {

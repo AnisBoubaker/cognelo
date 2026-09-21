@@ -1368,7 +1368,7 @@ export const api = {
       }
     ),
   regradeActivityAttempt: (courseId: string, attemptId: string, input?: { reason?: string | null }) =>
-    request<{ result: { attempt: GradebookMutationAttempt; grade: GradebookMutationGrade } }>(
+    request<{ result: { attempt: GradebookMutationAttempt; grade: GradebookMutationGrade } | null; deferred?: string }>(
       `/courses/${courseId}/gradebook/attempts/${attemptId}/regrade`,
       {
         method: "POST",

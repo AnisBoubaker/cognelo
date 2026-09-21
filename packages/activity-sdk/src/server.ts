@@ -117,6 +117,12 @@ export type PluginGradingResult = {
   metadata?: Record<string, unknown>;
 };
 
+export type PluginGradingDeferredResult = {
+  deferred: true;
+  reason: string;
+  metadata?: Record<string, unknown>;
+};
+
 export type PluginGradingHandler = (input: {
   user: CurrentUser;
   courseId: string;
@@ -125,7 +131,7 @@ export type PluginGradingHandler = (input: {
   coreAttemptId: string;
   pluginAttemptRef?: string | null;
   activity: ServerActivityRecord;
-}) => Promise<PluginGradingResult>;
+}) => Promise<PluginGradingResult | PluginGradingDeferredResult>;
 
 export type PluginAiFeedbackResult = {
   feedbackRef: string;

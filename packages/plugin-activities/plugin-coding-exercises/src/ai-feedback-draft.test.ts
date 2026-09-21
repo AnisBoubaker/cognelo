@@ -19,6 +19,12 @@ vi.mock("@cognelo/core", () => ({
   hashAiFeedbackValue: vi.fn(),
   recordAiFeedbackResearchEvent: vi.fn()
 }));
+vi.mock("./executions", () => ({
+  getLatestCodingExerciseTestResult: vi.fn(async (input: { originalResultSummary: unknown }) => ({
+    resultSummary: input.originalResultSummary,
+    testEvaluationId: null
+  }))
+}));
 
 const { createCodingExerciseTeacherFeedbackDraft } = await import("./ai-feedback");
 

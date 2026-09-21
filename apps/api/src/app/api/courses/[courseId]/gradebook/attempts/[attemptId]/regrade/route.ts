@@ -36,6 +36,10 @@ export async function POST(request: NextRequest, { params }: Params) {
       activity: context.activity
     });
 
+    if ("deferred" in gradingResult) {
+      return json({ result: null, deferred: gradingResult.reason, metadata: gradingResult.metadata ?? {} });
+    }
+
     return json({
       result: await recordActivityAttemptGradingResult(user, {
         attemptId: context.attemptId,

@@ -2,6 +2,8 @@
 
 `@cognelo/plugin-coding-exercises` provides the `coding-exercise` activity type. Teachers author prompts, starter/template code, reference solutions, visible and hidden tests, rubrics, and optional automatic feedback. Learners write and run code in Monaco, submit against hidden tests through Judge0, resume drafts, and review prior submissions.
 
+Teacher **Regrade all** reruns current hidden tests without invoking AI; **Generate AI feedback for all** evaluates the current rubric using the latest saved test result without rerunning tests. Both recompute the grade using current component weights.
+
 ## Boundaries
 
 - `Activity.config` contains only student-safe prompt, language, starter/template projection, visible tests, and editor settings.
@@ -26,6 +28,7 @@ Load only the topic relevant to the change.
 src/plugin.ts             activity definition and public config
 src/routes.ts             plugin-owned HTTP routes
 src/executions.ts         run and submission persistence
+src/regrading.ts          teacher test-only grade composition
 src/hidden-tests.ts       private test management
 src/judge0.ts             server-side Judge0 client
 src/web/                  authoring, learner, and feedback UI
