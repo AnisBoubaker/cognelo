@@ -1,138 +1,21 @@
 # Plugin: Web Design Coding Exercises
 
-This README is for the web-design-coding-exercises plugin only.
+`@cognelo/plugin-web-design-coding-exercises` provides the `web-design-coding-exercise` activity type. Learners edit teacher-defined HTML/CSS/JavaScript starter files, preview them in a sandboxed iframe, and run or submit them against Playwright tests through an external runner.
 
-It documents plugin-specific architecture, browser preview boundaries, and Playwright grading. Platform-wide architecture belongs in the root [README.md](../../../README.md).
+## Read By Topic
 
-## Purpose
+- [Public/private data and bank/course lifecycle](docs/REFERENCE.md#architecture-boundary)
+- [Teacher authoring](docs/REFERENCE.md#authoring-ux)
+- [Playwright validation and submission flow](docs/REFERENCE.md#playwright-grading)
+- [Runner setup](docs/REFERENCE.md#docker-runner)
+- [Detailed decisions](docs/DECISIONS.md)
 
-`@cognelo/plugin-web-design-coding-exercises` provides the `web-design-coding-exercise` activity type.
+## Boundaries
 
-Teachers can define a private HTML/CSS/JavaScript solution bundle and a separate student starter bundle. Activity-bank authoring stores the reusable source version; assigning that bank activity to a course creates a course-local copy. Students work only from the copied starter bundle in Monaco editor tabs and see their own result immediately in a sandboxed iframe.
+- Public config contains only student starter files, prompt, preview entry, and editor settings.
+- Teacher solution bundles, Playwright tests, screenshots, submissions, and results use plugin-owned persistence.
+- Fast preview is client-side and sandboxed; graded execution is server-mediated through the external runner.
+- Enabled tests must pass against the private reference bundle before they are saved.
+- Bank/course private data is copied, synchronized, duplicated, and deleted through explicit plugin hooks.
 
-Standalone student file bundles autosave through the core `ActivityResponseDraft` state host and resume after reload. Successful final submission clears that draft. Embedded Test web-design activities continue to autosave through the Test execution host and `TestItemAttempt` rather than the standalone draft route, and Test navigation remounts the workspace so file/editor state stays scoped to its item.
-
-Teachers can include `{{ EXPECTED_RESULT }}` in the prompt to show students a visual target, or `{{ EXPECTED_RESULT_CROPPED }}` to trim large plain background regions around that target. Cognelo replaces either token with a screenshot generated from the private solution bundle; the student browser receives only the image artifact, never the solution source files.
-
-## Package Contents
-
-```text
-src/
-  db.ts                         Plugin DB manifest
-  index.ts                      Public plugin exports
-  plugin.ts                     Activity plugin definition
-  routes.ts                     Plugin-owned test management and execution subroutes
-  server.ts                     Server plugin registration
-  tests.ts                      Reference bundle and Playwright test persistence
-  runner.ts                     HTTP client for the external Playwright runner
-  executions.ts                 Student run/submit persistence and result normalization
-  web-design-coding-exercises.ts
-                                Shared config parsing and preview helpers
-  web/
-    web-design-coding-exercise-activity-view.tsx
-                                Plugin-owned authoring and learner UI
-```
-
-## Architecture Boundary
-
-The plugin separates:
-
-- public activity config that is safe to send to students
-- private Playwright tests and reference solutions that must stay server-side
-- visual preview, which runs client-side in a sandboxed iframe
-- graded execution, which should run through an external Playwright runner service behind Cognelo routes
-
-The implementation keeps only student-visible starter fields in `Activity.config`:
-
-- `prompt`
-- `files` (student starting files only)
-- `previewEntry`
-- `maxEditorSeconds`
-
-Plugin-owned persistence:
-
-- `PluginWebDesignExerciseReferenceBundle`: private teacher solution file bundle and validation summary
-- `PluginWebDesignExerciseTest`: sample and hidden Playwright tests
-- `PluginWebDesignExerciseSubmission`: student run/submit file bundle and overall result summary
-- `PluginWebDesignExerciseTestResult`: normalized per-test result records
-- `PluginBankWebDesignExerciseReferenceBundle`: bank-owned private reference bundle for reusable authoring
-- `PluginBankWebDesignExerciseTest`: bank-owned sample and hidden Playwright tests
-
-These tables are modeled in this plugin's local Prisma schema under `prisma/schema.prisma`; server-side persistence uses the plugin-local Prisma client from `src/db-client.ts`.
-
-When a web-design bank activity is copied into a course, the plugin's server hook copies the bank reference bundle and tests into the course-owned plugin tables. After that, course edits and bank edits are independent.
-
-Explicit synchronization replaces private reference bundles/tests through plugin hooks: retrieval refreshes course-owned rows and is blocked after any attempt, while publishing refreshes bank-owned rows after core creates a new immutable bank version. Publishing remains allowed after attempts because it does not replace the attempted course copy.
-
-Bank-version comparison currently covers generic student-facing configuration only. Private reference bundles and Playwright tests are excluded because their bank rows are not immutable per-version snapshots.
-
-Draft saves update mutable public/private bank authoring without creating a version. A changed Published save creates the next immutable generic snapshot; private rows remain unversioned.
-
-Duplicating a web-design activity inside a bank copies its private bank reference bundle and tests through the platform bank-duplication hook. Moving the activity retains its ID and therefore retains those private rows without migration.
-
-## Authoring UX
-
-The teacher authoring UI is tabbed, but it still behaves as one guarded form. Keep it registered with `useUnsavedChangesGuard` from `@cognelo/activity-ui`, and register any future web-design authoring/settings panels with the same dirty/save/discard pattern.
-
-## Playwright Grading
-
-Implemented plugin subroutes:
-
-```text
-GET    /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/tests
-PUT    /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/tests
-GET    /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/expected-result
-GET    /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/run
-POST   /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/run
-GET    /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/submit
-POST   /api/courses/:courseId/activities/:activityId/web-design-coding-exercises/submit
-
-GET    /api/activity-banks/:activityBankId/activities/:bankActivityId/web-design-coding-exercises/tests
-PUT    /api/activity-banks/:activityBankId/activities/:bankActivityId/web-design-coding-exercises/tests
-GET    /api/activity-banks/:activityBankId/activities/:bankActivityId/web-design-coding-exercises/expected-result
-```
-
-The same learner run/submit routes are available through group-scoped assigned activity dispatch. Bank routes are available through the generic activity-bank plugin dispatcher; they are not hardcoded as web-design-specific API route files in `apps/api`.
-
-The test-management route is teacher/admin-only for course copies and bank-owner/admin-only for bank activities. It persists the reference bundle plus sample/hidden Playwright tests. Enabled tests must pass against the teacher reference bundle before they are saved. Student run uses enabled sample tests; student submit uses enabled hidden tests.
-
-The submit flow is:
-
-1. web UI calls a Cognelo plugin route
-2. plugin route authenticates the user and loads the activity
-3. plugin service stores a pending submission
-4. Cognelo sends the submitted file bundle and enabled tests to an external Playwright runner
-5. the runner renders the submitted page in an isolated browser context
-6. the runner returns normalized test results
-7. Cognelo stores filtered results and returns them to the browser
-
-The student browser should never receive hidden tests or private solution/reference files. Teacher authoring loads the private reference bundle through teacher/admin-only plugin routes.
-
-When a teacher saves tests, Cognelo sends the private solution bundle plus all enabled tests to the runner first. If any enabled test fails, the save is rejected and the previous saved tests remain in place. Disabled tests are persisted without being executed and are marked as skipped in their validation summary.
-
-If the prompt contains `{{ EXPECTED_RESULT }}` or `{{ EXPECTED_RESULT_CROPPED }}`, saving tests and solution also asks the Playwright runner to render the private solution bundle and capture a PNG screenshot. The cropped token additionally trims large plain background regions while keeping padding around the visible content. The screenshot is stored in plugin-owned reference metadata and exposed to students through a student-safe expected-result route.
-
-## Docker Runner
-
-The Playwright runner lives in `packages/web-design-runner` and is intended to run in Docker with the official Playwright image, so Chromium and system dependencies are container-managed rather than installed on each developer machine.
-
-```text
-npm run dev:runner
-```
-
-The runner listens on port `3456`. The API reads `WEB_DESIGN_RUNNER_URL`, which defaults to `http://localhost:3456` for local development. Running `docker compose up -d web-design-runner` is equivalent to `npm run dev:runner`.
-
-Teacher authoring uses the shared responsive `EditActionBar` across its tabs. Saved/unsaved status covers the combined activity, file, solution, and test draft, and Cancel restores the last complete saved snapshot.
-
-The activity definition uses the semantic `browser-code` icon rendered by the platform's shared Tabler icon layer.
-
-## Contributor Workflow
-
-Standalone gradebook **Review all** loads the private reference bundle and latest student submissions through teacher-authorized routes. It shows one green/red pass/fail bar per enabled hidden Playwright test, and hovering either segment lists the students in it.
-
-When changing this plugin, update:
-
-- `packages/plugin-activities/plugin-web-design-coding-exercises/README.md`
-- `packages/plugin-activities/plugin-web-design-coding-exercises/PROJECT_MEMORY.md`
-
-Only update the root `README.md` or `docs/PROJECT_MEMORY.md` if the change affects the whole platform or a cross-plugin convention.
+When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an invariant changed, and the relevant detailed section.

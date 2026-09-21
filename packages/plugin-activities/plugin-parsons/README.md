@@ -1,131 +1,19 @@
 # Plugin: Parsons
 
-This README is for the Parsons plugin only.
+`@cognelo/plugin-parsons` provides the `parsons-problem` activity type. Teachers define a prompt, reference solution, line groups, indentation behavior, and precedence rules. Learners reconstruct the program with keyboard- and pointer-accessible controls.
 
-It documents plugin-specific behavior, persistence, routes, and contributor workflow. Platform-wide architecture belongs in the root [README.md](../../../README.md).
+## Read By Topic
 
-## Purpose
+- [Authoring config, persistence, and routes](docs/REFERENCE.md#persistence)
+- [Generation and grading behavior](docs/REFERENCE.md#routes)
+- [Learner and authoring UX](docs/REFERENCE.md#ux-notes)
+- [Detailed decisions](docs/DECISIONS.md)
 
-`@cognelo/plugin-parsons` provides the `parsons-problem` activity type for programming education.
+## Boundaries
 
-Teachers can:
+- Authored Parsons data is generic activity config, so core owns bank copying, synchronization, and version comparison.
+- Student state and event history use plugin-owned `PluginParsonsAttempt` and `PluginParsonsAttemptEvent` tables.
+- Teacher/admin previews are ephemeral and must not pollute learner research data.
+- Summative submission uses core attempts and suppresses correctness until grade release; teacher regrades use the plugin's server grading handler.
 
-- define the prompt
-- author a reference solution
-- choose the display language
-- strip indentation from the student version
-- create line groups directly from the editor gutter
-- mark groups as strict or flexible
-- add precedence rules between groups
-- generate a prompt and solution with AI while using selected skills, suggesting catalog skills, or ignoring knowledge links
-
-Students can:
-
-- reorder scrambled lines
-- restore indentation when required
-- use click-to-select plus arrow-key movement
-- resume persisted attempts
-- confirm standalone summative submission before it is recorded, then return to the course content page
-
-## Package Contents
-
-```text
-src/
-  attempt-types.ts          Shared Parsons attempt schemas/types
-  attempts.ts               Persistence logic for Parsons attempts
-  db.ts                     Plugin DB manifest
-  index.ts                  Public plugin exports
-  messages.ts               Plugin-local i18n strings
-  parsons.ts                Runtime/config/parsing/evaluation helpers
-  plugin.ts                 Activity plugin definition and config schema
-  routes.ts                 Plugin-owned server subroutes
-  server.ts                 Server plugin exports
-  web/
-    parsons-activity-view.tsx
-                            Plugin-owned web UI
-```
-
-## Activity Type
-
-- `parsons-problem`
-
-The activity config currently includes:
-
-- `prompt`
-- `solution`
-- `language`
-- `stripIndentation`
-- `groups`
-- `precedenceRules`
-
-## Persistence
-
-Parsons owns plugin-specific persistence for student attempts.
-
-Authored Parsons content remains in generic activity config, so explicit course/bank synchronization is core-owned and needs no private authoring hook. Any existing core attempt prevents bank-to-course retrieval, while course-to-bank publication remains allowed because it does not replace attempted course content.
-
-The shared bank-version visualizer can therefore compare the complete Parsons authoring configuration without a plugin-specific diff.
-
-Parsons versions are publication milestones: draft saves create no version, while changed Published saves create the next immutable snapshot.
-
-The activity definition uses the semantic `tornado` icon name, rendered by the platform's shared Tabler icon layer.
-
-Current plugin-owned tables:
-
-- `PluginParsonsAttempt`
-- `PluginParsonsAttemptEvent`
-
-These tables are modeled in this plugin's local Prisma schema under `prisma/schema.prisma`; attempt services use the plugin-local Prisma client from `src/db-client.ts`.
-
-Key behavior:
-
-- students get a persisted in-progress attempt
-- reload restores saved block order, indentation, selected block, and last evaluation snapshot
-- correct completion closes the current attempt
-- the next fresh try starts a new attempt
-- teacher/admin previews stay ephemeral so instructor exploration does not pollute student-behavior data
-
-## Routes
-
-Parsons owns its own plugin subroute definitions in `src/routes.ts`.
-
-Current subroutes:
-
-```text
-POST   /api/courses/:courseId/activities/:activityId/parsons/attempt
-PATCH  /api/courses/:courseId/activities/:activityId/parsons/attempt
-POST   /api/courses/:courseId/activities/:activityId/parsons/generate
-GET    /api/courses/:courseId/groups/:groupId/activities/assigned/:activityId/parsons/gradebook-attempts
-```
-
-These are also available through group-scoped assigned activity dispatch for student work. They are mounted through the platform’s generic plugin dispatchers, not through Parsons-specific files in `apps/api`.
-
-Every knowledge mode provides the complete subject catalog to the generation model as a curriculum boundary. `Use selected skills` additionally constrains the generated problem with the current draft selection. `Suggest skills` ignores the old selection and applies exact subject-catalog matches to the unsaved Concepts-tab draft after generation. `Ignore skills` neither reads nor changes the draft and performs no suggestion pass.
-
-The gradebook attempts route is teacher-only. It returns a participant's completed Parsons submissions by default and can include in-progress/abandoned attempts plus event history with `includeAttempts=true`; the course gradebook detailed-results page uses it for the Parsons "See answer" overlay.
-
-Parsons registers a server `gradeAttempt` handler for the platform gradebook regrade API. Teacher-triggered regrades resolve the stored plugin attempt reference, evaluate the submitted attempt state against the current course-local activity config, and let the core gradebook service record the updated grade plus a `regraded` audit event.
-
-Summative submissions do not show correctness feedback during the activity. When the gradebook item is released, Parsons provides sanitized deterministic student feedback through the core normalized grade result: the same order/indentation messages used by formative checks plus an order/indentation grading breakdown. This does not expose raw plugin payloads, attempt history, or grading timestamps to students.
-
-## UX Notes
-
-- student rows render in a compact editor-like style
-- syntax highlighting and line numbers come from shared `@cognelo/activity-ui`
-- teacher authoring is registered with the shared `useUnsavedChangesGuard`; future Parsons authoring/settings forms should register the same dirty/save/discard behavior
-- scrambling is random on each fresh try/reset
-- order feedback counts minimally misplaced units instead of cascading false counts
-- groups are stored as line ranges so edits inside a group keep the group coherent
-- teacher authoring uses the shared responsive `EditActionBar` for saved/unsaved status and snapshot-backed Cancel/Save actions
-- standalone summative submission uses a confirmation dialog; cancelling keeps the arrangement editable, while a successful confirmation records the attempt before navigating back to course content
-
-## Contributor Workflow
-
-Standalone activity **Review all** loads each participant's latest completed attempt and shows the reference solution, an error-count distribution, and a grade distribution. Hovering a bar identifies the students in that bucket.
-
-When changing this plugin, update:
-
-- `packages/plugin-activities/plugin-parsons/README.md`
-- `packages/plugin-activities/plugin-parsons/PROJECT_MEMORY.md`
-
-Only update the root `README.md` or `docs/PROJECT_MEMORY.md` if the change affects the whole platform or a cross-plugin convention.
+When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an invariant changed, and the relevant detailed section.
