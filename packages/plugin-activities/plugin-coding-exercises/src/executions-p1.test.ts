@@ -75,6 +75,11 @@ const dbMocks = vi.hoisted(() => {
     executions: state.executions,
     prisma: {
     pluginCodingExerciseExecution: {
+      findFirst: vi.fn(() => Promise.resolve(executionRow({
+        kind: "submit",
+        status: "completed",
+        resultSummary: { phase: "finished", earnedWeight: 1, totalWeight: 2 }
+      }))),
       create: vi.fn((args: { data: Record<string, unknown> }) =>
         Promise.resolve({
           id: "execution-1",
@@ -134,6 +139,14 @@ const dbMocks = vi.hoisted(() => {
     },
     pluginCodingExerciseHiddenTest: {
       findMany: vi.fn(() => Promise.resolve(state.hiddenTests))
+    },
+    pluginCodingExerciseTestEvaluation: {
+      create: vi.fn(() => Promise.resolve({ id: "test-evaluation-1" })),
+      update: vi.fn((args: { data: Record<string, unknown> }) => Promise.resolve({
+        id: "test-evaluation-1",
+        resultSummary: args.data.resultSummary
+      })),
+      findFirst: vi.fn(() => Promise.resolve(null))
     }
     }
   };
@@ -179,6 +192,8 @@ const {
   listCodingExerciseAttemptHistory,
   listRecentCodingExerciseExecutions,
   listCodingExerciseReviewExecutions,
+  getLatestCodingExerciseTestResult,
+  regradeCodingExerciseTests,
   runCodingExercise,
   submitCodingExercise,
   validateReferenceSolutionAgainstHiddenTests
@@ -583,6 +598,58 @@ describe("coding exercise executions", () => {
       orderBy: [{ createdAt: "desc" }],
       take: 3
     });
+  });
+
+  it("reruns current hidden tests without creating another student submission", async () => {
+    dbMocks.hiddenTests = [{
+      id: "corrected-test",
+      name: "Corrected expected output",
+      stdin: "3",
+      expectedOutput: "6",
+      isEnabled: true,
+      weight: 4,
+      orderIndex: 0,
+      metadata: { testCode: "" }
+    }];
+    judge0Mocks.runJudge0Submission.mockResolvedValue({
+      token: "regrade-token",
+      stdout: "6",
+      status: { id: 3, description: "Accepted" }
+    });
+
+    await expect(regradeCodingExerciseTests({
+      activityId: "activity-1",
+      executionId: "execution-1",
+      actorUserId: "teacher-1",
+      activityConfig
+    })).resolves.toMatchObject({
+      testEvaluationId: "test-evaluation-1",
+      resultSummary: { earnedWeight: 4, totalWeight: 4, testCount: 1 }
+    });
+    expect(dbMocks.prisma.pluginCodingExerciseExecution.create).not.toHaveBeenCalled();
+    expect(dbMocks.prisma.pluginCodingExerciseTestEvaluation.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        executionId: "execution-1",
+        actorUserId: "teacher-1",
+        configSnapshot: expect.objectContaining({
+          hiddenTests: [expect.objectContaining({ id: "corrected-test", expectedOutput: "6" })]
+        })
+      })
+    }));
+  });
+
+  it("uses the latest successful regrade result, falling back to the original submission", async () => {
+    const originalResultSummary = { earnedWeight: 1, totalWeight: 2 };
+    await expect(getLatestCodingExerciseTestResult({
+      activityId: "activity-1", executionId: "execution-1", originalResultSummary
+    })).resolves.toMatchObject({ resultSummary: originalResultSummary, testEvaluationId: null });
+    dbMocks.prisma.pluginCodingExerciseTestEvaluation.findFirst.mockResolvedValueOnce({
+      id: "test-evaluation-2",
+      resultSummary: { earnedWeight: 3, totalWeight: 3 }
+    } as never);
+    await expect(getLatestCodingExerciseTestResult({
+      activityId: "activity-1", executionId: "execution-1", originalResultSummary
+    })).resolves.toMatchObject({ resultSummary: { earnedWeight: 3, totalWeight: 3 }, testEvaluationId: "test-evaluation-2" });
   });
 
   it("ignores operational failures when selecting each learner's latest review submission", async () => {

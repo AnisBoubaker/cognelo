@@ -856,6 +856,8 @@ export const frMessages = {
       regradeReason: "Recalcul demande par l'enseignant",
       regradeUnavailable: "Aucune tentative soumise n'est disponible pour le recalcul.",
       regradeError: "Impossible de recalculer cette tentative.",
+      regradeAwaitingRubric: "Tests recalculés. Générez ou saisissez une note de grille pour calculer la note finale.",
+      regradeBatchSummary: "Recalcul terminé : {graded} notées, {pending} en attente de la grille, {failed} en échec.",
       deleteSubmission: "Supprimer la soumission",
       deleteSubmissionPrompt: "Entrez la raison de la suppression. Elle sera visible par l'etudiant.",
       deleteSubmissionConfirm: "Supprimer la soumission #{number} de {name} ?",

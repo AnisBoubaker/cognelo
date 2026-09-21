@@ -498,6 +498,7 @@ First plugin integration target:
 - Completed: add tests for manual override audit events, plugin grading handler resolution, and regrade context assembly.
 - Completed: replace the browser-prompt override UI with plugin-specific manual grading panels. Parsons now exposes a manual grading renderer that shows the submitted answer/attempt history beside score and reason fields, and the web gradebook resolves it through the activity definition `manualGrading.rendererKey`.
 - Completed: add bulk teacher workflows on the detailed activity results page. Teachers can trigger Regrade All for submitted/graded attempts, or open Grade All Manually to page through student attempts 10 at a time. Manual grading page navigation and Save persist all grades on the current page, including editable student-facing feedback text seeded from deterministic Parsons feedback when available. Programming Exercise rows load their submitted source through the plugin's review-all route instead of falling through to the Parsons route.
+- Completed: Programming Exercise Regrade All reruns current hidden tests in separate private evaluation records without invoking AI, composes the latest rubric score with current component weights, and defers final grading when that rubric score is missing. The batch continues after individual errors. Teacher-triggered AI feedback separately evaluates the current rubric using the latest saved test result without rerunning tests.
 
 ### Phase 9: Analytics And Research Exports
 

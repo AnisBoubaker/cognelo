@@ -19,6 +19,7 @@ import {
 } from "./executions";
 import { AppError } from "@cognelo/core";
 import { createCodingExerciseTeacherFeedbackDraft, evaluateCodingExerciseAttemptWithAi, getCodingExerciseAiFeedbackTeacherSubmission, reviseCodingExerciseAiFeedback, snapshotCodingExerciseAiFeedbackConfig } from "./ai-feedback";
+import { regradeCodingExerciseAttempt } from "./regrading";
 
 export const codingExercisesServerPlugin: ServerActivityPlugin = {
   key: "coding-exercises",
@@ -33,6 +34,16 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
     codingExerciseGenerateRubricRoute,
     codingExerciseGenerateTestsRoute
   ],
+  grading: {
+    gradeAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, pluginAttemptRef, activity }) => {
+      if (!pluginAttemptRef) {
+        throw new AppError(409, "CODING_EXERCISE_SUBMISSION_REQUIRED", "This attempt does not reference a coding exercise submission.");
+      }
+      return regradeCodingExerciseAttempt({
+        user, courseId, groupId, activityId, coreAttemptId, executionId: pluginAttemptRef, activity
+      });
+    }
+  },
   aiFeedback: {
     evaluateAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, pluginAttemptRef, activity, triggerKind }) => {
       if (!pluginAttemptRef) {

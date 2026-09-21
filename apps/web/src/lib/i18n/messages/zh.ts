@@ -855,6 +855,8 @@ export const zhMessages = {
       regradeReason: "教师请求重新评分",
       regradeUnavailable: "没有可重新评分的已提交尝试。",
       regradeError: "无法重新评分这次尝试。",
+      regradeAwaitingRubric: "测试已重新评分。请生成或输入评分量规分数以计算最终成绩。",
+      regradeBatchSummary: "重新评分完成：{graded} 份已评分，{pending} 份等待量规评分，{failed} 份失败。",
       deleteSubmission: "删除提交",
       deleteSubmissionPrompt: "请输入删除原因。学生将能看到该原因。",
       deleteSubmissionConfirm: "删除 {name} 的第 {number} 次提交？",

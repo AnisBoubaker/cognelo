@@ -178,8 +178,9 @@ MCQ answer-key grading remains deterministic and authoritative. AI feedback may 
 
 ### Regrading
 
-- Retrying the same failed model call uses the attempt's immutable rubric/configuration snapshot.
-- An explicit regrade with revised activity settings or another model creates a new result version and a `regraded` core grade event.
+- Formative/Test-child retries retain the attempt's immutable rubric/configuration snapshot. A teacher-started Programming Exercise evaluation uses the current rubric/reference solution/prompt and latest saved test result, without running tests, and snapshots those inputs in a new model-evaluation version.
+- Programming Exercise **Regrade all** is a separate test-only action: rerun current enabled tests, append a test-evaluation record, and recompute the grade using current component weights and the latest existing rubric score. A missing rubric score defers final grading; no model call occurs. **Generate AI feedback for all** recomputes the rubric component without running tests. If both tests and rubric changed, teachers run these actions in that order.
+- A completed explicit regrade creates a new result version and a `regraded` core grade event.
 - Previous model outputs, parsed results, feedback, scores, and grade snapshots remain available for audit and research.
 - Releasing, hiding, regrading, and challenging a grade are separate events; one must not overwrite another's history.
 
@@ -344,7 +345,8 @@ Status: complete. Course settings, SDK contracts, secure model resolution, norma
 
 ### Phase 2 — Programming Exercise Pilot
 
-Status: complete. Programming Exercises support a private unnamed general grading rubric that remains available to teachers without automatic feedback, immediate formative evaluation when automation is enabled, teacher-triggered summative evaluation, configurable deterministic/rubric weighting, strict two-attempt structured-output validation, immutable private evaluation artifacts, submission-time private rubric snapshots, and teacher review of submitted code, submission-time hidden-test outcomes, and editable summary/strength/improvement/criterion scores and narrative. Course and bank editors expose a dedicated host Grading tab after Concepts with nested Rubric and Test cases side tabs. Rubrics may be generated only from a title, student prompt, and reference solution; both rubric and assessment-feedback generation resolve the Subject teaching language server-side.
+Status: complete. Programming Exercises support a private unnamed general grading rubric that remains available to teachers without automatic feedback, immediate formative evaluation when automation is enabled, teacher-triggered summative evaluation, configurable deterministic/rubric weighting, strict two-attempt structured-output validation, immutable private evaluation artifacts, submission-time private rubric snapshots, and teacher review of submitted code, latest successful hidden-test outcomes, and editable summary/strength/improvement/criterion scores and narrative. Course and bank editors expose a dedicated host Grading tab after Concepts with nested Rubric and Test cases side tabs. Rubrics may be generated only from a title, student prompt, and reference solution; both rubric and assessment-feedback generation resolve the Subject teaching language server-side.
+Teacher correction workflows additionally append test-only reruns against current hidden tests and regenerate summative feedback against the current rubric and latest saved tests. Neither action invokes the other; the original submission snapshot and earlier evaluation artifacts remain immutable.
 
 The development seed includes a reproducible two-section Programming Exercise batch at the submitted-but-not-evaluated boundary. This permits teacher single/batch generation, review, editing, release, learner review, challenge, and research-event testing without requiring Judge0 to execute dozens of fixture submissions during seeding. A clean course receives the fallback seed model, while reseeding preserves a teacher-selected assessment-feedback model and explicit feedback switch.
 
@@ -408,6 +410,7 @@ Status: partial. The manager research endpoint is implemented with stable identi
 - Weighted programming grades preserve deterministic and AI components separately.
 - Invalid/failed AI output cannot create a partial or silent grade.
 - Retry and regrade preserve earlier evaluation versions and research events.
+- Programming Exercise test-only regrading never invokes AI or creates another student attempt; later AI generation never reruns tests and uses the latest successful saved test result plus current rubric.
 - Students can challenge only their own released AI-graded feedback.
 - Teacher resolution requires a response and records any grade change through the audited override path.
 - Course challenge listing and resolution authorization are enforced server-side.

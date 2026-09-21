@@ -341,7 +341,6 @@ export async function submitCodingExercise(params: {
   activityConfig: unknown;
   input: z.infer<typeof codingExerciseSubmitInputSchema>;
 }) {
-  const env = getServerEnv();
   const config = parseCodingExerciseConfig(params.activityConfig);
   const input = codingExerciseSubmitInputSchema.parse(params.input);
   const privateConfig = await getCodingExercisePrivateConfig({ activityId: params.activityId });
@@ -377,96 +376,21 @@ export async function submitCodingExercise(params: {
   });
 
   try {
-    const testResults = [];
-    let totalWeight = 0;
-    let earnedWeight = 0;
-    let firstFailureMessage: string | null = null;
-    let latestToken: string | null = null;
-    let latestStdout: string | null = null;
-    let latestStderr: string | null = null;
-    let latestCompileOutput: string | null = null;
-    let latestStatusId: number | null = null;
-    let latestStatusLabel: string | null = null;
-    let latestTime: string | null = null;
-    let latestMemory: number | null = null;
-
-    for (const hiddenTest of normalizedHiddenTests) {
-      totalWeight += hiddenTest.weight;
-      const sourceCode = buildCodingExerciseSource({
-        config,
-        privateConfig,
-        studentSourceCode: input.sourceCode,
-        testCode: hiddenTest.testCode
-      });
-      const result = await runJudge0Submission({
-        languageId: runtime.languageId,
-        sourceCode,
-        stdin: hiddenTest.stdin,
-        expectedOutput: getJudge0ExpectedOutput(hiddenTest.expectedOutput, hiddenTest),
-        cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
-        wallTimeLimit: 10,
-        memoryLimitKb: 128000,
-        enablePerProcessAndThreadTimeLimit: env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS,
-        enablePerProcessAndThreadMemoryLimit: env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS
-      });
-
-      const comparison = evaluateJudge0Result(result, hiddenTest.expectedOutput, hiddenTest);
-      const passed = comparison.matched;
-      if (passed) {
-        earnedWeight += hiddenTest.weight;
-      } else if (!firstFailureMessage) {
-        firstFailureMessage = result.message ?? result.stderr ?? result.compile_output ?? comparison.message ?? result.status?.description ?? "Hidden test failed.";
-      }
-
-      latestToken = result.token;
-      latestStdout = result.stdout ?? null;
-      latestStderr = result.stderr ?? null;
-      latestCompileOutput = result.compile_output ?? null;
-      latestStatusId = result.status?.id ?? null;
-      latestStatusLabel = result.status?.description ?? null;
-      latestTime = result.time ?? null;
-      latestMemory = result.memory ?? null;
-
-      testResults.push({
-        id: hiddenTest.id,
-        name: hiddenTest.name,
-        passed,
-        weight: hiddenTest.weight,
-        statusId: result.status?.id ?? null,
-        statusLabel: result.status?.description ?? null,
-        message: result.message ?? result.stderr ?? result.compile_output ?? comparison.message ?? null,
-        outputMatchMode: hiddenTest.outputMatchMode,
-        containsLinesOrderMatters: hiddenTest.containsLinesOrderMatters,
-        timeSeconds: result.time ?? null,
-        memoryKb: result.memory ?? null
-      });
-    }
-
-    const accepted = earnedWeight === totalWeight;
+    const evaluated = await executeHiddenTests({ config, privateConfig, runtime, hiddenTests: normalizedHiddenTests, sourceCode: input.sourceCode });
     const updatedExecution = await codingExerciseExecutionClient.pluginCodingExerciseExecution.update({
       where: { id: pendingExecution.id },
       data: {
-        status: accepted ? "completed" : "failed",
-        judge0Token: latestToken,
-        stdout: latestStdout,
-        stderr: latestStderr,
-        compileOutput: latestCompileOutput,
-        message: firstFailureMessage,
-        timeSeconds: latestTime,
-        memoryKb: latestMemory ?? undefined,
-        judge0StatusId: latestStatusId ?? undefined,
-        judge0StatusLabel: latestStatusLabel ?? undefined,
-        resultSummary: {
-          judge0LanguageName: runtime.languageName,
-          executionMode: config.executionMode,
-          phase: "finished",
-          accepted,
-          testCount: normalizedHiddenTests.length,
-          passedCount: testResults.filter((test) => test.passed).length,
-          earnedWeight,
-          totalWeight,
-          tests: testResults
-        } as Prisma.InputJsonValue
+        status: evaluated.summary.accepted ? "completed" : "failed",
+        judge0Token: evaluated.latestToken,
+        stdout: evaluated.latestStdout,
+        stderr: evaluated.latestStderr,
+        compileOutput: evaluated.latestCompileOutput,
+        message: evaluated.firstFailureMessage,
+        timeSeconds: evaluated.latestTime,
+        memoryKb: evaluated.latestMemory ?? undefined,
+        judge0StatusId: evaluated.latestStatusId ?? undefined,
+        judge0StatusLabel: evaluated.latestStatusLabel ?? undefined,
+        resultSummary: evaluated.summary as Prisma.InputJsonValue
       }
     });
 
@@ -488,6 +412,171 @@ export async function submitCodingExercise(params: {
     }
 
     throw new AppError(502, "JUDGE0_SUBMISSION_FAILED", "The remote code execution service could not complete the submission.");
+  }
+}
+
+async function executeHiddenTests(input: {
+  config: ReturnType<typeof parseCodingExerciseConfig>;
+  privateConfig: CodingExercisePrivateConfig;
+  runtime: Awaited<ReturnType<typeof resolveJudge0Language>>;
+  hiddenTests: HiddenTestCase[];
+  sourceCode: string;
+}) {
+  const env = getServerEnv();
+  const { config, privateConfig, runtime, hiddenTests } = input;
+  const testResults = [];
+  let totalWeight = 0;
+  let earnedWeight = 0;
+  let firstFailureMessage: string | null = null;
+  let latestToken: string | null = null;
+  let latestStdout: string | null = null;
+  let latestStderr: string | null = null;
+  let latestCompileOutput: string | null = null;
+  let latestStatusId: number | null = null;
+  let latestStatusLabel: string | null = null;
+  let latestTime: string | null = null;
+  let latestMemory: number | null = null;
+
+  for (const hiddenTest of hiddenTests) {
+    totalWeight += hiddenTest.weight;
+    const sourceCode = buildCodingExerciseSource({
+      config,
+      privateConfig,
+      studentSourceCode: input.sourceCode,
+      testCode: hiddenTest.testCode
+    });
+    const result = await runJudge0Submission({
+      languageId: runtime.languageId,
+      sourceCode,
+      stdin: hiddenTest.stdin,
+      expectedOutput: getJudge0ExpectedOutput(hiddenTest.expectedOutput, hiddenTest),
+      cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
+      wallTimeLimit: 10,
+      memoryLimitKb: 128000,
+      enablePerProcessAndThreadTimeLimit: env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS,
+      enablePerProcessAndThreadMemoryLimit: env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS
+    });
+    const comparison = evaluateJudge0Result(result, hiddenTest.expectedOutput, hiddenTest);
+    const passed = comparison.matched;
+    if (passed) earnedWeight += hiddenTest.weight;
+    else if (!firstFailureMessage) {
+      firstFailureMessage = result.message ?? result.stderr ?? result.compile_output ?? comparison.message ?? result.status?.description ?? "Hidden test failed.";
+    }
+    latestToken = result.token;
+    latestStdout = result.stdout ?? null;
+    latestStderr = result.stderr ?? null;
+    latestCompileOutput = result.compile_output ?? null;
+    latestStatusId = result.status?.id ?? null;
+    latestStatusLabel = result.status?.description ?? null;
+    latestTime = result.time ?? null;
+    latestMemory = result.memory ?? null;
+    testResults.push({
+      id: hiddenTest.id,
+      name: hiddenTest.name,
+      passed,
+      weight: hiddenTest.weight,
+      statusId: result.status?.id ?? null,
+      statusLabel: result.status?.description ?? null,
+      message: result.message ?? result.stderr ?? result.compile_output ?? comparison.message ?? null,
+      outputMatchMode: hiddenTest.outputMatchMode,
+      containsLinesOrderMatters: hiddenTest.containsLinesOrderMatters,
+      timeSeconds: result.time ?? null,
+      memoryKb: result.memory ?? null
+    });
+  }
+
+  return {
+    summary: {
+      judge0LanguageName: runtime.languageName,
+      executionMode: config.executionMode,
+      phase: "finished",
+      accepted: earnedWeight === totalWeight,
+      testCount: hiddenTests.length,
+      passedCount: testResults.filter((test) => test.passed).length,
+      earnedWeight,
+      totalWeight,
+      tests: testResults
+    },
+    firstFailureMessage,
+    latestToken,
+    latestStdout,
+    latestStderr,
+    latestCompileOutput,
+    latestStatusId,
+    latestStatusLabel,
+    latestTime,
+    latestMemory
+  };
+}
+
+export async function getLatestCodingExerciseTestResult(input: {
+  activityId: string;
+  executionId: string;
+  originalResultSummary: unknown;
+}) {
+  const latest = await prisma.pluginCodingExerciseTestEvaluation.findFirst({
+    where: { activityId: input.activityId, executionId: input.executionId, status: "completed" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }]
+  });
+  return {
+    resultSummary: latest?.resultSummary ?? input.originalResultSummary,
+    testEvaluationId: latest?.id ?? null
+  };
+}
+
+export async function regradeCodingExerciseTests(input: {
+  activityId: string;
+  executionId: string;
+  actorUserId: string;
+  activityConfig: unknown;
+}) {
+  const execution = await prisma.pluginCodingExerciseExecution.findFirst({
+    where: { id: input.executionId, activityId: input.activityId, kind: "submit" }
+  });
+  if (!execution) {
+    throw new AppError(404, "CODING_EXERCISE_EXECUTION_NOT_FOUND", "The coding exercise submission was not found.");
+  }
+  if (isCodingExerciseOperationalFailure(execution)) {
+    throw new AppError(503, "CODING_EXERCISE_RESULT_UNAVAILABLE", "This submission was interrupted by the code execution service and cannot be regraded.");
+  }
+  const config = parseCodingExerciseConfig(input.activityConfig);
+  const privateConfig = await getCodingExercisePrivateConfig({ activityId: input.activityId });
+  const runtime = await resolveJudge0Language(config.language);
+  const hiddenTests = (await prisma.pluginCodingExerciseHiddenTest.findMany({
+    where: { activityId: input.activityId, isEnabled: true },
+    orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }]
+  })).map(toHiddenTestCase);
+  if (!hiddenTests.length) {
+    throw new AppError(400, "HIDDEN_TESTS_REQUIRED", "This coding exercise does not have any enabled hidden tests yet.");
+  }
+  const evaluation = await prisma.pluginCodingExerciseTestEvaluation.create({
+    data: {
+      activityId: input.activityId,
+      executionId: input.executionId,
+      actorUserId: input.actorUserId,
+      status: "pending",
+      resultSummary: { phase: "pending", testCount: hiddenTests.length },
+      configSnapshot: { activityConfig: config, privateConfig, hiddenTests } as Prisma.InputJsonValue
+    }
+  });
+  try {
+    const result = await executeHiddenTests({ config, privateConfig, runtime, hiddenTests, sourceCode: execution.sourceCode });
+    const completed = await prisma.pluginCodingExerciseTestEvaluation.update({
+      where: { id: evaluation.id },
+      data: { status: "completed", resultSummary: result.summary as Prisma.InputJsonValue }
+    });
+    return { testEvaluationId: completed.id, resultSummary: completed.resultSummary, feedbackConfig: privateConfig.aiFeedback };
+  } catch (error) {
+    await prisma.pluginCodingExerciseTestEvaluation.update({
+      where: { id: evaluation.id },
+      data: {
+        status: "failed",
+        resultSummary: { phase: "failed-before-result" },
+        error: error instanceof Error ? error.message.slice(0, 8000) : "Unknown Judge0 failure."
+      }
+    });
+    if (error instanceof AppError) throw error;
+    throw new AppError(502, "JUDGE0_SUBMISSION_FAILED", "The remote code execution service could not complete the regrade.");
   }
 }
 

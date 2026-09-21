@@ -104,6 +104,22 @@ model PluginCodingExerciseExecution {
   @@index([judge0Token])
 }
 
+model PluginCodingExerciseTestEvaluation {
+  id             String   @id @default(cuid())
+  activityId     String
+  executionId    String
+  actorUserId    String
+  status         String
+  resultSummary  Json     @default("{}")
+  configSnapshot Json     @default("{}")
+  error          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([executionId, status, createdAt])
+  @@index([activityId, createdAt])
+}
+
 model PluginCodingExerciseAiEvaluation {
   id                 String   @id @default(cuid())
   activityId         String

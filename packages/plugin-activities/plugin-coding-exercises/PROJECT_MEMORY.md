@@ -9,6 +9,6 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Standalone drafts use core `ActivityResponseDraft`; embedded Test drafts use `TestItemAttempt`. Do not mix those persistence paths.
 - Summative submissions use core attempts and attempt limits. Practice-run grouping is derived from timestamps around submissions.
 - Rubrics are general teacher grading tools, not conditional on model feedback. Summative model grading is teacher-triggered; formative feedback may run immediately.
-- Evaluation artifacts and submission-time configuration snapshots are immutable. Teacher revisions and rubric score changes use core audited feedback/regrade flows.
+- Original executions and submission-time snapshots remain immutable. Teacher test regrades append private test-evaluation records; teacher-triggered feedback uses the current rubric and latest successful test run, whereas formative/Test-child evaluation retains the submission snapshot. Final grade recomposition uses current component weights and core audited regrade flows; a missing rubric score never counts as zero.
 - Rubric and learner feedback generation use the Subject teaching language, not the viewer locale.
 - Monaco assets are first-party for SEB compatibility, with the controlled plain-text fallback retained.
