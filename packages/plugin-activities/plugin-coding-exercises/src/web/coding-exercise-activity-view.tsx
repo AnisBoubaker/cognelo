@@ -74,6 +74,7 @@ type CodingExecution = {
   stderr?: string | null;
   compileOutput?: string | null;
   message?: string | null;
+  outputTruncated?: boolean;
   timeSeconds?: string | null;
   memoryKb?: number | null;
   judge0StatusLabel?: string | null;
@@ -2096,6 +2097,7 @@ export function CodingExerciseActivityView({
                     >
                       {runExecution ? getExecutionDisplayOutput(runExecution, pluginLocale) : ""}
                     </pre>
+                    {runExecution?.outputTruncated ? <p className="muted">{t("outputTruncated")}</p> : null}
                   </div>
 
                     {error ? <p className="error">{error}</p> : null}
@@ -2691,6 +2693,7 @@ function ExecutionCard({
         </div>
       ) : null}
       {execution.message ? <p className="muted">{execution.message}</p> : null}
+      {execution.outputTruncated ? <p className="muted">{formatCodingExercisesMessage(locale, "outputTruncated")}</p> : null}
       {tests.length && !compact ? (
         <div className="stack">
           <strong>{formatCodingExercisesMessage(locale, "hiddenTestResults")}</strong>

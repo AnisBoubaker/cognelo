@@ -11,6 +11,7 @@ import {
   type CodingExerciseSampleTest
 } from "./coding-exercises";
 import { Prisma, prisma } from "./db-client";
+import { capExecutionResultSummary, capExecutionText, capJudge0Output, MAX_EXECUTION_MESSAGE_BYTES } from "./execution-output";
 import { isCodingExerciseOperationalFailure } from "./execution-results";
 import { resolveJudge0Language, runJudge0Submission } from "./judge0";
 import {
@@ -212,15 +213,18 @@ export async function runCodingExercise(params: {
     });
 
     const comparison = evaluateJudge0Result(result, input.expectedOutput, outputMatcher, input.compareOutput);
+    const savedOutput = capJudge0Output(result);
+    const message = capExecutionText(result.message ?? comparison.message, MAX_EXECUTION_MESSAGE_BYTES);
+    const comparisonMessage = capExecutionText(comparison.message, MAX_EXECUTION_MESSAGE_BYTES);
     const normalizedExecution = await codingExerciseExecutionClient.pluginCodingExerciseExecution.update({
       where: { id: pendingExecution.id },
       data: {
         status: comparison.matched ? "completed" : "failed",
         judge0Token: result.token,
-        stdout: result.stdout,
-        stderr: result.stderr,
-        compileOutput: result.compile_output,
-        message: result.message ?? comparison.message,
+        stdout: savedOutput.stdout,
+        stderr: savedOutput.stderr,
+        compileOutput: savedOutput.compileOutput,
+        message: message.value,
         timeSeconds: result.time,
         memoryKb: result.memory ?? undefined,
         judge0StatusId: result.status?.id,
@@ -231,7 +235,8 @@ export async function runCodingExercise(params: {
           outputCompared: input.compareOutput,
           outputMatchMode: input.outputMatchMode,
           containsLinesOrderMatters: input.containsLinesOrderMatters,
-          comparisonMessage: comparison.message,
+          comparisonMessage: comparisonMessage.value,
+          outputTruncated: savedOutput.outputTruncated || message.truncated || comparisonMessage.truncated,
           executionMode: config.executionMode,
           phase: "finished"
         } as Prisma.InputJsonValue
@@ -248,7 +253,7 @@ export async function runCodingExercise(params: {
           phase: "failed-before-result",
           outputCompared: input.compareOutput
         } as Prisma.InputJsonValue,
-        message: error instanceof Error ? error.message : "Unknown Judge0 execution failure."
+        message: capExecutionText(error instanceof Error ? error.message : "Unknown Judge0 execution failure.", MAX_EXECUTION_MESSAGE_BYTES).value
       }
     });
 
@@ -403,7 +408,7 @@ export async function submitCodingExercise(params: {
         resultSummary: {
           phase: "failed-before-result"
         } as Prisma.InputJsonValue,
-        message: error instanceof Error ? error.message : "Unknown Judge0 submission failure."
+        message: capExecutionText(error instanceof Error ? error.message : "Unknown Judge0 submission failure.", MAX_EXECUTION_MESSAGE_BYTES).value
       }
     });
 
@@ -436,6 +441,7 @@ async function executeHiddenTests(input: {
   let latestStatusLabel: string | null = null;
   let latestTime: string | null = null;
   let latestMemory: number | null = null;
+  let outputTruncated = false;
 
   for (const hiddenTest of hiddenTests) {
     totalWeight += hiddenTest.weight;
@@ -457,15 +463,24 @@ async function executeHiddenTests(input: {
       enablePerProcessAndThreadMemoryLimit: env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS
     });
     const comparison = evaluateJudge0Result(result, hiddenTest.expectedOutput, hiddenTest);
+    const savedOutput = capJudge0Output(result);
+    const testMessage = capExecutionText(
+      result.message ?? result.stderr ?? result.compile_output ?? comparison.message ?? null,
+      MAX_EXECUTION_MESSAGE_BYTES
+    );
+    outputTruncated ||= savedOutput.outputTruncated || testMessage.truncated;
     const passed = comparison.matched;
     if (passed) earnedWeight += hiddenTest.weight;
     else if (!firstFailureMessage) {
-      firstFailureMessage = result.message ?? result.stderr ?? result.compile_output ?? comparison.message ?? result.status?.description ?? "Hidden test failed.";
+      firstFailureMessage = capExecutionText(
+        result.message ?? result.stderr ?? result.compile_output ?? comparison.message ?? result.status?.description ?? "Hidden test failed.",
+        MAX_EXECUTION_MESSAGE_BYTES
+      ).value ?? null;
     }
     latestToken = result.token;
-    latestStdout = result.stdout ?? null;
-    latestStderr = result.stderr ?? null;
-    latestCompileOutput = result.compile_output ?? null;
+    latestStdout = savedOutput.stdout ?? null;
+    latestStderr = savedOutput.stderr ?? null;
+    latestCompileOutput = savedOutput.compileOutput ?? null;
     latestStatusId = result.status?.id ?? null;
     latestStatusLabel = result.status?.description ?? null;
     latestTime = result.time ?? null;
@@ -477,7 +492,7 @@ async function executeHiddenTests(input: {
       weight: hiddenTest.weight,
       statusId: result.status?.id ?? null,
       statusLabel: result.status?.description ?? null,
-      message: result.message ?? result.stderr ?? result.compile_output ?? comparison.message ?? null,
+      message: testMessage.value ?? null,
       outputMatchMode: hiddenTest.outputMatchMode,
       containsLinesOrderMatters: hiddenTest.containsLinesOrderMatters,
       timeSeconds: result.time ?? null,
@@ -491,6 +506,7 @@ async function executeHiddenTests(input: {
       executionMode: config.executionMode,
       phase: "finished",
       accepted: earnedWeight === totalWeight,
+      outputTruncated,
       testCount: hiddenTests.length,
       passedCount: testResults.filter((test) => test.passed).length,
       earnedWeight,
@@ -519,7 +535,7 @@ export async function getLatestCodingExerciseTestResult(input: {
     orderBy: [{ createdAt: "desc" }, { id: "desc" }]
   });
   return {
-    resultSummary: latest?.resultSummary ?? input.originalResultSummary,
+    resultSummary: capExecutionResultSummary(latest?.resultSummary ?? input.originalResultSummary).value,
     testEvaluationId: latest?.id ?? null
   };
 }
@@ -737,6 +753,8 @@ async function validateReferenceSolutionTestGroup(params: {
     });
 
     const comparison = evaluateJudge0Result(result, testCase.expectedOutput, testCase);
+    const savedOutput = capJudge0Output(result);
+    const message = capExecutionText(result.message ?? comparison.message, MAX_EXECUTION_MESSAGE_BYTES);
     const passed = comparison.matched;
     if (passed) {
       earnedWeight += testCase.weight;
@@ -750,10 +768,11 @@ async function validateReferenceSolutionTestGroup(params: {
       statusId: result.status?.id ?? null,
       statusLabel: result.status?.description ?? null,
       expectedOutput: testCase.expectedOutput,
-      stdout: result.stdout ?? null,
-      stderr: result.stderr ?? null,
-      compileOutput: result.compile_output ?? null,
-      message: result.message ?? comparison.message,
+      stdout: savedOutput.stdout ?? null,
+      stderr: savedOutput.stderr ?? null,
+      compileOutput: savedOutput.compileOutput ?? null,
+      message: message.value,
+      outputTruncated: savedOutput.outputTruncated || message.truncated,
       outputMatchMode: testCase.outputMatchMode,
       containsLinesOrderMatters: testCase.containsLinesOrderMatters,
       timeSeconds: result.time ?? null,
@@ -811,6 +830,12 @@ function normalizeResultSummary(value: unknown) {
 }
 
 function toCodingExerciseExecutionRecord(execution: CodingExerciseExecutionRow) {
+  const stdout = capExecutionText(execution.stdout);
+  const stderr = capExecutionText(execution.stderr);
+  const compileOutput = capExecutionText(execution.compileOutput);
+  const message = capExecutionText(execution.message, MAX_EXECUTION_MESSAGE_BYTES);
+  const summary = capExecutionResultSummary(normalizeResultSummary(execution.resultSummary));
+  const resultSummary = summary.value as Record<string, unknown>;
   return {
     id: execution.id,
     activityId: execution.activityId,
@@ -823,15 +848,16 @@ function toCodingExerciseExecutionRecord(execution: CodingExerciseExecutionRow) 
     judge0Token: execution.judge0Token,
     stdin: execution.stdin ?? "",
     expectedOutput: execution.expectedOutput ?? "",
-    stdout: execution.stdout,
-    stderr: execution.stderr,
-    compileOutput: execution.compileOutput,
-    message: execution.message,
+    stdout: stdout.value,
+    stderr: stderr.value,
+    compileOutput: compileOutput.value,
+    message: message.value,
+    outputTruncated: stdout.truncated || stderr.truncated || compileOutput.truncated || message.truncated || summary.truncated || resultSummary.outputTruncated === true,
     timeSeconds: execution.timeSeconds,
     memoryKb: execution.memoryKb,
     judge0StatusId: execution.judge0StatusId,
     judge0StatusLabel: execution.judge0StatusLabel,
-    resultSummary: normalizeResultSummary(execution.resultSummary),
+    resultSummary,
     createdAt: execution.createdAt.toISOString(),
     updatedAt: execution.updatedAt.toISOString()
   };
@@ -847,7 +873,7 @@ function toReferenceSolutionRecord(referenceSolution: {
   return {
     sourceCode: referenceSolution.sourceCode,
     privateConfig: parseCodingExercisePrivateConfig(referenceSolution.privateConfig),
-    validationSummary: normalizeResultSummary(referenceSolution.validationSummary),
+    validationSummary: capExecutionResultSummary(normalizeResultSummary(referenceSolution.validationSummary)).value as Record<string, unknown>,
     createdAt: referenceSolution.createdAt.toISOString(),
     updatedAt: referenceSolution.updatedAt.toISOString()
   };

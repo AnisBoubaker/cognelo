@@ -15,6 +15,7 @@ This document preserves detailed Programming Exercises decisions. Load only the 
 - Teacher reference solutions live in `PluginCodingExerciseReferenceSolution`.
 - Practice runs and later submissions live in `PluginCodingExerciseExecution`.
 - The first execution route is `coding-exercises/run`, which stores each run server-side before and after the Judge0 request.
+- Do not persist or return unbounded Judge0 diagnostics: compare full output for correctness, then cap stored streams/messages and cap historical rows again at serialization. The exact limits and learner notice are specified in [REFERENCE.md](REFERENCE.md#judge0-integration).
 - Hidden tests are managed through the teacher-only `coding-exercises/hidden-tests` route.
 - Bank activity authoring now has bank-owned private coding test/reference tables; course assignment must copy those private records into course-owned plugin tables via `onCourseActivityCreatedFromBankVersion` so coding exercises persist the same authoring data in banks and courses.
 - Any future coding-exercise bank-owned private table must be added to the bank-to-course copy hook and the bank-activity delete cleanup hook, then manually verified by publishing a bank activity, adding it to a course, checking the course-owned plugin rows, and deleting the bank activity.
