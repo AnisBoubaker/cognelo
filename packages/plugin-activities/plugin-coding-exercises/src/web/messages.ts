@@ -158,6 +158,7 @@ type MessageKey =
   | "stdout"
   | "stderr"
   | "compileOutput"
+  | "outputTruncated"
   | "hiddenTestResults"
   | "test"
   | "statusPending"
@@ -329,6 +330,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     stdout: "Stdout",
     stderr: "Stderr",
     compileOutput: "Compile output",
+    outputTruncated: "Only the beginning of the output was saved and shown.",
     hiddenTestResults: "Hidden test results",
     test: "Test",
     statusPending: "pending",
@@ -497,6 +499,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     stdout: "Stdout",
     stderr: "Stderr",
     compileOutput: "Sortie de compilation",
+    outputTruncated: "Seul le début de la sortie a été enregistré et affiché.",
     hiddenTestResults: "Résultats des tests cachés",
     test: "Test",
     statusPending: "en attente",
@@ -665,6 +668,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     stdout: "标准输出",
     stderr: "标准错误",
     compileOutput: "编译输出",
+    outputTruncated: "仅保存并显示了输出的开头。",
     hiddenTestResults: "隐藏测试结果",
     test: "测试",
     statusPending: "进行中",

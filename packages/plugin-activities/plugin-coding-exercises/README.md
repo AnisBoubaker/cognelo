@@ -9,6 +9,7 @@ Teacher **Regrade all** reruns current hidden tests without invoking AI; **Gener
 - `Activity.config` contains only student-safe prompt, language, starter/template projection, visible tests, and editor settings.
 - Reference solutions, hidden scaffolds/tests, rubrics, evaluations, and execution history use plugin-owned persistence.
 - Browsers call Cognelo plugin routes; only the server communicates with Judge0.
+- Execution output is bounded before persistence and in browser-facing responses; grading still uses the complete Judge0 result.
 - Course and bank copies have independent private rows connected by explicit lifecycle hooks.
 
 ## Read By Topic

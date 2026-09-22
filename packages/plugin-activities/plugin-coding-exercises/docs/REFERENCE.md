@@ -184,6 +184,7 @@ Behavior:
 - `hidden-tests` is teacher/admin only and carries the private reference solution
 - Judge0 source is assembled server-side from the private template plus student code, then per-test harness code is injected at `{{ TEST_CODE }}` when present
 - Cognelo always exchanges source, stdin, expected output, stdout, stderr, compiler output, and Judge0 messages as Base64 at the Judge0 boundary, decoding them before persistence and comparison. This preserves UTF-8 program text and output such as accented characters and also safely carries non-printable diagnostics.
+- Cognelo compares the complete decoded Judge0 result first, then stores at most 16 KiB of each stdout/stderr/compiler-output stream and 4 KiB of each diagnostic message, cutting only at a UTF-8 character boundary. The same limits apply to hidden-test and reference-validation summaries. Execution/history and private validation responses apply the caps again to older oversized rows. Learners see a localized notice when a run or submission has shortened output; result status and scoring still reflect the complete Judge0 result.
 - enabled hidden tests are validated against the teacher reference solution before they are saved
 
 ### Output matching

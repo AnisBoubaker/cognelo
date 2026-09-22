@@ -8,6 +8,7 @@ import {
   type CodingExerciseOutputMatchMode
 } from "./coding-exercises";
 import { Prisma, prisma } from "./db-client";
+import { capExecutionResultSummary } from "./execution-output";
 import { getCodingExerciseReferenceSolution, validateReferenceSolutionAgainstHiddenTests } from "./executions";
 
 const codingExerciseHiddenTestsClient = prisma as typeof prisma & {
@@ -569,7 +570,7 @@ function toReferenceSolutionRecord(referenceSolution: {
   return {
     sourceCode: referenceSolution.sourceCode,
     privateConfig: parseCodingExercisePrivateConfig(referenceSolution.privateConfig),
-    validationSummary: normalizeMetadata(referenceSolution.validationSummary),
+    validationSummary: capExecutionResultSummary(normalizeMetadata(referenceSolution.validationSummary)).value,
     createdAt: referenceSolution.createdAt.toISOString(),
     updatedAt: referenceSolution.updatedAt.toISOString()
   };

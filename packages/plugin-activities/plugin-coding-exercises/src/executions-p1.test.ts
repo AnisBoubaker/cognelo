@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MAX_EXECUTION_OUTPUT_BYTES } from "./execution-output";
 
 type MockHiddenTest = {
   id: string;
@@ -286,6 +287,28 @@ describe("coding exercise executions", () => {
     });
   });
 
+  it("compares full output but saves and returns only a bounded prefix", async () => {
+    const hugeOutput = `pass\n${"x\n".repeat(100_000)}`;
+    judge0Mocks.runJudge0Submission.mockResolvedValueOnce({
+      token: "large-output-token",
+      stdout: hugeOutput,
+      status: { id: 3, description: "Accepted" }
+    });
+
+    const execution = await runCodingExercise({
+      activityId: "activity-1",
+      userId: "student-1",
+      activityConfig,
+      input: { sourceCode: "print('pass')", expectedOutput: "pass", outputMatchMode: "contains_lines" }
+    });
+
+    expect(execution.resultSummary).toMatchObject({ accepted: true, outputTruncated: true });
+    expect(execution.outputTruncated).toBe(true);
+    expect(Buffer.byteLength(execution.stdout ?? "", "utf8")).toBe(MAX_EXECUTION_OUTPUT_BYTES);
+    const update = dbMocks.prisma.pluginCodingExerciseExecution.update.mock.calls[0]?.[0];
+    expect(Buffer.byteLength(String(update?.data.stdout ?? ""), "utf8")).toBe(MAX_EXECUTION_OUTPUT_BYTES);
+  });
+
   it("runs personalized input without comparing stdout", async () => {
     dbMocks.prisma.pluginCodingExerciseReferenceSolution.findUnique.mockResolvedValueOnce({
       sourceCode: "print('reference')",
@@ -463,6 +486,32 @@ describe("coding exercise executions", () => {
     });
   });
 
+  it("bounds hidden-test output and diagnostics in the saved submission", async () => {
+    const hugeOutput = "result\n".repeat(100_000);
+    judge0Mocks.runJudge0Submission.mockResolvedValue({
+      token: "large-submission-token",
+      stdout: hugeOutput,
+      stderr: hugeOutput,
+      message: hugeOutput,
+      status: { id: 11, description: "Runtime Error (NZEC)" }
+    });
+
+    const execution = await submitCodingExercise({
+      activityId: "activity-1",
+      userId: "student-1",
+      activityConfig,
+      input: { sourceCode: "print('result')" }
+    });
+
+    expect(execution.outputTruncated).toBe(true);
+    expect(execution.resultSummary).toMatchObject({ outputTruncated: true });
+    expect(Buffer.byteLength(execution.stdout ?? "", "utf8")).toBeLessThanOrEqual(MAX_EXECUTION_OUTPUT_BYTES);
+    const update = dbMocks.prisma.pluginCodingExerciseExecution.update.mock.calls[0]?.[0];
+    expect(Buffer.byteLength(String(update?.data.stdout ?? ""), "utf8")).toBeLessThanOrEqual(MAX_EXECUTION_OUTPUT_BYTES);
+    const savedSummary = update?.data.resultSummary as { tests: Array<{ message: string }> };
+    expect(savedSummary.tests[0]?.message.length).toBeLessThan(hugeOutput.length);
+  });
+
   it("grades hidden contains-lines tests in Cognelo after Judge0 accepts execution", async () => {
     dbMocks.hiddenTests = [
       {
@@ -551,6 +600,29 @@ describe("coding exercise executions", () => {
     });
   });
 
+  it("bounds reference-validation output before it can be saved in the validation summary", async () => {
+    const hugeOutput = "x".repeat(100_000);
+    judge0Mocks.runJudge0Submission.mockResolvedValueOnce({
+      token: "large-reference-token",
+      stdout: hugeOutput,
+      status: { id: 3, description: "Accepted" }
+    });
+
+    const validation = await validateReferenceSolutionAgainstHiddenTests({
+      activityConfig,
+      sourceCode: "print('reference')",
+      sampleTests: [{
+        id: "sample-1", title: "Sample", input: "", output: "x", testCode: "",
+        outputMatchMode: "contains_lines", containsLinesOrderMatters: false
+      }],
+      hiddenTests: [],
+      privateConfig: { hiddenSupportCode: "", templateSource: "{{ STUDENT_CODE }}", templatePrefix: "", templateSuffix: "", templateVisibleLineNumbers: [], aiFeedback: { enabled: false, gradingEnabled: false, instructions: "", testWeightPercent: 60, aiWeightPercent: 40, criteria: [] } }
+    });
+
+    expect(validation.sampleTests.tests[0]?.outputTruncated).toBe(true);
+    expect(Buffer.byteLength(validation.sampleTests.tests[0]?.stdout ?? "", "utf8")).toBe(MAX_EXECUTION_OUTPUT_BYTES);
+  });
+
   it("returns failed reference validation summaries when Judge0 rejects a test", async () => {
     judge0Mocks.runJudge0Submission.mockResolvedValueOnce({
       token: "h1",
@@ -598,6 +670,22 @@ describe("coding exercise executions", () => {
       orderBy: [{ createdAt: "desc" }],
       take: 3
     });
+  });
+
+  it("bounds oversized historical output and nested diagnostics in browser-facing records", async () => {
+    const hugeOutput = "line\n".repeat(100_000);
+    dbMocks.prisma.pluginCodingExerciseExecution.findMany.mockResolvedValueOnce([
+      dbMocks.executionRow({
+        id: "legacy-large-run",
+        stdout: hugeOutput,
+        resultSummary: { tests: [{ message: hugeOutput }] }
+      })
+    ]);
+
+    const [execution] = await listRecentCodingExerciseExecutions({ activityId: "activity-1", userId: "student-1" });
+    expect(execution.outputTruncated).toBe(true);
+    expect(Buffer.byteLength(execution.stdout ?? "", "utf8")).toBeLessThanOrEqual(MAX_EXECUTION_OUTPUT_BYTES);
+    expect(String((execution.resultSummary.tests as Array<{ message: string }>)[0]?.message).length).toBeLessThan(hugeOutput.length);
   });
 
   it("reruns current hidden tests without creating another student submission", async () => {
