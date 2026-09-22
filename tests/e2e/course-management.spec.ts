@@ -191,7 +191,7 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     await expect(page.getByRole("heading", { name: data.groupTitle })).toBeVisible();
   });
 
-  test("teacher versions, compares, duplicates, and moves a bank activity", async ({ teacherPage: page }) => {
+  test("teacher versions, compares, duplicates, publishes, and moves a bank activity", async ({ teacherPage: page }) => {
     if (!data) throw new Error("The activity suite was not provisioned.");
     const title = `E2E bank lifecycle ${data.token}`;
     await createBankActivityThroughUi(page, data, {
@@ -199,13 +199,13 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
       typeName: /Mult.*choice questions/
     });
     await page.getByLabel("Title", { exact: true }).fill(title);
-    await page.getByLabel("Student prompt").fill("First version of the bank lifecycle activity.");
+    await page.locator('label[for="mcq-description"]').locator("..").getByRole("textbox", { name: "Student prompt" }).fill("First version of the bank lifecycle activity.");
     await page.locator("#mcq-source").fill("## Version\nWhich version is this?\n\n- [x] One\n- [ ] Two");
     await page.getByRole("button", { name: "Save multiple choice questions" }).click();
     await expect(page.getByText("Multiple choice questions activity saved.", { exact: true })).toBeVisible();
     await publishCurrentBankActivity(page);
 
-    await page.getByLabel("Student prompt").fill("Second version of the bank lifecycle activity.");
+    await page.locator('label[for="mcq-description"]').locator("..").getByRole("textbox", { name: "Student prompt" }).fill("Second version of the bank lifecycle activity.");
     await page.locator("#mcq-source").fill("## Version\nWhich version is this?\n\n- [ ] One\n- [x] Two");
     const secondVersionSaved = page.waitForResponse(
       (response) =>
@@ -229,10 +229,25 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     const duplicate = page.getByRole("dialog", { name: "Duplicate activity" });
     const duplicateTitle = `${title} copy`;
     await duplicate.getByLabel("Title").fill(duplicateTitle);
+    const duplicated = page.waitForResponse((response) =>
+      response.ok() && response.request().method() === "POST" && response.url().endsWith("/duplicate")
+    );
     await duplicate.getByRole("button", { name: "Duplicate" }).click();
+    const duplicateResponse = await duplicated;
+    const duplicatedActivityId = (await duplicateResponse.json()).activity.id as string;
     await expect(page.getByText(duplicateTitle, { exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: `Actions for ${duplicateTitle}` }).click();
+    const publish = page.waitForResponse((response) =>
+      response.ok() && response.request().method() === "PATCH" &&
+      response.url().endsWith(`/api/activity-banks/${data.activityBankId}/activities/${duplicatedActivityId}`)
+    );
+    await page.getByRole("menuitem", { name: "Publish" }).click();
+    const published = await publish;
+    await expect(published.json()).resolves.toMatchObject({ activity: { lifecycle: "published", currentVersion: { versionNumber: 1 } } });
+
+    await page.getByRole("button", { name: `Actions for ${duplicateTitle}` }).click();
+    await expect(page.getByRole("menuitem", { name: "Publish" })).toHaveCount(0);
     await page.getByRole("menuitem", { name: "Move", exact: true }).click();
     const move = page.getByRole("dialog", { name: "Move activity" });
     await move.getByLabel("Destination activity bank").selectOption(data.secondaryActivityBankId);

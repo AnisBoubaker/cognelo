@@ -65,6 +65,7 @@ export default function ActivityBankDetailPage() {
   const [error, setError] = useState("");
   const [savingActivity, setSavingActivity] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [publishingActivityId, setPublishingActivityId] = useState<string | null>(null);
   const [deletingActivityId, setDeletingActivityId] = useState<string | null>(null);
   const [duplicatingActivityId, setDuplicatingActivityId] = useState<string | null>(null);
   const [duplicatingActivity, setDuplicatingActivity] = useState<BankActivity | null>(null);
@@ -196,6 +197,22 @@ export default function ActivityBankDetailPage() {
       setError(err instanceof Error ? err.message : t("activityBankDetail.updateActivityError"));
     } finally {
       setSavingEdit(false);
+    }
+  }
+
+  async function publishActivity(activity: BankActivity) {
+    if (!bank || publishingActivityId) return;
+    setActivityActionMenuId(null);
+    setActivityActionMenuAnchor(null);
+    setPublishingActivityId(activity.id);
+    setError("");
+    try {
+      await api.updateBankActivity(bank.id, activity.id, { lifecycle: "published" });
+      await loadPage();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("activityBankDetail.publishActivityError"));
+    } finally {
+      setPublishingActivityId(null);
     }
   }
 
@@ -799,6 +816,7 @@ export default function ActivityBankDetailPage() {
                     ) : activity ? (
                       <ContextMenu anchor={activityActionMenuId === activity.id ? activityActionMenuAnchor : null} className="content-context-menu" open={activityActionMenuId === activity.id} onClose={() => { setActivityActionMenuId(null); setActivityActionMenuAnchor(null); }}>
                         <Link className="content-context-menu-item" href={`/activity-banks/${bank?.id}/activities/${activity.id}`} role="menuitem"><EditIcon /><span>{t("common.edit")}</span></Link>
+                        {activity.lifecycle !== "published" ? <button className="content-context-menu-item" disabled={publishingActivityId !== null} onClick={() => void publishActivity(activity)} role="menuitem" type="button"><AppIcon name="check" /><span>{t("activityBankDetail.publishActivity")}</span></button> : null}
                         <button className="content-context-menu-item" disabled={duplicatingActivityId === activity.id} onClick={() => { setActivityActionMenuId(null); setDuplicatingActivity(activity); setDuplicateTitle(defaultDuplicateBankActivityTitle(activity.title)); }} role="menuitem" type="button"><DuplicateIcon /><span>{t("activityBankDetail.duplicateActivity")}</span></button>
                         <button className="content-context-menu-item" onClick={() => { setActivityActionMenuId(null); setMovingActivity(activity); setMoveTargetBankId(""); }} role="menuitem" type="button"><MoveIcon /><span>{t("activityBankDetail.moveActivity")}</span></button>
                         {(activity.versions?.length ?? 0) >= 2 ? <button className="content-context-menu-item" onClick={() => openVersionComparison(activity)} role="menuitem" type="button"><CompareIcon /><span>{t("bankActivityPage.compareVersions")}</span></button> : null}
