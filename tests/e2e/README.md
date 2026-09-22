@@ -10,7 +10,7 @@ The Playwright suite covers the platform's critical browser journeys with real A
 - authoring a core compound Test from reusable bank activities and completing its student assessment flow;
 - the placeholder activity's intentional unsupported authoring and learner states;
 - summative assignment policy, draft autosave and resume, multiple attempts, attempt limits, automatic grading, gradebook filtering/export, release/hide controls, and student grade visibility;
-- bank activity publication, version comparison, duplication, and movement between banks; and
+- bank activity publication from the editor and list, version comparison, duplication, and movement between banks; and
 - group settings updates and restoration.
 
 Browser interactions use accessible roles, labels, and visible text. Direct structural selectors are limited to stable editor surfaces that cannot be uniquely addressed or verified through an accessible name. Teardown invokes the public activity and bank deletion routes first so plugin-private records receive their lifecycle hooks, then uses direct database access only as an exact-ID fallback for records created by that test run. Stateful tests provision disposable, currently available scenarios through authenticated public API routes because durable seed courses can legitimately have expired availability dates. The ZIP-upload path builds its fixture in memory instead of committing a binary archive.
