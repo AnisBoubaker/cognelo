@@ -525,9 +525,9 @@ Decision after Phase 3: Cognelo currently has no production content to preserve.
 
 - Add folder selection and content item creation to activity add/assignment flows.
 - Ensure group assignment creates a group-scoped content item.
-- Ensure course-wide assignment behavior remains compatible with existing all-groups policy and future group inheritance.
+- Ensure course activity settings materialize placement only for explicitly assigned current groups; later groups remain unassigned.
 
-Implemented scope: `ActivityInputSchema`, `CourseGroupActivityInputSchema`, and all-groups assignment input support optional `contentPlacement`. Course activity creation can create a course-scoped activity content item. Direct group assignment can create a group-scoped activity content item in a selected shared course folder. All-groups assignment stores placement metadata and materializes activity content items for current and future groups using the same shared course folder IDs.
+Implemented scope: `ActivityInputSchema`, `CourseGroupActivityInputSchema`, and assignment materialization support optional `contentPlacement`. Course activity creation can create a course-scoped activity content item. Direct group assignment can create a group-scoped activity content item in a selected shared course folder. The settings dialog materializes activity content items only for assigned current groups and supports visibility overrides, but folder placement remains exclusively managed by drag-and-drop in the canonical course tree; later groups remain unassigned.
 
 ### Phase 6: Unified Picker - Complete
 
@@ -536,7 +536,7 @@ Implemented scope: `ActivityInputSchema`, `CourseGroupActivityInputSchema`, and 
 - Add folder selection and visibility controls for both materials and activities.
 - Keep plugin activity type discovery through the existing registry.
 
-Implemented scope: the course activity picker is now a course-element picker. It loads course content folders, offers a Material tab, lets teachers choose a destination folder and visibility, creates course-level folders from the picker, creates new material shells from material type choices, places those new materials into the content tree, and sends `contentPlacement` when creating local or bank-backed course activities. Direct group assignment and course-wide all-groups assignment also ask for folder and visibility and pass `contentPlacement`. Full group/student unified tree rendering remains later work.
+Implemented scope: the course activity picker is now a course-element picker. It loads course content folders, offers a Material tab, lets teachers choose a destination folder and visibility, creates course-level folders from the picker, creates new material shells from material type choices, places those new materials into the content tree, and sends `contentPlacement` when creating local or bank-backed course activities. Direct group assignment can select an initial folder, while later folder changes use course-tree drag-and-drop. The activity settings dialog manages visibility but not folders. Full group/student unified tree rendering remains later work.
 
 ### Phase 7: Unified Teacher Content Tree - Complete
 

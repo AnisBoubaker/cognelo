@@ -10,6 +10,7 @@ import {
   ContentTypePluginInstallationUpdateSchema,
   BankActivityInputSchema,
   CourseGroupActivityInputSchema,
+  CourseAllGroupsActivityAssignmentInputSchema,
   CourseGroupInputSchema,
   CourseGroupUpdateSchema,
   CourseInputSchema,
@@ -382,6 +383,22 @@ describe("shared contract schemas", () => {
       metadata: {},
       position: 0
     });
+    expect(CourseAllGroupsActivityAssignmentInputSchema.parse({
+      assessmentMode: "summative",
+      groupAssignments: [
+        { groupId: "group-1", assigned: true, overrideFields: ["pointsPossible"] },
+        { groupId: "group-2", assigned: false }
+      ]
+    })).toMatchObject({
+      assessmentMode: "summative",
+      groupAssignments: [
+        { groupId: "group-1", assigned: true, overrideFields: ["pointsPossible"] },
+        { groupId: "group-2", assigned: false, overrideFields: [] }
+      ]
+    });
+    expect(() => CourseAllGroupsActivityAssignmentInputSchema.parse({
+      groupAssignments: [{ groupId: "group-1", assigned: true, overrideFields: ["contentFolder"] }]
+    })).toThrow();
     expect(EnrollmentInputSchema.parse({ userId: "user-1", role: "student" })).toEqual({ userId: "user-1", role: "student" });
   });
 });

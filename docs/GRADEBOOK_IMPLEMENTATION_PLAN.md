@@ -404,8 +404,8 @@ These are implementation details rather than product-level blockers:
 ### Phase 2: Gradebook Item Lifecycle - Completed
 
 - Completed: create gradebook items when activities are assigned to groups.
-- Completed: handle course-wide all-groups assignments by creating one gradebook item per materialized `CourseGroupActivity`.
-- Completed: preserve gradebook items when all-groups policy is removed.
+- Completed: create one gradebook item per `CourseGroupActivity` materialized by the course activity settings dialog.
+- Completed: delete the group-scoped gradebook records when that group is explicitly unassigned.
 - Completed: group activity assignment removal is handled by the `CourseGroupActivity` relation lifecycle.
 - Completed: guarded group deletion cascades group-scoped gradebook items, attempts, grades, and audit events; participant transfer creates deduplicated destination enrollments before deleting the source group, while permanent learner removal requires explicit confirmation.
 - Deferred until grade editing services exist: block grade editing after course archive.
@@ -466,11 +466,11 @@ First plugin integration target:
 
 ### Phase 6A: Formative/Summative Assignment Mode - Completed
 
-- Completed: add assignment-level `assessmentMode` metadata for direct group assignments and course-wide all-groups assignments.
+- Completed: add General assignment-level `assessmentMode` metadata for direct group assignments and course activity settings.
 - Completed: default new assignments to formative activity behavior.
-- Completed: expose formative/summative selection in group assignment and course-wide all-groups assignment forms.
+- Completed: expose formative/summative selection as a non-overridable General activity setting.
 - Completed: expose core gradebook policy settings in summative assignment forms: points possible, points/pass-fail grading mode, pass threshold, attempt limit mode, max attempts, grade strategy, and drop-lowest for weighted averages.
-- Completed: persist those settings into each materialized `GradebookItem`, including all current groups and future groups created from an all-groups rule.
+- Completed: persist inherited or explicitly overridden settings into each assigned current group's `GradebookItem`; newly created groups remain unassigned.
 - Completed: pass group assignment metadata into plugin route and renderer context.
 - Completed: make Parsons checks analytics-only for formative activities.
 - Completed: make Parsons summative submissions create core attempts and automatic grades, with the student-facing Parsons toolbar showing Submit instead of Check.

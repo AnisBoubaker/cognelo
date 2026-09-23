@@ -18,6 +18,7 @@ const tx = vi.hoisted(() => ({
   courseGroupActivity: {
     create: vi.fn(),
     createMany: vi.fn(),
+    delete: vi.fn(),
     findMany: vi.fn(),
     update: vi.fn(),
     upsert: vi.fn()
@@ -28,6 +29,10 @@ const tx = vi.hoisted(() => ({
     findFirst: vi.fn(),
     findMany: vi.fn(),
     update: vi.fn()
+  },
+  courseGroupContentVisibilityOverride: {
+    deleteMany: vi.fn(),
+    upsert: vi.fn()
   },
   gradebookItem: {
     upsert: vi.fn()
@@ -77,6 +82,7 @@ const mockPrisma = vi.hoisted(() => ({
     upsert: vi.fn()
   },
   courseContentItem: {
+    findFirst: vi.fn(),
     findMany: vi.fn()
   },
   courseGroupContentVisibilityOverride: {
@@ -141,6 +147,7 @@ const {
   deleteCourseGroup,
   createGroupMaterial,
   getCourseGroup,
+  getCourseActivityAssignmentSettings,
   getCourseMaterialForGroupDownload,
   getGroupAssignedActivity,
   hideCourseMaterialForGroup,
@@ -204,6 +211,41 @@ describe("group services", () => {
     await expect(listGroupActivityAssignments(studentUser, "course-1", "group-1"))
       .rejects.toMatchObject({ status: 403 });
     expect(mockPrisma.courseGroupActivity.findMany).not.toHaveBeenCalled();
+  });
+
+  it("treats every current group as assigned when an existing activity has no assignment data", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      courseId: "course-1",
+      title: "Legacy activity",
+      metadata: {
+        allGroupsAssignment: {
+          contentPlacement: { parentId: "stale-folder", isVisible: true }
+        }
+      },
+      activityType: { key: "mcq" }
+    });
+    mockPrisma.courseGroup.findMany.mockResolvedValue([
+      { id: "group-1", title: "Group 1", activities: [] },
+      { id: "group-2", title: "Group 2", activities: [] }
+    ]);
+    mockPrisma.courseContentItem.findFirst.mockResolvedValue({
+      parentId: "folder-1",
+      titleSnapshot: "Legacy activity",
+      isVisible: true,
+      metadata: {}
+    });
+
+    await expect(getCourseActivityAssignmentSettings(teacherUser, "course-1", "activity-1")).resolves.toMatchObject({
+      general: {
+        assessmentMode: "formative",
+        contentPlacement: { parentId: "folder-1", isVisible: true }
+      },
+      groups: [
+        { groupId: "group-1", assigned: true, overrideFields: [] },
+        { groupId: "group-2", assigned: true, overrideFields: [] }
+      ]
+    });
   });
 
   it("creates groups as drafts with the creator as a teacher participant", async () => {
@@ -280,7 +322,7 @@ describe("group services", () => {
     expect(tx.courseGroup.delete).toHaveBeenCalledWith({ where: { id: "group-1" } });
   });
 
-  it("creates gradebook items for course-wide assignments inherited by a new group", async () => {
+  it("does not assign existing activities when a new group is created", async () => {
     tx.courseGroup.create.mockResolvedValue({ id: "group-1" });
     tx.activity.findMany.mockResolvedValue([
       {
@@ -299,37 +341,11 @@ describe("group services", () => {
 
     await createCourseGroup(teacherUser, "course-1", { title: "Team A" });
 
-    expect(tx.courseGroupActivity.upsert).toHaveBeenCalledWith({
-      where: {
-        groupId_activityId: {
-          groupId: "group-1",
-          activityId: "activity-1"
-        }
-      },
-      update: {},
-      create: {
-        groupId: "group-1",
-        activityId: "activity-1",
-        availableFrom: new Date("2026-05-18T13:00:00.000Z"),
-        availableUntil: null,
-        metadata: { assignmentScope: "course_all_groups", enablePerGroupSettings: true, assessmentMode: "formative" },
-        position: 0
-      }
-    });
-    expect(tx.gradebookItem.upsert).toHaveBeenCalledWith({
-      where: { groupActivityId: "assignment-group-1" },
-      update: {},
-      create: {
-        courseId: "course-1",
-        groupId: "group-1",
-        groupActivityId: "assignment-group-1",
-        activityId: "activity-1",
-        titleSnapshot: "Parsons warmup"
-      }
-    });
+    expect(tx.courseGroupActivity.upsert).not.toHaveBeenCalled();
+    expect(tx.gradebookItem.upsert).not.toHaveBeenCalled();
   });
 
-  it("assigns a course activity to all current groups and stores the future-group rule", async () => {
+  it("assigns a course activity to all current groups without assigning future groups", async () => {
     mockPrisma.activity.findFirst.mockResolvedValue({
       id: "activity-1",
       courseId: "course-1",
@@ -360,7 +376,9 @@ describe("group services", () => {
               availableFrom: "2026-05-18T13:00:00.000Z",
               availableUntil: "2026-05-25T13:00:00.000Z",
               enablePerGroupSettings: true,
-              assessmentMode: "formative"
+              futureGroupsAssigned: false,
+              assessmentMode: "formative",
+              assignedGroupIds: ["group-1", "group-2"]
             }
           })
         })
@@ -375,40 +393,21 @@ describe("group services", () => {
           activityId: "activity-1",
           availableFrom: new Date("2026-05-18T13:00:00.000Z"),
           availableUntil: new Date("2026-05-25T13:00:00.000Z"),
-          metadata: { assignmentScope: "course_all_groups", enablePerGroupSettings: true, assessmentMode: "formative" }
+          metadata: { assignmentScope: "course_activity_settings", overrideFields: [], assessmentMode: "formative" }
         })
       })
     );
     expect(tx.courseGroupActivity.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { groupId_activityId: { groupId: "group-2", activityId: "activity-1" } },
-        update: {
-          metadata: { assignmentScope: "course_all_groups", enablePerGroupSettings: true, assessmentMode: "formative" }
-        }
+        update: expect.objectContaining({
+          availableFrom: new Date("2026-05-18T13:00:00.000Z"),
+          availableUntil: new Date("2026-05-25T13:00:00.000Z"),
+          metadata: { assignmentScope: "course_activity_settings", overrideFields: [], assessmentMode: "formative" }
+        })
       })
     );
-    expect(tx.gradebookItem.upsert).toHaveBeenCalledWith({
-      where: { groupActivityId: "assignment-group-1" },
-      update: {},
-      create: {
-        courseId: "course-1",
-        groupId: "group-1",
-        groupActivityId: "assignment-group-1",
-        activityId: "activity-1",
-        titleSnapshot: "Loop practice"
-      }
-    });
-    expect(tx.gradebookItem.upsert).toHaveBeenCalledWith({
-      where: { groupActivityId: "assignment-group-2" },
-      update: {},
-      create: {
-        courseId: "course-1",
-        groupId: "group-2",
-        groupActivityId: "assignment-group-2",
-        activityId: "activity-1",
-        titleSnapshot: "Loop practice"
-      }
-    });
+    expect(tx.gradebookItem.upsert).toHaveBeenCalledTimes(2);
   });
 
   it("assigns a Test summatively to all groups with one gradebook item per assignment", async () => {
@@ -447,6 +446,119 @@ describe("group services", () => {
           allGroupsAssignment: expect.objectContaining({ assessmentMode: "summative" })
         })
       })
+    }));
+  });
+
+  it("saves explicit group overrides and removes unchecked group assignments", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      courseId: "course-1",
+      title: "Final quiz",
+      metadata: {},
+      activityType: { key: "mcq" }
+    });
+    tx.courseGroup.findMany.mockResolvedValue([
+      {
+        id: "group-1",
+        activities: [{ id: "assignment-1", activityId: "activity-1", position: 0, metadata: { note: "keep" } }]
+      },
+      {
+        id: "group-2",
+        activities: [{ id: "assignment-2", activityId: "activity-1", position: 0, metadata: {} }]
+      }
+    ]);
+    tx.activity.findFirst.mockResolvedValue({ id: "activity-1" });
+
+    await assignActivityToAllCourseGroups(teacherUser, "course-1", "activity-1", {
+      assessmentMode: "summative",
+      availableFrom: "2026-05-18T13:00:00.000Z",
+      gradebookSettings: { pointsPossible: 100, gradeStrategy: "latest" },
+      contentPlacement: { parentId: null, isVisible: true },
+      groupAssignments: [
+        {
+          groupId: "group-1",
+          assigned: true,
+          overrideFields: ["availableFrom", "pointsPossible"],
+          availableFrom: "2026-05-19T13:00:00.000Z",
+          gradebookSettings: { pointsPossible: 25 },
+          contentPlacement: { parentId: null, isVisible: true }
+        },
+        { groupId: "group-2", assigned: false }
+      ]
+    });
+
+    expect(tx.courseGroupActivity.delete).toHaveBeenCalledWith({ where: { id: "assignment-2" } });
+    expect(tx.courseGroupActivity.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { groupId_activityId: { groupId: "group-1", activityId: "activity-1" } },
+      update: expect.objectContaining({
+        availableFrom: new Date("2026-05-19T13:00:00.000Z"),
+        metadata: {
+          note: "keep",
+          assignmentScope: "course_activity_settings",
+          overrideFields: ["availableFrom", "pointsPossible"],
+          assessmentMode: "summative"
+        }
+      })
+    }));
+    expect(tx.gradebookItem.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      update: expect.objectContaining({ pointsPossible: 25, gradeStrategy: "latest" })
+    }));
+    expect(tx.activity.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        metadata: expect.objectContaining({
+          allGroupsAssignment: expect.objectContaining({ assignedGroupIds: ["group-1"], enabled: false })
+        })
+      })
+    }));
+  });
+
+  it("clears summative-only overrides when General is formative", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      courseId: "course-1",
+      title: "Practice",
+      metadata: {},
+      activityType: { key: "mcq" }
+    });
+    tx.courseGroup.findMany.mockResolvedValue([{ id: "group-1", activities: [] }]);
+    tx.activity.findFirst.mockResolvedValue({ id: "activity-1" });
+
+    await assignActivityToAllCourseGroups(teacherUser, "course-1", "activity-1", {
+      assessmentMode: "formative",
+      requireSafeExamBrowser: false,
+      groupAssignments: [{
+        groupId: "group-1",
+        assigned: true,
+        overrideFields: ["pointsPossible", "grading", "attempts", "gradeStrategy", "requireSafeExamBrowser"],
+        requireSafeExamBrowser: true,
+        gradebookSettings: {
+          pointsPossible: 25,
+          gradingMode: "pass_fail",
+          attemptLimitMode: "max_attempts",
+          maxAttempts: 2,
+          gradeStrategy: "best"
+        }
+      }]
+    });
+
+    expect(tx.courseGroupActivity.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        metadata: {
+          assignmentScope: "course_activity_settings",
+          overrideFields: [],
+          assessmentMode: "formative"
+        }
+      })
+    }));
+    expect(tx.activity.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: {
+        metadata: {
+          allGroupsAssignment: expect.not.objectContaining({
+            gradebookSettings: expect.anything(),
+            requireSafeExamBrowser: expect.anything()
+          })
+        }
+      }
     }));
   });
 
@@ -503,7 +615,7 @@ describe("group services", () => {
     expect(tx.courseGroupActivity.upsert).not.toHaveBeenCalled();
   });
 
-  it("applies course-wide dates to existing group assignments when per-group settings are disabled", async () => {
+  it("applies inherited General dates to existing group assignments", async () => {
     mockPrisma.activity.findFirst.mockResolvedValue({
       id: "activity-1",
       courseId: "course-1",
@@ -527,7 +639,7 @@ describe("group services", () => {
         update: {
           availableFrom: new Date("2026-05-18T13:00:00.000Z"),
           availableUntil: new Date("2026-05-25T13:00:00.000Z"),
-          metadata: { assignmentScope: "course_all_groups", enablePerGroupSettings: false, assessmentMode: "formative" }
+          metadata: { assignmentScope: "course_activity_settings", overrideFields: [], assessmentMode: "formative" }
         }
       })
     );
@@ -579,7 +691,82 @@ describe("group services", () => {
     });
   });
 
-  it("creates course-wide content placement when a future group inherits assignments", async () => {
+  it("keeps drag-and-drop course placement canonical when assignment settings are saved", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      courseId: "course-1",
+      title: "Loop practice",
+      metadata: {}
+    });
+    tx.courseGroup.findMany.mockResolvedValue([{ id: "group-1", activities: [] }]);
+    tx.courseContentItem.findFirst
+      .mockResolvedValueOnce({ id: "course-content-1", parentId: "current-folder", isVisible: true })
+      .mockResolvedValueOnce({ id: "current-folder" })
+      .mockResolvedValueOnce(null);
+    tx.activity.findFirst.mockResolvedValue({ id: "activity-1" });
+
+    await assignActivityToAllCourseGroups(teacherUser, "course-1", "activity-1", {
+      contentPlacement: {
+        parentId: "stale-folder",
+        titleSnapshot: "Loop practice",
+        isVisible: true
+      }
+    });
+
+    expect(tx.activity.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: {
+        metadata: {
+          allGroupsAssignment: expect.objectContaining({
+            contentPlacement: expect.objectContaining({ parentId: "current-folder" })
+          })
+        }
+      }
+    }));
+    expect(tx.courseContentItem.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        parentId: "current-folder",
+        courseGroupActivityId: "assignment-group-1"
+      })
+    });
+  });
+
+  it("persists General and group visibility through the canonical course content item", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      courseId: "course-1",
+      title: "Loop practice",
+      metadata: {},
+      activityType: { key: "mcq" }
+    });
+    tx.courseGroup.findMany.mockResolvedValue([{ id: "group-1", activities: [] }]);
+    tx.courseContentItem.findFirst
+      .mockResolvedValueOnce({ id: "course-content-1", parentId: null, isVisible: true })
+      .mockResolvedValueOnce(null);
+    tx.activity.findFirst.mockResolvedValue({ id: "activity-1" });
+
+    await assignActivityToAllCourseGroups(teacherUser, "course-1", "activity-1", {
+      assessmentMode: "formative",
+      contentPlacement: { parentId: null, isVisible: false },
+      groupAssignments: [{
+        groupId: "group-1",
+        assigned: true,
+        overrideFields: ["visibility"],
+        contentPlacement: { parentId: null, isVisible: true }
+      }]
+    });
+
+    expect(tx.courseContentItem.update).toHaveBeenCalledWith({
+      where: { id: "course-content-1" },
+      data: { isVisible: false }
+    });
+    expect(tx.courseGroupContentVisibilityOverride.upsert).toHaveBeenCalledWith({
+      where: { groupId_contentItemId: { groupId: "group-1", contentItemId: "course-content-1" } },
+      create: { groupId: "group-1", contentItemId: "course-content-1", isVisible: true },
+      update: { isVisible: true }
+    });
+  });
+
+  it("does not create activity content placement for a new group", async () => {
     tx.courseGroup.create.mockResolvedValue({ id: "group-1" });
     tx.activity.findMany.mockResolvedValue([
       {
@@ -601,16 +788,7 @@ describe("group services", () => {
 
     await createCourseGroup(teacherUser, "course-1", { title: "Team A" });
 
-    expect(tx.courseContentItem.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        courseId: "course-1",
-        groupId: "group-1",
-        kind: "activity",
-        titleSnapshot: "Inherited warmup",
-        activityId: "activity-1",
-        courseGroupActivityId: "assignment-group-1"
-      })
-    });
+    expect(tx.courseContentItem.create).not.toHaveBeenCalled();
   });
 
   it("removes the course-wide policy while leaving group assignments group-managed", async () => {

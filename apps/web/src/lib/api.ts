@@ -4,6 +4,7 @@ import type {
   AdminUserPasswordReset,
   AdminUserUpdate,
   ActivityPluginInstallationUpdate,
+  ActivityAssignmentOverrideField,
   AiAgentConnectionInput,
   AiAgentConnectionUpdate,
   ActivityInput,
@@ -693,6 +694,50 @@ export type CourseGroupActivityAssignment = {
   metadata?: Record<string, unknown>;
   position: number;
   activity: Activity;
+};
+
+export type ActivityAssignmentGradebookSettings = {
+  pointsPossible: number;
+  gradingMode: "points" | "pass_fail";
+  passThresholdPoints: number | null;
+  passThresholdOutOf: number | null;
+  attemptLimitMode: "unlimited" | "max_attempts" | "until_due";
+  maxAttempts: number | null;
+  gradeStrategy: "latest" | "best" | "first" | "weighted_average";
+  dropLowestAttempt: boolean;
+};
+
+export type CourseActivityAssignmentSettings = {
+  general: {
+    availableFrom: string | null;
+    availableUntil: string | null;
+    assessmentMode: "formative" | "summative";
+    requireSafeExamBrowser: boolean;
+    gradebookSettings: ActivityAssignmentGradebookSettings;
+    contentPlacement: {
+      parentId: string | null;
+      titleSnapshot: string | null;
+      isVisible: boolean;
+      metadata: Record<string, unknown>;
+    };
+  };
+  groups: Array<{
+    groupId: string;
+    title: string;
+    assigned: boolean;
+    assignmentId: string | null;
+    overrideFields: ActivityAssignmentOverrideField[];
+    availableFrom: string | null;
+    availableUntil: string | null;
+    requireSafeExamBrowser: boolean;
+    gradebookSettings: ActivityAssignmentGradebookSettings;
+    contentPlacement: {
+      parentId: string | null;
+      titleSnapshot: string | null;
+      isVisible: boolean;
+      metadata: Record<string, unknown>;
+    };
+  }>;
 };
 
 export type StudentActivitySubmissionAudit = {
@@ -1524,6 +1569,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input)
     }),
+  courseActivityAssignmentSettings: (courseId: string, activityId: string) =>
+    request<{ settings: CourseActivityAssignmentSettings }>(
+      `/courses/${courseId}/activities/${activityId}/assign-all-groups`
+    ),
   removeActivityFromAllCourseGroupsPolicy: (courseId: string, activityId: string) =>
     request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}/assign-all-groups`, {
       method: "DELETE"
