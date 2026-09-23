@@ -164,8 +164,13 @@ export default function CourseGroupPage() {
         Promise.all(
           (groupResult.group.activities ?? [])
             // Submission history is activity-scoped protected content. The ordinary-browser
-            // course overview must let the selected activity's SEB launcher gate that request.
-            .filter((assignment) => !assignmentRequiresSafeExamBrowser(assignment.metadata))
+            // course overview must let the selected activity's SEB launcher gate that request,
+            // and upcoming assignments must remain locked without aborting the whole overview.
+            .filter(
+              (assignment) =>
+                !assignmentRequiresSafeExamBrowser(assignment.metadata) &&
+                (!assignment.availableFrom || new Date(assignment.availableFrom).getTime() <= Date.now())
+            )
             .map(async (assignment) => ({
               activityId: assignment.activity.id,
               audit: await api.studentActivitySubmissions(courseId, groupId, assignment.activity.id)

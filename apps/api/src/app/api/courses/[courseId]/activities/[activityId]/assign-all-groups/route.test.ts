@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   assignActivityToAllCourseGroups: vi.fn(),
+  getCourseActivityAssignmentSettings: vi.fn(),
   removeActivityFromAllCourseGroupsPolicy: vi.fn(),
   readJson: vi.fn(),
   requireUser: vi.fn()
@@ -9,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@cognelo/core", () => ({
   assignActivityToAllCourseGroups: mocks.assignActivityToAllCourseGroups,
+  getCourseActivityAssignmentSettings: mocks.getCourseActivityAssignmentSettings,
   removeActivityFromAllCourseGroupsPolicy: mocks.removeActivityFromAllCourseGroupsPolicy
 }));
 
@@ -20,7 +22,7 @@ vi.mock("@/lib/http", () => ({
   requireUser: mocks.requireUser
 }));
 
-const { DELETE, POST } = await import("./route");
+const { DELETE, GET, POST } = await import("./route");
 
 describe("assign all course groups route", () => {
   beforeEach(() => {
@@ -28,7 +30,22 @@ describe("assign all course groups route", () => {
     mocks.requireUser.mockResolvedValue({ id: "teacher-1", roles: ["teacher"] });
     mocks.readJson.mockResolvedValue({ availableFrom: "2026-05-18T13:00:00.000Z", availableUntil: null });
     mocks.assignActivityToAllCourseGroups.mockResolvedValue({ id: "activity-1" });
+    mocks.getCourseActivityAssignmentSettings.mockResolvedValue({ general: {}, groups: [] });
     mocks.removeActivityFromAllCourseGroupsPolicy.mockResolvedValue({ id: "activity-1" });
+  });
+
+  it("returns the current General and per-group settings", async () => {
+    const response = await GET(new Request("http://test.local") as never, {
+      params: Promise.resolve({ courseId: "course-1", activityId: "activity-1" })
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ settings: { general: {}, groups: [] } });
+    expect(mocks.getCourseActivityAssignmentSettings).toHaveBeenCalledWith(
+      { id: "teacher-1", roles: ["teacher"] },
+      "course-1",
+      "activity-1"
+    );
   });
 
   it("assigns a course activity to every group", async () => {

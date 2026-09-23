@@ -17,12 +17,12 @@ import {
 } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
+import { ActivitySettingsDialog } from "@/components/activity-settings-dialog";
 import { ActivityTypeIcon, AppIcon, FolderContentIcon as SharedFolderContentIcon } from "@/components/app-icon";
 import { useAuth } from "@/components/auth-provider";
 import { CourseSettingsPanel, type CourseSettingsSection } from "@/components/course-settings-panel";
 import { CourseParticipantsPanel } from "@/components/course-participants-panel";
 import { CourseGradeChallengesPanel } from "@/components/course-grade-challenges-panel";
-import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import {
   api,
@@ -90,23 +90,6 @@ export default function CourseDetailPage() {
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingFolderTitle, setEditingFolderTitle] = useState("");
   const [editingFolderSelectAll, setEditingFolderSelectAll] = useState(false);
-  const [assignAllActivityId, setAssignAllActivityId] = useState<string | null>(null);
-  const [assignAllParentId, setAssignAllParentId] = useState("");
-  const [assignAllIsVisible, setAssignAllIsVisible] = useState(true);
-  const [assignAllAvailableFrom, setAssignAllAvailableFrom] = useState("");
-  const [assignAllAvailableUntil, setAssignAllAvailableUntil] = useState("");
-  const [assignAllEnablePerGroupSettings, setAssignAllEnablePerGroupSettings] = useState(true);
-  const [assignAllAssessmentMode, setAssignAllAssessmentMode] = useState<"formative" | "summative">("formative");
-  const [assignAllRequireSafeExamBrowser, setAssignAllRequireSafeExamBrowser] = useState(false);
-  const [assignAllPointsPossible, setAssignAllPointsPossible] = useState("100");
-  const [assignAllGradingMode, setAssignAllGradingMode] = useState<"points" | "pass_fail">("points");
-  const [assignAllPassThresholdPoints, setAssignAllPassThresholdPoints] = useState("50");
-  const [assignAllPassThresholdOutOf, setAssignAllPassThresholdOutOf] = useState("100");
-  const [assignAllAttemptLimitMode, setAssignAllAttemptLimitMode] = useState<"unlimited" | "max_attempts" | "until_due">("unlimited");
-  const [assignAllMaxAttempts, setAssignAllMaxAttempts] = useState("1");
-  const [assignAllGradeStrategy, setAssignAllGradeStrategy] = useState<"latest" | "best" | "first" | "weighted_average">("latest");
-  const [assignAllDropLowestAttempt, setAssignAllDropLowestAttempt] = useState(false);
-  const [assignAllSavingActivityId, setAssignAllSavingActivityId] = useState<string | null>(null);
   const [settingsContentItemId, setSettingsContentItemId] = useState<string | null>(null);
   const [settingsMaterialTitle, setSettingsMaterialTitle] = useState("");
   const [settingsMaterialUrl, setSettingsMaterialUrl] = useState("");
@@ -523,121 +506,6 @@ export default function CourseDetailPage() {
     }
   }
 
-  function startAssigningActivityToAllGroups(activity: NonNullable<Course["activities"]>[number]) {
-    const rule = getAllGroupsAssignmentRule(activity);
-    const coursePlacement = contentItems.find(
-      (item) => item.groupId === null && item.kind === "activity" && item.activityId === activity.id
-    );
-    const gradebookSettings = rule?.gradebookSettings;
-    const isTest = activity.activityType.key === "test";
-    setAssignAllActivityId(activity.id);
-    setAssignAllAvailableFrom(toDateTimeLocalValue(rule?.availableFrom));
-    setAssignAllAvailableUntil(toDateTimeLocalValue(rule?.availableUntil));
-    setAssignAllEnablePerGroupSettings(rule?.enablePerGroupSettings ?? true);
-    setAssignAllParentId(rule?.contentPlacement?.parentId ?? coursePlacement?.parentId ?? "");
-    setAssignAllIsVisible(rule?.contentPlacement?.isVisible ?? coursePlacement?.isVisible ?? true);
-    setAssignAllAssessmentMode(isTest ? "summative" : rule?.assessmentMode ?? "formative");
-    setAssignAllRequireSafeExamBrowser(rule?.requireSafeExamBrowser ?? false);
-    setAssignAllPointsPossible(String(gradebookSettings?.pointsPossible ?? 100));
-    setAssignAllGradingMode(gradebookSettings?.gradingMode ?? "points");
-    setAssignAllPassThresholdPoints(String(gradebookSettings?.passThresholdPoints ?? 50));
-    setAssignAllPassThresholdOutOf(String(gradebookSettings?.passThresholdOutOf ?? 100));
-    setAssignAllAttemptLimitMode(gradebookSettings?.attemptLimitMode ?? "unlimited");
-    setAssignAllMaxAttempts(String(gradebookSettings?.maxAttempts ?? 1));
-    setAssignAllGradeStrategy(gradebookSettings?.gradeStrategy ?? "latest");
-    setAssignAllDropLowestAttempt(gradebookSettings?.dropLowestAttempt ?? false);
-    setError("");
-  }
-
-  function buildAssignAllGradebookSettings() {
-    const pointsPossible = Number(assignAllPointsPossible);
-    const passThresholdPoints = Number(assignAllPassThresholdPoints);
-    const passThresholdOutOf = Number(assignAllPassThresholdOutOf);
-    const maxAttempts = Number(assignAllMaxAttempts);
-    return {
-      pointsPossible: Number.isFinite(pointsPossible) && pointsPossible > 0 ? pointsPossible : 100,
-      gradingMode: assignAllGradingMode,
-      passThresholdPoints:
-        assignAllGradingMode === "pass_fail" && Number.isFinite(passThresholdPoints) ? passThresholdPoints : null,
-      passThresholdOutOf:
-        assignAllGradingMode === "pass_fail" && Number.isFinite(passThresholdOutOf) && passThresholdOutOf > 0 ? passThresholdOutOf : null,
-      attemptLimitMode: assignAllAttemptLimitMode,
-      maxAttempts: assignAllAttemptLimitMode === "max_attempts" && Number.isFinite(maxAttempts) && maxAttempts > 0 ? Math.floor(maxAttempts) : null,
-      gradeStrategy: assignAllGradeStrategy,
-      dropLowestAttempt: assignAllGradeStrategy === "weighted_average" ? assignAllDropLowestAttempt : false
-    };
-  }
-
-  async function assignActivityToAllGroups(event: FormEvent) {
-    event.preventDefault();
-    if (!assignAllActivityId) {
-      return;
-    }
-
-    setError("");
-    setAssignAllSavingActivityId(assignAllActivityId);
-    try {
-      const selectedActivity = course?.activities?.find((activity) => activity.id === assignAllActivityId);
-      const assessmentMode = selectedActivity?.activityType.key === "test" ? "summative" : assignAllAssessmentMode;
-      await api.assignActivityToAllCourseGroups(courseId, assignAllActivityId, {
-        availableFrom: toIsoOrNull(assignAllAvailableFrom),
-        availableUntil: toIsoOrNull(assignAllAvailableUntil),
-        enablePerGroupSettings: assignAllEnablePerGroupSettings,
-        assessmentMode,
-        requireSafeExamBrowser: assessmentMode === "summative" && assignAllRequireSafeExamBrowser,
-        ...(assessmentMode === "summative" ? { gradebookSettings: buildAssignAllGradebookSettings() } : {}),
-        contentPlacement: {
-          parentId: assignAllParentId || null,
-          isVisible: assignAllIsVisible,
-          metadata: {}
-        }
-      });
-      setAssignAllActivityId(null);
-      setAssignAllParentId("");
-      setAssignAllIsVisible(true);
-      setAssignAllAvailableFrom("");
-      setAssignAllAvailableUntil("");
-      setAssignAllEnablePerGroupSettings(true);
-      setAssignAllAssessmentMode("formative");
-      setAssignAllRequireSafeExamBrowser(false);
-      setAssignAllPointsPossible("100");
-      setAssignAllGradingMode("points");
-      setAssignAllPassThresholdPoints("50");
-      setAssignAllPassThresholdOutOf("100");
-      setAssignAllAttemptLimitMode("unlimited");
-      setAssignAllMaxAttempts("1");
-      setAssignAllGradeStrategy("latest");
-      setAssignAllDropLowestAttempt(false);
-      await refresh();
-      closeContentSettings();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("courseDetail.assignAllGroupsError"));
-    } finally {
-      setAssignAllSavingActivityId(null);
-    }
-  }
-
-  async function removeActivityFromAllGroupsPolicy(activity: NonNullable<Course["activities"]>[number]) {
-    const confirmed = window.confirm(t("courseDetail.removeAllGroupsPolicyConfirm", { title: activity.title }));
-    if (!confirmed) {
-      return;
-    }
-
-    setError("");
-    setAssignAllSavingActivityId(activity.id);
-    try {
-      await api.removeActivityFromAllCourseGroupsPolicy(courseId, activity.id);
-      if (assignAllActivityId === activity.id) {
-        setAssignAllActivityId(null);
-      }
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("courseDetail.removeAllGroupsPolicyError"));
-    } finally {
-      setAssignAllSavingActivityId(null);
-    }
-  }
-
   function materialHref(material: CourseMaterial) {
     if (legacyMaterialHasStoredFile(material)) {
       return withMaterialDownloadVersion(api.materialDownloadUrl(courseId, material.id), material);
@@ -720,7 +588,6 @@ export default function CourseDetailPage() {
   const groupAssignmentById = new Map((contentGroup?.activities ?? []).map((assignment) => [assignment.id, assignment]));
   const settingsContentItem = settingsContentItemId ? contentItems.find((item) => item.id === settingsContentItemId) ?? null : null;
   const settingsActivity = settingsContentItem?.activityId ? courseActivityById.get(settingsContentItem.activityId) ?? null : null;
-  const settingsActivityIsTest = settingsActivity?.activityType.key === "test";
   const settingsContentResource = settingsContentItem?.contentResourceId ? contentResourceById.get(settingsContentItem.contentResourceId) ?? null : null;
   const settingsContentType = settingsContentResource ? contentTypeByKey.get(settingsContentResource.contentTypeKey) ?? null : null;
   const SettingsContentTypeRenderer = resolveContentTypeSettingsRenderer(settingsContentType?.settingsRendererKey);
@@ -1025,10 +892,6 @@ export default function CourseDetailPage() {
     setSettingsContentItemId(item.id);
     setSettingsError("");
     if (item.activityId) {
-      const activity = courseActivityById.get(item.activityId);
-      if (activity) {
-        startAssigningActivityToAllGroups(activity);
-      }
       return;
     }
     if (item.materialId) {
@@ -1649,9 +1512,13 @@ export default function CourseDetailPage() {
                                       {contentResourceIsUnavailable ? (
                                         <span className="metadata-badge is-warning">{t("courseDetail.contentPluginUnavailable")}</span>
                                       ) : null}
-                                      {allGroupsRule?.enabled ? (
+                                      {allGroupsRule && (allGroupsRule.enabled || allGroupsRule.assignedGroupIds !== null) ? (
                                         <span className="metadata-badge is-course-wide">
-                                          {t("courseDetail.assignedToAllGroups")} ·{" "}
+                                          {(allGroupsRule.assignedGroupIds === null
+                                            ? allGroupsRule.enabled
+                                            : allGroupsRule.assignedGroupIds.length === sortedCourseGroups.length)
+                                            ? t("courseDetail.assignedToAllGroups")
+                                            : t("courseDetail.assignedToGroupsCount", { count: allGroupsRule.assignedGroupIds?.length ?? 0 })} ·{" "}
                                           {formatAvailabilityWindow(allGroupsRule.availableFrom, allGroupsRule.availableUntil, t)}
                                         </span>
                                       ) : null}
@@ -2128,7 +1995,7 @@ export default function CourseDetailPage() {
                 <section
                   aria-labelledby="course-content-settings-title"
                   aria-modal="true"
-                  className="dialog-panel"
+                  className={settingsActivity ? "dialog-panel activity-settings-dialog" : "dialog-panel"}
                   role="dialog"
                 >
                   <div className="section-heading">
@@ -2142,225 +2009,12 @@ export default function CourseDetailPage() {
                   </div>
 
                   {settingsActivity ? (
-                    <form className="form" onSubmit={assignActivityToAllGroups}>
-                      <div className="grid compact-form-grid">
-                        <div className="field">
-                          <label htmlFor={`settings-assign-folder-${settingsActivity.id}`}>{t("courseDetail.contentFolderLabel")}</label>
-                          <select
-                            id={`settings-assign-folder-${settingsActivity.id}`}
-                            value={assignAllParentId}
-                            disabled={assignAllSavingActivityId === settingsActivity.id}
-                            onChange={(event) => setAssignAllParentId(event.target.value)}
-                          >
-                            <option value="">{t("courseDetail.contentFolderRoot")}</option>
-                            {contentFolderOptions.map(({ item: folder, depth }) => (
-                              <option key={folder.id} value={folder.id}>
-                                {formatFolderOptionLabel(folder, depth, t("courseDetail.untitledFolder"))}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="field">
-                          <label htmlFor={`settings-assign-from-${settingsActivity.id}`}>{t("groupPage.availableFrom")}</label>
-                          <DateTimeMinuteInput
-                            id={`settings-assign-from-${settingsActivity.id}`}
-                            value={assignAllAvailableFrom}
-                            onChange={setAssignAllAvailableFrom}
-                            disabled={assignAllSavingActivityId === settingsActivity.id}
-                          />
-                        </div>
-                        <div className="field">
-                          <label htmlFor={`settings-assign-until-${settingsActivity.id}`}>{t("groupPage.availableUntil")}</label>
-                          <DateTimeMinuteInput
-                            id={`settings-assign-until-${settingsActivity.id}`}
-                            value={assignAllAvailableUntil}
-                            onChange={setAssignAllAvailableUntil}
-                            disabled={assignAllSavingActivityId === settingsActivity.id}
-                          />
-                        </div>
-                        <div className="field">
-                          <label htmlFor={`settings-assign-mode-${settingsActivity.id}`}>{t("groupPage.assessmentMode")}</label>
-                          <select
-                            id={`settings-assign-mode-${settingsActivity.id}`}
-                            value={assignAllAssessmentMode}
-                            disabled={assignAllSavingActivityId === settingsActivity.id || settingsActivityIsTest}
-                            onChange={(event) => {
-                              const mode = event.target.value as "formative" | "summative";
-                              setAssignAllAssessmentMode(mode);
-                              if (mode === "formative") setAssignAllRequireSafeExamBrowser(false);
-                            }}
-                          >
-                            <option value="formative">{t("groupPage.assessmentModeFormative")}</option>
-                            <option value="summative">{t("groupPage.assessmentModeSummative")}</option>
-                          </select>
-                        </div>
-                      </div>
-                      <label className="checkbox-row" htmlFor={`settings-assign-visible-${settingsActivity.id}`}>
-                        <input
-                          id={`settings-assign-visible-${settingsActivity.id}`}
-                          type="checkbox"
-                          checked={assignAllIsVisible}
-                          disabled={assignAllSavingActivityId === settingsActivity.id}
-                          onChange={(event) => setAssignAllIsVisible(event.target.checked)}
-                        />
-                        <span>{t("courseDetail.contentVisibleLabel")}</span>
-                      </label>
-                      <label className="checkbox-row" htmlFor={`settings-assign-overrides-${settingsActivity.id}`}>
-                        <input
-                          id={`settings-assign-overrides-${settingsActivity.id}`}
-                          type="checkbox"
-                          checked={assignAllEnablePerGroupSettings}
-                          disabled={assignAllSavingActivityId === settingsActivity.id}
-                          onChange={(event) => setAssignAllEnablePerGroupSettings(event.target.checked)}
-                        />
-                        <span>{t("courseDetail.enablePerGroupSettings")}</span>
-                      </label>
-                      {assignAllAssessmentMode === "summative" ? (
-                        <>
-                          <label className="checkbox-row" htmlFor={`settings-assign-seb-${settingsActivity.id}`}>
-                            <input
-                              id={`settings-assign-seb-${settingsActivity.id}`}
-                              type="checkbox"
-                              checked={assignAllRequireSafeExamBrowser}
-                              disabled={assignAllSavingActivityId === settingsActivity.id}
-                              onChange={(event) => setAssignAllRequireSafeExamBrowser(event.target.checked)}
-                            />
-                            <span>
-                              {t("groupPage.requireSafeExamBrowser")}
-                              <small className="muted">{t("groupPage.requireSafeExamBrowserHelp")}</small>
-                            </span>
-                          </label>
-                          <div className="grid compact-form-grid">
-                          <div className="field">
-                            <label htmlFor={`settings-assign-points-${settingsActivity.id}`}>{t("groupPage.pointsPossible")}</label>
-                            <input
-                              id={`settings-assign-points-${settingsActivity.id}`}
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              value={assignAllPointsPossible}
-                              disabled={assignAllSavingActivityId === settingsActivity.id}
-                              onChange={(event) => setAssignAllPointsPossible(event.target.value)}
-                            />
-                          </div>
-                          <div className="field">
-                            <label htmlFor={`settings-assign-grading-mode-${settingsActivity.id}`}>{t("groupPage.gradingMode")}</label>
-                            <select
-                              id={`settings-assign-grading-mode-${settingsActivity.id}`}
-                              value={assignAllGradingMode}
-                              disabled={assignAllSavingActivityId === settingsActivity.id}
-                              onChange={(event) => setAssignAllGradingMode(event.target.value as "points" | "pass_fail")}
-                            >
-                              <option value="points">{t("groupPage.gradingModePoints")}</option>
-                              <option value="pass_fail">{t("groupPage.gradingModePassFail")}</option>
-                            </select>
-                          </div>
-                          <div className="field">
-                            <label htmlFor={`settings-assign-attempt-mode-${settingsActivity.id}`}>{t("groupPage.attemptLimitMode")}</label>
-                            <select
-                              id={`settings-assign-attempt-mode-${settingsActivity.id}`}
-                              value={assignAllAttemptLimitMode}
-                              disabled={assignAllSavingActivityId === settingsActivity.id}
-                              onChange={(event) => setAssignAllAttemptLimitMode(event.target.value as "unlimited" | "max_attempts" | "until_due")}
-                            >
-                              <option value="unlimited">{t("groupPage.attemptLimitUnlimited")}</option>
-                              <option value="max_attempts">{t("groupPage.attemptLimitMax")}</option>
-                              <option value="until_due">{t("groupPage.attemptLimitUntilDue")}</option>
-                            </select>
-                          </div>
-                          {assignAllGradingMode === "pass_fail" ? (
-                            <>
-                              <div className="field">
-                                <label htmlFor={`settings-assign-pass-points-${settingsActivity.id}`}>{t("groupPage.passThresholdPoints")}</label>
-                                <input
-                                  id={`settings-assign-pass-points-${settingsActivity.id}`}
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={assignAllPassThresholdPoints}
-                                  disabled={assignAllSavingActivityId === settingsActivity.id}
-                                  onChange={(event) => setAssignAllPassThresholdPoints(event.target.value)}
-                                />
-                              </div>
-                              <div className="field">
-                                <label htmlFor={`settings-assign-pass-out-of-${settingsActivity.id}`}>{t("groupPage.passThresholdOutOf")}</label>
-                                <input
-                                  id={`settings-assign-pass-out-of-${settingsActivity.id}`}
-                                  type="number"
-                                  min="0.01"
-                                  step="0.01"
-                                  value={assignAllPassThresholdOutOf}
-                                  disabled={assignAllSavingActivityId === settingsActivity.id}
-                                  onChange={(event) => setAssignAllPassThresholdOutOf(event.target.value)}
-                                />
-                              </div>
-                            </>
-                          ) : null}
-                          {assignAllAttemptLimitMode === "max_attempts" ? (
-                            <div className="field">
-                              <label htmlFor={`settings-assign-max-attempts-${settingsActivity.id}`}>{t("groupPage.maxAttempts")}</label>
-                              <input
-                                id={`settings-assign-max-attempts-${settingsActivity.id}`}
-                                type="number"
-                                min="1"
-                                step="1"
-                                value={assignAllMaxAttempts}
-                                disabled={assignAllSavingActivityId === settingsActivity.id}
-                                onChange={(event) => setAssignAllMaxAttempts(event.target.value)}
-                              />
-                            </div>
-                          ) : null}
-                          <div className="field">
-                            <label htmlFor={`settings-assign-grade-strategy-${settingsActivity.id}`}>{t("groupPage.gradeStrategy")}</label>
-                            <select
-                              id={`settings-assign-grade-strategy-${settingsActivity.id}`}
-                              value={assignAllGradeStrategy}
-                              disabled={assignAllSavingActivityId === settingsActivity.id}
-                              onChange={(event) =>
-                                setAssignAllGradeStrategy(event.target.value as "latest" | "best" | "first" | "weighted_average")
-                              }
-                            >
-                              <option value="latest">{t("groupPage.gradeStrategyLatest")}</option>
-                              <option value="best">{t("groupPage.gradeStrategyBest")}</option>
-                              <option value="first">{t("groupPage.gradeStrategyFirst")}</option>
-                              <option value="weighted_average">{t("groupPage.gradeStrategyWeightedAverage")}</option>
-                            </select>
-                          </div>
-                          {assignAllGradeStrategy === "weighted_average" ? (
-                            <label className="checkbox-row" htmlFor={`settings-assign-drop-lowest-${settingsActivity.id}`}>
-                              <input
-                                id={`settings-assign-drop-lowest-${settingsActivity.id}`}
-                                type="checkbox"
-                                checked={assignAllDropLowestAttempt}
-                                disabled={assignAllSavingActivityId === settingsActivity.id}
-                                onChange={(event) => setAssignAllDropLowestAttempt(event.target.checked)}
-                              />
-                              <span>{t("groupPage.dropLowestAttempt")}</span>
-                            </label>
-                          ) : null}
-                          </div>
-                        </>
-                      ) : null}
-                      {settingsError ? <p className="error">{settingsError}</p> : null}
-                      <div className="row">
-                        <button disabled={assignAllSavingActivityId === settingsActivity.id} type="submit">
-                          {assignAllSavingActivityId === settingsActivity.id ? t("common.saving") : t("courseDetail.assignAllGroupsSave")}
-                        </button>
-                        {getAllGroupsAssignmentRule(settingsActivity)?.enabled ? (
-                          <button
-                            className="danger"
-                            disabled={assignAllSavingActivityId === settingsActivity.id}
-                            type="button"
-                            onClick={() => removeActivityFromAllGroupsPolicy(settingsActivity)}
-                          >
-                            {t("courseDetail.removeAllGroupsPolicy")}
-                          </button>
-                        ) : null}
-                        <Link className="button secondary" href={`/courses/${courseId}/activities/${settingsActivity.id}`}>
-                          {t("courseDetail.openActivity")}
-                        </Link>
-                      </div>
-                    </form>
+                    <ActivitySettingsDialog
+                      activity={settingsActivity}
+                      courseId={courseId}
+                      onClose={closeContentSettings}
+                      onSaved={refresh}
+                    />
                   ) : settingsContentResource && settingsContentType && SettingsContentTypeRenderer ? (
                     SettingsContentTypeRenderer({
                       definition: settingsContentType,
@@ -2421,6 +2075,9 @@ function getAllGroupsAssignmentRule(activity: NonNullable<Course["activities"]>[
   const record = rule as Record<string, unknown>;
   return {
     enabled: record.enabled === true,
+    assignedGroupIds: Array.isArray(record.assignedGroupIds)
+      ? record.assignedGroupIds.filter((groupId): groupId is string => typeof groupId === "string")
+      : null,
     availableFrom: typeof record.availableFrom === "string" ? record.availableFrom : null,
     availableUntil: typeof record.availableUntil === "string" ? record.availableUntil : null,
     enablePerGroupSettings: record.enablePerGroupSettings !== false,
@@ -2476,26 +2133,6 @@ function withContentResourceDownloadVersion(url: string, resource: CourseContent
         ? resource.metadata.originalName
         : null;
   return version ? `${url}?v=${encodeURIComponent(version)}` : url;
-}
-
-function toDateTimeLocalValue(value: string | null | undefined) {
-  if (!value) {
-    return "";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return offsetDate.toISOString().slice(0, 16);
-}
-
-function toIsoOrNull(value: string) {
-  if (!value) {
-    return null;
-  }
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function formatBytes(bytes: number) {
@@ -2734,11 +2371,6 @@ function flattenContentItems(contentItems: CourseContentItem[], collapsedFolderI
   }
 
   return rows;
-}
-
-function formatFolderOptionLabel(folder: CourseContentItem, depth: number, fallbackTitle: string) {
-  const title = folder.titleSnapshot ?? fallbackTitle;
-  return depth > 0 ? `${"  ".repeat(depth)}- ${title}` : title;
 }
 
 function isContentDescendant(contentItems: CourseContentItem[], possibleChildId: string, possibleAncestorId: string) {

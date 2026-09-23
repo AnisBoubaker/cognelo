@@ -521,6 +521,56 @@ describe("gradebook attempt services", () => {
     );
   });
 
+  it("keeps the first graded attempt when the grade strategy is first", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    tx.gradeEvent.findMany.mockResolvedValue([
+      {
+        attemptId: "attempt-1",
+        nextValue: {
+          attemptId: "attempt-1",
+          attemptNumber: 1,
+          rawScore: 7,
+          rawMaxScore: 10,
+          normalizedScore: 70,
+          normalizedMaxScore: 100,
+          isPass: null
+        }
+      }
+    ]);
+    mockPrisma.activityAttempt.findUnique.mockResolvedValue({
+      id: "attempt-2",
+      courseId: "course-1",
+      gradebookItemId: "gradebook-item-1",
+      participantId: "participant-1",
+      userId: "student-1",
+      attemptNumber: 2,
+      isLate: false,
+      lateBySeconds: null,
+      submittedAt: new Date("2026-05-18T15:00:00.000Z"),
+      participant,
+      gradebookItem: {
+        ...groupActivity.gradebookItem,
+        gradeStrategy: "first"
+      }
+    });
+
+    await recordActivityAttemptGradingResult(teacherUser, {
+      attemptId: "attempt-2",
+      rawScore: 9,
+      rawMaxScore: 10,
+      source: "auto"
+    });
+
+    expect(tx.grade.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          selectedAttemptId: "attempt-1",
+          normalizedScore: 70
+        })
+      })
+    );
+  });
+
   it("selects a weighted average grade and can drop the lowest attempt", async () => {
     authMocks.canManageCourse.mockResolvedValueOnce(true);
     tx.gradeEvent.findMany.mockResolvedValue([

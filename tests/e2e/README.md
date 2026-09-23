@@ -10,6 +10,7 @@ The Playwright suite covers the platform's critical browser journeys with real A
 - authoring a core compound Test from reusable bank activities and completing its student assessment flow;
 - the placeholder activity's intentional unsupported authoring and learner states;
 - summative assignment policy, draft autosave and resume, multiple attempts, attempt limits, automatic grading, gradebook filtering/export, release/hide controls, and student grade visibility;
+- activity-settings dialog layout and placeholders, Cancel behavior, formative/summative field filtering, Assign-to-all preservation, unassignment cleanup, inheritance and every group override category, save/reopen persistence, assigned/unassigned access, group visibility, upcoming and expired availability, Safe Exam Browser gating, and effective per-group gradebook policy;
 - bank activity publication from the editor and list, version comparison, duplication, and movement between banks; and
 - group settings updates and restoration.
 

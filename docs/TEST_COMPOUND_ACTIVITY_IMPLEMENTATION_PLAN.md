@@ -44,7 +44,7 @@ Core Test Activity
 The outer Test is a genuine course `Activity` whose activity type is owned by core rather than an installable plugin. This lets the existing platform continue to use:
 
 - `CourseGroupActivity` for assignment;
-- the existing all-groups assignment policy;
+- the shared course activity assignment settings policy;
 - `CourseContentItem` for content-tree placement;
 - `GradebookItem` for the single Test gradebook entry;
 - `ActivityAttempt` for the parent Test sitting;
@@ -208,8 +208,8 @@ Assignment behavior:
 - assessment mode is always `summative`;
 - availability and due dates belong to the Test assignment;
 - attempt limits and grade strategy belong to the Test gradebook item;
-- all-groups assignment materializes one Test assignment per current group and remains inherited by future groups;
-- per-group settings follow the existing all-groups policy;
+- **Assign to all** materializes one Test assignment per current group, while later groups remain unassigned;
+- per-group settings use explicit overrides of the General Test policy;
 - one content-tree row represents the Test;
 - Test items never appear as sibling course-content rows.
 
@@ -414,7 +414,7 @@ Phase 2 intentionally leaves Test duplication, teacher runtime preview, and immu
 
 - [x] Enable the Test activity type for course creation through its dedicated core flow.
 - [x] Enforce summative-only assignment in direct-group and all-groups services and authoring UI.
-- [x] Reuse group/all-groups assignment, content placement, future-group inheritance, and one gradebook item per assigned Test.
+- [x] Reuse group/settings-dialog assignment, inherited or overridden content placement, and one gradebook item per assigned Test; later groups remain unassigned.
 - [x] Reject child assignment/content placement outside the Test.
 
 Core Test types remain protected from the generic plugin activity creation/update routes so a Test shell cannot be created without its normalized `Test` row. Test content visibility now follows the teacher's selected placement. Student execution remains unavailable until Phase 4 adds the composite execution contract and Test runtime.
@@ -489,7 +489,7 @@ Each phase requires:
 - Design documented.
 - Phase 1 foundation implemented.
 - Phase 2 authoring and ownership implemented: dedicated Test creation, settings, local/bank child composition, reorder/remove/edit flows, containment filters, and lifecycle-safe deletion.
-- Phase 3 assignment and content integration implemented: Test is enabled through its dedicated creation flow, assignments are summative-only, direct/all-groups/future-group materialization reuses the existing content and gradebook paths, and contained children cannot be assigned or placed independently.
+- Phase 3 assignment and content integration implemented: Test is enabled through its dedicated creation flow, assignments are summative-only, direct and settings-dialog materialization reuse the existing content and gradebook paths, later groups remain unassigned, and contained children cannot be assigned or placed independently.
 - Phase 4 execution and the first MCQ adapter are implemented. Students receive a dedicated Test start/resume and navigation shell rather than the teacher authoring form. Core persists one parent attempt plus generic per-item attempts. MCQ answers autosave without an individual submit button; **Submit Test** dispatches every child through capability/handler/renderer registries designed for additional plugins and then submits the parent once.
 - Phase 5 grading and review are implemented: parent aggregation, normal gradebook/release/audit integration, Test breakdowns, item-level manual adjustment with parent recomputation, parent override preservation, Test regrading, individual attempt review, and extensible aggregate review.
 - Phase 6 is implemented. MCQ, Parsons, coding exercise, and web-design coding exercise use plugin-owned composite execution/review adapters; Test attempts use immutable revisions; duplication copies generic and plugin-owned data; deadlines and no-resume rules are server-enforced; final submission is idempotent and concurrency-safe; and the student shell includes localized, accessible timing, navigation, save, and submission states.

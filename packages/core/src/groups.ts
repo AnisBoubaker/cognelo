@@ -14,7 +14,7 @@ import {
   CourseGroupUpdateSchema
 } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
-import type { CurrentUser } from "@cognelo/contracts";
+import type { ActivityAssignmentOverrideField, CurrentUser } from "@cognelo/contracts";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { assertCanManageCourse, assertCanViewCourse, canManageCourse, isAdmin } from "./authorization";
 import { listContentItems } from "./course-content";
@@ -34,10 +34,28 @@ type CourseWideAssignmentMetadata = {
   requireSafeExamBrowser?: boolean;
   gradebookSettings?: GradebookItemSettingsInput;
   contentPlacement?: CourseWideContentPlacement;
+  assignedGroupIds?: string[];
+  futureGroupsAssigned?: boolean;
 };
 
 const COURSE_WIDE_ASSIGNMENT_METADATA_KEY = "allGroupsAssignment";
 const COURSE_WIDE_ASSIGNMENT_SCOPE = "course_all_groups";
+const COURSE_ACTIVITY_SETTINGS_SCOPE = "course_activity_settings";
+const SUMMATIVE_OVERRIDE_FIELDS = new Set<ActivityAssignmentOverrideField>([
+  "availableFrom",
+  "availableUntil",
+  "visibility",
+  "requireSafeExamBrowser",
+  "pointsPossible",
+  "grading",
+  "attempts",
+  "gradeStrategy"
+]);
+const FORMATIVE_OVERRIDE_FIELDS = new Set<ActivityAssignmentOverrideField>([
+  "availableFrom",
+  "availableUntil",
+  "visibility"
+]);
 
 const groupInclude = {
   materials: { orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }] },
@@ -151,9 +169,109 @@ export async function createCourseGroup(user: CurrentUser, courseId: string, inp
       }
     });
 
-    await createCourseWideAssignmentsForGroup(tx, courseId, group.id);
     return group;
   });
+}
+
+export async function getCourseActivityAssignmentSettings(user: CurrentUser, courseId: string, activityId: string) {
+  await assertCanManageCourse(user, courseId);
+  const activity = await assertActivityBelongsToCourse(courseId, activityId);
+  const [groups, coursePlacement] = await Promise.all([
+    prisma.courseGroup.findMany({
+      where: { courseId },
+      include: {
+        activities: {
+          where: { activityId },
+          include: {
+            gradebookItem: true,
+            contentItems: {
+              where: { kind: "activity" },
+              orderBy: [{ createdAt: "asc" }],
+              take: 1
+            }
+          }
+        }
+      },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }]
+    }),
+    prisma.courseContentItem.findFirst({
+      where: { courseId, groupId: null, activityId, kind: "activity" },
+      select: { id: true, parentId: true, titleSnapshot: true, isVisible: true, metadata: true }
+    })
+  ]);
+  const visibilityOverrides = coursePlacement
+    ? await prisma.courseGroupContentVisibilityOverride.findMany({
+        where: { contentItemId: coursePlacement.id },
+        select: { groupId: true, isVisible: true }
+      })
+    : [];
+  const visibilityByGroupId = new Map(visibilityOverrides.map((override) => [override.groupId, override.isVisible]));
+  const rule = getCourseWideAssignmentMetadata(activity.metadata);
+  const assessmentMode = activity.activityType?.key === "test" ? "summative" : rule?.assessmentMode ?? "formative";
+  const generalGradebookSettings = normalizeGradebookItemSettings(rule?.gradebookSettings);
+  const generalContentPlacement = {
+    parentId: coursePlacement?.parentId ?? rule?.contentPlacement?.parentId ?? null,
+    titleSnapshot: rule?.contentPlacement?.titleSnapshot ?? coursePlacement?.titleSnapshot ?? activity.title,
+    isVisible: coursePlacement?.isVisible ?? rule?.contentPlacement?.isVisible ?? true,
+    metadata: rule?.contentPlacement?.metadata ?? asMetadataRecord(coursePlacement?.metadata)
+  };
+  const general = {
+    availableFrom: rule?.availableFrom ?? null,
+    availableUntil: rule?.availableUntil ?? null,
+    assessmentMode,
+    requireSafeExamBrowser: assessmentMode === "summative" && rule?.requireSafeExamBrowser === true,
+    gradebookSettings: generalGradebookSettings,
+    contentPlacement: generalContentPlacement
+  };
+  const hasStoredAssignments = groups.some((group) => group.activities.length > 0);
+
+  return {
+    general,
+    groups: groups.map((group) => {
+      const assignment = group.activities[0] ?? null;
+      const assigned = assignment ? true : !hasStoredAssignments;
+      const assignmentGradebookSettings = assignment?.gradebookItem
+        ? gradebookSettingsFromItem(assignment.gradebookItem)
+        : generalGradebookSettings;
+      const assignmentContentPlacement = assignment?.contentItems[0]
+        ? {
+            parentId: assignment.contentItems[0].parentId,
+            titleSnapshot: assignment.contentItems[0].titleSnapshot,
+            isVisible: visibilityByGroupId.get(group.id) ?? assignment.contentItems[0].isVisible,
+            metadata: asMetadataRecord(assignment.contentItems[0].metadata)
+          }
+        : {
+            ...generalContentPlacement,
+            isVisible: visibilityByGroupId.get(group.id) ?? generalContentPlacement.isVisible
+          };
+      const storedOverrideFields = assignment
+        ? readStoredOverrideFields(assignment.metadata) ?? inferLegacyOverrideFields({
+            assignment,
+            assignmentContentPlacement,
+            assignmentGradebookSettings,
+            general
+          })
+        : [];
+      const allowedOverrideFields = assessmentMode === "summative" ? SUMMATIVE_OVERRIDE_FIELDS : FORMATIVE_OVERRIDE_FIELDS;
+      const overrideFields = storedOverrideFields.filter((field) => allowedOverrideFields.has(field));
+
+      return {
+        groupId: group.id,
+        title: group.title,
+        assigned,
+        assignmentId: assignment?.id ?? null,
+        overrideFields,
+        availableFrom: assignment?.availableFrom?.toISOString() ?? general.availableFrom,
+        availableUntil: assignment?.availableUntil?.toISOString() ?? general.availableUntil,
+        requireSafeExamBrowser:
+          assessmentMode === "summative"
+            ? assignmentRequiresSafeExamBrowser(assignment?.metadata) || (!overrideFields.includes("requireSafeExamBrowser") && general.requireSafeExamBrowser)
+            : false,
+        gradebookSettings: assignmentGradebookSettings,
+        contentPlacement: assignmentContentPlacement
+      };
+    })
+  };
 }
 
 export async function assignActivityToAllCourseGroups(user: CurrentUser, courseId: string, activityId: string, input: unknown) {
@@ -164,11 +282,50 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   assertTestAssignmentIsSummative(activity, data.assessmentMode);
   assertSafeExamBrowserIsSummative(data.assessmentMode, data.requireSafeExamBrowser);
   await assertTestReadyForCompositeExecution(courseId, activity);
-  const availableFrom = parseDateInput(data.availableFrom);
-  const availableUntil = parseDateInput(data.availableUntil);
-  const gradebookSettings = data.gradebookSettings ? normalizeGradebookItemSettings(data.gradebookSettings) : undefined;
+  const gradebookSettings = normalizeGradebookItemSettings(data.gradebookSettings);
 
   return prisma.$transaction(async (tx) => {
+    const [groups, coursePlacement] = await Promise.all([
+      tx.courseGroup.findMany({
+        where: { courseId },
+        include: {
+          activities: {
+            where: { activityId },
+            select: { id: true, activityId: true, position: true, metadata: true }
+          }
+        },
+        orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }]
+      }),
+      tx.courseContentItem.findFirst({
+        where: { courseId, groupId: null, activityId, kind: "activity" },
+        select: { id: true, parentId: true, isVisible: true }
+      })
+    ]);
+    const canonicalParentId = coursePlacement?.parentId ?? data.contentPlacement?.parentId ?? null;
+    const generalContentPlacement = data.contentPlacement
+      ? {
+          ...data.contentPlacement,
+          parentId: canonicalParentId,
+          isVisible: data.contentPlacement.isVisible ?? coursePlacement?.isVisible ?? true
+        }
+      : undefined;
+    const groupById = new Map(groups.map((group) => [group.id, group]));
+    const requestedAssignments = data.groupAssignments ?? groups.map((group) => ({
+      groupId: group.id,
+      assigned: true,
+      overrideFields: [],
+      availableFrom: data.availableFrom,
+      availableUntil: data.availableUntil,
+      requireSafeExamBrowser: data.requireSafeExamBrowser,
+      gradebookSettings,
+      contentPlacement: data.contentPlacement
+    }));
+    const unknownGroup = requestedAssignments.find((assignment) => !groupById.has(assignment.groupId));
+    if (unknownGroup) {
+      throw new AppError(400, "COURSE_ACTIVITY_SETTINGS_GROUP_INVALID", "Every group setting must belong to the course.");
+    }
+    const requestedByGroupId = new Map(requestedAssignments.map((assignment) => [assignment.groupId, assignment]));
+    const assignedGroupIds = requestedAssignments.filter((assignment) => assignment.assigned).map((assignment) => assignment.groupId);
     const activityMetadata = asMetadataRecord(activity.metadata);
     await tx.activity.update({
       where: { id: activityId },
@@ -176,85 +333,133 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
         metadata: {
           ...activityMetadata,
           [COURSE_WIDE_ASSIGNMENT_METADATA_KEY]: {
-            enabled: true,
+            enabled: assignedGroupIds.length > 0 && assignedGroupIds.length === groups.length,
             availableFrom: data.availableFrom ?? null,
             availableUntil: data.availableUntil ?? null,
-            enablePerGroupSettings: data.enablePerGroupSettings,
+            enablePerGroupSettings: true,
+            futureGroupsAssigned: false,
             assessmentMode: data.assessmentMode,
             ...(data.requireSafeExamBrowser ? { requireSafeExamBrowser: true } : {}),
-            ...(gradebookSettings ? { gradebookSettings } : {}),
-            ...(data.contentPlacement ? { contentPlacement: data.contentPlacement } : {})
+            ...(data.assessmentMode === "summative" ? { gradebookSettings } : {}),
+            ...(generalContentPlacement ? { contentPlacement: generalContentPlacement } : {}),
+            assignedGroupIds
           }
         } as Prisma.InputJsonValue
       }
     });
-
-    const groups = await tx.courseGroup.findMany({
-      where: { courseId },
-      include: {
-        activities: {
-          select: { id: true, activityId: true, position: true },
-          orderBy: [{ position: "asc" }, { createdAt: "asc" }]
-        }
-      }
-    });
+    if (coursePlacement && generalContentPlacement) {
+      await tx.courseContentItem.update({
+        where: { id: coursePlacement.id },
+        data: { isVisible: generalContentPlacement.isVisible }
+      });
+    }
 
     await Promise.all(
-      groups.map((group) => {
+      groups.map(async (group) => {
         const existingAssignment = group.activities.find((assignment) => assignment.activityId === activityId);
-        const nextPosition = existingAssignment?.position ?? group.activities.length;
-        const groupAssignmentMetadata = buildCourseWideGroupAssignmentMetadata(
-          data.enablePerGroupSettings,
-          data.assessmentMode,
-          data.requireSafeExamBrowser
+        const requested = requestedByGroupId.get(group.id);
+        if (!requested?.assigned) {
+          if (coursePlacement) {
+            await tx.courseGroupContentVisibilityOverride.deleteMany({
+              where: { groupId: group.id, contentItemId: coursePlacement.id }
+            });
+          }
+          if (existingAssignment) {
+            await tx.courseGroupActivity.delete({ where: { id: existingAssignment.id } });
+          }
+          return;
+        }
+        const allowedFields = data.assessmentMode === "summative" ? SUMMATIVE_OVERRIDE_FIELDS : FORMATIVE_OVERRIDE_FIELDS;
+        const overrideFields = requested.overrideFields.filter((field) => allowedFields.has(field));
+        const groupAvailableFrom = overrideFields.includes("availableFrom") ? requested.availableFrom : data.availableFrom;
+        const groupAvailableUntil = overrideFields.includes("availableUntil") ? requested.availableUntil : data.availableUntil;
+        validateAvailability(groupAvailableFrom, groupAvailableUntil);
+        const requireSafeExamBrowser = data.assessmentMode === "summative" && (
+          overrideFields.includes("requireSafeExamBrowser")
+            ? requested.requireSafeExamBrowser === true
+            : data.requireSafeExamBrowser
         );
-        return tx.courseGroupActivity
-          .upsert({
-            where: {
-              groupId_activityId: {
-                groupId: group.id,
-                activityId
-              }
-            },
-            update: data.enablePerGroupSettings
-              ? {
-                  metadata: groupAssignmentMetadata
+        const requestedGradebookSettings = normalizeGradebookItemSettings(requested.gradebookSettings);
+        const effectiveGradebookSettings = data.assessmentMode === "summative"
+          ? mergeGradebookSettings(gradebookSettings, requestedGradebookSettings, overrideFields)
+          : gradebookSettings;
+        const requestedPlacement = requested.contentPlacement ?? generalContentPlacement;
+        const effectivePlacement = {
+          parentId: canonicalParentId,
+          titleSnapshot: requestedPlacement?.titleSnapshot ?? generalContentPlacement?.titleSnapshot ?? activity.title,
+          isVisible: overrideFields.includes("visibility")
+            ? requestedPlacement?.isVisible ?? true
+            : generalContentPlacement?.isVisible ?? true,
+          metadata: requestedPlacement?.metadata ?? generalContentPlacement?.metadata ?? {}
+        };
+        if (coursePlacement) {
+          if (
+            overrideFields.includes("visibility") &&
+            effectivePlacement.isVisible !== (generalContentPlacement?.isVisible ?? coursePlacement.isVisible)
+          ) {
+            await tx.courseGroupContentVisibilityOverride.upsert({
+              where: {
+                groupId_contentItemId: {
+                  groupId: group.id,
+                  contentItemId: coursePlacement.id
                 }
-              : {
-                  availableFrom,
-                  availableUntil,
-                  metadata: groupAssignmentMetadata
-                },
-            create: {
+              },
+              create: {
+                groupId: group.id,
+                contentItemId: coursePlacement.id,
+                isVisible: effectivePlacement.isVisible
+              },
+              update: { isVisible: effectivePlacement.isVisible }
+            });
+          } else {
+            await tx.courseGroupContentVisibilityOverride.deleteMany({
+              where: { groupId: group.id, contentItemId: coursePlacement.id }
+            });
+          }
+        }
+        const groupAssignmentMetadata = buildCourseActivitySettingsMetadata(
+          existingAssignment?.metadata,
+          overrideFields,
+          data.assessmentMode,
+          requireSafeExamBrowser
+        );
+        const assignment = await tx.courseGroupActivity.upsert({
+          where: {
+            groupId_activityId: {
               groupId: group.id,
-              activityId,
-              availableFrom,
-              availableUntil,
-              metadata: groupAssignmentMetadata,
-              position: nextPosition
-            }
-          })
-          .then((assignment) =>
-            ensureGradebookItemForAssignment(tx, {
-              courseId,
-              groupId: group.id,
-              groupActivityId: assignment.id,
-              activityId,
-              titleSnapshot: activity.title,
-              gradebookSettings
-            }).then(() =>
-              data.contentPlacement
-                ? ensureAssignmentContentItem(tx, {
-                    courseId,
-                    groupId: group.id,
-                    groupActivityId: assignment.id,
-                    activityId,
-                    title: activity.title,
-                    placement: data.contentPlacement
-                  })
-                : undefined
-            )
-          );
+              activityId
+            },
+          },
+          update: {
+            availableFrom: parseDateInput(groupAvailableFrom),
+            availableUntil: parseDateInput(groupAvailableUntil),
+            metadata: groupAssignmentMetadata
+          },
+          create: {
+            groupId: group.id,
+            activityId,
+            availableFrom: parseDateInput(groupAvailableFrom),
+            availableUntil: parseDateInput(groupAvailableUntil),
+            metadata: groupAssignmentMetadata,
+            position: existingAssignment?.position ?? group.activities.length
+          }
+        });
+        await ensureGradebookItemForAssignment(tx, {
+          courseId,
+          groupId: group.id,
+          groupActivityId: assignment.id,
+          activityId,
+          titleSnapshot: activity.title,
+          gradebookSettings: effectiveGradebookSettings
+        });
+        await ensureAssignmentContentItem(tx, {
+          courseId,
+          groupId: group.id,
+          groupActivityId: assignment.id,
+          activityId,
+          title: activity.title,
+          placement: effectivePlacement
+        });
       })
     );
 
@@ -904,82 +1109,6 @@ export async function deleteGroupActivityAssignment(
   return { ok: true };
 }
 
-async function createCourseWideAssignmentsForGroup(
-  tx: Pick<typeof prisma, "activity" | "courseContentItem" | "courseGroupActivity" | "gradebookItem">,
-  courseId: string,
-  groupId: string
-) {
-  const courseActivities = await tx.activity.findMany({
-    where: { courseId, testItem: null },
-    include: { activityType: true },
-    orderBy: [{ position: "asc" }, { createdAt: "asc" }]
-  });
-  const assignmentData = courseActivities.flatMap((activity, index) => {
-    const rule = getCourseWideAssignmentMetadata(activity.metadata);
-    if (!rule?.enabled) {
-      return [];
-    }
-    const assessmentMode = activity.activityType?.key === "test" ? "summative" : rule.assessmentMode ?? "formative";
-    return {
-      groupId,
-      activityId: activity.id,
-      availableFrom: parseDateInput(rule.availableFrom),
-      availableUntil: parseDateInput(rule.availableUntil),
-      metadata: buildCourseWideGroupAssignmentMetadata(
-        rule.enablePerGroupSettings ?? true,
-        assessmentMode,
-        rule.requireSafeExamBrowser ?? false
-      ),
-      position: index
-    };
-  });
-
-  if (!assignmentData.length) {
-    return;
-  }
-
-  await Promise.all(
-    assignmentData.map((assignment) =>
-      tx.courseGroupActivity
-        .upsert({
-          where: {
-            groupId_activityId: {
-              groupId: assignment.groupId,
-              activityId: assignment.activityId
-            }
-          },
-          update: {},
-          create: assignment
-        })
-        .then((createdAssignment) => {
-          const activity = courseActivities.find((candidate) => candidate.id === assignment.activityId);
-          return ensureGradebookItemForAssignment(tx, {
-            courseId,
-            groupId,
-            groupActivityId: createdAssignment.id,
-            activityId: createdAssignment.activityId,
-            titleSnapshot: activity?.title ?? "Activity",
-            gradebookSettings: getCourseWideAssignmentMetadata(activity?.metadata)?.gradebookSettings
-              ? normalizeGradebookItemSettings(getCourseWideAssignmentMetadata(activity?.metadata)?.gradebookSettings)
-              : undefined
-          }).then(() => {
-            const placement = getCourseWideAssignmentMetadata(activity?.metadata)?.contentPlacement;
-            return placement
-              ? ensureAssignmentContentItem(tx, {
-                  courseId,
-                  groupId,
-                  groupActivityId: createdAssignment.id,
-                  activityId: createdAssignment.activityId,
-                  title: activity?.title ?? "Activity",
-                  placement
-                })
-              : undefined;
-          });
-        })
-    )
-  );
-}
-
 async function ensureGradebookItemForAssignment(
   tx: GradebookItemDb,
   input: {
@@ -1239,6 +1368,105 @@ function normalizeGradebookItemSettings(input: unknown) {
   };
 }
 
+function gradebookSettingsFromItem(item: {
+  pointsPossible: number;
+  gradingMode: string;
+  passThresholdPoints: number | null;
+  passThresholdOutOf: number | null;
+  attemptLimitMode: string;
+  maxAttempts: number | null;
+  gradeStrategy: string;
+  dropLowestAttempt: boolean;
+}) {
+  return normalizeGradebookItemSettings({
+    pointsPossible: item.pointsPossible,
+    gradingMode: item.gradingMode,
+    passThresholdPoints: item.passThresholdPoints,
+    passThresholdOutOf: item.passThresholdOutOf,
+    attemptLimitMode: item.attemptLimitMode,
+    maxAttempts: item.maxAttempts,
+    gradeStrategy: item.gradeStrategy,
+    dropLowestAttempt: item.dropLowestAttempt
+  });
+}
+
+function readStoredOverrideFields(value: Prisma.JsonValue | undefined): ActivityAssignmentOverrideField[] | null {
+  const metadata = asMetadataRecord(value);
+  if (!Array.isArray(metadata.overrideFields)) {
+    return null;
+  }
+  const validFields = metadata.overrideFields.filter(
+    (field): field is ActivityAssignmentOverrideField =>
+      typeof field === "string" && SUMMATIVE_OVERRIDE_FIELDS.has(field as ActivityAssignmentOverrideField)
+  );
+  return [...new Set(validFields)];
+}
+
+function inferLegacyOverrideFields(input: {
+  assignment: {
+    availableFrom: Date | null;
+    availableUntil: Date | null;
+    metadata: Prisma.JsonValue;
+  };
+  assignmentContentPlacement: {
+    parentId?: string | null;
+    isVisible?: boolean;
+  };
+  assignmentGradebookSettings: GradebookItemSettingsInput;
+  general: {
+    availableFrom: string | null;
+    availableUntil: string | null;
+    requireSafeExamBrowser: boolean;
+    gradebookSettings: GradebookItemSettingsInput;
+    contentPlacement: {
+      parentId?: string | null;
+      isVisible?: boolean;
+    };
+  };
+}) {
+  const fields: ActivityAssignmentOverrideField[] = [];
+  if ((input.assignment.availableFrom?.toISOString() ?? null) !== input.general.availableFrom) fields.push("availableFrom");
+  if ((input.assignment.availableUntil?.toISOString() ?? null) !== input.general.availableUntil) fields.push("availableUntil");
+  if ((input.assignmentContentPlacement.isVisible ?? true) !== (input.general.contentPlacement.isVisible ?? true)) fields.push("visibility");
+  if (assignmentRequiresSafeExamBrowser(input.assignment.metadata) !== input.general.requireSafeExamBrowser) {
+    fields.push("requireSafeExamBrowser");
+  }
+  const groupGradebook = input.assignmentGradebookSettings;
+  const generalGradebook = input.general.gradebookSettings;
+  if (groupGradebook.pointsPossible !== generalGradebook.pointsPossible) fields.push("pointsPossible");
+  if (
+    groupGradebook.gradingMode !== generalGradebook.gradingMode ||
+    groupGradebook.passThresholdPoints !== generalGradebook.passThresholdPoints ||
+    groupGradebook.passThresholdOutOf !== generalGradebook.passThresholdOutOf
+  ) fields.push("grading");
+  if (
+    groupGradebook.attemptLimitMode !== generalGradebook.attemptLimitMode ||
+    groupGradebook.maxAttempts !== generalGradebook.maxAttempts
+  ) fields.push("attempts");
+  if (
+    groupGradebook.gradeStrategy !== generalGradebook.gradeStrategy ||
+    groupGradebook.dropLowestAttempt !== generalGradebook.dropLowestAttempt
+  ) fields.push("gradeStrategy");
+  return fields;
+}
+
+function mergeGradebookSettings(
+  general: GradebookItemSettingsInput,
+  group: GradebookItemSettingsInput,
+  overrideFields: ActivityAssignmentOverrideField[]
+) {
+  return {
+    pointsPossible: overrideFields.includes("pointsPossible") ? group.pointsPossible : general.pointsPossible,
+    gradingMode: overrideFields.includes("grading") ? group.gradingMode : general.gradingMode,
+    passThresholdPoints: overrideFields.includes("grading") ? group.passThresholdPoints : general.passThresholdPoints,
+    passThresholdOutOf: overrideFields.includes("grading") ? group.passThresholdOutOf : general.passThresholdOutOf,
+    attemptLimitMode: overrideFields.includes("attempts") ? group.attemptLimitMode : general.attemptLimitMode,
+    maxAttempts: overrideFields.includes("attempts") ? group.maxAttempts : general.maxAttempts,
+    gradeStrategy: overrideFields.includes("gradeStrategy") ? group.gradeStrategy : general.gradeStrategy,
+    dropLowestAttempt: overrideFields.includes("gradeStrategy") ? group.dropLowestAttempt : general.dropLowestAttempt
+  };
+}
+
 function buildGradebookItemSettingsData(settings: GradebookItemSettingsInput) {
   return {
     pointsPossible: settings.pointsPossible,
@@ -1252,14 +1480,25 @@ function buildGradebookItemSettingsData(settings: GradebookItemSettingsInput) {
   };
 }
 
-function buildCourseWideGroupAssignmentMetadata(
-  enablePerGroupSettings: boolean,
+function buildCourseActivitySettingsMetadata(
+  currentValue: Prisma.JsonValue | undefined,
+  overrideFields: ActivityAssignmentOverrideField[],
   assessmentMode: "formative" | "summative",
   requireSafeExamBrowser: boolean
 ): Prisma.InputJsonValue {
+  const current = asMetadataRecord(currentValue);
+  const {
+    assignmentScope: _assignmentScope,
+    enablePerGroupSettings: _enablePerGroupSettings,
+    overrideFields: _overrideFields,
+    assessmentMode: _assessmentMode,
+    requireSafeExamBrowser: _requireSafeExamBrowser,
+    ...preserved
+  } = current;
   return {
-    assignmentScope: COURSE_WIDE_ASSIGNMENT_SCOPE,
-    enablePerGroupSettings,
+    ...preserved,
+    assignmentScope: COURSE_ACTIVITY_SETTINGS_SCOPE,
+    overrideFields,
     assessmentMode,
     ...(requireSafeExamBrowser ? { requireSafeExamBrowser: true } : {})
   };
@@ -1274,17 +1513,26 @@ export function assignmentRequiresSafeExamBrowser(value: unknown) {
 
 function isCourseWideGroupAssignment(value: Prisma.JsonValue | undefined) {
   const metadata = asMetadataRecord(value);
-  return metadata.assignmentScope === COURSE_WIDE_ASSIGNMENT_SCOPE;
+  return metadata.assignmentScope === COURSE_WIDE_ASSIGNMENT_SCOPE || metadata.assignmentScope === COURSE_ACTIVITY_SETTINGS_SCOPE;
 }
 
 function canEditCourseWideGroupAssignmentSettings(value: Prisma.JsonValue | undefined) {
   const metadata = asMetadataRecord(value);
+  if (metadata.assignmentScope === COURSE_ACTIVITY_SETTINGS_SCOPE) {
+    const overrideFields = readStoredOverrideFields(value) ?? [];
+    return overrideFields.includes("availableFrom") || overrideFields.includes("availableUntil");
+  }
   return metadata.enablePerGroupSettings !== false;
 }
 
 function removeCourseWideGroupAssignmentMarker(value: Prisma.JsonValue | undefined): Prisma.InputJsonValue {
   const metadata = asMetadataRecord(value);
-  const { assignmentScope: _removedScope, enablePerGroupSettings: _removedSetting, ...nextMetadata } = metadata;
+  const {
+    assignmentScope: _removedScope,
+    enablePerGroupSettings: _removedSetting,
+    overrideFields: _removedOverrides,
+    ...nextMetadata
+  } = metadata;
   return nextMetadata as Prisma.InputJsonValue;
 }
 

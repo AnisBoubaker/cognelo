@@ -668,6 +668,33 @@ export type CourseGroupActivityInput = z.infer<typeof CourseGroupActivityInputSc
 export const AssignedActivityAssessmentModeSchema = z.enum(["formative", "summative"]);
 export type AssignedActivityAssessmentMode = z.infer<typeof AssignedActivityAssessmentModeSchema>;
 
+export const ActivityAssignmentOverrideFieldSchema = z.enum([
+  "availableFrom",
+  "availableUntil",
+  "visibility",
+  "requireSafeExamBrowser",
+  "pointsPossible",
+  "grading",
+  "attempts",
+  "gradeStrategy"
+]);
+export type ActivityAssignmentOverrideField = z.infer<typeof ActivityAssignmentOverrideFieldSchema>;
+
+export const CourseActivityGroupAssignmentSettingsSchema = z.object({
+  groupId: RecordIdSchema,
+  assigned: z.boolean(),
+  overrideFields: z.array(ActivityAssignmentOverrideFieldSchema).max(8).refine(
+    (fields) => new Set(fields).size === fields.length,
+    { message: "Override fields must be unique." }
+  ).optional().default([]),
+  availableFrom: z.string().datetime().nullable().optional(),
+  availableUntil: z.string().datetime().nullable().optional(),
+  requireSafeExamBrowser: z.boolean().optional(),
+  gradebookSettings: GradebookItemSettingsInputSchema.optional(),
+  contentPlacement: CourseContentPlacementInputSchema.optional()
+});
+export type CourseActivityGroupAssignmentSettings = z.infer<typeof CourseActivityGroupAssignmentSettingsSchema>;
+
 export const CourseAllGroupsActivityAssignmentInputSchema = z.object({
   availableFrom: z.string().datetime().nullable().optional(),
   availableUntil: z.string().datetime().nullable().optional(),
@@ -675,7 +702,11 @@ export const CourseAllGroupsActivityAssignmentInputSchema = z.object({
   assessmentMode: AssignedActivityAssessmentModeSchema.optional().default("formative"),
   requireSafeExamBrowser: z.boolean().optional().default(false),
   gradebookSettings: GradebookItemSettingsInputSchema.optional(),
-  contentPlacement: CourseContentPlacementInputSchema.optional()
+  contentPlacement: CourseContentPlacementInputSchema.optional(),
+  groupAssignments: z.array(CourseActivityGroupAssignmentSettingsSchema).max(500).refine(
+    (assignments) => new Set(assignments.map((assignment) => assignment.groupId)).size === assignments.length,
+    { message: "Group assignment settings must be unique by group." }
+  ).optional()
 });
 export type CourseAllGroupsActivityAssignmentInput = z.infer<typeof CourseAllGroupsActivityAssignmentInputSchema>;
 

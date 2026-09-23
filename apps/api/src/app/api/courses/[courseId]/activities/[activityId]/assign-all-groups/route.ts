@@ -1,11 +1,23 @@
 import { NextRequest } from "next/server";
-import { assignActivityToAllCourseGroups, removeActivityFromAllCourseGroupsPolicy } from "@cognelo/core";
+import {
+  assignActivityToAllCourseGroups,
+  getCourseActivityAssignmentSettings,
+  removeActivityFromAllCourseGroupsPolicy
+} from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; activityId: string }> };
 
 export function OPTIONS() {
   return options();
+}
+
+export async function GET(_request: NextRequest, { params }: Params) {
+  return handleRoute(async () => {
+    const user = await requireUser();
+    const { courseId, activityId } = await params;
+    return json({ settings: await getCourseActivityAssignmentSettings(user, courseId, activityId) });
+  });
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
