@@ -127,6 +127,12 @@ type ReferenceValidationGroup = {
   tests?: ReferenceValidationTestResult[];
 };
 
+type CodingExerciseValidationReceipt = {
+  validationSummary: Record<string, unknown>;
+  expiresAt: string;
+  signature: string;
+};
+
 type CodingExerciseClient = {
   listHiddenTests: (
     courseId: string,
@@ -145,10 +151,12 @@ type CodingExerciseClient = {
       privateConfig: CodingExercisePrivateConfig;
       activityConfig?: Record<string, unknown>;
       validateOnly?: boolean;
+      validationReceipt?: CodingExerciseValidationReceipt;
     }
   ) => Promise<{
     tests: HiddenTest[];
     referenceSolution: { sourceCode: string; privateConfig: CodingExercisePrivateConfig; validationSummary: Record<string, unknown> } | null;
+    validationReceipt?: CodingExerciseValidationReceipt;
   }>;
   runCode: (
     courseId: string,
@@ -753,12 +761,14 @@ export function CodingExerciseActivityView({
         activityConfig: persistedActivityConfig
       };
 
+      let validationReceipt: CodingExerciseValidationReceipt | undefined;
       if (canManage && course?.id && codingClient) {
         const validationResult = await codingClient.saveHiddenTests(course.id, activity.id, {
           ...hiddenTestsInput,
           validateOnly: true
         });
         setReferenceValidationSummary(validationResult.referenceSolution?.validationSummary ?? null);
+        validationReceipt = validationResult.validationReceipt;
       }
 
       await onSave({
@@ -768,7 +778,10 @@ export function CodingExerciseActivityView({
       });
 
       if (canManage && course?.id && codingClient) {
-        const result = await codingClient.saveHiddenTests(course.id, activity.id, hiddenTestsInput);
+        const result = await codingClient.saveHiddenTests(course.id, activity.id, {
+          ...hiddenTestsInput,
+          validationReceipt
+        });
         setHiddenTests(result.tests);
         setReferenceSolution(result.referenceSolution?.sourceCode ?? "");
         setPrivateConfig(parseCodingExercisePrivateConfig(result.referenceSolution?.privateConfig ?? {}));
@@ -946,8 +959,17 @@ export function CodingExerciseActivityView({
       notifications.error(t("generateTestsReferenceRequired"));
       return;
     }
+    if (hasExistingGeneratedTestContent(config, hiddenTests)) {
+      setReplacementDialog("tests");
+      return;
+    }
+    openTestGenerationCountDialog();
+  }
+
+  function openTestGenerationCountDialog() {
     setVisibleTestGenerationCount(codingExerciseDefaultVisibleTestCount);
     setHiddenTestGenerationCount(codingExerciseDefaultHiddenTestCount);
+    setReplacementDialog(null);
     setTestGenerationDialogOpen(true);
   }
 
@@ -1219,7 +1241,7 @@ export function CodingExerciseActivityView({
       void generateRubric();
       return;
     }
-    void generateTests();
+    openTestGenerationCountDialog();
   }
 
   function renderAuthoringGrading(content: ReactNode) {
@@ -1353,9 +1375,6 @@ export function CodingExerciseActivityView({
                   <p className="eyebrow">{t("generateTests")}</p>
                   <h2 id="coding-generation-tests-title">{t("generateTestsDialogTitle")}</h2>
                   <p className="muted" id="coding-generation-tests-description">{t("generateTestsDialogMessage")}</p>
-                  {hasExistingGeneratedTestContent(config, hiddenTests) ? (
-                    <p className="muted">{t("replaceTestsMessage")}</p>
-                  ) : null}
                 </div>
                 <div className="form-grid two-columns">
                   <div className="field">

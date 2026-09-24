@@ -1,5 +1,7 @@
 import type { CurrentUser } from "@cognelo/contracts";
+import { getServerEnv } from "@cognelo/config";
 import { assertActivityAuthoringMutable, assertCanManageActivityBank, assertCanManageCourse, AppError } from "@cognelo/core";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   codingExerciseHiddenTestsInputSchema,
   codingExerciseOutputMatchModeSchema,
@@ -10,6 +12,9 @@ import {
 import { Prisma, prisma } from "./db-client";
 import { capExecutionResultSummary } from "./execution-output";
 import { getCodingExerciseReferenceSolution, validateReferenceSolutionAgainstHiddenTests } from "./executions";
+import { hashCodingExerciseValidationValue } from "./validation-cache";
+
+const validationReceiptLifetimeMs = 10 * 60 * 1000;
 
 const codingExerciseHiddenTestsClient = prisma as typeof prisma & {
   pluginCodingExerciseReferenceSolution: {
@@ -65,6 +70,12 @@ function normalizeMetadata(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
+type CodingExerciseValidationReceipt = {
+  validationSummary: Record<string, unknown>;
+  expiresAt: string;
+  signature: string;
+};
+
 export async function listCodingExerciseHiddenTests(params: { activityId: string }) {
   const tests = await prisma.pluginCodingExerciseHiddenTest.findMany({
     where: { activityId: params.activityId },
@@ -107,9 +118,11 @@ export async function replaceCodingExerciseHiddenTests(params: {
 }) {
   await assertCanManageCourse(params.user, params.courseId);
   await assertActivityAuthoringMutable(params.courseId, params.activityId);
+  const previousReferenceSolution = await getCodingExerciseReferenceSolution({ activityId: params.activityId });
   const input = await validateCodingExerciseHiddenTestsInput({
     activityConfig: params.activityConfig,
-    input: params.input
+    input: params.input,
+    previousValidationSummary: previousReferenceSolution?.validationSummary
   });
 
   if (input.validateOnly) {
@@ -169,9 +182,13 @@ export async function replaceBankCodingExerciseHiddenTests(params: {
 }) {
   assertBankCodingExerciseStorageAvailable();
   await assertCanManageActivityBank(params.user, params.activityBankId);
+  const previousReferenceSolution = await codingExerciseHiddenTestsClient.pluginBankCodingExerciseReferenceSolution.findUnique({
+    where: { bankActivityId: params.bankActivityId }
+  });
   const input = await validateCodingExerciseHiddenTestsInput({
     activityConfig: params.activityConfig,
-    input: params.input
+    input: params.input,
+    previousValidationSummary: previousReferenceSolution?.validationSummary
   });
 
   if (input.validateOnly) {
@@ -389,7 +406,11 @@ export async function deleteCourseCodingExerciseData(params: { activityId: strin
   });
 }
 
-async function validateCodingExerciseHiddenTestsInput(params: { activityConfig: unknown; input: unknown }) {
+async function validateCodingExerciseHiddenTestsInput(params: {
+  activityConfig: unknown;
+  input: unknown;
+  previousValidationSummary?: unknown;
+}) {
   const input = codingExerciseHiddenTestsInputSchema.parse(params.input);
   const seenIds = new Set<string>();
   for (const test of input.tests) {
@@ -408,8 +429,19 @@ async function validateCodingExerciseHiddenTestsInput(params: { activityConfig: 
     );
   }
 
-  const validationSummary = await validateReferenceSolutionAgainstHiddenTests({
-    activityConfig: input.activityConfig ?? params.activityConfig,
+  const activityConfig = input.activityConfig ?? params.activityConfig;
+  const validationInputFingerprint = createValidationInputFingerprint({
+    activityConfig,
+    referenceSolution: input.referenceSolution,
+    sampleTests: input.sampleTests,
+    tests: input.tests,
+    privateConfig
+  });
+  const receiptSummary = !input.validateOnly && input.validationReceipt
+    ? verifyValidationReceipt(input.validationReceipt, validationInputFingerprint)
+    : null;
+  const validationSummary = receiptSummary ?? await validateReferenceSolutionAgainstHiddenTests({
+    activityConfig,
     sourceCode: input.referenceSolution,
     sampleTests: input.sampleTests,
     hiddenTests: input.tests.map((test, index) => ({
@@ -417,11 +449,19 @@ async function validateCodingExerciseHiddenTestsInput(params: { activityConfig: 
       testCode: test.testCode,
       orderIndex: index
     })),
-    privateConfig
+    privateConfig,
+    previousValidationSummary: params.previousValidationSummary
   });
 
   if (!validationSummary.accepted) {
-    const firstFailedTest = [...validationSummary.sampleTests.tests, ...validationSummary.hiddenTests.tests].find((test) => !test.passed);
+    const sampleValidation = normalizeMetadata(validationSummary.sampleTests);
+    const hiddenValidation = normalizeMetadata(validationSummary.hiddenTests);
+    const sampleResults = Array.isArray(sampleValidation.tests) ? sampleValidation.tests : [];
+    const hiddenResults = Array.isArray(hiddenValidation.tests) ? hiddenValidation.tests : [];
+    const firstFailedTest = [...sampleResults, ...hiddenResults].find((test) => {
+      const result = normalizeMetadata(test);
+      return result.passed === false;
+    });
     const failureReason =
       (firstFailedTest &&
         typeof firstFailedTest === "object" &&
@@ -472,8 +512,65 @@ async function validateCodingExerciseHiddenTestsInput(params: { activityConfig: 
   return {
     ...input,
     privateConfig,
-    validationSummary
+    validationSummary,
+    validationReceipt: input.validateOnly
+      ? createValidationReceipt(validationInputFingerprint, validationSummary)
+      : undefined
   };
+}
+
+function createValidationInputFingerprint(input: {
+  activityConfig: unknown;
+  referenceSolution: string;
+  sampleTests: unknown[];
+  tests: unknown[];
+  privateConfig: unknown;
+}) {
+  return hashCodingExerciseValidationValue({ version: 1, ...input });
+}
+
+function createValidationReceipt(
+  validationInputFingerprint: string,
+  validationSummary: Record<string, unknown>
+): CodingExerciseValidationReceipt {
+  const expiresAt = new Date(Date.now() + validationReceiptLifetimeMs).toISOString();
+  return {
+    validationSummary,
+    expiresAt,
+    signature: signValidationReceipt(validationInputFingerprint, validationSummary, expiresAt)
+  };
+}
+
+function verifyValidationReceipt(
+  receipt: CodingExerciseValidationReceipt,
+  validationInputFingerprint: string
+): Record<string, unknown> | null {
+  const expiresAtTime = Date.parse(receipt.expiresAt);
+  if (!Number.isFinite(expiresAtTime) || expiresAtTime <= Date.now() || receipt.validationSummary.accepted !== true) {
+    return null;
+  }
+  const expectedSignature = signValidationReceipt(
+    validationInputFingerprint,
+    receipt.validationSummary,
+    receipt.expiresAt
+  );
+  const actualBytes = Buffer.from(receipt.signature, "hex");
+  const expectedBytes = Buffer.from(expectedSignature, "hex");
+  if (actualBytes.length !== expectedBytes.length || !timingSafeEqual(actualBytes, expectedBytes)) {
+    return null;
+  }
+  return receipt.validationSummary;
+}
+
+function signValidationReceipt(
+  validationInputFingerprint: string,
+  validationSummary: Record<string, unknown>,
+  expiresAt: string
+) {
+  const summaryFingerprint = hashCodingExerciseValidationValue(validationSummary);
+  return createHmac("sha256", getServerEnv().JWT_SECRET)
+    .update(`${validationInputFingerprint}.${summaryFingerprint}.${expiresAt}`)
+    .digest("hex");
 }
 
 function toValidatedHiddenTestsResponse(input: Awaited<ReturnType<typeof validateCodingExerciseHiddenTestsInput>>) {
@@ -496,7 +593,8 @@ function toValidatedHiddenTestsResponse(input: Awaited<ReturnType<typeof validat
       validationSummary: input.validationSummary,
       createdAt: timestamp,
       updatedAt: timestamp
-    }
+    },
+    validationReceipt: input.validationReceipt
   };
 }
 

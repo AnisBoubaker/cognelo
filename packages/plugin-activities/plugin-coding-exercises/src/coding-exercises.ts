@@ -131,7 +131,12 @@ export const codingExerciseHiddenTestsInputSchema = z.object({
   referenceSolution: z.string().max(60000).default(""),
   privateConfig: codingExercisePrivateConfigSchema.default({}),
   activityConfig: codingExerciseConfigSchema.optional(),
-  validateOnly: z.boolean().default(false)
+  validateOnly: z.boolean().default(false),
+  validationReceipt: z.object({
+    validationSummary: z.record(z.unknown()),
+    expiresAt: z.string().datetime(),
+    signature: z.string().regex(/^[a-f0-9]{64}$/)
+  }).strict().optional()
 });
 
 const judge0LanguageNameCandidates: Record<string, readonly string[]> = {

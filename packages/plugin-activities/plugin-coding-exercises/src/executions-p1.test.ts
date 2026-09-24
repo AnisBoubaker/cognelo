@@ -569,35 +569,90 @@ describe("coding exercise executions", () => {
       .mockResolvedValueOnce({ token: "s1", stdout: "2", status: { id: 3, description: "Accepted" } })
       .mockResolvedValueOnce({ token: "h1", stdout: "4", status: { id: 3, description: "Accepted" } });
 
-    await expect(
-      validateReferenceSolutionAgainstHiddenTests({
-        activityConfig,
-        sourceCode: "print('reference')",
-        sampleTests: [{
-          id: "sample-1", title: "Sample", input: "1", output: "2", testCode: "",
-          outputMatchMode: "exact", containsLinesOrderMatters: false
-        }],
-        hiddenTests: [
-          {
-            id: "hidden-1",
-            name: "Hidden",
-            stdin: "2",
-            expectedOutput: "4",
-            testCode: "",
-            outputMatchMode: "exact",
-            containsLinesOrderMatters: false,
-            isEnabled: true,
-            weight: 3,
-            orderIndex: 0
-          }
-        ],
-        privateConfig: { hiddenSupportCode: "", templateSource: "{{ STUDENT_CODE }}", templatePrefix: "", templateSuffix: "", templateVisibleLineNumbers: [], aiFeedback: { enabled: false, gradingEnabled: false, instructions: "", testWeightPercent: 60, aiWeightPercent: 40, criteria: [] } }
-      })
-    ).resolves.toMatchObject({
+    const validationInput: Parameters<typeof validateReferenceSolutionAgainstHiddenTests>[0] = {
+      activityConfig,
+      sourceCode: "print('reference')",
+      sampleTests: [{
+        id: "sample-1", title: "Sample", input: "1", output: "2", testCode: "",
+        outputMatchMode: "exact", containsLinesOrderMatters: false
+      }],
+      hiddenTests: [
+        {
+          id: "hidden-1",
+          name: "Hidden",
+          stdin: "2",
+          expectedOutput: "4",
+          testCode: "",
+          outputMatchMode: "exact",
+          containsLinesOrderMatters: false,
+          isEnabled: true,
+          weight: 3,
+          orderIndex: 0
+        }
+      ],
+      privateConfig: { hiddenSupportCode: "", templateSource: "{{ STUDENT_CODE }}", templatePrefix: "", templateSuffix: "", templateVisibleLineNumbers: [], aiFeedback: { enabled: false, gradingEnabled: false, instructions: "", testWeightPercent: 60, aiWeightPercent: 40, criteria: [] } }
+    };
+    const initialValidation = await validateReferenceSolutionAgainstHiddenTests(validationInput);
+    expect(initialValidation).toMatchObject({
       accepted: true,
+      executedTestCount: 2,
+      reusedTestCount: 0,
       sampleTests: { passedCount: 1 },
       hiddenTests: { earnedWeight: 3, totalWeight: 3 }
     });
+    expect(judge0Mocks.runJudge0Submission).toHaveBeenCalledTimes(2);
+
+    judge0Mocks.runJudge0Submission.mockClear();
+    judge0Mocks.resolveJudge0Language.mockClear();
+    const unchangedValidation = await validateReferenceSolutionAgainstHiddenTests({
+      ...validationInput,
+      hiddenTests: [{ ...validationInput.hiddenTests[0]!, name: "Renamed hidden test", weight: 5 }],
+      previousValidationSummary: initialValidation
+    });
+    expect(unchangedValidation).toMatchObject({
+      accepted: true,
+      executedTestCount: 0,
+      reusedTestCount: 2,
+      hiddenTests: {
+        earnedWeight: 5,
+        totalWeight: 5,
+        tests: [expect.objectContaining({ name: "Renamed hidden test", weight: 5 })]
+      }
+    });
+    expect(judge0Mocks.resolveJudge0Language).not.toHaveBeenCalled();
+    expect(judge0Mocks.runJudge0Submission).not.toHaveBeenCalled();
+
+    judge0Mocks.runJudge0Submission.mockResolvedValueOnce({
+      token: "h2",
+      stdout: "6",
+      status: { id: 3, description: "Accepted" }
+    });
+    const dirtyValidation = await validateReferenceSolutionAgainstHiddenTests({
+      ...validationInput,
+      hiddenTests: [{ ...validationInput.hiddenTests[0]!, expectedOutput: "6" }],
+      previousValidationSummary: unchangedValidation
+    });
+    expect(dirtyValidation).toMatchObject({
+      accepted: true,
+      executedTestCount: 1,
+      reusedTestCount: 1,
+      sampleTests: { executedTestCount: 0, reusedTestCount: 1 },
+      hiddenTests: { executedTestCount: 1, reusedTestCount: 0 }
+    });
+    expect(judge0Mocks.runJudge0Submission).toHaveBeenCalledTimes(1);
+
+    judge0Mocks.runJudge0Submission.mockClear();
+    judge0Mocks.runJudge0Submission
+      .mockResolvedValueOnce({ token: "s2", stdout: "2", status: { id: 3, description: "Accepted" } })
+      .mockResolvedValueOnce({ token: "h3", stdout: "6", status: { id: 3, description: "Accepted" } });
+    const referenceChangedValidation = await validateReferenceSolutionAgainstHiddenTests({
+      ...validationInput,
+      sourceCode: "print('updated reference')",
+      hiddenTests: [{ ...validationInput.hiddenTests[0]!, expectedOutput: "6" }],
+      previousValidationSummary: dirtyValidation
+    });
+    expect(referenceChangedValidation).toMatchObject({ executedTestCount: 2, reusedTestCount: 0 });
+    expect(judge0Mocks.runJudge0Submission).toHaveBeenCalledTimes(2);
   });
 
   it("bounds reference-validation output before it can be saved in the validation summary", async () => {
