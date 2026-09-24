@@ -287,7 +287,8 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
           : await api.saveCodingExerciseHiddenTests(courseId, activityId, input);
         return {
           tests: result.tests as CodingExerciseHiddenTest[],
-          referenceSolution: result.referenceSolution
+          referenceSolution: result.referenceSolution,
+          validationReceipt: result.validationReceipt
         };
       },
       runCode: async (courseId: string, activityId: string, input: Parameters<typeof api.runCodingExercise>[2]) => {

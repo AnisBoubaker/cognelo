@@ -785,6 +785,12 @@ export type CodingExerciseReferenceSolution = {
   updatedAt: string;
 };
 
+export type CodingExerciseValidationReceipt = {
+  validationSummary: Record<string, unknown>;
+  expiresAt: string;
+  signature: string;
+};
+
 export type CodingExerciseExecution = {
   id: string;
   activityId: string;
@@ -1605,9 +1611,10 @@ export const api = {
       privateConfig?: CodingExerciseReferenceSolution["privateConfig"];
       activityConfig?: Record<string, unknown>;
       validateOnly?: boolean;
+      validationReceipt?: CodingExerciseValidationReceipt;
     }
   ) =>
-    request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
+    request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null; validationReceipt?: CodingExerciseValidationReceipt }>(
       `/courses/${courseId}/activities/${activityId}/coding-exercises/hidden-tests`,
       {
         method: "PUT",
@@ -1686,9 +1693,10 @@ export const api = {
       privateConfig?: CodingExerciseReferenceSolution["privateConfig"];
       activityConfig?: Record<string, unknown>;
       validateOnly?: boolean;
+      validationReceipt?: CodingExerciseValidationReceipt;
     }
   ) =>
-    request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
+    request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null; validationReceipt?: CodingExerciseValidationReceipt }>(
       `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-exercises/hidden-tests`,
       {
         method: "PUT",
@@ -2110,9 +2118,12 @@ export const api = {
       }>;
       referenceSolution: string;
       privateConfig?: CodingExerciseReferenceSolution["privateConfig"];
+      activityConfig?: Record<string, unknown>;
+      validateOnly?: boolean;
+      validationReceipt?: CodingExerciseValidationReceipt;
     }
   ) =>
-    request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
+    request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null; validationReceipt?: CodingExerciseValidationReceipt }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/hidden-tests`,
       {
         method: "PUT",

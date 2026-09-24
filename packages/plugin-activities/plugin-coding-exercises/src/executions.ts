@@ -20,6 +20,7 @@ import {
   validateCodingExerciseOutputMatcher,
   type CodingExerciseOutputMatcher
 } from "./output-matcher";
+import { hashCodingExerciseValidationValue } from "./validation-cache";
 
 type CodingExerciseExecutionRow = {
   id: string;
@@ -108,6 +109,27 @@ type ReferenceValidationTestCase = {
   outputMatchMode: CodingExerciseOutputMatchMode;
   containsLinesOrderMatters: boolean;
   weight: number;
+  validationFingerprint: string;
+};
+
+type ReferenceValidationTestResult = Record<string, unknown> & {
+  id: string;
+  name: string;
+  passed: boolean;
+  weight: number;
+  validationFingerprint: string;
+  statusId?: number | null;
+  statusLabel?: string | null;
+  expectedOutput?: string;
+  stdout?: string | null;
+  stderr?: string | null;
+  compileOutput?: string | null;
+  message?: string | null;
+  outputTruncated?: boolean;
+  outputMatchMode?: CodingExerciseOutputMatchMode;
+  containsLinesOrderMatters?: boolean;
+  timeSeconds?: string | null;
+  memoryKb?: number | null;
 };
 
 type ReferenceSolutionValidationRecord = {
@@ -623,9 +645,10 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
   sampleTests: CodingExerciseSampleTest[];
   hiddenTests: HiddenTestCase[];
   privateConfig: CodingExercisePrivateConfig;
+  previousValidationSummary?: unknown;
 }) {
   const config = parseCodingExerciseConfig(params.activityConfig);
-  const sampleTests = params.sampleTests.map((test) => ({
+  const sampleTests = params.sampleTests.map((test) => withReferenceValidationFingerprint({
     id: test.id,
     name: test.title.trim() || test.id,
     stdin: test.input,
@@ -634,10 +657,10 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
     outputMatchMode: test.outputMatchMode,
     containsLinesOrderMatters: test.containsLinesOrderMatters,
     weight: 1
-  }));
+  }, config, params.privateConfig, params.sourceCode));
   const enabledHiddenTests = params.hiddenTests
     .filter((test) => test.isEnabled)
-    .map((test) => ({
+    .map((test) => withReferenceValidationFingerprint({
       id: test.id,
       name: test.name,
       stdin: test.stdin,
@@ -646,7 +669,7 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
       outputMatchMode: test.outputMatchMode,
       containsLinesOrderMatters: test.containsLinesOrderMatters,
       weight: test.weight
-    }));
+    }, config, params.privateConfig, params.sourceCode));
   const allTestsCount = sampleTests.length + enabledHiddenTests.length;
 
   if (!allTestsCount) {
@@ -657,15 +680,21 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
       sampleTests: {
         testCount: 0,
         passedCount: 0,
+        executedTestCount: 0,
+        reusedTestCount: 0,
         tests: []
       },
       hiddenTests: {
         testCount: 0,
         passedCount: 0,
+        executedTestCount: 0,
+        reusedTestCount: 0,
         earnedWeight: 0,
         totalWeight: 0,
         tests: []
-      }
+      },
+      executedTestCount: 0,
+      reusedTestCount: 0
     };
   }
 
@@ -677,34 +706,159 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
     );
   }
 
-  const env = getServerEnv();
-  const runtime = await resolveJudge0Language(config.language);
-  const sampleValidation = await validateReferenceSolutionTestGroup({
-    tests: sampleTests,
-    config,
-    privateConfig: params.privateConfig,
-    languageId: runtime.languageId,
-    sourceCode: params.sourceCode,
-    cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
-    env
-  });
-  const hiddenValidation = await validateReferenceSolutionTestGroup({
-    tests: enabledHiddenTests,
-    config,
-    privateConfig: params.privateConfig,
-    languageId: runtime.languageId,
-    sourceCode: params.sourceCode,
-    cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
-    env
-  });
+  const previousSummary = normalizeValidationRecord(params.previousValidationSummary);
+  const samplePlan = planReferenceValidationGroup(sampleTests, previousSummary?.sampleTests);
+  const hiddenPlan = planReferenceValidationGroup(enabledHiddenTests, previousSummary?.hiddenTests);
+  const dirtyTestCount = samplePlan.dirtyTests.length + hiddenPlan.dirtyTests.length;
+  let runtime: Awaited<ReturnType<typeof resolveJudge0Language>> | null = null;
+  let sampleExecutedResults: ReferenceValidationTestResult[] = [];
+  let hiddenExecutedResults: ReferenceValidationTestResult[] = [];
+
+  if (dirtyTestCount > 0) {
+    const env = getServerEnv();
+    runtime = await resolveJudge0Language(config.language);
+    const executionParams = {
+      config,
+      privateConfig: params.privateConfig,
+      languageId: runtime.languageId,
+      sourceCode: params.sourceCode,
+      cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
+      env
+    };
+    sampleExecutedResults = (await validateReferenceSolutionTestGroup({
+      ...executionParams,
+      tests: samplePlan.dirtyTests
+    })).tests;
+    hiddenExecutedResults = (await validateReferenceSolutionTestGroup({
+      ...executionParams,
+      tests: hiddenPlan.dirtyTests
+    })).tests;
+  }
+
+  const sampleValidation = mergeReferenceValidationGroup(sampleTests, samplePlan.reusedResults, sampleExecutedResults);
+  const hiddenValidation = mergeReferenceValidationGroup(enabledHiddenTests, hiddenPlan.reusedResults, hiddenExecutedResults);
+  const previousJudge0LanguageName = typeof previousSummary?.judge0LanguageName === "string"
+    ? previousSummary.judge0LanguageName
+    : null;
 
   return {
     accepted: sampleValidation.accepted && hiddenValidation.accepted,
-    judge0LanguageName: runtime.languageName,
+    judge0LanguageName: runtime?.languageName ?? previousJudge0LanguageName,
     validatedAt: new Date().toISOString(),
     sampleTests: sampleValidation,
-    hiddenTests: hiddenValidation
+    hiddenTests: hiddenValidation,
+    executedTestCount: dirtyTestCount,
+    reusedTestCount: allTestsCount - dirtyTestCount
   };
+}
+
+function withReferenceValidationFingerprint(
+  test: Omit<ReferenceValidationTestCase, "validationFingerprint">,
+  config: ReturnType<typeof parseCodingExerciseConfig>,
+  privateConfig: CodingExercisePrivateConfig,
+  sourceCode: string
+): ReferenceValidationTestCase {
+  return {
+    ...test,
+    validationFingerprint: hashCodingExerciseValidationValue({
+      version: 1,
+      language: config.language,
+      executionMode: config.executionMode,
+      maxEditorSeconds: config.maxEditorSeconds,
+      sourceCode,
+      templateSource: privateConfig.templateSource,
+      templatePrefix: privateConfig.templatePrefix,
+      templateSuffix: privateConfig.templateSuffix,
+      stdin: test.stdin,
+      expectedOutput: test.expectedOutput,
+      testCode: test.testCode,
+      outputMatchMode: test.outputMatchMode,
+      containsLinesOrderMatters: test.containsLinesOrderMatters
+    })
+  };
+}
+
+function normalizeValidationRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function planReferenceValidationGroup(tests: ReferenceValidationTestCase[], previousGroupValue: unknown) {
+  const previousGroup = normalizeValidationRecord(previousGroupValue);
+  const previousTests = Array.isArray(previousGroup?.tests) ? previousGroup.tests : [];
+  const previousByKey = new Map<string, ReferenceValidationTestResult>();
+  for (const value of previousTests) {
+    const result = normalizeValidationRecord(value);
+    if (
+      result &&
+      typeof result.id === "string" &&
+      typeof result.name === "string" &&
+      result.passed === true &&
+      typeof result.weight === "number" &&
+      typeof result.validationFingerprint === "string"
+    ) {
+      previousByKey.set(
+        referenceValidationResultKey(result.id, result.validationFingerprint),
+        result as ReferenceValidationTestResult
+      );
+    }
+  }
+
+  const reusedResults = new Map<string, ReferenceValidationTestResult>();
+  const dirtyTests: ReferenceValidationTestCase[] = [];
+  for (const test of tests) {
+    const resultKey = referenceValidationResultKey(test.id, test.validationFingerprint);
+    const previous = previousByKey.get(resultKey);
+    if (previous) {
+      reusedResults.set(resultKey, previous);
+    } else {
+      dirtyTests.push(test);
+    }
+  }
+  return { dirtyTests, reusedResults };
+}
+
+function mergeReferenceValidationGroup(
+  tests: ReferenceValidationTestCase[],
+  reusedResults: Map<string, ReferenceValidationTestResult>,
+  executedResults: ReferenceValidationTestResult[]
+) {
+  const executedByKey = new Map(executedResults.map((result) => [
+    referenceValidationResultKey(result.id, result.validationFingerprint),
+    result
+  ]));
+  const results = tests.map((test) => {
+    const resultKey = referenceValidationResultKey(test.id, test.validationFingerprint);
+    const result = executedByKey.get(resultKey) ?? reusedResults.get(resultKey);
+    if (!result) {
+      throw new Error(`Missing reference validation result for test ${test.id}.`);
+    }
+    return {
+      ...result,
+      id: test.id,
+      name: test.name,
+      weight: test.weight,
+      expectedOutput: test.expectedOutput,
+      outputMatchMode: test.outputMatchMode,
+      containsLinesOrderMatters: test.containsLinesOrderMatters,
+      validationFingerprint: test.validationFingerprint
+    };
+  });
+  const totalWeight = tests.reduce((total, test) => total + test.weight, 0);
+  const earnedWeight = results.reduce((total, result) => total + (result.passed ? result.weight : 0), 0);
+  return {
+    accepted: results.every((result) => result.passed),
+    testCount: results.length,
+    passedCount: results.filter((result) => result.passed).length,
+    executedTestCount: executedResults.length,
+    reusedTestCount: results.length - executedResults.length,
+    earnedWeight,
+    totalWeight,
+    tests: results
+  };
+}
+
+function referenceValidationResultKey(id: string, validationFingerprint: string) {
+  return `${id}:${validationFingerprint}`;
 }
 
 async function validateReferenceSolutionTestGroup(params: {
@@ -721,13 +875,15 @@ async function validateReferenceSolutionTestGroup(params: {
       accepted: true,
       testCount: 0,
       passedCount: 0,
+      executedTestCount: 0,
+      reusedTestCount: 0,
       earnedWeight: 0,
       totalWeight: 0,
-      tests: []
+      tests: [] as ReferenceValidationTestResult[]
     };
   }
 
-  const testResults = [];
+  const testResults: ReferenceValidationTestResult[] = [];
   let totalWeight = 0;
   let earnedWeight = 0;
 
@@ -775,6 +931,7 @@ async function validateReferenceSolutionTestGroup(params: {
       outputTruncated: savedOutput.outputTruncated || message.truncated,
       outputMatchMode: testCase.outputMatchMode,
       containsLinesOrderMatters: testCase.containsLinesOrderMatters,
+      validationFingerprint: testCase.validationFingerprint,
       timeSeconds: result.time ?? null,
       memoryKb: result.memory ?? null
     });
@@ -784,6 +941,8 @@ async function validateReferenceSolutionTestGroup(params: {
     accepted: earnedWeight === totalWeight,
     testCount: params.tests.length,
     passedCount: testResults.filter((test) => test.passed).length,
+    executedTestCount: params.tests.length,
+    reusedTestCount: 0,
     earnedWeight,
     totalWeight,
     tests: testResults

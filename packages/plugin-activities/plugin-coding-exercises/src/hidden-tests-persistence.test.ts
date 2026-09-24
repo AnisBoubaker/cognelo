@@ -136,7 +136,11 @@ const executionMocks = vi.hoisted(() => ({
       updatedAt: "2026-05-14T12:00:00.000Z"
     })
   ),
-  validateReferenceSolutionAgainstHiddenTests: vi.fn(() =>
+  validateReferenceSolutionAgainstHiddenTests: vi.fn((): Promise<{
+    accepted: boolean;
+    sampleTests: { tests: Array<Record<string, unknown>> };
+    hiddenTests: { tests: Array<Record<string, unknown>> };
+  }> =>
     Promise.resolve({
       accepted: true,
       sampleTests: { tests: [] },
@@ -148,6 +152,10 @@ const executionMocks = vi.hoisted(() => ({
 vi.mock("./db-client", () => ({
   prisma: dbMocks.prisma,
   Prisma: {}
+}));
+
+vi.mock("@cognelo/config", () => ({
+  getServerEnv: () => ({ JWT_SECRET: "test-secret-that-is-at-least-32-characters" })
 }));
 
 vi.mock("@cognelo/core", () => coreMocks);
@@ -254,6 +262,94 @@ describe("coding exercise hidden test persistence", () => {
         create: expect.objectContaining({ activityId: "course-activity-1" })
       })
     );
+  });
+
+  it("uses the signed preflight result when persisting instead of validating dirty tests twice", async () => {
+    const preflight = await replaceCodingExerciseHiddenTests({
+      activityId: "course-activity-1",
+      courseId: "course-1",
+      activityConfig: { prompt: "Write a function.", language: "python" },
+      user: { id: "teacher-1", role: "teacher" } as never,
+      input: { ...hiddenInput, validateOnly: true }
+    });
+
+    if (!("validationReceipt" in preflight) || !preflight.validationReceipt) {
+      throw new Error("Expected a validation receipt from preflight validation.");
+    }
+    const validationReceipt = preflight.validationReceipt;
+    expect(validationReceipt).toMatchObject({
+      validationSummary: { accepted: true },
+      signature: expect.stringMatching(/^[a-f0-9]{64}$/)
+    });
+    expect(executionMocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(1);
+    expect(dbMocks.transaction.pluginCodingExerciseHiddenTest.deleteMany).not.toHaveBeenCalled();
+
+    await replaceCodingExerciseHiddenTests({
+      activityId: "course-activity-1",
+      courseId: "course-1",
+      activityConfig: { prompt: "Write a function.", language: "python" },
+      user: { id: "teacher-1", role: "teacher" } as never,
+      input: { ...hiddenInput, validationReceipt }
+    });
+
+    expect(executionMocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(1);
+    expect(dbMocks.transaction.pluginCodingExerciseHiddenTest.deleteMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not trust a modified preflight validation receipt", async () => {
+    const preflight = await replaceCodingExerciseHiddenTests({
+      activityId: "course-activity-1",
+      courseId: "course-1",
+      activityConfig: { prompt: "Write a function.", language: "python" },
+      user: { id: "teacher-1", role: "teacher" } as never,
+      input: { ...hiddenInput, validateOnly: true }
+    });
+    if (!("validationReceipt" in preflight) || !preflight.validationReceipt) {
+      throw new Error("Expected a validation receipt from preflight validation.");
+    }
+
+    await replaceCodingExerciseHiddenTests({
+      activityId: "course-activity-1",
+      courseId: "course-1",
+      activityConfig: { prompt: "Write a function.", language: "python" },
+      user: { id: "teacher-1", role: "teacher" } as never,
+      input: {
+        ...hiddenInput,
+        validationReceipt: {
+          ...preflight.validationReceipt,
+          validationSummary: { ...preflight.validationReceipt.validationSummary, tampered: true }
+        }
+      }
+    });
+
+    expect(executionMocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(2);
+  });
+
+  it("blocks persistence when a dirty test fails reference validation", async () => {
+    executionMocks.validateReferenceSolutionAgainstHiddenTests.mockResolvedValueOnce({
+      accepted: false,
+      sampleTests: { tests: [] },
+      hiddenTests: {
+        tests: [{
+          id: "hidden-1",
+          name: "First",
+          passed: false,
+          statusLabel: "Wrong Answer"
+        }]
+      }
+    });
+
+    await expect(replaceCodingExerciseHiddenTests({
+      activityId: "course-activity-1",
+      courseId: "course-1",
+      activityConfig: { prompt: "Write a function.", language: "python" },
+      user: { id: "teacher-1", role: "teacher" } as never,
+      input: hiddenInput
+    })).rejects.toMatchObject({
+      code: "REFERENCE_SOLUTION_VALIDATION_FAILED",
+      details: expect.objectContaining({ failedTestId: "hidden-1" })
+    });
+    expect(dbMocks.transaction.pluginCodingExerciseHiddenTest.deleteMany).not.toHaveBeenCalled();
   });
 
   it("replaces bank hidden tests atomically without writing course reference rows", async () => {

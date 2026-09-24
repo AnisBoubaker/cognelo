@@ -81,12 +81,20 @@ const generatedSolutionSchema = z
     }
   });
 
+const maxGeneratedTestNameLength = 50;
+const generatedSampleTestSchema = sampleTestSchema.extend({
+  title: z.string().trim().min(1).max(maxGeneratedTestNameLength)
+});
+const generatedHiddenTestSchema = codingExerciseHiddenTestSchema.extend({
+  name: z.string().trim().min(1).max(maxGeneratedTestNameLength)
+});
+
 const generatedTestsSchema = z
   .object({
     status: z.enum(["ok", "warning"]).optional().default("ok"),
     warningMessage: z.string().max(1200).optional().default(""),
-    sampleTests: z.array(sampleTestSchema).min(1).max(codingExerciseMaxGeneratedTestCount),
-    hiddenTests: z.array(codingExerciseHiddenTestSchema).min(1).max(codingExerciseMaxGeneratedTestCount)
+    sampleTests: z.array(generatedSampleTestSchema).min(1).max(codingExerciseMaxGeneratedTestCount),
+    hiddenTests: z.array(generatedHiddenTestSchema).min(1).max(codingExerciseMaxGeneratedTestCount)
   })
   .superRefine((tests, context) => {
     if (tests.status === "warning" && tests.warningMessage.trim().length < 10) {
@@ -504,6 +512,7 @@ function buildTestsGenerationSystemPrompt(input: {
     "- Generate enough hidden tests to cover normal cases, edge cases, and common mistakes.",
     "- Every visible and hidden test must use outputMatchMode contains_lines with containsLinesOrderMatters false. Do not use exact or regex matching.",
     "- Hidden tests may intentionally reproduce the same test case as a visible test with different input values. This is useful for detecting solutions that hard-code the visible examples, so do not reject that overlap as duplication.",
+    `- Give every test a concise, descriptive title/name of at most ${maxGeneratedTestNameLength} characters. State the behavior and expected result when practical, for example "Factorial -3 should give 0" instead of a generic label such as "Negative case".`,
     "- IDs must be stable, lowercase, and unique.",
     "- The reference solution must pass every generated sample and hidden test.",
     "- Compute every expected output from the reference solution logic. Do not guess.",

@@ -161,6 +161,45 @@ describe("coding exercise AI generation", () => {
     expect(mocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(1);
   });
 
+  it("requires generated test names to be descriptive and no longer than fifty characters", async () => {
+    mocks.generateQuestionAuthoringText
+      .mockResolvedValueOnce(JSON.stringify({
+        sampleTests: [{ id: "sample-1", title: "x".repeat(51), input: "-3", output: "0" }],
+        hiddenTests: [{ id: "hidden-1", name: "Negative case", stdin: "6", expectedOutput: "720" }]
+      }))
+      .mockResolvedValueOnce(JSON.stringify({
+        sampleTests: [{ id: "sample-1", title: "Factorial -3 should give 0", input: "-3", output: "0" }],
+        hiddenTests: [{ id: "hidden-1", name: "Factorial 6 should give 720", stdin: "6", expectedOutput: "720" }]
+      }));
+
+    const generated = await generateCodingExerciseTests({
+      user,
+      description: "Calculate a factorial",
+      prompt: "Calculate the factorial of the provided integer.",
+      language: "python",
+      locale: "en",
+      subject,
+      referenceSolution: "print(1)",
+      templateSource: "{{ STUDENT_CODE }}",
+      templateVisibleLineNumbers: [],
+      visibleTestCount: 1,
+      hiddenTestCount: 1
+    });
+
+    expect(generated).toMatchObject({
+      attempts: 2,
+      sampleTests: [{ title: "Factorial -3 should give 0" }],
+      hiddenTests: [{ name: "Factorial 6 should give 720" }]
+    });
+    expect(mocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(1);
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain(
+      "title/name of at most 50 characters"
+    );
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain(
+      "Factorial -3 should give 0"
+    );
+  });
+
   it("generates the requested counts as contains-lines tests and reports validation failures", async () => {
     const sampleTests = Array.from({ length: 2 }, (_, index) => ({
       id: `sample-${index + 1}`,
@@ -215,6 +254,7 @@ describe("coding exercise AI generation", () => {
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("exactly 2 visible sample tests and exactly 3 hidden tests");
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("outputMatchMode contains_lines");
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("reproduce the same test case as a visible test with different input values");
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("title/name of at most 50 characters");
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("exit code 0");
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("floating-point comparisons");
 

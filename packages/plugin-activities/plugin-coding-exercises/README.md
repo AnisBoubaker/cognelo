@@ -2,7 +2,9 @@
 
 `@cognelo/plugin-coding-exercises` provides the `coding-exercise` activity type. Teachers author prompts, starter/template code, reference solutions, visible and hidden tests, rubrics, and optional automatic feedback. Learners write and run code in Monaco, submit against hidden tests through Judge0, resume drafts, and review prior submissions.
 
-AI test generation asks for visible and hidden counts (3 and 8 by default, at most 15 each), produces **Contains lines** comparisons, and validates the complete suite against the reviewed reference solution before inserting it into the authoring form.
+AI test generation warns before replacing an existing suite, then asks for visible and hidden counts (3 and 8 by default, at most 15 each), produces **Contains lines** comparisons with concise descriptive names capped at 50 characters, and validates the complete suite against the reviewed reference solution before inserting it into the authoring form.
+
+On later saves, reference validation reuses fingerprinted passing results and sends only new, changed, or previously failing tests to Judge0. A short-lived signed preflight receipt carries that server-validated result into persistence without executing dirty tests twice; any failure still blocks the save.
 
 Teacher **Regrade all** reruns current hidden tests without invoking AI; **Generate AI feedback for all** evaluates the current rubric using the latest saved test result without rerunning tests. Both recompute the grade using current component weights.
 
