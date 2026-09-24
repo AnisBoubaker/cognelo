@@ -325,7 +325,9 @@ describe("coding exercise plugin routes", () => {
           language: "python",
           locale: "en",
           referenceSolution: "print(1)",
-          templateSource: "{{ STUDENT_CODE }}"
+          templateSource: "{{ STUDENT_CODE }}",
+          visibleTestCount: 4,
+          hiddenTestCount: 12
         })
       })
     ).resolves.toEqual({ hiddenTests: [] });
@@ -349,6 +351,10 @@ describe("coding exercise plugin routes", () => {
       title: "Smallest value",
       referenceSolution: "print(1)",
       subject: expect.objectContaining({ teachingLanguage: "fr" })
+    }));
+    expect(mocks.generateCodingExerciseTests).toHaveBeenCalledWith(expect.objectContaining({
+      visibleTestCount: 4,
+      hiddenTestCount: 12
     }));
   });
 

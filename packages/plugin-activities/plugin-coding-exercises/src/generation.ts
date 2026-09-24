@@ -2,7 +2,10 @@ import { z } from "zod";
 import { activityGenerationKnowledgeSchema, activityKnowledgeGenerationPrompt, AppError, generateQuestionAuthoringText, suggestActivityKnowledgeSelections, type ActivityGenerationKnowledge } from "@cognelo/core";
 import {
   createCodingExerciseAiRubricCriterionId,
+  codingExerciseDefaultHiddenTestCount,
+  codingExerciseDefaultVisibleTestCount,
   codingExerciseHiddenTestSchema,
+  codingExerciseMaxGeneratedTestCount,
   codingExerciseTestInsertionToken,
   codingExerciseTemplateInsertionToken,
   parseCodingExercisePrivateConfig,
@@ -40,6 +43,8 @@ export const codingExerciseTestsGenerationInputSchema = z.object({
   referenceSolution: z.string().min(1).max(60000),
   templateSource: z.string().min(1).max(120000),
   templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([]),
+  visibleTestCount: z.number().int().min(1).max(codingExerciseMaxGeneratedTestCount).default(codingExerciseDefaultVisibleTestCount),
+  hiddenTestCount: z.number().int().min(1).max(codingExerciseMaxGeneratedTestCount).default(codingExerciseDefaultHiddenTestCount),
   knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
 });
 
@@ -80,8 +85,8 @@ const generatedTestsSchema = z
   .object({
     status: z.enum(["ok", "warning"]).optional().default("ok"),
     warningMessage: z.string().max(1200).optional().default(""),
-    sampleTests: z.array(sampleTestSchema).min(1).max(10),
-    hiddenTests: z.array(codingExerciseHiddenTestSchema).min(1).max(15)
+    sampleTests: z.array(sampleTestSchema).min(1).max(codingExerciseMaxGeneratedTestCount),
+    hiddenTests: z.array(codingExerciseHiddenTestSchema).min(1).max(codingExerciseMaxGeneratedTestCount)
   })
   .superRefine((tests, context) => {
     if (tests.status === "warning" && tests.warningMessage.trim().length < 10) {
@@ -236,10 +241,14 @@ export async function generateCodingExerciseTests(input: {
   referenceSolution: string;
   templateSource: string;
   templateVisibleLineNumbers: number[];
+  visibleTestCount?: number;
+  hiddenTestCount?: number;
   knowledge?: ActivityGenerationKnowledge;
 }) {
-  const systemPrompt = buildTestsGenerationSystemPrompt(input);
-  let userPrompt = buildTestsInitialPrompt(input);
+  const visibleTestCount = input.visibleTestCount ?? codingExerciseDefaultVisibleTestCount;
+  const hiddenTestCount = input.hiddenTestCount ?? codingExerciseDefaultHiddenTestCount;
+  const systemPrompt = buildTestsGenerationSystemPrompt({ ...input, visibleTestCount, hiddenTestCount });
+  let userPrompt = buildTestsInitialPrompt({ ...input, visibleTestCount, hiddenTestCount });
   let lastPayload: unknown = null;
   let lastIssues: string[] = [];
 
@@ -272,7 +281,9 @@ export async function generateCodingExerciseTests(input: {
       language: input.language,
       referenceSolution: input.referenceSolution,
       templateSource: input.templateSource,
-      templateVisibleLineNumbers: input.templateVisibleLineNumbers
+      templateVisibleLineNumbers: input.templateVisibleLineNumbers,
+      visibleTestCount,
+      hiddenTestCount
     });
     if (validation.fatalError) {
       throw new AppError(validation.fatalError.status, validation.fatalError.code, validation.fatalError.message, {
@@ -452,7 +463,14 @@ function buildSolutionGenerationSystemPrompt(input: { language: string; locale: 
   ].join("\n");
 }
 
-function buildTestsGenerationSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext; knowledge?: ActivityGenerationKnowledge }) {
+function buildTestsGenerationSystemPrompt(input: {
+  language: string;
+  locale: GenerationLocale;
+  subject: SubjectContext;
+  visibleTestCount: number;
+  hiddenTestCount: number;
+  knowledge?: ActivityGenerationKnowledge;
+}) {
   return [
     "You generate visible and hidden test cases for Cognelo coding exercises.",
     "Return only valid JSON. Do not wrap the JSON in Markdown fences. Do not add explanations.",
@@ -460,8 +478,8 @@ function buildTestsGenerationSystemPrompt(input: { language: string; locale: Gen
     "Required JSON shape when generation is possible:",
     "{",
     '  "status": "ok",',
-    '  "sampleTests": [{"id":"sample-1","title":"...","input":"...","output":"...","testCode":""}],',
-    '  "hiddenTests": [{"id":"hidden-1","name":"...","stdin":"...","expectedOutput":"...","testCode":"","isEnabled":true,"weight":1}]',
+    '  "sampleTests": [{"id":"sample-1","title":"...","input":"...","output":"...","testCode":"","outputMatchMode":"contains_lines","containsLinesOrderMatters":false}],',
+    '  "hiddenTests": [{"id":"hidden-1","name":"...","stdin":"...","expectedOutput":"...","testCode":"","outputMatchMode":"contains_lines","containsLinesOrderMatters":false,"isEnabled":true,"weight":1}]',
     "}",
     "",
     "If tests can be generated but require assumptions, return the same shape with:",
@@ -481,9 +499,11 @@ function buildTestsGenerationSystemPrompt(input: { language: string; locale: Gen
     `- Programming language: ${input.language}.`,
     "- The selected programming language is authoritative. Generate test harness code for that language only.",
     "- Base tests on the student-facing prompt, the reviewed reference solution, and the provided template.",
-    "- Generate exactly one visible sample test unless the exercise truly needs more.",
-    "- Let the exercise scope decide the number of hidden tests, but never generate more than 15 hidden tests.",
+    `- Generate exactly ${input.visibleTestCount} visible sample tests and exactly ${input.hiddenTestCount} hidden tests.`,
+    `- Never generate more than ${codingExerciseMaxGeneratedTestCount} tests of either kind.`,
     "- Generate enough hidden tests to cover normal cases, edge cases, and common mistakes.",
+    "- Every visible and hidden test must use outputMatchMode contains_lines with containsLinesOrderMatters false. Do not use exact or regex matching.",
+    "- Hidden tests may intentionally reproduce the same test case as a visible test with different input values. This is useful for detecting solutions that hard-code the visible examples, so do not reject that overlap as duplication.",
     "- IDs must be stable, lowercase, and unique.",
     "- The reference solution must pass every generated sample and hidden test.",
     "- Compute every expected output from the reference solution logic. Do not guess.",
@@ -550,9 +570,16 @@ function buildSolutionInitialPrompt(input: { description: string; prompt: string
   ].join("\n");
 }
 
-function buildTestsInitialPrompt(input: { description: string; prompt: string; referenceSolution: string; templateSource: string }) {
+function buildTestsInitialPrompt(input: {
+  description: string;
+  prompt: string;
+  referenceSolution: string;
+  templateSource: string;
+  visibleTestCount: number;
+  hiddenTestCount: number;
+}) {
   return [
-    "Generate coding exercise tests from the complete context below.",
+    `Generate exactly ${input.visibleTestCount} visible tests and ${input.hiddenTestCount} hidden tests from the complete context below.`,
     "The student-facing prompt, reviewed reference solution, and template source are all provided. Do not return a missing-context error.",
     "",
     "Activity description:",
@@ -621,6 +648,8 @@ async function validateGeneratedTests(input: {
   referenceSolution: string;
   templateSource: string;
   templateVisibleLineNumbers: number[];
+  visibleTestCount: number;
+  hiddenTestCount: number;
 }) {
   const parsed = generatedTestsSchema.safeParse(input.payload);
   if (!parsed.success) {
@@ -629,8 +658,26 @@ async function validateGeneratedTests(input: {
     };
   }
 
-  const tests = parsed.data;
+  const tests = {
+    ...parsed.data,
+    sampleTests: parsed.data.sampleTests.map((test) => ({
+      ...test,
+      outputMatchMode: "contains_lines" as const,
+      containsLinesOrderMatters: false
+    })),
+    hiddenTests: parsed.data.hiddenTests.map((test) => ({
+      ...test,
+      outputMatchMode: "contains_lines" as const,
+      containsLinesOrderMatters: false
+    }))
+  };
   const issues: string[] = [];
+  if (tests.sampleTests.length !== input.visibleTestCount) {
+    issues.push(`Generate exactly ${input.visibleTestCount} visible sample tests; received ${tests.sampleTests.length}.`);
+  }
+  if (tests.hiddenTests.length !== input.hiddenTestCount) {
+    issues.push(`Generate exactly ${input.hiddenTestCount} hidden tests; received ${tests.hiddenTests.length}.`);
+  }
   const allTestIds = [...tests.sampleTests.map((test) => test.id), ...tests.hiddenTests.map((test) => test.id)];
   const duplicateIds = allTestIds.filter((id, index) => allTestIds.indexOf(id) !== index);
   if (duplicateIds.length) {

@@ -116,7 +116,7 @@ AI-generated templates use one of two portable execution shapes:
 - full-program exercises: `{{ STUDENT_CODE }}` with stdin/stdout tests and empty test harness code
 - callable-unit exercises: `{{ STUDENT_CODE }}\n\n{{ TEST_CODE }}` with per-test harness code
 
-AI-generated hidden tests are capped at 15.
+Before test generation, the teacher chooses the visible and hidden test counts in a dialog. Each count defaults to 3 visible and 8 hidden and must be between 1 and 15. The generation route requires those exact counts, validates the complete suite against the reviewed reference solution, and inserts every generated test with unordered **Contains lines** matching. Hidden tests may intentionally exercise the same case type as a visible test with different input values; this overlap helps catch solutions that hard-code the published examples and is not treated as accidental duplication.
 
 Generated full-program tests must use inputs for which the reviewed reference solution exits successfully. The generator is explicitly told not to exercise invalid-input branches that return a non-zero status and to avoid ambiguous floating-point threshold values; execution-validation retries repeat those constraints when correcting a rejected suite.
 

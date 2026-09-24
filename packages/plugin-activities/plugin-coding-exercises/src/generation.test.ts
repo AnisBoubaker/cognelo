@@ -17,7 +17,13 @@ vi.mock("./executions", () => ({
   validateReferenceSolutionAgainstHiddenTests: mocks.validateReferenceSolutionAgainstHiddenTests
 }));
 
-const { generateCodingExercisePrompt, generateCodingExerciseRubric, generateCodingExerciseSolution, generateCodingExerciseTests } = await import("./generation");
+const {
+  codingExerciseTestsGenerationInputSchema,
+  generateCodingExercisePrompt,
+  generateCodingExerciseRubric,
+  generateCodingExerciseSolution,
+  generateCodingExerciseTests
+} = await import("./generation");
 
 const user = {
   id: "teacher-1",
@@ -90,27 +96,125 @@ describe("coding exercise AI generation", () => {
     ).resolves.toMatchObject({ status: "error", attempts: 1 });
   });
 
-  it("generates tests, caps hidden tests by schema, and reports validation failures", async () => {
+  it("validates generated-test count defaults and the per-kind maximum", () => {
+    const baseInput = {
+      description: "Return one",
+      prompt: "Write a function that returns one.",
+      language: "python",
+      locale: "en" as const,
+      referenceSolution: "print(1)",
+      templateSource: "{{ STUDENT_CODE }}"
+    };
+
+    expect(codingExerciseTestsGenerationInputSchema.parse(baseInput)).toMatchObject({
+      visibleTestCount: 3,
+      hiddenTestCount: 8
+    });
+    expect(codingExerciseTestsGenerationInputSchema.parse({
+      ...baseInput,
+      visibleTestCount: 15,
+      hiddenTestCount: 15
+    })).toMatchObject({ visibleTestCount: 15, hiddenTestCount: 15 });
+    expect(() => codingExerciseTestsGenerationInputSchema.parse({ ...baseInput, visibleTestCount: 16 })).toThrow();
+    expect(() => codingExerciseTestsGenerationInputSchema.parse({ ...baseInput, hiddenTestCount: 16 })).toThrow();
+  });
+
+  it("retries when the model does not return the requested test counts", async () => {
+    const testPayload = (visibleCount: number, hiddenCount: number) => ({
+      sampleTests: Array.from({ length: visibleCount }, (_, index) => ({
+        id: `sample-${index + 1}`,
+        title: `Sample ${index + 1}`,
+        input: String(index),
+        output: String(index)
+      })),
+      hiddenTests: Array.from({ length: hiddenCount }, (_, index) => ({
+        id: `hidden-${index + 1}`,
+        name: `Hidden ${index + 1}`,
+        stdin: String(index),
+        expectedOutput: String(index)
+      }))
+    });
+    mocks.generateQuestionAuthoringText
+      .mockResolvedValueOnce(JSON.stringify(testPayload(1, 1)))
+      .mockResolvedValueOnce(JSON.stringify(testPayload(2, 2)));
+
+    await expect(generateCodingExerciseTests({
+      user,
+      description: "Return one",
+      prompt: "Write a function that returns one.",
+      language: "python",
+      locale: "en",
+      subject,
+      referenceSolution: "print(1)",
+      templateSource: "{{ STUDENT_CODE }}",
+      templateVisibleLineNumbers: [],
+      visibleTestCount: 2,
+      hiddenTestCount: 2
+    })).resolves.toMatchObject({ attempts: 2 });
+
+    expect(mocks.generateQuestionAuthoringText.mock.calls[1]?.[1]?.userPrompt).toContain(
+      "Generate exactly 2 visible sample tests; received 1."
+    );
+    expect(mocks.generateQuestionAuthoringText.mock.calls[1]?.[1]?.userPrompt).toContain(
+      "Generate exactly 2 hidden tests; received 1."
+    );
+    expect(mocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(1);
+  });
+
+  it("generates the requested counts as contains-lines tests and reports validation failures", async () => {
+    const sampleTests = Array.from({ length: 2 }, (_, index) => ({
+      id: `sample-${index + 1}`,
+      title: `Sample ${index + 1}`,
+      input: String(index),
+      output: String(index),
+      outputMatchMode: "exact"
+    }));
+    const hiddenTests = Array.from({ length: 3 }, (_, index) => ({
+      id: `hidden-${index + 1}`,
+      name: `Hidden ${index + 1}`,
+      stdin: String(index + 2),
+      expectedOutput: String(index + 2),
+      outputMatchMode: "regex"
+    }));
     mocks.generateQuestionAuthoringText.mockResolvedValueOnce(
       JSON.stringify({
-        sampleTests: [{ id: "sample-1", title: "Sample", input: "", output: "1" }],
-        hiddenTests: [{ id: "hidden-1", name: "Hidden", stdin: "", expectedOutput: "1" }]
+        sampleTests,
+        hiddenTests
       })
     );
 
-    await expect(
-      generateCodingExerciseTests({
-        user,
-        description: "Return one",
-        prompt: "Write a function that returns one.",
-        language: "python",
-        locale: "en",
-        subject,
-        referenceSolution: "print(1)",
-        templateSource: "{{ STUDENT_CODE }}",
-        templateVisibleLineNumbers: []
-      })
-    ).resolves.toMatchObject({ attempts: 1, hiddenTests: [{ id: "hidden-1" }] });
+    const generated = await generateCodingExerciseTests({
+      user,
+      description: "Return one",
+      prompt: "Write a function that returns one.",
+      language: "python",
+      locale: "en",
+      subject,
+      referenceSolution: "print(1)",
+      templateSource: "{{ STUDENT_CODE }}",
+      templateVisibleLineNumbers: [],
+      visibleTestCount: 2,
+      hiddenTestCount: 3
+    });
+    expect(generated).toMatchObject({ attempts: 1 });
+    if (generated.status === "error") throw new Error("Expected generated tests.");
+    expect(generated.sampleTests).toHaveLength(2);
+    expect(generated.hiddenTests).toHaveLength(3);
+    expect([...generated.sampleTests, ...generated.hiddenTests]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ outputMatchMode: "contains_lines", containsLinesOrderMatters: false })
+      ])
+    );
+    expect([...generated.sampleTests, ...generated.hiddenTests].every(
+      (test) => test.outputMatchMode === "contains_lines" && test.containsLinesOrderMatters === false
+    )).toBe(true);
+    expect(mocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledWith(expect.objectContaining({
+      sampleTests: expect.arrayContaining([expect.objectContaining({ outputMatchMode: "contains_lines" })]),
+      hiddenTests: expect.arrayContaining([expect.objectContaining({ outputMatchMode: "contains_lines" })])
+    }));
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("exactly 2 visible sample tests and exactly 3 hidden tests");
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("outputMatchMode contains_lines");
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("reproduce the same test case as a visible test with different input values");
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("exit code 0");
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("floating-point comparisons");
 
@@ -126,7 +230,9 @@ describe("coding exercise AI generation", () => {
         subject,
         referenceSolution: "print(1)",
         templateSource: "{{ STUDENT_CODE }}",
-        templateVisibleLineNumbers: []
+        templateVisibleLineNumbers: [],
+        visibleTestCount: 1,
+        hiddenTestCount: 1
       })
     ).rejects.toMatchObject({ status: 422, code: "CODING_EXERCISE_TEST_GENERATION_INVALID" });
   });
@@ -151,7 +257,9 @@ describe("coding exercise AI generation", () => {
       subject,
       referenceSolution: "int main(void) { return 0; }",
       templateSource: "{{ STUDENT_CODE }}",
-      templateVisibleLineNumbers: []
+      templateVisibleLineNumbers: [],
+      visibleTestCount: 1,
+      hiddenTestCount: 1
     })).rejects.toMatchObject({ status: 422, code: "REFERENCE_SOLUTION_COMPILATION_FAILED" });
     expect(mocks.generateQuestionAuthoringText).toHaveBeenCalledTimes(1);
   });

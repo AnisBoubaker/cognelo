@@ -41,6 +41,24 @@ describe("coding exercise config and template helpers", () => {
     expect(hidden.tests[0]).toMatchObject({ outputMatchMode: "exact", containsLinesOrderMatters: false });
   });
 
+  it("accepts at most fifteen visible tests", () => {
+    const sampleTests = Array.from({ length: 15 }, (_, index) => ({
+      id: `sample-${index + 1}`,
+      title: `Sample ${index + 1}`,
+      input: String(index),
+      output: String(index)
+    }));
+
+    expect(parseCodingExerciseConfig({
+      prompt: "Write a program that echoes the provided value.",
+      sampleTests
+    }).sampleTests).toHaveLength(15);
+    expect(() => parseCodingExerciseConfig({
+      prompt: "Write a program that echoes the provided value.",
+      sampleTests: [...sampleTests, { id: "sample-16", title: "Sample 16", input: "15", output: "15" }]
+    })).toThrow();
+  });
+
   it("merges hidden support code into private template source", () => {
     const privateConfig = parseCodingExercisePrivateConfig({
       hiddenSupportCode: "def helper():\n    return 1",
