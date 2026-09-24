@@ -227,6 +227,8 @@ export type CodingExerciseTestsGenerationInput = CodingExerciseGenerationBaseInp
   referenceSolution: string;
   templateSource: string;
   templateVisibleLineNumbers: number[];
+  visibleTestCount: number;
+  hiddenTestCount: number;
 };
 
 export type CodingExerciseRubricGenerationInput = CodingExerciseGenerationBaseInput & {

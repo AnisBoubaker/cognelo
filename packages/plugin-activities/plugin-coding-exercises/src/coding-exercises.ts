@@ -2,6 +2,9 @@ import { z } from "zod";
 
 export const codingExerciseTemplateInsertionToken = "{{ STUDENT_CODE }}";
 export const codingExerciseTestInsertionToken = "{{ TEST_CODE }}";
+export const codingExerciseDefaultVisibleTestCount = 3;
+export const codingExerciseDefaultHiddenTestCount = 8;
+export const codingExerciseMaxGeneratedTestCount = 15;
 
 export const codingExerciseExecutionModeSchema = z.literal("template");
 
@@ -28,7 +31,7 @@ export const codingExerciseConfigSchema = z.object({
   executionMode: codingExerciseExecutionModeSchema.default("template"),
   starterCode: z.string().max(40000).default(""),
   studentTemplateSource: z.string().max(120000).default(""),
-  sampleTests: z.array(sampleTestSchema).max(10).default([]),
+  sampleTests: z.array(sampleTestSchema).max(codingExerciseMaxGeneratedTestCount).default([]),
   maxEditorSeconds: z.number().int().min(30).max(14400).default(1800)
 });
 
@@ -124,7 +127,7 @@ export type CodingExercisePrivateConfig = z.infer<typeof codingExercisePrivateCo
 
 export const codingExerciseHiddenTestsInputSchema = z.object({
   tests: z.array(codingExerciseHiddenTestSchema).max(50),
-  sampleTests: z.array(sampleTestSchema).max(10).default([]),
+  sampleTests: z.array(sampleTestSchema).max(codingExerciseMaxGeneratedTestCount).default([]),
   referenceSolution: z.string().max(60000).default(""),
   privateConfig: codingExercisePrivateConfigSchema.default({}),
   activityConfig: codingExerciseConfigSchema.optional(),
@@ -205,7 +208,7 @@ export function normalizeCodingExerciseSampleTests(value: unknown) {
         }))
       )
     )
-    .max(10)
+    .max(codingExerciseMaxGeneratedTestCount)
     .parse(raw);
 }
 

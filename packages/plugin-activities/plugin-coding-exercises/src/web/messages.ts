@@ -40,6 +40,13 @@ type MessageKey =
   | "generateTestsPromptRequired"
   | "generateTestsReferenceRequired"
   | "generateTestsError"
+  | "generateTestsDialogTitle"
+  | "generateTestsDialogMessage"
+  | "visibleTestCount"
+  | "hiddenTestCount"
+  | "testCountLimit"
+  | "cancelTestGeneration"
+  | "confirmTestGeneration"
   | "replaceTestsTitle"
   | "replaceTestsMessage"
   | "keepCurrentTests"
@@ -212,6 +219,13 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     generateTestsPromptRequired: "Add a prompt before generating test cases.",
     generateTestsReferenceRequired: "Add or generate a reference solution before generating test cases.",
     generateTestsError: "Unable to generate valid test cases right now.",
+    generateTestsDialogTitle: "Generate test cases",
+    generateTestsDialogMessage: "Choose how many visible and hidden tests to generate. Generated tests use Contains lines output matching.",
+    visibleTestCount: "Visible tests",
+    hiddenTestCount: "Hidden tests",
+    testCountLimit: "Choose between 1 and 15 tests of each kind.",
+    cancelTestGeneration: "Cancel",
+    confirmTestGeneration: "Generate tests",
     replaceTestsTitle: "Replace existing test cases?",
     replaceTestsMessage: "Generating test cases will replace existing visible sample tests and hidden tests.",
     keepCurrentTests: "Keep current tests",
@@ -381,6 +395,13 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     generateTestsPromptRequired: "Ajoutez une consigne avant de generer les cas de test.",
     generateTestsReferenceRequired: "Ajoutez ou generez une solution de reference avant de generer les cas de test.",
     generateTestsError: "Impossible de generer des cas de test valides pour le moment.",
+    generateTestsDialogTitle: "Générer les cas de test",
+    generateTestsDialogMessage: "Choisissez le nombre de tests visibles et cachés à générer. Les tests générés utilisent la comparaison « Contient les lignes ».",
+    visibleTestCount: "Tests visibles",
+    hiddenTestCount: "Tests cachés",
+    testCountLimit: "Choisissez entre 1 et 15 tests de chaque type.",
+    cancelTestGeneration: "Annuler",
+    confirmTestGeneration: "Générer les tests",
     replaceTestsTitle: "Remplacer les cas de test existants?",
     replaceTestsMessage: "La generation remplacera les tests d'exemple visibles et les tests caches existants.",
     keepCurrentTests: "Conserver les tests",
@@ -550,6 +571,13 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     generateTestsPromptRequired: "请先添加题目再生成测试用例。",
     generateTestsReferenceRequired: "请先添加或生成参考答案，再生成测试用例。",
     generateTestsError: "暂时无法生成有效测试用例。",
+    generateTestsDialogTitle: "生成测试用例",
+    generateTestsDialogMessage: "选择要生成的可见测试和隐藏测试数量。生成的测试使用“包含指定行”输出匹配。",
+    visibleTestCount: "可见测试",
+    hiddenTestCount: "隐藏测试",
+    testCountLimit: "每种测试请选择 1 到 15 个。",
+    cancelTestGeneration: "取消",
+    confirmTestGeneration: "生成测试",
     replaceTestsTitle: "替换现有测试用例？",
     replaceTestsMessage: "生成测试用例会替换现有可见示例测试和隐藏测试。",
     keepCurrentTests: "保留当前测试",

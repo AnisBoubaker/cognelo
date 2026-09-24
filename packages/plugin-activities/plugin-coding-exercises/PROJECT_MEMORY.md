@@ -6,6 +6,7 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Judge0 is server-only and all source/input/output fields cross its boundary as Base64. Status 13 is an infrastructure failure, never a learner result or consumed attempt.
 - Bank/course private rows require copy, sync, duplication, and deletion hooks. Duplication must copy the complete private configuration; generated reference solutions must merge rather than erase rubrics.
 - Enabled hidden tests must pass the private reference solution before save. `{{ STUDENT_CODE }}` is required; `{{ TEST_CODE }}` is the optional per-test harness insertion point.
+- AI test generation asks for 1–15 visible and 1–15 hidden tests, defaulting to 3 and 8. Generated tests always use unordered `contains_lines`; hidden tests may cover the same case type as visible tests with different values to expose hard-coded solutions.
 - Standalone drafts use core `ActivityResponseDraft`; embedded Test drafts use `TestItemAttempt`. Do not mix those persistence paths.
 - Summative submissions use core attempts and attempt limits. Practice-run grouping is derived from timestamps around submissions.
 - Judge0 output is compared before truncation. Bound new execution/validation diagnostics when saving and bound legacy rows again when serializing them, or one runaway run can stall every later history view.

@@ -11,6 +11,9 @@ import {
   buildCodingExerciseStudentTemplateSource,
   buildCodingExerciseTemplateSource,
   createCodingExerciseAiRubricCriterionId,
+  codingExerciseDefaultHiddenTestCount,
+  codingExerciseDefaultVisibleTestCount,
+  codingExerciseMaxGeneratedTestCount,
   codingExerciseTemplateRequiresTestCodeMarker,
   codingExerciseTemplateInsertionToken,
   getCodingExerciseAiFeedbackValidationMessages,
@@ -215,6 +218,8 @@ type CodingExerciseAiGenerationClient = {
     referenceSolution: string;
     templateSource: string;
     templateVisibleLineNumbers: number[];
+    visibleTestCount: number;
+    hiddenTestCount: number;
     knowledge: ActivityKnowledgeGenerationRequest;
   }) => Promise<
     | {
@@ -327,6 +332,9 @@ export function CodingExerciseActivityView({
   const [generatingRubric, setGeneratingRubric] = useState(false);
   const [gradingSection, setGradingSection] = useState<"rubric" | "tests">("rubric");
   const [replacementDialog, setReplacementDialog] = useState<"prompt" | "solution" | "rubric" | "tests" | null>(null);
+  const [testGenerationDialogOpen, setTestGenerationDialogOpen] = useState(false);
+  const [visibleTestGenerationCount, setVisibleTestGenerationCount] = useState(codingExerciseDefaultVisibleTestCount);
+  const [hiddenTestGenerationCount, setHiddenTestGenerationCount] = useState(codingExerciseDefaultHiddenTestCount);
   const [error, setError] = useState("");
   const [editorCode, setEditorCode] = useState(() => getCodingExerciseInitialStudentSource(activity.config));
   const [sampleInput, setSampleInput] = useState("");
@@ -938,20 +946,24 @@ export function CodingExerciseActivityView({
       notifications.error(t("generateTestsReferenceRequired"));
       return;
     }
-    if (hasExistingGeneratedTestContent(config, hiddenTests)) {
-      setReplacementDialog("tests");
-      return;
-    }
-    void generateTests();
+    setVisibleTestGenerationCount(codingExerciseDefaultVisibleTestCount);
+    setHiddenTestGenerationCount(codingExerciseDefaultHiddenTestCount);
+    setTestGenerationDialogOpen(true);
   }
 
-  async function generateTests() {
+  async function generateTests(input: {
+    visibleTestCount?: number;
+    hiddenTestCount?: number;
+  } = {}) {
     if (!aiGenerationClient) {
       return;
     }
 
+    const visibleTestCount = input.visibleTestCount ?? codingExerciseDefaultVisibleTestCount;
+    const hiddenTestCount = input.hiddenTestCount ?? codingExerciseDefaultHiddenTestCount;
     setGeneratingTests(true);
     setReplacementDialog(null);
+    setTestGenerationDialogOpen(false);
     setError("");
     try {
       const draft = aiGenerationDraftRef.current;
@@ -967,6 +979,8 @@ export function CodingExerciseActivityView({
         referenceSolution: referenceSolutionForGeneration,
         templateSource: persistedPrivateConfig.templateSource,
         templateVisibleLineNumbers: persistedPrivateConfig.templateVisibleLineNumbers,
+        visibleTestCount,
+        hiddenTestCount,
         knowledge: knowledgeGeneration.request
       });
       if (result.status === "error") {
@@ -980,7 +994,7 @@ export function CodingExerciseActivityView({
       const generatedAt = Date.now();
       const generatedHiddenTests = result.hiddenTests.map((test, index) => ({
         ...test,
-        outputMatchMode: "exact" as const,
+        outputMatchMode: "contains_lines" as const,
         containsLinesOrderMatters: false,
         id: `${test.id}-${generatedAt}-${index + 1}`.slice(0, 80),
         orderIndex: index,
@@ -1213,6 +1227,10 @@ export function CodingExerciseActivityView({
     return authoringGradingPortalTarget ? createPortal(content, authoringGradingPortalTarget) : null;
   }
 
+  const testGenerationCountsValid = [visibleTestGenerationCount, hiddenTestGenerationCount].every(
+    (count) => Number.isInteger(count) && count >= 1 && count <= codingExerciseMaxGeneratedTestCount
+  );
+
   return (
     <section className="section stack">
       {canManage ? (
@@ -1315,6 +1333,70 @@ export function CodingExerciseActivityView({
                   </button>
                   <button type="button" onClick={confirmReplacementGeneration}>
                     {getReplaceReplacementLabel()}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          ) : null}
+
+          {testGenerationDialogOpen && typeof document !== "undefined" ? createPortal(
+            <div className="dialog-backdrop" role="presentation">
+              <div
+                aria-describedby="coding-generation-tests-description"
+                aria-labelledby="coding-generation-tests-title"
+                aria-modal="true"
+                className="dialog-panel"
+                role="dialog"
+              >
+                <div className="stack" style={{ gap: 8 }}>
+                  <p className="eyebrow">{t("generateTests")}</p>
+                  <h2 id="coding-generation-tests-title">{t("generateTestsDialogTitle")}</h2>
+                  <p className="muted" id="coding-generation-tests-description">{t("generateTestsDialogMessage")}</p>
+                  {hasExistingGeneratedTestContent(config, hiddenTests) ? (
+                    <p className="muted">{t("replaceTestsMessage")}</p>
+                  ) : null}
+                </div>
+                <div className="form-grid two-columns">
+                  <div className="field">
+                    <label htmlFor="coding-generation-visible-test-count">{t("visibleTestCount")}</label>
+                    <input
+                      id="coding-generation-visible-test-count"
+                      max={codingExerciseMaxGeneratedTestCount}
+                      min={1}
+                      step={1}
+                      type="number"
+                      value={visibleTestGenerationCount}
+                      onChange={(event) => setVisibleTestGenerationCount(Number(event.target.value))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="coding-generation-hidden-test-count">{t("hiddenTestCount")}</label>
+                    <input
+                      id="coding-generation-hidden-test-count"
+                      max={codingExerciseMaxGeneratedTestCount}
+                      min={1}
+                      step={1}
+                      type="number"
+                      value={hiddenTestGenerationCount}
+                      onChange={(event) => setHiddenTestGenerationCount(Number(event.target.value))}
+                    />
+                  </div>
+                </div>
+                <p className="muted">{t("testCountLimit")}</p>
+                <div className="dialog-actions">
+                  <button className="secondary" type="button" onClick={() => setTestGenerationDialogOpen(false)}>
+                    {t("cancelTestGeneration")}
+                  </button>
+                  <button
+                    disabled={!testGenerationCountsValid}
+                    type="button"
+                    onClick={() => void generateTests({
+                      visibleTestCount: visibleTestGenerationCount,
+                      hiddenTestCount: hiddenTestGenerationCount
+                    })}
+                  >
+                    {t("confirmTestGeneration")}
                   </button>
                 </div>
               </div>
@@ -1650,7 +1732,12 @@ export function CodingExerciseActivityView({
           <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
             <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
               <h3>{t("visibleSampleTests")}</h3>
-              <button type="button" className="button secondary" onClick={addSampleTest}>
+              <button
+                type="button"
+                className="button secondary"
+                disabled={normalizeCodingExerciseSampleTests(config.sampleTests).length >= codingExerciseMaxGeneratedTestCount}
+                onClick={addSampleTest}
+              >
                 {t("addSampleTest")}
               </button>
             </div>
