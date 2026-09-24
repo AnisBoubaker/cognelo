@@ -709,6 +709,8 @@ model BankActivity {
   courseActivities     Activity[]
   knowledgeConcepts    BankActivityKnowledgeConcept[]
   mediaAssetReferences MediaAssetReference[]
+  bankTestDefinition   BankTest?                      @relation("BankTestShellActivity")
+  bankTestItem         BankTestItem?                  @relation("BankTestItemActivity")
 
   @@index([bankId, folderId, position])
   @@index([folderId])
@@ -736,6 +738,8 @@ model ActivityVersion {
   activityAttempts         ActivityAttempt[]
   knowledgeConcepts        ActivityVersionKnowledgeConcept[]
   mediaAssetReferences     MediaAssetReference[]
+  bankTestVersion          BankTestVersion?                  @relation("BankTestShellVersion")
+  bankTestVersionItems     BankTestVersionItem[]             @relation("BankTestItemVersion")
 
   @@unique([bankActivityId, versionNumber])
   @@index([bankActivityId, createdAt])
@@ -831,6 +835,66 @@ model Test {
   revisions  TestRevision[]
 
   @@index([courseId])
+}
+
+model BankTest {
+  id             String            @id @default(cuid())
+  bankActivityId String            @unique
+  settings       Json              @default("{}")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  activity       BankActivity      @relation("BankTestShellActivity", fields: [bankActivityId], references: [id], onDelete: Cascade)
+  items          BankTestItem[]
+  versions       BankTestVersion[]
+}
+
+model BankTestItem {
+  id             String       @id @default(cuid())
+  bankTestId     String
+  bankActivityId String       @unique
+  position       Int          @default(0)
+  pointsPossible Float        @default(1)
+  isRequired     Boolean      @default(true)
+  metadata       Json         @default("{}")
+  removedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  test           BankTest     @relation(fields: [bankTestId], references: [id], onDelete: Cascade)
+  activity       BankActivity @relation("BankTestItemActivity", fields: [bankActivityId], references: [id], onDelete: Cascade)
+
+  @@index([bankTestId, position])
+  @@index([bankTestId, removedAt, position])
+}
+
+model BankTestVersion {
+  id                String                @id @default(cuid())
+  bankTestId        String
+  activityVersionId String                @unique
+  settings          Json                  @default("{}")
+  createdAt         DateTime              @default(now())
+  test              BankTest              @relation(fields: [bankTestId], references: [id], onDelete: Cascade)
+  activityVersion   ActivityVersion       @relation("BankTestShellVersion", fields: [activityVersionId], references: [id], onDelete: Cascade)
+  items             BankTestVersionItem[]
+
+  @@index([bankTestId, createdAt])
+}
+
+model BankTestVersionItem {
+  id                   String          @id @default(cuid())
+  bankTestVersionId    String
+  sourceBankTestItemId String
+  activityVersionId    String
+  position             Int
+  pointsPossible       Float
+  isRequired           Boolean
+  metadata             Json            @default("{}")
+  createdAt            DateTime        @default(now())
+  version              BankTestVersion @relation(fields: [bankTestVersionId], references: [id], onDelete: Cascade)
+  activityVersion      ActivityVersion @relation("BankTestItemVersion", fields: [activityVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([bankTestVersionId, sourceBankTestItemId])
+  @@index([bankTestVersionId, position])
+  @@index([activityVersionId])
 }
 
 model TestRevision {
@@ -1229,32 +1293,32 @@ model GradeEvent {
 /// foreign keys so approved research records can survive operational data
 /// retention and plugin cleanup.
 model AiFeedbackResearchEvent {
-  id                 String   @id @default(cuid())
-  eventType          String
-  courseId           String
-  groupId            String?
-  activityId         String
-  groupActivityId    String?
-  gradebookItemId    String?
-  participantId      String?
-  userId             String?
-  attemptId          String?
-  actorUserId        String?
-  pluginKey          String
-  feedbackRef        String?
-  feedbackVersion    Int?
-  assessmentMode     String
-  triggerKind        String
-  provider           String?
-  model              String?
-  promptVersion      String?
-  schemaVersion      String?
-  submissionHash     String?
-  feedbackHash       String?
-  aiContribution     Float?
-  outcome            String?
-  metadata           Json     @default("{}")
-  createdAt          DateTime @default(now())
+  id              String   @id @default(cuid())
+  eventType       String
+  courseId        String
+  groupId         String?
+  activityId      String
+  groupActivityId String?
+  gradebookItemId String?
+  participantId   String?
+  userId          String?
+  attemptId       String?
+  actorUserId     String?
+  pluginKey       String
+  feedbackRef     String?
+  feedbackVersion Int?
+  assessmentMode  String
+  triggerKind     String
+  provider        String?
+  model           String?
+  promptVersion   String?
+  schemaVersion   String?
+  submissionHash  String?
+  feedbackHash    String?
+  aiContribution  Float?
+  outcome         String?
+  metadata        Json     @default("{}")
+  createdAt       DateTime @default(now())
 
   @@index([courseId, createdAt])
   @@index([activityId, createdAt])
@@ -1269,13 +1333,13 @@ model AiFeedbackResearchEvent {
 /// values so the audit trail remains intelligible if source records are later
 /// removed under their own retention policy.
 model GradeChallenge {
-  id                    String   @id @default(cuid())
-  courseId              String
-  groupId               String
-  activityId            String
-  groupActivityId       String?
-  gradebookItemId       String
-  participantId         String
+  id                     String    @id @default(cuid())
+  courseId               String
+  groupId                String
+  activityId             String
+  groupActivityId        String?
+  gradebookItemId        String
+  participantId          String
   userId                 String?
   attemptId              String
   gradeId                String?
@@ -1286,14 +1350,14 @@ model GradeChallenge {
   feedbackHash           String?
   releasedGradeSnapshot  Json
   explanation            String
-  status                 String   @default("open")
+  status                 String    @default("open")
   teacherResponse        String?
   resolvedByUserId       String?
   resolvedAt             DateTime?
   resultingGradeSnapshot Json?
-  metadata               Json     @default("{}")
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  metadata               Json      @default("{}")
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   @@unique([feedbackRef, feedbackVersion, participantId])
   @@index([courseId, status, createdAt])

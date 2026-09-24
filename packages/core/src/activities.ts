@@ -359,6 +359,9 @@ type ActivityBankSyncStatus = "in_sync" | "course_ahead" | "bank_ahead" | "diver
 export async function getCourseActivityBankSyncStatus(user: CurrentUser, courseId: string, activityId: string) {
   await assertCanManageCourse(user, courseId);
   const source = await loadSyncSource(courseId, activityId);
+  if (source.activityType.key === "test") {
+    throw new AppError(409, "TEST_BANK_SYNC_ROUTE_REQUIRED", "Test synchronization uses its compound activity lifecycle.");
+  }
   const latestVersion = await prisma.activityVersion.findFirst({
     where: { bankActivityId: source.bankActivityId!, lifecycle: "published" },
     orderBy: { versionNumber: "desc" },
@@ -389,6 +392,9 @@ export async function syncCourseActivityWithBank(user: CurrentUser, courseId: st
   await assertCanManageCourse(user, courseId);
   const data = CourseActivityBankSyncSchema.parse(input);
   const source = await loadSyncSource(courseId, activityId);
+  if (source.activityType.key === "test") {
+    throw new AppError(409, "TEST_BANK_SYNC_ROUTE_REQUIRED", "Test synchronization uses its compound activity lifecycle.");
+  }
   if (data.action !== "publish_to_bank") {
     const attemptCount = await prisma.activityAttempt.count({ where: { activityId } });
     if (attemptCount > 0) {

@@ -427,21 +427,29 @@ export default function CourseDetailPage() {
     setError("");
     setIsAddingActivity(true);
     try {
-      const result = await api.createActivity(courseId, {
-        title: bankActivity.title,
-        activityTypeKey: bankActivity.activityType.key,
-        bankActivityId: bankActivity.id,
-        activityVersionId: bankActivity.currentVersionId ?? undefined,
-        lifecycle: "draft",
-        description: bankActivity.description,
-        config: {},
-        metadata: { researchTags: [] },
-        position: course?.activities?.length ?? 0,
-        contentPlacement: buildPickerContentPlacement(bankActivity.title)
-      });
+      const activityId = bankActivity.activityType.key === "test"
+        ? (await api.createTestFromBank(courseId, {
+            bankActivityId: bankActivity.id,
+            activityVersionId: bankActivity.currentVersionId ?? undefined,
+            lifecycle: "draft",
+            position: course?.activities?.length ?? 0,
+            contentPlacement: buildPickerContentPlacement(bankActivity.title)
+          })).test.activityId
+        : (await api.createActivity(courseId, {
+            title: bankActivity.title,
+            activityTypeKey: bankActivity.activityType.key,
+            bankActivityId: bankActivity.id,
+            activityVersionId: bankActivity.currentVersionId ?? undefined,
+            lifecycle: "draft",
+            description: bankActivity.description,
+            config: {},
+            metadata: { researchTags: [] },
+            position: course?.activities?.length ?? 0,
+            contentPlacement: buildPickerContentPlacement(bankActivity.title)
+          })).activity.id;
       setShowActivityPicker(false);
       await refresh();
-      router.push(`/courses/${courseId}/activities/${result.activity.id}`);
+      router.push(`/courses/${courseId}/activities/${activityId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("courseDetail.createActivityError"));
     } finally {
@@ -1631,7 +1639,7 @@ export default function CourseDetailPage() {
                                         <MaterialActionIcon name="duplicate" />
                                         <span>{t("courseDetail.duplicateActivity")}</span>
                                       </button>
-                                      {activity.bankActivityId && activity.activityVersionId ? (
+                                      {activity.bankActivityId && activity.activityVersionId && activity.activityType.key !== "test" ? (
                                         <button className="content-context-menu-item" disabled={bankSyncLoading} role="menuitem" type="button" onClick={() => void openBankSync(activity.id, activity.title)}>
                                           <MaterialActionIcon name="sync" />
                                           <span>{t("courseDetail.bankSyncAction")}</span>

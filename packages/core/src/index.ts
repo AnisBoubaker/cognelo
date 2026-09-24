@@ -7,6 +7,7 @@ export * from "./ai-feedback";
 export * from "./auth";
 export * from "./authorization";
 export * from "./background-jobs";
+export * from "./bank-tests";
 export * from "./course-content";
 export * from "./courses";
 export * from "./email-delivery";

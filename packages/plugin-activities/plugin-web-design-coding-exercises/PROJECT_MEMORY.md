@@ -8,5 +8,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Saving enabled tests is reference-validation dependent and atomic; failed validation leaves prior tests unchanged.
 - Expected-result prompt tokens expose only generated PNG artifacts, never solution source.
 - Standalone drafts use `ActivityResponseDraft`; embedded Test drafts use `TestItemAttempt`.
-- Every private bank-owned table must participate in copy, sync, duplication, and deletion hooks.
+- Every private bank-owned table must participate in copy, sync, duplication, and deletion hooks, including when a reusable bank Test owns the activity as a hidden child.
 - The runner remains secret-free and requires production hardening, isolation, and smoke coverage for screenshot cropping.

@@ -12,6 +12,7 @@
 ## Boundaries
 
 - Authored Parsons data is generic activity config, so core owns bank copying, synchronization, and version comparison.
+- Reusable bank Tests copy Parsons children into Test-owned bank activities and later into independent course children; learner attempt/event rows are never copied.
 - Student state and event history use plugin-owned `PluginParsonsAttempt` and `PluginParsonsAttemptEvent` tables.
 - Teacher/admin previews are ephemeral and must not pollute learner research data.
 - Summative submission uses core attempts and suppresses correctness until grade release; teacher regrades use the plugin's server grading handler.

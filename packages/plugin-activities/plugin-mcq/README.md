@@ -14,6 +14,7 @@
 - `##` starts a question; `- [x]` and `- [ ]` mark correct and incorrect choices.
 - `#` and `---` create titled and untitled content sections between questions.
 - Authored content is generic activity config, so core owns bank copying, synchronization, and version comparison.
+- Reusable bank Tests copy MCQ children into Test-owned bank activities and later into independent course children without plugin-private authoring rows.
 - Standalone answers autosave through `ActivityResponseDraft`; compound Test answers use `TestItemAttempt`.
 - Summative submissions use core attempts, limits, gradebook selection, and release visibility.
 - Optional model feedback can explain results but never changes deterministic MCQ grades and is not challengeable.

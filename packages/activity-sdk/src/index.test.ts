@@ -43,7 +43,7 @@ describe("activity SDK registry", () => {
     expect(getActivityProviderForActivityType("mcq")).toEqual({ kind: "plugin", key: "mcq" });
     expect(isCoreActivityType("test")).toBe(true);
     expect(getActivityDefinition("test")).toMatchObject({
-      creationScopes: ["course"],
+      creationScopes: ["course", "bank"],
       isEnabledByDefault: true
     });
   });

@@ -94,6 +94,8 @@ export async function duplicateTest(user: CurrentUser, courseId: string, activit
     const shell = await tx.activity.create({
       data: {
         courseId,
+        bankActivityId: source.activity.bankActivityId,
+        activityVersionId: source.activity.activityVersionId,
         activityTypeId: source.activity.activityTypeId,
         title: data.title ?? `${source.activity.title} (copy)`,
         description: source.activity.description,

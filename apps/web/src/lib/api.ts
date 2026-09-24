@@ -632,6 +632,24 @@ export type CourseTest = {
   items: CourseTestItem[];
 };
 
+export type BankTestItem = {
+  id: string;
+  bankActivityId: string;
+  position: number;
+  pointsPossible: number;
+  isRequired: boolean;
+  metadata: Record<string, unknown>;
+  activity: BankActivity;
+};
+
+export type BankTest = {
+  id: string;
+  bankActivityId: string;
+  settings: CourseTestSettings;
+  activity: BankActivity;
+  items: BankTestItem[];
+};
+
 export type TestItemRuntimeAttempt = {
   id: string;
   lifecycle: "started" | "submitted" | "graded" | "deleted";
@@ -1326,11 +1344,47 @@ export const api = {
     }),
   bankActivities: (activityBankId: string) =>
     request<{ activities: BankActivity[] }>(`/activity-banks/${activityBankId}/activities`),
+  bankActivity: (activityBankId: string, bankActivityId: string) =>
+    request<{ activity: BankActivity }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}`),
   createBankActivity: (activityBankId: string, input: BankActivityInput) =>
     request<{ activity: BankActivity }>(`/activity-banks/${activityBankId}/activities`, {
       method: "POST",
       body: JSON.stringify(input)
     }),
+  createBankTest: (activityBankId: string, input: {
+    title: string;
+    description?: string;
+    lifecycle?: "draft" | "published" | "paused" | "archived";
+    settings?: Partial<CourseTestSettings>;
+    position?: number;
+    folderId?: string | null;
+  }) => request<{ test: BankTest }>(`/activity-banks/${activityBankId}/tests`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  }),
+  bankTest: (activityBankId: string, bankActivityId: string) =>
+    request<{ test: BankTest }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/test`),
+  updateBankTest: (activityBankId: string, bankActivityId: string, input: {
+    title?: string;
+    description?: string;
+    lifecycle?: "draft" | "published" | "paused" | "archived";
+    settings?: Partial<CourseTestSettings>;
+  }) => request<{ test: BankTest }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/test`, {
+    method: "PATCH",
+    body: JSON.stringify(input)
+  }),
+  createBankTestItem: (activityBankId: string, bankActivityId: string, input: Record<string, unknown>) =>
+    request<{ item: BankTestItem }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/test/items`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  updateBankTestItem: (activityBankId: string, bankActivityId: string, itemId: string, input: Partial<Pick<BankTestItem, "position" | "pointsPossible" | "isRequired" | "metadata">>) =>
+    request<{ item: BankTestItem }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/test/items/${itemId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input)
+    }),
+  deleteBankTestItem: (activityBankId: string, bankActivityId: string, itemId: string) =>
+    request<{ ok: true }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/test/items/${itemId}`, { method: "DELETE" }),
   createActivityBankFolder: (activityBankId: string, input: { title: string; parentId?: string | null; position?: number }) =>
     request<{ folder: ActivityBankFolder }>(`/activity-banks/${activityBankId}/folders`, {
       method: "POST",
@@ -1836,6 +1890,13 @@ export const api = {
     position?: number;
     contentPlacement?: { parentId?: string | null; position?: number; isVisible?: boolean; titleSnapshot?: string; metadata?: Record<string, unknown> };
   }) => request<{ test: CourseTest }>(`/courses/${courseId}/tests`, { method: "POST", body: JSON.stringify(input) }),
+  createTestFromBank: (courseId: string, input: {
+    bankActivityId: string;
+    activityVersionId?: string;
+    lifecycle?: "draft" | "published" | "archived";
+    position?: number;
+    contentPlacement?: { parentId?: string | null; position?: number; isVisible?: boolean; titleSnapshot?: string; metadata?: Record<string, unknown> };
+  }) => request<{ test: CourseTest }>(`/courses/${courseId}/tests/from-bank`, { method: "POST", body: JSON.stringify(input) }),
   test: (courseId: string, activityId: string) =>
     request<{ test: CourseTest }>(`/courses/${courseId}/activities/${activityId}/test`),
   updateTest: (courseId: string, activityId: string, input: {
@@ -1846,6 +1907,11 @@ export const api = {
   }) => request<{ test: CourseTest }>(`/courses/${courseId}/activities/${activityId}/test`, { method: "PATCH", body: JSON.stringify(input) }),
   duplicateTest: (courseId: string, activityId: string, input: { title?: string; contentItemId?: string } = {}) =>
     request<{ test: CourseTest }>(`/courses/${courseId}/activities/${activityId}/test/duplicate`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  publishTestToBank: (courseId: string, activityId: string, input: { activityBankId: string; title?: string }) =>
+    request<{ test: BankTest }>(`/courses/${courseId}/activities/${activityId}/test/publish-to-bank`, {
       method: "POST",
       body: JSON.stringify(input)
     }),

@@ -96,6 +96,8 @@ Generic versions are created only for changed Published saves. Draft saves updat
 
 Duplicating a coding exercise inside an activity bank invokes the platform bank-duplication hook and copies its bank-owned reference solution, complete private configuration (including rubric and automatic-feedback settings), and hidden tests to the new independent bank activity. Generating a replacement reference solution changes the solution and template fields while preserving that rubric configuration. Moving a bank activity keeps its ID, so its plugin-owned rows move with it without copying.
 
+Reusable bank Tests use the same lifecycle at child granularity. Adding a coding exercise to a bank Test creates a new Test-owned bank activity and invokes bank duplication; importing that Test into a course invokes bank-to-course copying for the owned child; publishing a course Test invokes course-to-bank copying before the course graph is linked; and deleting or duplicating the Test dispatches the corresponding hook for every owned coding child.
+
 ## Authoring UX
 
 The teacher authoring UI is a form surface and must stay registered with the shared `useUnsavedChangesGuard` hook from `@cognelo/activity-ui`. Any future coding-exercise authoring tabs or settings panels should do the same so navigation can offer continue editing, save and leave, or discard and leave.

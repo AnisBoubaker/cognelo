@@ -157,19 +157,24 @@ export default function ActivityBankDetailPage() {
     try {
       const definition = activityDefinitions.find((candidate) => candidate.key === selectedActivityTypeKey);
       const localized = definition?.i18n?.[locale];
-      const activity = await api.createBankActivity(bank.id, {
+      const input = {
         title: localized?.defaultTitle ?? definition?.name ?? activityTypeLabel(selectedActivityTypeKey),
-        activityTypeKey: selectedActivityTypeKey,
         description: localized?.description ?? definition?.description ?? "",
-        lifecycle: "draft",
-        config: definition?.defaultConfig ?? {},
-        metadata: {},
+        lifecycle: "draft" as const,
         position: nextBankItemPosition(activityPickerFolderId),
         folderId: activityPickerFolderId
-      });
+      };
+      const bankActivityId = selectedActivityTypeKey === "test"
+        ? (await api.createBankTest(bank.id, input)).test.bankActivityId
+        : (await api.createBankActivity(bank.id, {
+            ...input,
+            activityTypeKey: selectedActivityTypeKey,
+            config: definition?.defaultConfig ?? {},
+            metadata: {}
+          })).activity.id;
       setShowActivityPicker(false);
       await loadPage();
-      router.push(`/activity-banks/${bank.id}/activities/${activity.activity.id}`);
+      router.push(`/activity-banks/${bank.id}/activities/${bankActivityId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("activityBankDetail.createActivityError"));
     } finally {
@@ -185,12 +190,20 @@ export default function ActivityBankDetailPage() {
     setSavingEdit(true);
     setError("");
     try {
-      await api.updateBankActivity(bank.id, editingActivity.id, {
-        title: editingActivity.title,
-        description: editingActivity.description,
-        lifecycle: editingActivity.lifecycle,
-        activityTypeKey: editingActivity.activityTypeKey
-      });
+      if (editingActivity.activityTypeKey === "test") {
+        await api.updateBankTest(bank.id, editingActivity.id, {
+          title: editingActivity.title,
+          description: editingActivity.description,
+          lifecycle: editingActivity.lifecycle
+        });
+      } else {
+        await api.updateBankActivity(bank.id, editingActivity.id, {
+          title: editingActivity.title,
+          description: editingActivity.description,
+          lifecycle: editingActivity.lifecycle,
+          activityTypeKey: editingActivity.activityTypeKey
+        });
+      }
       setEditingActivity(null);
       await loadPage();
     } catch (err) {
@@ -207,7 +220,8 @@ export default function ActivityBankDetailPage() {
     setPublishingActivityId(activity.id);
     setError("");
     try {
-      await api.updateBankActivity(bank.id, activity.id, { lifecycle: "published" });
+      if (activity.activityType.key === "test") await api.updateBankTest(bank.id, activity.id, { lifecycle: "published" });
+      else await api.updateBankActivity(bank.id, activity.id, { lifecycle: "published" });
       await loadPage();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("activityBankDetail.publishActivityError"));
@@ -602,7 +616,7 @@ export default function ActivityBankDetailPage() {
 
   const bankActivityTypes = activityTypes.filter((type) => {
     const definition = activityDefinitions.find((candidate) => candidate.key === type.key);
-    return definition?.provider?.kind !== "core" && (!definition?.creationScopes || definition.creationScopes.includes("bank"));
+    return (definition?.provider?.kind !== "core" || definition.key === "test") && (!definition?.creationScopes || definition.creationScopes.includes("bank"));
   });
   const visibleActivityCategories = activityCategories.filter((category) =>
     bankActivityTypes.some((type) => activityTypeCreatesCategory(type.key, category.id))

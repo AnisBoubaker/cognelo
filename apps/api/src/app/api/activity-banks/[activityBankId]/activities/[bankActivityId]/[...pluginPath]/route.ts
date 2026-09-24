@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { resolvePluginRoute } from "@cognelo/activity-sdk/server";
-import { AppError, assertActivityTypePluginEnabled, assertCanManageActivityBank, getActivityBank } from "@cognelo/core";
+import { AppError, assertActivityTypePluginEnabled, assertCanManageActivityBank, getBankActivity } from "@cognelo/core";
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ activityBankId: string; bankActivityId: string; pluginPath: string[] }> };
@@ -15,12 +15,7 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
   const user = await requireUser();
   const { activityBankId, bankActivityId, pluginPath } = params;
   await assertCanManageActivityBank(user, activityBankId);
-  const bank = await getActivityBank(user, activityBankId);
-  const activity = bank.activities.find((candidate) => candidate.id === bankActivityId);
-
-  if (!activity) {
-    throw new AppError(404, "BANK_ACTIVITY_NOT_FOUND", "The requested activity was not found in this activity bank.");
-  }
+  const activity = await getBankActivity(user, activityBankId, bankActivityId);
 
   await assertActivityTypePluginEnabled(activity.activityType.key);
   const route = resolvePluginRoute(activity.activityType.key, pluginPath);
