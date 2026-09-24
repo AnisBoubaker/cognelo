@@ -41,6 +41,7 @@ const subjectInclude = {
     include: {
       owner: { select: { id: true, email: true, name: true } },
       activities: {
+        where: { bankTestItem: null },
         include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } } },
         orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }]
       }
@@ -639,6 +640,7 @@ export async function listActivityBanks(user: CurrentUser, subjectId?: string) {
       subject: { include: { knowledgeConcepts: { where: { active: true }, include: { skillRecords: { where: { active: true }, orderBy: { position: "asc" } } }, orderBy: { createdAt: "asc" } }, knowledgePrerequisites: { orderBy: { createdAt: "asc" } } } },
       owner: { select: { id: true, email: true, name: true } },
       activities: {
+        where: { bankTestItem: null },
         include: { activityType: true, currentVersion: true },
         orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }]
       }
@@ -657,6 +659,7 @@ export async function getActivityBank(user: CurrentUser, activityBankId: string)
       owner: { select: { id: true, email: true, name: true } },
       folders: { orderBy: [{ parentId: "asc" }, { position: "asc" }, { createdAt: "asc" }] },
       activities: {
+        where: { bankTestItem: null },
         include: {
           activityType: true,
           currentVersion: true,
@@ -697,6 +700,7 @@ export async function createActivityBank(user: CurrentUser, input: unknown) {
       owner: { select: { id: true, email: true, name: true } },
       folders: { orderBy: [{ parentId: "asc" as const }, { position: "asc" as const }, { createdAt: "asc" as const }] },
       activities: {
+        where: { bankTestItem: null },
         include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } } },
         orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }]
       }
@@ -736,6 +740,7 @@ export async function updateActivityBank(user: CurrentUser, activityBankId: stri
       owner: { select: { id: true, email: true, name: true } },
       folders: { orderBy: [{ parentId: "asc" as const }, { position: "asc" as const }, { createdAt: "asc" as const }] },
       activities: {
+        where: { bankTestItem: null },
         include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } } },
         orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }]
       }
@@ -749,20 +754,21 @@ export async function deleteActivityBank(user: CurrentUser, activityBankId: stri
     where: { id: activityBankId },
     include: {
       activities: {
-        select: { id: true, position: true, activityType: { select: { key: true } } },
+        select: { id: true, position: true, activityType: { select: { key: true } }, bankTestItem: { select: { id: true } } },
         orderBy: [{ position: "asc" }, { createdAt: "asc" }]
       }
     }
   });
   if (!bank) throw notFound("Activity bank");
   await assertCanManageActivityBank(user, activityBankId);
+  const topLevelActivityCount = bank.activities.filter((activity) => !activity.bankTestItem).length;
 
   if (data.action === "delete" && bank.activities.length && !data.force) {
     throw new AppError(
       409,
       "ACTIVITY_BANK_NOT_EMPTY",
       "This activity bank contains activities. Confirm again to delete the bank and all its contents.",
-      { activityCount: bank.activities.length }
+      { activityCount: topLevelActivityCount }
     );
   }
 
@@ -779,21 +785,24 @@ export async function deleteActivityBank(user: CurrentUser, activityBankId: stri
 
     await prisma.$transaction(async (transaction) => {
       const startingPosition = await nextBankItemPosition(transaction, destination.id, null);
-      for (const [index, activity] of bank.activities.entries()) {
+      let topLevelOffset = 0;
+      for (const activity of bank.activities) {
         await transaction.bankActivity.update({
           where: { id: activity.id },
-          data: { bankId: destination.id, folderId: null, position: startingPosition + index }
+          data: activity.bankTestItem
+            ? { bankId: destination.id, folderId: null }
+            : { bankId: destination.id, folderId: null, position: startingPosition + topLevelOffset++ }
         });
       }
       await transaction.activityBank.delete({ where: { id: activityBankId } });
     });
 
-    return { activityCount: bank.activities.length, deletedActivities: [] };
+    return { activityCount: topLevelActivityCount, deletedActivities: [] };
   }
 
   await prisma.activityBank.delete({ where: { id: activityBankId } });
   return {
-    activityCount: bank.activities.length,
+    activityCount: topLevelActivityCount,
     deletedActivities: bank.activities.map((activity) => ({
       bankActivityId: activity.id,
       activityTypeKey: activity.activityType.key
@@ -804,7 +813,7 @@ export async function deleteActivityBank(user: CurrentUser, activityBankId: stri
 export async function listBankActivities(user: CurrentUser, activityBankId: string) {
   await assertCanViewActivityBank(user, activityBankId);
   return prisma.bankActivity.findMany({
-    where: { bankId: activityBankId },
+    where: { bankId: activityBankId, bankTestItem: null },
     include: {
       activityType: true,
       currentVersion: true,
@@ -815,9 +824,29 @@ export async function listBankActivities(user: CurrentUser, activityBankId: stri
   });
 }
 
+export async function getBankActivity(user: CurrentUser, activityBankId: string, bankActivityId: string) {
+  await assertCanViewActivityBank(user, activityBankId);
+  const activity = await prisma.bankActivity.findFirst({
+    where: { id: bankActivityId, bankId: activityBankId },
+    include: {
+      activityType: true,
+      currentVersion: true,
+      knowledgeConcepts: { include: { concept: true } },
+      versions: { where: { lifecycle: "published" }, orderBy: { versionNumber: "desc" } },
+      bankTestItem: { select: { id: true, test: { select: { bankActivityId: true } } } },
+      bankTestDefinition: { select: { id: true } }
+    }
+  });
+  if (!activity) throw notFound("Bank activity");
+  return activity;
+}
+
 export async function createBankActivity(user: CurrentUser, activityBankId: string, input: unknown) {
   await assertCanManageActivityBank(user, activityBankId);
   const data = BankActivityInputSchema.parse(input);
+  if (data.activityTypeKey === "test") {
+    throw new AppError(400, "BANK_TEST_CREATION_ROUTE_REQUIRED", "Create a reusable Test through its dedicated authoring flow.");
+  }
   const activityType = await resolveActivityType(data.activityTypeKey);
   const mergedConfig = validateActivityPayload(data.activityTypeKey, data.config, data.metadata);
   await assertValidActivityBankFolder(prisma, activityBankId, data.folderId);
@@ -887,7 +916,14 @@ export async function createBankActivity(user: CurrentUser, activityBankId: stri
 export async function updateBankActivity(user: CurrentUser, bankActivityId: string, input: unknown) {
   const bankActivity = await prisma.bankActivity.findUnique({
     where: { id: bankActivityId },
-    include: { bank: true, activityType: true, knowledgeConcepts: true, versions: { orderBy: { versionNumber: "desc" }, take: 1 } }
+    include: {
+      bank: true,
+      activityType: true,
+      knowledgeConcepts: true,
+      versions: { orderBy: { versionNumber: "desc" }, take: 1 },
+      bankTestItem: { include: { test: true } },
+      bankTestDefinition: { select: { id: true } }
+    }
   });
   if (!bankActivity) {
     throw notFound("Bank activity");
@@ -895,6 +931,9 @@ export async function updateBankActivity(user: CurrentUser, bankActivityId: stri
   await assertCanManageActivityBank(user, bankActivity.bankId);
 
   const data = BankActivityUpdateSchema.parse(input);
+  if (bankActivity.bankTestDefinition || bankActivity.activityType.key === "test" || data.activityTypeKey === "test") {
+    throw new AppError(400, "BANK_TEST_UPDATE_ROUTE_REQUIRED", "Update a reusable Test through its dedicated authoring flow.");
+  }
   const activityTypeKey = data.activityTypeKey ?? bankActivity.activityType.key;
   const activityType = data.activityTypeKey ? await resolveActivityType(data.activityTypeKey) : bankActivity.activityType;
   const currentConfig = (bankActivity.config as Record<string, unknown> | null) ?? {};
@@ -978,7 +1017,7 @@ export async function updateBankActivity(user: CurrentUser, bankActivityId: stri
       config: mergedConfig
     }, { actorId: user.id });
 
-    return transaction.bankActivity.update({
+    const updated = await transaction.bankActivity.update({
       where: { id: bankActivityId },
       data: {
         activityTypeId: activityType.id,
@@ -1002,6 +1041,13 @@ export async function updateBankActivity(user: CurrentUser, bankActivityId: stri
         versions: { where: { lifecycle: "published" }, orderBy: { versionNumber: "desc" } }
       }
     });
+    if (bankActivity.bankTestItem) {
+      await transaction.bankActivity.update({
+        where: { id: bankActivity.bankTestItem.test.bankActivityId },
+        data: { lifecycle: "draft" }
+      });
+    }
+    return updated;
   });
 }
 
@@ -1009,15 +1055,29 @@ export async function deleteBankActivity(user: CurrentUser, activityBankId: stri
   const data = BankActivityDeleteSchema.parse(input);
   const bankActivity = await prisma.bankActivity.findUnique({
     where: { id: bankActivityId },
-    include: { bank: true, activityType: true }
+    include: {
+      bank: true,
+      activityType: true,
+      bankTestItem: true,
+      bankTestDefinition: {
+        include: { items: { include: { activity: { include: { activityType: true } } } } }
+      }
+    }
   });
   if (!bankActivity || bankActivity.bankId !== activityBankId) {
     throw notFound("Bank activity");
   }
   await assertCanManageActivityBank(user, bankActivity.bankId);
 
+  if (bankActivity.bankTestItem) {
+    throw new AppError(409, "BANK_TEST_ITEM_DELETE_ROUTE_REQUIRED", "Remove this activity from its Test.");
+  }
+
+  const ownedActivities = bankActivity.bankTestDefinition?.items.map((item) => item.activity) ?? [];
+  const deletionIds = [bankActivityId, ...ownedActivities.map((activity) => activity.id)];
+
   const courseUsages = await prisma.activity.findMany({
-    where: { bankActivityId },
+    where: { bankActivityId: { in: deletionIds } },
     distinct: ["courseId"],
     select: { courseId: true }
   });
@@ -1030,15 +1090,27 @@ export async function deleteBankActivity(user: CurrentUser, activityBankId: stri
     );
   }
 
-  const deleted = await prisma.bankActivity.delete({
-    where: { id: bankActivityId },
-    include: { activityType: true }
-  });
+  const deleted = ownedActivities.length
+    ? await prisma.$transaction(async (transaction) => {
+      await transaction.bankActivity.deleteMany({ where: { id: { in: ownedActivities.map((activity) => activity.id) } } });
+      return transaction.bankActivity.delete({
+        where: { id: bankActivityId },
+        include: { activityType: true }
+      });
+    })
+    : await prisma.bankActivity.delete({
+        where: { id: bankActivityId },
+        include: { activityType: true }
+      });
 
   return {
     bankActivityId,
     activityTypeKey: deleted.activityType.key,
-    courseCount: courseUsages.length
+    courseCount: courseUsages.length,
+    deletedActivities: [
+      ...ownedActivities.map((activity) => ({ bankActivityId: activity.id, activityTypeKey: activity.activityType.key })),
+      { bankActivityId: deleted.id, activityTypeKey: deleted.activityType.key }
+    ]
   };
 }
 
@@ -1049,10 +1121,14 @@ export async function duplicateBankActivity(user: CurrentUser, activityBankId: s
     where: { id: bankActivityId },
     include: {
       activityType: true,
-      knowledgeConcepts: true
+      knowledgeConcepts: true,
+      bankTestDefinition: { select: { id: true } },
+      bankTestItem: { select: { id: true } }
     }
   });
   if (!source || source.bankId !== activityBankId) throw notFound("Bank activity");
+  if (source.bankTestItem) throw new AppError(409, "BANK_TEST_ITEM_DUPLICATE_UNSUPPORTED", "Duplicate the containing Test instead.");
+  if (source.bankTestDefinition) throw new AppError(409, "BANK_TEST_DUPLICATE_ROUTE_REQUIRED", "Duplicate this Test through its dedicated action.");
 
   const position = await nextBankItemPosition(prisma, activityBankId, source.folderId ?? null);
 
@@ -1131,8 +1207,16 @@ function stableSnapshotValue(value: unknown): string {
 
 export async function moveBankActivity(user: CurrentUser, activityBankId: string, bankActivityId: string, input: unknown) {
   const data = BankActivityMoveSchema.parse(input);
-  const source = await prisma.bankActivity.findUnique({ where: { id: bankActivityId }, include: { bank: true } });
+  const source = await prisma.bankActivity.findUnique({
+    where: { id: bankActivityId },
+    include: {
+      bank: true,
+      bankTestItem: { select: { id: true } },
+      bankTestDefinition: { include: { items: { select: { bankActivityId: true } } } }
+    }
+  });
   if (!source || source.bankId !== activityBankId) throw notFound("Bank activity");
+  if (source.bankTestItem) throw new AppError(409, "BANK_TEST_ITEM_MOVE_UNSUPPORTED", "Move the containing Test instead.");
   await assertCanManageActivityBank(user, activityBankId);
   if (data.targetActivityBankId === activityBankId) {
     throw new AppError(400, "INVALID_ACTIVITY_BANK_DESTINATION", "Choose a different destination activity bank.");
@@ -1144,10 +1228,24 @@ export async function moveBankActivity(user: CurrentUser, activityBankId: string
     throw new AppError(400, "ACTIVITY_BANK_SUBJECT_MISMATCH", "Activities can only be moved to a bank under the same subject.");
   }
   const position = await nextBankItemPosition(prisma, destination.id, null);
-  return prisma.bankActivity.update({
-    where: { id: bankActivityId },
-    data: { bankId: destination.id, folderId: null, position },
-    include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } }, versions: { where: { lifecycle: "published" }, orderBy: { versionNumber: "desc" } } }
+  const childIds = source.bankTestDefinition?.items.map((item) => item.bankActivityId) ?? [];
+  if (!childIds.length) {
+    return prisma.bankActivity.update({
+      where: { id: bankActivityId },
+      data: { bankId: destination.id, folderId: null, position },
+      include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } }, versions: { where: { lifecycle: "published" }, orderBy: { versionNumber: "desc" } } }
+    });
+  }
+  return prisma.$transaction(async (transaction) => {
+      await transaction.bankActivity.updateMany({
+        where: { id: { in: childIds } },
+        data: { bankId: destination.id, folderId: null }
+      });
+    return transaction.bankActivity.update({
+      where: { id: bankActivityId },
+      data: { bankId: destination.id, folderId: null, position },
+      include: { activityType: true, currentVersion: true, knowledgeConcepts: { include: { concept: true } }, versions: { where: { lifecycle: "published" }, orderBy: { versionNumber: "desc" } } }
+    });
   });
 }
 
@@ -1231,8 +1329,12 @@ export async function updateBankActivityPlacement(
 ) {
   await assertCanManageActivityBank(user, activityBankId);
   const data = BankActivityPlacementUpdateSchema.parse(input);
-  const activity = await prisma.bankActivity.findFirst({ where: { id: bankActivityId, bankId: activityBankId } });
+  const activity = await prisma.bankActivity.findFirst({
+    where: { id: bankActivityId, bankId: activityBankId },
+    include: { bankTestItem: { select: { id: true } } }
+  });
   if (!activity) throw notFound("Bank activity");
+  if (activity.bankTestItem) throw new AppError(409, "BANK_TEST_ITEM_PLACEMENT_UNSUPPORTED", "Contained Test activities do not have bank-folder placement.");
   if (data.folderId !== undefined) {
     await assertValidActivityBankFolder(prisma, activityBankId, data.folderId);
   }
@@ -1268,7 +1370,7 @@ async function nextBankItemPosition(
       select: { position: true }
     }),
     db.bankActivity.findFirst({
-      where: { bankId: activityBankId, folderId: parentId },
+      where: { bankId: activityBankId, folderId: parentId, bankTestItem: null },
       orderBy: [{ position: "desc" }, { createdAt: "desc" }],
       select: { position: true }
     })
@@ -1317,7 +1419,7 @@ async function assertCanCreateActivityBank(user: CurrentUser) {
   throw forbidden();
 }
 
-async function assertCanViewActivityBank(user: CurrentUser, activityBankId: string) {
+export async function assertCanViewActivityBank(user: CurrentUser, activityBankId: string) {
   await assertCanViewSubjects(user);
   const bank = await prisma.activityBank.findUnique({ where: { id: activityBankId } });
   if (!bank) {

@@ -15,6 +15,7 @@ Teacher **Regrade all** reruns current hidden tests without invoking AI; **Gener
 - Browsers call Cognelo plugin routes; only the server communicates with Judge0.
 - Execution output is bounded before persistence and in browser-facing responses; grading still uses the complete Judge0 result.
 - Course and bank copies have independent private rows connected by explicit lifecycle hooks.
+- Reusable bank Tests invoke those same hooks for each Test-owned child during bank copy, course import, course publication, duplication, and deletion.
 
 ## Read By Topic
 

@@ -66,6 +66,8 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
   const [loadFailed, setLoadFailed] = useState(false);
   const [itemPendingRemoval, setItemPendingRemoval] = useState<CourseTestItem | null>(null);
   const [showActivityPicker, setShowActivityPicker] = useState(false);
+  const [showPublishToBank, setShowPublishToBank] = useState(false);
+  const [publishBankId, setPublishBankId] = useState("");
   const hasUnsavedSettings = Boolean(test && (
     title !== test.activity.title || description !== test.activity.description || JSON.stringify(test.settings) !== savedSettings
   ));
@@ -176,6 +178,20 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
     }
   }
 
+  async function publishCurrentTestToBank() {
+    if (!publishBankId) return;
+    setBusy(true);
+    try {
+      const result = await api.publishTestToBank(courseId, activity.id, { activityBankId: publishBankId, title: title.trim() });
+      notifications.success("Test added to the activity bank as a reusable published Test.");
+      router.push(`/activity-banks/${publishBankId}/activities/${result.test.bankActivityId}`);
+    } catch (reason) {
+      notifications.error(reason instanceof Error ? reason.message : "The Test could not be added to the activity bank.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   useUnsavedChangesGuard(
     useMemo(() => ({
       isDirty: hasUnsavedSettings,
@@ -260,9 +276,19 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
             onSave={saveSettings}
             saveDisabled={!title.trim()}
             secondaryActions={(
-              <button className="button secondary" disabled={busy || hasUnsavedSettings} type="button" onClick={duplicateCurrentTest}>
-                Duplicate Test
-              </button>
+              <>
+                <button className="button secondary" disabled={busy || hasUnsavedSettings} type="button" onClick={duplicateCurrentTest}>
+                  Duplicate Test
+                </button>
+                {!activity.bankActivityId ? (
+                  <button className="button secondary" disabled={busy || hasUnsavedSettings || !banks.some((bank) => bank.canManage)} type="button" onClick={() => {
+                    setPublishBankId(banks.find((bank) => bank.canManage)?.id ?? "");
+                    setShowPublishToBank(true);
+                  }}>
+                    Add to activity bank
+                  </button>
+                ) : null}
+              </>
             )}
           />
         ) : null}
@@ -354,6 +380,26 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
           }
         }}
       />
+      {showPublishToBank ? (
+        <div className="dialog-backdrop" role="presentation">
+          <section aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="publish-test-to-bank-title">
+            <div className="section-heading">
+              <div><p className="eyebrow">Reusable Test</p><h2 id="publish-test-to-bank-title">Add this Test to an activity bank</h2></div>
+            </div>
+            <p className="muted">The Test and every contained activity will be copied into the bank and published as one reusable version.</p>
+            <div className="field">
+              <label htmlFor="publish-test-bank">Activity bank</label>
+              <select id="publish-test-bank" value={publishBankId} disabled={busy} onChange={(event) => setPublishBankId(event.target.value)}>
+                {banks.filter((bank) => bank.canManage).map((bank) => <option key={bank.id} value={bank.id}>{bank.title}</option>)}
+              </select>
+            </div>
+            <div className="dialog-actions">
+              <button className="secondary" disabled={busy} type="button" onClick={() => setShowPublishToBank(false)}>Cancel</button>
+              <button disabled={busy || !publishBankId} type="button" onClick={() => void publishCurrentTestToBank()}>{busy ? "Publishing…" : "Add and publish"}</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

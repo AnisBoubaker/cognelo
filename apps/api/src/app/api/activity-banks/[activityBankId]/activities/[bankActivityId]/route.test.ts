@@ -32,6 +32,7 @@ describe("bank activity DELETE route", () => {
     vi.clearAllMocks();
     mocks.requireUser.mockResolvedValue({ id: "user-1", roles: ["admin"] });
     mocks.readJson.mockResolvedValue({ force: true });
+    mocks.runBankActivityDeletedHooks.mockResolvedValue(undefined);
     mocks.deleteBankActivity.mockResolvedValue({
       bankActivityId: "bank-activity-1",
       activityTypeKey: "coding-exercise",
@@ -70,5 +71,29 @@ describe("bank activity DELETE route", () => {
 
     expect(mocks.deleteBankActivity).toHaveBeenCalled();
     expect(mocks.runBankActivityDeletedHooks).toHaveBeenCalled();
+  });
+
+  it("cleans up every plugin-owned child when a reusable Test is deleted", async () => {
+    mocks.deleteBankActivity.mockResolvedValue({
+      bankActivityId: "test-shell-1",
+      activityTypeKey: "test",
+      courseCount: 0,
+      deletedActivities: [
+        { bankActivityId: "owned-child-1", activityTypeKey: "coding-exercise" },
+        { bankActivityId: "test-shell-1", activityTypeKey: "test" }
+      ]
+    });
+
+    await DELETE(new Request("http://test.local") as never, {
+      params: Promise.resolve({ activityBankId: "bank-1", bankActivityId: "test-shell-1" })
+    });
+
+    expect(mocks.runBankActivityDeletedHooks).toHaveBeenNthCalledWith(1, {
+      user: { id: "user-1", roles: ["admin"] },
+      activityBankId: "bank-1",
+      bankActivityId: "owned-child-1",
+      activityTypeKey: "coding-exercise"
+    });
+    expect(mocks.runBankActivityDeletedHooks).toHaveBeenCalledTimes(2);
   });
 });

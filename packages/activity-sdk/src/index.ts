@@ -138,7 +138,7 @@ const coreDefinitions: ActivityDefinition[] = [
     key: "test",
     name: "Test",
     description: "A summative assessment composed of regular activities.",
-    creationScopes: ["course"],
+    creationScopes: ["course", "bank"],
     defaultCategoryIds: ["generic"],
     isEnabledByDefault: true,
     icon: "clipboard-check",

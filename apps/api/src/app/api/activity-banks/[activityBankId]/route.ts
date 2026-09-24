@@ -30,9 +30,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { activityBankId } = await params;
     const result = await deleteActivityBank(user, activityBankId, await readJson(request));
-    for (const activity of result.deletedActivities) {
-      await runBankActivityDeletedHooks({ user, activityBankId, ...activity });
-    }
+    await Promise.all(result.deletedActivities.map((activity) =>
+      runBankActivityDeletedHooks({ user, activityBankId, ...activity })
+    ));
     return json({ ok: true, activityCount: result.activityCount });
   });
 }

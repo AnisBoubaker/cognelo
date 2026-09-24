@@ -14,15 +14,15 @@ It must:
 - contain ordered, independently authored activities;
 - accept activities copied from an activity bank;
 - accept new activities created only inside the Test;
+- support reusable, versioned Tests authored directly in activity banks or published from a course;
 - preserve each child activity's normal plugin configuration and grading behavior;
 - expose one student attempt, one submission, and one released grade;
 - retain a per-item result breakdown for teacher review and audit.
 
 ## Non-Goals
 
-The first implementation does not include:
+The implementation does not include:
 
-- reusable Tests in activity banks;
 - direct references to mutable standalone course activities;
 - independently assigned or independently released Test items;
 - nested Tests;
@@ -51,6 +51,18 @@ The outer Test is a genuine course `Activity` whose activity type is owned by co
 - the existing attempt-limit, availability, late-policy, grade-selection, and release services.
 
 The child activities are normal course-local `Activity` rows backed by their ordinary plugins. They are contained by `TestItem` and are not independently assigned.
+
+A reusable Test uses the same ownership pattern in an activity bank:
+
+```text
+BankActivity (core Test shell)
+└── BankTest
+    ├── BankTestItem → owned plugin BankActivity
+    ├── BankTestItem → owned plugin BankActivity
+    └── BankTestItem → owned plugin BankActivity
+```
+
+The contained bank activities are private composition children rather than top-level bank entries. Copying an existing bank activity into a bank Test immediately creates an independent owned copy and invokes the normal bank-duplication hook. The Test therefore remains intact when the original source activity is edited or deleted.
 
 ## Activity Provider Model
 
@@ -139,6 +151,12 @@ Invariants:
 
 Cross-row invariants are enforced in the core Test service and covered by service tests.
 
+### Reusable bank Tests
+
+`BankTest` and `BankTestItem` mirror the mutable course Test graph with a core Test `BankActivity` shell and independently owned child `BankActivity` rows. `BankTestVersion` is anchored one-to-one to the shell `ActivityVersion`; ordered `BankTestVersionItem` rows freeze Test settings, points, required status, item metadata, and the exact child `ActivityVersion` selected for that publication.
+
+Contained bank activities never appear as standalone bank rows and cannot be moved between folders or deleted outside their owning Test. Removing an item from the mutable composition archives its owned child while retaining it for older published Test versions; the next publication omits it. Moving a bank Test moves its complete owned graph. Deleting the whole Test deletes every active or archived owned child, invokes each plugin's normal bank-deletion hook, and leaves course copies intact through the existing nullable provenance relations.
+
 ### `TestItemAttempt`
 
 Added in Phase 4:
@@ -179,6 +197,14 @@ Adding a bank activity to a Test creates a course-local activity copy using the 
 - omit top-level course content placement.
 
 The Test never points directly at a mutable bank activity.
+
+The same rule applies while authoring a reusable bank Test. An activity selected from any writable or readable same-subject bank is copied into a new child `BankActivity` owned by the Test. Generic data and media references are copied by core; private plugin data is copied through `onBankActivityDuplicated`.
+
+### Add a reusable Test to a course
+
+Adding a published bank Test deep-copies the selected shell version and its `BankTestVersionItem` composition into one course Test shell plus owned course child activities. Each course child retains provenance to the Test-owned bank child/version and invokes `onCourseActivityCreatedFromBankVersion`, so private reference solutions and tests remain independent after import. The course Test shell retains the bank Test shell/version provenance needed by the synchronization lifecycle.
+
+Publishing an existing course Test into a bank performs the inverse deep copy. Core creates and publishes the independent generic bank graph, every child then invokes `onCourseActivityPublishedToBank` against its resulting version, and only after all hooks succeed are the course shell and children linked to those bank versions. Any private-data failure removes the partial bank graph and leaves the course Test untouched.
 
 ### Create inside Test
 
@@ -370,9 +396,11 @@ Edit safety rules:
 - after the first attempt, structure, points, generic child configuration, and supported plugin-owned private authoring data are locked;
 - teachers use **Duplicate Test** to create an independent draft shell, child activities, item settings, and plugin-owned private data for future changes.
 
+Reusable bank Test publications are also immutable composition snapshots. Draft edits update the mutable `BankTest` graph and return the shell to Draft. Publishing reuses the latest version when the complete generic graph is unchanged; otherwise it publishes changed children, creates a new shell `ActivityVersion`, and records the ordered `BankTestVersionItem` snapshot. Plugin-private authoring data retains the platform's existing limitation: it is copied independently but is current bank state rather than version-snapshotted private state.
+
 ## API and Service Boundaries
 
-Core service module: `packages/core/src/tests.ts`.
+Core service modules: `packages/core/src/tests.ts` for course authoring/execution and `packages/core/src/bank-tests.ts` for reusable Test ownership and bank/course deep-copy boundaries.
 
 Planned operations:
 
@@ -467,6 +495,19 @@ Coding exercise and web-design coding exercise now opt into composite execution 
 Each newly started Test attempt is attached to an immutable revision snapshot. Test duplication creates an independent draft shell and child rows, then invokes plugin duplication hooks for private authoring data. The no-resume policy is enforced with a browser-session identifier; returning in a new session causes the server to reject further child writes and the student shell to finalize the last saved state. A unique `TestSubmissionClaim` ensures that only one concurrent final-submit request runs child graders, while completed retries remain idempotent.
 
 Teacher-triggered AI assessment is integrated at the parent attempt boundary. Test submission never invokes AI. A teacher action dispatches every supported child through its registered AI-feedback handler, skips children whose plugin/activity/course configuration is ineffective, writes child feedback and any AI-derived normalized item score, and then recomputes the ordinary parent grade. Student-safe child feedback remains embedded in the parent normalized result and is therefore hidden until parent release. Every AI-graded child retains its own immutable feedback reference/version; students may challenge each eligible child separately while a teacher grade adjustment still applies through the audited parent-grade override path. Coding-exercise submission rows preserve their private feedback/rubric snapshot for the later Test evaluation, while public child activity state continues to follow the Test revision/attempt snapshot contracts.
+
+### Phase 7 — Reusable bank Tests
+
+- [x] Allow the core Test definition in both course and bank creation scopes.
+- [x] Add mutable `BankTest`/`BankTestItem` ownership and immutable `BankTestVersion`/`BankTestVersionItem` composition snapshots.
+- [x] Support direct bank Test authoring with local or copied same-subject plugin activities.
+- [x] Hide contained children from top-level bank lists while preserving direct plugin authoring routes.
+- [x] Deep-copy published bank Tests into courses and run bank-to-course hooks for every child.
+- [x] Publish an existing course Test into a bank, run course-to-bank hooks for every child, and link the course graph only after successful publication.
+- [x] Deep-duplicate, move, and delete complete bank Test graphs with plugin lifecycle cleanup and failure compensation.
+- [ ] Add compound Test synchronization in both directions. Retrieval must replace the complete course graph only before any Test attempt exists; publication to the bank remains allowed after attempts because it does not mutate the attempted course graph.
+
+Until the final item is implemented, imported Test provenance is retained but the generic single-activity synchronization action is hidden and rejected for Test shells so it cannot update only the shell and leave composition stale.
 
 ## Verification Strategy
 

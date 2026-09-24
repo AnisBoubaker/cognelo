@@ -19,6 +19,8 @@ export type ActivityPickerDialogProps = {
   activityBanks: ActivityBank[];
   disabled?: boolean;
   excludedBankActivityIds?: ReadonlySet<string>;
+  excludedBankActivityTypeKeys?: ReadonlySet<string>;
+  creationScope?: "bank" | "course";
   extraLocalChoices?: ExtraActivityPickerChoice[];
   placement?: ReactNode;
   materialPanel?: ReactNode;
@@ -37,6 +39,8 @@ export function ActivityPickerDialog({
   activityBanks,
   disabled = false,
   excludedBankActivityIds,
+  excludedBankActivityTypeKeys,
+  creationScope = "course",
   extraLocalChoices = [],
   placement,
   materialPanel,
@@ -53,9 +57,9 @@ export function ActivityPickerDialog({
   const pluginActivityTypes = useMemo(
     () => activityTypes.filter((type) => {
       const definition = findDefinition(activityDefinitions, type.key);
-      return definition?.provider?.kind !== "core" && (!definition?.creationScopes || definition.creationScopes.includes("course"));
+      return definition?.provider?.kind !== "core" && (!definition?.creationScopes || definition.creationScopes.includes(creationScope));
     }),
-    [activityDefinitions, activityTypes]
+    [activityDefinitions, activityTypes, creationScope]
   );
 
   const visibleCategories = useMemo(
@@ -95,7 +99,8 @@ export function ActivityPickerDialog({
     activity.lifecycle === "published" &&
     activity.currentVersionId &&
     activity.currentVersion?.lifecycle === "published" &&
-    !excludedBankActivityIds?.has(activity.id)
+    !excludedBankActivityIds?.has(activity.id) &&
+    !excludedBankActivityTypeKeys?.has(activity.activityType.key)
   );
   const visibleActivityTypes = selectedTab === "activity-banks" || selectedTab === "material"
     ? []

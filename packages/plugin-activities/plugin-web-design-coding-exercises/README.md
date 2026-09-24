@@ -17,5 +17,6 @@
 - Fast preview is client-side and sandboxed; graded execution is server-mediated through the external runner.
 - Enabled tests must pass against the private reference bundle before they are saved.
 - Bank/course private data is copied, synchronized, duplicated, and deleted through explicit plugin hooks.
+- Reusable bank Tests invoke those hooks for every independently owned web-design child across bank copy, course import/publication, duplication, and deletion.
 
 When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an invariant changed, and the relevant detailed section.

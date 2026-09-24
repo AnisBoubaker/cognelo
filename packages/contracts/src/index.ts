@@ -602,6 +602,39 @@ export const TestUpdateSchema = z.object({
 });
 export type TestUpdate = z.infer<typeof TestUpdateSchema>;
 
+export const BankTestCreateSchema = z.object({
+  title: z.string().trim().min(2).max(180),
+  description: z.string().max(4000).optional().default(""),
+  lifecycle: ActivityLifecycleSchema.optional().default("draft"),
+  position: z.number().int().min(0).optional().default(0),
+  folderId: RecordIdSchema.nullable().optional(),
+  settings: TestSettingsSchema.optional().default({})
+});
+export type BankTestCreate = z.infer<typeof BankTestCreateSchema>;
+
+export const BankTestUpdateSchema = z.object({
+  title: z.string().trim().min(2).max(180).optional(),
+  description: z.string().max(4000).optional(),
+  lifecycle: ActivityLifecycleSchema.optional(),
+  settings: TestSettingsSchema.partial().optional()
+});
+export type BankTestUpdate = z.infer<typeof BankTestUpdateSchema>;
+
+export const TestFromBankCreateSchema = z.object({
+  bankActivityId: RecordIdSchema,
+  activityVersionId: RecordIdSchema.optional(),
+  lifecycle: ActivityLifecycleSchema.optional().default("draft"),
+  position: z.number().int().min(0).optional().default(0),
+  contentPlacement: CourseContentPlacementInputSchema.optional()
+});
+export type TestFromBankCreate = z.infer<typeof TestFromBankCreateSchema>;
+
+export const CourseTestPublishToBankSchema = z.object({
+  activityBankId: RecordIdSchema,
+  title: z.string().trim().min(2).max(180).optional()
+});
+export type CourseTestPublishToBank = z.infer<typeof CourseTestPublishToBankSchema>;
+
 export const TestDuplicateSchema = z.object({
   title: z.string().trim().min(2).max(180).optional(),
   contentItemId: RecordIdSchema.optional()

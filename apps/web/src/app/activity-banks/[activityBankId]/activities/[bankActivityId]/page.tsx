@@ -2,10 +2,11 @@
 
 import { useNotifications } from "@cognelo/activity-ui";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ActivityEditorTabs } from "@/components/activity-editor-tabs";
+import { BankTestActivityView } from "@/components/bank-test-activity-view";
 import type { ActivityKnowledgeConceptSelection } from "@cognelo/contracts";
 import { api, type ActivityBank, type ActivityDefinition, type ActivityType, type BankActivity } from "@/lib/api";
 import { bankActivityRenderers } from "@/lib/activity-renderers";
@@ -25,6 +26,7 @@ type ActivityLifecycle = "draft" | "published" | "paused" | "archived";
 
 export default function BankActivityAuthoringPage() {
   const params = useParams<{ activityBankId: string; bankActivityId: string }>();
+  const searchParams = useSearchParams();
   const { activityBankId, bankActivityId } = params;
   const { locale, t } = useI18n();
   const notifications = useNotifications();
@@ -37,10 +39,19 @@ export default function BankActivityAuthoringPage() {
   const [error, setError] = useState("");
   const conceptDraftRef = useRef<ActivityKnowledgeConceptSelection[]>([]);
   const updateConceptDraft = useCallback((selections: ActivityKnowledgeConceptSelection[]) => { conceptDraftRef.current = selections; }, []);
+  const updateLoadedActivity = useCallback((updated: BankActivity) => {
+    setActivity(updated);
+    setLifecycleDraft(updated.lifecycle as ActivityLifecycle);
+  }, []);
 
   async function loadPage() {
-    const [bankResult, typeResult, aiAgentResult] = await Promise.all([api.activityBank(activityBankId), api.activityTypes(), api.aiAgentConnections()]);
-    const nextActivity = bankResult.activityBank.activities?.find((candidate) => candidate.id === bankActivityId) ?? null;
+    const [bankResult, activityResult, typeResult, aiAgentResult] = await Promise.all([
+      api.activityBank(activityBankId),
+      api.bankActivity(activityBankId, bankActivityId),
+      api.activityTypes(),
+      api.aiAgentConnections()
+    ]);
+    const nextActivity = activityResult.activity;
     setBank(bankResult.activityBank);
     setActivityDefinitions(typeResult.registeredDefinitions);
     setHasQuestionAuthoringAgent(
@@ -49,9 +60,6 @@ export default function BankActivityAuthoringPage() {
     setActivity(nextActivity);
     conceptDraftRef.current = nextActivity?.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills, selectedSkillIds: link.selectedSkillIds })) ?? [];
     setLifecycleDraft((nextActivity?.lifecycle ?? "draft") as ActivityLifecycle);
-    if (!nextActivity) {
-      setError(t("bankActivityPage.notFound"));
-    }
   }
 
   useEffect(() => {
@@ -109,11 +117,11 @@ export default function BankActivityAuthoringPage() {
     setError("");
 
     try {
-      const result = await api.updateBankActivity(activityBankId, activity.id, {
-        lifecycle: nextLifecycle
-      });
-      setActivity(result.activity);
-      setLifecycleDraft(result.activity.lifecycle as ActivityLifecycle);
+      const nextActivity = activity.activityType.key === "test"
+        ? (await api.updateBankTest(activityBankId, activity.id, { lifecycle: nextLifecycle })).test.activity
+        : (await api.updateBankActivity(activityBankId, activity.id, { lifecycle: nextLifecycle })).activity;
+      setActivity(nextActivity);
+      setLifecycleDraft(nextActivity.lifecycle as ActivityLifecycle);
       notifications.success(t("bankActivityPage.statusSaved"));
     } catch (err) {
       setLifecycleDraft(previousLifecycle);
@@ -126,6 +134,10 @@ export default function BankActivityAuthoringPage() {
   function renderAuthoring() {
     if (!renderedActivity) {
       return <p>{t("common.loading")}</p>;
+    }
+
+    if (renderedActivity.activityType.key === "test" && activity && bank) {
+      return <BankTestActivityView activity={activity} bank={bank} locale={locale} onActivityUpdated={updateLoadedActivity} />;
     }
 
     const BankActivityRenderer = activityDefinitions.some((definition) => definition.key === renderedActivity.activityType.key)
@@ -176,7 +188,9 @@ export default function BankActivityAuthoringPage() {
             {activity?.lifecycle === "draft" && activity.currentVersion ? <p className="muted">{t("bankActivityPage.unpublishedChanges", { version: activity.currentVersion.versionNumber })}</p> : null}
           </div>
           <div className="hero-actions">
-            <Link className="button secondary" href={`/activity-banks/${activityBankId}`}>
+            <Link className="button secondary" href={searchParams.get("testBankActivityId")
+              ? `/activity-banks/${activityBankId}/activities/${searchParams.get("testBankActivityId")}`
+              : `/activity-banks/${activityBankId}`}>
               {t("bankActivityPage.backToBank")}
             </Link>
           </div>
@@ -206,7 +220,7 @@ export default function BankActivityAuthoringPage() {
           ) : null}
         </section>
 
-        {activity ? (
+        {activity && activity.activityType.key !== "test" ? (
           <ActivityEditorTabs
             concepts={bank?.subject?.knowledgeConcepts ?? []}
             prerequisites={bank?.subject?.knowledgePrerequisites ?? []}

@@ -70,6 +70,8 @@ Draft saves update mutable public/private bank authoring without creating a vers
 
 Duplicating a web-design activity inside a bank copies its private bank reference bundle and tests through the platform bank-duplication hook. Moving the activity retains its ID and therefore retains those private rows without migration.
 
+Reusable bank Tests dispatch that same lifecycle per owned web-design child. A copied bank source becomes an independent hidden bank activity; course import and course publication copy its private bundle/tests in the appropriate direction; whole-Test duplication and deletion invoke the existing child hooks with compensation on failure.
+
 ## Authoring UX
 
 The teacher authoring UI is tabbed, but it still behaves as one guarded form. Keep it registered with `useUnsavedChangesGuard` from `@cognelo/activity-ui`, and register any future web-design authoring/settings panels with the same dirty/save/discard pattern.
