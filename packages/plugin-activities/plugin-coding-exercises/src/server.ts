@@ -21,6 +21,8 @@ import { AppError } from "@cognelo/core";
 import { createCodingExerciseTeacherFeedbackDraft, evaluateCodingExerciseAttemptWithAi, getCodingExerciseAiFeedbackTeacherSubmission, reviseCodingExerciseAiFeedback, snapshotCodingExerciseAiFeedbackConfig } from "./ai-feedback";
 import { regradeCodingExerciseAttempt } from "./regrading";
 
+export { listCodingExerciseProgrammingLanguages } from "./judge0";
+
 export const codingExercisesServerPlugin: ServerActivityPlugin = {
   key: "coding-exercises",
   routes: [

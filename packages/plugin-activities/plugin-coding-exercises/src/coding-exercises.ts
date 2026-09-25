@@ -27,7 +27,7 @@ export const sampleTestSchema = z.object({
 
 export const codingExerciseConfigSchema = z.object({
   prompt: z.string().min(10).max(12000),
-  language: z.string().min(1).max(40).default("python"),
+  language: z.string().max(80).default(""),
   executionMode: codingExerciseExecutionModeSchema.default("template"),
   starterCode: z.string().max(40000).default(""),
   studentTemplateSource: z.string().max(120000).default(""),
@@ -425,11 +425,23 @@ function projectCodingExerciseTemplateSection(
 export function getCodingExerciseHiddenCodePlaceholder(language: string, indentation = "") {
   const normalizedLanguage = language.trim().toLowerCase();
 
-  if (normalizedLanguage === "python") {
+  if (["bash", "elixir", "perl", "python", "python2", "r", "ruby"].includes(normalizedLanguage)) {
     return `${indentation}# Hidden code`;
   }
 
-  return `${indentation}// Hidden code`;
+  if (["haskell", "lua", "sql"].includes(normalizedLanguage)) return `${indentation}-- Hidden code`;
+  if (["assembly", "clojure", "common-lisp"].includes(normalizedLanguage)) return `${indentation}; Hidden code`;
+  if (["erlang", "octave", "prolog"].includes(normalizedLanguage)) return `${indentation}% Hidden code`;
+  if (normalizedLanguage === "fortran") return `${indentation}! Hidden code`;
+  if (["basic", "vbnet"].includes(normalizedLanguage)) return `${indentation}' Hidden code`;
+  if (normalizedLanguage === "ocaml") return `${indentation}(* Hidden code *)`;
+
+  const slashCommentLanguages = new Set([
+    "c", "cpp", "csharp", "d", "go", "groovy", "java", "javascript", "kotlin", "objectivec", "pascal", "php", "rust", "scala", "swift", "typescript"
+  ]);
+  if (slashCommentLanguages.has(normalizedLanguage)) return `${indentation}// Hidden code`;
+
+  return indentation;
 }
 
 function getCodingExerciseRuntimeEpilogue(language: string) {
@@ -446,11 +458,7 @@ function getCodingExerciseRuntimeEpilogue(language: string) {
 
 export function getJudge0LanguageCandidates(languageKey: string) {
   const normalizedKey = languageKey.trim().toLowerCase();
-  const candidates = judge0LanguageNameCandidates[normalizedKey];
-  if (!candidates?.length) {
-    throw new Error(`Unsupported coding exercise language: ${languageKey}`);
-  }
-
+  const candidates = judge0LanguageNameCandidates[normalizedKey] ?? [];
   return { languageKey: normalizedKey, candidates };
 }
 

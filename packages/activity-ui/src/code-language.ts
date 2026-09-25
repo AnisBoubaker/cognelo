@@ -47,24 +47,35 @@ const supportedPrismLanguages = new Set<string>([
 
 const monacoLanguageAliases: Record<string, string> = {
   actionscript: "javascript",
+  basic: "vb",
+  bash: "shell",
   coffee: "coffeescript",
+  "common-lisp": "scheme",
+  cpp: "cpp",
   csharp: "csharp",
   cs: "csharp",
+  fsharp: "fsharp",
   js: "javascript",
   objectivec: "objective-c",
+  python2: "python",
   py: "python",
   reason: "plaintext",
   shell: "shell",
   sh: "shell",
   text: "plaintext",
-  ts: "typescript"
+  ts: "typescript",
+  vbnet: "vb"
 };
 
 const supportedMonacoLanguages = new Set<string>([
   "c",
   "coffeescript",
+  "clojure",
   "cpp",
+  "csharp",
   "css",
+  "elixir",
+  "fsharp",
   "go",
   "graphql",
   "html",
@@ -72,26 +83,40 @@ const supportedMonacoLanguages = new Set<string>([
   "javascript",
   "json",
   "kotlin",
+  "lua",
   "markdown",
   "objective-c",
+  "pascal",
+  "perl",
+  "php",
   "plaintext",
   "python",
+  "r",
+  "ruby",
   "rust",
+  "scala",
+  "scheme",
+  "shell",
   "sql",
   "swift",
   "typescript",
+  "vb",
   "xml",
   "yaml"
 ]);
 
 export function normalizeCodeLanguage(language: string) {
-  const normalized = language.trim().toLowerCase();
+  const normalized = normalizeProgrammingLanguageKey(language);
   const mapped = prismLanguageAliases[normalized] ?? normalized;
   return supportedPrismLanguages.has(mapped) ? mapped : "text";
 }
 
 export function normalizeMonacoLanguage(language: string) {
-  const normalized = language.trim().toLowerCase();
+  const normalized = normalizeProgrammingLanguageKey(language);
   const mapped = monacoLanguageAliases[normalized] ?? normalized;
   return supportedMonacoLanguages.has(mapped) ? mapped : "plaintext";
+}
+
+function normalizeProgrammingLanguageKey(language: string) {
+  return language.trim().toLowerCase().replace(/\s+\([^()]+\)\s*$/, "");
 }

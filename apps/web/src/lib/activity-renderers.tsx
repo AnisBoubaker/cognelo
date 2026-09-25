@@ -272,6 +272,7 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
   );
   const codingClient = useMemo(
     () => ({
+      listProgrammingLanguages: () => api.programmingLanguages(),
       listHiddenTests: async (courseId: string, activityId: string) => {
         const result = groupId
           ? await api.groupCodingExerciseHiddenTests(courseId, groupId, activityId)
@@ -1162,6 +1163,7 @@ function CodingExerciseBankActivityRenderer(context: BankActivityRendererContext
       locale={context.locale}
       authoringGradingPortalTarget={authoringGradingPortalTarget}
       codingClient={{
+        listProgrammingLanguages: () => api.programmingLanguages(),
         listHiddenTests: async (_courseId, activityId) => api.bankCodingExerciseHiddenTests(context.activityBankId, activityId),
         saveHiddenTests: async (_courseId, activityId, input) => api.saveBankCodingExerciseHiddenTests(context.activityBankId, activityId, input),
         runCode: async () => {

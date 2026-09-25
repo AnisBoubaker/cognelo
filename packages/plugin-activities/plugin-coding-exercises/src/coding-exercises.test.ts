@@ -38,6 +38,7 @@ describe("coding exercise config and template helpers", () => {
     });
 
     expect(config.sampleTests[0]).toMatchObject({ outputMatchMode: "exact", containsLinesOrderMatters: false });
+    expect(config.language).toBe("");
     expect(hidden.tests[0]).toMatchObject({ outputMatchMode: "exact", containsLinesOrderMatters: false });
   });
 
@@ -193,6 +194,8 @@ describe("coding exercise config and template helpers", () => {
     expect(
       buildCodingExerciseStudentTemplateSource("def helper():\n    return 1\n{{ STUDENT_CODE }}", [0], "python")
     ).toContain("# Hidden code");
+    expect(buildCodingExerciseStudentTemplateSource("helper\n{{ STUDENT_CODE }}", [], "common-lisp")).toContain("; Hidden code");
+    expect(buildCodingExerciseStudentTemplateSource("helper\n{{ STUDENT_CODE }}", [], "sql")).toContain("-- Hidden code");
   });
 
   it("aligns starter code indentation with the student insertion marker", () => {
@@ -207,7 +210,7 @@ describe("coding exercise config and template helpers", () => {
     expect(getJudge0LanguageCandidates("typescript").candidates[0]).toBe("TypeScript (5.6.3)");
     expect(getJudge0LanguageCandidates("java").candidates[0]).toBe("Java (OpenJDK 17.0.12)");
     expect(getJudge0LanguageCandidates("go").candidates[0]).toBe("Go (1.22.7)");
-    expect(() => getJudge0LanguageCandidates("brainfuck")).toThrow("Unsupported coding exercise language");
+    expect(getJudge0LanguageCandidates("brainfuck")).toEqual({ languageKey: "brainfuck", candidates: [] });
   });
 
   it("normalizes hidden test payloads", () => {

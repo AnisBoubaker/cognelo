@@ -248,8 +248,8 @@ export type CourseSettingsInput = z.infer<typeof CourseSettingsInputSchema>;
 export const SubjectTeachingLanguageSchema = UiLocaleSchema;
 export type SubjectTeachingLanguage = z.infer<typeof SubjectTeachingLanguageSchema>;
 
-export const subjectProgrammingLanguages = ["c", "cpp", "go", "java", "python", "rust", "typescript"] as const;
-export const SubjectProgrammingLanguageSchema = z.enum(subjectProgrammingLanguages);
+export const subjectMultipleProgrammingLanguages = "multiple" as const;
+export const SubjectProgrammingLanguageSchema = z.string().trim().min(1).max(80).regex(/^[a-z0-9][a-z0-9-]*$/);
 export type SubjectProgrammingLanguage = z.infer<typeof SubjectProgrammingLanguageSchema>;
 
 export const SubjectInputSchema = z.object({

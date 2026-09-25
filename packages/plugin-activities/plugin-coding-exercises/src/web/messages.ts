@@ -6,6 +6,9 @@ type MessageKey =
   | "title"
   | "description"
   | "language"
+  | "chooseLanguage"
+  | "languageRequired"
+  | "loadLanguagesError"
   | "prompt"
   | "generatePrompt"
   | "generatingPrompt"
@@ -185,6 +188,9 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     title: "Title",
     description: "Description",
     language: "Language",
+    chooseLanguage: "--- Choose ---",
+    languageRequired: "Choose a programming language before saving, generating content, or running tests.",
+    loadLanguagesError: "Unable to load the programming languages available from Judge0.",
     prompt: "Prompt",
     generatePrompt: "Generate prompt automatically",
     generatingPrompt: "Generating prompt...",
@@ -361,6 +367,9 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     title: "Titre",
     description: "Description",
     language: "Langage",
+    chooseLanguage: "--- Choisir ---",
+    languageRequired: "Choisissez un langage de programmation avant d’enregistrer, de générer du contenu ou d’exécuter des tests.",
+    loadLanguagesError: "Impossible de charger les langages de programmation disponibles dans Judge0.",
     prompt: "Consigne",
     generatePrompt: "Generer l'enonce automatiquement",
     generatingPrompt: "Generation de l'enonce...",
@@ -537,6 +546,9 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     title: "标题",
     description: "说明",
     language: "语言",
+    chooseLanguage: "--- 请选择 ---",
+    languageRequired: "请先选择编程语言，再保存、生成内容或运行测试。",
+    loadLanguagesError: "无法加载 Judge0 提供的编程语言。",
     prompt: "题目",
     generatePrompt: "自动生成题目",
     generatingPrompt: "正在生成题目...",

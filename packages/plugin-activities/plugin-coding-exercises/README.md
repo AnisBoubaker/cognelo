@@ -2,7 +2,7 @@
 
 `@cognelo/plugin-coding-exercises` provides the `coding-exercise` activity type. Teachers author prompts, starter/template code, reference solutions, visible and hidden tests, rubrics, and optional automatic feedback. Learners write and run code in Monaco, submit against hidden tests through Judge0, resume drafts, and review prior submissions.
 
-New exercises inherit the owning Subject's optional default programming language when they are created in a course, activity bank, course Test, or reusable bank Test. Without a Subject default, the plugin's Python default remains in effect; existing and copied exercises keep their saved language.
+New exercises inherit the owning Subject's optional default programming language when they are created in a course, activity bank, course Test, or reusable bank Test. The choices come from the programming languages exposed by the configured Judge0 instance. A Subject can declare multiple languages; both that value and a missing default leave the exercise at `--- Choose ---`. Saving, generation, validation, execution, and submission remain unavailable until the exercise has one language. Existing and copied exercises keep their saved language.
 
 AI test generation warns before replacing an existing suite, then asks for visible and hidden counts (3 and 8 by default, at most 15 each), produces **Contains lines** comparisons with concise descriptive names capped at 50 characters, and validates the complete suite against the reviewed reference solution before inserting it into the authoring form.
 

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { RichTextEditor } from "@cognelo/activity-ui";
 import { AppShell } from "@/components/app-shell";
-import { api, type Subject, type SubjectProgrammingLanguage } from "@/lib/api";
+import { api, type ProgrammingLanguageOption, type Subject, type SubjectProgrammingLanguage } from "@/lib/api";
 import { locales, useI18n, type Locale } from "@/lib/i18n";
-import { subjectProgrammingLanguageOptions } from "@/lib/subject-programming-language";
+import { subjectMultipleProgrammingLanguages } from "@/lib/subject-programming-language";
 
 export default function SubjectsPage() {
   const { locale, t } = useI18n();
@@ -15,6 +15,7 @@ export default function SubjectsPage() {
   const [description, setDescription] = useState("");
   const [teachingLanguage, setTeachingLanguage] = useState<Locale>(locale);
   const [programmingLanguage, setProgrammingLanguage] = useState<SubjectProgrammingLanguage | "">("");
+  const [programmingLanguages, setProgrammingLanguages] = useState<ProgrammingLanguageOption[]>([]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -28,7 +29,10 @@ export default function SubjectsPage() {
 
   useEffect(() => {
     loadSubjects();
-  }, []);
+    api.programmingLanguages()
+      .then((result) => setProgrammingLanguages(result.languages))
+      .catch((err) => setError(err instanceof Error ? err.message : t("subjects.programmingLanguagesLoadError")));
+  }, [t]);
 
   async function createSubject(event: FormEvent) {
     event.preventDefault();
@@ -113,7 +117,8 @@ export default function SubjectsPage() {
                   onChange={(event) => setProgrammingLanguage(event.target.value as SubjectProgrammingLanguage | "")}
                 >
                   <option value="">{t("subjects.programmingLanguageNone")}</option>
-                  {subjectProgrammingLanguageOptions.map((language) => <option key={language.value} value={language.value}>{language.label}</option>)}
+                  <option value={subjectMultipleProgrammingLanguages}>{t("subjects.programmingLanguageMultiple")}</option>
+                  {programmingLanguages.map((language) => <option key={language.key} value={language.key}>{language.label}</option>)}
                 </select>
                 <p className="muted">{t("subjects.programmingLanguageHelp")}</p>
               </div>

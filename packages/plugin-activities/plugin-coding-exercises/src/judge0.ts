@@ -33,6 +33,29 @@ export type Judge0Language = {
   name: string;
 };
 
+export type CodingExerciseProgrammingLanguage = {
+  key: string;
+  label: string;
+};
+
+const nonProgrammingJudge0Languages = new Set(["executable", "multi-file program", "plain text"]);
+const judge0LanguageKeyAliases: Record<string, string> = {
+  "c++": "cpp",
+  "c#": "csharp",
+  "common lisp": "common-lisp",
+  "f#": "fsharp",
+  "objective-c": "objectivec",
+  "vb.net": "vbnet"
+};
+const judge0LanguageLabelAliases: Record<string, string> = {
+  cpp: "C++",
+  csharp: "C#",
+  "common-lisp": "Common Lisp",
+  fsharp: "F#",
+  objectivec: "Objective-C",
+  vbnet: "VB.Net"
+};
+
 type Judge0EncodedSubmissionResponse = {
   token: string;
   stdout?: string | null;
@@ -63,10 +86,47 @@ export async function listJudge0Languages(): Promise<Judge0Language[]> {
   return (await response.json()) as Judge0Language[];
 }
 
+export function getCodingExerciseProgrammingLanguages(languages: Judge0Language[]): CodingExerciseProgrammingLanguage[] {
+  const available = new Map<string, CodingExerciseProgrammingLanguage>();
+  for (const language of languages) {
+    const option = codingExerciseProgrammingLanguageFromJudge0(language.name);
+    if (option) available.set(option.key, option);
+  }
+  return [...available.values()].sort((left, right) => left.label.localeCompare(right.label));
+}
+
+export async function listCodingExerciseProgrammingLanguages() {
+  return getCodingExerciseProgrammingLanguages(await listJudge0Languages());
+}
+
+function codingExerciseProgrammingLanguageFromJudge0(name: string): CodingExerciseProgrammingLanguage | null {
+  const baseName = name.replace(/\s+\([^()]*(?:\([^()]*\)[^()]*)*\)\s*$/, "").trim();
+  const normalizedBaseName = baseName.toLowerCase();
+  if (!baseName || nonProgrammingJudge0Languages.has(normalizedBaseName)) return null;
+
+  if (normalizedBaseName === "python") {
+    const pythonMajorVersion = name.match(/\(\s*(\d+)/)?.[1];
+    return pythonMajorVersion === "2"
+      ? { key: "python2", label: "Python 2" }
+      : { key: "python", label: "Python 3" };
+  }
+
+  const key = judge0LanguageKeyAliases[normalizedBaseName]
+    ?? normalizedBaseName.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (!key) return null;
+  return { key, label: judge0LanguageLabelAliases[key] ?? baseName };
+}
+
 export async function resolveJudge0Language(languageKey: string) {
   const { languageKey: normalizedLanguageKey, candidates } = getJudge0LanguageCandidates(languageKey);
+  if (!normalizedLanguageKey) {
+    throw new AppError(409, "CODING_EXERCISE_LANGUAGE_REQUIRED", "Choose a programming language before running or validating code.");
+  }
   const languages = await listJudge0Languages();
-  const language = languages.find((entry) => candidates.includes(entry.name));
+  const language = languages.find((entry) => candidates.includes(entry.name))
+    ?? [...languages]
+      .filter((entry) => codingExerciseProgrammingLanguageFromJudge0(entry.name)?.key === normalizedLanguageKey)
+      .sort((left, right) => right.id - left.id)[0];
   if (!language) {
     throw new AppError(
       503,

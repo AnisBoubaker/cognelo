@@ -22,7 +22,7 @@ type GenerationLocale = "en" | "fr" | "zh" | "ar";
 
 export const codingExercisePromptGenerationInputSchema = z.object({
   description: z.string().min(10).max(4000),
-  language: z.string().min(1).max(40),
+  language: z.string().min(1).max(80),
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
   knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
 });
@@ -30,7 +30,7 @@ export const codingExercisePromptGenerationInputSchema = z.object({
 export const codingExerciseSolutionGenerationInputSchema = z.object({
   description: z.string().max(4000).default(""),
   prompt: z.string().min(10).max(12000),
-  language: z.string().min(1).max(40),
+  language: z.string().min(1).max(80),
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
   knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
 });
@@ -38,7 +38,7 @@ export const codingExerciseSolutionGenerationInputSchema = z.object({
 export const codingExerciseTestsGenerationInputSchema = z.object({
   description: z.string().max(4000).default(""),
   prompt: z.string().min(10).max(12000),
-  language: z.string().min(1).max(40),
+  language: z.string().min(1).max(80),
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
   referenceSolution: z.string().min(1).max(60000),
   templateSource: z.string().min(1).max(120000),
@@ -53,7 +53,7 @@ export const codingExerciseRubricGenerationInputSchema = z.object({
   description: z.string().max(4000).default(""),
   prompt: z.string().min(10).max(12000),
   referenceSolution: z.string().trim().min(1).max(60000),
-  language: z.string().min(1).max(40),
+  language: z.string().min(1).max(80),
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
   knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
 });
