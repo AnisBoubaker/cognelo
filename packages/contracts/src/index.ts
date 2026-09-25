@@ -248,10 +248,15 @@ export type CourseSettingsInput = z.infer<typeof CourseSettingsInputSchema>;
 export const SubjectTeachingLanguageSchema = UiLocaleSchema;
 export type SubjectTeachingLanguage = z.infer<typeof SubjectTeachingLanguageSchema>;
 
+export const subjectProgrammingLanguages = ["c", "cpp", "go", "java", "python", "rust", "typescript"] as const;
+export const SubjectProgrammingLanguageSchema = z.enum(subjectProgrammingLanguages);
+export type SubjectProgrammingLanguage = z.infer<typeof SubjectProgrammingLanguageSchema>;
+
 export const SubjectInputSchema = z.object({
   title: z.string().min(2).max(160),
   description: z.string().max(4000).optional().default(""),
   teachingLanguage: SubjectTeachingLanguageSchema.default("en"),
+  programmingLanguage: SubjectProgrammingLanguageSchema.nullable().optional().default(null),
   metadata: z.record(z.unknown()).optional().default({})
 });
 export type SubjectInput = z.infer<typeof SubjectInputSchema>;

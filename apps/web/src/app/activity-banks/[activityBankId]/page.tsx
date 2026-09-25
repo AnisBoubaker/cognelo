@@ -32,6 +32,7 @@ import {
   type BankActivity
 } from "@/lib/api";
 import { defaultDuplicateBankActivityTitle } from "@/lib/activity-bank-titles";
+import { activityCreationConfig } from "@/lib/activity-creation-defaults";
 import { useI18n } from "@/lib/i18n";
 
 type EditingActivityState = {
@@ -169,7 +170,7 @@ export default function ActivityBankDetailPage() {
         : (await api.createBankActivity(bank.id, {
             ...input,
             activityTypeKey: selectedActivityTypeKey,
-            config: definition?.defaultConfig ?? {},
+            config: activityCreationConfig(selectedActivityTypeKey, definition, bank.subject?.programmingLanguage),
             metadata: {}
           })).activity.id;
       setShowActivityPicker(false);

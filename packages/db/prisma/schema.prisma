@@ -306,6 +306,7 @@ model Subject {
   title                  String
   description            String                         @default("")
   teachingLanguage       String                         @default("en")
+  programmingLanguage    String?
   metadata               Json                           @default("{}")
   createdById            String
   createdAt              DateTime                       @default(now())

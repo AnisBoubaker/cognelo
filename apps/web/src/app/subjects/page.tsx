@@ -4,8 +4,9 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { RichTextEditor } from "@cognelo/activity-ui";
 import { AppShell } from "@/components/app-shell";
-import { api, type Subject } from "@/lib/api";
+import { api, type Subject, type SubjectProgrammingLanguage } from "@/lib/api";
 import { locales, useI18n, type Locale } from "@/lib/i18n";
+import { subjectProgrammingLanguageOptions } from "@/lib/subject-programming-language";
 
 export default function SubjectsPage() {
   const { locale, t } = useI18n();
@@ -13,6 +14,7 @@ export default function SubjectsPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [teachingLanguage, setTeachingLanguage] = useState<Locale>(locale);
+  const [programmingLanguage, setProgrammingLanguage] = useState<SubjectProgrammingLanguage | "">("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -33,10 +35,11 @@ export default function SubjectsPage() {
     setSaving(true);
     setError("");
     try {
-      await api.createSubject({ title, description, teachingLanguage, metadata: {} });
+      await api.createSubject({ title, description, teachingLanguage, programmingLanguage: programmingLanguage || null, metadata: {} });
       setTitle("");
       setDescription("");
       setTeachingLanguage(locale);
+      setProgrammingLanguage("");
       setShowCreateForm(false);
       loadSubjects();
     } catch (err) {
@@ -102,6 +105,18 @@ export default function SubjectsPage() {
                 </select>
                 <p className="muted">{t("subjects.teachingLanguageHelp")}</p>
               </div>
+              <div className="field">
+                <label htmlFor="subject-programming-language">{t("subjects.programmingLanguageLabel")}</label>
+                <select
+                  id="subject-programming-language"
+                  value={programmingLanguage}
+                  onChange={(event) => setProgrammingLanguage(event.target.value as SubjectProgrammingLanguage | "")}
+                >
+                  <option value="">{t("subjects.programmingLanguageNone")}</option>
+                  {subjectProgrammingLanguageOptions.map((language) => <option key={language.value} value={language.value}>{language.label}</option>)}
+                </select>
+                <p className="muted">{t("subjects.programmingLanguageHelp")}</p>
+              </div>
               <div className="hero-actions">
                 <button type="submit" disabled={saving}>
                   {saving ? t("common.saving") : t("common.create")}
@@ -114,6 +129,7 @@ export default function SubjectsPage() {
                     setTitle("");
                     setDescription("");
                     setTeachingLanguage(locale);
+                    setProgrammingLanguage("");
                   }}
                 >
                   {t("common.cancel")}

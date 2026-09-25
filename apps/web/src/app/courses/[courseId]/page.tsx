@@ -44,6 +44,7 @@ import {
 } from "@/lib/api";
 import { ContentTypeIcon as MaterialTypeIcon, resolveContentTypeSettingsRenderer } from "@/lib/content-type-renderers";
 import { defaultDuplicateActivityTitle } from "@/lib/activity-bank-titles";
+import { activityCreationConfig } from "@/lib/activity-creation-defaults";
 import { useI18n } from "@/lib/i18n";
 
 type ContentDropPlacement = "after" | "before" | "inside";
@@ -384,7 +385,7 @@ export default function CourseDetailPage() {
         activityTypeKey: selectedActivityTypeKey,
         lifecycle: "draft",
         description: selectedActivityCopy.description,
-        config: definition?.defaultConfig ?? {},
+        config: activityCreationConfig(selectedActivityTypeKey, definition, course?.subject?.programmingLanguage),
         metadata: { researchTags: [] },
         position: course?.activities?.length ?? 0,
         contentPlacement: buildPickerContentPlacement(selectedActivityCopy.defaultTitle || t("courseDetail.defaultActivityTitle"))

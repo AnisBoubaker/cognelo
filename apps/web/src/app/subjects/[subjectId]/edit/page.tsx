@@ -5,8 +5,9 @@ import { EditActionBar, RichTextEditor, useNotifications, useUnsavedChangesGuard
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SubjectKnowledgeGraph } from "@/components/subject-knowledge-graph";
-import { api, type Subject, type SubjectKnowledgeConcept, type SubjectKnowledgeGraphDraft, type SubjectKnowledgePrerequisite } from "@/lib/api";
+import { api, type Subject, type SubjectKnowledgeConcept, type SubjectKnowledgeGraphDraft, type SubjectKnowledgePrerequisite, type SubjectProgrammingLanguage } from "@/lib/api";
 import { locales, useI18n, type Locale } from "@/lib/i18n";
+import { subjectProgrammingLanguageOptions } from "@/lib/subject-programming-language";
 
 export default function EditSubjectPage() {
   const params = useParams<{ subjectId: string }>();
@@ -18,6 +19,7 @@ export default function EditSubjectPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [teachingLanguage, setTeachingLanguage] = useState<Locale>("en");
+  const [programmingLanguage, setProgrammingLanguage] = useState<SubjectProgrammingLanguage | "">("");
   const [graphConcepts, setGraphConcepts] = useState<SubjectKnowledgeConcept[]>([]);
   const [graphPrerequisites, setGraphPrerequisites] = useState<SubjectKnowledgePrerequisite[]>([]);
   const [knowledgeGraphDeletions, setKnowledgeGraphDeletions] = useState<{ conceptIds: string[]; skillIds: string[] }>({ conceptIds: [], skillIds: [] });
@@ -25,9 +27,10 @@ export default function EditSubjectPage() {
     title: string;
     description: string;
     teachingLanguage: Locale;
+    programmingLanguage: SubjectProgrammingLanguage | "";
     concepts: SubjectKnowledgeConcept[];
     prerequisites: SubjectKnowledgePrerequisite[];
-  }>({ title: "", description: "", teachingLanguage: "en", concepts: [], prerequisites: [] });
+  }>({ title: "", description: "", teachingLanguage: "en", programmingLanguage: "", concepts: [], prerequisites: [] });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [aiGenerationEnabled, setAiGenerationEnabled] = useState(false);
@@ -41,12 +44,13 @@ export default function EditSubjectPage() {
         setTitle(result.subject.title);
         setDescription(result.subject.description ?? "");
         setTeachingLanguage(result.subject.teachingLanguage);
+        setProgrammingLanguage(result.subject.programmingLanguage ?? "");
         const concepts = result.subject.knowledgeConcepts ?? [];
         const prerequisites = result.subject.knowledgePrerequisites ?? [];
         setGraphConcepts(concepts);
         setGraphPrerequisites(prerequisites);
         setKnowledgeGraphDeletions({ conceptIds: [], skillIds: [] });
-        setSavedSnapshot({ title: result.subject.title, description: result.subject.description ?? "", teachingLanguage: result.subject.teachingLanguage, concepts, prerequisites });
+        setSavedSnapshot({ title: result.subject.title, description: result.subject.description ?? "", teachingLanguage: result.subject.teachingLanguage, programmingLanguage: result.subject.programmingLanguage ?? "", concepts, prerequisites });
       })
       .catch((err) => setError(err instanceof Error ? err.message : t("editSubject.loadError")));
   }, [subjectId, t]);
@@ -64,6 +68,7 @@ export default function EditSubjectPage() {
   const hasUnsavedChanges = title !== savedSnapshot.title
     || description !== savedSnapshot.description
     || teachingLanguage !== savedSnapshot.teachingLanguage
+    || programmingLanguage !== savedSnapshot.programmingLanguage
     || JSON.stringify({ concepts: graphConcepts, prerequisites: graphPrerequisites })
       !== JSON.stringify({ concepts: savedSnapshot.concepts, prerequisites: savedSnapshot.prerequisites });
 
@@ -71,6 +76,7 @@ export default function EditSubjectPage() {
     setTitle(savedSnapshot.title);
     setDescription(savedSnapshot.description);
     setTeachingLanguage(savedSnapshot.teachingLanguage);
+    setProgrammingLanguage(savedSnapshot.programmingLanguage);
     setGraphConcepts(savedSnapshot.concepts);
     setGraphPrerequisites(savedSnapshot.prerequisites);
     setKnowledgeGraphDeletions({ conceptIds: [], skillIds: [] });
@@ -93,12 +99,13 @@ export default function EditSubjectPage() {
         title,
         description,
         teachingLanguage,
+        programmingLanguage: programmingLanguage || null,
         knowledgeGraph,
         knowledgeGraphDeletions: knowledgeGraphDeletions.conceptIds.length || knowledgeGraphDeletions.skillIds.length
           ? knowledgeGraphDeletions
           : undefined
       });
-      setSavedSnapshot({ title, description, teachingLanguage, concepts: graphConcepts, prerequisites: graphPrerequisites });
+      setSavedSnapshot({ title, description, teachingLanguage, programmingLanguage, concepts: graphConcepts, prerequisites: graphPrerequisites });
       router.push(`/subjects/${result.subject.id}`);
     } catch (err) {
       notify({ variant: "error", message: err instanceof Error ? err.message : t("editSubject.saveError") });
@@ -106,7 +113,7 @@ export default function EditSubjectPage() {
     } finally {
       setSaving(false);
     }
-  }, [description, graphConcepts, graphPrerequisites, knowledgeGraphDeletions, notify, router, subjectId, t, teachingLanguage, title]);
+  }, [description, graphConcepts, graphPrerequisites, knowledgeGraphDeletions, notify, programmingLanguage, router, subjectId, t, teachingLanguage, title]);
 
   useUnsavedChangesGuard(
     useMemo(
@@ -178,6 +185,18 @@ export default function EditSubjectPage() {
                     {locales.map((language) => <option key={language} value={language}>{t(`locale.${language}`)}</option>)}
                   </select>
                   <p className="muted">{t("subjects.teachingLanguageHelp")}</p>
+                </div>
+                <div className="field subject-language-field">
+                  <label htmlFor="subject-programming-language">{t("subjects.programmingLanguageLabel")}</label>
+                  <select
+                    id="subject-programming-language"
+                    value={programmingLanguage}
+                    onChange={(event) => setProgrammingLanguage(event.target.value as SubjectProgrammingLanguage | "")}
+                  >
+                    <option value="">{t("subjects.programmingLanguageNone")}</option>
+                    {subjectProgrammingLanguageOptions.map((language) => <option key={language.value} value={language.value}>{language.label}</option>)}
+                  </select>
+                  <p className="muted">{t("subjects.programmingLanguageHelp")}</p>
                 </div>
               </form>
             </section>

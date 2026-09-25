@@ -8,6 +8,7 @@ import { AppShell } from "@/components/app-shell";
 import { SubjectKnowledgeGraph } from "@/components/subject-knowledge-graph";
 import { api, type Subject } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { subjectProgrammingLanguageLabel } from "@/lib/subject-programming-language";
 
 export default function SubjectDetailPage() {
   const params = useParams<{ subjectId: string }>();
@@ -30,7 +31,14 @@ export default function SubjectDetailPage() {
           <div className="hero-meta">
             <p className="eyebrow">{t("subjectDetail.eyebrow")}</p>
             <h1>{subject?.title ?? t("subjectDetail.fallbackTitle")}</h1>
-            {subject ? <p className="muted">{t("subjects.teachingLanguageSummary", { language: t(`locale.${subject.teachingLanguage}`) })}</p> : null}
+            {subject ? (
+              <p className="muted">
+                {t("subjects.teachingLanguageSummary", { language: t(`locale.${subject.teachingLanguage}`) })}
+                {subject.programmingLanguage
+                  ? ` · ${t("subjects.programmingLanguageSummary", { language: subjectProgrammingLanguageLabel(subject.programmingLanguage) })}`
+                  : ""}
+              </p>
+            ) : null}
           </div>
           {subject ? (
             <div className="hero-actions">

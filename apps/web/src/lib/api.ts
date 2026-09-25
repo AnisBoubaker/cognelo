@@ -32,6 +32,7 @@ import type {
   EmailVerificationRequest,
   MaterialKind,
   SubjectInput,
+  SubjectProgrammingLanguage,
   SubjectKnowledgeConceptInput,
   SubjectKnowledgeConceptUpdate,
   SubjectKnowledgeGraphDraft,
@@ -44,7 +45,7 @@ import type {
 import type { ActivityVersionDiff } from "@cognelo/contracts";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 
-export type { MaterialKind, SubjectKnowledgeGraphDraft };
+export type { MaterialKind, SubjectKnowledgeGraphDraft, SubjectProgrammingLanguage };
 
 export type AdminRole = { id: string; key: "admin" | "course_manager" | "teacher" | "student"; name: string; description: string | null };
 export type AdminUser = {
@@ -316,6 +317,7 @@ export type Subject = {
   title: string;
   description: string;
   teachingLanguage: "en" | "fr" | "zh" | "ar";
+  programmingLanguage: SubjectProgrammingLanguage | null;
   metadata?: Record<string, unknown>;
   materials?: CourseMaterial[];
   activityBanks?: ActivityBank[];

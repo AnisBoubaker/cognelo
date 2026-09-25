@@ -839,12 +839,14 @@ async function main() {
     where: { id: "seed-subject-programming" },
     update: {
       title: "Programming",
-      description: "Shared programming curriculum materials and activity banks."
+      description: "Shared programming curriculum materials and activity banks.",
+      programmingLanguage: "c"
     },
     create: {
       id: "seed-subject-programming",
       title: "Programming",
       description: "Shared programming curriculum materials and activity banks.",
+      programmingLanguage: "c",
       createdById: teacher.id
     }
   });

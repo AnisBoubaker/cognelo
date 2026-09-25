@@ -14,6 +14,7 @@ import {
   type BankTest,
   type BankTestItem
 } from "@/lib/api";
+import { activityCreationConfig } from "@/lib/activity-creation-defaults";
 import type { Locale } from "@/lib/i18n";
 
 type Props = {
@@ -106,7 +107,7 @@ export function BankTestActivityView({ activity, bank, locale, onActivityUpdated
       activityTypeKey: activityType.key,
       title: definition?.i18n?.[locale]?.defaultTitle ?? definition?.name ?? activityType.name,
       description: definition?.i18n?.[locale]?.description ?? definition?.description ?? activityType.description,
-      config: definition?.defaultConfig ?? {},
+      config: activityCreationConfig(activityType.key, definition, bank.subject?.programmingLanguage),
       position: test.items.length
     });
   }
