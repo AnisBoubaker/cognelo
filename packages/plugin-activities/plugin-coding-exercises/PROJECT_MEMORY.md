@@ -16,4 +16,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Rubric and learner feedback generation use the Subject teaching language, not the viewer locale.
 - New course and bank exercises, including local Test children, inherit the optional single-language Subject default selected from the configured Judge0 runtimes. Missing and multiple-language Subject values deliberately create an exercise with no language; saving, generation, validation, and execution are blocked until the author chooses one. Existing and copied exercises retain their saved language.
 - Monaco assets are first-party for SEB compatibility, with the controlled plain-text fallback retained.
+- The student template projection drops whitespace-only hidden boundaries. Monaco cursor and selection limits must be derived from the current model rather than the previous React value so empty answers accept their first keystroke and select-all clears only student code.
 - Monaco/basic code editors, rendered code, and Markdown code spans/fences inherit the shared non-translation policy; never extend that opt-out to the surrounding instructional prose.

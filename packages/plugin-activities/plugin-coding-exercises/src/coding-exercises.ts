@@ -385,9 +385,13 @@ export function alignCodingExerciseStarterCodeToTemplate(starterCode: string, te
 export function buildCodingExerciseStudentTemplateProjectionFromSource(templateSource: string) {
   const templateParts = splitCodingExerciseTemplateSource(templateSource);
   return {
-    readOnlyPrefix: templateParts.prefix,
-    readOnlySuffix: templateParts.suffix
+    readOnlyPrefix: normalizeCodingExerciseStudentTemplateBoundary(templateParts.prefix),
+    readOnlySuffix: normalizeCodingExerciseStudentTemplateBoundary(templateParts.suffix)
   };
+}
+
+function normalizeCodingExerciseStudentTemplateBoundary(boundary: string) {
+  return boundary.trim().length > 0 ? boundary : "";
 }
 
 function projectCodingExerciseTemplateSection(
@@ -465,7 +469,7 @@ export function getJudge0LanguageCandidates(languageKey: string) {
 function projectCodingExerciseHiddenLines(hiddenLines: string[], projectedLines: string[], language: string) {
   const hasSubstantiveLine = hiddenLines.some((line) => line.trim().length > 0);
   if (!hasSubstantiveLine) {
-    return hiddenLines.map(() => "");
+    return [];
   }
 
   return [getCodingExerciseHiddenCodePlaceholder(language, getCodingExerciseHiddenPlaceholderIndentation(hiddenLines, projectedLines))];

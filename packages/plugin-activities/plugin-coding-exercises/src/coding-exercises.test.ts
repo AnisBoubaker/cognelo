@@ -3,6 +3,7 @@ import {
   alignCodingExerciseStarterCodeToTemplate,
   balanceCodingExerciseAiRubricCriterionWeights,
   buildCodingExerciseSource,
+  buildCodingExerciseStudentTemplateProjectionFromSource,
   buildCodingExerciseStudentTemplateSource,
   buildCodingExerciseTemplateSource,
   codingExerciseHiddenTestsInputSchema,
@@ -196,6 +197,22 @@ describe("coding exercise config and template helpers", () => {
     ).toContain("# Hidden code");
     expect(buildCodingExerciseStudentTemplateSource("helper\n{{ STUDENT_CODE }}", [], "common-lisp")).toContain("; Hidden code");
     expect(buildCodingExerciseStudentTemplateSource("helper\n{{ STUDENT_CODE }}", [], "sql")).toContain("-- Hidden code");
+  });
+
+  it("omits hidden blank scaffold lines from the student editor", () => {
+    expect(
+      buildCodingExerciseStudentTemplateSource(
+        "{{ STUDENT_CODE }}\n\n{{ TEST_CODE }}",
+        [],
+        "python"
+      )
+    ).toBe("{{ STUDENT_CODE }}");
+  });
+
+  it("normalizes legacy whitespace-only protected boundaries", () => {
+    expect(
+      buildCodingExerciseStudentTemplateProjectionFromSource("\n{{ STUDENT_CODE }}\n\n")
+    ).toEqual({ readOnlyPrefix: "", readOnlySuffix: "" });
   });
 
   it("aligns starter code indentation with the student insertion marker", () => {
