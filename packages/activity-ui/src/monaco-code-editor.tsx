@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Editor, { loader, type Monaco, type OnMount } from "@monaco-editor/react";
+import { codeInputProtectionAttributes, protectCodeInput } from "./code-input-protection";
 import { normalizeMonacoLanguage } from "./code-language";
 import { getEditableMonacoValue } from "./monaco-code-editor-value";
 
@@ -117,12 +118,12 @@ export function MonacoCodeEditor({
 
   if (monacoLoadState === "failed") {
     return (
-      <div className="monaco-code-editor" style={editorContainerStyle(height, minHeight)}>
+      <div className="monaco-code-editor notranslate" translate="no" style={editorContainerStyle(height, minHeight)}>
         <textarea
+          {...codeInputProtectionAttributes}
           aria-label={ariaLabel}
           id={id}
           readOnly={readOnly}
-          spellCheck={false}
           style={{
             background: "#f8fbff",
             border: 0,
@@ -153,7 +154,7 @@ export function MonacoCodeEditor({
 
   if (monacoLoadState === "loading") {
     return (
-      <div className="monaco-code-editor" role="status" style={editorContainerStyle(height, minHeight)}>
+      <div className="monaco-code-editor notranslate" translate="no" role="status" style={editorContainerStyle(height, minHeight)}>
         <span style={{ margin: "auto" }}>Loading editor…</span>
       </div>
     );
@@ -161,7 +162,8 @@ export function MonacoCodeEditor({
 
   return (
     <div
-      className="monaco-code-editor"
+      className="monaco-code-editor notranslate"
+      translate="no"
       style={editorContainerStyle(height, minHeight)}
     >
       <Editor
@@ -233,6 +235,7 @@ export function MonacoCodeEditor({
   function handleEditorMount(editor: Parameters<OnMount>[0], monaco: Monaco) {
     editorRef.current = editor;
     monacoRef.current = monaco;
+    protectCodeInput(editor.getDomNode()?.querySelector("textarea") ?? null);
 
     if (!hasRestrictedEditableRegion) {
       return;

@@ -27,6 +27,16 @@ function createMarkdownParser(protectMath: boolean) {
     },
     {
       renderer: {
+        code({ text, lang, escaped }: Tokens.Code) {
+          const language = lang?.match(/^\S*/)?.[0] ?? "";
+          const renderedCode = `${text.replace(/\n$/, "")}\n`;
+          const code = escaped ? renderedCode : escapeHtml(renderedCode);
+          const languageClass = language ? ` language-${escapeHtmlAttribute(language)}` : "";
+          return `<pre class="notranslate" translate="no"><code class="notranslate${languageClass}" translate="no">${code}</code></pre>\n`;
+        },
+        codespan({ text }: Tokens.Codespan) {
+          return `<code class="notranslate" translate="no">${text}</code>`;
+        },
         image({ href, text, title }: Tokens.Image) {
           const width = markdownImageWidth(readMarkdownImageSize(href));
           return `<img src="${escapeHtmlAttribute(href)}" alt="${escapeHtmlAttribute(text)}"${title ? ` title="${escapeHtmlAttribute(title)}"` : ""}${width ? ` style="width: ${width}; height: auto"` : ""}>`;
@@ -125,4 +135,8 @@ function renderMathToken(token: MathToken, protectMath: boolean) {
 
 function escapeHtmlAttribute(value: string) {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function escapeHtml(value: string) {
+  return escapeHtmlAttribute(value).replace(/'/g, "&#39;");
 }

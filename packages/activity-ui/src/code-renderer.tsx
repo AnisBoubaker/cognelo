@@ -40,7 +40,7 @@ export function CodeRenderer({
   return (
     <Highlight code={code} language={normalizedLanguage} prism={Prism} theme={themes.github}>
       {({ className: highlightClassName, getLineProps, getTokenProps, tokens }) => (
-        <div className={`code-renderer ${className ?? ""}`.trim()}>
+        <div className={`code-renderer notranslate ${className ?? ""}`.trim()} translate="no">
           <pre className={`${highlightClassName} code-renderer-pre`}>
             {tokens.map((line, index) => {
               const lineProps = getLineProps({ line });
@@ -82,7 +82,7 @@ function MarkdownCodeRenderer({
   const languagesByLine = getMarkdownLineLanguages(lines);
 
   return (
-    <div className={`code-renderer ${className ?? ""}`.trim()}>
+    <div className={`code-renderer notranslate ${className ?? ""}`.trim()} translate="no">
       <pre className="prism-code language-markdown code-renderer-pre">
         {lines.map((line, index) => (
           <HighlightedLine

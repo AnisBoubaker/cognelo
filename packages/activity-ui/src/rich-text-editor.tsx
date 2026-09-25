@@ -1378,7 +1378,7 @@ function extractMathExpression(source: string, displayMode: boolean) {
 function markdownToEditorHtml(markdown: string) {
   const html = DOMPurify.sanitize(renderMarkdownToHtml(markdown, { protectMath: true }), {
     USE_PROFILES: { html: true, mathMl: true, svg: true },
-    ADD_ATTR: ["contenteditable", "data-markdown-math-display", "data-markdown-math-source"]
+    ADD_ATTR: ["contenteditable", "data-markdown-math-display", "data-markdown-math-source", "translate"]
   });
   return html.trim() ? html : "<p><br></p>";
 }
