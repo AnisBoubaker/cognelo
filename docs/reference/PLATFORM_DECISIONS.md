@@ -43,7 +43,7 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 
 ## Implemented Platform Foundations
 
-- Authentication uses JWT stored in HttpOnly cookies. JWTs carry the user's authentication version; administrator password resets increment the persisted version so every older token is rejected.
+- Authentication uses eight-hour JWTs stored in HttpOnly cookies. JWTs carry the user's authentication version; administrator password resets increment the persisted version so every older token is rejected. A successful `GET /api/users/me` issues a fresh JWT and cookie, making the lifetime rolling for an active browser. Concurrent interval/focus checks are deduplicated. Transport, API, and database failures preserve the current user and activity while the client shows a reconnecting state and retries; only a confirmed unauthorized response clears the session. Session rejections are logged with a reason and optional secret-keyed opaque reference, never a token or email address.
 - Global authorization supports many-to-many user roles (`admin`, `course_manager`, `teacher`, `student`) and is designed for more roles later.
 - Users have account-wide profile settings with editable first and last name fields. Email changes are intentionally admin-only.
 - The authenticated account menu shows `Cognelo ver. …` beneath Logout. The web build derives the value from `git describe` against `cognelo-*` release tags, retains commit and dirty-checkout metadata for non-release builds, accepts a build-time `NEXT_PUBLIC_COGNELO_VERSION` override, and falls back to the web package version when Git metadata is unavailable.

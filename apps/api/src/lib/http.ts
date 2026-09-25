@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { getServerEnv } from "@cognelo/config";
-import { AppError, verifyAuthToken } from "@cognelo/core";
+import { AppError, refreshAuthSession, verifyAuthToken } from "@cognelo/core";
 export { AUTH_COOKIE, validateCsrfOrigin } from "./csrf";
 import { AUTH_COOKIE } from "./csrf";
 
@@ -11,13 +11,28 @@ export async function requireUser(options: { allowPasswordChangeRequired?: boole
   const env = getServerEnv();
   const token = (await cookies()).get(AUTH_COOKIE)?.value;
   const user = await verifyAuthToken(token, env.JWT_SECRET);
+  assertAccountReady(user, options);
+  return user;
+}
+
+export async function refreshUserSession(options: { allowPasswordChangeRequired?: boolean; allowEmailVerificationRequired?: boolean } = {}) {
+  const env = getServerEnv();
+  const token = (await cookies()).get(AUTH_COOKIE)?.value;
+  const session = await refreshAuthSession(token, env.JWT_SECRET);
+  assertAccountReady(session.user, options);
+  return session;
+}
+
+function assertAccountReady(
+  user: Awaited<ReturnType<typeof verifyAuthToken>>,
+  options: { allowPasswordChangeRequired?: boolean; allowEmailVerificationRequired?: boolean }
+) {
   if (user.mustChangePassword && !options.allowPasswordChangeRequired) {
     throw new AppError(403, "PASSWORD_CHANGE_REQUIRED", "You must change your temporary password before continuing.");
   }
   if (user.emailVerified === false && !options.allowEmailVerificationRequired) {
     throw new AppError(403, "EMAIL_VERIFICATION_REQUIRED", "Verify your email address before continuing.");
   }
-  return user;
 }
 
 function corsHeaders(init?: ResponseInit) {

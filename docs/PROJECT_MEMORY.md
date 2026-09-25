@@ -21,6 +21,7 @@ This file is intentionally short. It records only cross-cutting decisions that a
 - Code editors, rendered code, and Markdown code spans/fences must remain non-translatable. Editable code also disables browser autocorrection, capitalization, spelling, writing suggestions, and known writing-assistant hooks; do not apply those protections to ordinary instructional prose.
 - User-facing text is localized. Subject teaching language—not the viewer locale—controls generated curriculum, rubric, and assessment-feedback language where documented. A separate optional Subject programming-language default, selected from the configured Judge0 runtimes, seeds new Programming Exercises created in that Subject's courses and banks; it never rewrites existing activities. Missing and multiple-language Subject values require an explicit exercise-level choice.
 - Cookie-authenticated mutations enforce the configured browser origin. External execution services such as Judge0 and Playwright remain behind Cognelo server routes.
+- Browser sessions use a rolling eight-hour HttpOnly cookie renewed by successful current-user checks. Temporary network, server, or database failures must preserve the mounted authenticated workspace and retry; only a confirmed invalid session may clear the user and redirect to sign-in.
 - Production schema changes require additive/idempotent migrations where possible, a fresh production-clone rehearsal, backups, explicit approval, smoke tests, and a documented rollback path.
 
 ## Where Details Live

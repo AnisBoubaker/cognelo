@@ -35,7 +35,7 @@ vi.mock("@cognelo/db", () => ({
   prisma: mockPrisma
 }));
 
-const { activatePendingAccount, loginWithPassword, verifyAuthToken } = await import("./auth");
+const { activatePendingAccount, loginWithPassword, refreshAuthSession, verifyAuthToken } = await import("./auth");
 
 const secret = "unit-test-secret";
 const activeUser = {
@@ -54,7 +54,9 @@ const activeUser = {
 
 describe("auth services", () => {
   beforeEach(() => {
+    vi.useRealTimers();
     vi.clearAllMocks();
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
     mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof tx) => unknown) => handler(tx));
   });
 
@@ -104,6 +106,55 @@ describe("auth services", () => {
       email: "teacher@example.test",
       roles: ["teacher"]
     });
+  });
+
+  it("renews a valid active session with a new eight-hour window", async () => {
+    mockPrisma.user.findUnique.mockResolvedValueOnce({
+      ...activeUser,
+      passwordHash: await bcrypt.hash("Password123!", 4)
+    });
+    const original = await loginWithPassword("teacher@example.test", "Password123!", secret);
+    const originalPayload = JSON.parse(Buffer.from(original.token.split(".")[1]!, "base64url").toString()) as { exp: number };
+
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 60 * 60 * 1000);
+    mockPrisma.user.findUnique.mockResolvedValueOnce(activeUser);
+    const refreshed = await refreshAuthSession(original.token, secret);
+    const refreshedPayload = JSON.parse(Buffer.from(refreshed.token.split(".")[1]!, "base64url").toString()) as { exp: number };
+
+    expect(refreshed.user).toMatchObject({ id: "user-1", email: "teacher@example.test" });
+    expect(refreshedPayload.exp - originalPayload.exp).toBe(60 * 60);
+  });
+
+  it("does not turn database failures during session verification into unauthorized responses", async () => {
+    mockPrisma.user.findUnique.mockResolvedValueOnce({
+      ...activeUser,
+      passwordHash: await bcrypt.hash("Password123!", 4)
+    });
+    const { token } = await loginWithPassword("teacher@example.test", "Password123!", secret);
+
+    mockPrisma.user.findUnique.mockRejectedValueOnce(new Error("database temporarily unavailable"));
+
+    await expect(verifyAuthToken(token, secret)).rejects.toThrow("database temporarily unavailable");
+  });
+
+  it("logs an expired-session reason without exposing the token or email", async () => {
+    mockPrisma.user.findUnique.mockResolvedValueOnce({
+      ...activeUser,
+      passwordHash: await bcrypt.hash("Password123!", 4)
+    });
+    const { token } = await loginWithPassword("teacher@example.test", "Password123!", secret);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 9 * 60 * 60 * 1000);
+    await expect(verifyAuthToken(token, secret)).rejects.toMatchObject({ status: 401, code: "UNAUTHORIZED" });
+
+    const logEntry = vi.mocked(console.warn).mock.calls.at(-1)?.[0];
+    expect(logEntry).toContain('"event":"auth_session_rejected"');
+    expect(logEntry).toContain('"reason":"token_expired"');
+    expect(logEntry).toContain('"sessionReference":');
+    expect(logEntry).not.toContain(token);
+    expect(logEntry).not.toContain(activeUser.email);
   });
 
   it("returns an email-verification requirement for a new account", async () => {

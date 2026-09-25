@@ -13,7 +13,7 @@ Plugin-specific behavior, routes, persistence, and UX notes belong in each plugi
 - **Shared contracts with Zod** keep API validation close to TypeScript types.
 - **Activity and content type registry packages** keep plugin logic out of subject, activity bank, course, and content tree models.
 - **Plugin-owned persistence and routes** keep plugin-specific concerns out of core tables and out of hardcoded API files.
-- **HttpOnly JWT cookie auth** gives a secure browser default for the MVP.
+- **HttpOnly JWT cookie auth** gives a secure browser default. The eight-hour window rolls forward after each successful current-user check; temporary connectivity or server failures retain the mounted authenticated workspace and retry instead of imitating logout.
 - **Built-in i18n** gives the web app English, French, and Chinese UI copy, while plugins can provide their own localized labels.
 
 ## Folder Structure
@@ -123,7 +123,7 @@ POST   /api/auth/logout
 POST   /api/auth/email-verification/send
 POST   /api/auth/email-verification/verify
 GET    /api/health
-GET    /api/users/me
+GET    /api/users/me                         # verify and renew the browser session
 PATCH  /api/users/me
 PUT    /api/users/me/password
 GET    /api/users

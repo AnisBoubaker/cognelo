@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { createHmac } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { ActivateAccountInputSchema, type CourseGroupParticipantRole, type CurrentUser } from "@cognelo/contracts";
 import { prisma } from "@cognelo/db";
@@ -44,31 +45,60 @@ export async function loginWithPassword(email: string, password: string, secret:
 }
 
 export async function verifyAuthToken(token: string | undefined, secret: string) {
+  return (await verifyAuthSession(token, secret)).user;
+}
+
+export async function refreshAuthSession(token: string | undefined, secret: string) {
+  const session = await verifyAuthSession(token, secret);
+  return {
+    user: session.user,
+    token: await createAuthToken(session.user, session.authVersion, secret)
+  };
+}
+
+async function verifyAuthSession(token: string | undefined, secret: string) {
   if (!token) {
     throw unauthorized();
   }
 
+  let payload: Awaited<ReturnType<typeof jwtVerify>>["payload"];
   try {
-    const { payload } = await jwtVerify(token, jwtSecret(secret));
-    const userId = payload.sub;
-    if (!userId) {
-      throw unauthorized();
-    }
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { roles: { include: { role: true } } }
-    });
-    if (!user || !user.isActive) {
-      throw unauthorized();
-    }
-    const tokenAuthVersion = typeof payload.authVersion === "number" ? payload.authVersion : 0;
-    if (tokenAuthVersion !== (user.authVersion ?? 0)) {
-      throw unauthorized();
-    }
-    return toCurrentUser(user);
-  } catch {
+    ({ payload } = await jwtVerify(token, jwtSecret(secret)));
+  } catch (error) {
+    logSessionRejection(sessionVerificationFailureReason(error), sessionRejectionUserId(error), secret);
     throw unauthorized();
   }
+
+  const userId = payload.sub;
+  if (!userId) {
+    logSessionRejection("missing_subject");
+    throw unauthorized();
+  }
+
+  // Database and infrastructure errors must remain server errors. Treating them
+  // as invalid credentials makes a temporary outage sign every active user out.
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { roles: { include: { role: true } } }
+  });
+  if (!user) {
+    logSessionRejection("user_missing", userId, secret);
+    throw unauthorized();
+  }
+  if (!user.isActive) {
+    logSessionRejection("user_inactive", userId, secret);
+    throw unauthorized();
+  }
+  const tokenAuthVersion = typeof payload.authVersion === "number" ? payload.authVersion : 0;
+  if (tokenAuthVersion !== (user.authVersion ?? 0)) {
+    logSessionRejection("auth_version_mismatch", userId, secret);
+    throw unauthorized();
+  }
+
+  return {
+    user: toCurrentUser(user),
+    authVersion: user.authVersion ?? 0
+  };
 }
 
 function toCurrentUser(user: {
@@ -164,19 +194,61 @@ async function signInUser(
   secret: string
 ) {
   const currentUser = toCurrentUser(user);
-  const token = await new SignJWT({
-    roles: currentUser.roles,
-    email: currentUser.email,
-    name: currentUser.name,
-    authVersion: user.authVersion ?? 0
+  const token = await createAuthToken(currentUser, user.authVersion ?? 0, secret);
+
+  return { user: currentUser, token };
+}
+
+async function createAuthToken(user: CurrentUser, authVersion: number, secret: string) {
+  return new SignJWT({
+    roles: user.roles,
+    email: user.email,
+    name: user.name,
+    authVersion
   })
     .setProtectedHeader({ alg: "HS256" })
-    .setSubject(currentUser.id)
+    .setSubject(user.id)
     .setIssuedAt()
     .setExpirationTime("8h")
     .sign(jwtSecret(secret));
+}
 
-  return { user: currentUser, token };
+type SessionRejectionReason =
+  | "token_expired"
+  | "token_invalid"
+  | "missing_subject"
+  | "user_missing"
+  | "user_inactive"
+  | "auth_version_mismatch";
+
+function sessionVerificationFailureReason(error: unknown): SessionRejectionReason {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ERR_JWT_EXPIRED"
+    ? "token_expired"
+    : "token_invalid";
+}
+
+function sessionRejectionUserId(error: unknown) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ERR_JWT_EXPIRED" &&
+    "payload" in error &&
+    typeof error.payload === "object" &&
+    error.payload !== null &&
+    "sub" in error.payload &&
+    typeof error.payload.sub === "string"
+  ) {
+    return error.payload.sub;
+  }
+  return undefined;
+}
+
+function logSessionRejection(reason: SessionRejectionReason, userId?: string, secret?: string) {
+  const sessionReference = userId && secret
+    ? createHmac("sha256", secret).update(`auth-session:${userId}`).digest("hex").slice(0, 16)
+    : undefined;
+  console.warn(JSON.stringify({ event: "auth_session_rejected", reason, ...(sessionReference ? { sessionReference } : {}) }));
 }
 
 async function ensureStudentRole(userId: string, tx: StudentAccessDb = prisma) {

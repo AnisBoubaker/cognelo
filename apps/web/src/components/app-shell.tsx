@@ -13,7 +13,7 @@ import { useI18n } from "@/lib/i18n";
 import { getPrimaryLandingPath } from "@/lib/navigation";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, refresh, sessionUnavailable } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const { t } = useI18n();
@@ -21,11 +21,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [accountMenuAnchor, setAccountMenuAnchor] = useState<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !user && !sessionUnavailable) {
       const returnTo = `${window.location.pathname}${window.location.search}`;
       router.replace(`/login?returnTo=${encodeURIComponent(returnTo)}`);
     }
-  }, [loading, router, user]);
+  }, [loading, router, sessionUnavailable, user]);
 
   useEffect(() => {
     if (!loading && user?.mustChangePassword) {
@@ -41,6 +41,16 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (loading) {
     return <main className="page">{t("common.loading")}</main>;
+  }
+
+  if (!user && sessionUnavailable) {
+    return (
+      <main className="page stack session-unavailable-page" role="alert">
+        <h1>{t("common.connectionUnavailableTitle")}</h1>
+        <p>{t("common.connectionUnavailableMessage")}</p>
+        <button type="button" onClick={() => void refresh()}>{t("common.retry")}</button>
+      </main>
+    );
   }
 
   if (!user) {
@@ -140,6 +150,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
+      {sessionUnavailable ? (
+        <div className="session-connection-warning" role="status">
+          <span>{t("common.connectionRetrying")}</span>
+          <button className="secondary" type="button" onClick={() => void refresh()}>{t("common.retry")}</button>
+        </div>
+      ) : null}
       {children}
     </div>
   );
