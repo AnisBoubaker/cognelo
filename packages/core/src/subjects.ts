@@ -86,6 +86,7 @@ export async function createSubject(user: CurrentUser, input: unknown) {
         title: data.title,
         description: data.description,
         teachingLanguage: data.teachingLanguage,
+        programmingLanguage: data.programmingLanguage,
         metadata: data.metadata as Prisma.InputJsonValue,
         createdById: user.id
       },
@@ -107,6 +108,7 @@ export async function updateSubject(user: CurrentUser, subjectId: string, input:
           title: data.title,
           description: data.description,
           teachingLanguage: data.teachingLanguage,
+          programmingLanguage: data.programmingLanguage,
           metadata: data.metadata as Prisma.InputJsonValue | undefined
         },
         include: subjectInclude
@@ -126,6 +128,7 @@ export async function updateSubject(user: CurrentUser, subjectId: string, input:
         title: data.title,
         description: data.description,
         teachingLanguage: data.teachingLanguage,
+        programmingLanguage: data.programmingLanguage,
         metadata: data.metadata as Prisma.InputJsonValue | undefined
       }
     });

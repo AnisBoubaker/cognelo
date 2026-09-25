@@ -121,18 +121,18 @@ describe("subject and activity bank services", () => {
     await expect(getSubject(adminUser, "subject-1")).resolves.toEqual({ id: "subject-1" });
 
     tx.subject.create.mockResolvedValue({ id: "subject-1", description: "" });
-    await createSubject(adminUser, { title: "Programming", teachingLanguage: "fr", metadata: { code: "INF" } });
+    await createSubject(adminUser, { title: "Programming", teachingLanguage: "fr", programmingLanguage: "python", metadata: { code: "INF" } });
     expect(tx.subject.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ title: "Programming", teachingLanguage: "fr", metadata: { code: "INF" }, createdById: "admin-1" })
+        data: expect.objectContaining({ title: "Programming", teachingLanguage: "fr", programmingLanguage: "python", metadata: { code: "INF" }, createdById: "admin-1" })
       })
     );
 
     tx.subject.update.mockResolvedValue({ id: "subject-1", title: "Updated", description: "" });
-    await updateSubject(adminUser, "subject-1", { title: "Updated", teachingLanguage: "zh" });
+    await updateSubject(adminUser, "subject-1", { title: "Updated", teachingLanguage: "zh", programmingLanguage: "c" });
     expect(tx.subject.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "subject-1" },
-      data: expect.objectContaining({ teachingLanguage: "zh" })
+      data: expect.objectContaining({ teachingLanguage: "zh", programmingLanguage: "c" })
     }));
   });
 

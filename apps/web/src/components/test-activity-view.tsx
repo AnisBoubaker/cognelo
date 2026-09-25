@@ -16,15 +16,22 @@ import {
   type CourseTest,
   type CourseTestItem,
   type CourseTestRuntime,
-  type CourseTestRuntimeItem
+  type CourseTestRuntimeItem,
+  type SubjectProgrammingLanguage
 } from "@/lib/api";
+import { activityCreationConfig } from "@/lib/activity-creation-defaults";
 import type { Locale } from "@/lib/i18n";
 
 type Props = {
   activity: Activity;
   activityRouteCourseId?: string;
   canManage: boolean;
-  course?: { id: string; title?: string; subjectId?: string } | null;
+  course?: {
+    id: string;
+    title?: string;
+    subjectId?: string;
+    subject?: { programmingLanguage?: SubjectProgrammingLanguage | null };
+  } | null;
   groupId?: string;
   locale: Locale;
   hasQuestionAuthoringAgent?: boolean;
@@ -140,7 +147,7 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
       activityTypeKey: activityType.key,
       title: definition?.i18n?.[locale]?.defaultTitle ?? definition?.name ?? activityType.name,
       description: definition?.i18n?.[locale]?.description ?? definition?.description ?? activityType.description,
-      config: definition?.defaultConfig ?? {},
+      config: activityCreationConfig(activityType.key, definition, course?.subject?.programmingLanguage),
       position: test.items.length
     });
     if (added) setShowActivityPicker(false);

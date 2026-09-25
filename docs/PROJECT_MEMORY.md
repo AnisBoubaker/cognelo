@@ -18,7 +18,7 @@ This file is intentionally short. It records only cross-cutting decisions that a
 - Research and audit records are append-oriented. Preserve immutable request/configuration snapshots, provenance, event history, and release visibility; do not silently rewrite historical evidence.
 - Shared authoring forms use the common unsaved-change guard and `EditActionBar`. Activity concept selection is host-owned and shares the activity draft/save boundary.
 - Reuse the shared editor, Markdown, rich-text, media, dialog, notification, and icon layers instead of creating plugin-local alternatives for platform behavior.
-- User-facing text is localized. Subject teaching language—not the viewer locale—controls generated curriculum, rubric, and assessment-feedback language where documented.
+- User-facing text is localized. Subject teaching language—not the viewer locale—controls generated curriculum, rubric, and assessment-feedback language where documented. A separate optional Subject programming-language default seeds new Programming Exercises created in that Subject's courses and banks; it never rewrites existing activities.
 - Cookie-authenticated mutations enforce the configured browser origin. External execution services such as Judge0 and Playwright remain behind Cognelo server routes.
 - Production schema changes require additive/idempotent migrations where possible, a fresh production-clone rehearsal, backups, explicit approval, smoke tests, and a documented rollback path.
 
