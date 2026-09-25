@@ -1,5 +1,5 @@
 import { getMe, updateMyProfile } from "@cognelo/core";
-import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
+import { authCookie, handleRoute, json, options, readJson, refreshUserSession, requireUser } from "@/lib/http";
 import type { NextRequest } from "next/server";
 
 export function OPTIONS() {
@@ -8,8 +8,10 @@ export function OPTIONS() {
 
 export async function GET() {
   return handleRoute(async () => {
-    const user = await requireUser({ allowPasswordChangeRequired: true, allowEmailVerificationRequired: true });
-    return json({ user: await getMe(user) });
+    const session = await refreshUserSession({ allowPasswordChangeRequired: true, allowEmailVerificationRequired: true });
+    const response = json({ user: await getMe(session.user) });
+    response.cookies.set(authCookie(session.token));
+    return response;
   });
 }
 

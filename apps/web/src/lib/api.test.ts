@@ -54,7 +54,8 @@ describe("web API client", () => {
       name: "ApiError",
       message: "Bad input.",
       code: "VALIDATION_ERROR",
-      details: { field: "title" }
+      details: { field: "title" },
+      status: 400
     });
   });
 

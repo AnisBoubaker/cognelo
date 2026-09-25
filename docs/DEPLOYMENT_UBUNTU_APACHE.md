@@ -1422,6 +1422,9 @@ sudo journalctl -u app1-api -n 200 --no-pager
 sudo journalctl -u app1-web -n 200 --no-pager
 sudo journalctl -u app1-api -f
 
+# Authentication session rejections (reason plus opaque reference; never tokens/emails)
+sudo journalctl -u app1-api --since '30 minutes ago' --no-pager | grep 'auth_session_rejected'
+
 # Apache
 sudo tail -f /var/log/apache2/app1-cognelo-error.log
 sudo tail -f /var/log/apache2/app1-cognelo-access.log
@@ -1463,6 +1466,7 @@ Common failure causes:
 - `502 Proxy Error`: the mapped Node process is stopped or the Apache port does not match systemd.
 - API health returns `500`: inspect the API journal and verify `DATABASE_URL`, database ownership, and migrations.
 - Login succeeds locally but not publicly: verify `NODE_ENV=production`, HTTPS, `CORS_ORIGIN`, `NEXT_PUBLIC_API_URL`, and that the web build used the production `.env`.
+- A user is redirected to sign-in: inspect `auth_session_rejected` events for `token_expired`, `token_invalid`, `user_missing`, `user_inactive`, or `auth_version_mismatch`. The opaque `sessionReference` can correlate repeated rejections for the same account without logging its identifier. A temporary network, API, or database failure should show the in-app reconnecting warning and must not create this event or clear the browser session.
 - Upload succeeds but files disappear after deployment: the deployment's `storage` symlink is missing or points to the wrong instance.
 - Rich-text image returns `403`: verify the viewer still has bank/course/assignment access and the owning content was saved so the staged upload became active. Do not work around it with a public Apache alias.
 - Rich-text media garbage collection fails: run `npm run media:gc` as the instance account, verify `MEDIA_STORAGE_ROOT`, storage ownership, and database connectivity, then inspect the service journal before retrying deletion.

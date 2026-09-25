@@ -425,6 +425,7 @@ Complete a short production smoke test:
 sudo journalctl -u app1-api --since '30 minutes ago' --no-pager
 sudo journalctl -u app1-web --since '30 minutes ago' --no-pager
 sudo tail -n 200 /var/log/apache2/app1-cognelo-error.log
+sudo journalctl -u app1-api --since '30 minutes ago' --no-pager | grep 'auth_session_rejected' || true
 ```
 
 Keep the old worktree and the database dump until the new release has been accepted.

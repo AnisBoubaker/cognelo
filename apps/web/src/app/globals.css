@@ -189,6 +189,31 @@ select:focus {
   margin-left: auto;
 }
 
+.session-connection-warning {
+  align-items: center;
+  background: #fff7df;
+  border-bottom: 1px solid #e4c568;
+  color: var(--brand-ink);
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  padding: 10px 24px;
+}
+
+.session-connection-warning button {
+  min-height: 34px;
+  padding-inline: 12px;
+}
+
+.session-unavailable-page {
+  margin-inline: auto;
+  max-width: 680px;
+}
+
+.session-unavailable-page button {
+  width: fit-content;
+}
+
 .brand-link {
   align-items: center;
   display: inline-flex;

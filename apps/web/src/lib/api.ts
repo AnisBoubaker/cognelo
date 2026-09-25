@@ -1145,12 +1145,14 @@ export function apiAbsoluteUrl(path: string) {
 export class ApiError extends Error {
   code?: string;
   details?: unknown;
+  status?: number;
 
-  constructor(message: string, options?: { code?: string; details?: unknown }) {
+  constructor(message: string, options?: { code?: string; details?: unknown; status?: number }) {
     super(message);
     this.name = "ApiError";
     this.code = options?.code;
     this.details = options?.details;
+    this.status = options?.status;
   }
 }
 
@@ -1180,7 +1182,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(body?.error?.message ?? "Request failed.", {
       code: body?.error?.code,
-      details: body?.error?.details
+      details: body?.error?.details,
+      status: response.status
     });
   }
   return body as T;
