@@ -17,7 +17,15 @@ import { createParsonsClient, type ParsonsAttemptEvaluation, type ParsonsGradebo
 import { AppShell } from "@/components/app-shell";
 import { AppIcon } from "@/components/app-icon";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
-import { api, apiRequest, type CodingExerciseExecution, Course, CourseGradebook, CourseGradebookRow } from "@/lib/api";
+import {
+  api,
+  apiRequest,
+  type CodingExerciseExecution,
+  Course,
+  CourseGradebook,
+  CourseGradebookRow,
+  type WebDesignExerciseSubmission
+} from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -29,13 +37,19 @@ type DraftGrade = {
   questionScores?: Record<string, string>;
 };
 
-type ManualGradingAttempt = ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CodingExerciseExecution;
+type ManualGradingAttempt =
+  | ParsonsGradebookAttemptRecord
+  | McqSubmission
+  | CodingHomeworkGradebookAttemptRecord
+  | CodingExerciseExecution
+  | WebDesignExerciseSubmission;
 
 export default function ManualActivityGradingPage() {
   const params = useParams<{ courseId: string; activityId: string }>();
   const searchParams = useSearchParams();
   const { courseId, activityId } = params;
   const groupId = searchParams.get("groupId") || undefined;
+  const participantId = searchParams.get("participantId") || undefined;
   const { locale, t } = useI18n();
   const notifications = useNotifications();
   const mcqCopy = getMcqManualGradingCopy(locale);
@@ -50,6 +64,7 @@ export default function ManualActivityGradingPage() {
   const [draftsByRowKey, setDraftsByRowKey] = useState<Record<string, DraftGrade>>({});
   const [loadingAttempts, setLoadingAttempts] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [appliedParticipantId, setAppliedParticipantId] = useState<string | null>(null);
 
   async function refresh() {
     const [courseResult, gradebookResult] = await Promise.all([
@@ -81,6 +96,13 @@ export default function ManualActivityGradingPage() {
   const resultsHref = `/courses/${courseId}/gradebook/activities/${activityId}${groupId ? `?groupId=${groupId}` : ""}`;
 
   useEffect(() => {
+    if (!participantId || appliedParticipantId === participantId || !rows.length) return;
+    const targetIndex = rows.findIndex((row) => row.participantId === participantId);
+    if (targetIndex >= 0) setPageIndex(Math.floor(targetIndex / pageSize));
+    setAppliedParticipantId(participantId);
+  }, [appliedParticipantId, pageSize, participantId, rows]);
+
+  useEffect(() => {
     if (!pageRows.length) {
       return;
     }
@@ -89,6 +111,9 @@ export default function ManualActivityGradingPage() {
     setLoadingAttempts(true);
     const codingExerciseReview = pageRows.some((row) => row.activityTypeKey === "coding-exercise")
       ? api.codingExerciseReviewAll(courseId, activityId)
+      : null;
+    const webDesignReview = pageRows.some((row) => row.activityTypeKey === "web-design-coding-exercise")
+      ? api.webDesignExerciseReviewAll(courseId, activityId)
       : null;
 
     Promise.all(
@@ -124,14 +149,26 @@ export default function ManualActivityGradingPage() {
           ]);
           return { row, attempts: sortAttemptsByDisplayedTimestamp(result.attempts), activityConfig: activityResult.activity.config ?? {} };
         }
-        const [result, activityResult] = await Promise.all([
-          parsonsClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
-            participantId: row.participantId,
-            includeAttempts: false
-          }),
-          api.groupActivity(courseId, row.groupId, row.activityId)
-        ]);
-        return { row, attempts: sortAttemptsByDisplayedTimestamp(result.attempts), activityConfig: activityResult.activity.config ?? {} };
+        if (row.activityTypeKey === "web-design-coding-exercise") {
+          const [review, activityResult] = await Promise.all([
+            webDesignReview!,
+            api.groupActivity(courseId, row.groupId, row.activityId)
+          ]);
+          const submission = review.submissions.find((candidate) => candidate.participantId === row.participantId)?.submission;
+          return { row, attempts: submission ? [submission] : [], activityConfig: activityResult.activity.config ?? {} };
+        }
+        if (row.activityTypeKey === "parsons-problem") {
+          const [result, activityResult] = await Promise.all([
+            parsonsClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
+              participantId: row.participantId,
+              includeAttempts: false
+            }),
+            api.groupActivity(courseId, row.groupId, row.activityId)
+          ]);
+          return { row, attempts: sortAttemptsByDisplayedTimestamp(result.attempts), activityConfig: activityResult.activity.config ?? {} };
+        }
+        const activityResult = await api.groupActivity(courseId, row.groupId, row.activityId);
+        return { row, attempts: [] as ManualGradingAttempt[], activityConfig: activityResult.activity.config ?? {} };
       })
     )
       .then((results) => {
@@ -167,6 +204,8 @@ export default function ManualActivityGradingPage() {
                 ? scoreFromMcqAttempt(activityConfig, selectedAttempt, row.maxScore)
                 : selectedAttempt && "sourceCode" in selectedAttempt
                   ? scoreFromCodingExecution(selectedAttempt, row.maxScore)
+                  : selectedAttempt && isWebDesignSubmission(selectedAttempt)
+                    ? scoreFromWebDesignSubmission(selectedAttempt, row.maxScore)
                   : scoreFromEvaluation(evaluation, row.maxScore));
             next[key] = {
               score: initialScore === null ? "" : formatGradeNumber(initialScore),
@@ -436,6 +475,16 @@ export default function ManualActivityGradingPage() {
                         <p className="eyebrow">{t("courseDetail.feedbackReviewSubmission")}</p>
                         <CodeRenderer code={selectedAttempt.sourceCode} language={selectedAttempt.languageKey} showLineNumbers />
                       </div>
+                    ) : selectedAttempt && isWebDesignSubmission(selectedAttempt) ? (
+                      <div className="stack">
+                        <p className="eyebrow">{t("courseDetail.feedbackReviewSubmission")}</p>
+                        {selectedAttempt.files.map((file) => (
+                          <article className="stack" key={file.id}>
+                            <strong>{file.path}</strong>
+                            <CodeRenderer code={file.starterCode} language={file.language} showLineNumbers />
+                          </article>
+                        ))}
+                      </div>
                     ) : selectedAttempt && "latestState" in selectedAttempt ? (
                       <div className="parsons-answer-lines">
                         {selectedAttempt.latestState.blocks.map((block) => (
@@ -516,6 +565,16 @@ function scoreFromCodingExecution(execution: CodingExerciseExecution, maxScore: 
   const earnedWeight = typeof execution.resultSummary.earnedWeight === "number" ? execution.resultSummary.earnedWeight : null;
   const totalWeight = typeof execution.resultSummary.totalWeight === "number" ? execution.resultSummary.totalWeight : null;
   return earnedWeight !== null && totalWeight !== null && totalWeight > 0 ? earnedWeight / totalWeight * maxScore : null;
+}
+
+function scoreFromWebDesignSubmission(submission: WebDesignExerciseSubmission, maxScore: number) {
+  return submission.score !== null && submission.maxScore !== null && submission.maxScore > 0
+    ? submission.score / submission.maxScore * maxScore
+    : null;
+}
+
+function isWebDesignSubmission(attempt: ManualGradingAttempt): attempt is WebDesignExerciseSubmission {
+  return "resultSummary" in attempt && "testResults" in attempt && "files" in attempt && !("sourceCode" in attempt);
 }
 
 function scoreFromMcqAttempt(activityConfig: Record<string, unknown>, attempt: McqSubmission, maxScore: number) {

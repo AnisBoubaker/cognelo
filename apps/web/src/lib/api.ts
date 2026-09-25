@@ -543,6 +543,7 @@ export type ActivityDefinition = {
     supportsAttempts?: boolean;
     supportsAutoGrading?: boolean;
     supportsManualGrading?: boolean;
+    supportsRegrading?: boolean;
     supportsCompositeExecution?: boolean;
   };
   authoring?: {

@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useNotifications } from "@cognelo/activity-ui";
-import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { createCodingHomeworkGraderClient, type CodingHomeworkGradebookAttemptRecord } from "@cognelo/plugin-coding-homework-grader";
 import { createMcqClient, type McqSubmission } from "@cognelo/plugin-mcq";
 import { createParsonsClient, type ParsonsGradebookAttemptRecord } from "@cognelo/plugin-parsons";
@@ -23,6 +22,7 @@ import {
   TeacherAiFeedbackReview
 } from "@/lib/api";
 import { getAiFeedbackReviewRenderer, getManualGradingRenderer, renderTestReviewAllItem } from "@/lib/activity-renderers";
+import { getGradebookActivityActions } from "@/lib/gradebook-actions";
 import { useI18n } from "@/lib/i18n";
 import { latestCompletedTestAttempt, type TestReviewAllSubmission } from "@/lib/test-review-all";
 
@@ -32,6 +32,7 @@ export default function GradebookActivityResultsPage() {
   const params = useParams<{ courseId: string; activityId: string }>();
   const searchParams = useSearchParams();
   const { courseId, activityId } = params;
+  const router = useRouter();
   const groupId = searchParams.get("groupId") || undefined;
   const { locale, t } = useI18n();
   const notifications = useNotifications();
@@ -43,7 +44,6 @@ export default function GradebookActivityResultsPage() {
   const [savingGradeKey, setSavingGradeKey] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<{
     row: CourseGradebookRow;
-    mode: "review" | "grade";
     activityConfig?: Record<string, unknown>;
     includeAttempts: boolean;
     attempts: GradebookReviewAttempt[];
@@ -67,6 +67,9 @@ export default function GradebookActivityResultsPage() {
     selectedIndex: number;
     review: TeacherAiFeedbackReview | null;
     draft: Record<string, unknown> | null;
+    gradeDraft: string;
+    gradeTouched: boolean;
+    initialGrade: number | null;
     loading: boolean;
     saving: boolean;
     error: string;
@@ -87,6 +90,8 @@ export default function GradebookActivityResultsPage() {
 
   const rows = gradebook?.rows ?? [];
   const activityTitle = rows[0]?.activityTitle ?? gradebook?.items[0]?.activityTitle ?? t("common.loading");
+  const activityTypeKey = rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? "";
+  const activityActions = getGradebookActivityActions(activityTypeKey);
   const groupTitle = groupId ? gradebook?.items.find((item) => item.groupId === groupId)?.groupTitle : null;
   const backHref = groupId ? `/courses/${courseId}?tab=gradebook&groupId=${encodeURIComponent(groupId)}` : `/courses/${courseId}?tab=gradebook`;
   const backLabel = t("courseDetail.backToCourseGradebook");
@@ -170,8 +175,8 @@ export default function GradebookActivityResultsPage() {
     }
   }
 
-  async function openManualGrading(row: CourseGradebookRow, mode: "review" | "grade") {
-    setOverlay({ row, mode, includeAttempts: false, attempts: [], selectedIndex: 0, loading: true, error: "" });
+  async function openManualGrading(row: CourseGradebookRow) {
+    setOverlay({ row, includeAttempts: false, attempts: [], selectedIndex: 0, loading: true, error: "" });
     await loadAttempts(row, false);
   }
 
@@ -335,7 +340,10 @@ export default function GradebookActivityResultsPage() {
       notifications.error(t("courseDetail.aiFeedbackUnavailable"));
       return;
     }
-    if (!window.confirm(t("courseDetail.aiFeedbackConfirm", { name: row.participantName }))) return;
+    const confirmKey = getGradebookActivityActions(row.activityTypeKey).aiAssessmentChangesGrade
+      ? "courseDetail.aiAssessmentGradingConfirm"
+      : "courseDetail.aiAssessmentFeedbackConfirm";
+    if (!window.confirm(t(confirmKey, { name: row.participantName }))) return;
     setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:ai-feedback`);
     try {
       await api.generateActivityAttemptAiFeedback(courseId, attempt.id);
@@ -350,7 +358,7 @@ export default function GradebookActivityResultsPage() {
 
   async function generateAiFeedbackForAllRows() {
     const eligible = groupedRows.flatMap((row) => {
-      if (!supportsAiFeedback(row.activityTypeKey)) return [];
+      if (!getGradebookActivityActions(row.activityTypeKey).canAssessWithAi) return [];
       const attempt = row.attempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber)
         ?? [...row.attempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted");
       return attempt ? [{ row, attempt }] : [];
@@ -359,7 +367,10 @@ export default function GradebookActivityResultsPage() {
       notifications.error(t("courseDetail.aiFeedbackUnavailable"));
       return;
     }
-    if (!window.confirm(t("courseDetail.aiFeedbackAllConfirm", { count: eligible.length }))) return;
+    const confirmKey = activityActions.aiAssessmentChangesGrade
+      ? "courseDetail.aiAssessmentGradingAllConfirm"
+      : "courseDetail.aiAssessmentFeedbackAllConfirm";
+    if (!window.confirm(t(confirmKey, { count: eligible.length }))) return;
     setSavingGradeKey("__all:ai-feedback");
     try {
       let completed = 0;
@@ -409,30 +420,103 @@ export default function GradebookActivityResultsPage() {
       notifications.error(t("courseDetail.feedbackReviewUnavailable"));
       return;
     }
-    setFeedbackReview({ rows: targetRows, selectedIndex, review: null, draft: null, loading: true, saving: false, error: "" });
+    setFeedbackReview({
+      rows: targetRows,
+      selectedIndex,
+      review: null,
+      draft: null,
+      gradeDraft: row.score === null ? "" : formatGradeNumber(row.score),
+      gradeTouched: false,
+      initialGrade: row.score,
+      loading: true,
+      saving: false,
+      error: ""
+    });
     try {
       const result = await api.activityAttemptAiFeedbackReview(courseId, attempt.id);
-      setFeedbackReview({ rows: targetRows, selectedIndex, review: result.review, draft: result.review.feedback, loading: false, saving: false, error: "" });
+      setFeedbackReview({
+        rows: targetRows,
+        selectedIndex,
+        review: result.review,
+        draft: result.review.feedback,
+        gradeDraft: row.score === null ? "" : formatGradeNumber(row.score),
+        gradeTouched: false,
+        initialGrade: row.score,
+        loading: false,
+        saving: false,
+        error: ""
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : t("courseDetail.feedbackReviewLoadError");
-      setFeedbackReview({ rows: targetRows, selectedIndex, review: null, draft: null, loading: false, saving: false, error: message });
+      setFeedbackReview({
+        rows: targetRows,
+        selectedIndex,
+        review: null,
+        draft: null,
+        gradeDraft: row.score === null ? "" : formatGradeNumber(row.score),
+        gradeTouched: false,
+        initialGrade: row.score,
+        loading: false,
+        saving: false,
+        error: message
+      });
       notifications.error(message);
     }
   }
 
   async function saveFeedbackReview() {
     if (!feedbackReview?.review || !feedbackReview.draft) return;
+    const row = feedbackReview.rows[feedbackReview.selectedIndex];
+    const normalizedGradeDraft = feedbackReview.gradeDraft.trim();
+    const parsedGrade = normalizedGradeDraft ? Number(normalizedGradeDraft) : null;
+    if (
+      feedbackReview.gradeTouched &&
+      (parsedGrade === null || !Number.isFinite(parsedGrade) || parsedGrade < 0 || parsedGrade > row.maxScore)
+    ) {
+      notifications.error(t("courseDetail.overrideGradeInvalidRange", { max: formatGradeNumber(row.maxScore) }));
+      return;
+    }
+    const feedbackChanged = JSON.stringify(feedbackReview.review.feedback) !== JSON.stringify(feedbackReview.draft);
+    const gradeChanged = feedbackReview.gradeTouched && parsedGrade !== null;
     setFeedbackReview((current) => current ? { ...current, saving: true, error: "" } : current);
     try {
-      const result = await api.reviseActivityAttemptAiFeedback(courseId, feedbackReview.review.attemptId, feedbackReview.draft);
+      const feedbackResult = feedbackChanged
+        ? await api.reviseActivityAttemptAiFeedback(courseId, feedbackReview.review.attemptId, feedbackReview.draft)
+        : null;
+      if (feedbackResult) {
+        setFeedbackReview((current) => current ? {
+          ...current,
+          rows: current.rows.map((candidate, index) =>
+            index === current.selectedIndex && feedbackResult.grade
+              ? { ...candidate, score: feedbackResult.grade.normalizedScore }
+              : candidate
+          ),
+          review: current.review ? { ...current.review, feedback: feedbackResult.feedback } : current.review,
+          draft: feedbackResult.feedback,
+          initialGrade: feedbackResult.grade?.normalizedScore ?? current.initialGrade
+        } : current);
+      }
+      const overrideResult = gradeChanged && parsedGrade !== null
+        ? await api.overrideGradebookGrade(courseId, row.gradebookItemId, row.participantId, {
+            score: parsedGrade,
+            maxScore: row.maxScore,
+            reason: t("courseDetail.reviewAndGradeReason")
+          })
+        : null;
+      const finalGrade = overrideResult?.grade.normalizedScore ?? feedbackResult?.grade?.normalizedScore ?? feedbackReview.initialGrade;
+      const savedFeedback = feedbackResult?.feedback ?? feedbackReview.draft;
       setFeedbackReview((current) => current ? {
         ...current,
         saving: false,
-        review: current.review ? { ...current.review, feedback: result.feedback } : current.review,
-        draft: result.feedback
+        rows: current.rows.map((candidate, index) => index === current.selectedIndex && finalGrade !== null ? { ...candidate, score: finalGrade } : candidate),
+        review: current.review ? { ...current.review, feedback: savedFeedback } : current.review,
+        draft: savedFeedback,
+        gradeDraft: finalGrade === null ? "" : formatGradeNumber(finalGrade),
+        gradeTouched: false,
+        initialGrade: finalGrade
       } : current);
       await refresh();
-      notifications.success(t("courseDetail.feedbackReviewSaved"));
+      notifications.success(t("courseDetail.reviewAndGradeSaved"));
     } catch (err) {
       const message = err instanceof Error ? err.message : t("courseDetail.feedbackReviewSaveError");
       setFeedbackReview((current) => current ? { ...current, saving: false, error: message } : current);
@@ -495,7 +579,7 @@ export default function GradebookActivityResultsPage() {
   async function regradeAllRows() {
     const rowsWithAttempts = groupedRows.filter(
       (row) =>
-        row.activityTypeKey !== "coding-homework-grader" &&
+        getGradebookActivityActions(row.activityTypeKey).canRerunAutomaticGrading &&
         row.attempts.some((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted")
     );
     if (!rowsWithAttempts.length) {
@@ -541,6 +625,18 @@ export default function GradebookActivityResultsPage() {
     });
   }, [rows]);
 
+  async function openReviewAndGrade(row: CourseGradebookRow) {
+    if (supportsAiFeedbackReview(row.activityTypeKey)) {
+      await openFeedbackReview([row]);
+      return;
+    }
+    if (getManualGradingRenderer(row.activityTypeKey)) {
+      await openManualGrading(row);
+      return;
+    }
+    router.push(manualGradingHref(courseId, activityId, groupId, row.participantId));
+  }
+
   return (
     <AppShell>
       <main className="page stack">
@@ -570,31 +666,32 @@ export default function GradebookActivityResultsPage() {
               <button className="button secondary" type="button" onClick={() => void openReviewAll()}>
                 {t("courseDetail.reviewAll")}
               </button>
-              <button className="button secondary" disabled={savingGradeKey === "__all:regrade"} type="button" onClick={() => void regradeAllRows()}>
-                {savingGradeKey === "__all:regrade" ? t("common.saving") : t("courseDetail.regradeAll")}
-              </button>
-              {supportsAiFeedback(rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? "") ? (
+              {activityActions.canRerunAutomaticGrading ? (
+                <button className="button secondary" disabled={!hasRowsWithSubmittedAttempts || savingGradeKey === "__all:regrade"} type="button" onClick={() => void regradeAllRows()}>
+                  {savingGradeKey === "__all:regrade" ? t("common.saving") : t("courseDetail.regradeAll")}
+                </button>
+              ) : null}
+              {activityActions.canAssessWithAi ? (
                 <button className="button secondary" disabled={savingGradeKey === "__all:ai-feedback"} type="button" onClick={() => void generateAiFeedbackForAllRows()}>
                   {savingGradeKey === "__all:ai-feedback" ? t("common.saving") : t("courseDetail.generateAiFeedbackAll")}
                 </button>
               ) : null}
-              {supportsAiFeedbackReview(rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? "") ? (
+              {activityActions.canReviewAndGrade && supportsAiFeedbackReview(activityTypeKey) ? (
                 <button className="button secondary" disabled={!hasRowsWithSubmittedAttempts} type="button" onClick={() => void openFeedbackReview(groupedRows)}>
-                  {t("courseDetail.feedbackReviewAll")}
+                  {t("courseDetail.gradeAllManually")}
                 </button>
-              ) : null}
-              {hasRowsWithSubmittedAttempts ? (
+              ) : activityActions.canReviewAndGrade && hasRowsWithSubmittedAttempts ? (
                 <Link
                   className="button secondary"
-                  href={`/courses/${courseId}/gradebook/activities/${activityId}/manual${groupId ? `?groupId=${groupId}` : ""}`}
+                  href={manualGradingHref(courseId, activityId, groupId)}
                 >
                   {t("courseDetail.gradeAllManually")}
                 </Link>
-              ) : (
+              ) : activityActions.canReviewAndGrade ? (
                 <button className="button secondary" disabled type="button">
                   {t("courseDetail.gradeAllManually")}
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -610,14 +707,11 @@ export default function GradebookActivityResultsPage() {
               {groupedRows.map((row) => (
                 <GradebookStudentRow
                   key={`${row.gradebookItemId}-${row.participantId}`}
-                  manualGradingAvailable={Boolean(manualGradingRenderer)}
                   row={row}
                   savingGradeKey={savingGradeKey}
-                  onOpenReview={(row) => openManualGrading(row, "review")}
-                  onOpenManualGrading={(row) => openManualGrading(row, "grade")}
+                  onReviewAndGrade={openReviewAndGrade}
                   onRegrade={regradeRow}
                   onGenerateAiFeedback={generateAiFeedbackForRow}
-                  onReviewFeedback={(row) => openFeedbackReview([row])}
                   t={t}
                 />
               ))}
@@ -648,7 +742,7 @@ export default function GradebookActivityResultsPage() {
                   includeAttempts: overlay.includeAttempts,
                   loading: overlay.loading,
                   error: overlay.error,
-                  readOnly: overlay.mode === "review",
+                  readOnly: false,
                   isSavingOverride: savingGradeKey === `${overlay.row.gradebookItemId}:${overlay.row.participantId}:override`,
                   isSavingRegrade: savingGradeKey === `${overlay.row.gradebookItemId}:${overlay.row.participantId}:regrade`,
                   isSavingDelete: savingGradeKey === `${overlay.row.gradebookItemId}:${overlay.row.participantId}:delete`,
@@ -710,6 +804,7 @@ export default function GradebookActivityResultsPage() {
                 if (canLeaveFeedbackReview(feedbackReview, t("courseDetail.feedbackReviewDiscardConfirm"))) setFeedbackReview(null);
               }}
               onFeedbackChange={(draft) => setFeedbackReview((current) => current ? { ...current, draft } : current)}
+              onGradeChange={(gradeDraft) => setFeedbackReview((current) => current ? { ...current, gradeDraft, gradeTouched: true } : current)}
               onSelectIndex={(selectedIndex) => {
                 if (canLeaveFeedbackReview(feedbackReview, t("courseDetail.feedbackReviewDiscardConfirm"))) void loadFeedbackReview(feedbackReview.rows, selectedIndex);
               }}
@@ -728,15 +823,19 @@ type AiFeedbackReviewState = {
   selectedIndex: number;
   review: TeacherAiFeedbackReview | null;
   draft: Record<string, unknown> | null;
+  gradeDraft: string;
+  gradeTouched: boolean;
+  initialGrade: number | null;
   loading: boolean;
   saving: boolean;
   error: string;
 };
 
-function AiFeedbackReviewPanel({ state, onClose, onFeedbackChange, onSelectIndex, onSave, t }: {
+function AiFeedbackReviewPanel({ state, onClose, onFeedbackChange, onGradeChange, onSelectIndex, onSave, t }: {
   state: AiFeedbackReviewState;
   onClose: () => void;
   onFeedbackChange: (feedback: Record<string, unknown>) => void;
+  onGradeChange: (grade: string) => void;
   onSelectIndex: (index: number) => void;
   onSave: () => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
@@ -749,7 +848,7 @@ function AiFeedbackReviewPanel({ state, onClose, onFeedbackChange, onSelectIndex
       <div className="section-heading">
         <div>
           <p className="eyebrow">{row?.groupTitle}</p>
-          <h2>{t("courseDetail.feedbackReview")}</h2>
+          <h2>{t("courseDetail.reviewAndGrade")}</h2>
           <p className="muted">
             {row?.participantName} · {state.selectedIndex + 1} / {state.rows.length}
           </p>
@@ -775,10 +874,30 @@ function AiFeedbackReviewPanel({ state, onClose, onFeedbackChange, onSelectIndex
         : null}
       {!state.loading && state.review && !renderer ? <p className="error-text">{t("courseDetail.feedbackReviewUnavailable")}</p> : null}
       {!state.loading && state.review && state.draft && renderer ? (
-        <div className="row wrap dialog-actions">
-          <button className="button primary" disabled={state.saving} type="button" onClick={() => void onSave()}>
-            {state.saving ? t("common.saving") : t("courseDetail.feedbackReviewSave")}
-          </button>
+        <div className="stack">
+          <div className="inline-panel form">
+            <div className="field" style={{ maxWidth: 260 }}>
+              <label htmlFor={`review-grade-${row.gradebookItemId}-${row.participantId}`}>
+                {t("courseDetail.finalGrade", { max: formatGradeNumber(row.maxScore) })}
+              </label>
+              <input
+                id={`review-grade-${row.gradebookItemId}-${row.participantId}`}
+                inputMode="decimal"
+                max={row.maxScore}
+                min={0}
+                step="any"
+                type="number"
+                value={state.gradeDraft}
+                onChange={(event) => onGradeChange(event.target.value)}
+              />
+              <span className="muted">{t("courseDetail.finalGradeHelp")}</span>
+            </div>
+          </div>
+          <div className="row wrap dialog-actions">
+            <button className="button primary" disabled={state.saving} type="button" onClick={() => void onSave()}>
+              {state.saving ? t("common.saving") : t("courseDetail.saveReview")}
+            </button>
+          </div>
         </div>
       ) : null}
     </section>
@@ -786,33 +905,33 @@ function AiFeedbackReviewPanel({ state, onClose, onFeedbackChange, onSelectIndex
 }
 
 function canLeaveFeedbackReview(state: AiFeedbackReviewState, confirmMessage: string) {
-  if (!state.review || !state.draft || JSON.stringify(state.review.feedback) === JSON.stringify(state.draft)) return true;
+  if (
+    !state.review ||
+    !state.draft ||
+    (
+      JSON.stringify(state.review.feedback) === JSON.stringify(state.draft) &&
+      !state.gradeTouched
+    )
+  ) return true;
   return window.confirm(confirmMessage);
 }
 
 function GradebookStudentRow({
-  manualGradingAvailable,
   row,
   savingGradeKey,
-  onOpenManualGrading,
-  onOpenReview,
+  onReviewAndGrade,
   onRegrade,
   onGenerateAiFeedback,
-  onReviewFeedback,
   t
 }: {
-  manualGradingAvailable: boolean;
   row: CourseGradebookRow;
   savingGradeKey: string | null;
-  onOpenManualGrading: (row: CourseGradebookRow) => Promise<void>;
-  onOpenReview: (row: CourseGradebookRow) => Promise<void>;
+  onReviewAndGrade: (row: CourseGradebookRow) => Promise<void>;
   onRegrade: (row: CourseGradebookRow) => Promise<void>;
   onGenerateAiFeedback: (row: CourseGradebookRow) => Promise<void>;
-  onReviewFeedback: (row: CourseGradebookRow) => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const rowHasSubmittedAttempt = hasSubmittedAttempt(row);
-  const regradeAvailable = row.activityTypeKey !== "coding-homework-grader";
 
   return (
     <div className="table-row table-row-gradebook-detail">
@@ -824,7 +943,7 @@ function GradebookStudentRow({
       <strong>{rowHasSubmittedAttempt || row.score !== null ? formatGradebookScore(row.score, row.maxScore) : t("courseDetail.didNotSubmit")}</strong>
       <span className="table-meta muted">{row.submittedAttemptCount}</span>
       <div className="table-actions">
-        {supportsAiFeedback(row.activityTypeKey) ? (
+        {getGradebookActivityActions(row.activityTypeKey).canAssessWithAi ? (
           <button
             className="button secondary"
             disabled={!rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:ai-feedback`}
@@ -834,34 +953,26 @@ function GradebookStudentRow({
             {t("courseDetail.generateAiFeedback")}
           </button>
         ) : null}
-        {supportsAiFeedbackReview(row.activityTypeKey) ? (
-          <button className="button secondary" disabled={!rowHasSubmittedAttempt} type="button" onClick={() => onReviewFeedback(row)}>
-            {t("courseDetail.feedbackReview")}
+        {getGradebookActivityActions(row.activityTypeKey).canRerunAutomaticGrading ? (
+          <button
+            className="button secondary"
+            disabled={!rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:regrade`}
+            type="button"
+            onClick={() => onRegrade(row)}
+          >
+            {t("courseDetail.regrade")}
           </button>
         ) : null}
-        {manualGradingAvailable ? (
-          <button className="button secondary" disabled={!rowHasSubmittedAttempt} type="button" onClick={() => onOpenReview(row)}>
-            {t("courseDetail.reviewGrade")}
+        {getGradebookActivityActions(row.activityTypeKey).canReviewAndGrade ? (
+          <button
+            className="button secondary"
+            disabled={!rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:override`}
+            type="button"
+            onClick={() => onReviewAndGrade(row)}
+          >
+            {t("courseDetail.reviewAndGrade")}
           </button>
-        ) : (
-          <span className="muted">{t("courseDetail.answerUnavailable")}</span>
-        )}
-        <button
-          className="button secondary"
-          disabled={!regradeAvailable || !rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:regrade`}
-          type="button"
-          onClick={() => onRegrade(row)}
-        >
-          {t("courseDetail.regrade")}
-        </button>
-        <button
-          className="button secondary"
-          disabled={!manualGradingAvailable || !rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:override`}
-          type="button"
-          onClick={() => onOpenManualGrading(row)}
-        >
-          {t("courseDetail.overrideGrade")}
-        </button>
+        ) : null}
       </div>
     </div>
   );
@@ -882,12 +993,16 @@ function hasSubmittedAttempt(row: CourseGradebookRow) {
   return row.attempts.some((attempt) => attempt.lifecycle === "graded" || attempt.lifecycle === "submitted");
 }
 
-function supportsAiFeedback(activityTypeKey: string) {
-  return getActivityDefinition(activityTypeKey)?.grading?.supportsAiFeedback === true;
-}
-
 function supportsAiFeedbackReview(activityTypeKey: string) {
   return Boolean(getAiFeedbackReviewRenderer(activityTypeKey));
+}
+
+function manualGradingHref(courseId: string, activityId: string, groupId?: string, participantId?: string) {
+  const search = new URLSearchParams();
+  if (groupId) search.set("groupId", groupId);
+  if (participantId) search.set("participantId", participantId);
+  const query = search.toString();
+  return `/courses/${courseId}/gradebook/activities/${activityId}/manual${query ? `?${query}` : ""}`;
 }
 
 function selectedFeedbackAttempt(row: CourseGradebookRow) {

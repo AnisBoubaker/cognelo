@@ -8,5 +8,6 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Saving enabled tests is reference-validation dependent and atomic; failed validation leaves prior tests unchanged.
 - Expected-result prompt tokens expose only generated PNG artifacts, never solution source.
 - Standalone drafts use `ActivityResponseDraft`; embedded Test drafts use `TestItemAttempt`.
+- The shared gradebook review page may display the latest submitted file bundle and apply a core manual-grade override, but automatic regrading must remain hidden until this plugin implements a current-answer grading handler.
 - Every private bank-owned table must participate in copy, sync, duplication, and deletion hooks, including when a reusable bank Test owns the activity as a hidden child.
 - The runner remains secret-free and requires production hardening, isolation, and smoke coverage for screenshot cropping.

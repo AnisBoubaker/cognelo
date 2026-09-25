@@ -17,6 +17,8 @@ export const codingExercisesPlugin: ActivityPlugin = {
       grading: {
         supportsAttempts: true,
         supportsAutoGrading: true,
+        supportsManualGrading: true,
+        supportsRegrading: true,
         supportsFeedbackRenderer: true,
         supportsAiFeedback: true,
         supportsAiFeedbackGrading: true,

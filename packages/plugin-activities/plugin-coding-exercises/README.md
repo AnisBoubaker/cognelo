@@ -6,7 +6,7 @@ AI test generation warns before replacing an existing suite, then asks for visib
 
 On later saves, reference validation reuses fingerprinted passing results and sends only new, changed, or previously failing tests to Judge0. A short-lived signed preflight receipt carries that server-validated result into persistence without executing dirty tests twice; any failure still blocks the save.
 
-Teacher **Regrade all** reruns current hidden tests without invoking AI; **Generate AI feedback for all** evaluates the current rubric using the latest saved test result without rerunning tests. Both recompute the grade using current component weights.
+Teacher **Rerun automatic grading** reruns current hidden tests without invoking AI; **Assess with AI** evaluates the current rubric and generates feedback from the latest saved test result without rerunning tests. Both recompute the grade using current component weights. **Review and grade** then presents the submitted code, test evidence, rubric scores, three feedback fields, and editable final grade in one place.
 
 ## Boundaries
 

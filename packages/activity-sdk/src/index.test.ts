@@ -83,6 +83,7 @@ describe("activity SDK registry", () => {
         supportsAttempts: true,
         supportsAutoGrading: true,
         supportsManualGrading: true,
+        supportsRegrading: true,
         supportsAnalyticsPayloads: true,
         supportsCompositeExecution: true
       })
@@ -96,7 +97,8 @@ describe("activity SDK registry", () => {
       expect.objectContaining({
         supportsAttempts: true,
         supportsAutoGrading: true,
-        supportsManualGrading: true
+        supportsManualGrading: true,
+        supportsRegrading: true
       })
     );
     expect(getActivityDefinition("mcq")?.manualGrading).toEqual(
@@ -105,9 +107,14 @@ describe("activity SDK registry", () => {
       })
     );
     expect(getActivityDefinition("coding-exercise")?.grading?.supportsCompositeExecution).toBe(true);
+    expect(getActivityDefinition("coding-exercise")?.grading).toMatchObject({ supportsManualGrading: true, supportsRegrading: true });
     expect(getActivityDefinition("coding-exercise")?.authoring?.gradingTab).toBe(true);
     expect(getActivityDefinition("web-design-coding-exercise")?.grading?.supportsCompositeExecution).toBe(true);
+    expect(getActivityDefinition("web-design-coding-exercise")?.grading).toMatchObject({ supportsManualGrading: true });
+    expect(getActivityDefinition("web-design-coding-exercise")?.grading?.supportsRegrading).not.toBe(true);
     expect(getActivityDefinition("coding-homework-grader")?.grading?.supportsCompositeExecution).not.toBe(true);
+    expect(getActivityDefinition("coding-homework-grader")?.grading?.supportsRegrading).not.toBe(true);
+    expect(getActivityDefinition("test")?.grading).toMatchObject({ supportsManualGrading: true, supportsRegrading: true });
   });
 
   it("exposes plugin database manifests for lifecycle management", () => {
