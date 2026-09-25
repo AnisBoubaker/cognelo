@@ -14,7 +14,8 @@ export function MarkdownRenderer({ markdown, className, compact = false }: Markd
   const html = useMemo(() => {
     const rendered = renderMarkdownToHtml(markdown);
     return DOMPurify.sanitize(rendered, {
-      USE_PROFILES: { html: true, mathMl: true, svg: true }
+      USE_PROFILES: { html: true, mathMl: true, svg: true },
+      ADD_ATTR: ["translate"]
     });
   }, [markdown]);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
+import { codeInputProtectionAttributes } from "./code-input-protection";
 import { CodeRenderer } from "./code-renderer";
 
 type CodeEditorProps = {
@@ -161,7 +162,8 @@ export function CodeEditor({
   return (
     <div
       ref={containerRef}
-      className="code-editor"
+      className="code-editor notranslate"
+      translate="no"
       style={
         {
           minHeight: `${minHeight}px`,
@@ -180,7 +182,7 @@ export function CodeEditor({
         aria-label={ariaLabel}
         ref={textareaRef}
         className="code-editor-input"
-        spellCheck={false}
+        {...codeInputProtectionAttributes}
         disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}

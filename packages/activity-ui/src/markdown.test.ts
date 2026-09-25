@@ -19,7 +19,16 @@ describe("shared Markdown rendering", () => {
     expect(html).toContain("<h2>Requirements</h2>");
     expect(html).toContain("<strong>two values</strong>");
     expect(html).toContain("<ul>");
-    expect(html).toContain('<code class="language-c">');
+    expect(html).toContain('<pre class="notranslate" translate="no">');
+    expect(html).toContain('<code class="notranslate language-c" translate="no">');
+  });
+
+  it("marks inline code as non-translatable without protecting surrounding prose", () => {
+    const html = renderMarkdownToHtml("Use `while` to repeat the instructions.");
+
+    expect(html).toContain('<code class="notranslate" translate="no">while</code>');
+    expect(html).toContain("<p>Use ");
+    expect(html).not.toContain('<p class="notranslate"');
   });
 
   it("renders Cognelo URI image sizing without changing ordinary Markdown images", () => {

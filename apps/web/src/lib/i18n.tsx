@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { applyDocumentLocale, localeStorageKey } from "./document-locale";
 import { messages } from "./i18n/messages";
 import { locales, type Locale, type MessageTree } from "./i18n/types";
 export { locales, type Locale, type MessageTree } from "./i18n/types";
@@ -47,7 +48,7 @@ export function detectInitialLocale() {
     return "en" as Locale;
   }
 
-  const saved = window.localStorage.getItem("cognelo-locale");
+  const saved = window.localStorage.getItem(localeStorageKey);
   if (saved && locales.includes(saved as Locale)) {
     return saved as Locale;
   }
@@ -75,15 +76,15 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setLocaleState(detectInitialLocale());
+    const initialLocale = detectInitialLocale();
+    setLocaleState(initialLocale);
+    applyDocumentLocale(initialLocale);
     setReady(true);
   }, []);
 
   useEffect(() => {
-    document.documentElement.lang = locale;
-    document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
-    window.localStorage.setItem("cognelo-locale", locale);
-  }, [locale]);
+    if (ready) applyDocumentLocale(locale);
+  }, [locale, ready]);
 
   const value = useMemo<I18nContextValue>(
     () => ({

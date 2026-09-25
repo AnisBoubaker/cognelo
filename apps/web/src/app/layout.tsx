@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { AuthProvider } from "@/components/auth-provider";
 import { AppNotificationProvider } from "@/components/notification-provider";
 import { UnsavedChangesProvider } from "@/components/unsaved-changes-provider";
+import { documentLocaleBootstrapScript } from "@/lib/document-locale";
 import { I18nProvider } from "@/lib/i18n";
 import "./globals.css";
 
@@ -18,7 +19,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: documentLocaleBootstrapScript }} />
+      </head>
       <body>
         <AuthProvider>
           <I18nProvider>
