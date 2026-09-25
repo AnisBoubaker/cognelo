@@ -22,6 +22,7 @@ export type ActivityGradingCapability = {
   supportsAttempts?: boolean;
   supportsAutoGrading?: boolean;
   supportsManualGrading?: boolean;
+  supportsRegrading?: boolean;
   supportsFeedbackRenderer?: boolean;
   supportsAiFeedback?: boolean;
   supportsAiFeedbackGrading?: boolean;
@@ -146,6 +147,7 @@ const coreDefinitions: ActivityDefinition[] = [
       supportsAttempts: true,
       supportsAutoGrading: true,
       supportsManualGrading: true,
+      supportsRegrading: true,
       supportsFeedbackRenderer: true,
       supportsAnalyticsPayloads: true,
       supportsAiFeedback: true,

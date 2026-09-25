@@ -102,7 +102,7 @@ These are also available through group-scoped assigned activity dispatch for stu
 
 Every knowledge mode provides the complete subject catalog to the generation model as a curriculum boundary. `Use selected skills` additionally constrains the generated problem with the current draft selection. `Suggest skills` ignores the old selection and applies exact subject-catalog matches to the unsaved Concepts-tab draft after generation. `Ignore skills` neither reads nor changes the draft and performs no suggestion pass.
 
-The gradebook attempts route is teacher-only. It returns a participant's completed Parsons submissions by default and can include in-progress/abandoned attempts plus event history with `includeAttempts=true`; the course gradebook detailed-results page uses it for the Parsons "See answer" overlay.
+The gradebook attempts route is teacher-only. It returns a participant's completed Parsons submissions by default and can include in-progress/abandoned attempts plus event history with `includeAttempts=true`; the course gradebook detailed-results page uses it for the Parsons **Review and grade** overlay.
 
 Parsons registers a server `gradeAttempt` handler for the platform gradebook regrade API. Teacher-triggered regrades resolve the stored plugin attempt reference, evaluate the submitted attempt state against the current course-local activity config, and let the core gradebook service record the updated grade plus a `regraded` audit event.
 
@@ -121,6 +121,6 @@ Summative submissions do not show correctness feedback during the activity. When
 
 ## Contributor Workflow
 
-Standalone activity **Review all** loads each participant's latest completed attempt and shows the reference solution, an error-count distribution, and a grade distribution. Hovering a bar identifies the students in that bucket.
+Standalone activity **Class overview** loads each participant's latest completed attempt and shows the reference solution, an error-count distribution, and a grade distribution. Hovering a bar identifies the students in that bucket.
 
 When changing this plugin, update this detailed reference, the package README if its overview or routing changed, and `PROJECT_MEMORY.md` only when a durable invariant changed. Update root documents only for platform-wide contracts.

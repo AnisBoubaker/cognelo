@@ -26,7 +26,7 @@ This document preserves detailed Parsons decisions. Load only the sections relev
 - Core's bank-version diff covers complete Parsons authoring because it is stored in immutable generic config; plugin-owned attempt history is not authoring data and is never compared.
 - Parsons bank config versions are publication milestones: draft saves do not create versions, while changed Published saves do.
 
-- Standalone gradebook **Review all** uses the latest completed attempt per participant, displays the authored solution, and derives hoverable misplaced-block and grade distributions without exposing student answers individually.
+- Standalone gradebook **Class overview** uses the latest completed attempt per participant, displays the authored solution, and derives hoverable misplaced-block and grade distributions without exposing student answers individually.
 
 - Parsons attempts are stored in:
   - `PluginParsonsAttempt`

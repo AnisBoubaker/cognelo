@@ -74,6 +74,7 @@ export const parsonsPlugin: ActivityPlugin = {
         supportsAttempts: true,
         supportsAutoGrading: true,
         supportsManualGrading: true,
+        supportsRegrading: true,
         supportsAnalyticsPayloads: true,
         supportsCompositeExecution: true,
         defaultMaxAttempts: null

@@ -130,6 +130,6 @@ The activity definition uses the semantic `browser-code` icon rendered by the pl
 
 ## Contributor Workflow
 
-Standalone gradebook **Review all** loads the private reference bundle and latest student submissions through teacher-authorized routes. It shows one green/red pass/fail bar per enabled hidden Playwright test, and hovering either segment lists the students in it.
+Standalone gradebook **Class overview** loads the private reference bundle and latest student submissions through teacher-authorized routes. It shows one green/red pass/fail bar per enabled hidden Playwright test, and hovering either segment lists the students in it. The shared **Review and grade** page loads the same latest submission, displays its submitted HTML/CSS/JavaScript files, and permits an audited final-grade override. The UI omits **Rerun automatic grading** because this plugin does not implement a current-answer regrading handler.
 
 When changing this plugin, update this detailed reference, the package README if its overview or routing changed, and `PROJECT_MEMORY.md` only when a durable invariant changed. Update root documents only for platform-wide contracts.

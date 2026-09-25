@@ -18,5 +18,6 @@
 - Enabled tests must pass against the private reference bundle before they are saved.
 - Bank/course private data is copied, synchronized, duplicated, and deleted through explicit plugin hooks.
 - Reusable bank Tests invoke those hooks for every independently owned web-design child across bank copy, course import/publication, duplication, and deletion.
+- The shared **Review and grade** workflow loads the latest submitted HTML/CSS/JavaScript files through the plugin's teacher-authorized review route and permits an audited final-grade override. Automatic regrading is not advertised because the plugin has no current-answer regrading handler.
 
 When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an invariant changed, and the relevant detailed section.

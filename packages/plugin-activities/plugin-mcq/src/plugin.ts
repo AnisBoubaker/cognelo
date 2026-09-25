@@ -160,6 +160,7 @@ export const mcqPlugin: ActivityPlugin = {
         supportsAttempts: true,
         supportsAutoGrading: true,
         supportsManualGrading: true,
+        supportsRegrading: true,
         supportsFeedbackRenderer: true,
         supportsAiFeedback: true,
         supportsAnalyticsPayloads: true,
