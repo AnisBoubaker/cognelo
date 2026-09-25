@@ -8,7 +8,7 @@ import {
 
 const fallbackConfig: CodingExerciseConfig = {
   prompt: "",
-  language: "python",
+  language: "",
   executionMode: "template",
   starterCode: "",
   studentTemplateSource: "{{ STUDENT_CODE }}",

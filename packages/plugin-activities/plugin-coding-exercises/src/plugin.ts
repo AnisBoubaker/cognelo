@@ -56,9 +56,9 @@ export const codingExercisesPlugin: ActivityPlugin = {
       },
       defaultConfig: {
         prompt: "Write a program that reads a name and prints `Hello, <name>!`.",
-        language: "python",
+        language: "",
         executionMode: "template",
-        starterCode: "name = input().strip()\n# Write your solution below\n",
+        starterCode: "",
         studentTemplateSource: "{{ STUDENT_CODE }}",
         sampleTests: [
           {

@@ -8,7 +8,7 @@ vi.mock("@cognelo/config", () => ({
   })
 }));
 
-const { listJudge0Languages, resolveJudge0Language, runJudge0Submission } = await import("./judge0");
+const { getCodingExerciseProgrammingLanguages, listJudge0Languages, resolveJudge0Language, runJudge0Submission } = await import("./judge0");
 
 describe("Judge0 client", () => {
   beforeEach(() => {
@@ -41,6 +41,38 @@ describe("Judge0 client", () => {
 
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("bad", { status: 500 }));
     await expect(listJudge0Languages()).rejects.toThrow("Judge0 languages request failed");
+  });
+
+  it("exposes every Judge0 programming language as a stable unique choice", () => {
+    expect(getCodingExerciseProgrammingLanguages([
+      { id: 48, name: "C (GCC 7.4.0)" },
+      { id: 50, name: "C (GCC 9.2.0)" },
+      { id: 46, name: "Bash (5.0.0)" },
+      { id: 70, name: "Python (2.7.17)" },
+      { id: 71, name: "Python (3.8.1)" },
+      { id: 43, name: "Plain Text" },
+      { id: 89, name: "Multi-file program" }
+    ])).toEqual([
+      { key: "bash", label: "Bash" },
+      { key: "c", label: "C" },
+      { key: "python2", label: "Python 2" },
+      { key: "python", label: "Python 3" }
+    ]);
+  });
+
+  it("resolves dynamically discovered languages and requires an explicit choice", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      Response.json([{ id: 46, name: "Bash (5.0.0)" }])
+    );
+    await expect(resolveJudge0Language("bash")).resolves.toEqual({
+      languageKey: "bash",
+      languageId: 46,
+      languageName: "Bash (5.0.0)"
+    });
+    await expect(resolveJudge0Language("")).rejects.toMatchObject({
+      status: 409,
+      code: "CODING_EXERCISE_LANGUAGE_REQUIRED"
+    });
   });
 
   it("base64-encodes submission text and decodes Unicode result text", async () => {

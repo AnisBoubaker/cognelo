@@ -8,7 +8,7 @@ import { AppShell } from "@/components/app-shell";
 import { SubjectKnowledgeGraph } from "@/components/subject-knowledge-graph";
 import { api, type Subject } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import { subjectProgrammingLanguageLabel } from "@/lib/subject-programming-language";
+import { subjectMultipleProgrammingLanguages, subjectProgrammingLanguageLabel } from "@/lib/subject-programming-language";
 
 export default function SubjectDetailPage() {
   const params = useParams<{ subjectId: string }>();
@@ -35,7 +35,11 @@ export default function SubjectDetailPage() {
               <p className="muted">
                 {t("subjects.teachingLanguageSummary", { language: t(`locale.${subject.teachingLanguage}`) })}
                 {subject.programmingLanguage
-                  ? ` · ${t("subjects.programmingLanguageSummary", { language: subjectProgrammingLanguageLabel(subject.programmingLanguage) })}`
+                  ? ` · ${t("subjects.programmingLanguageSummary", {
+                      language: subject.programmingLanguage === subjectMultipleProgrammingLanguages
+                        ? t("subjects.programmingLanguageMultiple")
+                        : subjectProgrammingLanguageLabel(subject.programmingLanguage)
+                    })}`
                   : ""}
               </p>
             ) : null}

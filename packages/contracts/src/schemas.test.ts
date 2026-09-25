@@ -306,8 +306,10 @@ describe("shared contract schemas", () => {
     });
     expect(SubjectInputSchema.parse({ title: "Math" })).toMatchObject({ description: "", teachingLanguage: "en", programmingLanguage: null, metadata: {} });
     expect(SubjectInputSchema.parse({ title: "Programming", programmingLanguage: "cpp" })).toMatchObject({ programmingLanguage: "cpp" });
+    expect(SubjectInputSchema.parse({ title: "Programming", programmingLanguage: "multiple" })).toMatchObject({ programmingLanguage: "multiple" });
+    expect(SubjectInputSchema.parse({ title: "Programming", programmingLanguage: "common-lisp" })).toMatchObject({ programmingLanguage: "common-lisp" });
     expect(() => SubjectInputSchema.parse({ title: "Math", teachingLanguage: "es" })).toThrow();
-    expect(() => SubjectInputSchema.parse({ title: "Programming", programmingLanguage: "brainfuck" })).toThrow();
+    expect(() => SubjectInputSchema.parse({ title: "Programming", programmingLanguage: "C++" })).toThrow();
     expect(SubjectKnowledgeGraphGenerationInputSchema.parse({ description: "A detailed mathematics curriculum." })).toEqual({
       description: "A detailed mathematics curriculum.",
       directions: "",

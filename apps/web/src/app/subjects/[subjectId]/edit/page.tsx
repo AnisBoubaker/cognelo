@@ -5,9 +5,9 @@ import { EditActionBar, RichTextEditor, useNotifications, useUnsavedChangesGuard
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SubjectKnowledgeGraph } from "@/components/subject-knowledge-graph";
-import { api, type Subject, type SubjectKnowledgeConcept, type SubjectKnowledgeGraphDraft, type SubjectKnowledgePrerequisite, type SubjectProgrammingLanguage } from "@/lib/api";
+import { api, type ProgrammingLanguageOption, type Subject, type SubjectKnowledgeConcept, type SubjectKnowledgeGraphDraft, type SubjectKnowledgePrerequisite, type SubjectProgrammingLanguage } from "@/lib/api";
 import { locales, useI18n, type Locale } from "@/lib/i18n";
-import { subjectProgrammingLanguageOptions } from "@/lib/subject-programming-language";
+import { subjectMultipleProgrammingLanguages, subjectProgrammingLanguageLabel } from "@/lib/subject-programming-language";
 
 export default function EditSubjectPage() {
   const params = useParams<{ subjectId: string }>();
@@ -20,6 +20,7 @@ export default function EditSubjectPage() {
   const [description, setDescription] = useState("");
   const [teachingLanguage, setTeachingLanguage] = useState<Locale>("en");
   const [programmingLanguage, setProgrammingLanguage] = useState<SubjectProgrammingLanguage | "">("");
+  const [programmingLanguages, setProgrammingLanguages] = useState<ProgrammingLanguageOption[]>([]);
   const [graphConcepts, setGraphConcepts] = useState<SubjectKnowledgeConcept[]>([]);
   const [graphPrerequisites, setGraphPrerequisites] = useState<SubjectKnowledgePrerequisite[]>([]);
   const [knowledgeGraphDeletions, setKnowledgeGraphDeletions] = useState<{ conceptIds: string[]; skillIds: string[] }>({ conceptIds: [], skillIds: [] });
@@ -35,6 +36,12 @@ export default function EditSubjectPage() {
   const [saving, setSaving] = useState(false);
   const [aiGenerationEnabled, setAiGenerationEnabled] = useState(false);
   const [activeTab, setActiveTab] = useState<"information" | "knowledge-graph">("information");
+
+  useEffect(() => {
+    api.programmingLanguages()
+      .then((result) => setProgrammingLanguages(result.languages))
+      .catch((err) => setError(err instanceof Error ? err.message : t("subjects.programmingLanguagesLoadError")));
+  }, [t]);
 
   useEffect(() => {
     api
@@ -194,7 +201,13 @@ export default function EditSubjectPage() {
                     onChange={(event) => setProgrammingLanguage(event.target.value as SubjectProgrammingLanguage | "")}
                   >
                     <option value="">{t("subjects.programmingLanguageNone")}</option>
-                    {subjectProgrammingLanguageOptions.map((language) => <option key={language.value} value={language.value}>{language.label}</option>)}
+                    <option value={subjectMultipleProgrammingLanguages}>{t("subjects.programmingLanguageMultiple")}</option>
+                    {programmingLanguage
+                      && programmingLanguage !== subjectMultipleProgrammingLanguages
+                      && !programmingLanguages.some((language) => language.key === programmingLanguage)
+                      ? <option value={programmingLanguage}>{subjectProgrammingLanguageLabel(programmingLanguage)}</option>
+                      : null}
+                    {programmingLanguages.map((language) => <option key={language.key} value={language.key}>{language.label}</option>)}
                   </select>
                   <p className="muted">{t("subjects.programmingLanguageHelp")}</p>
                 </div>

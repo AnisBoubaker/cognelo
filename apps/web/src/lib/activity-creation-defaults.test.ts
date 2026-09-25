@@ -11,8 +11,15 @@ describe("activity creation defaults", () => {
     });
   });
 
-  it("keeps the plugin default when the subject has no programming language", () => {
-    expect(activityCreationConfig("coding-exercise", codingDefinition, null)).toEqual(codingDefinition.defaultConfig);
+  it("requires a choice when the subject has no single programming language", () => {
+    expect(activityCreationConfig("coding-exercise", codingDefinition, null)).toEqual({
+      language: "",
+      prompt: "Write a program."
+    });
+    expect(activityCreationConfig("coding-exercise", codingDefinition, "multiple")).toEqual({
+      language: "",
+      prompt: "Write a program."
+    });
   });
 
   it("does not change another activity type", () => {

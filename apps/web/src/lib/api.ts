@@ -531,6 +531,11 @@ export type ActivityType = {
   description: string;
 };
 
+export type ProgrammingLanguageOption = {
+  key: string;
+  label: string;
+};
+
 export type ActivityDefinition = {
   key: string;
   name: string;
@@ -1593,6 +1598,7 @@ export const api = {
       method: "DELETE"
     }),
   activityTypes: () => request<{ activityTypes: ActivityType[]; registeredDefinitions: ActivityDefinition[] }>("/activity-types"),
+  programmingLanguages: () => request<{ languages: ProgrammingLanguageOption[] }>("/programming-languages"),
   activity: (courseId: string, activityId: string) =>
     request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}`),
   groupActivity: (courseId: string, groupId: string, activityId: string) =>

@@ -6,6 +6,7 @@ import {
   codingExerciseHiddenTestsInputSchema,
   codingExerciseOutputMatchModeSchema,
   codingExerciseTemplateRequiresTestCodeMarker,
+  parseCodingExerciseConfig,
   parseCodingExercisePrivateConfig,
   type CodingExerciseOutputMatchMode
 } from "./coding-exercises";
@@ -430,6 +431,13 @@ async function validateCodingExerciseHiddenTestsInput(params: {
   }
 
   const activityConfig = input.activityConfig ?? params.activityConfig;
+  if (!parseCodingExerciseConfig(activityConfig).language) {
+    throw new AppError(
+      409,
+      "CODING_EXERCISE_LANGUAGE_REQUIRED",
+      "Choose a programming language before validating tests."
+    );
+  }
   const validationInputFingerprint = createValidationInputFingerprint({
     activityConfig,
     referenceSolution: input.referenceSolution,

@@ -264,6 +264,22 @@ describe("coding exercise hidden test persistence", () => {
     );
   });
 
+  it("does not validate or save tests until a programming language is selected", async () => {
+    await expect(replaceCodingExerciseHiddenTests({
+      activityId: "course-activity-1",
+      courseId: "course-1",
+      activityConfig: { prompt: "Write a function.", language: "" },
+      user: { id: "teacher-1", role: "teacher" } as never,
+      input: hiddenInput
+    })).rejects.toMatchObject({
+      status: 409,
+      code: "CODING_EXERCISE_LANGUAGE_REQUIRED"
+    });
+
+    expect(executionMocks.validateReferenceSolutionAgainstHiddenTests).not.toHaveBeenCalled();
+    expect(dbMocks.transaction.pluginCodingExerciseHiddenTest.deleteMany).not.toHaveBeenCalled();
+  });
+
   it("uses the signed preflight result when persisting instead of validating dirty tests twice", async () => {
     const preflight = await replaceCodingExerciseHiddenTests({
       activityId: "course-activity-1",

@@ -3,7 +3,7 @@
 import { type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
-import { CodeEditor, CodeRenderer, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, RichTextEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
+import { CodeEditor, CodeRenderer, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, RichTextEditor, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   alignCodingExerciseStarterCodeToTemplate,
   balanceCodingExerciseAiRubricCriterionWeights,
@@ -133,7 +133,13 @@ type CodingExerciseValidationReceipt = {
   signature: string;
 };
 
+type ProgrammingLanguageOption = {
+  key: string;
+  label: string;
+};
+
 type CodingExerciseClient = {
+  listProgrammingLanguages?: () => Promise<{ languages: ProgrammingLanguageOption[] }>;
   listHiddenTests: (
     courseId: string,
     activityId: string
@@ -274,7 +280,6 @@ type CodingExerciseActivityViewProps = {
   onSubmitted?: () => void;
 };
 
-const disabledCodingExerciseLanguages = new Set(["javascript"]);
 const personalizedTestId = "__personalized_test__";
 const workspaceDividerWidth = 12;
 const minimumEditorWidth = 360;
@@ -309,14 +314,11 @@ export function CodingExerciseActivityView({
     privateConfig: CodingExercisePrivateConfig;
     language: string;
   } | null>(null);
-  const codingExerciseLanguageOptions = codeLanguageOptions.map((option) => ({
-    ...option,
-    disabled: disabledCodingExerciseLanguages.has(option.value)
-  }));
   const previousActivityIdRef = useRef(activity.id);
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);
   const [config, setConfig] = useState<CodingExerciseConfig>(() => getCodingExerciseActivityConfig(activity.config));
+  const [programmingLanguages, setProgrammingLanguages] = useState<ProgrammingLanguageOption[]>([]);
   const [hiddenTests, setHiddenTests] = useState<HiddenTest[]>([]);
   const [referenceSolution, setReferenceSolution] = useState("");
   const [privateConfig, setPrivateConfig] = useState<CodingExercisePrivateConfig>(() => parseCodingExercisePrivateConfig({}));
@@ -376,6 +378,10 @@ export function CodingExerciseActivityView({
   const visibleSampleTests = normalizeCodingExerciseSampleTests(config.sampleTests);
   const isPersonalizedTest = selectedSampleTestId === personalizedTestId;
   const aiFeedbackValidationMessages = getCodingExerciseAiFeedbackValidationMessages(privateConfig.aiFeedback);
+  const codingExerciseLanguageOptions = config.language && !programmingLanguages.some((language) => language.key === config.language)
+    ? [{ key: config.language, label: config.language }, ...programmingLanguages]
+    : programmingLanguages;
+  const loadLanguagesErrorMessage = t("loadLanguagesError");
 
   useEffect(() => {
     if (typeof document === "undefined" || document.getElementById("coding-exercise-spinner-style")) {
@@ -505,6 +511,21 @@ export function CodingExerciseActivityView({
       });
     return () => { cancelled = true; };
   }, [activity.id, activityConfigKey, canManage, executionStateHost, readOnly]);
+
+  useEffect(() => {
+    if (!canManage || !codingClient?.listProgrammingLanguages) return;
+    let cancelled = false;
+    codingClient.listProgrammingLanguages()
+      .then((result) => {
+        if (!cancelled) setProgrammingLanguages(result.languages);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : loadLanguagesErrorMessage);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canManage, codingClient, loadLanguagesErrorMessage]);
 
   useEffect(() => {
     if (!canManage || !course?.id || !codingClient) {
@@ -718,6 +739,9 @@ export function CodingExerciseActivityView({
     setError("");
 
     try {
+      if (!config.language) {
+        throw new Error(t("languageRequired"));
+      }
       const aiFeedbackValidationMessage = getCodingExerciseAiFeedbackValidationMessages(privateConfig.aiFeedback)[0];
       if (aiFeedbackValidationMessage) {
         throw new Error(aiFeedbackValidationMessage);
@@ -846,6 +870,10 @@ export function CodingExerciseActivityView({
     if (!aiGenerationClient) {
       return;
     }
+    if (!config.language) {
+      notifications.error(t("languageRequired"));
+      return;
+    }
     if (description.trim().length < 10) {
       notifications.error(t("generatePromptDescriptionRequired"));
       return;
@@ -858,7 +886,7 @@ export function CodingExerciseActivityView({
   }
 
   async function generatePrompt() {
-    if (!aiGenerationClient) {
+    if (!aiGenerationClient || !config.language) {
       return;
     }
 
@@ -886,6 +914,10 @@ export function CodingExerciseActivityView({
     if (!aiGenerationClient) {
       return;
     }
+    if (!config.language) {
+      notifications.error(t("languageRequired"));
+      return;
+    }
     if (config.prompt.trim().length < 10) {
       notifications.error(t("generateSolutionPromptRequired"));
       return;
@@ -898,7 +930,7 @@ export function CodingExerciseActivityView({
   }
 
   async function generateSolution() {
-    if (!aiGenerationClient) {
+    if (!aiGenerationClient || !config.language) {
       return;
     }
 
@@ -948,6 +980,10 @@ export function CodingExerciseActivityView({
     if (!aiGenerationClient) {
       return;
     }
+    if (!config.language) {
+      notifications.error(t("languageRequired"));
+      return;
+    }
     const draft = aiGenerationDraftRef.current;
     const promptForGeneration = config.prompt.trim() ? config.prompt : draft?.prompt ?? "";
     const referenceSolutionForGeneration = referenceSolution.trim() ? referenceSolution : draft?.referenceSolution ?? "";
@@ -977,7 +1013,7 @@ export function CodingExerciseActivityView({
     visibleTestCount?: number;
     hiddenTestCount?: number;
   } = {}) {
-    if (!aiGenerationClient) {
+    if (!aiGenerationClient || !config.language) {
       return;
     }
 
@@ -996,7 +1032,7 @@ export function CodingExerciseActivityView({
       const result = await aiGenerationClient.generateTests({
         description,
         prompt: promptForGeneration,
-        language: config.language || draft?.language || "python",
+        language: config.language,
         locale: pluginLocale,
         referenceSolution: referenceSolutionForGeneration,
         templateSource: persistedPrivateConfig.templateSource,
@@ -1044,6 +1080,10 @@ export function CodingExerciseActivityView({
     if (!aiGenerationClient) {
       return;
     }
+    if (!config.language) {
+      notifications.error(t("languageRequired"));
+      return;
+    }
     if (!title.trim() || config.prompt.trim().length < 10 || !referenceSolution.trim()) {
       notifications.error(t("generateRubricRequirements"));
       return;
@@ -1056,7 +1096,7 @@ export function CodingExerciseActivityView({
   }
 
   async function generateRubric() {
-    if (!aiGenerationClient) {
+    if (!aiGenerationClient || !config.language) {
       return;
     }
 
@@ -1086,7 +1126,7 @@ export function CodingExerciseActivityView({
   }
 
   async function runCode() {
-    if (!course?.id || !codingClient || !editorCode.trim()) {
+    if (!course?.id || !codingClient || !config.language || !editorCode.trim()) {
       return;
     }
     setWorkingAction("run");
@@ -1113,7 +1153,7 @@ export function CodingExerciseActivityView({
   }
 
   async function submitCode() {
-    if (!course?.id || !codingClient || !editorCode.trim()) {
+    if (!course?.id || !codingClient || !config.language || !editorCode.trim()) {
       return;
     }
     setWorkingAction("submit");
@@ -1271,19 +1311,21 @@ export function CodingExerciseActivityView({
               value={config.language}
               onChange={(event) => {
                 const nextLanguage = event.target.value;
-                if (disabledCodingExerciseLanguages.has(nextLanguage)) {
-                  return;
-                }
                 aiGenerationDraftRef.current = null;
+                setReplacementDialog(null);
+                setTestGenerationDialogOpen(false);
+                setReferenceValidationSummary(null);
                 setConfig((current) => ({ ...current, language: nextLanguage }));
               }}
             >
+              <option value="">{t("chooseLanguage")}</option>
               {codingExerciseLanguageOptions.map((option) => (
-                <option key={option.value} value={option.value} disabled={option.disabled}>
+                <option key={option.key} value={option.key}>
                   {option.label}
                 </option>
               ))}
             </select>
+            {!config.language ? <p className="muted">{t("languageRequired")}</p> : null}
           </div>
 
           <div className="field">
@@ -1302,7 +1344,7 @@ export function CodingExerciseActivityView({
             <button
               className="secondary"
               type="button"
-              disabled={generatingPrompt || description.trim().length < 10}
+              disabled={!config.language || generatingPrompt || description.trim().length < 10}
               onClick={requestPromptGeneration}
             >
               {generatingPrompt ? t("generatingPrompt") : t("generatePrompt")}
@@ -1329,7 +1371,7 @@ export function CodingExerciseActivityView({
             <button
               className="secondary"
               type="button"
-              disabled={generatingSolution || config.prompt.trim().length < 10}
+              disabled={!config.language || generatingSolution || config.prompt.trim().length < 10}
               onClick={requestSolutionGeneration}
             >
               {generatingSolution ? t("generatingSolution") : t("generateSolution")}
@@ -1408,7 +1450,7 @@ export function CodingExerciseActivityView({
                     {t("cancelTestGeneration")}
                   </button>
                   <button
-                    disabled={!testGenerationCountsValid}
+                    disabled={!config.language || !testGenerationCountsValid}
                     type="button"
                     onClick={() => void generateTests({
                       visibleTestCount: visibleTestGenerationCount,
@@ -1610,8 +1652,12 @@ export function CodingExerciseActivityView({
                   {aiGenerationClient ? (
                     <button
                       className="button secondary"
-                      disabled={generatingRubric || !title.trim() || config.prompt.trim().length < 10 || !referenceSolution.trim()}
-                      title={!title.trim() || config.prompt.trim().length < 10 || !referenceSolution.trim() ? t("generateRubricRequirements") : undefined}
+                      disabled={!config.language || generatingRubric || !title.trim() || config.prompt.trim().length < 10 || !referenceSolution.trim()}
+                      title={!config.language
+                        ? t("languageRequired")
+                        : !title.trim() || config.prompt.trim().length < 10 || !referenceSolution.trim()
+                          ? t("generateRubricRequirements")
+                          : undefined}
                       type="button"
                       onClick={requestRubricGeneration}
                     >
@@ -1741,7 +1787,7 @@ export function CodingExerciseActivityView({
             <button
               className="secondary"
               type="button"
-              disabled={generatingTests || config.prompt.trim().length < 10 || !referenceSolution.trim()}
+              disabled={!config.language || generatingTests || config.prompt.trim().length < 10 || !referenceSolution.trim()}
               onClick={requestTestsGeneration}
             >
               {generatingTests ? t("generatingTests") : t("generateTests")}
@@ -1754,7 +1800,7 @@ export function CodingExerciseActivityView({
               <button
                 type="button"
                 className="button secondary"
-                disabled={normalizeCodingExerciseSampleTests(config.sampleTests).length >= codingExerciseMaxGeneratedTestCount}
+                disabled={!config.language || normalizeCodingExerciseSampleTests(config.sampleTests).length >= codingExerciseMaxGeneratedTestCount}
                 onClick={addSampleTest}
               >
                 {t("addSampleTest")}
@@ -1846,7 +1892,7 @@ export function CodingExerciseActivityView({
           <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
             <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
               <h3>{t("hiddenTests")}</h3>
-              <button type="button" className="button secondary" onClick={addHiddenTest}>
+              <button type="button" className="button secondary" disabled={!config.language} onClick={addHiddenTest}>
                 {t("addHiddenTest")}
               </button>
             </div>
@@ -1991,7 +2037,7 @@ export function CodingExerciseActivityView({
               <EditActionBar
                 isDirty={hasUnsavedChanges}
                 isSaving={saving}
-                saveDisabled={aiFeedbackValidationMessages.length > 0}
+                saveDisabled={!config.language || aiFeedbackValidationMessages.length > 0}
                 savedLabel={actionCopy.saved}
                 unsavedLabel={actionCopy.unsaved}
                 saveLabel={t("saveCodingExercise")}
@@ -2008,7 +2054,7 @@ export function CodingExerciseActivityView({
           <EditActionBar
             isDirty={hasUnsavedChanges}
             isSaving={saving}
-            saveDisabled={aiFeedbackValidationMessages.length > 0}
+            saveDisabled={!config.language || aiFeedbackValidationMessages.length > 0}
             savedLabel={actionCopy.saved}
             unsavedLabel={actionCopy.unsaved}
             saveLabel={t("saveCodingExercise")}
@@ -2067,7 +2113,7 @@ export function CodingExerciseActivityView({
 
                   {!deferSubmission ? (
                     <div className="row coding-exercise-editor-actions" style={{ alignItems: "center" }}>
-                      <button type="button" onClick={submitCode} disabled={readOnly || workingAction === "submit" || !editorCode.trim()}>
+                      <button type="button" onClick={submitCode} disabled={!config.language || readOnly || workingAction === "submit" || !editorCode.trim()}>
                         {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
                       </button>
                       {submitExecution && submitExecution.status !== "pending" ? (
@@ -2176,7 +2222,7 @@ export function CodingExerciseActivityView({
                     </div>
                   )}
 
-                  <button type="button" onClick={runCode} disabled={readOnly || workingAction === "run" || !editorCode.trim()}>
+                  <button type="button" onClick={runCode} disabled={!config.language || readOnly || workingAction === "run" || !editorCode.trim()}>
                     {workingAction === "run" ? t("running") : t("runTest")}
                   </button>
 
