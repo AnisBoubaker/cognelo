@@ -110,6 +110,8 @@ test.describe.serial("timed Test countdown", () => {
     const timer = studentPage.getByRole("timer");
     const accountSelector = studentPage.getByRole("button", { name: "Open account menu" });
     await expect(timer).toBeVisible();
+    await studentPage.evaluate(() => window.scrollTo(0, 0));
+    await expect.poll(() => studentPage.evaluate(() => window.scrollY)).toBe(0);
     await expect(timer).toHaveClass(/test-countdown--normal/);
     expect(await timer.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(13, 27, 71)");
     expect(await timer.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(255, 255, 255)");
@@ -126,7 +128,9 @@ test.describe.serial("timed Test countdown", () => {
     await expect.poll(() => studentPage.evaluate(() => window.scrollY)).toBeGreaterThan(0);
     const timerAfterScroll = await timer.boundingBox();
     if (!timerAfterScroll) throw new Error("The Test timer disappeared while scrolling.");
-    expect(Math.abs(timerAfterScroll.y - timerBeforeScroll.y)).toBeLessThanOrEqual(1);
+    expect(timerAfterScroll.y).toBeLessThan(timerBeforeScroll.y);
+    expect(timerAfterScroll.y).toBeGreaterThanOrEqual(11);
+    expect(timerAfterScroll.y).toBeLessThanOrEqual(13);
 
     await studentPage.evaluate(() => window.scrollTo(0, 0));
     await accountSelector.click();

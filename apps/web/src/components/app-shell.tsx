@@ -21,24 +21,34 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [accountMenuAnchor, setAccountMenuAnchor] = useState<HTMLButtonElement | null>(null);
   const appShellRef = useRef<HTMLDivElement | null>(null);
   const accountTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const countdownAnchorTopRef = useRef(86);
 
   useEffect(() => {
     const shell = appShellRef.current;
     const trigger = accountTriggerRef.current;
     if (!shell || !trigger) return;
 
-    const updateCountdownPosition = () => {
-      const bounds = trigger.getBoundingClientRect();
-      shell.style.setProperty("--test-countdown-top", `${Math.round(bounds.bottom + window.scrollY + 12)}px`);
-      shell.style.setProperty("--test-countdown-right", `${Math.max(16, Math.round(window.innerWidth - bounds.right))}px`);
+    const updateCountdownTop = () => {
+      shell.style.setProperty(
+        "--test-countdown-top",
+        `${Math.max(12, Math.round(countdownAnchorTopRef.current - window.scrollY))}px`
+      );
     };
-    updateCountdownPosition();
-    const observer = new ResizeObserver(updateCountdownPosition);
+    const updateCountdownAnchor = () => {
+      const bounds = trigger.getBoundingClientRect();
+      countdownAnchorTopRef.current = bounds.bottom + window.scrollY + 12;
+      shell.style.setProperty("--test-countdown-right", `${Math.max(16, Math.round(window.innerWidth - bounds.right))}px`);
+      updateCountdownTop();
+    };
+    updateCountdownAnchor();
+    const observer = new ResizeObserver(updateCountdownAnchor);
     observer.observe(trigger);
-    window.addEventListener("resize", updateCountdownPosition);
+    window.addEventListener("resize", updateCountdownAnchor);
+    window.addEventListener("scroll", updateCountdownTop, { passive: true });
     return () => {
       observer.disconnect();
-      window.removeEventListener("resize", updateCountdownPosition);
+      window.removeEventListener("resize", updateCountdownAnchor);
+      window.removeEventListener("scroll", updateCountdownTop);
     };
   }, [loading, user?.id]);
 
