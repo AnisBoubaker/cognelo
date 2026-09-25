@@ -964,6 +964,7 @@ export type CourseGradebookRow = {
   status: Exclude<GradebookStatus, "all">;
   score: number | null;
   maxScore: number;
+  gradeSource: "auto" | "manual" | "override" | "regrade" | null;
   isPass: boolean | null;
   latePenaltyApplied: boolean;
   latePenaltyPercent: number | null;

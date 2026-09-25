@@ -21,7 +21,12 @@ import {
   GradebookMutationGrade,
   TeacherAiFeedbackReview
 } from "@/lib/api";
-import { getAiFeedbackReviewRenderer, getManualGradingRenderer, renderTestReviewAllItem } from "@/lib/activity-renderers";
+import {
+  getAiFeedbackReviewCalculatedGradePercent,
+  getAiFeedbackReviewRenderer,
+  getManualGradingRenderer,
+  renderTestReviewAllItem
+} from "@/lib/activity-renderers";
 import { getGradebookActivityActions } from "@/lib/gradebook-actions";
 import { useI18n } from "@/lib/i18n";
 import { latestCompletedTestAttempt, type TestReviewAllSubmission } from "@/lib/test-review-all";
@@ -69,6 +74,8 @@ export default function GradebookActivityResultsPage() {
     draft: Record<string, unknown> | null;
     gradeDraft: string;
     gradeTouched: boolean;
+    gradeFollowsCalculated: boolean;
+    preserveTeacherGrade: boolean;
     initialGrade: number | null;
     loading: boolean;
     saving: boolean;
@@ -416,6 +423,8 @@ export default function GradebookActivityResultsPage() {
   async function loadFeedbackReview(targetRows: CourseGradebookRow[], selectedIndex: number) {
     const row = targetRows[selectedIndex];
     const attempt = selectedFeedbackAttempt(row);
+    const preserveTeacherGrade = row.gradeSource === "manual" || row.gradeSource === "override";
+    const gradeFollowsCalculated = !preserveTeacherGrade && !row.latePenaltyApplied;
     if (!attempt) {
       notifications.error(t("courseDetail.feedbackReviewUnavailable"));
       return;
@@ -427,6 +436,8 @@ export default function GradebookActivityResultsPage() {
       draft: null,
       gradeDraft: row.score === null ? "" : formatGradeNumber(row.score),
       gradeTouched: false,
+      gradeFollowsCalculated,
+      preserveTeacherGrade,
       initialGrade: row.score,
       loading: true,
       saving: false,
@@ -434,13 +445,20 @@ export default function GradebookActivityResultsPage() {
     });
     try {
       const result = await api.activityAttemptAiFeedbackReview(courseId, attempt.id);
+      const calculatedGrade = gradeFollowsCalculated
+        ? calculatedNormalizedGrade(row, result.review.activityTypeKey, result.review.feedback)
+        : null;
       setFeedbackReview({
         rows: targetRows,
         selectedIndex,
         review: result.review,
         draft: result.review.feedback,
-        gradeDraft: row.score === null ? "" : formatGradeNumber(row.score),
+        gradeDraft: row.score === null
+          ? calculatedGrade === null ? "" : formatGradeNumber(calculatedGrade)
+          : formatGradeNumber(row.score),
         gradeTouched: false,
+        gradeFollowsCalculated,
+        preserveTeacherGrade,
         initialGrade: row.score,
         loading: false,
         saving: false,
@@ -455,6 +473,8 @@ export default function GradebookActivityResultsPage() {
         draft: null,
         gradeDraft: row.score === null ? "" : formatGradeNumber(row.score),
         gradeTouched: false,
+        gradeFollowsCalculated,
+        preserveTeacherGrade,
         initialGrade: row.score,
         loading: false,
         saving: false,
@@ -496,7 +516,8 @@ export default function GradebookActivityResultsPage() {
           initialGrade: feedbackResult.grade?.normalizedScore ?? current.initialGrade
         } : current);
       }
-      const overrideResult = gradeChanged && parsedGrade !== null
+      const shouldPreserveTeacherGrade = feedbackReview.preserveTeacherGrade && Boolean(feedbackResult?.grade);
+      const overrideResult = (gradeChanged || shouldPreserveTeacherGrade) && parsedGrade !== null
         ? await api.overrideGradebookGrade(courseId, row.gradebookItemId, row.participantId, {
             score: parsedGrade,
             maxScore: row.maxScore,
@@ -513,6 +534,8 @@ export default function GradebookActivityResultsPage() {
         draft: savedFeedback,
         gradeDraft: finalGrade === null ? "" : formatGradeNumber(finalGrade),
         gradeTouched: false,
+        gradeFollowsCalculated: overrideResult ? false : feedbackResult?.grade ? true : current.gradeFollowsCalculated,
+        preserveTeacherGrade: overrideResult ? true : feedbackResult?.grade ? false : current.preserveTeacherGrade,
         initialGrade: finalGrade
       } : current);
       await refresh();
@@ -803,8 +826,25 @@ export default function GradebookActivityResultsPage() {
               onClose={() => {
                 if (canLeaveFeedbackReview(feedbackReview, t("courseDetail.feedbackReviewDiscardConfirm"))) setFeedbackReview(null);
               }}
-              onFeedbackChange={(draft) => setFeedbackReview((current) => current ? { ...current, draft } : current)}
-              onGradeChange={(gradeDraft) => setFeedbackReview((current) => current ? { ...current, gradeDraft, gradeTouched: true } : current)}
+              onFeedbackChange={(draft) => setFeedbackReview((current) => {
+                if (!current) return current;
+                const row = current.rows[current.selectedIndex];
+                const calculatedGrade = current.review && current.gradeFollowsCalculated && !current.gradeTouched
+                  ? calculatedNormalizedGrade(row, current.review.activityTypeKey, draft)
+                  : null;
+                return {
+                  ...current,
+                  draft,
+                  ...(calculatedGrade === null ? {} : { gradeDraft: formatGradeNumber(calculatedGrade) })
+                };
+              })}
+              onGradeChange={(gradeDraft) => setFeedbackReview((current) => current ? {
+                ...current,
+                gradeDraft,
+                gradeTouched: true,
+                gradeFollowsCalculated: false,
+                preserveTeacherGrade: true
+              } : current)}
               onSelectIndex={(selectedIndex) => {
                 if (canLeaveFeedbackReview(feedbackReview, t("courseDetail.feedbackReviewDiscardConfirm"))) void loadFeedbackReview(feedbackReview.rows, selectedIndex);
               }}
@@ -825,6 +865,8 @@ type AiFeedbackReviewState = {
   draft: Record<string, unknown> | null;
   gradeDraft: string;
   gradeTouched: boolean;
+  gradeFollowsCalculated: boolean;
+  preserveTeacherGrade: boolean;
   initialGrade: number | null;
   loading: boolean;
   saving: boolean;
@@ -1020,6 +1062,15 @@ function formatGradebookScore(score: number | null, maxScore: number) {
 
 function formatGradeNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function calculatedNormalizedGrade(
+  row: CourseGradebookRow,
+  activityTypeKey: string,
+  feedback: Record<string, unknown>
+) {
+  const percent = getAiFeedbackReviewCalculatedGradePercent(activityTypeKey, feedback);
+  return percent === null ? null : percent * row.maxScore / 100;
 }
 
 function sortAttemptsByDisplayedTimestamp(attempts: GradebookReviewAttempt[]) {

@@ -912,6 +912,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         status,
         score: effectiveGrade?.normalizedScore ?? null,
         maxScore: effectiveGrade?.normalizedMaxScore ?? item.pointsPossible,
+        gradeSource: effectiveGrade?.source ?? null,
         isPass: effectiveGrade?.isPass ?? null,
         latePenaltyApplied: effectiveGrade?.latePenaltyApplied ?? false,
         latePenaltyPercent: effectiveGrade?.latePenaltyPercent ?? null,

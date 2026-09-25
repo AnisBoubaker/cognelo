@@ -3,7 +3,11 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { CodeRenderer } from "@cognelo/activity-ui";
-import { CodingExerciseActivityView, CodingExerciseAiFeedbackReview } from "@cognelo/plugin-coding-exercises";
+import {
+  CodingExerciseActivityView,
+  CodingExerciseAiFeedbackReview,
+  getCodingExerciseGradingBreakdown
+} from "@cognelo/plugin-coding-exercises";
 import {
   CodingHomeworkGraderActivityView,
   CodingHomeworkManualGradingPanel,
@@ -1324,4 +1328,10 @@ export const aiFeedbackReviewRenderers: Record<string, (context: AiFeedbackRevie
 export function getAiFeedbackReviewRenderer(activityTypeKey: string) {
   const rendererKey = getActivityDefinition(activityTypeKey)?.aiFeedback?.rendererKey;
   return rendererKey ? aiFeedbackReviewRenderers[rendererKey] ?? null : null;
+}
+
+export function getAiFeedbackReviewCalculatedGradePercent(activityTypeKey: string, feedback: Record<string, unknown>) {
+  const rendererKey = getActivityDefinition(activityTypeKey)?.aiFeedback?.rendererKey;
+  if (rendererKey !== "coding-exercise-ai-feedback-review") return null;
+  return getCodingExerciseGradingBreakdown(feedback)?.totalGrade ?? null;
 }
