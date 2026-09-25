@@ -4,7 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Editor, { loader, type Monaco, type OnMount } from "@monaco-editor/react";
 import { codeInputProtectionAttributes, protectCodeInput } from "./code-input-protection";
 import { normalizeMonacoLanguage } from "./code-language";
-import { getEditableMonacoValue } from "./monaco-code-editor-value";
+import {
+  clampMonacoSelectionToEditableOffsets,
+  getEditableMonacoOffsets,
+  getEditableMonacoValue
+} from "./monaco-code-editor-value";
 
 let hasRegisteredCogneloTheme = false;
 loader.config({ paths: { vs: "/_vendor/monaco/vs" } });
@@ -44,10 +48,10 @@ export function MonacoCodeEditor({
   const displayedValue = `${readOnlyPrefix}${value}${readOnlySuffix}`;
   const hasRestrictedEditableRegion = !readOnly && (readOnlyPrefix.length > 0 || readOnlySuffix.length > 0);
   const displayedValueRef = useRef(displayedValue);
-  const editableOffsetsRef = useRef(getEditableOffsets(displayedValue, readOnlyPrefix, readOnlySuffix));
+  const readOnlyRegionRef = useRef({ readOnly, readOnlyPrefix, readOnlySuffix });
 
   displayedValueRef.current = displayedValue;
-  editableOffsetsRef.current = getEditableOffsets(displayedValue, readOnlyPrefix, readOnlySuffix);
+  readOnlyRegionRef.current = { readOnly, readOnlyPrefix, readOnlySuffix };
 
   useEffect(() => {
     if (loader.__getMonacoInstance()) {
@@ -84,7 +88,7 @@ export function MonacoCodeEditor({
       return;
     }
 
-    const editableOffsets = editableOffsetsRef.current;
+    const editableOffsets = getEditableMonacoOffsets(displayedValue, readOnlyPrefix, readOnlySuffix);
     const prefixRange = editableOffsets.startOffset > 0 ? getMonacoRangeFromOffsets(monaco, displayedValue, 0, editableOffsets.startOffset) : null;
     const suffixRange =
       editableOffsets.endOffset < displayedValue.length
@@ -147,6 +151,25 @@ export function MonacoCodeEditor({
             });
             if (nextStudentValue !== null) onChange(nextStudentValue);
           }}
+          onSelect={(event) => {
+            if (!hasRestrictedEditableRegion) return;
+            const textarea = event.currentTarget;
+            const editableOffsets = getEditableMonacoOffsets(
+              textarea.value,
+              readOnlyPrefix,
+              readOnlySuffix
+            );
+            const clampedSelection = clampMonacoSelectionToEditableOffsets(
+              { startOffset: textarea.selectionStart, endOffset: textarea.selectionEnd },
+              editableOffsets
+            );
+            if (
+              clampedSelection.startOffset !== textarea.selectionStart ||
+              clampedSelection.endOffset !== textarea.selectionEnd
+            ) {
+              textarea.setSelectionRange(clampedSelection.startOffset, clampedSelection.endOffset);
+            }
+          }}
         />
       </div>
     );
@@ -189,7 +212,7 @@ export function MonacoCodeEditor({
             const model = editor?.getModel();
             if (editor && model && model.getValue() !== displayedValue) {
               model.setValue(displayedValue);
-              const editableOffsets = getEditableOffsets(displayedValue, readOnlyPrefix, readOnlySuffix);
+              const editableOffsets = getEditableMonacoOffsets(displayedValue, readOnlyPrefix, readOnlySuffix);
               const nextPosition = model.getPositionAt(editableOffsets.endOffset);
               if (nextPosition) {
                 editor.setPosition(nextPosition);
@@ -237,41 +260,61 @@ export function MonacoCodeEditor({
     monacoRef.current = monaco;
     protectCodeInput(editor.getDomNode()?.querySelector("textarea") ?? null);
 
-    if (!hasRestrictedEditableRegion) {
-      return;
-    }
-
-    const editableOffsets = editableOffsetsRef.current;
-    const editableRange = getMonacoRangeFromOffsets(
-      monaco,
-      displayedValueRef.current,
-      editableOffsets.startOffset,
-      editableOffsets.endOffset
-    );
-    if (editableRange) {
-      editor.setPosition(editableRange.getStartPosition());
+    if (hasRestrictedEditableRegion) {
+      const model = editor.getModel();
+      const editableOffsets = getEditableMonacoOffsets(
+        displayedValueRef.current,
+        readOnlyPrefix,
+        readOnlySuffix
+      );
+      if (model) {
+        editor.setPosition(model.getPositionAt(editableOffsets.startOffset));
+      }
     }
 
     editor.onDidChangeCursorSelection((event) => {
-      if (!event.selection.isEmpty()) {
-        return;
-      }
-
       const model = editor.getModel();
       if (!model) {
         return;
       }
 
-      const offset = model.getOffsetAt(event.selection.getPosition());
-      const currentEditableOffsets = editableOffsetsRef.current;
-      if (offset >= currentEditableOffsets.startOffset && offset <= currentEditableOffsets.endOffset) {
+      const currentRegion = readOnlyRegionRef.current;
+      if (
+        currentRegion.readOnly ||
+        (!currentRegion.readOnlyPrefix && !currentRegion.readOnlySuffix)
+      ) {
         return;
       }
 
-      const clampedOffset =
-        offset < currentEditableOffsets.startOffset ? currentEditableOffsets.startOffset : currentEditableOffsets.endOffset;
-      const nextPosition = model.getPositionAt(clampedOffset);
-      editor.setPosition(nextPosition);
+      const editableOffsets = getEditableMonacoOffsets(
+        model.getValue(),
+        currentRegion.readOnlyPrefix,
+        currentRegion.readOnlySuffix
+      );
+      const selectionStartOffset = model.getOffsetAt(event.selection.getStartPosition());
+      const selectionEndOffset = model.getOffsetAt(event.selection.getEndPosition());
+      const clampedSelection = clampMonacoSelectionToEditableOffsets(
+        { startOffset: selectionStartOffset, endOffset: selectionEndOffset },
+        editableOffsets
+      );
+
+      if (
+        clampedSelection.startOffset === selectionStartOffset &&
+        clampedSelection.endOffset === selectionEndOffset
+      ) {
+        return;
+      }
+
+      const nextSelection = getMonacoRangeFromOffsets(
+        monaco,
+        model.getValue(),
+        clampedSelection.startOffset,
+        clampedSelection.endOffset,
+        true
+      );
+      if (nextSelection) {
+        editor.setSelection(nextSelection);
+      }
     });
   }
 }
@@ -332,15 +375,14 @@ function getPositionFromOffset(value: string, offset: number) {
   };
 }
 
-function getEditableOffsets(displayedValue: string, readOnlyPrefix: string, readOnlySuffix: string) {
-  return {
-    startOffset: readOnlyPrefix.length,
-    endOffset: displayedValue.length - readOnlySuffix.length
-  };
-}
-
-function getMonacoRangeFromOffsets(monaco: Monaco | null, value: string, startOffset: number, endOffset: number) {
-  if (!monaco || startOffset === endOffset) {
+function getMonacoRangeFromOffsets(
+  monaco: Monaco | null,
+  value: string,
+  startOffset: number,
+  endOffset: number,
+  allowEmpty = false
+) {
+  if (!monaco || (!allowEmpty && startOffset === endOffset)) {
     return null;
   }
 

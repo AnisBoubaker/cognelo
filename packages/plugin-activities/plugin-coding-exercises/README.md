@@ -4,6 +4,8 @@
 
 Student and teacher code surfaces opt out of browser translation and writing assistance, including the Monaco fallback and code embedded in rendered Markdown instructions. Ordinary instructional prose remains eligible for translation.
 
+Student template protection omits whitespace-only hidden boundaries, keeps the cursor within the live editable region, and lets select-all clear the student answer without removing protected scaffold code.
+
 New exercises inherit the owning Subject's optional default programming language when they are created in a course, activity bank, course Test, or reusable bank Test. The choices come from the programming languages exposed by the configured Judge0 instance. A Subject can declare multiple languages; both that value and a missing default leave the exercise at `--- Choose ---`. Saving, generation, validation, execution, and submission remain unavailable until the exercise has one language. Existing and copied exercises keep their saved language.
 
 AI test generation warns before replacing an existing suite, then asks for visible and hidden counts (3 and 8 by default, at most 15 each), produces **Contains lines** comparisons with concise descriptive names capped at 50 characters, and validates the complete suite against the reviewed reference solution before inserting it into the authoring form.
