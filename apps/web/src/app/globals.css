@@ -167,6 +167,8 @@ select:focus {
 
 .app-shell {
   min-height: 100vh;
+  --test-countdown-right: 24px;
+  --test-countdown-top: 86px;
 }
 
 .topbar {
@@ -645,6 +647,43 @@ select:focus {
   line-height: 1.2;
   padding-top: 2px;
   text-align: center;
+}
+
+.test-countdown {
+  background: var(--brand-ink);
+  border-radius: 999px;
+  box-shadow: 0 12px 28px rgba(13, 27, 71, 0.24);
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1;
+  max-width: calc(100vw - 32px);
+  opacity: 1;
+  padding: 12px 16px;
+  position: fixed;
+  right: var(--test-countdown-right);
+  top: var(--test-countdown-top);
+  transition:
+    background 180ms ease,
+    opacity 120ms ease,
+    visibility 120ms ease;
+  visibility: visible;
+  white-space: nowrap;
+  z-index: 19;
+}
+
+.test-countdown--warning {
+  background: #9a4b00;
+}
+
+.test-countdown--critical {
+  background: #991b1b;
+}
+
+.app-shell.has-open-account-menu .test-countdown {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
 }
 
 .page {

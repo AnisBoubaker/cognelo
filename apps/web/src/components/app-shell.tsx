@@ -3,7 +3,7 @@
 import { ContextMenu } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { BrandLogo } from "@/components/brand-logo";
 import { AppIcon } from "@/components/app-icon";
@@ -19,6 +19,28 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [accountMenuAnchor, setAccountMenuAnchor] = useState<HTMLButtonElement | null>(null);
+  const appShellRef = useRef<HTMLDivElement | null>(null);
+  const accountTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    const shell = appShellRef.current;
+    const trigger = accountTriggerRef.current;
+    if (!shell || !trigger) return;
+
+    const updateCountdownPosition = () => {
+      const bounds = trigger.getBoundingClientRect();
+      shell.style.setProperty("--test-countdown-top", `${Math.round(bounds.bottom + window.scrollY + 12)}px`);
+      shell.style.setProperty("--test-countdown-right", `${Math.max(16, Math.round(window.innerWidth - bounds.right))}px`);
+    };
+    updateCountdownPosition();
+    const observer = new ResizeObserver(updateCountdownPosition);
+    observer.observe(trigger);
+    window.addEventListener("resize", updateCountdownPosition);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateCountdownPosition);
+    };
+  }, [loading, user?.id]);
 
   useEffect(() => {
     if (!loading && !user && !sessionUnavailable) {
@@ -75,7 +97,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   ];
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${isAccountMenuOpen ? " has-open-account-menu" : ""}`} ref={appShellRef}>
       <header className="topbar">
         <BrandLogo href={getPrimaryLandingPath(user)} />
         <div className="topbar-actions">
@@ -95,6 +117,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               aria-haspopup="menu"
               aria-label={t("nav.accountMenu")}
               className="secondary account-trigger"
+              ref={accountTriggerRef}
               type="button"
               onClick={(event) => {
                 setAccountMenuAnchor(event.currentTarget);
