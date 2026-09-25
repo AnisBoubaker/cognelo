@@ -21,6 +21,7 @@ import {
 } from "@/lib/api";
 import { activityCreationConfig } from "@/lib/activity-creation-defaults";
 import type { Locale } from "@/lib/i18n";
+import { getTestCountdownTone, shouldAutoSubmitTestAttempt } from "@/lib/test-countdown";
 
 type Props = {
   activity: Activity;
@@ -561,13 +562,16 @@ function TestStudentRuntime({
     : null;
 
   useEffect(() => {
-    if (
-      runtime?.attempt?.lifecycle === "started" &&
-      (remainingSeconds === 0 || runtime.resume.blocked) &&
-      autoSubmittedAttemptRef.current !== runtime.attempt.id &&
-      pendingSaveCount === 0 &&
-      !busy
-    ) {
+    if (shouldAutoSubmitTestAttempt({
+      attemptId: runtime?.attempt?.id,
+      lifecycle: runtime?.attempt?.lifecycle,
+      remainingSeconds,
+      resumeBlocked: runtime?.resume.blocked ?? false,
+      pendingSaveCount,
+      busy,
+      autoSubmittedAttemptId: autoSubmittedAttemptRef.current
+    })) {
+      if (!runtime?.attempt) return;
       autoSubmittedAttemptRef.current = runtime.attempt.id;
       notifications.info(t(runtime.resume.blocked
         ? "courseDetail.testResumeDisabledSubmitting"
@@ -583,6 +587,9 @@ function TestStudentRuntime({
   const attemptStarted = runtime.attempt?.lifecycle === "started" && !runtime.resume.blocked;
   const selectedItem = selectedRuntimeItem;
   const isReadOnly = !attemptStarted;
+  const countdownTone = remainingSeconds === null
+    ? null
+    : getTestCountdownTone(remainingSeconds, runtime.timing.timeLimitMinutes);
 
   if (!runtime.attempt) {
     const unavailableMessageKey = testAvailabilityMessageKey(runtime.availability.reason);
@@ -626,6 +633,16 @@ function TestStudentRuntime({
 
   return (
     <div className="stack">
+      {attemptStarted && remainingSeconds !== null && countdownTone ? (
+        <div
+          aria-label={t("courseDetail.testTimeRemaining", { time: formatRemainingTime(remainingSeconds) })}
+          aria-live="off"
+          className={`test-countdown test-countdown--${countdownTone}`}
+          role="timer"
+        >
+          {t("courseDetail.testTimeRemaining", { time: formatRemainingTime(remainingSeconds) })}
+        </div>
+      ) : null}
       <section className="section stack">
         <div>
           <p className="eyebrow">{isReadOnly ? t("courseDetail.testSubmittedLabel") : t("courseDetail.testAttemptNumber", { number: runtime.attempt.attemptNumber })}</p>
@@ -634,11 +651,6 @@ function TestStudentRuntime({
         <MarkdownRenderer markdown={runtime.test.activity.description} />
         <div className="inline-panel">
           <strong>{t("courseDetail.testActivityPosition", { current: Math.min(selectedIndex + 1, runtime.test.items.length), total: runtime.test.items.length })}</strong>
-          {remainingSeconds !== null ? (
-            <span aria-live="polite" className={remainingSeconds <= 60 ? "error" : "muted"} role="status">
-              {" · "}{t("courseDetail.testTimeRemaining", { time: formatRemainingTime(remainingSeconds) })}
-            </span>
-          ) : null}
         </div>
         <div className="section-actions" aria-label={t("courseDetail.testActivitiesLabel")}>
           {runtime.test.items.map((item, index) => {
