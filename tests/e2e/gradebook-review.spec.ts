@@ -23,12 +23,30 @@ test.describe("consistent gradebook review actions", () => {
     expect(aiConfirmationMessage).toContain("evaluate the rubric, generate feedback, and update");
     expect(aiConfirmationMessage).toContain("Automatic grading will not be rerun");
 
-    await page.getByRole("button", { name: "Review and grade", exact: true }).first().click();
+    const autoGradedStudentRow = page.locator(".table-row-gradebook-detail").filter({ hasText: "programming.a01@cognelo.local" });
+    await autoGradedStudentRow.getByRole("button", { name: "Review and grade", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: "Review and grade" })).toBeVisible();
     await expect(dialog.getByText("Summary", { exact: true })).toBeVisible();
     await expect(dialog.getByText("Strengths", { exact: true })).toBeVisible();
     await expect(dialog.getByText("Improvements", { exact: true })).toBeVisible();
-    await expect(dialog.getByLabel(/Final grade \(out of/)).toBeVisible();
+    await expect(dialog.getByText("Weight: 50%", { exact: true })).toBeVisible();
+    const automaticGrade = dialog.getByLabel("Automatic tests grade (out of 60)");
+    const rubricGrade = dialog.getByLabel("Rubric grade (out of 40)");
+    const totalGrade = dialog.getByLabel("Total (out of 100)");
+    await expect(automaticGrade).toBeVisible();
+    await expect(rubricGrade).toBeVisible();
+    await expect(totalGrade).toBeVisible();
+    const gradePositions = await Promise.all([automaticGrade, rubricGrade, totalGrade].map(async (field) => (await field.boundingBox())?.y));
+    expect(new Set(gradePositions).size).toBe(1);
+    const finalGrade = dialog.getByLabel(/Final grade \(out of/);
+    await expect(finalGrade).toBeVisible();
+
+    const totalBefore = await totalGrade.inputValue();
+    const firstCriterion = dialog.getByLabel("Score (%)").first();
+    const nextCriterionScore = Number(await firstCriterion.inputValue()) === 100 ? "0" : "100";
+    await firstCriterion.fill(nextCriterionScore);
+    await expect.poll(() => totalGrade.inputValue()).not.toBe(totalBefore);
+    await expect.poll(async () => Number(await finalGrade.inputValue())).toBe(Number(await totalGrade.inputValue()));
   });
 });

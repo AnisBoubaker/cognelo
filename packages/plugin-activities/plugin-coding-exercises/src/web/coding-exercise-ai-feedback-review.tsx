@@ -9,6 +9,14 @@ export type CodingExerciseAiFeedbackReviewProps = {
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
+export type CodingExerciseGradingBreakdown = {
+  automaticGrade: number | null;
+  automaticMax: number;
+  rubricGrade: number | null;
+  rubricMax: number;
+  totalGrade: number | null;
+};
+
 export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbackChange, t }: CodingExerciseAiFeedbackReviewProps) {
   const sourceCode = typeof submission.sourceCode === "string" ? submission.sourceCode : "";
   const language = typeof submission.language === "string" ? submission.language : "text";
@@ -18,6 +26,7 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
   const strengths = stringArray(feedback.strengths).join("\n\n");
   const improvements = stringArray(feedback.improvements).join("\n\n");
   const criteria = recordArray(feedback.criteria);
+  const gradingBreakdown = getCodingExerciseGradingBreakdown(feedback);
 
   return (
     <div className="stack">
@@ -74,9 +83,15 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
       </label>
       {criteria.length ? <section className="stack stack-tight">
         <h3>{t("courseDetail.feedbackReviewCriteria")}</h3>
-        {criteria.map((criterion, index) => (
-          <section className="stack stack-tight inline-panel" key={stringValue(criterion.id) || index}>
-            <strong>{stringValue(criterion.title)}</strong>
+        {criteria.map((criterion, index) => {
+          const weightPercent = finiteNumber(criterion.weightPercent);
+          return <section className="stack stack-tight inline-panel" key={stringValue(criterion.id) || index}>
+            <div className="row wrap" style={{ alignItems: "baseline", justifyContent: "space-between" }}>
+              <strong>{stringValue(criterion.title)}</strong>
+              {weightPercent === null ? null : (
+                <span className="muted">{t("courseDetail.feedbackReviewCriterionWeight", { weight: formatGradeNumber(weightPercent) })}</span>
+              )}
+            </div>
             <label className="field">
               <span>{t("courseDetail.feedbackReviewCriterionScore")}</span>
               <input
@@ -85,13 +100,13 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
                 step="0.01"
                 type="number"
                 value={typeof criterion.scorePercent === "number" || typeof criterion.scorePercent === "string" ? criterion.scorePercent : ""}
-                onChange={(event) => onFeedbackChange({
+                onChange={(event) => onFeedbackChange(recalculateCodingExerciseFeedback({
                   ...feedback,
                   criteria: criteria.map((entry, itemIndex) => itemIndex === index ? {
                     ...entry,
                     scorePercent: event.target.value === "" ? "" : Number(event.target.value)
                   } : entry)
-                })}
+                }))}
               />
             </label>
             <label className="field">
@@ -106,11 +121,71 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
                 })}
               />
             </label>
-          </section>
-        ))}
+          </section>;
+        })}
       </section> : null}
+      {gradingBreakdown ? (
+        <section className="inline-panel form stack stack-tight">
+          <div className="grading-breakdown-grid">
+            <label className="field">
+              <span>{t("courseDetail.feedbackReviewAutomaticTestsGrade", { max: formatGradeNumber(gradingBreakdown.automaticMax) })}</span>
+              <input readOnly value={formatOptionalGrade(gradingBreakdown.automaticGrade)} />
+            </label>
+            <label className="field">
+              <span>{t("courseDetail.feedbackReviewRubricGrade", { max: formatGradeNumber(gradingBreakdown.rubricMax) })}</span>
+              <input readOnly value={formatOptionalGrade(gradingBreakdown.rubricGrade)} />
+            </label>
+            <label className="field">
+              <span>{t("courseDetail.feedbackReviewCalculatedTotal", { max: 100 })}</span>
+              <input readOnly value={formatOptionalGrade(gradingBreakdown.totalGrade)} />
+            </label>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
+}
+
+export function getCodingExerciseGradingBreakdown(feedback: Record<string, unknown>): CodingExerciseGradingBreakdown | null {
+  const deterministicScore = finiteNumber(feedback.deterministicScore);
+  const gradingEnabled = feedback.gradingEnabled === true;
+  const automaticMax = gradingEnabled ? finiteNumber(feedback.testWeightPercent) : 100;
+  const rubricMax = gradingEnabled ? finiteNumber(feedback.aiWeightPercent) : 0;
+  if (deterministicScore === null || automaticMax === null || rubricMax === null) return null;
+
+  const criteria = recordArray(feedback.criteria);
+  const totalCriterionWeight = criteria.reduce((total, criterion) => total + (finiteNumber(criterion.weightPercent) ?? 0), 0);
+  const rubricScore = criteria.length && totalCriterionWeight > 0
+    ? clampPercent(criteria.reduce(
+        (total, criterion) => total + (finiteNumber(criterion.scorePercent) ?? 0) * (finiteNumber(criterion.weightPercent) ?? 0),
+        0
+      ) / totalCriterionWeight)
+    : finiteNumber(feedback.aiScore);
+  const automaticGrade = clampPercent(deterministicScore) * automaticMax / 100;
+  const rubricGrade = rubricMax === 0 ? 0 : rubricScore === null ? null : clampPercent(rubricScore) * rubricMax / 100;
+  const totalGrade = rubricGrade === null ? null : automaticGrade + rubricGrade;
+
+  return {
+    automaticGrade,
+    automaticMax,
+    rubricGrade,
+    rubricMax,
+    totalGrade
+  };
+}
+
+export function recalculateCodingExerciseFeedback(feedback: Record<string, unknown>) {
+  const breakdown = getCodingExerciseGradingBreakdown(feedback);
+  if (!breakdown) return feedback;
+  const rubricMax = breakdown.rubricMax;
+  const rubricScore = rubricMax > 0 && breakdown.rubricGrade !== null
+    ? breakdown.rubricGrade / rubricMax * 100
+    : finiteNumber(feedback.aiScore);
+  return {
+    ...feedback,
+    ...(rubricScore !== null ? { aiScore: clampPercent(rubricScore) } : {}),
+    ...(breakdown.totalGrade !== null ? { combinedScore: clampPercent(breakdown.totalGrade) } : {})
+  };
 }
 
 function stringValue(value: unknown) {
@@ -136,4 +211,20 @@ function recordArray(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)))
     : [];
+}
+
+function finiteNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function clampPercent(value: number) {
+  return Math.max(0, Math.min(100, value));
+}
+
+function formatOptionalGrade(value: number | null) {
+  return value === null ? "" : formatGradeNumber(value);
+}
+
+function formatGradeNumber(value: number) {
+  return Number(value.toFixed(2)).toString();
 }

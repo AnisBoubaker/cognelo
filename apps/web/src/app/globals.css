@@ -1446,6 +1446,12 @@ a.card:hover,
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.grading-breakdown-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .settings-layout {
   align-items: start;
   display: grid;
@@ -5408,6 +5414,7 @@ a.card:hover,
   }
 
   .form-grid-two,
+  .grading-breakdown-grid,
   .settings-layout {
     grid-template-columns: 1fr;
   }

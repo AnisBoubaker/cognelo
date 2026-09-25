@@ -638,7 +638,7 @@ describe("gradebook attempt services", () => {
   });
 
   it("lists course gradebook rows for student participants and filters missing work", async () => {
-    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    authMocks.canManageCourse.mockResolvedValue(true);
     mockPrisma.gradebookItem.findMany.mockResolvedValue([
       {
         id: "gradebook-item-1",
@@ -707,6 +707,7 @@ describe("gradebook attempt services", () => {
             isPass: null,
             latePenaltyApplied: false,
             latePenaltyPercent: null,
+            source: "override",
             selectedAttempt: { attemptNumber: 1, isLate: false }
           }
         ],
@@ -739,6 +740,13 @@ describe("gradebook attempt services", () => {
           maxScore: 100
         }
       ]
+    });
+    await expect(getCourseGradebook(teacherUser, "course-1", { status: "graded" })).resolves.toMatchObject({
+      rows: [{
+        gradebookItemId: "gradebook-item-2",
+        score: 92,
+        gradeSource: "override"
+      }]
     });
   });
 
