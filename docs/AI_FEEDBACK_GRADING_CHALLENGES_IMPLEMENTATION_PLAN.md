@@ -86,7 +86,7 @@ The model is always resolved server-side. Provider keys, raw credentials, privat
 - A teacher may retry a failed evaluation. Each retry creates a new immutable evaluation version and supersedes the previous result; it never overwrites research or audit history.
 - The teacher can review generated feedback and the score breakdown before grade release.
 - The detailed gradebook offers one **Review and grade** flow for every submitted attempt and a whole-class review flow across all submitted learners. A feedback-capable activity plugin renders the submitted answer, any plugin-relevant evidence such as Programming Exercise test outcomes, and editable feedback or rubric fields; the shared wrapper adds the editable final grade. Generated feedback pre-populates the same form, otherwise the plugin supplies an empty teacher-authoring draft.
-- Teacher revisions may update learner-visible narrative feedback before or after release. A plugin may also expose editable rubric percentages and return a validated grading result; Programming Exercises then recompute the AI and combined scores with the immutable deterministic result and configured weights, and core records the change through its audited regrade path. Core preserves the immutable original evaluation artifact, records previous/next feedback and research telemetry, and blocks further edits after that feedback version is challenged.
+- Teacher revisions may update learner-visible narrative feedback before or after release, including while a challenge is open. A plugin may also expose editable rubric percentages and return a validated grading result; Programming Exercises then recompute the AI and combined scores with the immutable deterministic result and configured weights, and core records the change through its audited regrade path. Core preserves the immutable original evaluation artifact and challenge hash, records previous/next feedback and research telemetry, and links post-challenge teacher revisions to the challenge ID.
 - Student-safe summative AI feedback is exposed only after the associated `GradebookItem` is released.
 
 Teacher-triggered batch grading processes attempts sequentially and independently, so one provider or parsing failure does not erase successful results for other attempts. The completion notice reports the failure count and most common actionable reason rather than expanding every learner name. A durable maximum batch size plus cancellation and timeout UX remain Phase 6 hardening.
@@ -218,12 +218,13 @@ Rules:
 - A challenge does not reopen the activity attempt or permit another submission.
 - Authorized course owners, teachers, and TAs can review challenges within their grading scope.
 - Resolving a challenge requires a teacher response.
-- The teacher may uphold the result or change the final normalized grade through the existing override service.
-- A grade adjustment writes the normal audited override event with the challenge ID in metadata.
+- The challenge queue never mutates a grade. Its **Review and grade** action opens the same plugin-provided review dialog used from the detailed gradebook, including the parent Test dialog for a challenged child.
+- Rubric recomposition, final normalized grade changes, and their append-only audit events continue through the existing gradebook review services.
+- Sending the answer compares the current grade with the released snapshot and records the challenge as `adjusted` or `upheld`; the teacher can optionally send the answer to the student through the guarded system-email path.
 - The student sees the challenge, status, teacher response, and resulting grade while reviewing the relevant answer/attempt.
-- Re-evaluating challenged work creates a new immutable feedback version rather than modifying the contested artifact.
+- Revising challenged work never modifies the plugin's immutable generated artifact or the challenge's feedback hash; the editable learner-visible revision is preserved as a new before/after grade event and linked research event.
 
-The course workspace has a manager-only **Challenges** tab listing open and resolved records with student, activity, section, explanation, status, response, and adjustment controls. Dedicated status/activity/section/student filter controls and a challenge-to-gradebook deep link into the plugin review surface remain UI follow-up work.
+The course workspace has a manager-only **Challenges** tab listing open and resolved `activity → student` rows. Expanding a row reveals the student's explanation, an in-place instance of the shared **Review and grade** dialog, and—for open records—the teacher answer plus optional student-email notification. Dedicated status/activity/section/student filter controls remain UI follow-up work.
 
 ## Compound Test Behavior
 
@@ -359,7 +360,7 @@ The development seed includes a reproducible two-section Programming Exercise ba
 
 ### Phase 3 — Grade Challenges
 
-Status: complete for the agreed core workflow. Students can challenge each released AI-graded feedback version with a required explanation; course managers have a Challenges tab and can uphold or adjust the grade with a required response. Adjustment uses the existing audited override service.
+Status: complete for the agreed core workflow. Students can challenge each released AI-graded feedback version with a required explanation; course managers have an expandable Challenges queue that opens the existing plugin review dialog for grading and sends a separate required response with optional email notification. Grade changes remain in the ordinary audited gradebook path, and response submission derives the challenge outcome from the released and current grade snapshots.
 
 - Add the core challenge schema and migration.
 - Add student create/read APIs and activity review panel.
