@@ -486,7 +486,7 @@ First plugin integration target:
 - Completed: treat release as publication of the final grade selected by the configured grade strategy and prevent further attempts after release.
 - Completed: keep student grade responses limited to normalized summaries and plugin-supported reviews of the authenticated student’s own attempts, without raw plugin grading payloads or hidden Test details.
 - Completed: released Parsons grades include sanitized deterministic feedback and a grading breakdown, using the same order/indentation messages that formative checks show, without exposing raw plugin payloads or grading timestamps.
-- Completed: the generic Grades view does not expose detailed attempt history; activity plugins may provide an authorized own-attempt review surface for repeatable assessments.
+- Completed: the generic Grades view does not interpret plugin attempt data. Activity plugins may provide an authorized, release-gated own-attempt grading report; Programming Exercises use this contract for graded source submissions, latest test outcomes/points, conditional component recap, and sanitized rubric/comments.
 - Completed: add teacher release/hide controls for each gradebook item in the course gradebook, including expandable group summaries and group-scoped detail links.
 - Completed: record release/hide audit events per student participant on the gradebook item.
 

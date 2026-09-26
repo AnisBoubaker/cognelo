@@ -2827,6 +2827,24 @@ a.card:hover,
   grid-template-columns: minmax(220px, 1.2fr) minmax(160px, 0.8fr) max-content;
 }
 
+.student-grade-report-cell {
+  border-top: 1px solid var(--line);
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding-top: 18px;
+}
+
+.coding-exercise-grade-recap {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.coding-exercise-grade-report > h3,
+.coding-exercise-grade-report h4 {
+  margin: 0;
+}
+
 .table-list-gradebook-detail {
   column-gap: 12px;
   display: grid;

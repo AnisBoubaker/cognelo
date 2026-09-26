@@ -104,6 +104,8 @@ Useful design rules:
 
 Teacher actions are selected from activity capability metadata. Declare `supportsManualGrading` when the shared **Review and grade** workflow may override the final score, and declare `supportsRegrading` only when the server can reevaluate an existing submitted attempt against current grading rules. The UI omits unsupported actions rather than showing disabled placeholders. Aggregate analysis remains the separate **Class overview** action.
 
+When a learner's released report needs plugin-owned evidence beyond core's sanitized score/feedback envelope, register `studentGradeReport.activityTypeKeys` and `studentGradeReport.getReport` on the server plugin. The generic student Grades route calls this handler only for final released rows. The handler must independently verify learner ownership and release state, return only bounded student-safe evidence, and exclude private tests, answers, prompts, credentials, and unrestricted evaluation artifacts. Programming Exercises use this boundary for submitted code and per-test outcomes while retaining hidden inputs and expected outputs privately.
+
 ## AI Feedback And AI-Assisted Grading
 
 AI assessment uses an explicit core/plugin boundary:

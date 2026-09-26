@@ -133,6 +133,15 @@ export type PluginGradingHandler = (input: {
   activity: ServerActivityRecord;
 }) => Promise<PluginGradingResult | PluginGradingDeferredResult>;
 
+export type PluginStudentGradeReportHandler = (input: {
+  user: CurrentUser;
+  courseId: string;
+  groupId: string;
+  activityId: string;
+  gradebookItemId: string;
+  selectedAttemptId?: string | null;
+}) => Promise<Record<string, unknown> | null>;
+
 export type PluginAiFeedbackResult = {
   feedbackRef: string;
   feedbackVersion: number;
@@ -216,6 +225,10 @@ export type ServerActivityPlugin = {
   grading?: {
     gradeAttempt?: PluginGradingHandler;
   };
+  studentGradeReport?: {
+    activityTypeKeys: readonly string[];
+    getReport: PluginStudentGradeReportHandler;
+  };
   aiFeedback?: {
     evaluateAttempt: PluginAiFeedbackHandler;
     teacherReview?: PluginAiFeedbackTeacherReviewHandler;
@@ -294,6 +307,12 @@ export function resolvePluginGradingHandler(activityTypeKey: string) {
   return serverPlugins.find((plugin) =>
     plugin.grading?.gradeAttempt && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
   )?.grading?.gradeAttempt ?? null;
+}
+
+export function resolvePluginStudentGradeReportHandler(activityTypeKey: string) {
+  return serverPlugins.find((plugin) =>
+    plugin.studentGradeReport?.activityTypeKeys.includes(activityTypeKey)
+  )?.studentGradeReport?.getReport ?? null;
 }
 
 export function resolvePluginAiFeedbackHandler(activityTypeKey: string) {

@@ -2,6 +2,7 @@
 
 import { MarkdownRenderer } from "@cognelo/activity-ui";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
+import { CodingExerciseStudentGradeReport } from "@cognelo/plugin-coding-exercises";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { CSSProperties, FocusEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
@@ -570,8 +571,11 @@ export default function CourseGroupPage() {
                           <span>{t("courseDetail.gradeHeader")}</span>
                           <span>{t("courseDetail.statusHeader")}</span>
                         </div>
-                        {studentGrades.rows.map((row) => (
-                          <div className="table-row table-row-student-grades" key={row.gradebookItemId}>
+                        {studentGrades.rows.map((row) => {
+                          const codingExerciseReport = row.activityTypeKey === "coding-exercise" && row.gradeKind === "final"
+                            ? row.gradingReport
+                            : null;
+                          return <div className="table-row table-row-student-grades" key={row.gradebookItemId}>
                             <div className="table-main table-main-stack">
                               <strong>{row.activityTitle}</strong>
                               <span className="table-meta-note muted">{row.activityTypeName}</span>
@@ -581,14 +585,25 @@ export default function CourseGroupPage() {
                               {row.latePenaltyApplied && row.latePenaltyPercent !== null ? (
                                 <span className="table-meta-note muted">-{row.latePenaltyPercent}%</span>
                               ) : null}
-                              <StudentFeedback feedback={row.feedback} maxScore={row.maxScore} t={t} />
+                              {codingExerciseReport ? null : <StudentFeedback feedback={row.feedback} maxScore={row.maxScore} t={t} />}
                             </div>
                             <span className={`participant-status is-${row.status.replace("_", "-")}`}>
                               {t(`courseDetail.gradebookStatus.${row.status}`)}
                               {row.latePenaltyApplied && row.latePenaltyPercent !== null ? ` -${row.latePenaltyPercent}%` : ""}
                             </span>
-                          </div>
-                        ))}
+                            {codingExerciseReport && row.score !== null ? (
+                              <div className="student-grade-report-cell">
+                                <CodingExerciseStudentGradeReport
+                                  feedback={row.feedback}
+                                  locale={locale}
+                                  maxScore={row.maxScore}
+                                  report={codingExerciseReport}
+                                  score={row.score}
+                                />
+                              </div>
+                            ) : null}
+                          </div>;
+                        })}
                       </div>
                     ) : (
                       <p className="muted">{t("groupPage.noReleasedGrades")}</p>

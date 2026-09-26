@@ -5,6 +5,7 @@ import {
   resolveCompositeExecutionActionHandler,
   resolveCompositeExecutionSubmissionHandler,
   resolvePluginGradingHandler,
+  resolvePluginStudentGradeReportHandler,
   resolvePluginAiFeedbackHandler,
   resolvePluginRoute,
   runBankActivityDeletedHooks,
@@ -89,6 +90,12 @@ describe("server activity SDK", () => {
     expect(resolvePluginGradingHandler("parsons-problem")).toBeTypeOf("function");
     expect(resolvePluginGradingHandler("mcq")).toBeTypeOf("function");
     expect(resolvePluginGradingHandler("placeholder")).toBeNull();
+  });
+
+  it("resolves release-gated student grade reports by activity type", () => {
+    expect(resolvePluginStudentGradeReportHandler("coding-exercise")).toBeTypeOf("function");
+    expect(resolvePluginStudentGradeReportHandler("mcq")).toBeNull();
+    expect(resolvePluginStudentGradeReportHandler("placeholder")).toBeNull();
   });
 
   it("resolves plugin-owned AI feedback handlers only for supported activity types", () => {
