@@ -396,7 +396,7 @@ describe("gradebook attempt services", () => {
           summary: "Review the output format.",
           feedbackRef: "teacher-feedback:attempt-1",
           feedbackVersion: 1,
-          challengeAllowed: false
+          challengeAllowed: true
         }
       },
       participant,
@@ -1309,12 +1309,17 @@ describe("gradebook attempt services", () => {
         },
         grades: [
           {
+            id: "grade-1",
+            rawScore: 88,
+            rawMaxScore: 100,
             normalizedScore: 88,
             normalizedMaxScore: 100,
             isPass: null,
             latePenaltyApplied: false,
             latePenaltyPercent: null,
             gradedAt: testNow,
+            source: "override",
+            selectedAttemptId: null,
             normalizedResult: {
               studentFeedback: {
                 kind: "parsons",
@@ -1355,12 +1360,14 @@ describe("gradebook attempt services", () => {
         ],
         attempts: [
           {
+            id: "attempt-1",
             participantId: "participant-1",
             attemptNumber: 1,
             lifecycle: "graded",
             isLate: false
           },
           {
+            id: "attempt-2",
             participantId: "participant-1",
             attemptNumber: 2,
             lifecycle: "graded",
@@ -1397,6 +1404,11 @@ describe("gradebook attempt services", () => {
             }
           },
           selectedAttemptId: null,
+          challengeAttemptId: "attempt-2",
+          gradeChallengeTarget: {
+            feedbackRef: expect.stringMatching(/^grade:grade-1:/),
+            feedbackVersion: 1
+          },
           selectedAttemptNumber: 2,
           attemptCount: 2,
           submittedAttemptCount: 2,

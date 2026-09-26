@@ -1329,10 +1329,10 @@ model AiFeedbackResearchEvent {
   @@index([eventType, createdAt])
 }
 
-/// A student challenge targets one immutable AI-feedback version. Like the
-/// research stream, the important identifiers and grade snapshots are kept as
-/// values so the audit trail remains intelligible if source records are later
-/// removed under their own retention policy.
+/// A student challenge targets one immutable released grade or feedback
+/// version. Like the research stream, the important identifiers and grade
+/// snapshots are kept as values so the audit trail remains intelligible if
+/// source records are later removed under their own retention policy.
 model GradeChallenge {
   id                     String    @id @default(cuid())
   courseId               String

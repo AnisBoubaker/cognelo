@@ -154,7 +154,15 @@ export async function reviseTeacherAttemptAiFeedback(
     : 1;
   const existingChallenge = hasCurrentFeedback
     ? await prisma.gradeChallenge.findFirst({
-      where: { participantId: attempt.participantId, feedbackRef, feedbackVersion },
+      where: {
+        participantId: attempt.participantId,
+        attemptId: attempt.id,
+        OR: [
+          { feedbackRef, feedbackVersion },
+          { feedbackRef: { startsWith: "grade:" } }
+        ]
+      },
+      orderBy: { createdAt: "desc" },
       select: { id: true }
     })
     : null;
@@ -186,7 +194,7 @@ export async function reviseTeacherAttemptAiFeedback(
     : kind === "ai_assessment_feedback"
       ? "generated"
       : "teacher";
-  const challengeAllowed = hasCurrentFeedback && currentFeedback.challengeAllowed === true;
+  const challengeAllowed = feedbackOrigin === "teacher" || (hasCurrentFeedback && currentFeedback.challengeAllowed === true);
   const feedbackForHash = {
     ...revisedContent,
     kind,

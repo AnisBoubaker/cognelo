@@ -16,5 +16,6 @@
 - Student state and event history use plugin-owned `PluginParsonsAttempt` and `PluginParsonsAttemptEvent` tables.
 - Teacher/admin previews are ephemeral and must not pollute learner research data.
 - Summative submission uses core attempts and suppresses correctness until grade release; teacher regrades use the plugin's server grading handler.
+- The released deterministic or teacher-overridden grade is challengeable through the core workflow and returns to the existing Parsons **Review and grade** surface.
 
 When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an invariant changed, and the relevant detailed section.

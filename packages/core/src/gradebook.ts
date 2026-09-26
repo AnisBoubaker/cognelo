@@ -2,6 +2,7 @@ import { prisma, type Prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 import { assertCanViewCourse, canManageCourse, isAdmin } from "./authorization";
 import { AppError, forbidden, notFound } from "./errors";
+import { gradeChallengeTargetForGrade } from "./grade-challenge-targets";
 
 type JsonInput = Prisma.InputJsonValue;
 type ActivityAttemptSource = {
@@ -1205,6 +1206,13 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
       }
       const displayedMaxScore = item.gradesReleased ? effectiveGrade?.normalizedMaxScore ?? item.pointsPossible : latestGrade?.normalizedMaxScore ?? item.pointsPossible;
       const status = getGradebookRowStatus(effectiveGrade, activeAttempts);
+      const latestSubmittedAttempt = submittedAttempts[submittedAttempts.length - 1] ?? null;
+      const challengeAttemptId = item.gradesReleased && effectiveGrade
+        ? effectiveGrade.selectedAttemptId ?? latestSubmittedAttempt?.id ?? null
+        : null;
+      const gradeChallengeTarget = item.gradesReleased && effectiveGrade && challengeAttemptId
+        ? gradeChallengeTargetForGrade(effectiveGrade)
+        : null;
 
       return [{
         gradebookItemId: item.id,
@@ -1221,6 +1229,10 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
         latePenaltyPercent: item.gradesReleased ? effectiveGrade?.latePenaltyPercent ?? null : latestGrade?.latePenaltyPercent ?? null,
         feedback: item.gradesReleased ? sanitizeStudentGradeFeedback(effectiveGrade?.normalizedResult) : sanitizeStudentGradeFeedback(latestGrade?.normalizedResult),
         selectedAttemptId: item.gradesReleased ? effectiveGrade?.selectedAttemptId ?? null : latestGrade?.attemptId ?? null,
+        challengeAttemptId,
+        gradeChallengeTarget: gradeChallengeTarget
+          ? { feedbackRef: gradeChallengeTarget.feedbackRef, feedbackVersion: gradeChallengeTarget.feedbackVersion }
+          : null,
         selectedAttemptNumber: item.gradesReleased ? effectiveGrade?.selectedAttempt?.attemptNumber ?? null : latestGrade?.attemptNumber ?? null,
         attemptCount: activeAttempts.length,
         submittedAttemptCount: submittedAttempts.length,

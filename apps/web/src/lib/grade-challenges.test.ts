@@ -1,11 +1,29 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { selectVisibleGradeChallenges } from "./grade-challenges";
+import { getGradeChallengeReferences, selectVisibleGradeChallenges } from "./grade-challenges";
 
 const gradebookDetailSource = readFileSync("apps/web/src/app/courses/[courseId]/gradebook/activities/[activityId]/page.tsx", "utf8");
 const challengePanelSource = readFileSync("apps/web/src/components/course-grade-challenges-panel.tsx", "utf8");
 
 describe("grade challenge review dialog", () => {
+  it("offers teacher-authored feedback and the released final grade as challenge targets", () => {
+    expect(getGradeChallengeReferences({
+      kind: "assessment_feedback",
+      details: {
+        feedbackRef: "teacher-feedback:attempt-1",
+        feedbackVersion: 1,
+        challengeAllowed: false,
+        feedbackOrigin: "teacher"
+      }
+    }, {
+      feedbackRef: "grade:grade-1:hash",
+      feedbackVersion: 1
+    }, "Final grade")).toEqual([
+      { feedbackRef: "teacher-feedback:attempt-1", feedbackVersion: 1, label: null },
+      { feedbackRef: "grade:grade-1:hash", feedbackVersion: 1, label: "Final grade" }
+    ]);
+  });
+
   it("hides resolved challenges by default and puts them after open challenges when shown", () => {
     const challenges = [
       { id: "adjusted-1", status: "adjusted" as const },

@@ -5,6 +5,7 @@ import { assertCanManageCourse } from "./authorization";
 import { recordAiFeedbackResearchEvent } from "./ai-feedback";
 import { sendSystemEmailToEligibleRecipient } from "./email-delivery";
 import { AppError, forbidden, notFound } from "./errors";
+import { gradeChallengeTargetForGrade } from "./grade-challenge-targets";
 
 const createChallengeSchema = z.object({
   feedbackRef: z.string().min(1).max(200),
@@ -51,11 +52,14 @@ export async function createGradeChallenge(user: CurrentUser, courseId: string, 
   if (!grade) {
     throw new AppError(409, "GRADE_NOT_AVAILABLE", "No released grade is available for this attempt.");
   }
+  const gradeTarget = gradeChallengeTargetForGrade(grade);
   const feedback = readFeedbackReferences(grade.normalizedResult).find(
     (candidate) => candidate.feedbackRef === data.feedbackRef && candidate.feedbackVersion === data.feedbackVersion
-  );
+  ) ?? (gradeTarget.feedbackRef === data.feedbackRef && gradeTarget.feedbackVersion === data.feedbackVersion
+    ? { ...gradeTarget, activityId: null, pluginKey: null, testItemId: null }
+    : null);
   if (!feedback) {
-    throw new AppError(409, "AI_FEEDBACK_VERSION_MISMATCH", "The challenged feedback is not the released feedback for this grade.");
+    throw new AppError(409, "GRADE_CHALLENGE_TARGET_MISMATCH", "The challenged grade or feedback is not the currently released version.");
   }
 
   const challengedActivityId = feedback.activityId ?? attempt.activityId;
@@ -87,7 +91,7 @@ export async function createGradeChallenge(user: CurrentUser, courseId: string, 
     }
   }).catch((error: unknown) => {
     if (isUniqueConstraintError(error)) {
-      throw new AppError(409, "GRADE_CHALLENGE_ALREADY_EXISTS", "This feedback version has already been challenged.");
+      throw new AppError(409, "GRADE_CHALLENGE_ALREADY_EXISTS", "This grade or feedback version has already been challenged.");
     }
     throw error;
   });
@@ -209,7 +213,13 @@ export async function resolveGradeChallenge(
   if (!currentGrade) {
     throw new AppError(409, "GRADE_NOT_AVAILABLE", "No grade is available for this challenge.");
   }
-  const status = gradeChanged(challenge.releasedGradeSnapshot, currentGrade) ? "adjusted" : "upheld";
+  const currentTarget = findChallengeTarget(currentGrade, challenge.feedbackRef, challenge.feedbackVersion);
+  const gradeAdjusted = gradeChanged(challenge.releasedGradeSnapshot, currentGrade);
+  const targetAdjusted = typeof challenge.feedbackHash === "string"
+    ? !currentTarget || currentTarget.feedbackHash !== challenge.feedbackHash
+    : false;
+  const feedbackAdjusted = targetAdjusted && (!challenge.feedbackRef.startsWith("grade:") || !gradeAdjusted);
+  const status = gradeAdjusted || targetAdjusted ? "adjusted" : "upheld";
   const resultingGradeSnapshot = status === "adjusted"
     ? gradeSnapshot(currentGrade) as Prisma.InputJsonValue
     : undefined;
@@ -235,8 +245,8 @@ export async function resolveGradeChallenge(
     const activityTitle = activity?.title ?? "activity";
     const courseTitle = course?.title ?? "course";
     const adjustmentNote = status === "adjusted"
-      ? " The grade was updated during the review."
-      : " The grade was not changed during the review.";
+      ? " The grade or feedback was updated during the review."
+      : " The grade and feedback were not changed during the review.";
     const deliver = dependencies.deliver ?? sendSystemEmailToEligibleRecipient;
     await deliver({
       recipientEmail: participant.email,
@@ -275,7 +285,7 @@ export async function resolveGradeChallenge(
     assessmentMode: "summative",
     triggerKind: "teacher_challenge_resolution",
     outcome: status,
-    metadata: { challengeId: challenge.id, gradeAdjusted: status === "adjusted", studentNotified: data.notifyStudent }
+    metadata: { challengeId: challenge.id, gradeAdjusted, feedbackAdjusted, studentNotified: data.notifyStudent }
   });
   return { ...resolved, notificationSent: data.notifyStudent };
 }
@@ -290,7 +300,10 @@ function readFeedbackReferences(value: unknown) {
     ? candidate.details as Record<string, unknown>
     : null;
   const directCandidate = typeof candidate.feedbackRef === "string" ? candidate : details ?? candidate;
-  const direct = typeof directCandidate.feedbackRef === "string" && typeof directCandidate.feedbackVersion === "number" && directCandidate.challengeAllowed === true
+  const challengeAllowed = directCandidate.challengeAllowed === true
+    || directCandidate.feedbackOrigin === "teacher"
+    || directCandidate.authoredByTeacher === true;
+  const direct = typeof directCandidate.feedbackRef === "string" && typeof directCandidate.feedbackVersion === "number" && challengeAllowed
     ? {
         feedbackRef: directCandidate.feedbackRef,
         feedbackVersion: directCandidate.feedbackVersion,
@@ -322,6 +335,21 @@ function readFeedbackReferences(value: unknown) {
     }
     return [];
   });
+}
+
+function findChallengeTarget(
+  grade: Parameters<typeof gradeChallengeTargetForGrade>[0],
+  feedbackRef: string,
+  feedbackVersion: number
+) {
+  const feedbackTarget = readFeedbackReferences(grade.normalizedResult).find(
+    (candidate) => candidate.feedbackRef === feedbackRef && candidate.feedbackVersion === feedbackVersion
+  );
+  if (feedbackTarget) return feedbackTarget;
+  const gradeTarget = gradeChallengeTargetForGrade(grade);
+  return gradeTarget.feedbackRef === feedbackRef && gradeTarget.feedbackVersion === feedbackVersion
+    ? gradeTarget
+    : null;
 }
 
 function gradeSnapshot(grade: { id: string; rawScore: number; rawMaxScore: number; normalizedScore: number; normalizedMaxScore: number; source: string; gradedAt: Date }) {
