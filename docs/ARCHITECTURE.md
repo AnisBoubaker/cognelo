@@ -124,6 +124,8 @@ To add a new plugin-backed activity type:
 4. Add frontend renderer/editor components keyed by `activity.activityType.key`.
 5. If the plugin has private bank-owned data, add a server plugin hook to copy that data when a bank version becomes a course activity.
 
+Plugins whose released learner report needs activity-specific evidence may also register a server-side `studentGradeReport` handler. The generic Grades route invokes it only for final released rows; the plugin must recheck learner ownership and release state and return a bounded student-safe projection rather than private grading records.
+
 No course table rewrite is required.
 
 ## Content Type Extensibility

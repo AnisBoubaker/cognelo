@@ -14,6 +14,8 @@ On later saves, reference validation reuses fingerprinted passing results and se
 
 Teacher **Rerun automatic grading** reruns current hidden tests without invoking AI; **Assess with AI** evaluates the current rubric and generates feedback from the latest saved test result without rerunning tests. Both recompute the grade using current component weights. **Review and grade** then presents the submitted code, test evidence, rubric scores with each criterion's configured weight, three feedback fields, a one-row live breakdown of the automatic-tests grade, rubric grade, and total, plus an editable final grade in one place.
 
+After release, the learner's grading report presents the available automatic-test and rubric point contributions plus the final total, every graded code attempt, teacher comments, criterion scores and explanations, and each test's pass/fail outcome and weighted score. Components that do not contribute to the configured grade are omitted from the recap. The report is built by a release-gated plugin handler and never includes hidden inputs, expected outputs, private rubric instructions, or raw model artifacts.
+
 ## Boundaries
 
 - `Activity.config` contains only student-safe prompt, language, starter/template projection, visible tests, and editor settings.

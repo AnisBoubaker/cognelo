@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { CodingExerciseStudentGradeReport } from "@cognelo/plugin-coding-exercises";
 import { AppShell } from "@/components/app-shell";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { useAuth } from "@/components/auth-provider";
@@ -303,7 +304,17 @@ export default function GroupActivityPage() {
               {releasedGrade.latePenaltyApplied && releasedGrade.latePenaltyPercent !== null ? (
                 <p className="muted">-{releasedGrade.latePenaltyPercent}%</p>
               ) : null}
-              <StudentFeedback feedback={releasedGrade.feedback} maxScore={releasedGrade.maxScore} t={t} />
+              {releasedGrade.activityTypeKey === "coding-exercise" && releasedGrade.gradingReport && releasedGrade.score !== null ? (
+                <CodingExerciseStudentGradeReport
+                  feedback={releasedGrade.feedback}
+                  locale={locale}
+                  maxScore={releasedGrade.maxScore}
+                  report={releasedGrade.gradingReport}
+                  score={releasedGrade.score}
+                />
+              ) : (
+                <StudentFeedback feedback={releasedGrade.feedback} maxScore={releasedGrade.maxScore} t={t} />
+              )}
               {aiFeedbackReferences.length ? (
                 <GradeChallengePanel
                   references={aiFeedbackReferences}

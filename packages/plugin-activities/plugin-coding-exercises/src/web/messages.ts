@@ -178,7 +178,27 @@ type MessageKey =
   | "judgeStatusWrongAnswer"
   | "judgeStatusCompilationError"
   | "judgeStatusRuntimeError"
-  | "judgeStatusTimeLimitExceeded";
+  | "judgeStatusTimeLimitExceeded"
+  | "gradingReportTitle"
+  | "gradeRecapTitle"
+  | "automaticTestsGrade"
+  | "rubricGrade"
+  | "totalGrade"
+  | "teacherCommentsTitle"
+  | "teacherComment"
+  | "feedbackSummary"
+  | "rubricDetailsTitle"
+  | "rubricCriterion"
+  | "rubricCriterionPoints"
+  | "rubricCriterionPercent"
+  | "gradedAttemptsTitle"
+  | "selectedForFinalGrade"
+  | "testResultsTitle"
+  | "testTotalScore"
+  | "testNumber"
+  | "testScore"
+  | "testScoreUnavailable"
+  | "noTestDetails";
 
 type MessageCatalog = Record<MessageKey, string>;
 
@@ -360,7 +380,27 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     judgeStatusWrongAnswer: "Wrong answer",
     judgeStatusCompilationError: "Compilation error",
     judgeStatusRuntimeError: "Runtime error",
-    judgeStatusTimeLimitExceeded: "Time limit exceeded"
+    judgeStatusTimeLimitExceeded: "Time limit exceeded",
+    gradingReportTitle: "Grading report",
+    gradeRecapTitle: "Grade recap",
+    automaticTestsGrade: "Automatic tests",
+    rubricGrade: "Rubric",
+    totalGrade: "Total",
+    teacherCommentsTitle: "Teacher comments",
+    teacherComment: "Comment",
+    feedbackSummary: "Summary",
+    rubricDetailsTitle: "Rubric details",
+    rubricCriterion: "Criterion {number}",
+    rubricCriterionPoints: "{score} / {max} points",
+    rubricCriterionPercent: "{score}%",
+    gradedAttemptsTitle: "Graded attempts",
+    selectedForFinalGrade: "Selected for final grade",
+    testResultsTitle: "Test details",
+    testTotalScore: "{score} / {max} test points",
+    testNumber: "Test {number}",
+    testScore: "{score} / {max}",
+    testScoreUnavailable: "Score unavailable",
+    noTestDetails: "No test details are available for this attempt."
   },
   fr: {
     authoringTitle: "Configuration de l'exercice de programmation",
@@ -539,7 +579,27 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     judgeStatusWrongAnswer: "Mauvaise réponse",
     judgeStatusCompilationError: "Erreur de compilation",
     judgeStatusRuntimeError: "Erreur à l’exécution",
-    judgeStatusTimeLimitExceeded: "Temps limite dépassé"
+    judgeStatusTimeLimitExceeded: "Temps limite dépassé",
+    gradingReportTitle: "Rapport de correction",
+    gradeRecapTitle: "Récapitulatif de la note",
+    automaticTestsGrade: "Tests automatiques",
+    rubricGrade: "Grille d’évaluation",
+    totalGrade: "Total",
+    teacherCommentsTitle: "Commentaires de l’enseignant",
+    teacherComment: "Commentaire",
+    feedbackSummary: "Résumé",
+    rubricDetailsTitle: "Détails de la grille d’évaluation",
+    rubricCriterion: "Critère {number}",
+    rubricCriterionPoints: "{score} / {max} points",
+    rubricCriterionPercent: "{score} %",
+    gradedAttemptsTitle: "Tentatives corrigées",
+    selectedForFinalGrade: "Retenue pour la note finale",
+    testResultsTitle: "Détails des tests",
+    testTotalScore: "{score} / {max} points de test",
+    testNumber: "Test {number}",
+    testScore: "{score} / {max}",
+    testScoreUnavailable: "Note non disponible",
+    noTestDetails: "Aucun détail de test n’est disponible pour cette tentative."
   },
   zh: {
     authoringTitle: "编程练习设置",
@@ -718,7 +778,27 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     judgeStatusWrongAnswer: "答案错误",
     judgeStatusCompilationError: "编译错误",
     judgeStatusRuntimeError: "运行时错误",
-    judgeStatusTimeLimitExceeded: "超过时间限制"
+    judgeStatusTimeLimitExceeded: "超过时间限制",
+    gradingReportTitle: "评分报告",
+    gradeRecapTitle: "成绩汇总",
+    automaticTestsGrade: "自动测试",
+    rubricGrade: "评分量规",
+    totalGrade: "总分",
+    teacherCommentsTitle: "教师评语",
+    teacherComment: "评语",
+    feedbackSummary: "总结",
+    rubricDetailsTitle: "评分量规详情",
+    rubricCriterion: "标准 {number}",
+    rubricCriterionPoints: "{score} / {max} 分",
+    rubricCriterionPercent: "{score}%",
+    gradedAttemptsTitle: "已评分的尝试",
+    selectedForFinalGrade: "计入最终成绩",
+    testResultsTitle: "测试详情",
+    testTotalScore: "测试得分 {score} / {max}",
+    testNumber: "测试 {number}",
+    testScore: "{score} / {max}",
+    testScoreUnavailable: "分数不可用",
+    noTestDetails: "此尝试没有可用的测试详情。"
   }
 };
 

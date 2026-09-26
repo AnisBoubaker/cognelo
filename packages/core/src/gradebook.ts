@@ -1210,6 +1210,7 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
         gradebookItemId: item.id,
         activityId: item.activity.id,
         activityTitle: item.titleSnapshot || item.activity.title,
+        activityTypeKey: item.activity.activityType.key,
         activityTypeName: item.activity.activityType.name,
         gradeKind: item.gradesReleased ? "final" : "latest",
         status,

@@ -1026,6 +1026,7 @@ export type StudentReleasedGradeRow = {
   gradebookItemId: string;
   activityId: string;
   activityTitle: string;
+  activityTypeKey: string;
   activityTypeName: string;
   gradeKind: "final" | "latest";
   status: Exclude<GradebookStatus, "all">;
@@ -1043,6 +1044,7 @@ export type StudentReleasedGradeRow = {
   availableFrom: string | null;
   availableUntil: string | null;
   gradedAt: string | null;
+  gradingReport: Record<string, unknown> | null;
 };
 
 export type GradeChallenge = {

@@ -1376,6 +1376,7 @@ describe("gradebook attempt services", () => {
           gradebookItemId: "gradebook-item-1",
           activityId: "activity-1",
           activityTitle: "Loops",
+          activityTypeKey: "parsons-problem",
           activityTypeName: "Parsons problem",
           gradeKind: "final",
           status: "graded",

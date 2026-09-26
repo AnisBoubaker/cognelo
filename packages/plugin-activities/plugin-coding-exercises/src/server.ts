@@ -20,6 +20,7 @@ import {
 import { AppError } from "@cognelo/core";
 import { createCodingExerciseTeacherFeedbackDraft, evaluateCodingExerciseAttemptWithAi, getCodingExerciseAiFeedbackTeacherSubmission, reviseCodingExerciseAiFeedback, snapshotCodingExerciseAiFeedbackConfig } from "./ai-feedback";
 import { regradeCodingExerciseAttempt } from "./regrading";
+import { getCodingExerciseStudentGradeReport } from "./student-grade-report";
 
 export { listCodingExerciseProgrammingLanguages } from "./judge0";
 
@@ -45,6 +46,10 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
         user, courseId, groupId, activityId, coreAttemptId, executionId: pluginAttemptRef, activity
       });
     }
+  },
+  studentGradeReport: {
+    activityTypeKeys: ["coding-exercise"],
+    getReport: getCodingExerciseStudentGradeReport
   },
   aiFeedback: {
     evaluateAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, pluginAttemptRef, activity, triggerKind }) => {
