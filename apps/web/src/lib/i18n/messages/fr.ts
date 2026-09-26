@@ -720,6 +720,8 @@ export const frMessages = {
       challengesTitle: "Contestations des notes IA",
       challengesHelp: "Développez une contestation pour lire le commentaire de l’étudiant, réviser le travail et la note, puis envoyer votre réponse.",
       noChallenges: "Aucune contestation de note IA n’a été soumise.",
+      noOpenChallenges: "Il n’y a aucune contestation de note ouverte.",
+      showResolvedChallenges: "Afficher les contestations résolues",
       challengesLoadError: "Impossible de charger les contestations.",
       challengeResolveError: "Impossible de résoudre la contestation.",
       studentExplanation: "Explication de l’étudiant",

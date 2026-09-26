@@ -719,6 +719,8 @@ export const zhMessages = {
       challengesTitle: "AI 成绩质疑",
       challengesHelp: "展开质疑以阅读学生留言、审核作业和成绩，然后发送回复。",
       noChallenges: "尚未提交 AI 成绩质疑。",
+      noOpenChallenges: "没有待处理的成绩质疑。",
+      showResolvedChallenges: "显示已处理的成绩质疑",
       challengesLoadError: "无法加载成绩质疑。",
       challengeResolveError: "无法处理成绩质疑。",
       studentExplanation: "学生说明",

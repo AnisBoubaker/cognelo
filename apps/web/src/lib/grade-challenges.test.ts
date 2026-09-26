@@ -1,10 +1,28 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { selectVisibleGradeChallenges } from "./grade-challenges";
 
 const gradebookDetailSource = readFileSync("apps/web/src/app/courses/[courseId]/gradebook/activities/[activityId]/page.tsx", "utf8");
 const challengePanelSource = readFileSync("apps/web/src/components/course-grade-challenges-panel.tsx", "utf8");
 
 describe("grade challenge review dialog", () => {
+  it("hides resolved challenges by default and puts them after open challenges when shown", () => {
+    const challenges = [
+      { id: "adjusted-1", status: "adjusted" as const },
+      { id: "open-1", status: "open" as const },
+      { id: "upheld-1", status: "upheld" as const },
+      { id: "open-2", status: "open" as const }
+    ];
+
+    expect(selectVisibleGradeChallenges(challenges, false).map((challenge) => challenge.id)).toEqual(["open-1", "open-2"]);
+    expect(selectVisibleGradeChallenges(challenges, true).map((challenge) => challenge.id)).toEqual([
+      "open-1",
+      "open-2",
+      "adjusted-1",
+      "upheld-1"
+    ]);
+  });
+
   it("uses the shared Review and grade dialog from both challenge and gradebook surfaces", () => {
     expect(challengePanelSource).toContain("<ReviewAndGradeDialog");
     expect(gradebookDetailSource).toContain("<ReviewAndGradeDialog");

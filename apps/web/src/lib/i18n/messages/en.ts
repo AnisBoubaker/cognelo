@@ -727,6 +727,8 @@ export const enMessages = {
       challengesTitle: "AI grade challenges",
       challengesHelp: "Expand a challenge to read the student's comment, review the work and grade, then send your answer.",
       noChallenges: "No AI grade challenges have been submitted.",
+      noOpenChallenges: "There are no open grade challenges.",
+      showResolvedChallenges: "Show resolved challenges",
       challengesLoadError: "Unable to load grade challenges.",
       challengeResolveError: "Unable to resolve the grade challenge.",
       studentExplanation: "Student explanation",

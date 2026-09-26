@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ReviewAndGradeDialog } from "@/components/review-and-grade-dialog";
 import { api, type CourseGradebookRow, type GradeChallenge } from "@/lib/api";
+import { selectVisibleGradeChallenges } from "@/lib/grade-challenges";
 import { useI18n } from "@/lib/i18n";
 
 export function CourseGradeChallengesPanel({ courseId }: { courseId: string }) {
@@ -15,6 +16,8 @@ export function CourseGradeChallengesPanel({ courseId }: { courseId: string }) {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [reviewLoadingId, setReviewLoadingId] = useState<string | null>(null);
   const [reviewRow, setReviewRow] = useState<CourseGradebookRow | null>(null);
+  const [showResolved, setShowResolved] = useState(false);
+  const visibleChallenges = selectVisibleGradeChallenges(challenges, showResolved);
 
   async function refresh() {
     setLoading(true);
@@ -76,77 +79,90 @@ export function CourseGradeChallengesPanel({ courseId }: { courseId: string }) {
           <h2>{t("courseDetail.challengesTitle")}</h2>
           <p className="muted">{t("courseDetail.challengesHelp")}</p>
         </div>
+        <label className="checkbox-row grade-challenge-filter">
+          <input
+            checked={showResolved}
+            type="checkbox"
+            onChange={(event) => setShowResolved(event.target.checked)}
+          />
+          <span>{t("courseDetail.showResolvedChallenges")}</span>
+        </label>
       </div>
       {error ? <p className="error">{error}</p> : null}
       {loading ? <p className="muted">{t("common.loading")}</p> : null}
       {!loading && !challenges.length ? <p className="muted">{t("courseDetail.noChallenges")}</p> : null}
-      <div className="grade-challenge-list">
-        {challenges.map((challenge) => (
-          <details className="grade-challenge-item" key={challenge.id}>
-            <summary>
-              <span className="grade-challenge-title">
-                <strong>{challenge.activityTitle}</strong>
-                <span aria-hidden="true">→</span>
-                <span>{challenge.participantName}</span>
-              </span>
-              <span className="muted">{challenge.groupTitle}</span>
-              <span className="status-badge">{t(`courseDetail.challengeStatus.${challenge.status}`)}</span>
-            </summary>
-            <div className="grade-challenge-content stack">
-              <div>
-                <strong>{t("courseDetail.studentExplanation")}</strong>
-                <p>{challenge.explanation}</p>
-              </div>
-              <div className="row wrap">
-                <button
-                  className="button secondary"
-                  disabled={reviewLoadingId === challenge.id}
-                  type="button"
-                  onClick={() => void openReviewAndGrade(challenge)}
-                >
-                  {reviewLoadingId === challenge.id ? t("common.loading") : t("courseDetail.reviewAndGrade")}
-                </button>
-              </div>
-              {challenge.status === "open" ? (
-                <>
-                  <div className="field">
-                    <label htmlFor={`challenge-response-${challenge.id}`}>{t("courseDetail.teacherResponse")}</label>
-                    <textarea
-                      id={`challenge-response-${challenge.id}`}
-                      rows={4}
-                      value={responseById[challenge.id] ?? ""}
-                      onChange={(event) => setResponseById((current) => ({ ...current, [challenge.id]: event.target.value }))}
-                    />
-                  </div>
-                  <label className="checkbox-row" htmlFor={`challenge-notify-${challenge.id}`}>
-                    <input
-                      checked={Boolean(notifyById[challenge.id])}
-                      id={`challenge-notify-${challenge.id}`}
-                      type="checkbox"
-                      onChange={(event) => setNotifyById((current) => ({ ...current, [challenge.id]: event.target.checked }))}
-                    />
-                    <span>{t("courseDetail.notifyStudentByEmail")}</span>
-                  </label>
-                  <div className="row wrap">
-                    <button
-                      disabled={savingId === challenge.id || !(responseById[challenge.id]?.trim())}
-                      type="button"
-                      onClick={() => void sendAnswer(challenge)}
-                    >
-                      {savingId === challenge.id ? t("common.saving") : t("courseDetail.sendChallengeAnswer")}
-                    </button>
-                  </div>
-                </>
-              ) : challenge.teacherResponse ? (
+      {!loading && challenges.length > 0 && !visibleChallenges.length ? (
+        <p className="muted">{t("courseDetail.noOpenChallenges")}</p>
+      ) : null}
+      {visibleChallenges.length ? (
+        <div className="grade-challenge-list">
+          {visibleChallenges.map((challenge) => (
+            <details className="grade-challenge-item" key={challenge.id}>
+              <summary>
+                <span className="grade-challenge-title">
+                  <strong>{challenge.activityTitle}</strong>
+                  <span aria-hidden="true">→</span>
+                  <span>{challenge.participantName}</span>
+                </span>
+                <span className="muted">{challenge.groupTitle}</span>
+                <span className="status-badge">{t(`courseDetail.challengeStatus.${challenge.status}`)}</span>
+              </summary>
+              <div className="grade-challenge-content stack">
                 <div>
-                  <strong>{t("courseDetail.teacherResponse")}</strong>
-                  <p>{challenge.teacherResponse}</p>
+                  <strong>{t("courseDetail.studentExplanation")}</strong>
+                  <p>{challenge.explanation}</p>
                 </div>
-              ) : null}
-            </div>
-          </details>
-        ))}
-      </div>
+                <div className="row wrap">
+                  <button
+                    className="button secondary"
+                    disabled={reviewLoadingId === challenge.id}
+                    type="button"
+                    onClick={() => void openReviewAndGrade(challenge)}
+                  >
+                    {reviewLoadingId === challenge.id ? t("common.loading") : t("courseDetail.reviewAndGrade")}
+                  </button>
+                </div>
+                {challenge.status === "open" ? (
+                  <>
+                    <div className="field">
+                      <label htmlFor={`challenge-response-${challenge.id}`}>{t("courseDetail.teacherResponse")}</label>
+                      <textarea
+                        id={`challenge-response-${challenge.id}`}
+                        rows={4}
+                        value={responseById[challenge.id] ?? ""}
+                        onChange={(event) => setResponseById((current) => ({ ...current, [challenge.id]: event.target.value }))}
+                      />
+                    </div>
+                    <label className="checkbox-row" htmlFor={`challenge-notify-${challenge.id}`}>
+                      <input
+                        checked={Boolean(notifyById[challenge.id])}
+                        id={`challenge-notify-${challenge.id}`}
+                        type="checkbox"
+                        onChange={(event) => setNotifyById((current) => ({ ...current, [challenge.id]: event.target.checked }))}
+                      />
+                      <span>{t("courseDetail.notifyStudentByEmail")}</span>
+                    </label>
+                    <div className="row wrap">
+                      <button
+                        disabled={savingId === challenge.id || !(responseById[challenge.id]?.trim())}
+                        type="button"
+                        onClick={() => void sendAnswer(challenge)}
+                      >
+                        {savingId === challenge.id ? t("common.saving") : t("courseDetail.sendChallengeAnswer")}
+                      </button>
+                    </div>
+                  </>
+                ) : challenge.teacherResponse ? (
+                  <div>
+                    <strong>{t("courseDetail.teacherResponse")}</strong>
+                    <p>{challenge.teacherResponse}</p>
+                  </div>
+                ) : null}
+              </div>
+            </details>
+          ))}
+        </div>
+      ) : null}
       {reviewRow ? (
         <ReviewAndGradeDialog
           courseId={courseId}
