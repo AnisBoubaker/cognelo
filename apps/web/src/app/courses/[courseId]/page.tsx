@@ -46,6 +46,7 @@ import { ContentTypeIcon as MaterialTypeIcon, resolveContentTypeSettingsRenderer
 import { defaultDuplicateActivityTitle } from "@/lib/activity-bank-titles";
 import { activityCreationConfig } from "@/lib/activity-creation-defaults";
 import { useI18n } from "@/lib/i18n";
+import { resolveCourseWorkspaceTab } from "@/lib/navigation";
 
 type ContentDropPlacement = "after" | "before" | "inside";
 type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
@@ -600,10 +601,7 @@ export default function CourseDetailPage() {
   const settingsContentResource = settingsContentItem?.contentResourceId ? contentResourceById.get(settingsContentItem.contentResourceId) ?? null : null;
   const settingsContentType = settingsContentResource ? contentTypeByKey.get(settingsContentResource.contentTypeKey) ?? null : null;
   const SettingsContentTypeRenderer = resolveContentTypeSettingsRenderer(settingsContentType?.settingsRendererKey);
-  const requestedCourseTab = searchParams.get("tab");
-  const activeCourseTab = requestedCourseTab === "participants" || requestedCourseTab === "groups" || requestedCourseTab === "gradebook" || requestedCourseTab === "settings"
-    ? requestedCourseTab === "groups" ? "participants" : requestedCourseTab
-    : "content";
+  const activeCourseTab = resolveCourseWorkspaceTab(searchParams.get("tab"));
   const activeCourseSettingsSection: CourseSettingsSection = searchParams.get("section") === "ai" ? "ai" : "general";
   const pickerPlacementPanel = (
     <div className="grid compact-form-grid activity-picker-placement">
