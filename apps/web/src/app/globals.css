@@ -4176,6 +4176,58 @@ a.card:hover,
   padding: 16px;
 }
 
+.grade-challenge-list {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.grade-challenge-item + .grade-challenge-item {
+  border-top: 1px solid var(--line);
+}
+
+.grade-challenge-item > summary {
+  align-items: center;
+  cursor: pointer;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) minmax(120px, auto) auto;
+  list-style: none;
+  padding: 16px 18px;
+}
+
+.grade-challenge-item > summary::-webkit-details-marker {
+  display: none;
+}
+
+.grade-challenge-item > summary::before {
+  color: var(--muted);
+  content: "›";
+  font-size: 1.3rem;
+  line-height: 1;
+  transition: transform 120ms ease;
+}
+
+.grade-challenge-item[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.grade-challenge-item[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.grade-challenge-title {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.grade-challenge-content {
+  padding: 18px;
+}
+
 .participant-status {
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -5565,6 +5617,24 @@ a.card:hover,
 
   .table-actions {
     justify-content: flex-start;
+  }
+
+  .grade-challenge-item > summary {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .grade-challenge-item > summary > .muted {
+    display: none;
+  }
+
+  .grade-challenge-title {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .grade-challenge-title > [aria-hidden="true"] {
+    display: none;
   }
 
   .plugin-settings-row {

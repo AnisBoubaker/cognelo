@@ -1069,6 +1069,7 @@ export type GradeChallenge = {
   participantEmail?: string;
   activityTitle?: string;
   groupTitle?: string;
+  reviewActivityId?: string;
 };
 
 export type DeletedSubmissionAudit = {
@@ -1522,7 +1523,7 @@ export const api = {
   resolveGradeChallenge: (
     courseId: string,
     challengeId: string,
-    input: { status: "upheld"; teacherResponse: string } | { status: "adjusted"; teacherResponse: string; score: number; maxScore?: number }
+    input: { teacherResponse: string; notifyStudent: boolean }
   ) => request<{ challenge: GradeChallenge }>(`/courses/${courseId}/grade-challenges/${challengeId}`, {
     method: "PATCH",
     body: JSON.stringify(input)

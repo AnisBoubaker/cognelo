@@ -199,10 +199,31 @@ describe("teacher AI feedback review", () => {
     });
   });
 
-  it("preserves the challenged feedback snapshot", async () => {
+  it("audits a teacher revision made after the feedback was challenged", async () => {
     mockPrisma.gradeChallenge.findFirst.mockResolvedValue({ id: "challenge-1" });
-    await expect(reviseTeacherAttemptAiFeedback(teacher, "course-1", "attempt-1", currentFeedback))
-      .rejects.toMatchObject({ code: "AI_FEEDBACK_ALREADY_CHALLENGED" });
-    expect(mockPrisma.grade.update).not.toHaveBeenCalled();
+    await expect(reviseTeacherAttemptAiFeedback(teacher, "course-1", "attempt-1", {
+      ...currentFeedback,
+      summary: "Reviewed after the challenge"
+    })).resolves.toMatchObject({
+      feedback: { summary: "Reviewed after the challenge", teacherRevision: 1 }
+    });
+    expect(mockPrisma.grade.update).toHaveBeenCalled();
+    expect(mockPrisma.gradeEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        previousValue: expect.objectContaining({
+          studentFeedback: expect.objectContaining({ feedbackHash: "original-hash" })
+        }),
+        metadata: expect.objectContaining({
+          gradeChallengeId: "challenge-1",
+          challengedFeedbackRevision: true,
+          previousFeedbackHash: "original-hash"
+        })
+      })
+    });
+    expect(mockPrisma.aiFeedbackResearchEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        metadata: expect.objectContaining({ gradeChallengeId: "challenge-1", challengedFeedbackRevision: true })
+      })
+    });
   });
 });

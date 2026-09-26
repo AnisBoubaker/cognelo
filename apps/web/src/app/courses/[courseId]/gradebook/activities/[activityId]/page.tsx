@@ -4,19 +4,18 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useNotifications } from "@cognelo/activity-ui";
-import { createCodingHomeworkGraderClient, type CodingHomeworkGradebookAttemptRecord } from "@cognelo/plugin-coding-homework-grader";
-import { createMcqClient, type McqSubmission } from "@cognelo/plugin-mcq";
-import { createParsonsClient, type ParsonsGradebookAttemptRecord } from "@cognelo/plugin-parsons";
+import { createMcqClient } from "@cognelo/plugin-mcq";
+import { createParsonsClient } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
 import { TestReviewAllPanel } from "@/components/test-review-all-panel";
 import { ActivityReviewAllPanel, toActivityReviewResponse, type ActivityReviewResponse } from "@/components/activity-review-all-panel";
+import { ReviewAndGradeDialog } from "@/components/review-and-grade-dialog";
 import {
   api,
   apiRequest,
   Course,
   CourseGradebook,
   CourseGradebookRow,
-  CourseTestAttemptReview,
   GradebookMutationAttempt,
   GradebookMutationGrade,
   TeacherAiFeedbackReview
@@ -31,31 +30,20 @@ import { getGradebookActivityActions } from "@/lib/gradebook-actions";
 import { useI18n } from "@/lib/i18n";
 import { latestCompletedTestAttempt, type TestReviewAllSubmission } from "@/lib/test-review-all";
 
-type GradebookReviewAttempt = ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview;
-
 export default function GradebookActivityResultsPage() {
   const params = useParams<{ courseId: string; activityId: string }>();
   const searchParams = useSearchParams();
   const { courseId, activityId } = params;
   const router = useRouter();
   const groupId = searchParams.get("groupId") || undefined;
-  const { locale, t } = useI18n();
+  const { t } = useI18n();
   const notifications = useNotifications();
-  const codingHomeworkClient = useMemo(() => createCodingHomeworkGraderClient(apiRequest), []);
   const mcqClient = useMemo(() => createMcqClient(apiRequest), []);
   const parsonsClient = useMemo(() => createParsonsClient(apiRequest), []);
   const [course, setCourse] = useState<Course | null>(null);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
   const [savingGradeKey, setSavingGradeKey] = useState<string | null>(null);
-  const [overlay, setOverlay] = useState<{
-    row: CourseGradebookRow;
-    activityConfig?: Record<string, unknown>;
-    includeAttempts: boolean;
-    attempts: GradebookReviewAttempt[];
-    selectedIndex: number;
-    loading: boolean;
-    error: string;
-  } | null>(null);
+  const [reviewAndGradeRow, setReviewAndGradeRow] = useState<CourseGradebookRow | null>(null);
   const [reviewAll, setReviewAll] = useState<{
     loading: boolean;
     error: string;
@@ -102,8 +90,6 @@ export default function GradebookActivityResultsPage() {
   const groupTitle = groupId ? gradebook?.items.find((item) => item.groupId === groupId)?.groupTitle : null;
   const backHref = groupId ? `/courses/${courseId}?tab=gradebook&groupId=${encodeURIComponent(groupId)}` : `/courses/${courseId}?tab=gradebook`;
   const backLabel = t("courseDetail.backToCourseGradebook");
-  const manualGradingRenderer = rows[0]?.activityTypeKey ? getManualGradingRenderer(rows[0].activityTypeKey) : null;
-  const selectedAttempt = overlay?.attempts[overlay.selectedIndex] ?? null;
   const hasRowsWithSubmittedAttempts = rows.some((row) => hasSubmittedAttempt(row));
   const isTest = rows[0]?.activityTypeKey === "test" || gradebook?.items[0]?.activityTypeKey === "test";
 
@@ -182,72 +168,6 @@ export default function GradebookActivityResultsPage() {
     }
   }
 
-  async function openManualGrading(row: CourseGradebookRow) {
-    setOverlay({ row, includeAttempts: false, attempts: [], selectedIndex: 0, loading: true, error: "" });
-    await loadAttempts(row, false);
-  }
-
-  async function loadAttempts(row: CourseGradebookRow, includeAttempts: boolean) {
-    setOverlay((current) => (current ? { ...current, includeAttempts, loading: true, error: "" } : current));
-    try {
-      if (row.activityTypeKey === "test") {
-        const parentAttempts = row.attempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
-        const reviews = await Promise.all(parentAttempts.map((attempt) => api.testAttemptReview(courseId, attempt.id)));
-        setOverlay((current) => current ? {
-          ...current,
-          includeAttempts,
-          attempts: sortAttemptsByDisplayedTimestamp(reviews.map((result) => result.review)),
-          selectedIndex: 0,
-          loading: false,
-          error: ""
-        } : current);
-        return;
-      }
-      const [attemptsResult, activityResult] = await Promise.all([
-        row.activityTypeKey === "mcq"
-          ? mcqClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
-              participantId: row.participantId
-            })
-          : row.activityTypeKey === "coding-homework-grader"
-            ? codingHomeworkClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
-                participantId: row.participantId,
-                includeAttempts
-              })
-          : parsonsClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
-              participantId: row.participantId,
-              includeAttempts
-            }),
-        api.groupActivity(courseId, row.groupId, row.activityId)
-      ]);
-      const attempts = sortAttemptsByDisplayedTimestamp(attemptsResult.attempts);
-      setOverlay((current) =>
-        current
-          ? {
-              ...current,
-              activityConfig: activityResult.activity.config ?? {},
-              includeAttempts,
-              attempts,
-              selectedIndex: Math.min(current.selectedIndex, Math.max(0, attempts.length - 1)),
-              loading: false,
-              error: ""
-            }
-          : current
-      );
-    } catch (err) {
-      notifications.error(err instanceof Error ? err.message : t("courseDetail.answerLoadError"));
-      setOverlay((current) =>
-        current
-          ? {
-              ...current,
-              includeAttempts,
-              loading: false,
-              error: ""
-            }
-          : current
-      );
-    }
-  }
-
   function applyUpdatedGrade(row: CourseGradebookRow, grade: GradebookMutationGrade, attempt?: GradebookMutationAttempt) {
     setGradebook((current) => {
       if (!current) {
@@ -295,24 +215,6 @@ export default function GradebookActivityResultsPage() {
         })
       };
     });
-  }
-
-  async function overrideGrade(row: CourseGradebookRow, input: { score: number; maxScore: number; reason: string | null; feedbackText?: string | null }) {
-    setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:override`);
-    try {
-      const result = await api.overrideGradebookGrade(courseId, row.gradebookItemId, row.participantId, {
-        score: input.score,
-        maxScore: input.maxScore,
-        reason: input.reason,
-        feedbackText: input.feedbackText ?? input.reason
-      });
-      await refresh();
-      applyUpdatedGrade(row, result.grade);
-    } catch (err) {
-      notifications.error(err instanceof Error ? err.message : t("courseDetail.overrideGradeError"));
-    } finally {
-      setSavingGradeKey(null);
-    }
   }
 
   async function regradeRow(row: CourseGradebookRow) {
@@ -547,58 +449,6 @@ export default function GradebookActivityResultsPage() {
     }
   }
 
-  async function gradeTestItem(row: CourseGradebookRow, parentAttemptId: string, testItemId: string, score: number, reason: string | null) {
-    try {
-      await api.gradeTestItem(courseId, parentAttemptId, testItemId, { score, reason });
-      await refresh();
-      setOverlay(null);
-      notifications.success("Test item grade saved.");
-    } catch (err) {
-      notifications.error(err instanceof Error ? err.message : t("courseDetail.overrideGradeError"));
-    }
-  }
-
-  async function deleteSelectedSubmission(row: CourseGradebookRow, selectedAttempt: GradebookReviewAttempt | null) {
-    if (!selectedAttempt) {
-      notifications.error(t("courseDetail.deleteSubmissionUnavailable"));
-      return;
-    }
-
-    const coreAttempt = row.attempts.find((attempt) => attempt.pluginAttemptRef === selectedAttempt.id);
-    if (!coreAttempt) {
-      notifications.error(t("courseDetail.deleteSubmissionUnavailable"));
-      return;
-    }
-
-    const reason = window.prompt(t("courseDetail.deleteSubmissionPrompt"));
-    if (reason === null) {
-      return;
-    }
-    const normalizedReason = reason.trim() || t("courseDetail.deleteSubmissionReasonFallback");
-    if (!window.confirm(t("courseDetail.deleteSubmissionConfirm", { name: row.participantName, number: coreAttempt.attemptNumber }))) {
-      return;
-    }
-
-    setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:delete`);
-    try {
-      await api.deleteActivitySubmission(courseId, coreAttempt.id, { reason: normalizedReason });
-      await refresh();
-      setOverlay((current) =>
-        current
-          ? {
-              ...current,
-              attempts: current.attempts.filter((attempt) => attempt.id !== selectedAttempt.id),
-              selectedIndex: Math.max(0, current.selectedIndex - 1)
-            }
-          : current
-      );
-    } catch (err) {
-      notifications.error(err instanceof Error ? err.message : t("courseDetail.deleteSubmissionError"));
-    } finally {
-      setSavingGradeKey(null);
-    }
-  }
-
   async function regradeAllRows() {
     const rowsWithAttempts = groupedRows.filter(
       (row) =>
@@ -649,12 +499,8 @@ export default function GradebookActivityResultsPage() {
   }, [rows]);
 
   async function openReviewAndGrade(row: CourseGradebookRow) {
-    if (supportsAiFeedbackReview(row.activityTypeKey)) {
-      await openFeedbackReview([row]);
-      return;
-    }
-    if (getManualGradingRenderer(row.activityTypeKey)) {
-      await openManualGrading(row);
+    if (supportsAiFeedbackReview(row.activityTypeKey) || getManualGradingRenderer(row.activityTypeKey)) {
+      setReviewAndGradeRow(row);
       return;
     }
     router.push(manualGradingHref(courseId, activityId, groupId, row.participantId));
@@ -744,42 +590,13 @@ export default function GradebookActivityResultsPage() {
           )}
         </section>
 
-        {overlay ? (
-          <div
-            className="dialog-backdrop"
-            role="presentation"
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget) {
-                setOverlay(null);
-              }
-            }}
-          >
-            {manualGradingRenderer
-              ? manualGradingRenderer({
-                  row: overlay.row,
-                  activityConfig: overlay.activityConfig,
-                  locale,
-                  attempts: overlay.attempts,
-                  selectedAttempt,
-                  selectedIndex: overlay.selectedIndex,
-                  includeAttempts: overlay.includeAttempts,
-                  loading: overlay.loading,
-                  error: overlay.error,
-                  readOnly: false,
-                  isSavingOverride: savingGradeKey === `${overlay.row.gradebookItemId}:${overlay.row.participantId}:override`,
-                  isSavingRegrade: savingGradeKey === `${overlay.row.gradebookItemId}:${overlay.row.participantId}:regrade`,
-                  isSavingDelete: savingGradeKey === `${overlay.row.gradebookItemId}:${overlay.row.participantId}:delete`,
-                  onClose: () => setOverlay(null),
-                  onIncludeAttemptsChange: (includeAttempts) => loadAttempts(overlay.row, includeAttempts),
-                  onSelectAttemptIndex: (selectedIndex) => setOverlay((current) => (current ? { ...current, selectedIndex } : current)),
-                  onOverrideGrade: (input) => overrideGrade(overlay.row, input),
-                  onRegradeAttempt: () => regradeRow(overlay.row),
-                  onDeleteSubmission: () => deleteSelectedSubmission(overlay.row, selectedAttempt),
-                  onGradeTestItem: (parentAttemptId, testItemId, score, reason) => gradeTestItem(overlay.row, parentAttemptId, testItemId, score, reason),
-                  t
-                })
-              : null}
-          </div>
+        {reviewAndGradeRow ? (
+          <ReviewAndGradeDialog
+            courseId={courseId}
+            row={reviewAndGradeRow}
+            onClose={() => setReviewAndGradeRow(null)}
+            onSaved={refresh}
+          />
         ) : null}
         {reviewAll ? (
           <div
@@ -1071,16 +888,4 @@ function calculatedNormalizedGrade(
 ) {
   const percent = getAiFeedbackReviewCalculatedGradePercent(activityTypeKey, feedback);
   return percent === null ? null : percent * row.maxScore / 100;
-}
-
-function sortAttemptsByDisplayedTimestamp(attempts: GradebookReviewAttempt[]) {
-  return [...attempts].sort((left, right) => attemptDisplayTime(right) - attemptDisplayTime(left));
-}
-
-function attemptDisplayTime(attempt: GradebookReviewAttempt) {
-  const value =
-    "completedAt" in attempt
-      ? attempt.completedAt ?? attempt.lastInteractionAt
-      : attempt.submittedAt ?? attempt.gradedAt;
-  return value ? new Date(value).getTime() : 0;
 }

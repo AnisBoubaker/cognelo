@@ -152,15 +152,12 @@ export async function reviseTeacherAttemptAiFeedback(
   const feedbackVersion = hasCurrentFeedback
     ? Number(currentFeedback.feedbackVersion)
     : 1;
-  if (hasCurrentFeedback) {
-    const existingChallenge = await prisma.gradeChallenge.findFirst({
+  const existingChallenge = hasCurrentFeedback
+    ? await prisma.gradeChallenge.findFirst({
       where: { participantId: attempt.participantId, feedbackRef, feedbackVersion },
       select: { id: true }
-    });
-    if (existingChallenge) {
-      throw new AppError(409, "AI_FEEDBACK_ALREADY_CHALLENGED", "Feedback cannot be edited after a learner has challenged this version.");
-    }
-  }
+    })
+    : null;
 
   const now = new Date();
   const teacherRevision = typeof currentFeedback.teacherRevision === "number"
@@ -279,7 +276,8 @@ export async function reviseTeacherAttemptAiFeedback(
           teacherRevision,
           ...(previousFeedbackHash ? { previousFeedbackHash } : {}),
           feedbackHash,
-          gradesReleased: attempt.gradebookItem.gradesReleased
+          gradesReleased: attempt.gradebookItem.gradesReleased,
+          ...(existingChallenge ? { gradeChallengeId: existingChallenge.id, challengedFeedbackRevision: true } : {})
         } as JsonInput,
         createdAt: now
       }
@@ -308,7 +306,8 @@ export async function reviseTeacherAttemptAiFeedback(
           feedbackOrigin,
           ...(previousFeedbackHash ? { previousFeedbackHash } : {}),
           gradesReleased: attempt.gradebookItem.gradesReleased,
-          ...(selectedGrade ? { gradeId: selectedGrade.id } : {})
+          ...(selectedGrade ? { gradeId: selectedGrade.id } : {}),
+          ...(existingChallenge ? { gradeChallengeId: existingChallenge.id, challengedFeedbackRevision: true } : {})
         } as JsonInput,
         createdAt: now
       }
