@@ -147,7 +147,7 @@ describe("teacher AI feedback review", () => {
         feedbackOrigin: "teacher",
         feedbackRef: "teacher-feedback:attempt-1",
         feedbackVersion: 1,
-        challengeAllowed: false,
+        challengeAllowed: true,
         summary: "Check the boundary condition.",
         authoredByTeacher: true
       }

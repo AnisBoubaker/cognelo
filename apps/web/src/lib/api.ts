@@ -1037,6 +1037,8 @@ export type StudentReleasedGradeRow = {
   latePenaltyPercent: number | null;
   feedback: StudentGradeFeedback | null;
   selectedAttemptId: string | null;
+  challengeAttemptId: string | null;
+  gradeChallengeTarget: { feedbackRef: string; feedbackVersion: number } | null;
   selectedAttemptNumber: number | null;
   attemptCount: number;
   submittedAttemptCount: number;

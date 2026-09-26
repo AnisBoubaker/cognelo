@@ -63,7 +63,7 @@ docs/
 - Materials: legacy generic typed course material records retained for compatibility while new content uses content type plugins
 - Activities: typed course-local activity copies with JSON config and research metadata
 - Student response drafts: core-owned per-participant/per-assignment JSON state for resumable standalone activity work without consuming a gradebook attempt
-- AI assessment feedback: plugin capability/handler contracts, direct teacher-triggered summative evaluation, immediate formative evaluation, plugin-owned teacher review/edit interfaces with whole-class navigation, release-gated student feedback, immutable research events, and course-wide grade challenges
+- AI assessment feedback: plugin capability/handler contracts, direct teacher-triggered summative evaluation, immediate formative evaluation, plugin-owned teacher review/edit interfaces with whole-class navigation, release-gated student feedback, immutable research events, and mechanism-neutral course-wide challenges for released grades or feedback
 - Activity knowledge links: every bank and course activity editor receives a core-owned Concepts tab for linking the activity to its subject knowledge graph; AI authoring can use selected skills, suggest replacement skill links, or ignore knowledge links
 - Activity types: enabled type listing plus SDK definitions
 

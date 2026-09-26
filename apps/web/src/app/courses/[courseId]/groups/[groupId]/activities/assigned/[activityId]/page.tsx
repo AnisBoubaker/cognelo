@@ -9,6 +9,7 @@ import { AppShell } from "@/components/app-shell";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { useAuth } from "@/components/auth-provider";
 import { api, ApiError, Activity, ActivityDefinition, Course, CourseGroup, DeletedSubmissionAudit, GradeChallenge, SafeExamBrowserAccess, SafeExamBrowserLaunch, StudentGradeFeedback, StudentReleasedGradeRow } from "@/lib/api";
+import { getGradeChallengeReferences, type GradeChallengeReference } from "@/lib/grade-challenges";
 import { useI18n } from "@/lib/i18n";
 import { activityRenderers } from "@/lib/activity-renderers";
 import { readSafeExamBrowserProof } from "@/lib/safe-exam-browser";
@@ -161,14 +162,15 @@ export default function GroupActivityPage() {
   }, [activityId, courseId, groupId, safeExamBrowserLaunchToken, t, user]);
 
   useEffect(() => {
-    if (!releasedGrade?.selectedAttemptId) {
+    const challengeAttemptId = releasedGrade?.challengeAttemptId ?? releasedGrade?.selectedAttemptId;
+    if (!challengeAttemptId) {
       setGradeChallenges([]);
       return;
     }
-    api.attemptGradeChallenges(courseId, releasedGrade.selectedAttemptId)
+    api.attemptGradeChallenges(courseId, challengeAttemptId)
       .then((result) => setGradeChallenges(result.challenges))
       .catch(() => setGradeChallenges([]));
-  }, [courseId, releasedGrade?.selectedAttemptId]);
+  }, [courseId, releasedGrade?.challengeAttemptId, releasedGrade?.selectedAttemptId]);
 
   useEffect(() => {
     if (!releasedGrade?.selectedAttemptId || !hasAiFeedback(releasedGrade.feedback)) return;
@@ -181,17 +183,23 @@ export default function GroupActivityPage() {
   }, [courseId, releasedGrade]);
 
   async function submitGradeChallenge() {
-    const references = getAiFeedbackReferences(releasedGrade?.feedback);
+    const references = getGradeChallengeReferences(
+      releasedGrade?.feedback,
+      releasedGrade?.gradeChallengeTarget,
+      t("groupPage.finalGradeLabel")
+    );
     const availableReferences = references.filter((reference) => !gradeChallenges.some(
       (challenge) => challenge.feedbackRef === reference.feedbackRef && challenge.feedbackVersion === reference.feedbackVersion
     ));
     const feedbackReference = availableReferences.find((reference) => feedbackReferenceKey(reference) === selectedChallengeReferenceKey)
       ?? availableReferences[0];
-    if (!releasedGrade?.selectedAttemptId || !feedbackReference || challengeExplanation.trim().length < 20) return;
+    const challengeAttemptId = releasedGrade?.challengeAttemptId ?? releasedGrade?.selectedAttemptId;
+    if (!challengeAttemptId || !feedbackReference || challengeExplanation.trim().length < 20) return;
     setIsSubmittingChallenge(true);
     try {
-      const result = await api.createGradeChallenge(courseId, releasedGrade.selectedAttemptId, {
-        ...feedbackReference,
+      const result = await api.createGradeChallenge(courseId, challengeAttemptId, {
+        feedbackRef: feedbackReference.feedbackRef,
+        feedbackVersion: feedbackReference.feedbackVersion,
         explanation: challengeExplanation.trim()
       });
       setGradeChallenges((current) => [result.challenge, ...current]);
@@ -263,7 +271,11 @@ export default function GroupActivityPage() {
     return localized?.name ?? definition?.name ?? activity.activityType.name;
   }
 
-  const aiFeedbackReferences = getAiFeedbackReferences(releasedGrade?.feedback);
+  const gradeChallengeReferences = getGradeChallengeReferences(
+    releasedGrade?.feedback,
+    releasedGrade?.gradeChallengeTarget,
+    t("groupPage.finalGradeLabel")
+  );
 
   return (
     <AppShell>
@@ -315,9 +327,9 @@ export default function GroupActivityPage() {
               ) : (
                 <StudentFeedback feedback={releasedGrade.feedback} maxScore={releasedGrade.maxScore} t={t} />
               )}
-              {aiFeedbackReferences.length ? (
+              {gradeChallengeReferences.length ? (
                 <GradeChallengePanel
-                  references={aiFeedbackReferences}
+                  references={gradeChallengeReferences}
                   challenges={gradeChallenges}
                   explanation={challengeExplanation}
                   isSubmitting={isSubmittingChallenge}
@@ -609,7 +621,7 @@ function GradeChallengePanel({
   onSubmit,
   t
 }: {
-  references: AiFeedbackReference[];
+  references: GradeChallengeReference[];
   challenges: GradeChallenge[];
   explanation: string;
   isSubmitting: boolean;
@@ -674,39 +686,7 @@ function GradeChallengePanel({
   );
 }
 
-type AiFeedbackReference = { feedbackRef: string; feedbackVersion: number; label: string | null };
-
-function getAiFeedbackReferences(feedback: StudentGradeFeedback | null | undefined): AiFeedbackReference[] {
-  if (!feedback?.details) return [];
-  if (feedback.kind === "test" && Array.isArray(feedback.details.items)) {
-    return feedback.details.items.flatMap((item) => {
-      if (!item || typeof item !== "object" || Array.isArray(item)) return [];
-      const itemRecord = item as Record<string, unknown>;
-      const itemFeedback = itemRecord.feedback;
-      if (!itemFeedback || typeof itemFeedback !== "object" || Array.isArray(itemFeedback)) return [];
-      const aiFeedback = (itemFeedback as Record<string, unknown>).aiFeedback;
-      if (!aiFeedback || typeof aiFeedback !== "object" || Array.isArray(aiFeedback)) return [];
-      const nested = aiFeedback as Record<string, unknown>;
-      if (typeof nested.feedbackRef === "string" && typeof nested.feedbackVersion === "number" && nested.challengeAllowed === true) {
-        return [{
-          feedbackRef: nested.feedbackRef,
-          feedbackVersion: nested.feedbackVersion,
-          label: typeof itemRecord.title === "string" ? itemRecord.title : null
-        }];
-      }
-      return [];
-    });
-  }
-  if (feedback.kind !== "ai_assessment_feedback") return [];
-  const feedbackRef = feedback.details.feedbackRef;
-  const feedbackVersion = feedback.details.feedbackVersion;
-  const challengeAllowed = feedback.details.challengeAllowed;
-  return typeof feedbackRef === "string" && typeof feedbackVersion === "number" && challengeAllowed === true
-    ? [{ feedbackRef, feedbackVersion, label: null }]
-    : [];
-}
-
-function feedbackReferenceKey(reference: AiFeedbackReference | undefined) {
+function feedbackReferenceKey(reference: GradeChallengeReference | undefined) {
   return reference ? `${reference.feedbackRef}:${reference.feedbackVersion}` : "";
 }
 

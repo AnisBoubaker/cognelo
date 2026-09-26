@@ -11,6 +11,8 @@ author assignment -> snapshot prior content -> validate ZIP -> analyze functions
 
 Long-running analysis and question generation use the shared background-job service. Final submission requests are idempotent and teachers can reprocess unfinished or failed work.
 
+Teacher-entered released grades and feedback are challengeable through the core course workflow, which reuses the plugin's existing **Review and grade** panel.
+
 ## Read By Topic
 
 - [Current capabilities and phase summary](docs/REFERENCE.md#current-state)

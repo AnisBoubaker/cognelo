@@ -8,10 +8,10 @@ Status: initial end-to-end implementation completed on 2026-09-19 for Programmin
 
 - **AI feedback** is the student-facing retroaction produced from a submitted activity.
 - **AI grading** means that some or all of the activity grade is calculated from that feedback evaluation.
-- **Feedback challenge** or **grade challenge** is a student's formal contestation of released AI feedback that influenced a grade.
+- **Feedback challenge** or **grade challenge** is a student's formal contestation of a released grade or learner-visible feedback, regardless of whether it was produced automatically or written by a teacher.
 - Coding Homework Grader's existing generated **challenge questions** are a separate pedagogical workflow and must not be renamed or reused as grade challenges.
 
-Teacher/admin product copy may use **AI feedback** and **Grade challenge** (French: **Rétroaction par IA** and **Contestation de la rétroaction/note**). Learner-facing copy must use mechanism-neutral terms such as **Assessment feedback**, **Feedback**, and **Grade challenge**; it must not say that feedback or grading was produced by AI.
+Teacher/admin product copy may use **AI feedback** for the generation feature and **Grade challenge** for the mechanism-neutral challenge workflow (French: **Rétroaction par IA** and **Contestation de la rétroaction/note**). Learner-facing copy must use mechanism-neutral terms such as **Assessment feedback**, **Feedback**, and **Grade challenge**; it must not say that feedback or grading was produced by AI.
 
 ## Goals
 
@@ -23,7 +23,7 @@ Teacher/admin product copy may use **AI feedback** and **Grade challenge** (Fren
 - Keep summative AI feedback hidden from the student until the gradebook item is released.
 - Let plugins decide whether AI feedback affects grading and how it combines with deterministic grading.
 - Preserve deterministic grading where it is authoritative, especially MCQ answer-key grading.
-- Let a student challenge any released AI feedback that contributed to an automatic grade.
+- Let a student challenge any released final grade and any separately identified challengeable feedback, including teacher-authored feedback.
 - Give teachers one course-wide challenge queue with a response and audited grade-adjustment workflow.
 - Let teachers author learner feedback directly, whether or not AI feedback is enabled or generated.
 - Retain reproducible, privacy-aware data for educational research, model evaluation, audit, and later student-model evidence work.
@@ -174,7 +174,7 @@ The plugin must validate that component weights total 100%. It stores the determ
 
 ### MCQ Example
 
-MCQ answer-key grading remains deterministic and authoritative. AI feedback may explain errors or suggest study areas, but it does not change the MCQ score. Because the AI result did not influence the grade, the mandatory AI-grade challenge workflow does not apply. Summative MCQ feedback is still teacher-triggered and release-gated; formative MCQ feedback is generated on submission.
+MCQ answer-key grading remains deterministic and authoritative. AI feedback may explain errors or suggest study areas, but it does not change the MCQ score and is not an independent challenge target. The released deterministic grade and any teacher-authored released feedback remain challengeable. Summative MCQ feedback is still teacher-triggered and release-gated; formative MCQ feedback is generated on submission.
 
 ### Regrading
 
@@ -212,15 +212,16 @@ Provisional fields:
 
 Rules:
 
-- Only released AI feedback that contributed to grading can be challenged.
-- A student can create one challenge for each immutable feedback version.
+- Every released final grade tied to a submitted attempt can be challenged, regardless of whether it was automatic, AI-assisted, or teacher-entered.
+- Separately identified generated or teacher-authored feedback can also be challenged when it is part of the released result; feedback-only model explanations that did not affect grading are not a separate challenge target, although the released deterministic grade remains challengeable.
+- A student can create one challenge for each immutable released grade or feedback version.
 - The explanation is required and becomes read-only after submission.
 - A challenge does not reopen the activity attempt or permit another submission.
 - Authorized course owners, teachers, and TAs can review challenges within their grading scope.
 - Resolving a challenge requires a teacher response.
 - The challenge queue never mutates a grade. Its **Review and grade** action opens the same plugin-provided review dialog used from the detailed gradebook, including the parent Test dialog for a challenged child.
 - Rubric recomposition, final normalized grade changes, and their append-only audit events continue through the existing gradebook review services.
-- Sending the answer compares the current grade with the released snapshot and records the challenge as `adjusted` or `upheld`; the teacher can optionally send the answer to the student through the guarded system-email path.
+- Sending the answer compares the current grade and challenged feedback with their released snapshots and records the challenge as `adjusted` or `upheld`; the teacher can optionally send the answer to the student through the guarded system-email path.
 - The student sees the challenge, status, teacher response, and resulting grade while reviewing the relevant answer/attempt.
 - Revising challenged work never modifies the plugin's immutable generated artifact or the challenge's feedback hash; the editable learner-visible revision is preserved as a new before/after grade event and linked research event.
 
@@ -360,7 +361,7 @@ The development seed includes a reproducible two-section Programming Exercise ba
 
 ### Phase 3 — Grade Challenges
 
-Status: complete for the agreed core workflow. Students can challenge each released AI-graded feedback version with a required explanation; course managers have an expandable Challenges queue that opens the existing plugin review dialog for grading and sends a separate required response with optional email notification. Grade changes remain in the ordinary audited gradebook path, and response submission derives the challenge outcome from the released and current grade snapshots.
+Status: complete for the agreed core workflow. Students can challenge a released final grade or a separately identified generated/teacher-authored feedback version with a required explanation; course managers have an expandable Challenges queue that opens the existing plugin review dialog for grading and sends a separate required response with optional email notification. Grade changes remain in the ordinary audited gradebook path, and response submission derives the challenge outcome from the released and current grade/feedback snapshots.
 
 - Add the core challenge schema and migration.
 - Add student create/read APIs and activity review panel.
@@ -412,7 +413,7 @@ Status: partial. The manager research endpoint is implemented with stable identi
 - Invalid/failed AI output cannot create a partial or silent grade.
 - Retry and regrade preserve earlier evaluation versions and research events.
 - Programming Exercise test-only regrading never invokes AI or creates another student attempt; later AI generation never reruns tests and uses the latest successful saved test result plus current rubric.
-- Students can challenge only their own released AI-graded feedback.
+- Students can challenge only their own released final grade or challengeable released feedback.
 - Teacher resolution requires a response and records any grade change through the audited override path.
 - Course challenge listing and resolution authorization are enforced server-side.
 - Research records cover successful, failed, retried, released, viewed, challenged, and adjusted evaluations.

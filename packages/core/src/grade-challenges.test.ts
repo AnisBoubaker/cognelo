@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
+import { gradeChallengeTargetForGrade } from "./grade-challenge-targets";
 
 const mockPrisma = vi.hoisted(() => ({
   activityAttempt: { findFirst: vi.fn() },
@@ -149,7 +150,7 @@ describe("grade challenges", () => {
       feedbackRef: "feedback-1",
       feedbackVersion: 1,
       explanation: "I would like this explanation reviewed even though it did not affect the score."
-    })).rejects.toMatchObject({ code: "AI_FEEDBACK_VERSION_MISMATCH", status: 409 });
+    })).rejects.toMatchObject({ code: "GRADE_CHALLENGE_TARGET_MISMATCH", status: 409 });
 
     expect(mockPrisma.gradeChallenge.create).not.toHaveBeenCalled();
   });
@@ -177,6 +178,38 @@ describe("grade challenges", () => {
       feedbackVersion: 2,
       explanation: "The released rubric feedback does not match the submitted answer."
     })).resolves.toMatchObject({ feedbackHash: "hash-3" });
+  });
+
+  it("recognizes previously stored teacher-authored feedback even when its legacy flag is false", async () => {
+    mockPrisma.grade.findUnique.mockResolvedValue({
+      ...grade,
+      normalizedResult: {
+        studentFeedback: {
+          kind: "assessment_feedback",
+          feedbackRef: "teacher-feedback:attempt-1",
+          feedbackVersion: 1,
+          feedbackHash: "teacher-hash",
+          feedbackOrigin: "teacher",
+          challengeAllowed: false
+        }
+      }
+    });
+
+    await expect(createGradeChallenge(student, "course-1", "attempt-1", {
+      feedbackRef: "teacher-feedback:attempt-1",
+      feedbackVersion: 1,
+      explanation: "The teacher-written feedback does not match the work I submitted."
+    })).resolves.toMatchObject({ feedbackHash: "teacher-hash" });
+  });
+
+  it("allows the learner to challenge the released grade independently of how it was produced", async () => {
+    const target = gradeChallengeTargetForGrade(grade);
+
+    await expect(createGradeChallenge(student, "course-1", "attempt-1", {
+      feedbackRef: target.feedbackRef,
+      feedbackVersion: target.feedbackVersion,
+      explanation: "I would like the teacher-entered final grade to be reviewed."
+    })).resolves.toMatchObject({ feedbackRef: target.feedbackRef, feedbackHash: target.feedbackHash });
   });
 
   it("returns the root gradebook activity used by Review and grade", async () => {
@@ -240,5 +273,42 @@ describe("grade challenges", () => {
       where: { id: "challenge-1" },
       data: expect.objectContaining({ status: "upheld" })
     });
+  });
+
+  it("records an adjusted response when challenged feedback changed without a score change", async () => {
+    mockPrisma.grade.findUnique.mockResolvedValue({
+      ...grade,
+      normalizedResult: {
+        ...grade.normalizedResult,
+        studentFeedback: {
+          ...(grade.normalizedResult.studentFeedback as Record<string, unknown>),
+          details: {
+            ...grade.normalizedResult.studentFeedback.details,
+            items: grade.normalizedResult.studentFeedback.details.items.map((item, index) => index === 1
+              ? {
+                  ...item,
+                  feedback: {
+                    aiFeedback: {
+                      ...item.feedback.aiFeedback,
+                      feedbackHash: "revised-hash"
+                    }
+                  }
+                }
+              : item)
+          }
+        }
+      }
+    });
+
+    await expect(resolveGradeChallenge(
+      { id: "teacher-1", roles: ["teacher"] } as CurrentUser,
+      "course-1",
+      "challenge-1",
+      { teacherResponse: "I revised the feedback while keeping the score unchanged.", notifyStudent: false }
+    )).resolves.toMatchObject({ status: "adjusted" });
+
+    expect(recordResearch).toHaveBeenCalledWith(expect.objectContaining({
+      metadata: expect.objectContaining({ gradeAdjusted: false, feedbackAdjusted: true })
+    }));
   });
 });
