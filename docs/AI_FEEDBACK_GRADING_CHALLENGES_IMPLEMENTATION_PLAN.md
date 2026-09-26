@@ -224,7 +224,7 @@ Rules:
 - The student sees the challenge, status, teacher response, and resulting grade while reviewing the relevant answer/attempt.
 - Revising challenged work never modifies the plugin's immutable generated artifact or the challenge's feedback hash; the editable learner-visible revision is preserved as a new before/after grade event and linked research event.
 
-The course workspace has a manager-only **Challenges** tab listing open and resolved `activity → student` rows. Expanding a row reveals the student's explanation, an in-place instance of the shared **Review and grade** dialog, and—for open records—the teacher answer plus optional student-email notification. Dedicated status/activity/section/student filter controls remain UI follow-up work.
+The course workspace has a manager-only **Challenges** tab listing `activity → student` rows. Open challenges are visible by default; a **Show resolved challenges** checkbox reveals upheld/adjusted records after every open row. Expanding a row reveals the student's explanation, an in-place instance of the shared **Review and grade** dialog, and—for open records—the teacher answer plus optional student-email notification. Dedicated activity/section/student filter controls remain UI follow-up work.
 
 ## Compound Test Behavior
 
@@ -364,7 +364,7 @@ Status: complete for the agreed core workflow. Students can challenge each relea
 
 - Add the core challenge schema and migration.
 - Add student create/read APIs and activity review panel.
-- Add the course Challenges tab, filters, detail view, and manager APIs.
+- Add the course Challenges tab, resolved-item toggle, detail view, and manager APIs.
 - Integrate teacher response, grade override, audit, and research events.
 
 ### Phase 4 — MCQ Feedback
@@ -394,7 +394,7 @@ Status: partial. The manager research endpoint is implemented with stable identi
 - add course research-consent filtering and approved retention/deletion/anonymization policies;
 - define and enforce raw provider-response retention;
 - add operational dashboards for failures, latency, model usage, and pending teacher grading;
-- add challenge-list filters and Compound Test child feedback review/edit rendering;
+- add activity/section/student challenge-list filters and Compound Test child feedback review/edit rendering;
 - add live-provider cross-plugin browser coverage and cancellation/timeout UX for larger batches;
 - update the student-model evidence plan if AI rubric dimensions become learning-evidence signals.
 

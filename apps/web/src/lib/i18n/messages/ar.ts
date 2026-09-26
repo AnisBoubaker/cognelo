@@ -672,6 +672,8 @@ export const arMessages = {
       challengesTitle: "الاعتراضات على علامات الذكاء الاصطناعي",
       challengesHelp: "وسّع الاعتراض لقراءة تعليق الطالب، وراجع العمل والعلامة، ثم أرسل إجابتك.",
       noChallenges: "لم تُرسل اعتراضات على علامات الذكاء الاصطناعي.",
+      noOpenChallenges: "لا توجد اعتراضات مفتوحة على العلامات.",
+      showResolvedChallenges: "إظهار الاعتراضات التي تم حلها",
       challengesLoadError: "تعذر تحميل اعتراضات العلامات.",
       challengeResolveError: "تعذر حل اعتراض العلامة.",
       studentExplanation: "تفسير الطالب",

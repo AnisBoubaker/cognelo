@@ -4183,6 +4183,10 @@ a.card:hover,
   overflow: hidden;
 }
 
+.grade-challenge-filter {
+  flex: 0 0 auto;
+}
+
 .grade-challenge-item + .grade-challenge-item {
   border-top: 1px solid var(--line);
 }
