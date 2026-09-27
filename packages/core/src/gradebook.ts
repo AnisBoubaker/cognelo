@@ -918,6 +918,9 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         latePenaltyApplied: effectiveGrade?.latePenaltyApplied ?? false,
         latePenaltyPercent: effectiveGrade?.latePenaltyPercent ?? null,
         feedback: sanitizeStudentGradeFeedback(effectiveGrade?.normalizedResult),
+        gradeCompletionContext: {
+          gradingResult: asJsonObject(effectiveGrade?.normalizedResult) ?? {}
+        },
         selectedAttemptNumber: effectiveGrade?.selectedAttempt?.attemptNumber ?? null,
         attemptCount: activeAttempts.length,
         lateAttemptCount: activeAttempts.filter((attempt) => attempt.isLate).length,
@@ -1057,9 +1060,14 @@ export async function setGradebookItemRelease(
         select: {
           id: true,
           participantId: true,
+          source: true,
           normalizedResult: true,
           selectedAttempt: { select: { id: true, pluginKey: true, userId: true } }
         }
+      },
+      attempts: {
+        where: { lifecycle: { in: ["submitted", "graded"] } },
+        select: { participantId: true, lifecycle: true }
       }
     }
   });
@@ -1070,6 +1078,25 @@ export async function setGradebookItemRelease(
 
   if (item.gradesReleased === input.released) {
     return item;
+  }
+
+  if (input.released) {
+    const submittedParticipantIds = new Set((item.attempts ?? []).map((attempt) => attempt.participantId));
+    const incompleteParticipantIds = [...submittedParticipantIds].filter((participantId) => {
+      const grade = item.grades?.find((candidate) => candidate.participantId === participantId);
+      if (!grade) return true;
+      return grade.source !== "override" && item.attempts?.some((attempt) =>
+        attempt.participantId === participantId && attempt.lifecycle === "submitted"
+      );
+    });
+    if (incompleteParticipantIds.length) {
+      throw new AppError(
+        409,
+        "GRADEBOOK_ITEM_INCOMPLETE",
+        `Grades cannot be released while ${incompleteParticipantIds.length} submitted grade${incompleteParticipantIds.length === 1 ? " is" : "s are"} incomplete.`,
+        { incompleteGradeCount: incompleteParticipantIds.length }
+      );
+    }
   }
 
   return prisma.$transaction(async (tx) => {

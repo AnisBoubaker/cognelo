@@ -142,6 +142,27 @@ export type PluginStudentGradeReportHandler = (input: {
   selectedAttemptId?: string | null;
 }) => Promise<Record<string, unknown> | null>;
 
+export type PluginGradeCompletion = {
+  status: "complete" | "partial";
+  completedComponentCount: number;
+  requiredComponentCount: number;
+};
+
+export type PluginGradeCompletionRow = {
+  participantId: string;
+  score: number;
+  gradeSource: "auto" | "manual" | "override" | "regrade" | null;
+  feedback: Record<string, unknown> | null;
+  gradingResult: Record<string, unknown>;
+};
+
+export type PluginGradeCompletionHandler = (input: {
+  user: CurrentUser;
+  courseId: string;
+  activityId: string;
+  rows: readonly PluginGradeCompletionRow[];
+}) => Promise<Readonly<Record<string, PluginGradeCompletion>>>;
+
 export type PluginAiFeedbackResult = {
   feedbackRef: string;
   feedbackVersion: number;
@@ -229,6 +250,10 @@ export type ServerActivityPlugin = {
     activityTypeKeys: readonly string[];
     getReport: PluginStudentGradeReportHandler;
   };
+  gradeCompletion?: {
+    activityTypeKeys: readonly string[];
+    getCompletions: PluginGradeCompletionHandler;
+  };
   aiFeedback?: {
     evaluateAttempt: PluginAiFeedbackHandler;
     teacherReview?: PluginAiFeedbackTeacherReviewHandler;
@@ -313,6 +338,12 @@ export function resolvePluginStudentGradeReportHandler(activityTypeKey: string) 
   return serverPlugins.find((plugin) =>
     plugin.studentGradeReport?.activityTypeKeys.includes(activityTypeKey)
   )?.studentGradeReport?.getReport ?? null;
+}
+
+export function resolvePluginGradeCompletionHandler(activityTypeKey: string) {
+  return serverPlugins.find((plugin) =>
+    plugin.gradeCompletion?.activityTypeKeys.includes(activityTypeKey)
+  )?.gradeCompletion?.getCompletions ?? null;
 }
 
 export function resolvePluginAiFeedbackHandler(activityTypeKey: string) {

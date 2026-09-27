@@ -1846,7 +1846,13 @@ export default function CourseDetailPage() {
                                 <div className="table-actions">
                                   <button
                                     className="button secondary"
-                                    disabled={savingReleaseItemId === activity.gradebookItemIds.join(":")}
+                                    disabled={
+                                      savingReleaseItemId === activity.gradebookItemIds.join(":")
+                                      || (!activity.allGradesReleased && activity.incompleteGradeCount > 0)
+                                    }
+                                    title={!activity.allGradesReleased && activity.incompleteGradeCount > 0
+                                      ? t("courseDetail.releaseGradesBlocked", { count: activity.incompleteGradeCount })
+                                      : undefined}
                                     type="button"
                                     onClick={() =>
                                       setGradebookItemsRelease(activity.gradebookItemIds, !activity.allGradesReleased, activity.activityTitle)
@@ -1854,6 +1860,11 @@ export default function CourseDetailPage() {
                                   >
                                     {activity.allGradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
                                   </button>
+                                  {!activity.allGradesReleased && activity.incompleteGradeCount > 0 ? (
+                                    <span className="grade-release-blocked-note">
+                                      {t("courseDetail.releaseGradesBlocked", { count: activity.incompleteGradeCount })}
+                                    </span>
+                                  ) : null}
                                 </div>
                                 <div className="table-actions">
                                   <Link className="button secondary" href={`/courses/${courseId}/gradebook/activities/${activity.activityId}`}>
@@ -1875,12 +1886,23 @@ export default function CourseDetailPage() {
                                       <div className="table-actions">
                                         <button
                                           className="button secondary"
-                                          disabled={savingReleaseItemId === group.gradebookItemId}
+                                          disabled={
+                                            savingReleaseItemId === group.gradebookItemId
+                                            || (!group.gradesReleased && group.incompleteGradeCount > 0)
+                                          }
+                                          title={!group.gradesReleased && group.incompleteGradeCount > 0
+                                            ? t("courseDetail.releaseGradesBlocked", { count: group.incompleteGradeCount })
+                                            : undefined}
                                           type="button"
                                           onClick={() => setGradebookRelease(group.gradebookItemId, !group.gradesReleased, `${activity.activityTitle} - ${group.groupTitle}`)}
                                         >
                                           {group.gradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
                                         </button>
+                                        {!group.gradesReleased && group.incompleteGradeCount > 0 ? (
+                                          <span className="grade-release-blocked-note">
+                                            {t("courseDetail.releaseGradesBlocked", { count: group.incompleteGradeCount })}
+                                          </span>
+                                        ) : null}
                                       </div>
                                       <div className="table-actions">
                                         <Link
@@ -2221,6 +2243,7 @@ type GradebookGroupSummary = {
   studentCount: number;
   submissionCount: number;
   gradedCount: number;
+  incompleteGradeCount: number;
   meanScore: number | null;
   meanMaxScore: number | null;
 };
@@ -2233,6 +2256,7 @@ type GradebookActivitySummary = {
   allGradesReleased: boolean;
   submissionCount: number;
   gradedCount: number;
+  incompleteGradeCount: number;
   meanScore: number | null;
   meanMaxScore: number | null;
   groups: GradebookGroupSummary[];
@@ -2269,6 +2293,7 @@ function buildGradebookActivitySummaries(items: CourseGradebookItemSummary[], ro
         allGradesReleased: groups.length > 0 && groups.every((group) => group.gradesReleased),
         submissionCount: sum(groups.map((group) => group.submissionCount)),
         gradedCount: sum(groups.map((group) => group.gradedCount)),
+        incompleteGradeCount: sum(groups.filter((group) => !group.gradesReleased).map((group) => group.incompleteGradeCount)),
         ...meanGradeForRows(activityRows),
         groups
       };
@@ -2285,6 +2310,7 @@ function summarizeGradebookGroup(item: CourseGradebookItemSummary, rows: CourseG
     studentCount: item.studentCount,
     submissionCount: sum(rows.map((row) => row.submittedAttemptCount)),
     gradedCount: rows.filter((row) => row.score !== null).length,
+    incompleteGradeCount: item.incompleteGradeCount,
     ...meanGradeForRows(rows)
   };
 }

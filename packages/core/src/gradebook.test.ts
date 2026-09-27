@@ -1124,7 +1124,9 @@ describe("gradebook attempt services", () => {
       titleSnapshot: "Loops",
       group: {
         participants: [{ id: "participant-1" }]
-      }
+      },
+      attempts: [{ participantId: "participant-1", lifecycle: "graded" }],
+      grades: [{ participantId: "participant-1", source: "auto", normalizedResult: {}, selectedAttempt: null }]
     });
     const now = new Date("2026-05-19T12:00:00.000Z");
 
@@ -1150,6 +1152,51 @@ describe("gradebook attempt services", () => {
         createdAt: now
       })
     });
+  });
+
+  it("refuses to release a gradebook item with a submitted ungraded attempt", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    mockPrisma.gradebookItem.findFirst.mockResolvedValue({
+      id: "gradebook-item-1",
+      gradesReleased: false,
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      titleSnapshot: "Loops",
+      group: { participants: [{ id: "participant-1" }, { id: "participant-2" }] },
+      attempts: [{ participantId: "participant-1", lifecycle: "submitted" }],
+      grades: []
+    });
+
+    await expect(setGradebookItemRelease(teacherUser, "course-1", "gradebook-item-1", {
+      released: true,
+      now: testNow
+    })).rejects.toMatchObject({
+      status: 409,
+      code: "GRADEBOOK_ITEM_INCOMPLETE",
+      details: { incompleteGradeCount: 1 }
+    });
+    expect(tx.gradebookItem.update).not.toHaveBeenCalled();
+  });
+
+  it("allows release when the only student without a grade did not submit", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    mockPrisma.gradebookItem.findFirst.mockResolvedValue({
+      id: "gradebook-item-1",
+      gradesReleased: false,
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      titleSnapshot: "Loops",
+      group: { participants: [{ id: "participant-1" }, { id: "participant-2" }] },
+      attempts: [{ participantId: "participant-1", lifecycle: "graded" }],
+      grades: [{ participantId: "participant-1", source: "auto", normalizedResult: {}, selectedAttempt: null }]
+    });
+
+    await expect(setGradebookItemRelease(teacherUser, "course-1", "gradebook-item-1", {
+      released: true,
+      now: testNow
+    })).resolves.toMatchObject({ gradesReleased: true });
   });
 
   it("overrides a participant grade and writes an override audit event", async () => {

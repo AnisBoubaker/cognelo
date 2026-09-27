@@ -5,6 +5,7 @@ import {
   resolveCompositeExecutionActionHandler,
   resolveCompositeExecutionSubmissionHandler,
   resolvePluginGradingHandler,
+  resolvePluginGradeCompletionHandler,
   resolvePluginStudentGradeReportHandler,
   resolvePluginAiFeedbackHandler,
   resolvePluginRoute,
@@ -96,6 +97,12 @@ describe("server activity SDK", () => {
     expect(resolvePluginStudentGradeReportHandler("coding-exercise")).toBeTypeOf("function");
     expect(resolvePluginStudentGradeReportHandler("mcq")).toBeNull();
     expect(resolvePluginStudentGradeReportHandler("placeholder")).toBeNull();
+  });
+
+  it("resolves plugin-owned grade completion handlers by activity type", () => {
+    expect(resolvePluginGradeCompletionHandler("coding-exercise")).toBeTypeOf("function");
+    expect(resolvePluginGradeCompletionHandler("mcq")).toBeNull();
+    expect(resolvePluginGradeCompletionHandler("placeholder")).toBeNull();
   });
 
   it("resolves plugin-owned AI feedback handlers only for supported activity types", () => {

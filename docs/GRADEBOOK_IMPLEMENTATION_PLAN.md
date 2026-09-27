@@ -91,6 +91,7 @@ It is intentionally a planning artifact. Implementation should proceed iterative
   - shown immediately
   - hidden until teacher releases them
 - Grade release is controlled per gradebook item.
+- Release is allowed only when every learner with a submitted attempt has a complete final grade. Submitted-ungraded attempts and plugin-declared partial multi-component grades block release; a learner with no submitted attempt does not.
 
 ### Plugin Contract
 
@@ -489,6 +490,7 @@ First plugin integration target:
 - Completed: the generic Grades view does not interpret plugin attempt data. Activity plugins may provide an authorized, release-gated own-attempt grading report; Programming Exercises use this contract for graded source submissions, latest test outcomes/points, conditional component recap, and sanitized rubric/comments.
 - Completed: add teacher release/hide controls for each gradebook item in the course gradebook, including expandable group summaries and group-scoped detail links.
 - Completed: record release/hide audit events per student participant on the gradebook item.
+- Completed: add a fail-closed release readiness gate and UI. Core blocks submitted-ungraded work, plugins batch-report activity-specific component completeness, detailed rows mark partial grades, filtered views retain full-item readiness counts, and non-submissions remain releasable.
 
 ### Phase 8: Manual Grading And Regrading
 

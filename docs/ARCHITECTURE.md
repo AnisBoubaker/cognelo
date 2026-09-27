@@ -126,6 +126,8 @@ To add a new plugin-backed activity type:
 
 Plugins whose released learner report needs activity-specific evidence may also register a server-side `studentGradeReport` handler. The generic Grades route invokes it only for final released rows; the plugin must recheck learner ownership and release state and return a bounded student-safe projection rather than private grading records.
 
+Plugins whose final grade has multiple independently completed components register a batch `gradeCompletion` handler. The teacher gradebook combines that plugin-owned classification with core attempt state: submitted-ungraded or partial rows prevent release, explicit teacher overrides are complete, and learners without a submission never block the item.
+
 No course table rewrite is required.
 
 ## Content Type Extensibility

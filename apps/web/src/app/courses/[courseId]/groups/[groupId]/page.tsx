@@ -1858,12 +1858,23 @@ export default function CourseGroupPage() {
                               <div className="table-actions">
                                 <button
                                   className="button secondary"
-                                  disabled={savingReleaseItemId === activity.gradebookItemId}
+                                  disabled={
+                                    savingReleaseItemId === activity.gradebookItemId
+                                    || (!activity.gradesReleased && activity.incompleteGradeCount > 0)
+                                  }
+                                  title={!activity.gradesReleased && activity.incompleteGradeCount > 0
+                                    ? t("courseDetail.releaseGradesBlocked", { count: activity.incompleteGradeCount })
+                                    : undefined}
                                   type="button"
                                   onClick={() => setGradebookRelease(activity.gradebookItemId, !activity.gradesReleased, activity.activityTitle)}
                                 >
                                   {activity.gradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
                                 </button>
+                                {!activity.gradesReleased && activity.incompleteGradeCount > 0 ? (
+                                  <span className="grade-release-blocked-note">
+                                    {t("courseDetail.releaseGradesBlocked", { count: activity.incompleteGradeCount })}
+                                  </span>
+                                ) : null}
                               </div>
                               <div className="table-actions">
                                 <Link
@@ -2463,6 +2474,7 @@ type GroupGradebookActivitySummary = {
   gradesReleased: boolean;
   submissionCount: number;
   gradedCount: number;
+  incompleteGradeCount: number;
   meanScore: number | null;
   meanMaxScore: number | null;
 };
@@ -2489,6 +2501,7 @@ function buildGroupGradebookActivitySummaries(
         gradesReleased: item.gradesReleased,
         submissionCount: sum(itemRows.map((row) => row.submittedAttemptCount)),
         gradedCount: itemRows.filter((row) => row.score !== null).length,
+        incompleteGradeCount: item.incompleteGradeCount,
         ...meanGradeForRows(itemRows)
       };
     })
