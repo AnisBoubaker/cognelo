@@ -10,6 +10,7 @@ const hiddenTestMocks = vi.hoisted(() => ({
 const executionMocks = vi.hoisted(() => ({
   codingExerciseRunInputSchema: { parse: vi.fn((value) => value) },
   codingExerciseSubmitInputSchema: { parse: vi.fn((value) => value) },
+  getCodingExercisePrivateConfig: vi.fn(),
   runCodingExercise: vi.fn(),
   submitCodingExercise: vi.fn()
 }));
@@ -43,6 +44,9 @@ describe("coding exercises server plugin lifecycle hooks", () => {
     vi.clearAllMocks();
     aiFeedbackMocks.snapshotCodingExerciseAiFeedbackConfig.mockResolvedValue({ enabled: false });
     aiFeedbackMocks.createCodingExerciseTeacherFeedbackDraft.mockResolvedValue({ kind: "assessment_feedback", criteria: [] });
+    executionMocks.getCodingExercisePrivateConfig.mockResolvedValue({
+      aiFeedback: { gradingEnabled: false }
+    });
   });
 
   it("copies bank-owned data when a coding exercise is assigned to a course", async () => {
@@ -219,6 +223,70 @@ describe("coding exercises server plugin lifecycle hooks", () => {
     });
 
     expect(revision).not.toHaveProperty("gradingResult");
+  });
+
+  it("reports a tests-only grade as partial while rubric grading is still missing", async () => {
+    executionMocks.getCodingExercisePrivateConfig.mockResolvedValue({
+      aiFeedback: { gradingEnabled: true }
+    });
+
+    await expect(codingExercisesServerPlugin.gradeCompletion?.getCompletions({
+      user: testUser(),
+      courseId: "course-1",
+      activityId: "activity-1",
+      rows: [{
+        participantId: "participant-1",
+        score: 80,
+        gradeSource: "auto",
+        feedback: null,
+        gradingResult: { kind: "coding-exercise", deterministicScore: 80 }
+      }]
+    })).resolves.toEqual({
+      "participant-1": {
+        status: "partial",
+        completedComponentCount: 1,
+        requiredComponentCount: 2
+      }
+    });
+  });
+
+  it("reports a rubric-backed or teacher-overridden grade as complete", async () => {
+    executionMocks.getCodingExercisePrivateConfig.mockResolvedValue({
+      aiFeedback: { gradingEnabled: true }
+    });
+
+    await expect(codingExercisesServerPlugin.gradeCompletion?.getCompletions({
+      user: testUser(),
+      courseId: "course-1",
+      activityId: "activity-1",
+      rows: [
+        {
+          participantId: "participant-1",
+          score: 84,
+          gradeSource: "regrade",
+          feedback: null,
+          gradingResult: { deterministicScore: 80, aiScore: 90, combinedScore: 84 }
+        },
+        {
+          participantId: "participant-2",
+          score: 75,
+          gradeSource: "override",
+          feedback: null,
+          gradingResult: {}
+        }
+      ]
+    })).resolves.toEqual({
+      "participant-1": {
+        status: "complete",
+        completedComponentCount: 2,
+        requiredComponentCount: 2
+      },
+      "participant-2": {
+        status: "complete",
+        completedComponentCount: 2,
+        requiredComponentCount: 2
+      }
+    });
   });
 });
 

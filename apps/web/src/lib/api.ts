@@ -953,6 +953,14 @@ export type CourseGradebookItemSummary = {
   gradesReleased: boolean;
   pointsPossible: number;
   studentCount: number;
+  incompleteGradeCount: number;
+  canReleaseGrades: boolean;
+};
+
+export type GradeCompletion = {
+  status: "complete" | "partial" | "ungraded";
+  completedComponentCount: number;
+  requiredComponentCount: number;
 };
 
 export type CourseGradebookRow = {
@@ -976,6 +984,7 @@ export type CourseGradebookRow = {
   latePenaltyApplied: boolean;
   latePenaltyPercent: number | null;
   feedback: StudentGradeFeedback | null;
+  gradeCompletion: GradeCompletion | null;
   selectedAttemptNumber: number | null;
   attemptCount: number;
   lateAttemptCount: number;

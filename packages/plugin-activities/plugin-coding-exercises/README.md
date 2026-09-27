@@ -14,6 +14,8 @@ On later saves, reference validation reuses fingerprinted passing results and se
 
 Teacher **Rerun automatic grading** reruns current hidden tests without invoking AI; **Assess with AI** evaluates the current rubric and generates feedback from the latest saved test result without rerunning tests. Both recompute the grade using current component weights. **Review and grade** then presents the submitted code, test evidence, rubric scores with each criterion's configured weight, three feedback fields, a one-row live breakdown of the automatic-tests grade, rubric grade, and total, plus an editable final grade in one place. Released final grades and separately identified generated or teacher-authored feedback can be challenged. The same shared dialog opens in place from a course challenge; teachers may revise challenged feedback because core preserves the original immutable snapshot/hash and audits the linked before/after revision and any grade change.
 
+When rubric grading is configured, a tests-only score is marked **Partial** in the detailed gradebook until the rubric component is graded. Programming Exercises report that component state through the server plugin contract, and the host prevents release while any submitted learner is partial or ungraded. A teacher final-grade override completes the grade; learners who did not submit do not block release.
+
 After release, the learner's grading report presents the available automatic-test and rubric point contributions plus the final total, every graded code attempt, teacher comments, criterion scores and explanations, and each test's pass/fail outcome and weighted score. Components that do not contribute to the configured grade are omitted from the recap. The report is built by a release-gated plugin handler and never includes hidden inputs, expected outputs, private rubric instructions, or raw model artifacts.
 
 ## Boundaries
@@ -43,6 +45,7 @@ src/plugin.ts             activity definition and public config
 src/routes.ts             plugin-owned HTTP routes
 src/executions.ts         run and submission persistence
 src/regrading.ts          teacher test-only grade composition
+src/grade-completion.ts   gradebook component-completeness classification
 src/hidden-tests.ts       private test management
 src/judge0.ts             server-side Judge0 client
 src/web/                  authoring, learner, and feedback UI

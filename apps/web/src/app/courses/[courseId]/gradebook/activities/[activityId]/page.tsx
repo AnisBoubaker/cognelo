@@ -799,7 +799,21 @@ function GradebookStudentRow({
         <span className="table-meta-note muted">{row.participantEmail}</span>
       </div>
       <span className="table-meta muted">{row.groupTitle}</span>
-      <strong>{rowHasSubmittedAttempt || row.score !== null ? formatGradebookScore(row.score, row.maxScore) : t("courseDetail.didNotSubmit")}</strong>
+      <div className="gradebook-grade-cell">
+        <strong>{rowHasSubmittedAttempt || row.score !== null ? formatGradebookScore(row.score, row.maxScore) : t("courseDetail.didNotSubmit")}</strong>
+        {row.gradeCompletion?.status === "partial" ? (
+          <span
+            className="grade-completion-badge grade-completion-badge-partial"
+            title={t("courseDetail.partialGradeDescription", {
+              completed: row.gradeCompletion.completedComponentCount,
+              required: row.gradeCompletion.requiredComponentCount
+            })}
+          >
+            <span aria-hidden="true">◐</span>
+            {t("courseDetail.partialGrade")}
+          </span>
+        ) : null}
+      </div>
       <span className="table-meta muted">{row.submittedAttemptCount}</span>
       <div className="table-actions">
         {getGradebookActivityActions(row.activityTypeKey).canAssessWithAi ? (

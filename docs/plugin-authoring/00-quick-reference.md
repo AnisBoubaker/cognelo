@@ -258,6 +258,10 @@ Typical shape:
 type ServerActivityPlugin = {
   key: string;
   routes?: readonly PluginRouteDefinition[];
+  gradeCompletion?: {
+    activityTypeKeys: readonly string[];
+    getCompletions: PluginGradeCompletionHandler;
+  };
   hooks?: {
     onCourseActivityCreatedFromBankVersion?: CourseActivityCreatedFromBankVersionHook;
     onCourseActivityPublishedToBank?: CourseActivityPublishedToBankHook;
@@ -504,15 +508,16 @@ Delete rule for plugin-owned bank data:
 
 ## Current Grading State
 
-There is no generic platform gradebook yet.
+Cognelo has a generic core gradebook for summative activities. Plugins keep activity-specific grading evidence in plugin-owned storage and return normalized results through the shared grading handlers.
 
-If your plugin needs grading today:
+If your plugin needs grading:
 
 - keep grading logic in the plugin package
 - store grading data in plugin-owned tables
-- keep the schema easy to adapt later to a shared grade system
+- return normalized scores and student-safe feedback through the shared server contract
+- implement `gradeCompletion.getCompletions` when the final grade requires multiple independently completed components, so partial submissions cannot be released
 
-The `plugin-coding-homework-grader` package is currently a scaffold, not a finished shared grading subsystem.
+Core owns attempts, final normalized grades, append-only grade events, release visibility, and teacher overrides.
 
 ## Verification
 

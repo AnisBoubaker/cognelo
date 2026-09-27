@@ -21,6 +21,7 @@ import { AppError } from "@cognelo/core";
 import { createCodingExerciseTeacherFeedbackDraft, evaluateCodingExerciseAttemptWithAi, getCodingExerciseAiFeedbackTeacherSubmission, reviseCodingExerciseAiFeedback, snapshotCodingExerciseAiFeedbackConfig } from "./ai-feedback";
 import { regradeCodingExerciseAttempt } from "./regrading";
 import { getCodingExerciseStudentGradeReport } from "./student-grade-report";
+import { getCodingExerciseGradeCompletions } from "./grade-completion";
 
 export { listCodingExerciseProgrammingLanguages } from "./judge0";
 
@@ -50,6 +51,10 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
   studentGradeReport: {
     activityTypeKeys: ["coding-exercise"],
     getReport: getCodingExerciseStudentGradeReport
+  },
+  gradeCompletion: {
+    activityTypeKeys: ["coding-exercise"],
+    getCompletions: getCodingExerciseGradeCompletions
   },
   aiFeedback: {
     evaluateAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, pluginAttemptRef, activity, triggerKind }) => {

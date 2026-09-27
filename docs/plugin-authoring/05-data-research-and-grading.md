@@ -106,6 +106,8 @@ Teacher actions are selected from activity capability metadata. Declare `support
 
 When a learner's released report needs plugin-owned evidence beyond core's sanitized score/feedback envelope, register `studentGradeReport.activityTypeKeys` and `studentGradeReport.getReport` on the server plugin. The generic student Grades route calls this handler only for final released rows. The handler must independently verify learner ownership and release state, return only bounded student-safe evidence, and exclude private tests, answers, prompts, credentials, and unrestricted evaluation artifacts. Programming Exercises use this boundary for submitted code and per-test outcomes while retaining hidden inputs and expected outputs privately.
 
+If a final grade has multiple independently completed components, register `gradeCompletion.activityTypeKeys` and the batch `gradeCompletion.getCompletions` handler. The host supplies scored rows grouped by activity; return `complete` or `partial` with completed/required component counts for every supplied participant. Use the activity's current private grading policy and normalized grading evidence, and treat an explicit teacher final-grade override as complete. Core separately identifies submitted rows with no grade. Either an ungraded or partial submitted row prevents release, while a learner with no submitted attempt never blocks it.
+
 ## AI Feedback And AI-Assisted Grading
 
 AI assessment uses an explicit core/plugin boundary:
