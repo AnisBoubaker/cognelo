@@ -86,7 +86,8 @@ export const mcqSubmissionRoute: PluginRouteDefinition = {
         courseId: context.courseId,
         groupId: context.groupId,
         activityId: context.activity.id,
-        participantId: participant.id
+        participantId: participant.id,
+        assessmentMode: context.activity.assignment?.metadata?.assessmentMode === "summative" ? "summative" : "formative"
       });
       const attempts = submissions.map((submission) => ({
         submission,
@@ -185,17 +186,40 @@ export const mcqFormativeFeedbackRoute: PluginRouteDefinition = {
         throw new AppError(409, "MCQ_SUMMATIVE_FEEDBACK_TEACHER_REQUIRED", "Summative MCQ feedback must be started by a teacher from the gradebook.");
       }
       const input = mcqSubmissionInputSchema.parse(await readJson());
+      const metadata = {
+        mode: "formative",
+        submittedAnswers: input.answers
+      } as Prisma.InputJsonValue;
+      const coreAttempt = await startActivityAttempt(context.user, {
+        courseId: context.courseId,
+        groupId: context.groupId,
+        activityId: context.activity.id,
+        pluginKey: "mcq",
+        pluginVersion: "0.1.0",
+        assessmentMode: "formative",
+        metadata
+      });
+      const submittedAttempt = await submitActivityAttempt(context.user, {
+        attemptId: coreAttempt.id,
+        pluginAttemptRef: coreAttempt.id,
+        metadata
+      });
+      const evaluation = context.activity.config?.aiFeedbackEnabled === true
+        ? await evaluateMcqWithAi({
+            user: context.user,
+            courseId: context.courseId,
+            groupId: context.groupId,
+            activityId: context.activity.id,
+            coreAttemptId: submittedAttempt.id,
+            activity: context.activity,
+            answers: input.answers,
+            assessmentMode: "formative",
+            triggerKind: "formative_submission"
+          })
+        : null;
       return {
-        evaluation: await evaluateMcqWithAi({
-          user: context.user,
-          courseId: context.courseId,
-          groupId: context.groupId,
-          activityId: context.activity.id,
-          activity: context.activity,
-          answers: input.answers,
-          assessmentMode: "formative",
-          triggerKind: "formative_submission"
-        })
+        attempt: toMcqSubmissionRecord(submittedAttempt.metadata, submittedAttempt),
+        evaluation
       };
     }
   }
@@ -247,7 +271,13 @@ async function findStudentParticipant(groupId: string, userId: string) {
   });
 }
 
-async function findMcqSubmissions(input: { courseId: string; groupId: string; activityId: string; participantId: string }) {
+async function findMcqSubmissions(input: {
+  courseId: string;
+  groupId: string;
+  activityId: string;
+  participantId: string;
+  assessmentMode: "formative" | "summative";
+}) {
   const attempts = await prisma.activityAttempt.findMany({
     where: {
       courseId: input.courseId,
@@ -255,6 +285,7 @@ async function findMcqSubmissions(input: { courseId: string; groupId: string; ac
       activityId: input.activityId,
       participantId: input.participantId,
       pluginKey: "mcq",
+      assessmentMode: input.assessmentMode,
       lifecycle: { in: ["submitted", "graded"] }
     },
     orderBy: [{ attemptNumber: "desc" }]
@@ -286,7 +317,14 @@ export function submittedAnswersFromMetadata(metadata: unknown): McqAnswerState 
 
 function toMcqSubmissionRecord(
   metadata: unknown,
-  attempt: { id: string; attemptNumber: number; lifecycle: string; submittedAt: Date | string | null; gradedAt: Date | string | null }
+  attempt: {
+    id: string;
+    attemptNumber: number;
+    lifecycle: string;
+    submittedAt: Date | string | null;
+    gradedAt: Date | string | null;
+    assessmentMode?: string;
+  }
 ) {
   return {
     id: attempt.id,
@@ -294,6 +332,7 @@ function toMcqSubmissionRecord(
     lifecycle: attempt.lifecycle,
     submittedAt: toIsoString(attempt.submittedAt),
     gradedAt: toIsoString(attempt.gradedAt),
+    assessmentMode: attempt.assessmentMode === "summative" ? "summative" : "formative",
     answers: submittedAnswersFromMetadata(metadata)
   };
 }

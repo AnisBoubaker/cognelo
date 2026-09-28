@@ -21,6 +21,7 @@ export type McqSubmission = {
   lifecycle: string;
   submittedAt: string | null;
   gradedAt: string | null;
+  assessmentMode?: "formative" | "summative";
   answers: Record<string, string[]>;
 };
 

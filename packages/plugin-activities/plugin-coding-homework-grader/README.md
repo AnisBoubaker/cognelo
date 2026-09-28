@@ -13,6 +13,8 @@ Long-running analysis and question generation use the shared background-job serv
 
 Teacher-entered released grades and feedback are challengeable through the core course workflow, which reuses the plugin's existing **Review and grade** panel.
 
+Finalized challenge answers create a core attempt tagged with the assignment mode. Formative attempts remain available to the teacher's read-only inspector; only summative attempts may receive a grade.
+
 ## Read By Topic
 
 - [Current capabilities and phase summary](docs/REFERENCE.md#current-state)

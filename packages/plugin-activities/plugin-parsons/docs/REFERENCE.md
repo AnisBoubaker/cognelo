@@ -102,7 +102,7 @@ These are also available through group-scoped assigned activity dispatch for stu
 
 Every knowledge mode provides the complete subject catalog to the generation model as a curriculum boundary. `Use selected skills` additionally constrains the generated problem with the current draft selection. `Suggest skills` ignores the old selection and applies exact subject-catalog matches to the unsaved Concepts-tab draft after generation. `Ignore skills` neither reads nor changes the draft and performs no suggestion pass.
 
-The gradebook attempts route is teacher-only. It returns a participant's completed Parsons submissions by default and can include in-progress/abandoned attempts plus event history with `includeAttempts=true`; the course gradebook detailed-results page uses it for the Parsons **Review and grade** overlay.
+The gradebook attempts route is teacher-only. It returns a participant's completed Parsons submissions by default and can include in-progress/abandoned attempts plus event history with `includeAttempts=true`; the course gradebook detailed-results page uses it for the Parsons **Review and grade** overlay. Each formative check and summative submission also creates a core attempt linked to the plugin attempt and tagged with the assignment mode. Core mode references keep old formative work inspectable after a switch to summative without admitting it into summative grading.
 
 Parsons registers a server `gradeAttempt` handler for the platform gradebook regrade API. Teacher-triggered regrades resolve the stored plugin attempt reference, evaluate the submitted attempt state against the current course-local activity config, and let the core gradebook service record the updated grade plus a `regraded` audit event.
 

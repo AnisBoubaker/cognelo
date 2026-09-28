@@ -63,8 +63,10 @@ It is intentionally a planning artifact. Implementation should proceed iterative
 - Group activity assignments have an assessment mode:
   - formative activity
   - summative activity
-- Formative activity checks are recorded by the plugin for analytics/research, but they do not create core submissions or gradebook grades.
-- Summative activity submissions create core attempts, submissions, and grades when the plugin can grade immediately.
+- Every inspectable formative check and summative submission creates a core attempt whose `assessmentMode` captures the assignment mode at that moment; plugins may additionally retain richer state and event history.
+- Only summative attempts consume summative attempt limits, enter grade selection, or receive gradebook grades. Formative attempts remain visible to teachers through the read-only attempt inspector.
+- Formative-to-summative changes preserve all old formative attempts and make only future attempts summative. Summative reports select only summative attempt references.
+- Summative-to-formative changes require explicit UI and API confirmation because they convert existing summative attempts to formative, deactivate current grades, hide released grades, and append per-student audit events. Grade snapshots and history are retained rather than deleted.
 - Every submission creates an attempt.
 - A successful final submission clears its standalone response draft on a best-effort basis; draft cleanup failure must not turn an already-recorded submission into a client-visible submission failure.
 - An attempt should not remain submitted without grading.
@@ -130,7 +132,7 @@ Core responsibilities:
 
 Parsons initial grading behavior:
 
-- Formative Parsons activities keep the existing "Check answer" workflow and record check events in the plugin attempt tables.
+- Formative Parsons activities keep the existing "Check answer" workflow, record check events in the plugin attempt tables, and create ungraded mode-tagged core-attempt snapshots for teacher inspection.
 - Summative Parsons activities show a student "Submit" action. Submitting records the Parsons result, creates a core `ActivityAttempt`, submits it, and records an automatic grade.
 - The initial Parsons raw grade is `1/1` when order and indentation are both correct.
 - Partial Parsons credit currently gives `0.7` for correct order and `0.3` for correct indentation.
@@ -478,6 +480,8 @@ First plugin integration target:
 - Completed: make Parsons summative submissions create core attempts and automatic grades, with the student-facing Parsons toolbar showing Submit instead of Check.
 - Completed: make completed summative Parsons attempts read-only when the attempt limit is reached, so students can review the attempt without starting or submitting another one.
 - Completed: suppress correct/incorrect validation messages in summative Parsons mode.
+- Completed: tag every inspectable plugin attempt with its creation-time assessment mode, expose formative and summative attempt histories to teachers, and exclude formative attempts from summative limits, grading, release, and reports.
+- Completed: preserve formative attempts when switching to summative; require explicit UI/API confirmation when switching summative to formative, then convert attempts, withdraw active grades, hide released grades, and audit every affected learner.
 
 ### Phase 7: Student Grade Visibility - Completed
 

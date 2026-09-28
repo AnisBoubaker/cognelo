@@ -950,6 +950,7 @@ export type CourseGradebookItemSummary = {
   activityTitle: string;
   activityTypeKey: string;
   activityTypeName: string;
+  assessmentMode: "formative" | "summative";
   gradesReleased: boolean;
   pointsPossible: number;
   studentCount: number;
@@ -971,6 +972,7 @@ export type CourseGradebookRow = {
   activityTitle: string;
   activityTypeKey: string;
   activityTypeName: string;
+  assessmentMode: "formative" | "summative";
   gradesReleased: boolean;
   participantId: string;
   participantName: string;
@@ -995,6 +997,7 @@ export type CourseGradebookRow = {
     attemptNumber: number;
     lifecycle: "started" | "submitted" | "graded" | "deleted";
     pluginAttemptRef: string | null;
+    assessmentMode: "formative" | "summative";
     startedAt: string;
     submittedAt: string | null;
     gradedAt: string | null;
@@ -1671,7 +1674,7 @@ export const api = {
       `/courses/${courseId}/activities/${activityId}/coding-exercises/hidden-tests`
     ),
   codingExerciseReviewAll: (courseId: string, activityId: string) =>
-    request<{ submissions: Array<{ participantId: string; execution: CodingExerciseExecution }> }>(
+    request<{ submissions: Array<{ participantId: string; execution: CodingExerciseExecution; attempts: CodingExerciseExecution[] }> }>(
       `/courses/${courseId}/activities/${activityId}/coding-exercises/review-all`
     ),
   saveCodingExerciseHiddenTests: (
@@ -1821,7 +1824,7 @@ export const api = {
       `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/tests`
     ),
   webDesignExerciseReviewAll: (courseId: string, activityId: string) =>
-    request<{ submissions: Array<{ participantId: string; submission: WebDesignExerciseSubmission }> }>(
+    request<{ submissions: Array<{ participantId: string; submission: WebDesignExerciseSubmission; attempts: WebDesignExerciseSubmission[] }> }>(
       `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/review-all`
     ),
   bankWebDesignExerciseTests: (activityBankId: string, bankActivityId: string) =>

@@ -16,7 +16,7 @@
 - Authored content is generic activity config, so core owns bank copying, synchronization, and version comparison.
 - Reusable bank Tests copy MCQ children into Test-owned bank activities and later into independent course children without plugin-private authoring rows.
 - Standalone answers autosave through `ActivityResponseDraft`; compound Test answers use `TestItemAttempt`.
-- Summative submissions use core attempts, limits, gradebook selection, and release visibility.
+- Formative **Check answers** and summative submissions both create mode-tagged core attempts. Only summative attempts use limits, gradebook selection, grading, and release visibility; teachers can inspect formative attempts read-only.
 - Optional model feedback can explain results but never changes deterministic MCQ grades and is not independently challengeable. The released deterministic grade and teacher-authored released feedback remain challengeable through the core workflow.
 
 When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an invariant changed, and the relevant detailed section.

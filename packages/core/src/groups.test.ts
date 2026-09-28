@@ -35,7 +35,18 @@ const tx = vi.hoisted(() => ({
     upsert: vi.fn()
   },
   gradebookItem: {
+    findUnique: vi.fn(),
+    update: vi.fn(),
     upsert: vi.fn()
+  },
+  activityAttempt: {
+    updateMany: vi.fn()
+  },
+  grade: {
+    updateMany: vi.fn()
+  },
+  gradeEvent: {
+    createMany: vi.fn()
   },
   courseGroupParticipant: {
     create: vi.fn(),
@@ -198,6 +209,8 @@ describe("group services", () => {
     tx.courseContentItem.findFirst.mockResolvedValue(null);
     mockPrisma.courseGroupContentVisibilityOverride.findMany.mockResolvedValue([]);
     tx.gradebookItem.upsert.mockResolvedValue({ id: "gradebook-item-1" });
+    tx.gradebookItem.findUnique.mockResolvedValue(null);
+    tx.courseGroupActivity.update.mockImplementation((input) => mockPrisma.courseGroupActivity.update(input));
     authMocks.canManageCourse.mockResolvedValue(true);
     authMocks.isAdmin.mockReturnValue(false);
     mockPrisma.test.findFirst.mockResolvedValue({
@@ -1361,6 +1374,108 @@ describe("group services", () => {
     ).rejects.toMatchObject({ status: 400, code: "TEST_SUMMATIVE_ONLY" });
 
     expect(mockPrisma.courseGroupActivity.update).not.toHaveBeenCalled();
+  });
+
+  it("requires explicit confirmation before converting summative attempts and grades to formative", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({
+      id: "assignment-1",
+      groupId: "group-1",
+      metadata: { assessmentMode: "summative" },
+      activity: { activityType: { key: "mcq" } }
+    });
+
+    await expect(
+      updateGroupActivityAssignment(teacherUser, "course-1", "group-1", "assignment-1", {
+        metadata: { assessmentMode: "formative" }
+      })
+    ).rejects.toMatchObject({ status: 409, code: "ASSESSMENT_MODE_CONVERSION_CONFIRMATION_REQUIRED" });
+
+    expect(tx.activityAttempt.updateMany).not.toHaveBeenCalled();
+    expect(tx.grade.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.courseGroupActivity.update).not.toHaveBeenCalled();
+  });
+
+  it("converts summative attempts, withdraws grades, and records the confirmed mode change", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({
+      id: "assignment-1",
+      groupId: "group-1",
+      metadata: { assessmentMode: "summative" },
+      activity: { activityType: { key: "mcq" } }
+    });
+    tx.gradebookItem.findUnique.mockResolvedValue({
+      id: "gradebook-item-1",
+      group: { participants: [{ id: "participant-1" }] },
+      attempts: [{ id: "attempt-1", participantId: "participant-1", assessmentMode: "summative" }],
+      grades: [{
+        id: "grade-1",
+        participantId: "participant-1",
+        selectedAttemptId: "attempt-1",
+        normalizedScore: 8,
+        normalizedMaxScore: 10,
+        isActive: true
+      }]
+    });
+    mockPrisma.courseGroupActivity.update.mockResolvedValue({ id: "assignment-1" });
+
+    await updateGroupActivityAssignment(teacherUser, "course-1", "group-1", "assignment-1", {
+      metadata: { assessmentMode: "formative" },
+      confirmSummativeToFormative: true
+    });
+
+    expect(tx.activityAttempt.updateMany).toHaveBeenCalledWith({
+      where: { groupActivityId: "assignment-1", assessmentMode: "summative" },
+      data: { assessmentMode: "formative" }
+    });
+    expect(tx.grade.updateMany).toHaveBeenCalledWith({
+      where: { gradebookItemId: "gradebook-item-1", isActive: true },
+      data: { isActive: false }
+    });
+    expect(tx.gradebookItem.update).toHaveBeenCalledWith({
+      where: { id: "gradebook-item-1" },
+      data: { gradesReleased: false }
+    });
+    expect(tx.gradeEvent.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({
+        eventType: "assessment_mode_changed",
+        gradeId: "grade-1",
+        participantId: "participant-1",
+        previousValue: expect.objectContaining({ assessmentMode: "summative", activeGrade: true }),
+        nextValue: expect.objectContaining({ assessmentMode: "formative", activeGrade: false, convertedAttemptCount: 1 })
+      })]
+    });
+  });
+
+  it("keeps formative attempts formative when an activity becomes summative", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({
+      id: "assignment-1",
+      groupId: "group-1",
+      metadata: { assessmentMode: "formative" },
+      activity: { activityType: { key: "mcq" } }
+    });
+    tx.gradebookItem.findUnique.mockResolvedValue({
+      id: "gradebook-item-1",
+      group: { participants: [{ id: "participant-1" }] },
+      attempts: [{ id: "attempt-1", participantId: "participant-1", assessmentMode: "formative" }],
+      grades: []
+    });
+    mockPrisma.courseGroupActivity.update.mockResolvedValue({ id: "assignment-1" });
+
+    await updateGroupActivityAssignment(teacherUser, "course-1", "group-1", "assignment-1", {
+      metadata: { assessmentMode: "summative" }
+    });
+
+    expect(tx.activityAttempt.updateMany).not.toHaveBeenCalled();
+    expect(tx.grade.updateMany).not.toHaveBeenCalled();
+    expect(tx.gradeEvent.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({
+        eventType: "assessment_mode_changed",
+        previousValue: expect.objectContaining({ assessmentMode: "formative" }),
+        nextValue: expect.objectContaining({ assessmentMode: "summative", convertedAttemptCount: 0 })
+      })]
+    });
   });
 
   it("allows course-wide group assignments to be reordered inside a group", async () => {

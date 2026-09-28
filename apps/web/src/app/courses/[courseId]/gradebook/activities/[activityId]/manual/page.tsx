@@ -60,6 +60,7 @@ export default function ManualActivityGradingPage() {
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [attemptsByRowKey, setAttemptsByRowKey] = useState<Record<string, ManualGradingAttempt[]>>({});
+  const [selectedAttemptIndexByRowKey, setSelectedAttemptIndexByRowKey] = useState<Record<string, number>>({});
   const [activityConfigByRowKey, setActivityConfigByRowKey] = useState<Record<string, Record<string, unknown>>>({});
   const [draftsByRowKey, setDraftsByRowKey] = useState<Record<string, DraftGrade>>({});
   const [loadingAttempts, setLoadingAttempts] = useState(false);
@@ -91,6 +92,11 @@ export default function ManualActivityGradingPage() {
   const pageSize = activityTypeKey === "mcq" ? MCQ_PAGE_SIZE : DEFAULT_PAGE_SIZE;
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const pageRows = useMemo(() => rows.slice(pageIndex * pageSize, pageIndex * pageSize + pageSize), [pageIndex, pageSize, rows]);
+  const pageHasGradeableAttempt = pageRows.some((row) => {
+    const attempts = attemptsByRowKey[rowKey(row)] ?? [];
+    const selectedAttempt = attempts[selectedAttemptIndexByRowKey[rowKey(row)] ?? 0] ?? null;
+    return row.assessmentMode === "summative" && assessmentModeForManualAttempt(row, selectedAttempt) === "summative";
+  });
   const activityTitle = rows[0]?.activityTitle ?? gradebook?.items[0]?.activityTitle ?? t("common.loading");
   const groupTitle = groupId ? gradebook?.items.find((item) => item.groupId === groupId)?.groupTitle : null;
   const resultsHref = `/courses/${courseId}/gradebook/activities/${activityId}${groupId ? `?groupId=${groupId}` : ""}`;
@@ -136,8 +142,8 @@ export default function ManualActivityGradingPage() {
             codingExerciseReview!,
             api.groupActivity(courseId, row.groupId, row.activityId)
           ]);
-          const execution = review.submissions.find((submission) => submission.participantId === row.participantId)?.execution;
-          return { row, attempts: execution ? [execution] : [], activityConfig: activityResult.activity.config ?? {} };
+          const attempts = review.submissions.find((submission) => submission.participantId === row.participantId)?.attempts ?? [];
+          return { row, attempts: sortAttemptsByDisplayedTimestamp(attempts), activityConfig: activityResult.activity.config ?? {} };
         }
         if (row.activityTypeKey === "coding-homework-grader") {
           const [result, activityResult] = await Promise.all([
@@ -154,8 +160,8 @@ export default function ManualActivityGradingPage() {
             webDesignReview!,
             api.groupActivity(courseId, row.groupId, row.activityId)
           ]);
-          const submission = review.submissions.find((candidate) => candidate.participantId === row.participantId)?.submission;
-          return { row, attempts: submission ? [submission] : [], activityConfig: activityResult.activity.config ?? {} };
+          const attempts = review.submissions.find((candidate) => candidate.participantId === row.participantId)?.attempts ?? [];
+          return { row, attempts: sortAttemptsByDisplayedTimestamp(attempts), activityConfig: activityResult.activity.config ?? {} };
         }
         if (row.activityTypeKey === "parsons-problem") {
           const [result, activityResult] = await Promise.all([
@@ -186,6 +192,14 @@ export default function ManualActivityGradingPage() {
           const next = { ...current };
           results.forEach(({ row, activityConfig }) => {
             next[rowKey(row)] = activityConfig;
+          });
+          return next;
+        });
+        setSelectedAttemptIndexByRowKey((current) => {
+          const next = { ...current };
+          results.forEach(({ row, attempts }) => {
+            const key = rowKey(row);
+            next[key] = Math.min(next[key] ?? 0, Math.max(0, attempts.length - 1));
           });
           return next;
         });
@@ -239,6 +253,11 @@ export default function ManualActivityGradingPage() {
     setSaving(true);
     try {
       for (const row of pageRows) {
+        const attempts = attemptsByRowKey[rowKey(row)] ?? [];
+        const selectedAttempt = attempts[selectedAttemptIndexByRowKey[rowKey(row)] ?? 0] ?? null;
+        if (row.assessmentMode === "formative" || assessmentModeForManualAttempt(row, selectedAttempt) === "formative") {
+          continue;
+        }
         const draft = draftsByRowKey[rowKey(row)];
         if (!draft) {
           continue;
@@ -247,7 +266,7 @@ export default function ManualActivityGradingPage() {
           continue;
         }
         const mcqAnswers = draft.questionScores
-          ? buildMcqReviewAnswers(activityConfigByRowKey[rowKey(row)] ?? {}, (attemptsByRowKey[rowKey(row)] ?? [])[0] as McqSubmission, row.maxScore)
+          ? buildMcqReviewAnswers(activityConfigByRowKey[rowKey(row)] ?? {}, selectedAttempt as McqSubmission, row.maxScore)
           : [];
         if (draft.questionScores) {
           const invalidAnswer = mcqAnswers.find((answer) => {
@@ -321,6 +340,32 @@ export default function ManualActivityGradingPage() {
     });
   }
 
+  function selectAttempt(row: CourseGradebookRow, index: number) {
+    const key = rowKey(row);
+    const attempts = attemptsByRowKey[key] ?? [];
+    const selectedAttempt = attempts[index] ?? null;
+    const activityConfig = activityConfigByRowKey[key] ?? {};
+    const evaluation = selectedAttempt && "latestState" in selectedAttempt ? selectedAttempt.latestState.lastEvaluation ?? null : null;
+    const initialScore = selectedAttempt && "answers" in selectedAttempt
+      ? scoreFromMcqAttempt(activityConfig, selectedAttempt, row.maxScore)
+      : selectedAttempt && "sourceCode" in selectedAttempt
+        ? scoreFromCodingExecution(selectedAttempt, row.maxScore)
+        : selectedAttempt && isWebDesignSubmission(selectedAttempt)
+          ? scoreFromWebDesignSubmission(selectedAttempt, row.maxScore)
+          : scoreFromEvaluation(evaluation, row.maxScore);
+    setSelectedAttemptIndexByRowKey((current) => ({ ...current, [key]: index }));
+    setDraftsByRowKey((current) => ({
+      ...current,
+      [key]: {
+        score: initialScore === null ? "" : formatGradeNumber(initialScore),
+        questionScores: selectedAttempt && "answers" in selectedAttempt
+          ? mcqQuestionScores(activityConfig, selectedAttempt, row.maxScore)
+          : undefined,
+        feedback: feedbackFromGrade(row, t) || feedbackFromEvaluation(evaluation, t)
+      }
+    }));
+  }
+
   return (
     <AppShell>
       <main className="page stack">
@@ -353,9 +398,9 @@ export default function ManualActivityGradingPage() {
               <button className="button secondary" disabled={saving || pageIndex >= pageCount - 1} type="button" onClick={() => void goToPage(pageIndex + 1)}>
                 {t("courseDetail.nextSubmission")}
               </button>
-              <button disabled={saving} type="button" onClick={() => void saveCurrentPage()}>
+              {pageHasGradeableAttempt ? <button disabled={saving} type="button" onClick={() => void saveCurrentPage()}>
                 {saving ? t("common.saving") : t("common.save")}
-              </button>
+              </button> : null}
             </div>
           </div>
 
@@ -366,7 +411,10 @@ export default function ManualActivityGradingPage() {
               {pageRows.map((row) => {
                 const key = rowKey(row);
                 const attempts = attemptsByRowKey[key] ?? [];
-                const selectedAttempt = attempts[0] ?? null;
+                const selectedAttemptIndex = selectedAttemptIndexByRowKey[key] ?? 0;
+                const selectedAttempt = attempts[selectedAttemptIndex] ?? null;
+                const selectedAttemptMode = assessmentModeForManualAttempt(row, selectedAttempt);
+                const readOnlyAttempt = row.assessmentMode === "formative" || selectedAttemptMode === "formative";
                 const draft = draftsByRowKey[key] ?? { score: "", feedback: "" };
                 const activityConfig = activityConfigByRowKey[key] ?? {};
                 const mcqReviewAnswers = selectedAttempt && "answers" in selectedAttempt
@@ -383,6 +431,19 @@ export default function ManualActivityGradingPage() {
                       </div>
                       <strong>{formatGradebookScore(row.score, row.maxScore)}</strong>
                     </div>
+
+                    {attempts.length > 1 ? (
+                      <div className="field" style={{ maxWidth: 360 }}>
+                        <label htmlFor={`attempt-${key}`}>{t("courseDetail.attemptHistory")}</label>
+                        <select id={`attempt-${key}`} value={selectedAttemptIndex} onChange={(event) => selectAttempt(row, Number(event.target.value))}>
+                          {attempts.map((attempt, index) => (
+                            <option key={manualAttemptId(attempt, index)} value={index}>
+                              {t("courseDetail.attemptNumber", { number: attempts.length - index })} · {assessmentModeForManualAttempt(row, attempt)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
 
                     {row.activityTypeKey === "test" ? (
                       <TestGradeBreakdown feedback={row.feedback} heading={t("groupPage.gradingBreakdownTitle")} />
@@ -449,7 +510,7 @@ export default function ManualActivityGradingPage() {
                                   </div>
                                 ) : null
                               )}
-                              <div className="field" style={{ maxWidth: 220 }}>
+                              {!readOnlyAttempt ? <div className="field" style={{ maxWidth: 220 }}>
                                 <label htmlFor={`score-${rowKey(row)}-${answer.questionId}`}>
                                   {formatMessage(mcqCopy.points, {
                                     score: formatGradeNumber(Number(draft.questionScores?.[answer.questionId] ?? answer.awardedScore)),
@@ -465,7 +526,7 @@ export default function ManualActivityGradingPage() {
                                   value={draft.questionScores?.[answer.questionId] ?? ""}
                                   onChange={(event) => updateQuestionScore(row, answer.questionId, event.target.value, answer.maxScore)}
                                 />
-                              </div>
+                              </div> : null}
                             </div>
                           </article>
                         ))}
@@ -511,7 +572,7 @@ export default function ManualActivityGradingPage() {
                       <p className="muted">{t("courseDetail.noAnswers")}</p>
                     )}
 
-                    <div className="form">
+                    {!readOnlyAttempt ? <div className="form">
                       {draft.questionScores ? (
                         <p className="muted">Total: {formatGradebookScore(sumQuestionScores(draft.questionScores), row.maxScore)}</p>
                       ) : (
@@ -535,7 +596,9 @@ export default function ManualActivityGradingPage() {
                           onChange={(event) => updateDraft(row, { feedback: event.target.value })}
                         />
                       </div>
-                    </div>
+                    </div> : (
+                      <p className="muted">{t("courseDetail.formativeAttemptReadOnly")}</p>
+                    )}
                   </article>
                 );
               })}
@@ -551,6 +614,23 @@ export default function ManualActivityGradingPage() {
 
 function rowKey(row: CourseGradebookRow) {
   return `${row.gradebookItemId}:${row.participantId}`;
+}
+
+function manualAttemptId(attempt: ManualGradingAttempt, index: number) {
+  return typeof attempt.id === "string" ? attempt.id : `attempt-${index}`;
+}
+
+function assessmentModeForManualAttempt(
+  row: CourseGradebookRow,
+  attempt: ManualGradingAttempt | null
+): "formative" | "summative" {
+  if (!attempt) return row.assessmentMode;
+  if ("assessmentMode" in attempt && attempt.assessmentMode === "summative") return "summative";
+  if ("assessmentMode" in attempt && attempt.assessmentMode === "formative") return "formative";
+  const coreAttempt = row.attempts.find((candidate) =>
+    candidate.id === attempt.id || candidate.pluginAttemptRef === attempt.id
+  );
+  return coreAttempt?.assessmentMode ?? "formative";
 }
 
 function scoreFromEvaluation(evaluation: ParsonsAttemptEvaluation | null, maxScore: number) {

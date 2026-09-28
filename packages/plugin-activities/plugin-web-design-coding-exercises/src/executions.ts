@@ -69,18 +69,23 @@ export async function listRecentWebDesignExerciseSubmissions(params: {
 }
 
 export async function listWebDesignExerciseReviewSubmissions(params: { activityId: string; userIds: string[] }) {
+  const submissions = await listWebDesignExerciseReviewSubmissionAttempts(params);
+  const seen = new Set<string>();
+  return submissions.filter((submission) => {
+    if (seen.has(submission.userId)) return false;
+    seen.add(submission.userId);
+    return true;
+  });
+}
+
+export async function listWebDesignExerciseReviewSubmissionAttempts(params: { activityId: string; userIds: string[] }) {
   if (!params.userIds.length) return [];
   const submissions = await prisma.pluginWebDesignExerciseSubmission.findMany({
     where: { activityId: params.activityId, userId: { in: params.userIds }, kind: "submit" },
     include: { testResults: { orderBy: { createdAt: "asc" } } },
     orderBy: [{ createdAt: "desc" }]
   });
-  const seen = new Set<string>();
-  return submissions.flatMap((submission) => {
-    if (seen.has(submission.userId)) return [];
-    seen.add(submission.userId);
-    return [toSubmissionRecord(submission)];
-  });
+  return submissions.map((submission) => toSubmissionRecord(submission));
 }
 
 export async function runWebDesignExercise(params: {

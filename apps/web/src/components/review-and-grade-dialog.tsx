@@ -446,8 +446,9 @@ function canLeaveFeedbackReview(state: FeedbackReviewState, confirmMessage: stri
 }
 
 function selectedFeedbackAttempt(row: CourseGradebookRow) {
-  return row.attempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber)
-    ?? [...row.attempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted")
+  const summativeAttempts = row.attempts.filter((candidate) => candidate.assessmentMode === "summative");
+  return summativeAttempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber)
+    ?? [...summativeAttempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted")
     ?? null;
 }
 

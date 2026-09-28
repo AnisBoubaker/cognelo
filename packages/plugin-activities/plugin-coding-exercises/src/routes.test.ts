@@ -249,7 +249,7 @@ describe("coding exercise plugin routes", () => {
     }));
   });
 
-  it("counts legacy plugin submissions when deciding whether another attempt is available", async () => {
+  it("does not let unclassified legacy submissions consume summative attempt limits", async () => {
     mocks.getActivityAttemptAvailability.mockResolvedValue({
       attemptLimitMode: "max_attempts",
       gradesReleased: false,
@@ -276,10 +276,10 @@ describe("coding exercise plugin routes", () => {
     ).resolves.toMatchObject({
       attempts: [{ submission: { id: "submit-1" } }],
       availability: {
-        usedAttempts: 1,
-        attemptsRemaining: 0,
-        canStart: false,
-        reason: "ATTEMPT_LIMIT_REACHED"
+        usedAttempts: 0,
+        attemptsRemaining: 1,
+        canStart: true,
+        reason: null
       }
     });
   });

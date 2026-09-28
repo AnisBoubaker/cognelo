@@ -36,7 +36,7 @@ vi.mock("@cognelo/db", () => ({
   prisma: mocks.prisma
 }));
 
-const { mcqGenerateRoute, mcqGradebookAttemptsRoute, mcqSubmissionRoute } = await import("./routes");
+const { mcqFormativeFeedbackRoute, mcqGenerateRoute, mcqGradebookAttemptsRoute, mcqSubmissionRoute } = await import("./routes");
 
 const context = {
   user: { id: "teacher-1", email: "teacher@example.test", name: null, firstName: null, lastName: null, roles: ["teacher" as const] },
@@ -370,6 +370,38 @@ describe("MCQ generation route", () => {
       "group-1",
       "activity-1"
     );
+  });
+
+  it("records every formative answer check as a non-graded core attempt", async () => {
+    await expect(
+      mcqFormativeFeedbackRoute.methods.POST?.({
+        request: new Request("http://test.local"),
+        context: {
+          ...context,
+          user: { ...context.user, id: "student-1", roles: ["student" as const] },
+          groupId: "group-1",
+          activity: {
+            ...context.activity,
+            config: { source: "## Question\n\n- [x] Correct\n- [ ] Wrong", aiFeedbackEnabled: false },
+            assignment: { id: "assignment-1", metadata: { assessmentMode: "formative" } }
+          }
+        },
+        readJson: async () => ({ answers: { "question-1": ["question-1-choice-1"] } })
+      })
+    ).resolves.toMatchObject({
+      attempt: { id: "core-attempt-1", assessmentMode: "formative" },
+      evaluation: null
+    });
+
+    expect(mocks.startActivityAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "student-1" }),
+      expect.objectContaining({ assessmentMode: "formative", pluginKey: "mcq" })
+    );
+    expect(mocks.submitActivityAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "student-1" }),
+      expect.objectContaining({ attemptId: "core-attempt-1" })
+    );
+    expect(mocks.recordActivityAttemptGradingResult).not.toHaveBeenCalled();
   });
 
   it("rejects a summative submission when the configured attempt limit is exhausted", async () => {

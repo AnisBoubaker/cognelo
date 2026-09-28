@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   assertCanManageCourse: vi.fn(),
   clearActivityResponseDraft: vi.fn(),
+  recordActivityAttemptGradingResult: vi.fn(),
+  startActivityAttempt: vi.fn(),
+  submitActivityAttempt: vi.fn(),
   getWebDesignExpectedResult: vi.fn(),
   listRecentWebDesignExerciseSubmissions: vi.fn(),
   listWebDesignExerciseTests: vi.fn(),
@@ -16,7 +19,10 @@ vi.mock("@cognelo/core", async () => {
   return {
     ...actual,
     assertCanManageCourse: mocks.assertCanManageCourse,
-    clearActivityResponseDraft: mocks.clearActivityResponseDraft
+    clearActivityResponseDraft: mocks.clearActivityResponseDraft,
+    recordActivityAttemptGradingResult: mocks.recordActivityAttemptGradingResult,
+    startActivityAttempt: mocks.startActivityAttempt,
+    submitActivityAttempt: mocks.submitActivityAttempt
   };
 });
 
@@ -68,6 +74,8 @@ describe("web design coding exercise routes", () => {
     mocks.listRecentWebDesignExerciseSubmissions.mockResolvedValue([{ id: "submission-1" }]);
     mocks.runWebDesignExercise.mockResolvedValue({ id: "run-1" });
     mocks.submitWebDesignExercise.mockResolvedValue({ id: "submit-1" });
+    mocks.startActivityAttempt.mockResolvedValue({ id: "core-attempt-1" });
+    mocks.submitActivityAttempt.mockResolvedValue({ id: "core-attempt-1" });
   });
 
   it("manages tests and expected results in course context", async () => {
@@ -110,5 +118,11 @@ describe("web design coding exercise routes", () => {
       "group-1",
       "activity-1"
     );
+    expect(mocks.startActivityAttempt).toHaveBeenCalledWith(context.user, expect.objectContaining({
+      assessmentMode: "formative",
+      pluginAttemptRef: "submit-1"
+    }));
+    expect(mocks.submitActivityAttempt).toHaveBeenCalledWith(context.user, expect.objectContaining({ attemptId: "core-attempt-1" }));
+    expect(mocks.recordActivityAttemptGradingResult).not.toHaveBeenCalled();
   });
 });

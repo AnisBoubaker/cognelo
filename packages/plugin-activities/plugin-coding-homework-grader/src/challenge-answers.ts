@@ -125,7 +125,7 @@ export async function saveCodingHomeworkChallengeAnswers(
   }
 
   const coreAttemptId =
-    options.finalize && !submission.coreAttemptId && options.gradebook?.assessmentMode === "summative"
+    options.finalize && !submission.coreAttemptId && options.gradebook
       ? await createSubmittedCoreAttempt(scope, submission, nextAnswers, submittedAt ?? new Date(), options.gradebook)
       : submission.coreAttemptId;
 
@@ -164,9 +164,10 @@ async function createSubmittedCoreAttempt(
   submittedAt: Date,
   gradebook: ChallengeAnswerGradebookOptions
 ) {
+  const assessmentMode = gradebook.assessmentMode === "summative" ? "summative" : "formative";
   const submittedAnswers = Object.fromEntries(submission.questions.map((question) => [question.id, answers.get(question.id) ?? ""]));
   const metadata = {
-    mode: "summative",
+    mode: assessmentMode,
     questionCount: submission.questions.length,
     submittedAnswers,
     submittedAt: submittedAt.toISOString(),
@@ -179,6 +180,7 @@ async function createSubmittedCoreAttempt(
     pluginKey: "coding-homework-grader",
     pluginVersion: gradebook.pluginVersion ?? "0.1.0",
     pluginAttemptRef: submission.id,
+    assessmentMode,
     activityConfigFingerprint: gradebook.activityConfigFingerprint ?? null,
     metadata
   });
