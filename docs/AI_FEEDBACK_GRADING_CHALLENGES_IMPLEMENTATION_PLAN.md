@@ -190,7 +190,7 @@ MCQ answer-key grading remains deterministic and authoritative. AI feedback may 
 - Summative feedback can be visible to authorized teachers before release.
 - Summative student endpoints must omit the feedback until the gradebook item is released.
 - Existing provisional-score behavior for repeatable summative activities does not automatically expose the AI narrative or private rubric.
-- A release action should surface pending/failed required feedback. The initial implementation must define whether release is blocked or requires an explicit teacher override; it must never silently claim that configured feedback is complete.
+- Release is fail-closed when pending/failed required grading leaves submitted work ungraded or a required component partial. Feedback-only pending work does not block release. Learners who did not submit do not block it, and an explicit teacher final-grade override is complete.
 - Student-facing result envelopes must remain sanitized and must not include provider prompts, raw responses, model credentials, hidden tests, or other learners' material.
 
 ## Grade Challenges
@@ -329,10 +329,10 @@ The normalized event should include stable references, timestamps, assessment mo
 
 ### Phase 0 — Confirm The Contract
 
-Status: complete. Grade release is not blocked automatically when feedback is pending or failed; the teacher controls evaluation and release as separate explicit actions. The web batch is bounded by the attempts currently loaded for the activity and processes them sequentially.
+Status: complete. Grade release is blocked when pending or failed required grading leaves submitted work ungraded or partial; feedback-only pending work remains a separate teacher-controlled action. The web batch is bounded by the attempts currently loaded for the activity and processes them sequentially.
 
 - Confirm course settings, trigger semantics, visibility, direct teacher execution, challenge rules, and research fields.
-- Confirm whether grade release is blocked by required feedback failures.
+- Completed: block release when required grading is incomplete, without blocking true non-submissions or feedback-only activities.
 - Confirm bounded batch size and timeout behavior for direct teacher-triggered grading.
 
 ### Phase 1 — Shared Platform Foundation
@@ -347,7 +347,7 @@ Status: complete. Course settings, SDK contracts, secure model resolution, norma
 
 ### Phase 2 — Programming Exercise Pilot
 
-Status: complete. Programming Exercises support a private unnamed general grading rubric that remains available to teachers without automatic feedback, immediate formative evaluation when automation is enabled, teacher-triggered summative evaluation, configurable deterministic/rubric weighting, strict two-attempt structured-output validation, immutable private evaluation artifacts, submission-time private rubric snapshots, and teacher review of submitted code, latest successful hidden-test outcomes, and editable summary/strength/improvement/criterion scores and narrative. Course and bank editors expose a dedicated host Grading tab after Concepts with nested Rubric and Test cases side tabs. Rubrics may be generated only from a title, student prompt, and reference solution; both rubric and assessment-feedback generation resolve the Subject teaching language server-side.
+Status: complete. Programming Exercises support a private unnamed general grading rubric that remains available to teachers without automatic feedback, immediate formative evaluation when automation is enabled, teacher-triggered summative evaluation, configurable deterministic/rubric weighting, strict two-attempt structured-output validation, immutable private evaluation artifacts, submission-time private rubric snapshots, and teacher review of submitted code, latest successful hidden-test outcomes, and editable summary/strength/improvement/criterion scores and narrative. A confirmed draft action clears all learner-facing narrative while preserving scores and grade components, allowing selected learners to receive manually written experimental feedback through the same audited save path. Course and bank editors expose a dedicated host Grading tab after Concepts with nested Rubric and Test cases side tabs. Rubrics may be generated only from a title, student prompt, and reference solution; both rubric and assessment-feedback generation resolve the Subject teaching language server-side.
 Teacher correction workflows additionally append test-only reruns against current hidden tests and regenerate summative feedback against the current rubric and latest saved tests. Neither action invokes the other; the original submission snapshot and earlier evaluation artifacts remain immutable.
 
 The development seed includes a reproducible two-section Programming Exercise batch at the submitted-but-not-evaluated boundary. This permits teacher single/batch generation, review, editing, release, learner review, challenge, and research-event testing without requiring Judge0 to execute dozens of fixture submissions during seeding. A clean course receives the fallback seed model, while reseeding preserves a teacher-selected assessment-feedback model and explicit feedback switch.
@@ -427,7 +427,7 @@ Status: partial. The manager research endpoint is implemented with stable identi
 
 ## Deferred Product And Policy Decisions
 
-- Whether summative release should later be blocked while required AI feedback is pending/failed. The current implementation permits explicit release.
+- Whether feedback-only summative release should later be blocked while generation is pending/failed. Required grading components already block release when incomplete.
 - A durable maximum batch size beyond the attempts loaded by the current detailed-gradebook view.
 - Request timeout/cancellation behavior for larger direct bulk grading without a background worker.
 - Whether Compound Test parent review should edit child feedback inline or open each child's plugin review renderer in a nested surface.
