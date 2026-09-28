@@ -5,12 +5,15 @@ import { describe, expect, it, vi } from "vitest";
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
 vi.mock("@cognelo/activity-ui", () => ({
-  CodeRenderer: ({ code }: { code: string }) => React.createElement("pre", null, code)
+  CodeRenderer: ({ code }: { code: string }) => React.createElement("pre", null, code),
+  ConfirmationDialog: () => null
 }));
 
 const {
+  clearCodingExerciseFeedbackContent,
   CodingExerciseAiFeedbackReview,
   getCodingExerciseGradingBreakdown,
+  hasCodingExerciseFeedbackContent,
   recalculateCodingExerciseFeedback
 } = await import("./coding-exercise-ai-feedback-review");
 
@@ -21,6 +24,7 @@ const messages: Record<string, string> = {
   "courseDetail.feedbackReviewTestPassed": "Passed",
   "courseDetail.feedbackReviewTestFailed": "Failed",
   "courseDetail.feedbackReviewTest": "Test {number}",
+  "courseDetail.feedbackReviewClearContent": "Clear feedback content",
   "courseDetail.feedbackReviewSummary": "Summary",
   "courseDetail.feedbackReviewStrengths": "Strengths",
   "courseDetail.feedbackReviewImprovements": "Improvements",
@@ -79,6 +83,52 @@ describe("coding exercise teacher feedback review", () => {
     const html = renderReview({ sourceCode: "print(1)", language: "python", resultSummary: {} });
 
     expect(html).not.toContain("Test results");
+  });
+
+  it("places the clear-content action before the editable feedback fields", () => {
+    const html = renderReview({ sourceCode: "print(1)", language: "python", resultSummary: {} });
+
+    expect(html).toContain("Clear feedback content");
+    expect(html.indexOf("Clear feedback content")).toBeLessThan(html.indexOf("Summary"));
+  });
+
+  it("clears every narrative field while preserving rubric scores and grading metadata", () => {
+    const generatedFeedback = {
+      kind: "ai_assessment_feedback",
+      summary: "Generated summary",
+      strengths: ["Generated strength"],
+      improvements: ["Generated improvement"],
+      deterministicScore: 80,
+      aiScore: 75,
+      combinedScore: 78,
+      criteria: [{
+        id: "quality",
+        title: "Code quality",
+        weightPercent: 100,
+        scorePercent: 75,
+        feedback: "Generated explanation"
+      }]
+    };
+
+    expect(hasCodingExerciseFeedbackContent(generatedFeedback)).toBe(true);
+    const cleared = clearCodingExerciseFeedbackContent(generatedFeedback);
+    expect(cleared).toMatchObject({
+      kind: "ai_assessment_feedback",
+      summary: "",
+      strengths: [],
+      improvements: [],
+      deterministicScore: 80,
+      aiScore: 75,
+      combinedScore: 78,
+      criteria: [{
+        id: "quality",
+        title: "Code quality",
+        weightPercent: 100,
+        scorePercent: 75,
+        feedback: ""
+      }]
+    });
+    expect(hasCodingExerciseFeedbackContent(cleared)).toBe(false);
   });
 
   it("shows the weighted automatic, rubric, and total grades", () => {

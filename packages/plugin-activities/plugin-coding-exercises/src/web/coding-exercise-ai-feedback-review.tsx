@@ -1,6 +1,7 @@
 "use client";
 
-import { CodeRenderer } from "@cognelo/activity-ui";
+import { useState } from "react";
+import { CodeRenderer, ConfirmationDialog } from "@cognelo/activity-ui";
 
 export type CodingExerciseAiFeedbackReviewProps = {
   feedback: Record<string, unknown>;
@@ -18,6 +19,7 @@ export type CodingExerciseGradingBreakdown = {
 };
 
 export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbackChange, t }: CodingExerciseAiFeedbackReviewProps) {
+  const [clearConfirmationOpen, setClearConfirmationOpen] = useState(false);
   const sourceCode = typeof submission.sourceCode === "string" ? submission.sourceCode : "";
   const language = typeof submission.language === "string" ? submission.language : "text";
   const resultSummary = recordValue(submission.resultSummary);
@@ -27,6 +29,7 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
   const improvements = stringArray(feedback.improvements).join("\n\n");
   const criteria = recordArray(feedback.criteria);
   const gradingBreakdown = getCodingExerciseGradingBreakdown(feedback);
+  const hasFeedbackContent = hasCodingExerciseFeedbackContent(feedback);
 
   return (
     <div className="stack">
@@ -69,6 +72,16 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
           </section>
         ) : null}
       </section>
+      <div className="row wrap" style={{ justifyContent: "flex-end" }}>
+        <button
+          className="button danger"
+          disabled={!hasFeedbackContent}
+          type="button"
+          onClick={() => setClearConfirmationOpen(true)}
+        >
+          {t("courseDetail.feedbackReviewClearContent")}
+        </button>
+      </div>
       <label className="field">
         <span>{t("courseDetail.feedbackReviewSummary")}</span>
         <textarea maxLength={3000} rows={5} value={stringValue(feedback.summary)} onChange={(event) => onFeedbackChange({ ...feedback, summary: event.target.value })} />
@@ -142,8 +155,43 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
           </div>
         </section>
       ) : null}
+      <ConfirmationDialog
+        open={clearConfirmationOpen}
+        title={t("courseDetail.feedbackReviewClearContentConfirmTitle")}
+        message={t("courseDetail.feedbackReviewClearContentConfirmMessage")}
+        confirmLabel={t("courseDetail.feedbackReviewClearContentConfirmAction")}
+        cancelLabel={t("common.cancel")}
+        confirmVariant="danger"
+        onCancel={() => setClearConfirmationOpen(false)}
+        onConfirm={() => {
+          onFeedbackChange(clearCodingExerciseFeedbackContent(feedback));
+          setClearConfirmationOpen(false);
+        }}
+      />
     </div>
   );
+}
+
+export function hasCodingExerciseFeedbackContent(feedback: Record<string, unknown>) {
+  return Boolean(
+    stringValue(feedback.summary).trim()
+    || stringArray(feedback.strengths).some((value) => value.trim())
+    || stringArray(feedback.improvements).some((value) => value.trim())
+    || recordArray(feedback.criteria).some((criterion) => stringValue(criterion.feedback).trim())
+  );
+}
+
+export function clearCodingExerciseFeedbackContent(feedback: Record<string, unknown>) {
+  return {
+    ...feedback,
+    summary: "",
+    strengths: [],
+    improvements: [],
+    criteria: recordArray(feedback.criteria).map((criterion) => ({
+      ...criterion,
+      feedback: ""
+    }))
+  };
 }
 
 export function getCodingExerciseGradingBreakdown(feedback: Record<string, unknown>): CodingExerciseGradingBreakdown | null {
