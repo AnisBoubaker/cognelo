@@ -85,8 +85,9 @@ function GlobalSolution({ config, solution }: { config: Record<string, unknown>;
 
 function PerTestResults({ responses, tests }: { responses: ActivityReviewResponse[]; tests: Array<{ id: string; name: string }> }) {
   return <section className="inline-panel stack"><h3>Results by test</h3>{tests.map((test) => {
-    const results = responses.flatMap((response) => response.testResults?.find((result) => result.testId === test.id) ? [response] : []);
-    const passed = results.filter((response) => response.testResults?.find((result) => result.testId === test.id)?.passed);
+    const matchesTest = (result: { testId: string; name: string }) => result.testId === test.id || result.name === test.name;
+    const results = responses.flatMap((response) => response.testResults?.find(matchesTest) ? [response] : []);
+    const passed = results.filter((response) => response.testResults?.find(matchesTest)?.passed);
     const failed = results.filter((response) => !passed.includes(response));
     return <div className="stack stack-tight" key={test.id}><strong>{test.name}</strong><div className="aggregate-stacked-bar" aria-label={`${test.name}: ${passed.length} passed, ${failed.length} failed`}>
       <BarSegment className="is-pass" label="Passed" responses={passed} total={results.length} />

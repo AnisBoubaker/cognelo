@@ -92,7 +92,7 @@ export async function getTeacherAttemptAiFeedbackReview(user: CurrentUser, cours
       }
     }
   });
-  const selectedGrade = grade?.selectedAttemptId === attempt.id ? grade : null;
+  const selectedGrade = grade?.isActive !== false && grade?.selectedAttemptId === attempt.id ? grade : null;
   const gradeFeedback = selectedGrade ? readStoredStudentFeedback(selectedGrade.normalizedResult) : {};
   const attemptFeedback = readAttemptTeacherFeedback(attempt.metadata);
   const feedback = isStoredTeacherFeedback(gradeFeedback)
@@ -136,7 +136,7 @@ export async function reviseTeacherAttemptAiFeedback(
       }
     }
   });
-  const selectedGrade = grade?.selectedAttemptId === attempt.id ? grade : null;
+  const selectedGrade = grade?.isActive !== false && grade?.selectedAttemptId === attempt.id ? grade : null;
   const normalizedResult = asRecord(selectedGrade?.normalizedResult);
   const gradeFeedback = selectedGrade ? readStoredStudentFeedback(selectedGrade.normalizedResult) : {};
   const attemptFeedback = readAttemptTeacherFeedback(attempt.metadata);

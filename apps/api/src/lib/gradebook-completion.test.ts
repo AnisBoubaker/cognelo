@@ -43,6 +43,7 @@ describe("gradebook completion resolution", () => {
         activityTitle: "Loops",
         activityTypeKey: "coding-exercise",
         activityTypeName: "Programming exercise",
+        assessmentMode: "summative",
         gradesReleased: false,
         pointsPossible: 100,
         studentCount: 3
@@ -64,6 +65,34 @@ describe("gradebook completion resolution", () => {
     expect(result.rows[0]).not.toHaveProperty("gradeCompletionContext");
     expect(result.items[0]).toMatchObject({ incompleteGradeCount: 2, canReleaseGrades: false });
   });
+
+  it("keeps formative submissions outside grade-completion and release readiness", async () => {
+    const gradebook = {
+      filters: { groupId: null, activityId: null, status: "all" },
+      groups: [{ id: "group-1", title: "Group" }],
+      activities: [{ id: "activity-1", title: "Practice" }],
+      items: [{
+        gradebookItemId: "item-1",
+        groupId: "group-1",
+        groupTitle: "Group",
+        activityId: "activity-1",
+        activityTitle: "Practice",
+        activityTypeKey: "coding-exercise",
+        activityTypeName: "Programming exercise",
+        assessmentMode: "formative",
+        gradesReleased: false,
+        pointsPossible: 100,
+        studentCount: 1
+      }],
+      rows: [row({ assessmentMode: "formative", score: null, submittedAttemptCount: 2, needsGradingCount: 0 })]
+    };
+
+    const result = await resolveCourseGradebookCompletions(user, "course-1", gradebook as never);
+
+    expect(result.rows[0]?.gradeCompletion).toBeNull();
+    expect(result.items[0]).toMatchObject({ incompleteGradeCount: 0, canReleaseGrades: true });
+    expect(sdkMocks.resolvePluginGradeCompletionHandler).not.toHaveBeenCalled();
+  });
 });
 
 function row(overrides: Record<string, unknown>) {
@@ -75,6 +104,7 @@ function row(overrides: Record<string, unknown>) {
     activityTitle: "Loops",
     activityTypeKey: "coding-exercise",
     activityTypeName: "Programming exercise",
+    assessmentMode: "summative",
     gradesReleased: false,
     participantId: "participant-1",
     participantName: "Student",

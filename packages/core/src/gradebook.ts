@@ -5,6 +5,7 @@ import { AppError, forbidden, notFound } from "./errors";
 import { gradeChallengeTargetForGrade } from "./grade-challenge-targets";
 
 type JsonInput = Prisma.InputJsonValue;
+export type ActivityAttemptAssessmentMode = "formative" | "summative";
 type ActivityAttemptSource = {
   courseId: string;
   groupId: string;
@@ -43,6 +44,7 @@ export type StartActivityAttemptInput = ActivityAttemptSource & {
   activityConfigFingerprint?: string | null;
   testRevisionId?: string | null;
   metadata?: JsonInput;
+  assessmentMode?: ActivityAttemptAssessmentMode;
   now?: Date;
 };
 
@@ -125,7 +127,11 @@ export type DeletedSubmissionAudit = {
 export async function startActivityAttempt(user: CurrentUser, input: StartActivityAttemptInput) {
   const now = input.now ?? new Date();
   const context = await resolveAssignedActivityAttemptContext(user, input);
-  await assertAttemptCanStart(context, now);
+  const assessmentMode = assignmentAssessmentMode(context.groupActivity.metadata);
+  if (input.assessmentMode && input.assessmentMode !== assessmentMode) {
+    throw new AppError(409, "ATTEMPT_MODE_MISMATCH", "The attempt mode no longer matches the activity assignment mode.");
+  }
+  await assertAttemptCanStart(context, now, assessmentMode);
 
   return prisma.$transaction(async (tx) => {
     const latestAttempt = await tx.activityAttempt.findFirst({
@@ -155,6 +161,7 @@ export async function startActivityAttempt(user: CurrentUser, input: StartActivi
         pluginKey: input.pluginKey,
         pluginVersion: input.pluginVersion,
         pluginAttemptRef: input.pluginAttemptRef ?? null,
+        assessmentMode,
         metadata: {
           ...(asJsonObject(input.metadata) ?? {}),
           knowledgeSkillSnapshot: (context.groupActivity.activity.knowledgeConcepts ?? []).flatMap((link) => {
@@ -182,10 +189,11 @@ export async function getActivityAttemptAvailability(user: CurrentUser, input: A
     pluginKey: "availability-check",
     pluginVersion: "0"
   });
-  const details = await activityAttemptAvailabilityDetails(context);
+  const assessmentMode = assignmentAssessmentMode(context.groupActivity.metadata);
+  const details = await activityAttemptAvailabilityDetails(context, assessmentMode);
 
   try {
-    await assertAttemptCanStart(context, input.now ?? new Date());
+    await assertAttemptCanStart(context, input.now ?? new Date(), assessmentMode);
     return { ...details, canStart: true as const, reason: null };
   } catch (error) {
     if (
@@ -198,8 +206,20 @@ export async function getActivityAttemptAvailability(user: CurrentUser, input: A
   }
 }
 
-async function activityAttemptAvailabilityDetails(context: Awaited<ReturnType<typeof resolveAssignedActivityAttemptContext>>) {
+async function activityAttemptAvailabilityDetails(
+  context: Awaited<ReturnType<typeof resolveAssignedActivityAttemptContext>>,
+  assessmentMode: ActivityAttemptAssessmentMode
+) {
   const item = context.gradebookItem;
+  if (assessmentMode === "formative") {
+    return {
+      attemptLimitMode: "unlimited" as const,
+      gradesReleased: false,
+      maxAttempts: null,
+      usedAttempts: null,
+      attemptsRemaining: null
+    };
+  }
   if (item.attemptLimitMode !== "max_attempts" || item.maxAttempts === null) {
     return {
       attemptLimitMode: item.attemptLimitMode,
@@ -214,6 +234,7 @@ async function activityAttemptAvailabilityDetails(context: Awaited<ReturnType<ty
     where: {
       gradebookItemId: item.id,
       participantId: context.participant.id,
+      assessmentMode: "summative",
       lifecycle: { not: "deleted" }
     }
   });
@@ -243,7 +264,7 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
   }
   await assertCanUseAttempt(user, attempt.courseId, attempt.participant);
 
-  if (attempt.gradebookItem.gradesReleased) {
+  if (attempt.assessmentMode !== "formative" && attempt.gradebookItem.gradesReleased) {
     throw new AppError(400, "GRADES_RELEASED", "No more submissions are allowed after grades have been released.");
   }
 
@@ -282,6 +303,9 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
     throw notFound("Activity attempt");
   }
   await assertCanUseAttempt(user, attempt.courseId, attempt.participant);
+  if (attempt.assessmentMode === "formative") {
+    throw new AppError(409, "FORMATIVE_ATTEMPT_NOT_GRADEABLE", "Formative attempts cannot contribute to a grade.");
+  }
 
   return prisma.$transaction(async (tx) => {
     const previousGrade = await tx.grade.findUnique({
@@ -290,13 +314,15 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
           gradebookItemId: attempt.gradebookItemId,
           participantId: attempt.participantId
         }
-      }
+      },
+      include: { selectedAttempt: { select: { assessmentMode: true } } }
     });
     const previousEvents = await tx.gradeEvent.findMany({
       where: {
         gradebookItemId: attempt.gradebookItemId,
         participantId: attempt.participantId,
-        attemptId: { not: null }
+        attemptId: { not: null },
+        attempt: { assessmentMode: "summative" }
       },
       orderBy: [{ createdAt: "asc" }]
     });
@@ -317,7 +343,9 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
       gradebookItem: attempt.gradebookItem,
       candidates: [
         ...eventCandidates,
-        ...(eventCandidates.length === 0 && previousGrade?.selectedAttemptId ? [gradeCandidateFromCurrentGrade(previousGrade)] : []),
+        ...(eventCandidates.length === 0 && previousGrade?.selectedAttemptId && previousGrade.selectedAttempt?.assessmentMode !== "formative"
+          ? [gradeCandidateFromCurrentGrade(previousGrade)]
+          : []),
         gradedCandidate
       ]
     });
@@ -341,6 +369,7 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
         gradedByUserId: user.id,
         gradedAt: now,
         source: input.source,
+        isActive: true,
         rawResult: (input.rawResult ?? {}) as JsonInput,
         normalizedResult: selectedGrade.normalizedResult as JsonInput,
         metadata: (input.metadata ?? {}) as JsonInput
@@ -360,6 +389,7 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
         gradedByUserId: user.id,
         gradedAt: now,
         source: input.source,
+        isActive: true,
         rawResult: (input.rawResult ?? {}) as JsonInput,
         normalizedResult: selectedGrade.normalizedResult as JsonInput,
         metadata: (input.metadata ?? {}) as JsonInput
@@ -435,6 +465,7 @@ export async function deleteActivitySubmission(user: CurrentUser, courseId: stri
         gradebookItemId: attempt.gradebookItemId,
         participantId: attempt.participantId,
         attemptId: { not: null },
+        attempt: { assessmentMode: "summative" },
         eventType: { not: "submission_deleted" }
       },
       orderBy: [{ createdAt: "asc" }]
@@ -543,6 +574,7 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
       }
     },
     include: {
+      groupActivity: { select: { metadata: true } },
       group: {
         select: {
           participants: {
@@ -556,6 +588,9 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
 
   if (!item) {
     throw notFound("Gradebook item");
+  }
+  if (assignmentAssessmentMode(item.groupActivity?.metadata) !== "summative") {
+    throw new AppError(409, "FORMATIVE_GRADE_NOT_ALLOWED", "Formative activity attempts can be reviewed but not graded.");
   }
 
   const participant = item.group.participants[0];
@@ -633,6 +668,7 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
         gradedByUserId: user.id,
         gradedAt: now,
         source: "override",
+        isActive: true,
         rawResult: nextSnapshot as JsonInput,
         normalizedResult: nextSnapshot as JsonInput,
         metadata: (input.metadata ?? {}) as JsonInput
@@ -652,6 +688,7 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
         gradedByUserId: user.id,
         gradedAt: now,
         source: "override",
+        isActive: true,
         rawResult: nextSnapshot as JsonInput,
         normalizedResult: nextSnapshot as JsonInput,
         metadata: (input.metadata ?? {}) as JsonInput
@@ -691,9 +728,12 @@ export async function recordActivityAttemptAiFeedback(
   await canManageCourseOrThrow(user, courseId);
   const attempt = await prisma.activityAttempt.findFirst({
     where: { id: input.attemptId, courseId },
-    select: { id: true, gradebookItemId: true, participantId: true }
+    select: { id: true, gradebookItemId: true, participantId: true, assessmentMode: true }
   });
   if (!attempt) throw notFound("Activity attempt");
+  if (attempt.assessmentMode === "formative") {
+    throw new AppError(409, "FORMATIVE_ATTEMPT_NOT_GRADEABLE", "Formative attempts cannot receive gradebook feedback.");
+  }
   const current = await prisma.grade.findUnique({
     where: {
       gradebookItemId_participantId: {
@@ -702,7 +742,7 @@ export async function recordActivityAttemptAiFeedback(
       }
     }
   });
-  if (!current) {
+  if (!current || current.isActive === false) {
     throw new AppError(409, "GRADE_REQUIRED_FOR_FEEDBACK", "A deterministic grade must exist before feedback-only AI feedback can be recorded.");
   }
   if (current.selectedAttemptId !== attempt.id) {
@@ -772,6 +812,9 @@ export async function getActivityAttemptRegradeContext(
 
   if (!attempt) {
     throw notFound("Activity attempt");
+  }
+  if (attempt.assessmentMode === "formative") {
+    throw new AppError(409, "FORMATIVE_ATTEMPT_NOT_GRADEABLE", "Formative attempts cannot be regraded.");
   }
 
   const activity = attempt.activity;
@@ -857,7 +900,8 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         select: {
           id: true,
           availableFrom: true,
-          availableUntil: true
+          availableUntil: true,
+          metadata: true
         }
       },
       grades: {
@@ -890,9 +934,15 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
       const grade = item.grades.find((candidate) => candidate.participantId === participant.id) ?? null;
       const attempts = item.attempts.filter((attempt) => attempt.participantId === participant.id);
       const activeAttempts = attempts.filter((attempt) => attempt.lifecycle !== "deleted");
-      const submittedAttempts = activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
-      const effectiveGrade = submittedAttempts.length || grade?.source === "override" ? grade : null;
-      const status = getGradebookRowStatus(effectiveGrade, activeAttempts);
+      const assessmentMode = assignmentAssessmentMode(item.groupActivity.metadata);
+      const currentModeAttempts = activeAttempts.filter((attempt) => (
+        attempt.assessmentMode === "formative" ? "formative" : "summative"
+      ) === assessmentMode);
+      const currentModeSubmittedAttempts = currentModeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
+      const summativeAttempts = activeAttempts.filter((attempt) => attempt.assessmentMode !== "formative");
+      const summativeSubmittedAttempts = summativeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
+      const effectiveGrade = grade && grade.isActive !== false && (summativeSubmittedAttempts.length || grade.source === "override") ? grade : null;
+      const status = getGradebookRowStatus(effectiveGrade, summativeAttempts);
       if (statusFilter !== "all" && status !== statusFilter) {
         return [];
       }
@@ -905,6 +955,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         activityTitle: item.titleSnapshot || item.activity.title,
         activityTypeKey: item.activity.activityType.key,
         activityTypeName: item.activity.activityType.name,
+        assessmentMode,
         gradesReleased: item.gradesReleased,
         participantId: participant.id,
         participantName: formatParticipantName(participant),
@@ -922,16 +973,17 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
           gradingResult: asJsonObject(effectiveGrade?.normalizedResult) ?? {}
         },
         selectedAttemptNumber: effectiveGrade?.selectedAttempt?.attemptNumber ?? null,
-        attemptCount: activeAttempts.length,
-        lateAttemptCount: activeAttempts.filter((attempt) => attempt.isLate).length,
-        submittedAttemptCount: submittedAttempts.length,
-        needsGradingCount: activeAttempts.filter((attempt) => attempt.lifecycle === "submitted").length,
+        attemptCount: currentModeAttempts.length,
+        lateAttemptCount: currentModeAttempts.filter((attempt) => attempt.isLate).length,
+        submittedAttemptCount: currentModeSubmittedAttempts.length,
+        needsGradingCount: summativeAttempts.filter((attempt) => attempt.lifecycle === "submitted").length,
         deletedSubmissions: deletedSubmissionAuditsForParticipant(item.events, participant.id),
         attempts: activeAttempts.map((attempt) => ({
           id: attempt.id,
           attemptNumber: attempt.attemptNumber,
           lifecycle: attempt.lifecycle,
           pluginAttemptRef: attempt.pluginAttemptRef,
+          assessmentMode: attempt.assessmentMode === "formative" ? "formative" : "summative",
           startedAt: attempt.startedAt.toISOString(),
           submittedAt: attempt.submittedAt?.toISOString() ?? null,
           gradedAt: attempt.gradedAt?.toISOString() ?? null,
@@ -959,6 +1011,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
       activityTitle: item.titleSnapshot || item.activity.title,
       activityTypeKey: item.activity.activityType.key,
       activityTypeName: item.activity.activityType.name,
+      assessmentMode: assignmentAssessmentMode(item.groupActivity.metadata),
       gradesReleased: item.gradesReleased,
       pointsPossible: item.pointsPossible,
       studentCount: item.group.participants.length
@@ -1048,6 +1101,7 @@ export async function setGradebookItemRelease(
       groupId: true,
       activityId: true,
       titleSnapshot: true,
+      groupActivity: { select: { metadata: true } },
       group: {
         select: {
           participants: {
@@ -1057,6 +1111,7 @@ export async function setGradebookItemRelease(
         }
       },
       grades: {
+        where: { isActive: true },
         select: {
           id: true,
           participantId: true,
@@ -1066,7 +1121,7 @@ export async function setGradebookItemRelease(
         }
       },
       attempts: {
-        where: { lifecycle: { in: ["submitted", "graded"] } },
+        where: { lifecycle: { in: ["submitted", "graded"] }, assessmentMode: "summative" },
         select: { participantId: true, lifecycle: true }
       }
     }
@@ -1074,6 +1129,9 @@ export async function setGradebookItemRelease(
 
   if (!item) {
     throw notFound("Gradebook item");
+  }
+  if (input.released && assignmentAssessmentMode(item.groupActivity?.metadata) !== "summative") {
+    throw new AppError(409, "FORMATIVE_GRADES_NOT_RELEASABLE", "Formative activities do not have releasable grades.");
   }
 
   if (item.gradesReleased === input.released) {
@@ -1198,7 +1256,7 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
         include: { selectedAttempt: true }
       },
       attempts: {
-        where: { participantId: participant.id },
+        where: { participantId: participant.id, assessmentMode: "summative" },
         orderBy: [{ attemptNumber: "asc" }]
       },
       events: {
@@ -1215,7 +1273,7 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
   });
 
   const rows = items.flatMap((item) => {
-      const grade = item.grades[0] ?? null;
+      const grade = item.grades[0] && item.grades[0].isActive !== false ? item.grades[0] : null;
       const activeAttempts = item.attempts.filter((attempt) => attempt.lifecycle !== "deleted");
       const submittedAttempts = activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
       const effectiveGrade = submittedAttempts.length || grade?.source === "override" ? grade : null;
@@ -1293,7 +1351,7 @@ export async function recordReleasedAttemptAiFeedbackViewed(user: CurrentUser, c
       }
     }
   });
-  if (!grade || grade.selectedAttemptId !== attempt.id) {
+  if (!grade || grade.isActive === false || grade.selectedAttemptId !== attempt.id) {
     throw new AppError(409, "GRADE_ATTEMPT_NOT_SELECTED", "This attempt is not the released grade attempt.");
   }
   const references = findAiFeedbackReferences(grade.normalizedResult);
@@ -1434,17 +1492,22 @@ async function resolveAttemptParticipant(user: CurrentUser, courseId: string, gr
 
 async function assertAttemptCanStart(
   context: Awaited<ReturnType<typeof resolveAssignedActivityAttemptContext>>,
-  now: Date
+  now: Date,
+  assessmentMode: ActivityAttemptAssessmentMode
 ) {
   const availableUntil = context.groupActivity.availableUntil;
   const item = context.gradebookItem;
 
-  if (item.gradesReleased) {
+  if (assessmentMode !== "formative" && item.gradesReleased) {
     throw new AppError(400, "GRADES_RELEASED", "No more attempts are allowed after grades have been released.");
   }
 
   if (availableUntil && now > availableUntil) {
     throw new AppError(400, "ATTEMPT_DUE_DATE_PASSED", "No more attempts are allowed after the due date.");
+  }
+
+  if (assessmentMode === "formative") {
+    return;
   }
 
   if (item.attemptLimitMode !== "max_attempts" || item.maxAttempts === null) {
@@ -1455,6 +1518,7 @@ async function assertAttemptCanStart(
     where: {
       gradebookItemId: item.id,
       participantId: context.participant.id,
+      assessmentMode: "summative",
       lifecycle: { not: "deleted" }
     }
   });
@@ -1462,6 +1526,10 @@ async function assertAttemptCanStart(
   if (usedAttempts >= item.maxAttempts) {
     throw new AppError(400, "ATTEMPT_LIMIT_REACHED", "The attempt limit has been reached.");
   }
+}
+
+export function assignmentAssessmentMode(value: unknown): ActivityAttemptAssessmentMode {
+  return asJsonObject(value)?.assessmentMode === "formative" ? "formative" : "summative";
 }
 
 async function assertCanUseAttempt(

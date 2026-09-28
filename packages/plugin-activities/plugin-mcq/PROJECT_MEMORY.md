@@ -11,4 +11,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Model explanations are not an independent challenge target because they do not affect scoring. The released deterministic/overridden grade and teacher-authored released feedback are challengeable through core.
 - Standalone and compound-Test draft paths are distinct and must not be mixed.
 - Attempt limits are enforced by both status UI and the submission route. Released final grades close further attempts.
+- Every standalone answer check/submission creates a core attempt with the assignment mode. Student summative history and limits select only summative attempts; teacher history can inspect both modes.
 - Teacher feedback and learner copy use mechanism-neutral wording.

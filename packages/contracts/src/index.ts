@@ -738,6 +738,7 @@ export const CourseAllGroupsActivityAssignmentInputSchema = z.object({
   availableUntil: z.string().datetime().nullable().optional(),
   enablePerGroupSettings: z.boolean().optional().default(true),
   assessmentMode: AssignedActivityAssessmentModeSchema.optional().default("formative"),
+  confirmSummativeToFormative: z.boolean().optional(),
   requireSafeExamBrowser: z.boolean().optional().default(false),
   gradebookSettings: GradebookItemSettingsInputSchema.optional(),
   contentPlacement: CourseContentPlacementInputSchema.optional(),
@@ -753,6 +754,7 @@ export const CourseGroupActivityUpdateSchema = z.object({
   availableUntil: z.string().datetime().nullable().optional(),
   config: z.record(z.unknown()).optional(),
   metadata: z.record(z.unknown()).optional(),
+  confirmSummativeToFormative: z.boolean().optional(),
   position: z.number().int().min(0).optional()
 });
 export type CourseGroupActivityUpdate = z.infer<typeof CourseGroupActivityUpdateSchema>;

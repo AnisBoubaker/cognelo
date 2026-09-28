@@ -107,6 +107,32 @@ describe("Parsons plugin routes", () => {
     ).resolves.toMatchObject({ attempt: { id: "attempt-1" } });
   });
 
+  it("records formative checks as core attempts without grading them", async () => {
+    await parsonsAttemptRoute.methods.PATCH?.({
+      request: new Request("http://test.local"),
+      context: {
+        ...context,
+        groupId: "group-1",
+        activity: {
+          ...context.activity,
+          assignment: { id: "assignment-1", metadata: { assessmentMode: "formative" } }
+        }
+      },
+      readJson: async () => ({
+        attemptId: "clx0000000000000000000000",
+        event: { type: "check", payload: {} },
+        result: { isCorrect: false, orderCorrect: false, indentationCorrect: true, misplacedBlocks: 2, incorrectIndents: 0 }
+      })
+    });
+
+    expect(mocks.startActivityAttempt).toHaveBeenCalledWith(context.user, expect.objectContaining({
+      assessmentMode: "formative",
+      pluginAttemptRef: "attempt-1"
+    }));
+    expect(mocks.submitActivityAttempt).toHaveBeenCalledWith(context.user, expect.objectContaining({ attemptId: "core-attempt-1" }));
+    expect(mocks.recordActivityAttemptGradingResult).not.toHaveBeenCalled();
+  });
+
   it("rejects invalid attempt updates and generates with manager permission", async () => {
     mocks.updateParsonsAttempt.mockResolvedValueOnce(null);
     await expect(

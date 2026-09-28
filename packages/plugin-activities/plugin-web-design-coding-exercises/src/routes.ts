@@ -1,8 +1,15 @@
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
-import { AppError, assertCanManageCourse, clearActivityResponseDraft } from "@cognelo/core";
+import {
+  AppError,
+  assertCanManageCourse,
+  clearActivityResponseDraft,
+  recordActivityAttemptGradingResult,
+  startActivityAttempt,
+  submitActivityAttempt
+} from "@cognelo/core";
 import {
   listRecentWebDesignExerciseSubmissions,
-  listWebDesignExerciseReviewSubmissions,
+  listWebDesignExerciseReviewSubmissionAttempts,
   runWebDesignExercise,
   submitWebDesignExercise,
   webDesignExerciseRunInputSchema
@@ -15,7 +22,7 @@ import {
   replaceBankWebDesignExerciseTests,
   replaceWebDesignExerciseTests
 } from "./tests";
-import { prisma } from "@cognelo/db";
+import { prisma, type Prisma } from "@cognelo/db";
 
 export const webDesignExerciseTestsRoute: PluginRouteDefinition = {
   path: "web-design-coding-exercises/tests",
@@ -125,6 +132,46 @@ export const webDesignExerciseSubmitRoute: PluginRouteDefinition = {
         input
       });
       if (context.courseId && context.groupId) {
+        const assessmentMode = context.activity.assignment?.metadata?.assessmentMode === "summative" ? "summative" : "formative";
+        const metadata = {
+          mode: assessmentMode,
+          submissionId: submission.id,
+          submittedFiles: input.files
+        } as Prisma.InputJsonValue;
+        const coreAttempt = await startActivityAttempt(context.user, {
+          courseId: context.courseId,
+          groupId: context.groupId,
+          activityId: context.activity.id,
+          pluginKey: "web-design-coding-exercises",
+          pluginVersion: "0.1.0",
+          pluginAttemptRef: submission.id,
+          assessmentMode,
+          metadata
+        });
+        const submittedAttempt = await submitActivityAttempt(context.user, {
+          attemptId: coreAttempt.id,
+          pluginAttemptRef: submission.id,
+          metadata
+        });
+        if (assessmentMode === "summative") {
+          if (submission.score === null || submission.maxScore === null || submission.maxScore <= 0) {
+            throw new AppError(409, "WEB_DESIGN_RESULT_INVALID", "The web design exercise did not return a valid score.");
+          }
+          await recordActivityAttemptGradingResult(context.user, {
+            attemptId: submittedAttempt.id,
+            rawScore: submission.score,
+            rawMaxScore: submission.maxScore,
+            source: "auto",
+            rawResult: {
+              ...submission.resultSummary,
+              tests: submission.testResults
+            } as Prisma.InputJsonValue,
+            normalizedResult: {
+              kind: "web-design-coding-exercise",
+              submissionId: submission.id
+            } as Prisma.InputJsonValue
+          });
+        }
         await clearActivityResponseDraft(context.user, context.courseId, context.groupId, context.activity.id).catch(() => undefined);
       }
 
@@ -144,9 +191,17 @@ export const webDesignExerciseReviewAllRoute: PluginRouteDefinition = {
         where: { group: { courseId: context.courseId }, role: "student", userId: { not: null } },
         select: { id: true, userId: true }
       });
-      const submissions = await listWebDesignExerciseReviewSubmissions({ activityId: context.activity.id, userIds: participants.flatMap((participant) => participant.userId ? [participant.userId] : []) });
-      const byUserId = new Map(submissions.map((submission) => [submission.userId, submission]));
-      return { submissions: participants.flatMap((participant) => participant.userId && byUserId.has(participant.userId) ? [{ participantId: participant.id, submission: byUserId.get(participant.userId) }] : []) };
+      const submissions = await listWebDesignExerciseReviewSubmissionAttempts({ activityId: context.activity.id, userIds: participants.flatMap((participant) => participant.userId ? [participant.userId] : []) });
+      const byUserId = new Map<string, typeof submissions>();
+      for (const submission of submissions) {
+        byUserId.set(submission.userId, [...(byUserId.get(submission.userId) ?? []), submission]);
+      }
+      return {
+        submissions: participants.flatMap((participant) => {
+          const attempts = participant.userId ? byUserId.get(participant.userId) ?? [] : [];
+          return attempts.length ? [{ participantId: participant.id, submission: attempts[0], attempts }] : [];
+        })
+      };
     }
   }
 };

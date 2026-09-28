@@ -609,11 +609,12 @@ export function McqActivityView({
     if (!isSummativeStudentSession || !submissionClient?.submit) {
       setSubmitted(true);
       setAiFeedback(null);
-      if (aiFeedbackEnabled && submissionClient?.feedback) {
+      if (submissionClient?.feedback) {
         try {
-          setAiFeedback(await submissionClient.feedback(activity.id, studentAnswers));
+          const feedback = await submissionClient.feedback(activity.id, studentAnswers);
+          if (aiFeedbackEnabled) setAiFeedback(feedback);
         } catch {
-          notifications.error(copy.aiFeedbackError);
+          if (aiFeedbackEnabled) notifications.error(copy.aiFeedbackError);
         }
       }
       return;

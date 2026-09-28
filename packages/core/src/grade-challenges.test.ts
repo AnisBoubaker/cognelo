@@ -145,6 +145,18 @@ describe("grade challenges", () => {
     }));
   });
 
+  it("does not expose a withdrawn grade as a current challenge target", async () => {
+    mockPrisma.grade.findUnique.mockResolvedValue({ ...grade, isActive: false });
+
+    await expect(createGradeChallenge(student, "course-1", "attempt-1", {
+      feedbackRef: "feedback-2",
+      feedbackVersion: 3,
+      explanation: "This feedback belonged to the withdrawn summative grade."
+    })).rejects.toMatchObject({ code: "GRADE_NOT_AVAILABLE", status: 409 });
+
+    expect(mockPrisma.gradeChallenge.create).not.toHaveBeenCalled();
+  });
+
   it("rejects feedback-only AI explanations that did not influence the grade", async () => {
     await expect(createGradeChallenge(student, "course-1", "attempt-1", {
       feedbackRef: "feedback-1",

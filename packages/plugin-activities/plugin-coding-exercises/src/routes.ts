@@ -14,7 +14,7 @@ import {
   codingExerciseRunInputSchema,
   codingExerciseSubmitInputSchema,
   listCodingExerciseAttemptHistory,
-  listCodingExerciseReviewExecutions,
+  listCodingExerciseReviewExecutionAttempts,
   listRecentCodingExerciseExecutions,
   runCodingExercise,
   submitCodingExercise
@@ -75,9 +75,17 @@ export const codingExerciseReviewAllRoute: PluginRouteDefinition = {
         where: { group: { courseId }, role: "student", userId: { not: null } },
         select: { id: true, userId: true }
       });
-      const executions = await listCodingExerciseReviewExecutions({ activityId: context.activity.id, userIds: participants.flatMap((participant) => participant.userId ? [participant.userId] : []) });
-      const byUserId = new Map(executions.map((execution) => [execution.userId, execution]));
-      return { submissions: participants.flatMap((participant) => participant.userId && byUserId.has(participant.userId) ? [{ participantId: participant.id, execution: byUserId.get(participant.userId) }] : []) };
+      const executions = await listCodingExerciseReviewExecutionAttempts({ activityId: context.activity.id, userIds: participants.flatMap((participant) => participant.userId ? [participant.userId] : []) });
+      const byUserId = new Map<string, typeof executions>();
+      for (const execution of executions) {
+        byUserId.set(execution.userId, [...(byUserId.get(execution.userId) ?? []), execution]);
+      }
+      return {
+        submissions: participants.flatMap((participant) => {
+          const attempts = participant.userId ? byUserId.get(participant.userId) ?? [] : [];
+          return attempts.length ? [{ participantId: participant.id, execution: attempts[0], attempts }] : [];
+        })
+      };
     }
   }
 };
@@ -196,14 +204,11 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
       });
       let aiFeedback: Awaited<ReturnType<typeof evaluateCodingExerciseAttemptWithAi>> | null = null;
       let aiFeedbackError: string | null = null;
-      if (isSummativeGroupActivity(context)) {
-        const earnedWeight = numberValue(execution.resultSummary.earnedWeight);
-        const totalWeight = numberValue(execution.resultSummary.totalWeight);
-        if (earnedWeight === null || totalWeight === null || totalWeight <= 0) {
-          throw new AppError(409, "CODING_EXERCISE_RESULT_INVALID", "The coding exercise did not return a valid weighted result.");
-        }
+      const assessmentMode = isSummativeGroupActivity(context) ? "summative" : "formative";
+      let submittedCoreAttemptId: string | null = null;
+      if (context.courseId && context.groupId) {
         const metadata = {
-          mode: "summative",
+          mode: assessmentMode,
           executionId: execution.id,
           submittedSourceCode: input.sourceCode
         } as Prisma.InputJsonValue;
@@ -214,6 +219,7 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
           pluginKey: "coding-exercises",
           pluginVersion: "0.1.0",
           pluginAttemptRef: execution.id,
+          assessmentMode,
           metadata
         });
         const submittedAttempt = await submitActivityAttempt(context.user, {
@@ -221,9 +227,17 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
           pluginAttemptRef: execution.id,
           metadata
         });
+        submittedCoreAttemptId = submittedAttempt.id;
+      }
+      if (assessmentMode === "summative" && submittedCoreAttemptId) {
+        const earnedWeight = numberValue(execution.resultSummary.earnedWeight);
+        const totalWeight = numberValue(execution.resultSummary.totalWeight);
+        if (earnedWeight === null || totalWeight === null || totalWeight <= 0) {
+          throw new AppError(409, "CODING_EXERCISE_RESULT_INVALID", "The coding exercise did not return a valid weighted result.");
+        }
         if (!aiFeedbackSetup.effective || !aiFeedbackSetup.config.gradingEnabled) {
           await recordActivityAttemptGradingResult(context.user, {
-            attemptId: submittedAttempt.id,
+            attemptId: submittedCoreAttemptId,
             rawScore: earnedWeight,
             rawMaxScore: totalWeight,
             source: "auto",
@@ -239,7 +253,7 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
             } as Prisma.InputJsonValue
           });
         }
-      } else if (context.courseId && context.groupId && aiFeedbackSetup.effective) {
+      } else if (assessmentMode === "formative" && context.courseId && context.groupId && aiFeedbackSetup.effective) {
         try {
           aiFeedback = await evaluateCodingExerciseAttemptWithAi({
             user: context.user,
@@ -347,22 +361,7 @@ async function getCodingExerciseAttemptAvailability(params: {
     groupId: params.context.groupId,
     activityId: params.context.activity.id
   });
-  if (availability.attemptLimitMode !== "max_attempts" || availability.maxAttempts === null) {
-    return availability;
-  }
-
-  const usedAttempts = Math.max(availability.usedAttempts ?? 0, params.submissionCount);
-  const attemptsRemaining = Math.max(0, availability.maxAttempts - usedAttempts);
-  return {
-    ...availability,
-    usedAttempts,
-    attemptsRemaining,
-    canStart: availability.canStart && attemptsRemaining > 0,
-    reason:
-      availability.canStart && attemptsRemaining === 0
-        ? "ATTEMPT_LIMIT_REACHED"
-        : availability.reason
-  };
+  return availability;
 }
 
 function numberValue(value: unknown) {

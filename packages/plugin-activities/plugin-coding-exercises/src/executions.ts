@@ -167,8 +167,11 @@ function toHiddenTestCase(test: {
   metadata: unknown;
 }): HiddenTestCase {
   const outputMatcher = getHiddenTestOutputMatcher(test.metadata);
+  const metadata = test.metadata && typeof test.metadata === "object" && !Array.isArray(test.metadata)
+    ? test.metadata as Record<string, unknown>
+    : {};
   return {
-    id: test.id,
+    id: typeof metadata.stableId === "string" && metadata.stableId.trim() ? metadata.stableId : test.id,
     name: test.name,
     stdin: test.stdin,
     expectedOutput: test.expectedOutput,
@@ -347,17 +350,24 @@ export async function listCodingExerciseAttemptHistory(params: {
 }
 
 export async function listCodingExerciseReviewExecutions(params: { activityId: string; userIds: string[] }) {
+  const executions = await listCodingExerciseReviewExecutionAttempts(params);
+  const seen = new Set<string>();
+  return executions.filter((execution) => {
+    if (seen.has(execution.userId)) return false;
+    seen.add(execution.userId);
+    return true;
+  });
+}
+
+export async function listCodingExerciseReviewExecutionAttempts(params: { activityId: string; userIds: string[] }) {
   if (!params.userIds.length) return [];
   const executions = await codingExerciseExecutionClient.pluginCodingExerciseExecution.findMany({
     where: { activityId: params.activityId, userId: { in: params.userIds }, kind: "submit" },
     orderBy: [{ createdAt: "desc" }]
   });
-  const seen = new Set<string>();
   return executions.flatMap((execution) => {
     const record = toCodingExerciseExecutionRecord(execution);
     if (isCodingExerciseOperationalFailure(record)) return [];
-    if (seen.has(execution.userId)) return [];
-    seen.add(execution.userId);
     return [record];
   });
 }

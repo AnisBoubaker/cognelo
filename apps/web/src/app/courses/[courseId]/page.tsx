@@ -1844,7 +1844,7 @@ export default function CourseDetailPage() {
                                 <span className="gradebook-number">{activity.gradedCount}</span>
                                 <strong className="gradebook-number">{formatMeanGrade(activity.meanScore, activity.meanMaxScore)}</strong>
                                 <div className="table-actions">
-                                  <button
+                                  {activity.assessmentMode === "summative" ? <button
                                     className="button secondary"
                                     disabled={
                                       savingReleaseItemId === activity.gradebookItemIds.join(":")
@@ -1859,8 +1859,8 @@ export default function CourseDetailPage() {
                                     }
                                   >
                                     {activity.allGradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
-                                  </button>
-                                  {!activity.allGradesReleased && activity.incompleteGradeCount > 0 ? (
+                                  </button> : null}
+                                  {activity.assessmentMode === "summative" && !activity.allGradesReleased && activity.incompleteGradeCount > 0 ? (
                                     <span className="grade-release-blocked-note">
                                       {t("courseDetail.releaseGradesBlocked", { count: activity.incompleteGradeCount })}
                                     </span>
@@ -1884,7 +1884,7 @@ export default function CourseDetailPage() {
                                       <span className="gradebook-number">{group.gradedCount}</span>
                                       <strong className="gradebook-number">{formatMeanGrade(group.meanScore, group.meanMaxScore)}</strong>
                                       <div className="table-actions">
-                                        <button
+                                        {group.assessmentMode === "summative" ? <button
                                           className="button secondary"
                                           disabled={
                                             savingReleaseItemId === group.gradebookItemId
@@ -1897,8 +1897,8 @@ export default function CourseDetailPage() {
                                           onClick={() => setGradebookRelease(group.gradebookItemId, !group.gradesReleased, `${activity.activityTitle} - ${group.groupTitle}`)}
                                         >
                                           {group.gradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
-                                        </button>
-                                        {!group.gradesReleased && group.incompleteGradeCount > 0 ? (
+                                        </button> : null}
+                                        {group.assessmentMode === "summative" && !group.gradesReleased && group.incompleteGradeCount > 0 ? (
                                           <span className="grade-release-blocked-note">
                                             {t("courseDetail.releaseGradesBlocked", { count: group.incompleteGradeCount })}
                                           </span>
@@ -2240,6 +2240,7 @@ type GradebookGroupSummary = {
   groupTitle: string;
   gradebookItemId: string;
   gradesReleased: boolean;
+  assessmentMode: "formative" | "summative";
   studentCount: number;
   submissionCount: number;
   gradedCount: number;
@@ -2252,6 +2253,7 @@ type GradebookActivitySummary = {
   activityId: string;
   activityTitle: string;
   activityTypeName: string;
+  assessmentMode: "formative" | "summative";
   gradebookItemIds: string[];
   allGradesReleased: boolean;
   submissionCount: number;
@@ -2289,6 +2291,7 @@ function buildGradebookActivitySummaries(items: CourseGradebookItemSummary[], ro
         activityId: first.activityId,
         activityTitle: first.activityTitle,
         activityTypeName: first.activityTypeName,
+        assessmentMode: first.assessmentMode,
         gradebookItemIds: activityItems.map((item) => item.gradebookItemId),
         allGradesReleased: groups.length > 0 && groups.every((group) => group.gradesReleased),
         submissionCount: sum(groups.map((group) => group.submissionCount)),
@@ -2307,6 +2310,7 @@ function summarizeGradebookGroup(item: CourseGradebookItemSummary, rows: CourseG
     groupTitle: item.groupTitle,
     gradebookItemId: item.gradebookItemId,
     gradesReleased: item.gradesReleased,
+    assessmentMode: item.assessmentMode,
     studentCount: item.studentCount,
     submissionCount: sum(rows.map((row) => row.submittedAttemptCount)),
     gradedCount: rows.filter((row) => row.score !== null).length,

@@ -87,6 +87,7 @@ export default function GradebookActivityResultsPage() {
   const activityTitle = rows[0]?.activityTitle ?? gradebook?.items[0]?.activityTitle ?? t("common.loading");
   const activityTypeKey = rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? "";
   const activityActions = getGradebookActivityActions(activityTypeKey);
+  const isSummativeActivity = (rows[0]?.assessmentMode ?? gradebook?.items[0]?.assessmentMode) === "summative";
   const groupTitle = groupId ? gradebook?.items.find((item) => item.groupId === groupId)?.groupTitle : null;
   const backHref = groupId ? `/courses/${courseId}?tab=gradebook&groupId=${encodeURIComponent(groupId)}` : `/courses/${courseId}?tab=gradebook`;
   const backLabel = t("courseDetail.backToCourseGradebook");
@@ -106,22 +107,31 @@ export default function GradebookActivityResultsPage() {
           const [definition, review] = await Promise.all([api.codingExerciseHiddenTests(courseId, activityId), api.codingExerciseReviewAll(courseId, activityId)]);
           solution = definition.referenceSolution?.sourceCode ?? null;
           tests = definition.tests.filter((test) => test.isEnabled).map((test) => ({ id: test.id, name: test.name }));
-          aggregateResults = new Map(review.submissions.map(({ participantId, execution }) => [participantId, normalizeCodingTestResults(execution.resultSummary.tests)]));
+          aggregateResults = new Map(review.submissions.flatMap(({ participantId, attempts }) => {
+            const row = rows.find((candidate) => candidate.participantId === participantId);
+            const execution = row ? matchingPluginAttempt(row, attempts) : null;
+            return execution ? [[participantId, normalizeCodingTestResults(execution.resultSummary.tests)] as const] : [];
+          }));
         }
         if (activityTypeKey === "web-design-coding-exercise") {
           const [definition, review] = await Promise.all([api.webDesignExerciseTests(courseId, activityId), api.webDesignExerciseReviewAll(courseId, activityId)]);
           solution = definition.referenceBundle?.files ?? null;
           tests = definition.tests.filter((test) => test.isEnabled && test.kind === "hidden").map((test) => ({ id: test.id, name: test.name }));
-          aggregateResults = new Map(review.submissions.map(({ participantId, submission }) => [participantId, submission.testResults.flatMap((result) => result.testId ? [{ testId: result.testId, name: result.name, passed: result.status === "completed" && (result.score ?? 0) >= result.weight }] : [])]));
+          aggregateResults = new Map(review.submissions.flatMap(({ participantId, attempts }) => {
+            const row = rows.find((candidate) => candidate.participantId === participantId);
+            const submission = row ? matchingPluginAttempt(row, attempts) : null;
+            return submission ? [[participantId, submission.testResults.flatMap((result) => result.testId ? [{ testId: result.testId, name: result.name, passed: result.status === "completed" && (result.score ?? 0) >= result.weight }] : [])] as const] : [];
+          }));
         }
         const loaded = await Promise.all(rows.map(async (row) => {
           if (activityTypeKey === "mcq") {
             const result = await mcqClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, { participantId: row.participantId });
-            return { row, state: result.attempts[0] ? { answers: result.attempts[0].answers } : null };
+            const attempt = matchingPluginAttempt(row, result.attempts);
+            return { row, state: attempt ? { answers: attempt.answers } : null };
           }
           if (activityTypeKey === "parsons-problem") {
             const result = await parsonsClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, { participantId: row.participantId });
-            return { row, state: result.attempts[0]?.latestState ?? null };
+            return { row, state: matchingPluginAttempt(row, result.attempts)?.latestState ?? null };
           }
           return { row, state: null };
         }));
@@ -218,9 +228,7 @@ export default function GradebookActivityResultsPage() {
   }
 
   async function regradeRow(row: CourseGradebookRow) {
-    const attempt =
-      row.attempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber) ??
-      [...row.attempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted");
+    const attempt = selectedSubmittedAttempt(row);
     if (!attempt) {
       notifications.error(t("courseDetail.regradeUnavailable"));
       return;
@@ -243,8 +251,7 @@ export default function GradebookActivityResultsPage() {
   }
 
   async function generateAiFeedbackForRow(row: CourseGradebookRow) {
-    const attempt = row.attempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber)
-      ?? [...row.attempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted");
+    const attempt = selectedSubmittedAttempt(row);
     if (!attempt) {
       notifications.error(t("courseDetail.aiFeedbackUnavailable"));
       return;
@@ -268,8 +275,7 @@ export default function GradebookActivityResultsPage() {
   async function generateAiFeedbackForAllRows() {
     const eligible = groupedRows.flatMap((row) => {
       if (!getGradebookActivityActions(row.activityTypeKey).canAssessWithAi) return [];
-      const attempt = row.attempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber)
-        ?? [...row.attempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted");
+      const attempt = selectedSubmittedAttempt(row);
       return attempt ? [{ row, attempt }] : [];
     });
     if (!eligible.length) {
@@ -453,7 +459,7 @@ export default function GradebookActivityResultsPage() {
     const rowsWithAttempts = groupedRows.filter(
       (row) =>
         getGradebookActivityActions(row.activityTypeKey).canRerunAutomaticGrading &&
-        row.attempts.some((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted")
+        Boolean(selectedSubmittedAttempt(row))
     );
     if (!rowsWithAttempts.length) {
       notifications.error(t("courseDetail.regradeUnavailable"));
@@ -469,9 +475,7 @@ export default function GradebookActivityResultsPage() {
       let pending = 0;
       let failed = 0;
       for (const row of rowsWithAttempts) {
-        const attempt =
-          row.attempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber) ??
-          [...row.attempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted");
+        const attempt = selectedSubmittedAttempt(row);
         if (attempt) {
           try {
             const response = await api.regradeActivityAttempt(courseId, attempt.id, { reason: t("courseDetail.regradeReason") });
@@ -499,6 +503,10 @@ export default function GradebookActivityResultsPage() {
   }, [rows]);
 
   async function openReviewAndGrade(row: CourseGradebookRow) {
+    if (row.assessmentMode === "formative") {
+      router.push(manualGradingHref(courseId, activityId, groupId, row.participantId));
+      return;
+    }
     if (supportsAiFeedbackReview(row.activityTypeKey) || getManualGradingRenderer(row.activityTypeKey)) {
       setReviewAndGradeRow(row);
       return;
@@ -535,17 +543,17 @@ export default function GradebookActivityResultsPage() {
               <button className="button secondary" type="button" onClick={() => void openReviewAll()}>
                 {t("courseDetail.reviewAll")}
               </button>
-              {activityActions.canRerunAutomaticGrading ? (
+              {isSummativeActivity && activityActions.canRerunAutomaticGrading ? (
                 <button className="button secondary" disabled={!hasRowsWithSubmittedAttempts || savingGradeKey === "__all:regrade"} type="button" onClick={() => void regradeAllRows()}>
                   {savingGradeKey === "__all:regrade" ? t("common.saving") : t("courseDetail.regradeAll")}
                 </button>
               ) : null}
-              {activityActions.canAssessWithAi ? (
+              {isSummativeActivity && activityActions.canAssessWithAi ? (
                 <button className="button secondary" disabled={savingGradeKey === "__all:ai-feedback"} type="button" onClick={() => void generateAiFeedbackForAllRows()}>
                   {savingGradeKey === "__all:ai-feedback" ? t("common.saving") : t("courseDetail.generateAiFeedbackAll")}
                 </button>
               ) : null}
-              {activityActions.canReviewAndGrade && supportsAiFeedbackReview(activityTypeKey) ? (
+              {isSummativeActivity && activityActions.canReviewAndGrade && supportsAiFeedbackReview(activityTypeKey) ? (
                 <button className="button secondary" disabled={!hasRowsWithSubmittedAttempts} type="button" onClick={() => void openFeedbackReview(groupedRows)}>
                   {t("courseDetail.gradeAllManually")}
                 </button>
@@ -816,7 +824,7 @@ function GradebookStudentRow({
       </div>
       <span className="table-meta muted">{row.submittedAttemptCount}</span>
       <div className="table-actions">
-        {getGradebookActivityActions(row.activityTypeKey).canAssessWithAi ? (
+        {row.assessmentMode === "summative" && getGradebookActivityActions(row.activityTypeKey).canAssessWithAi ? (
           <button
             className="button secondary"
             disabled={!rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:ai-feedback`}
@@ -826,7 +834,7 @@ function GradebookStudentRow({
             {t("courseDetail.generateAiFeedback")}
           </button>
         ) : null}
-        {getGradebookActivityActions(row.activityTypeKey).canRerunAutomaticGrading ? (
+        {row.assessmentMode === "summative" && getGradebookActivityActions(row.activityTypeKey).canRerunAutomaticGrading ? (
           <button
             className="button secondary"
             disabled={!rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:regrade`}
@@ -839,11 +847,11 @@ function GradebookStudentRow({
         {getGradebookActivityActions(row.activityTypeKey).canReviewAndGrade ? (
           <button
             className="button secondary"
-            disabled={!rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:override`}
+            disabled={(row.assessmentMode === "summative" && !rowHasSubmittedAttempt) || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:override`}
             type="button"
             onClick={() => onReviewAndGrade(row)}
           >
-            {t("courseDetail.reviewAndGrade")}
+            {t(row.assessmentMode === "formative" ? "courseDetail.inspectAttempts" : "courseDetail.reviewAndGrade")}
           </button>
         ) : null}
       </div>
@@ -863,7 +871,21 @@ function normalizeCodingTestResults(value: unknown): Array<{ testId: string; nam
 }
 
 function hasSubmittedAttempt(row: CourseGradebookRow) {
-  return row.attempts.some((attempt) => attempt.lifecycle === "graded" || attempt.lifecycle === "submitted");
+  return Boolean(selectedSubmittedAttempt(row));
+}
+
+function matchingPluginAttempt<T extends { id: string }>(row: CourseGradebookRow, attempts: T[]): T | null {
+  const currentModeRefs = new Set(
+    row.attempts
+      .filter((attempt) => attempt.assessmentMode === row.assessmentMode && attempt.pluginAttemptRef)
+      .map((attempt) => attempt.pluginAttemptRef as string)
+  );
+  const matched = attempts.find((attempt) => currentModeRefs.has(attempt.id));
+  if (matched) return matched;
+  if (row.assessmentMode === "summative") return null;
+
+  const allCoreRefs = new Set(row.attempts.flatMap((attempt) => attempt.pluginAttemptRef ? [attempt.pluginAttemptRef] : []));
+  return attempts.find((attempt) => !allCoreRefs.has(attempt.id)) ?? attempts[0] ?? null;
 }
 
 function supportsAiFeedbackReview(activityTypeKey: string) {
@@ -879,8 +901,13 @@ function manualGradingHref(courseId: string, activityId: string, groupId?: strin
 }
 
 function selectedFeedbackAttempt(row: CourseGradebookRow) {
-  return row.attempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber)
-    ?? [...row.attempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted")
+  return selectedSubmittedAttempt(row);
+}
+
+function selectedSubmittedAttempt(row: CourseGradebookRow) {
+  const currentModeAttempts = row.attempts.filter((candidate) => candidate.assessmentMode === row.assessmentMode);
+  return currentModeAttempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber)
+    ?? [...currentModeAttempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted")
     ?? null;
 }
 

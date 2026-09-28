@@ -192,6 +192,66 @@ describe("gradebook attempt services", () => {
     });
   });
 
+  it("stores formative mode on core attempts without applying summative release or attempt limits", async () => {
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({
+      ...groupActivity,
+      metadata: { assessmentMode: "formative" },
+      gradebookItem: {
+        ...groupActivity.gradebookItem,
+        gradesReleased: true,
+        attemptLimitMode: "max_attempts",
+        maxAttempts: 1
+      }
+    });
+    mockPrisma.activityAttempt.count.mockResolvedValue(5);
+
+    await expect(startActivityAttempt(studentUser, {
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      pluginKey: "mcq",
+      pluginVersion: "0.1.0",
+      assessmentMode: "formative"
+    })).resolves.toMatchObject({ assessmentMode: "formative" });
+
+    expect(mockPrisma.activityAttempt.count).not.toHaveBeenCalled();
+  });
+
+  it("still enforces assignment availability for formative attempts", async () => {
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({
+      ...groupActivity,
+      availableUntil: new Date("2025-01-01T09:00:00.000Z"),
+      metadata: { assessmentMode: "formative" }
+    });
+
+    await expect(startActivityAttempt(studentUser, {
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      pluginKey: "mcq",
+      pluginVersion: "0.1.0",
+      assessmentMode: "formative",
+      now: new Date("2025-01-01T10:00:00.000Z")
+    })).rejects.toMatchObject({ status: 400, code: "ATTEMPT_DUE_DATE_PASSED" });
+  });
+
+  it("rejects grading a formative attempt", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    mockPrisma.activityAttempt.findUnique.mockResolvedValue({
+      id: "attempt-1",
+      courseId: "course-1",
+      participant,
+      assessmentMode: "formative"
+    });
+
+    await expect(recordActivityAttemptGradingResult(teacherUser, {
+      attemptId: "attempt-1",
+      rawScore: 1,
+      rawMaxScore: 1,
+      source: "manual"
+    })).rejects.toMatchObject({ status: 409, code: "FORMATIVE_ATTEMPT_NOT_GRADEABLE" });
+  });
+
   it("rejects a new attempt when the gradebook item max attempt limit is reached", async () => {
     mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({
       ...groupActivity,
@@ -697,7 +757,8 @@ describe("gradebook attempt services", () => {
         groupActivity: {
           id: "assignment-2",
           availableFrom: null,
-          availableUntil: null
+          availableUntil: null,
+          metadata: { assessmentMode: "summative" }
         },
         grades: [
           {
@@ -708,7 +769,7 @@ describe("gradebook attempt services", () => {
             latePenaltyApplied: false,
             latePenaltyPercent: null,
             source: "override",
-            selectedAttempt: { attemptNumber: 1, isLate: false }
+            selectedAttempt: { attemptNumber: 2, isLate: false }
           }
         ],
         attempts: [
@@ -716,6 +777,20 @@ describe("gradebook attempt services", () => {
             id: "attempt-1",
             participantId: "participant-1",
             attemptNumber: 1,
+            assessmentMode: "formative",
+            lifecycle: "submitted",
+            startedAt: testNow,
+            submittedAt: testNow,
+            gradedAt: null,
+            isLate: false,
+            lateBySeconds: null,
+            durationSeconds: 60
+          },
+          {
+            id: "attempt-2",
+            participantId: "participant-1",
+            attemptNumber: 2,
+            assessmentMode: "summative",
             lifecycle: "graded",
             startedAt: testNow,
             submittedAt: testNow,
@@ -745,7 +820,13 @@ describe("gradebook attempt services", () => {
       rows: [{
         gradebookItemId: "gradebook-item-2",
         score: 92,
-        gradeSource: "override"
+        gradeSource: "override",
+        attemptCount: 1,
+        submittedAttemptCount: 1,
+        attempts: [
+          expect.objectContaining({ id: "attempt-1", assessmentMode: "formative" }),
+          expect.objectContaining({ id: "attempt-2", assessmentMode: "summative" })
+        ]
       }]
     });
   });

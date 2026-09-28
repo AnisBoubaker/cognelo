@@ -16,6 +16,8 @@ Teacher **Rerun automatic grading** reruns current hidden tests without invoking
 
 When rubric grading is configured, a tests-only score is marked **Partial** in the detailed gradebook until the rubric component is graded. Programming Exercises report that component state through the server plugin contract, and the host prevents release while any submitted learner is partial or ungraded. A teacher final-grade override completes the grade; learners who did not submit do not block release.
 
+Every successful standalone code submission creates a core attempt tagged with the assignment mode. Formative attempts are inspectable and may receive immediate feedback, but never consume summative limits or enter the grade. Summative reports resolve plugin executions only through summative core references, so old formative work remains available without polluting later summative results.
+
 After release, the learner's grading report presents the available automatic-test and rubric point contributions plus the final total, every graded code attempt, teacher comments, criterion scores and explanations, and each test's pass/fail outcome and weighted score. Components that do not contribute to the configured grade are omitted from the recap. The report is built by a release-gated plugin handler and never includes hidden inputs, expected outputs, private rubric instructions, or raw model artifacts.
 
 ## Boundaries

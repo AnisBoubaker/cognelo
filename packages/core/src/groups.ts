@@ -423,6 +423,15 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
           data.assessmentMode,
           requireSafeExamBrowser
         );
+        if (existingAssignment) {
+          await applyAssignmentAssessmentModeTransition(tx, {
+            assignmentId: existingAssignment.id,
+            actorUserId: user.id,
+            confirmed: data.confirmSummativeToFormative === true,
+            previousMode: readAssessmentMode(existingAssignment.metadata),
+            nextMode: data.assessmentMode
+          });
+        }
         const assignment = await tx.courseGroupActivity.upsert({
           where: {
             groupId_activityId: {
@@ -1071,20 +1080,31 @@ export async function updateGroupActivityAssignment(
     throw new AppError(400, "COURSE_WIDE_GROUP_ACTIVITY_LOCKED", "This activity is assigned to all groups from the course.");
   }
 
-  return prisma.courseGroupActivity.update({
-    where: { id: assignmentId },
-    data: {
-      availableFrom: data.availableFrom !== undefined ? parseDateInput(data.availableFrom) : undefined,
-      availableUntil: data.availableUntil !== undefined ? parseDateInput(data.availableUntil) : undefined,
-      config: data.config as Prisma.InputJsonValue | undefined,
-      metadata: data.metadata as Prisma.InputJsonValue | undefined,
-      position: data.position
-    },
-    include: {
-      activity: {
-        include: { activityType: true, bankActivity: true, activityVersion: true }
+  return prisma.$transaction(async (tx) => {
+    const previousMode = readAssessmentMode(assignment.metadata);
+    const nextMode = readAssessmentMode(effectiveMetadata);
+    await applyAssignmentAssessmentModeTransition(tx, {
+      assignmentId,
+      actorUserId: user.id,
+      confirmed: data.confirmSummativeToFormative === true,
+      previousMode,
+      nextMode
+    });
+    return tx.courseGroupActivity.update({
+      where: { id: assignmentId },
+      data: {
+        availableFrom: data.availableFrom !== undefined ? parseDateInput(data.availableFrom) : undefined,
+        availableUntil: data.availableUntil !== undefined ? parseDateInput(data.availableUntil) : undefined,
+        config: data.config as Prisma.InputJsonValue | undefined,
+        metadata: data.metadata as Prisma.InputJsonValue | undefined,
+        position: data.position
+      },
+      include: {
+        activity: {
+          include: { activityType: true, bankActivity: true, activityVersion: true }
+        }
       }
-    }
+    });
   });
 }
 
@@ -1502,6 +1522,98 @@ function buildCourseActivitySettingsMetadata(
     assessmentMode,
     ...(requireSafeExamBrowser ? { requireSafeExamBrowser: true } : {})
   };
+}
+
+function readAssessmentMode(value: unknown): "formative" | "summative" {
+  return value && typeof value === "object" && !Array.isArray(value) && (value as Record<string, unknown>).assessmentMode === "summative"
+    ? "summative"
+    : "formative";
+}
+
+async function applyAssignmentAssessmentModeTransition(
+  tx: Prisma.TransactionClient,
+  input: {
+    assignmentId: string;
+    actorUserId: string;
+    confirmed: boolean;
+    previousMode: "formative" | "summative";
+    nextMode: "formative" | "summative";
+  }
+) {
+  if (input.previousMode === input.nextMode) return;
+  if (input.previousMode === "summative" && input.nextMode === "formative" && !input.confirmed) {
+    throw new AppError(
+      409,
+      "ASSESSMENT_MODE_CONVERSION_CONFIRMATION_REQUIRED",
+      "Confirm that existing summative attempts will become formative and active grades will be withdrawn."
+    );
+  }
+  const item = await tx.gradebookItem.findUnique({
+    where: { groupActivityId: input.assignmentId },
+    include: {
+      group: { select: { participants: { where: { role: "student" }, select: { id: true } } } },
+      attempts: { select: { id: true, participantId: true, assessmentMode: true } },
+      grades: { select: { id: true, participantId: true, selectedAttemptId: true, normalizedScore: true, normalizedMaxScore: true, isActive: true } }
+    }
+  });
+  if (!item) return;
+
+  const now = new Date();
+  const convertingToFormative = input.previousMode === "summative" && input.nextMode === "formative";
+  const convertedAttempts = convertingToFormative
+    ? item.attempts.filter((attempt) => attempt.assessmentMode === "summative")
+    : [];
+
+  if (convertingToFormative) {
+    await tx.activityAttempt.updateMany({
+      where: { groupActivityId: input.assignmentId, assessmentMode: "summative" },
+      data: { assessmentMode: "formative" }
+    });
+    await tx.grade.updateMany({
+      where: { gradebookItemId: item.id, isActive: true },
+      data: { isActive: false }
+    });
+    await tx.gradebookItem.update({
+      where: { id: item.id },
+      data: { gradesReleased: false }
+    });
+  }
+
+  const gradeByParticipantId = new Map(item.grades.map((grade) => [grade.participantId, grade]));
+  const convertedCountByParticipantId = new Map<string, number>();
+  for (const attempt of convertedAttempts) {
+    convertedCountByParticipantId.set(attempt.participantId, (convertedCountByParticipantId.get(attempt.participantId) ?? 0) + 1);
+  }
+  const events = item.group.participants.map((participant) => {
+    const grade = gradeByParticipantId.get(participant.id);
+    return {
+      gradeId: grade?.id ?? null,
+      gradebookItemId: item.id,
+      participantId: participant.id,
+      actorUserId: input.actorUserId,
+      eventType: "assessment_mode_changed" as const,
+      previousValue: {
+        assessmentMode: input.previousMode,
+        activeGrade: grade?.isActive === true,
+        score: grade?.isActive ? grade.normalizedScore : null,
+        maxScore: grade?.isActive ? grade.normalizedMaxScore : null
+      } as Prisma.InputJsonValue,
+      nextValue: {
+        assessmentMode: input.nextMode,
+        activeGrade: convertingToFormative ? false : grade?.isActive === true,
+        convertedAttemptCount: convertedCountByParticipantId.get(participant.id) ?? 0
+      } as Prisma.InputJsonValue,
+      metadata: {
+        assignmentId: input.assignmentId,
+        transition: `${input.previousMode}_to_${input.nextMode}`,
+        selectedAttemptId: grade?.selectedAttemptId ?? null
+      } as Prisma.InputJsonValue,
+      createdAt: now
+    };
+  });
+  if (events.length) {
+    await tx.gradeEvent.createMany({ data: events });
+  }
 }
 
 export function assignmentRequiresSafeExamBrowser(value: unknown) {

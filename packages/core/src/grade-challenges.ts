@@ -49,7 +49,7 @@ export async function createGradeChallenge(user: CurrentUser, courseId: string, 
       }
     }
   });
-  if (!grade) {
+  if (!grade || grade.isActive === false) {
     throw new AppError(409, "GRADE_NOT_AVAILABLE", "No released grade is available for this attempt.");
   }
   const gradeTarget = gradeChallengeTargetForGrade(grade);

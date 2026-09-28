@@ -1856,7 +1856,7 @@ export default function CourseGroupPage() {
                               <span className="gradebook-number">{activity.gradedCount}</span>
                               <strong className="gradebook-number">{formatMeanGrade(activity.meanScore, activity.meanMaxScore)}</strong>
                               <div className="table-actions">
-                                <button
+                                {activity.assessmentMode === "summative" ? <button
                                   className="button secondary"
                                   disabled={
                                     savingReleaseItemId === activity.gradebookItemId
@@ -1869,8 +1869,8 @@ export default function CourseGroupPage() {
                                   onClick={() => setGradebookRelease(activity.gradebookItemId, !activity.gradesReleased, activity.activityTitle)}
                                 >
                                   {activity.gradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
-                                </button>
-                                {!activity.gradesReleased && activity.incompleteGradeCount > 0 ? (
+                                </button> : null}
+                                {activity.assessmentMode === "summative" && !activity.gradesReleased && activity.incompleteGradeCount > 0 ? (
                                   <span className="grade-release-blocked-note">
                                     {t("courseDetail.releaseGradesBlocked", { count: activity.incompleteGradeCount })}
                                   </span>
@@ -2472,6 +2472,7 @@ type GroupGradebookActivitySummary = {
   activityTypeName: string;
   gradebookItemId: string;
   gradesReleased: boolean;
+  assessmentMode: "formative" | "summative";
   submissionCount: number;
   gradedCount: number;
   incompleteGradeCount: number;
@@ -2499,6 +2500,7 @@ function buildGroupGradebookActivitySummaries(
         activityTypeName: item.activityTypeName,
         gradebookItemId: item.gradebookItemId,
         gradesReleased: item.gradesReleased,
+        assessmentMode: item.assessmentMode,
         submissionCount: sum(itemRows.map((row) => row.submittedAttemptCount)),
         gradedCount: itemRows.filter((row) => row.score !== null).length,
         incompleteGradeCount: item.incompleteGradeCount,

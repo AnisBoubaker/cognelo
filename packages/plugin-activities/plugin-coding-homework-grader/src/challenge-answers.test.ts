@@ -153,6 +153,26 @@ describe("coding homework challenge answers", () => {
     expect(result.submission.coreAttemptId).toBe("core-attempt-1");
   });
 
+  it("creates a non-graded core attempt when finalized in formative mode", async () => {
+    await saveCodingHomeworkChallengeAnswers(
+      { activityId: "activity-1", courseId: "course-1", groupId: "group-1", user: testUser() },
+      {
+        answers: [
+          { questionId: "question-1", answer: "The loop accumulates values before returning." },
+          { questionId: "question-2", answer: "The base case decides the edge behavior." }
+        ],
+        submissionId: "submission-1"
+      },
+      { finalize: true, gradebook: { assessmentMode: "formative", pluginVersion: "0.1.0" } }
+    );
+
+    expect(coreMocks.startActivityAttempt).toHaveBeenCalledWith(testUser(), expect.objectContaining({
+      assessmentMode: "formative",
+      pluginAttemptRef: "submission-1"
+    }));
+    expect(coreMocks.submitActivityAttempt).toHaveBeenCalledWith(testUser(), expect.objectContaining({ attemptId: "core-attempt-1" }));
+  });
+
   it("locks completed submissions", async () => {
     dbMocks.pluginCodingHomeworkSubmission.findFirst.mockResolvedValue(testSubmission({ status: "ready_for_grading" }));
 

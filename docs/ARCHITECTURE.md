@@ -128,6 +128,8 @@ Plugins whose released learner report needs activity-specific evidence may also 
 
 Plugins whose final grade has multiple independently completed components register a batch `gradeCompletion` handler. The teacher gradebook combines that plugin-owned classification with core attempt state: submitted-ungraded or partial rows prevent release, explicit teacher overrides are complete, and learners without a submission never block the item.
 
+Every standalone learner check/submission that represents an inspectable attempt writes a core `ActivityAttempt` in addition to any richer plugin-owned record. `ActivityAttempt.assessmentMode` captures `formative` or `summative` at submission time; summative limits, grade selection, grading, and release queries ignore formative attempts. Changing an assignment from formative to summative does not rewrite history, so old practice attempts remain inspectable but cannot pollute the summative report or grade. Changing summative to formative is a data conversion: the API requires explicit confirmation, converts existing assignment attempts to formative, deactivates the current grade snapshots, clears release, and appends `assessment_mode_changed` events for every student. The grade rows remain as inactive historical snapshots so the append-only event trail and prior grade evidence are retained.
+
 No course table rewrite is required.
 
 ## Content Type Extensibility

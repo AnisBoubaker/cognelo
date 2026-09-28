@@ -64,6 +64,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [savedAssessmentMode, setSavedAssessmentMode] = useState<"formative" | "summative" | null>(null);
   const isTest = activity.activityType.key === "test";
 
   useEffect(() => {
@@ -75,6 +76,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
         if (cancelled) return;
         const nextDraft = buildDraft(settings, isTest);
         setDraft(nextDraft);
+        setSavedAssessmentMode(nextDraft.assessmentMode);
         setSelectedGroupId(nextDraft.groups[0]?.groupId ?? "");
       })
       .catch((loadError) => {
@@ -151,6 +153,8 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
   async function saveSettings(event: FormEvent) {
     event.preventDefault();
     if (!draft) return;
+    const convertsSummativeToFormative = savedAssessmentMode === "summative" && draft.assessmentMode === "formative";
+    if (convertsSummativeToFormative && !window.confirm(t("groupPage.summativeToFormativeConfirm"))) return;
     setSaving(true);
     setError("");
     try {
@@ -162,6 +166,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
         availableUntil: toIsoOrNull(draft.general.availableUntil),
         enablePerGroupSettings: true,
         assessmentMode: draft.assessmentMode,
+        confirmSummativeToFormative: convertsSummativeToFormative,
         requireSafeExamBrowser: draft.assessmentMode === "summative" && draft.general.requireSafeExamBrowser,
         gradebookSettings: buildGradebookSettings(draft.general),
         contentPlacement: {

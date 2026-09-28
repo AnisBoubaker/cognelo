@@ -46,7 +46,9 @@ export async function resolveCourseGradebookCompletions(user: CurrentUser, cours
   const rows = gradebook.rows.map((row) => {
     const { gradeCompletionContext: _gradeCompletionContext, ...publicRow } = row;
     const activityKey = `${row.activityTypeKey}:${row.activityId}`;
-    const gradeCompletion: GradeCompletion | null = row.submittedAttemptCount === 0 && row.score === null
+    const gradeCompletion: GradeCompletion | null = row.assessmentMode === "formative"
+      ? null
+      : row.submittedAttemptCount === 0 && row.score === null
       ? null
       : isUngradedRow(row)
         ? { status: "ungraded", completedComponentCount: 0, requiredComponentCount: 1 }
@@ -61,9 +63,11 @@ export async function resolveCourseGradebookCompletions(user: CurrentUser, cours
     rowsByItem.set(row.gradebookItemId, itemRows);
   });
   const items = gradebook.items.map((item) => {
-    const incompleteGradeCount = (rowsByItem.get(item.gradebookItemId) ?? []).filter((row) =>
-      row.submittedAttemptCount > 0 && row.gradeCompletion?.status !== "complete"
-    ).length;
+    const incompleteGradeCount = item.assessmentMode === "formative"
+      ? 0
+      : (rowsByItem.get(item.gradebookItemId) ?? []).filter((row) =>
+          row.submittedAttemptCount > 0 && row.gradeCompletion?.status !== "complete"
+        ).length;
     return {
       ...item,
       incompleteGradeCount,
@@ -75,7 +79,7 @@ export async function resolveCourseGradebookCompletions(user: CurrentUser, cours
 }
 
 function isUngradedRow(row: CoreCourseGradebook["rows"][number]) {
-  return row.submittedAttemptCount > 0 && (
+  return row.assessmentMode !== "formative" && row.submittedAttemptCount > 0 && (
     row.score === null || (row.needsGradingCount > 0 && row.gradeSource !== "override")
   );
 }
