@@ -211,6 +211,9 @@ async function processActivityVariation(job: BackgroundJobRecord) {
       });
     }
 
+    const createdActivity = createdBankActivityId
+      ? await getBankActivity(payload.user, payload.activityBankId, createdBankActivityId)
+      : null;
     await reportJobProgress(job.id, {
       completed: copies.length,
       fraction: 0,
@@ -218,7 +221,7 @@ async function processActivityVariation(job: BackgroundJobRecord) {
       step: "saving",
       total: copies.length
     });
-    return { activityId: createdBankActivityId, title: payload.title };
+    return { activityId: createdBankActivityId, title: createdActivity?.title ?? payload.title };
   } catch (error) {
     let cleanupError: unknown = null;
     if (createdBankActivityId) {
@@ -241,10 +244,26 @@ async function processActivityVariation(job: BackgroundJobRecord) {
   }
 }
 
-async function cleanupVariation(user: CurrentUser, activityBankId: string, bankActivityId: string) {
+export async function cleanupVariation(user: CurrentUser, activityBankId: string, bankActivityId: string) {
   const deleted = await deleteBankActivity(user, activityBankId, bankActivityId, { force: true });
+  const failures: string[] = [];
   for (const activity of deleted.deletedActivities ?? []) {
-    await runBankActivityDeletedHooks({ user, activityBankId, ...activity }).catch(() => undefined);
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        await runBankActivityDeletedHooks({ user, activityBankId, ...activity });
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (lastError) {
+      failures.push(`${activity.activityTypeKey}:${activity.bankActivityId}: ${lastError instanceof Error ? lastError.message : "Unknown cleanup error."}`);
+    }
+  }
+  if (failures.length) {
+    throw new Error(`Plugin-private cleanup failed after three attempts (${failures.join("; ")}).`);
   }
 }
 

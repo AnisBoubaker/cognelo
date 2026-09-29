@@ -122,6 +122,11 @@ const generatedRubricSchema = z.object({
   }
 });
 
+const generatedVariationMetadataSchema = z.object({
+  title: z.string().trim().min(2).max(160),
+  description: z.string().trim().min(10).max(4000)
+}).strict();
+
 export async function generateCodingExercisePrompt(input: {
   user: Parameters<typeof generateQuestionAuthoringText>[0];
   description: string;
@@ -161,6 +166,83 @@ export async function generateCodingExercisePrompt(input: {
   throw new AppError(422, "CODING_EXERCISE_PROMPT_GENERATION_INVALID", "The AI agent could not generate a valid coding exercise prompt.", {
     issues: lastIssues,
     prompt: lastPrompt
+  });
+}
+
+export async function generateCodingExerciseVariationMetadata(input: {
+  user: Parameters<typeof generateQuestionAuthoringText>[0];
+  prompt: string;
+  originalTitle: string;
+  originalDescription: string;
+  language: string;
+  locale: GenerationLocale;
+  subject: SubjectContext;
+}) {
+  const systemPrompt = [
+    "You create the title and catalog description for a newly generated Cognelo coding exercise.",
+    "Return only valid JSON with exactly this shape: {\"title\":\"...\",\"description\":\"...\"}.",
+    "The title must concisely name the concrete task in the new student prompt.",
+    "The description must accurately summarize what the student will implement and the main learning objective.",
+    "Do not describe the activity as a variation, copy, or alternative version, and do not refer to the original exercise.",
+    "Do not add requirements that are absent from the new student prompt.",
+    `Programming language: ${input.language}.`,
+    `Write the title and description in ${localeName(input.locale)}.`,
+    "",
+    "Subject context:",
+    `Title: ${input.subject.title}`,
+    `Description: ${input.subject.description || "No subject description provided."}`
+  ].join("\n");
+  const immutableContext = [
+    "New student-facing prompt:",
+    "<student_prompt>",
+    input.prompt.trim(),
+    "</student_prompt>",
+    "",
+    "Original metadata, which must not be repeated verbatim:",
+    `Title: ${input.originalTitle.trim()}`,
+    `Description: ${input.originalDescription.trim() || "None."}`
+  ].join("\n");
+  let userPrompt = immutableContext;
+  let lastPayload: unknown = null;
+  let lastIssues: string[] = [];
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const raw = await generateQuestionAuthoringText(input.user, {
+      systemPrompt,
+      userPrompt,
+      maxOutputTokens: 1200
+    });
+    const parsed = parseGeneratedJson(raw);
+    if (parsed.ok) {
+      const validation = generatedVariationMetadataSchema.safeParse(parsed.value);
+      if (validation.success) {
+        const issues = collectVariationMetadataIssues(validation.data, input);
+        if (!issues.length) return { ...validation.data, attempts: attempt };
+        lastIssues = issues;
+        lastPayload = validation.data;
+      } else {
+        lastIssues = validation.error.issues.map((issue) => `${issue.path.join(".") || "payload"}: ${issue.message}`);
+        lastPayload = parsed.value;
+      }
+    } else {
+      lastIssues = [parsed.issue];
+      lastPayload = raw;
+    }
+    userPrompt = [
+      "The previous metadata was invalid. Return the full corrected JSON payload only.",
+      "Validation issues:",
+      ...lastIssues.map((issue) => `- ${issue}`),
+      "",
+      immutableContext,
+      "",
+      "Previous payload:",
+      typeof lastPayload === "string" ? lastPayload : JSON.stringify(lastPayload, null, 2)
+    ].join("\n");
+  }
+
+  throw new AppError(422, "CODING_EXERCISE_VARIATION_METADATA_INVALID", "The AI agent could not generate a matching title and description for the coding exercise variation.", {
+    issues: lastIssues,
+    payload: lastPayload
   });
 }
 
@@ -662,6 +744,23 @@ function validateGeneratedSolution(input: { payload: unknown; language: string }
     },
     issues: []
   };
+}
+
+function collectVariationMetadataIssues(
+  metadata: z.infer<typeof generatedVariationMetadataSchema>,
+  input: { originalTitle: string; originalDescription: string }
+) {
+  const issues: string[] = [];
+  if (metadata.title.localeCompare(input.originalTitle.trim(), undefined, { sensitivity: "base" }) === 0) {
+    issues.push("title must name the new exercise and must not repeat the original title.");
+  }
+  if (
+    input.originalDescription.trim()
+    && metadata.description.localeCompare(input.originalDescription.trim(), undefined, { sensitivity: "base" }) === 0
+  ) {
+    issues.push("description must summarize the new exercise and must not repeat the original description.");
+  }
+  return issues;
 }
 
 async function validateGeneratedTests(input: {

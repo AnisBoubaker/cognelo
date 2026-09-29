@@ -617,10 +617,9 @@ export const frMessages = {
       variationProgressCount: "{completed} activité(s) sur {total}",
       variationQueued: "En attente du démarrage…",
       variationFailed: "La variante n’a pas pu être créée.",
-      variationComplete: "La variante est prête.",
+      variationComplete: 'Le nouvel exercice est « {title} ».',
       variationError: "Impossible de créer la variante de l’activité.",
       variationStatusError: "Impossible de vérifier la progression de la variante.",
-      openVariation: "Ouvrir la variante",
       variationStep: {
         content: "Génération de {title}…",
         prompt: "Génération d’un nouvel énoncé pour {title}…",
