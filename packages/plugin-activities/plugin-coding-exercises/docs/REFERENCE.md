@@ -115,6 +115,8 @@ AI-assisted solution and test generation is intentionally staged:
 1. Generate the reference solution and execution template. This clears starter code so the teacher can review the proposed answer before deciding what students should receive.
 2. Generate visible and hidden test cases from the student instructions, reviewed reference solution, and template. Generated tests are validated server-side against Judge0 before they are inserted into the form.
 
+Activity-bank variation uses those same validated stages as one background operation. Core first deep-copies generic and private authoring, including concept selections and the complete rubric-bearing private configuration. The plugin then generates a distinct prompt, solution/template, and the same number of visible/hidden tests, preserves each hidden test's positional weight, and saves only after reference validation. The rubric and feedback/grading policy are not regenerated; they remain an identical but independently stored starting point on the variation. Reusable Test variation invokes this path once per Programming Exercise child and reports its prompt/solution/test/validation stages to the host progress dialog.
+
 AI-generated templates use one of two portable execution shapes:
 
 - full-program exercises: `{{ STUDENT_CODE }}` with stdin/stdout tests and empty test harness code

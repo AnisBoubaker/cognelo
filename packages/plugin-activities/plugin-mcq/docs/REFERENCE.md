@@ -57,6 +57,8 @@ When a teacher has selected an enabled question-authoring AI agent in global set
 
 The same panel offers `Use selected skills`, `Suggest skills`, and `Ignore skills`. Every mode provides the complete subject catalog to the generation model as a curriculum boundary. Selected mode additionally targets the current draft skills. Suggested skills are selected from the subject catalog after the MCQ source validates and are applied to the unsaved host Concepts-tab draft. Ignore mode does not read or change that draft and performs no suggestion pass.
 
+The activity-bank **Create variation** action runs as a background operation after core has created an independent draft and copied its exact concept selections. The plugin generates a distinct student introduction and the same number of new questions at comparable difficulty, while retaining generation/display/feedback settings. The generated source passes the ordinary syntax/count checks and mandatory independent answer-key audit before it is saved. Optional instructions entered in the variation dialog guide only that run and are not persisted in `aiGenerationInstructions`.
+
 The saved AI language choice defaults to `none`, shown as "Not a programming exercise." It affects AI generation only: generated code fences must explicitly declare the selected programming language, for example ` ```python `. Manually authored code fences must include their own language identifier when syntax highlighting is wanted; unlabeled fences render as plain text regardless of the saved AI language.
 
 In activity-bank lists, MCQ rows display the activity title without repeating the student prompt beneath it.

@@ -3914,6 +3914,26 @@ a.card:hover,
   justify-content: flex-end;
 }
 
+.activity-variation-progress {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.activity-variation-progress progress {
+  accent-color: var(--brand-blue);
+  height: 16px;
+  width: 100%;
+}
+
+.activity-variation-progress-summary {
+  color: var(--muted);
+  display: flex;
+  font-size: 13px;
+  font-weight: 700;
+  justify-content: space-between;
+}
+
 .table-actions {
   align-items: center;
   display: flex;

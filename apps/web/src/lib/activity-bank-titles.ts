@@ -6,3 +6,11 @@ export function defaultDuplicateActivityTitle(title: string, maxLength = 180) {
 }
 
 export const defaultDuplicateBankActivityTitle = (title: string) => defaultDuplicateActivityTitle(title, 160);
+
+export function defaultVariationBankActivityTitle(
+  title: string,
+  locale: "en" | "fr" | "zh" | "ar"
+) {
+  const suffix = locale === "fr" ? " (variante)" : locale === "zh" ? "（变体）" : locale === "ar" ? " (نسخة متنوعة)" : " (variation)";
+  return `${title.slice(0, 160 - suffix.length).trimEnd()}${suffix}`;
+}

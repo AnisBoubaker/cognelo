@@ -5,10 +5,15 @@ import { buildMcqGradingResultFromConfig } from "./grading";
 import { z } from "zod";
 import { mcqFormativeFeedbackRoute, mcqGenerateRoute, mcqGradebookAttemptsRoute, mcqSubmissionRoute, submittedAnswersFromMetadata } from "./routes";
 import { evaluateMcqWithAi, reviseMcqAiFeedback } from "./ai-feedback";
+import { createMcqBankActivityVariation } from "./variation";
 
 export const mcqServerPlugin: ServerActivityPlugin = {
   key: "mcq",
   routes: [mcqGenerateRoute, mcqSubmissionRoute, mcqFormativeFeedbackRoute, mcqGradebookAttemptsRoute],
+  bankVariation: {
+    activityTypeKeys: ["mcq"],
+    createVariation: createMcqBankActivityVariation
+  },
   aiFeedback: {
     evaluateAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, activity, triggerKind, testItemAttempt }) => {
       const attempt = testItemAttempt ? null : await prisma.activityAttempt.findUnique({ where: { id: coreAttemptId }, select: { metadata: true } });

@@ -17,7 +17,8 @@ const {
   getBackgroundJob,
   registerBackgroundJobHandler,
   runBackgroundJobOnce,
-  startBackgroundJobWorker
+  startBackgroundJobWorker,
+  updateBackgroundJobMetadata
 } = await import("./background-jobs");
 
 describe("background job service", () => {
@@ -125,6 +126,22 @@ describe("background job service", () => {
 
     await expect(getBackgroundJob("job-read")).resolves.toMatchObject({ id: "job-read" });
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(expect.stringContaining('WHERE "id" = $1'), "job-read");
+  });
+
+  it("merges progress metadata without replacing job ownership metadata", async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+      jobRow({ metadata: { userId: "teacher-1", progress: { completed: 1, total: 3 } } })
+    ]);
+
+    await expect(updateBackgroundJobMetadata("job-1", { progress: { completed: 1, total: 3 } })).resolves.toMatchObject({
+      metadata: { userId: "teacher-1", progress: { completed: 1, total: 3 } }
+    });
+    expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
+      expect.stringContaining('"metadata" = COALESCE'),
+      "job-1",
+      JSON.stringify({ progress: { completed: 1, total: 3 } }),
+      expect.any(Date)
+    );
   });
 
   it("stops interval polling after the configured idle timeout", async () => {

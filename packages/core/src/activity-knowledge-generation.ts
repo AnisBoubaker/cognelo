@@ -1,7 +1,9 @@
 import { z } from "zod";
-import type { ActivityKnowledgeConceptSelection } from "@cognelo/contracts";
+import type { ActivityKnowledgeConceptSelection, CurrentUser } from "@cognelo/contracts";
 import { AppError } from "./errors";
 import { generateQuestionAuthoringText } from "./ai-agents";
+import { prisma } from "@cognelo/db";
+import { assertCanManageActivityBank } from "./subjects";
 
 const knowledgeConceptSchema = z.object({
   id: z.string().min(1).max(120),
@@ -19,6 +21,78 @@ export const activityGenerationKnowledgeSchema = z.discriminatedUnion("mode", [
 ]);
 
 export type ActivityGenerationKnowledge = z.infer<typeof activityGenerationKnowledgeSchema>;
+
+export async function getBankActivityVariationGenerationContext(
+  user: CurrentUser,
+  activityBankId: string,
+  bankActivityId: string
+) {
+  await assertCanManageActivityBank(user, activityBankId);
+  const bank = await prisma.activityBank.findUnique({
+    where: { id: activityBankId },
+    include: {
+      subject: {
+        include: {
+          knowledgeConcepts: {
+            where: { active: true },
+            include: { skillRecords: { where: { active: true }, orderBy: [{ position: "asc" }] } },
+            orderBy: [{ createdAt: "asc" }]
+          }
+        }
+      },
+      activities: {
+        where: { id: bankActivityId },
+        include: {
+          knowledgeConcepts: {
+            include: {
+              concept: { include: { skillRecords: { orderBy: [{ position: "asc" }] } } }
+            }
+          }
+        }
+      }
+    }
+  });
+  const activity = bank?.activities[0];
+  if (!bank || !activity) {
+    throw new AppError(404, "BANK_ACTIVITY_NOT_FOUND", "Bank activity was not found.");
+  }
+
+  const concepts = bank.subject.knowledgeConcepts.map(toVariationConcept);
+  const selectedConcepts = activity.knowledgeConcepts.flatMap((selection) => {
+    const concept = toVariationConcept(selection.concept);
+    if (selection.selectsAllSkills) return [concept];
+    const selectedSkillIds = jsonStringArray(selection.selectedSkillIds);
+    const selectedSkills = jsonStringArray(selection.selectedSkills);
+    const selectedIndexes = concept.skills
+      .map((skill, index) => ({ skill, index }))
+      .filter(({ skill, index }) => selectedSkillIds.includes(concept.skillIds[index]) || selectedSkills.includes(skill));
+    return [{
+      ...concept,
+      skills: selectedIndexes.map(({ skill }) => skill),
+      skillIds: selectedIndexes.map(({ index }) => concept.skillIds[index])
+    }];
+  });
+
+  return {
+    locale: normalizeVariationLocale(bank.subject.teachingLanguage),
+    subject: { title: bank.subject.title, description: bank.subject.description },
+    knowledge: { mode: "selected" as const, concepts, selectedConcepts }
+  };
+}
+
+function toVariationConcept(concept: {
+  id: string;
+  title: string;
+  skills: string;
+  skillRecords: Array<{ id: string; title: string }>;
+}) {
+  const legacySkills = concept.skills.split(/\r?\n/).map((skill) => skill.trim()).filter(Boolean);
+  const skills = concept.skillRecords.length ? concept.skillRecords.map((skill) => skill.title) : legacySkills;
+  const skillIds = concept.skillRecords.length
+    ? concept.skillRecords.map((skill) => skill.id)
+    : skills.map((_, index) => `${concept.id}:legacy-skill-${index + 1}`);
+  return { id: concept.id, title: concept.title, skills, skillIds };
+}
 
 export function activityKnowledgeGenerationPrompt(knowledge: ActivityGenerationKnowledge) {
   const boundary = knowledge.concepts.length
@@ -122,4 +196,12 @@ function parseJson(value: string) {
   } catch {
     return null;
   }
+}
+
+function jsonStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
+function normalizeVariationLocale(value: string): "en" | "fr" | "zh" | "ar" {
+  return value === "fr" || value === "zh" || value === "ar" ? value : "en";
 }

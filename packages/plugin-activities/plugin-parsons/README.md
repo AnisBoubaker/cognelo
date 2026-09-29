@@ -17,5 +17,6 @@
 - Teacher/admin previews are ephemeral and must not pollute learner research data.
 - Formative checks and summative submissions create mode-tagged core attempts linked to the richer plugin attempt. Only summative attempts are graded, suppress correctness until release, and support teacher regrades; formative checks remain read-only teacher evidence.
 - The released deterministic or teacher-overridden grade is challengeable through the core workflow and returns to the existing Parsons **Review and grade** surface.
+- Activity-bank variations preserve the selected concepts, language, grouping/precedence structure, line count, and difficulty while generating a meaningfully different prompt and reference solution. The copied activity is independent, including inside reusable Test variations.
 
 When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an invariant changed, and the relevant detailed section.

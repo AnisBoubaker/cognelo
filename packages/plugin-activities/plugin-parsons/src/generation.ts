@@ -44,6 +44,14 @@ export async function generateParsonsProblem(input: {
   locale: GenerationLocale;
   subject: SubjectContext;
   knowledge?: ActivityGenerationKnowledge;
+  variation?: {
+    originalPrompt: string;
+    originalSolution: string;
+    instructions: string;
+    requiredNonEmptyLineCount: number;
+    requiredPhysicalLineCount: number;
+    groupingStructure: string;
+  };
 }) {
   const systemPrompt = buildSystemPrompt(input);
   let userPrompt = buildInitialUserPrompt(input);
@@ -73,7 +81,10 @@ export async function generateParsonsProblem(input: {
       };
     }
 
-    const validated = validateGeneratedParsonsPayload(parsed.value);
+    const validated = validateGeneratedParsonsPayload(parsed.value, input.variation && {
+      requiredNonEmptyLineCount: input.variation.requiredNonEmptyLineCount,
+      requiredPhysicalLineCount: input.variation.requiredPhysicalLineCount
+    });
     if (!validated.issues.length && validated.payload) {
       const knowledgeConceptSelections = await suggestActivityKnowledgeSelections({
         user: input.user,
@@ -98,7 +109,7 @@ export async function generateParsonsProblem(input: {
   });
 }
 
-function buildSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext; knowledge?: ActivityGenerationKnowledge }) {
+function buildSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext; knowledge?: ActivityGenerationKnowledge; variation?: { requiredNonEmptyLineCount: number; requiredPhysicalLineCount: number } }) {
   return [
     "You generate Parsons problem authoring content for Cognelo.",
     "Return only valid JSON. Do not wrap the JSON in Markdown fences. Do not add explanations.",
@@ -138,6 +149,12 @@ function buildSystemPrompt(input: { language: string; locale: GenerationLocale; 
     "- Do not use the error shape only because some details are missing; make reasonable assumptions and warn.",
     "- Do not include Markdown fences around the solution field.",
     "- The solution should normally contain at least three non-empty lines.",
+    ...(input.variation ? [
+      `- This is a variation. The new solution must contain exactly ${input.variation.requiredNonEmptyLineCount} non-empty lines so the original grouping structure remains valid.`,
+      `- The solution must contain exactly ${input.variation.requiredPhysicalLineCount} physical lines, including blank lines.`,
+      "- Preserve the same concepts, difficulty, cognitive demand, and approximate implementation complexity.",
+      "- Change the algorithmic details or code path enough that the solution is genuinely different; do not merely rename variables or retheme the same statements."
+    ] : []),
     "- Keep the prompt student-facing. Do not reveal the exact final line order outside the solution field.",
     "- warningMessage and error message must be concise, actionable, and written in the current UI/content language.",
     "",
@@ -152,14 +169,37 @@ function buildSystemPrompt(input: { language: string; locale: GenerationLocale; 
   ].join("\n");
 }
 
-function buildInitialUserPrompt(input: { description: string }) {
+function buildInitialUserPrompt(input: { description: string; variation?: { originalPrompt: string; originalSolution: string; instructions: string; groupingStructure: string } }) {
+  if (input.variation) {
+    return [
+      "Generate a genuine variation of this existing Parsons problem.",
+      "",
+      "Original teacher description:",
+      input.description.trim(),
+      "",
+      "Original student prompt:",
+      input.variation.originalPrompt.trim(),
+      "",
+      "Original reference solution:",
+      input.variation.originalSolution,
+      "",
+      "Grouping and precedence settings that must remain applicable to the same line ranges:",
+      input.variation.groupingStructure,
+      "",
+      "Optional teacher instructions:",
+      input.variation.instructions.trim() || "None."
+    ].join("\n");
+  }
   return [
     "Generate a Parsons problem that matches this teacher description:",
     input.description.trim()
   ].join("\n\n");
 }
 
-function validateGeneratedParsonsPayload(payload: unknown) {
+function validateGeneratedParsonsPayload(
+  payload: unknown,
+  requiredLineCounts?: { requiredNonEmptyLineCount: number; requiredPhysicalLineCount: number }
+) {
   const result = generatedParsonsSchema.safeParse(payload);
   if (!result.success) {
     return {
@@ -170,8 +210,15 @@ function validateGeneratedParsonsPayload(payload: unknown) {
 
   const issues: string[] = [];
   const solutionLines = result.data.solution.replace(/\r\n/g, "\n").split("\n").filter((line) => line.trim().length > 0);
-  if (solutionLines.length < 3) {
+  if (!requiredLineCounts && solutionLines.length < 3) {
     issues.push("solution must contain at least three non-empty lines for a meaningful Parsons problem.");
+  }
+  if (requiredLineCounts && solutionLines.length !== requiredLineCounts.requiredNonEmptyLineCount) {
+    issues.push(`solution must contain exactly ${requiredLineCounts.requiredNonEmptyLineCount} non-empty lines; received ${solutionLines.length}.`);
+  }
+  const physicalLineCount = result.data.solution.replace(/\r\n/g, "\n").split("\n").length;
+  if (requiredLineCounts && physicalLineCount !== requiredLineCounts.requiredPhysicalLineCount) {
+    issues.push(`solution must contain exactly ${requiredLineCounts.requiredPhysicalLineCount} physical lines; received ${physicalLineCount}.`);
   }
 
   return {

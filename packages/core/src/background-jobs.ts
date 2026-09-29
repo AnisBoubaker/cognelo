@@ -128,6 +128,20 @@ export async function getBackgroundJob(jobId: string) {
   return rows[0] ? toBackgroundJobRecord(rows[0]) : null;
 }
 
+export async function updateBackgroundJobMetadata(jobId: string, patch: Record<string, unknown>) {
+  const rows = await prisma.$queryRawUnsafe<BackgroundJobRow[]>(
+    `UPDATE "BackgroundJob"
+     SET "metadata" = COALESCE("metadata", '{}'::jsonb) || $2::jsonb,
+         "updatedAt" = $3
+     WHERE "id" = $1
+     RETURNING *`,
+    jobId,
+    JSON.stringify(patch),
+    new Date()
+  );
+  return rows[0] ? toBackgroundJobRecord(rows[0]) : null;
+}
+
 export async function runBackgroundJobOnce(options: { queue?: string; workerId?: string } = {}) {
   const workerId = options.workerId ?? `worker-${randomUUID()}`;
   const job = await claimBackgroundJob({ queue: options.queue, workerId });

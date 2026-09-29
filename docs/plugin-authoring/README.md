@@ -97,6 +97,7 @@ If you just want the shortest possible summary:
 8. If it exposes any authoring or settings form, register that form with `useUnsavedChangesGuard` from `@cognelo/activity-ui`
 9. If it has private bank-owned data, add a server hook to copy it into course-owned plugin tables when assigned. This is required for correct copy semantics.
 10. Do not implement or hide activity-to-knowledge-concept selection in the plugin. The host application supplies the mandatory Concepts tab to every activity authoring page and core owns its versioned links.
+11. If the activity can generate bank variations, advertise `authoring.supportsVariations` and implement the server `bankVariation.createVariation` handler. The handler owns all public/private regeneration and must leave the copied activity as an independent valid draft.
 
 For a content type plugin:
 

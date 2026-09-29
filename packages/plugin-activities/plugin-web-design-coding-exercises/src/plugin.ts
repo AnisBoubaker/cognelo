@@ -14,6 +14,9 @@ export const webDesignCodingExercisesPlugin: ActivityPlugin = {
       description: "Students edit HTML, CSS, and JavaScript files with a live sandboxed browser preview.",
       defaultCategoryIds: ["programming"],
       icon: "browser-code",
+      authoring: {
+        supportsVariations: true
+      },
       grading: {
         supportsAttempts: true,
         supportsAutoGrading: true,

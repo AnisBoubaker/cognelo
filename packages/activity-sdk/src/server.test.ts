@@ -4,6 +4,7 @@ import {
   listPluginRoutes,
   resolveCompositeExecutionActionHandler,
   resolveCompositeExecutionSubmissionHandler,
+  resolveBankActivityVariationHandler,
   resolvePluginGradingHandler,
   resolvePluginGradeCompletionHandler,
   resolvePluginStudentGradeReportHandler,
@@ -118,6 +119,14 @@ describe("server activity SDK", () => {
     expect(resolveCompositeExecutionActionHandler("coding-exercise", "run")).toBeTypeOf("function");
     expect(resolveCompositeExecutionActionHandler("coding-exercise", "submit")).toBeNull();
     expect(resolveCompositeExecutionSubmissionHandler("placeholder")).toBeNull();
+  });
+
+  it("resolves bank variation handlers for every Test-capable activity plugin", () => {
+    expect(resolveBankActivityVariationHandler("mcq")).toBeTypeOf("function");
+    expect(resolveBankActivityVariationHandler("parsons-problem")).toBeTypeOf("function");
+    expect(resolveBankActivityVariationHandler("coding-exercise")).toBeTypeOf("function");
+    expect(resolveBankActivityVariationHandler("web-design-coding-exercise")).toBeTypeOf("function");
+    expect(resolveBankActivityVariationHandler("placeholder")).toBeNull();
   });
 
   it("runs bank deletion hooks without requiring every plugin to implement one", async () => {
