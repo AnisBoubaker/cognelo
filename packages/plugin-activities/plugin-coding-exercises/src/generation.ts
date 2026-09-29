@@ -188,7 +188,7 @@ export async function generateCodingExerciseSolution(input: {
     if (!parsed.ok) {
       lastPayload = raw;
       lastIssues = [parsed.issue];
-      userPrompt = buildCorrectionPrompt("JSON payload", raw, lastIssues);
+      userPrompt = buildSolutionCorrectionPrompt(input, raw, lastIssues);
       continue;
     }
 
@@ -197,9 +197,9 @@ export async function generateCodingExerciseSolution(input: {
       if (isMissingProvidedContextError(impossible.data.message)) {
         lastPayload = parsed.value;
         lastIssues = [
-          "The request already includes the student-facing prompt, reference solution, and template. Generate tests from the provided context instead of returning a missing-context error."
+          "The request already includes the teacher description and student-facing prompt. Generate the reference solution and template from that provided context instead of returning a missing-context error."
         ];
-        userPrompt = buildCorrectionPrompt("JSON payload", JSON.stringify(parsed.value, null, 2), lastIssues);
+        userPrompt = buildSolutionCorrectionPrompt(input, JSON.stringify(parsed.value, null, 2), lastIssues);
         continue;
       }
       return {
@@ -230,7 +230,7 @@ export async function generateCodingExerciseSolution(input: {
 
     lastPayload = parsed.value;
     lastIssues = validation.issues;
-    userPrompt = buildTestCorrectionPrompt(JSON.stringify(parsed.value, null, 2), validation.issues);
+    userPrompt = buildSolutionCorrectionPrompt(input, JSON.stringify(parsed.value, null, 2), validation.issues);
   }
 
   throw new AppError(422, "CODING_EXERCISE_SOLUTION_GENERATION_INVALID", "The AI agent could not generate a valid coding exercise solution.", {
@@ -270,7 +270,11 @@ export async function generateCodingExerciseTests(input: {
     if (!parsed.ok) {
       lastPayload = raw;
       lastIssues = [parsed.issue];
-      userPrompt = buildCorrectionPrompt("JSON payload", raw, lastIssues);
+      userPrompt = buildTestCorrectionPrompt(
+        { ...input, visibleTestCount, hiddenTestCount },
+        raw,
+        lastIssues
+      );
       continue;
     }
 
@@ -315,7 +319,11 @@ export async function generateCodingExerciseTests(input: {
 
     lastPayload = parsed.value;
     lastIssues = validation.issues;
-    userPrompt = buildCorrectionPrompt("JSON payload", JSON.stringify(parsed.value, null, 2), validation.issues);
+    userPrompt = buildTestCorrectionPrompt(
+      { ...input, visibleTestCount, hiddenTestCount },
+      JSON.stringify(parsed.value, null, 2),
+      validation.issues
+    );
   }
 
   throw new AppError(422, "CODING_EXERCISE_TEST_GENERATION_INVALID", "The AI agent could not generate valid coding exercise tests.", {
@@ -404,6 +412,7 @@ function buildPromptGenerationSystemPrompt(input: { language: string; locale: Ge
     "Return only the prompt text. Do not return JSON, Markdown fences, starter code, solutions, or tests.",
     "The prompt must be clear enough for a student to implement the exercise.",
     "The prompt must be anchored in a concrete, realistic mini-scenario. Do not ask the student to invent the context or decide what the function is for.",
+    "Define the executable contract precisely: required inputs or function signature, required return value or printed output, and applicable edge cases.",
     "Prefer domain examples that make the function useful: inventory, grades, temperatures, bank/account values, coordinates, counters, reservations, sensor readings, or small business rules.",
     "Avoid purely meta phrasing such as 'write a function that illustrates concept X' as the main task. Teach the concept through the scenario instead.",
     "When the teacher gives a difficulty level, match the scope and constraints to that difficulty.",
@@ -457,6 +466,9 @@ function buildSolutionGenerationSystemPrompt(input: { language: string; locale: 
     `  2. Callable unit: templateSource is exactly ${codingExerciseTemplateInsertionToken}\\n\\n${codingExerciseTestInsertionToken}. Use this when the student should write a function, method, class, helper, or other code that tests need to call.`,
     "- Do not generate body-insertion templates. Do not indent the student insertion marker inside another function, class, method, main, or block.",
     "- referenceSolution must have the same shape as the expected student answer: a complete program for full-program exercises, or complete top-level declarations/functions/classes for callable-unit exercises.",
+    "- The reference solution and template must support meaningful independent automated test cases; never hard-code fixed demonstration calls or outputs as the only execution path.",
+    `- When the prompt asks students to implement a function, method, class, or helper, use the callable-unit template with ${codingExerciseTestInsertionToken} so each test can invoke it with different arguments.`,
+    "- When using the full-program template for an input-driven task, the reference program must read the varying case data from standard input instead of embedding one example in source code.",
     "- templateVisibleLineNumbers should normally be an empty array for AI-generated solutions.",
     "- If the prompt is ambiguous but still permits a plausible solution, generate one with status warning and explain the assumption.",
     "- warningMessage and error message must be concise, actionable, and written in the current UI/content language.",
@@ -516,6 +528,8 @@ function buildTestsGenerationSystemPrompt(input: {
     "- IDs must be stable, lowercase, and unique.",
     "- The reference solution must pass every generated sample and hidden test.",
     "- Compute every expected output from the reference solution logic. Do not guess.",
+    "- The reference solution and template are immutable during this stage. Do not invent stdin that the reference program does not read, and do not invent testCode when the template cannot insert it.",
+    "- If the immutable solution/template cannot support the requested number of meaningful independent cases, return the error shape instead of fabricating ineffective tests.",
     "- Choose only inputs for which the provided reference solution terminates successfully with exit code 0. Do not test invalid-input branches that intentionally return a non-zero exit code.",
     "- For floating-point comparisons, do not use mathematically exact threshold values unless you have accounted for the language's binary floating-point behavior. Prefer values safely inside or outside the threshold so the observed branch is unambiguous.",
     `- If the template contains ${codingExerciseTestInsertionToken}, every sample and hidden test must include non-empty testCode, and testCode must run the reference/student code and print the expected output.`,
@@ -999,16 +1013,51 @@ function buildCorrectionPrompt(label: string, previous: string, issues: string[]
   ].join("\n");
 }
 
-function buildTestCorrectionPrompt(previous: string, issues: string[]) {
+function buildSolutionCorrectionPrompt(
+  input: { description: string; prompt: string },
+  previous: string,
+  issues: string[]
+) {
+  return [
+    "The previous JSON payload was invalid. Return the full corrected JSON payload only.",
+    "Keep the new payload consistent with the complete immutable exercise context below.",
+    "",
+    "Validation issues:",
+    ...issues.map((issue) => `- ${issue}`),
+    "",
+    buildSolutionInitialPrompt(input),
+    "",
+    "Previous JSON payload:",
+    previous
+  ].join("\n");
+}
+
+function buildTestCorrectionPrompt(
+  input: {
+    description: string;
+    prompt: string;
+    referenceSolution: string;
+    templateSource: string;
+    visibleTestCount: number;
+    hiddenTestCount: number;
+  },
+  previous: string,
+  issues: string[]
+) {
   return [
     "The previous JSON payload failed execution validation. Return the full corrected JSON payload only.",
     "Replace or remove every failing test; do not merely repeat its mathematically expected result.",
+    "The reference solution and template are immutable. Re-read them below before changing any input, testCode, or expected output.",
+    "Never add stdin unless the reference solution reads it, and never add testCode unless the template contains {{ TEST_CODE }}.",
     "Do not include inputs for which the reference solution exits with a non-zero status.",
     "Avoid floating-point values exactly on a comparison threshold when binary representation can change the branch.",
     "Expected output must match the reference solution's actual stdout byte for byte.",
     "",
     "Validation issues:",
     ...issues.map((issue) => `- ${issue}`),
+    "",
+    "Complete immutable exercise context:",
+    buildTestsInitialPrompt(input),
     "",
     "Previous JSON payload:",
     previous

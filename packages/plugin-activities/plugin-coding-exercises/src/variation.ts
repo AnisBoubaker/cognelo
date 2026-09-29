@@ -40,44 +40,72 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
     throw new AppError(422, "CODING_EXERCISE_VARIATION_NOT_DISTINCT", "The AI agent repeated the original programming exercise prompt.");
   }
 
-  await input.reportProgress({ fraction: 0.35, step: "solution" });
-  const solutionResult = await generateCodingExerciseSolution({
-    user: input.user,
-    description: variationBrief,
-    prompt: promptResult.prompt,
-    language: sourceConfig.language,
-    locale: input.locale,
-    subject: input.subject,
-    knowledge: input.knowledge
-  });
-  if (solutionResult.status === "error") {
-    throw new AppError(422, "CODING_EXERCISE_VARIATION_SOLUTION_UNAVAILABLE", solutionResult.message);
-  }
-  if (sourceReferenceSolution && solutionResult.referenceSolution.trim() === sourceReferenceSolution.trim()) {
-    throw new AppError(422, "CODING_EXERCISE_VARIATION_SOLUTION_NOT_DISTINCT", "The AI agent repeated the original programming exercise solution.");
-  }
-
   const visibleTestCount = sourceConfig.sampleTests.length;
   const hiddenTestCount = sourcePrivate.tests.length;
-  await input.reportProgress({ fraction: 0.58, step: "tests" });
-  const testsResult = visibleTestCount || hiddenTestCount
-    ? await generateCodingExerciseTests({
-        user: input.user,
-        description: variationBrief,
-        prompt: promptResult.prompt,
-        language: sourceConfig.language,
-        locale: input.locale,
-        subject: input.subject,
-        referenceSolution: solutionResult.referenceSolution,
-        templateSource: solutionResult.templateSource,
-        templateVisibleLineNumbers: solutionResult.templateVisibleLineNumbers,
-        visibleTestCount,
-        hiddenTestCount,
-        knowledge: input.knowledge
-      })
-    : null;
-  if (testsResult?.status === "error") {
-    throw new AppError(422, "CODING_EXERCISE_VARIATION_TESTS_UNAVAILABLE", testsResult.message);
+  type SolutionResult = Exclude<Awaited<ReturnType<typeof generateCodingExerciseSolution>>, { status: "error" }>;
+  type TestsResult = Exclude<Awaited<ReturnType<typeof generateCodingExerciseTests>>, { status: "error" }>;
+  let solutionResult: SolutionResult | null = null;
+  let testsResult: TestsResult | null = null;
+  let solutionBrief = variationBrief;
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    await input.reportProgress({ fraction: attempt === 1 ? 0.35 : 0.66, step: "solution" });
+    const candidateSolution = await generateCodingExerciseSolution({
+      user: input.user,
+      description: solutionBrief,
+      prompt: promptResult.prompt,
+      language: sourceConfig.language,
+      locale: input.locale,
+      subject: input.subject,
+      knowledge: input.knowledge
+    });
+    if (candidateSolution.status === "error") {
+      if (attempt < 2 && (visibleTestCount || hiddenTestCount)) {
+        solutionBrief = buildTestabilityRetryBrief(variationBrief, visibleTestCount, hiddenTestCount, [candidateSolution.message]);
+        continue;
+      }
+      throw new AppError(422, "CODING_EXERCISE_VARIATION_SOLUTION_UNAVAILABLE", candidateSolution.message);
+    }
+    if (sourceReferenceSolution && candidateSolution.referenceSolution.trim() === sourceReferenceSolution.trim()) {
+      throw new AppError(422, "CODING_EXERCISE_VARIATION_SOLUTION_NOT_DISTINCT", "The AI agent repeated the original programming exercise solution.");
+    }
+
+    await input.reportProgress({ fraction: attempt === 1 ? 0.58 : 0.76, step: "tests" });
+    try {
+      const candidateTests = visibleTestCount || hiddenTestCount
+        ? await generateCodingExerciseTests({
+            user: input.user,
+            description: solutionBrief,
+            prompt: promptResult.prompt,
+            language: sourceConfig.language,
+            locale: input.locale,
+            subject: input.subject,
+            referenceSolution: candidateSolution.referenceSolution,
+            templateSource: candidateSolution.templateSource,
+            templateVisibleLineNumbers: candidateSolution.templateVisibleLineNumbers,
+            visibleTestCount,
+            hiddenTestCount,
+            knowledge: input.knowledge
+          })
+        : null;
+      if (candidateTests?.status === "error") {
+        if (attempt < 2) {
+          solutionBrief = buildTestabilityRetryBrief(variationBrief, visibleTestCount, hiddenTestCount, [candidateTests.message]);
+          continue;
+        }
+        throw new AppError(422, "CODING_EXERCISE_VARIATION_TESTS_UNAVAILABLE", candidateTests.message);
+      }
+      solutionResult = candidateSolution;
+      testsResult = candidateTests;
+      break;
+    } catch (error) {
+      const feedback = recoverableTestGenerationFeedback(error);
+      if (attempt >= 2 || !feedback) throw error;
+      solutionBrief = buildTestabilityRetryBrief(variationBrief, visibleTestCount, hiddenTestCount, feedback);
+    }
+  }
+  if (!solutionResult) {
+    throw new AppError(422, "CODING_EXERCISE_VARIATION_SOLUTION_UNAVAILABLE", "The AI agent could not generate a reference solution that supports the required test suite.");
   }
   if (testsResult && testSuitesMatch(sourceConfig.sampleTests, sourcePrivate.tests, testsResult.sampleTests, testsResult.hiddenTests)) {
     throw new AppError(422, "CODING_EXERCISE_VARIATION_TESTS_NOT_DISTINCT", "The AI agent repeated the original programming exercise tests.");
@@ -140,6 +168,40 @@ function buildCodingVariationBrief(input: {
     "Original reference solution (for complexity reference only):",
     input.referenceSolution.slice(0, 2500)
   ].join("\n");
+}
+
+function buildTestabilityRetryBrief(
+  variationBrief: string,
+  visibleTestCount: number,
+  hiddenTestCount: number,
+  issues: string[]
+) {
+  return [
+    variationBrief,
+    "",
+    "The previous reference solution/template could not support the required automated test suite and must not be reused.",
+    `Generate a new solution/template that supports ${visibleTestCount} visible and ${hiddenTestCount} hidden meaningful independent cases.`,
+    "For a function or helper task, use the callable-unit template with {{ TEST_CODE }} so tests can call it with different arguments.",
+    "For a full-program task, read all varying case data from standard input; do not hard-code demonstration calls or outputs.",
+    "Test-generation or execution feedback:",
+    ...issues.slice(0, 12).map((issue) => `- ${issue}`)
+  ].join("\n");
+}
+
+function recoverableTestGenerationFeedback(error: unknown) {
+  if (!(error instanceof AppError) || ![
+    "CODING_EXERCISE_TEST_GENERATION_INVALID",
+    "REFERENCE_SOLUTION_COMPILATION_FAILED"
+  ].includes(error.code)) {
+    return null;
+  }
+  const details = error.details && typeof error.details === "object" && !Array.isArray(error.details)
+    ? error.details as { issues?: unknown }
+    : {};
+  const issues = Array.isArray(details.issues)
+    ? details.issues.filter((issue): issue is string => typeof issue === "string")
+    : [];
+  return issues.length ? issues : [error.message];
 }
 
 function testSuitesMatch(

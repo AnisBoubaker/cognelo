@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@cognelo/core", () => ({
   AppError: class AppError extends Error {
-    constructor(public status: number, public code: string, message: string) { super(message); }
+    constructor(public status: number, public code: string, message: string, public details?: unknown) { super(message); }
   },
   updateBankActivity: mocks.updateBankActivity
 }));
@@ -25,7 +25,10 @@ vi.mock("./hidden-tests", () => ({
   replaceBankCodingExerciseHiddenTests: mocks.replacePrivate
 }));
 
-const { createCodingExerciseBankActivityVariation } = await import("./variation");
+const [{ AppError }, { createCodingExerciseBankActivityVariation }] = await Promise.all([
+  import("@cognelo/core"),
+  import("./variation")
+]);
 
 describe("coding exercise bank variations", () => {
   beforeEach(() => {
@@ -116,6 +119,52 @@ describe("coding exercise bank variations", () => {
     })).rejects.toMatchObject({ code: "CODING_EXERCISE_VARIATION_TESTS_NOT_DISTINCT" });
     expect(mocks.updateBankActivity).not.toHaveBeenCalled();
     expect(mocks.replacePrivate).not.toHaveBeenCalled();
+  });
+
+  it("regenerates the solution and template when they cannot support the required tests", async () => {
+    mocks.generateSolution
+      .mockResolvedValueOnce({
+        status: "ok",
+        referenceSolution: "print_fixed_examples();",
+        templateSource: "{{ STUDENT_CODE }}",
+        templateVisibleLineNumbers: [],
+        starterCode: ""
+      })
+      .mockResolvedValueOnce({
+        status: "ok",
+        referenceSolution: "int double_value(int value) { return value * 2; }",
+        templateSource: "{{ STUDENT_CODE }}\n\n{{ TEST_CODE }}",
+        templateVisibleLineNumbers: [],
+        starterCode: ""
+      });
+    mocks.generateTests.mockRejectedValueOnce(new AppError(
+      422,
+      "CODING_EXERCISE_TEST_GENERATION_INVALID",
+      "The AI agent could not generate valid coding exercise tests.",
+      { issues: ["Every varying stdin case produced the same fixed stdout."] }
+    ));
+
+    await createCodingExerciseBankActivityVariation({
+      user: { id: "teacher-1", email: "teacher@example.test", name: null, firstName: null, lastName: null, roles: ["teacher"] },
+      activityBankId: "bank-1",
+      sourceActivity: activity("source-1"),
+      activity: activity("variation-1"),
+      instructions: "",
+      locale: "en",
+      subject: { title: "Programming", description: "Introductory programming" },
+      knowledge: { mode: "selected", concepts: [], selectedConcepts: [] },
+      reportProgress: vi.fn(async () => undefined)
+    });
+
+    expect(mocks.generateSolution).toHaveBeenCalledTimes(2);
+    expect(mocks.generateSolution.mock.calls[1]?.[0]?.description).toContain(
+      "previous reference solution/template could not support the required automated test suite"
+    );
+    expect(mocks.generateSolution.mock.calls[1]?.[0]?.description).toContain(
+      "Every varying stdin case produced the same fixed stdout."
+    );
+    expect(mocks.generateTests).toHaveBeenCalledTimes(2);
+    expect(mocks.replacePrivate.mock.calls[0]?.[0]?.input.referenceSolution).toContain("double_value");
   });
 });
 
