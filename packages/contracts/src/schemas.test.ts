@@ -23,6 +23,7 @@ import {
   EmailTestInputSchema,
   EmailVerificationCodeInputSchema,
   EmailVerificationRequestSchema,
+  ExecutionRunnerConfigurationInputSchema,
   LoginInputSchema,
   SubjectInputSchema,
   SubjectKnowledgeGraphGenerationInputSchema,
@@ -63,6 +64,27 @@ describe("shared contract schemas", () => {
     expect(EmailVerificationRequestSchema.parse({ locale: "fr" })).toEqual({ locale: "fr" });
     expect(EmailVerificationRequestSchema.parse({})).toEqual({ locale: "en" });
     expect(() => EmailVerificationRequestSchema.parse({ locale: "de" })).toThrow();
+  });
+
+  it("validates execution runner endpoints and authentication pairs", () => {
+    expect(ExecutionRunnerConfigurationInputSchema.parse({
+      displayName: "Judge0",
+      baseUrl: "https://runner.example.test",
+      authHeader: "X-Auth-Token",
+      authToken: "secret"
+    })).toMatchObject({
+      isEnabled: true,
+      settings: { enablePerProcessAndThreadLimits: true }
+    });
+    expect(() => ExecutionRunnerConfigurationInputSchema.parse({
+      displayName: "Runner",
+      baseUrl: "ftp://runner.example.test"
+    })).toThrow();
+    expect(() => ExecutionRunnerConfigurationInputSchema.parse({
+      displayName: "Runner",
+      baseUrl: "https://runner.example.test",
+      authToken: "secret"
+    })).toThrow();
   });
 
   it("normalizes Test authoring defaults", () => {

@@ -1,5 +1,5 @@
 import { getServerEnv } from "@cognelo/config";
-import { AppError } from "@cognelo/core";
+import { AppError, resolveExecutionRunner } from "@cognelo/core";
 import { z } from "zod";
 import type { WebDesignExerciseFile } from "./web-design-coding-exercises";
 
@@ -45,13 +45,14 @@ export async function runWebDesignTestsInRunner(params: {
   }>;
   timeoutMs?: number;
 }) {
-  const env = getServerEnv();
+  const runner = await resolveExecutionRunner("web_design", getServerEnv().EMAIL_CREDENTIALS_ENCRYPTION_KEY);
 
   try {
-    const response = await fetch(`${env.WEB_DESIGN_RUNNER_URL}/run`, {
+    const response = await fetch(`${runner.baseUrl}/run`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...runner.headers
       },
       body: JSON.stringify({
         files: params.files,
@@ -88,13 +89,14 @@ export async function captureWebDesignScreenshotInRunner(params: {
     height: number;
   };
 }) {
-  const env = getServerEnv();
+  const runner = await resolveExecutionRunner("web_design", getServerEnv().EMAIL_CREDENTIALS_ENCRYPTION_KEY);
 
   try {
-    const response = await fetch(`${env.WEB_DESIGN_RUNNER_URL}/screenshot`, {
+    const response = await fetch(`${runner.baseUrl}/screenshot`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...runner.headers
       },
       body: JSON.stringify({
         files: params.files,

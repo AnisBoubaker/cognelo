@@ -1,4 +1,3 @@
-import { getServerEnv } from "@cognelo/config";
 import { AppError } from "@cognelo/core";
 import { z } from "zod";
 import {
@@ -189,7 +188,6 @@ export async function runCodingExercise(params: {
   activityConfig: unknown;
   input: CodingExerciseRunInput;
 }) {
-  const env = getServerEnv();
   const config = parseCodingExerciseConfig(params.activityConfig);
   const input = codingExerciseRunInputSchema.parse(params.input);
   const outputMatcher = toOutputMatcher(input);
@@ -232,9 +230,7 @@ export async function runCodingExercise(params: {
       expectedOutput: input.compareOutput ? getJudge0ExpectedOutput(input.expectedOutput, outputMatcher) : undefined,
       cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
       wallTimeLimit: 10,
-      memoryLimitKb: 128000,
-      enablePerProcessAndThreadTimeLimit: env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS,
-      enablePerProcessAndThreadMemoryLimit: env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS
+      memoryLimitKb: 128000
     });
 
     const comparison = evaluateJudge0Result(result, input.expectedOutput, outputMatcher, input.compareOutput);
@@ -459,7 +455,6 @@ async function executeHiddenTests(input: {
   hiddenTests: HiddenTestCase[];
   sourceCode: string;
 }) {
-  const env = getServerEnv();
   const { config, privateConfig, runtime, hiddenTests } = input;
   const testResults = [];
   let totalWeight = 0;
@@ -490,9 +485,7 @@ async function executeHiddenTests(input: {
       expectedOutput: getJudge0ExpectedOutput(hiddenTest.expectedOutput, hiddenTest),
       cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
       wallTimeLimit: 10,
-      memoryLimitKb: 128000,
-      enablePerProcessAndThreadTimeLimit: env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS,
-      enablePerProcessAndThreadMemoryLimit: env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS
+      memoryLimitKb: 128000
     });
     const comparison = evaluateJudge0Result(result, hiddenTest.expectedOutput, hiddenTest);
     const savedOutput = capJudge0Output(result);
@@ -725,15 +718,13 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
   let hiddenExecutedResults: ReferenceValidationTestResult[] = [];
 
   if (dirtyTestCount > 0) {
-    const env = getServerEnv();
     runtime = await resolveJudge0Language(config.language);
     const executionParams = {
       config,
       privateConfig: params.privateConfig,
       languageId: runtime.languageId,
       sourceCode: params.sourceCode,
-      cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
-      env
+      cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5)
     };
     sampleExecutedResults = (await validateReferenceSolutionTestGroup({
       ...executionParams,
@@ -878,7 +869,6 @@ async function validateReferenceSolutionTestGroup(params: {
   languageId: number;
   sourceCode: string;
   cpuTimeLimit: number;
-  env: ReturnType<typeof getServerEnv>;
 }) {
   if (!params.tests.length) {
     return {
@@ -913,9 +903,7 @@ async function validateReferenceSolutionTestGroup(params: {
       expectedOutput: getJudge0ExpectedOutput(testCase.expectedOutput, testCase),
       cpuTimeLimit: params.cpuTimeLimit,
       wallTimeLimit: 10,
-      memoryLimitKb: 128000,
-      enablePerProcessAndThreadTimeLimit: params.env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS,
-      enablePerProcessAndThreadMemoryLimit: params.env.JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS
+      memoryLimitKb: 128000
     });
 
     const comparison = evaluateJudge0Result(result, testCase.expectedOutput, testCase);

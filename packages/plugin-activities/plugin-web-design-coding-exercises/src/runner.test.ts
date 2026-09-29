@@ -1,7 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@cognelo/config", () => ({
-  getServerEnv: () => ({ WEB_DESIGN_RUNNER_URL: "http://runner.test" })
+  getServerEnv: () => ({ EMAIL_CREDENTIALS_ENCRYPTION_KEY: "test-key" })
+}));
+
+vi.mock("@cognelo/core", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@cognelo/core")>()),
+  resolveExecutionRunner: vi.fn(() => Promise.resolve({
+    id: "runner-1",
+    runnerType: "web_design",
+    baseUrl: "http://runner.test",
+    headers: {},
+    settings: { enablePerProcessAndThreadLimits: true }
+  }))
 }));
 
 const { captureWebDesignScreenshotInRunner, runWebDesignTestsInRunner } = await import("./runner");

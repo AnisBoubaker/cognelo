@@ -122,7 +122,9 @@ The Playwright runner lives in `packages/web-design-runner` and is intended to r
 npm run dev:runner
 ```
 
-The runner listens on port `3456`. The API reads `WEB_DESIGN_RUNNER_URL`, which defaults to `http://localhost:3456` for local development. Running `docker compose up -d web-design-runner` is equivalent to `npm run dev:runner`.
+The runner listens on port `3456`. Administrators configure its base URL and optional authentication header/token under **Settings → Runners**; the local development seed creates `http://localhost:3456`. Runtime plugin code resolves the endpoint through core rather than reading an environment variable. Running `docker compose up -d web-design-runner` is equivalent to `npm run dev:runner`.
+
+`GET /health` returns `{ ok: true, capabilities: ["run", "screenshot"] }`. The settings card uses this manifest to verify the endpoint, authentication path, browser-test execution contract, and screenshot capability before reporting the runner ready.
 
 Teacher authoring uses the shared responsive `EditActionBar` across its tabs. Saved/unsaved status covers the combined activity, file, solution, and test draft, and Cancel restores the last complete saved snapshot.
 

@@ -2,10 +2,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@cognelo/config", () => ({
   getServerEnv: () => ({
-    JUDGE0_BASE_URL: "https://judge0.test",
-    JUDGE0_AUTH_HEADER: "X-Auth",
-    JUDGE0_AUTH_TOKEN: "token"
+    EMAIL_CREDENTIALS_ENCRYPTION_KEY: "test-key"
   })
+}));
+
+vi.mock("@cognelo/core", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@cognelo/core")>()),
+  resolveExecutionRunner: vi.fn(() => Promise.resolve({
+    id: "runner-1",
+    runnerType: "judge0",
+    baseUrl: "https://judge0.test",
+    headers: { "X-Auth": "token" },
+    settings: { enablePerProcessAndThreadLimits: true }
+  }))
 }));
 
 const { getCodingExerciseProgrammingLanguages, listJudge0Languages, resolveJudge0Language, runJudge0Submission } = await import("./judge0");
@@ -108,7 +117,9 @@ describe("Judge0 client", () => {
           language_id: 71,
           source_code: Buffer.from('print("allô élève")', "utf8").toString("base64"),
           stdin: Buffer.from("Montréal", "utf8").toString("base64"),
-          expected_output: Buffer.from("allô élève", "utf8").toString("base64")
+          expected_output: Buffer.from("allô élève", "utf8").toString("base64"),
+          enable_per_process_and_thread_time_limit: true,
+          enable_per_process_and_thread_memory_limit: true
         })
       })
     );

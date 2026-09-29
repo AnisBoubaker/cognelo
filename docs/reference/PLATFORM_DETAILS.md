@@ -443,6 +443,8 @@ After generating a Prisma client while development services are already running,
 npm run db:seed
 ```
 
+The development seed registers Judge0 at `http://localhost:2358` with the local Compose token and the Web Design runner at `http://localhost:3456`. SageMath is shown under **Settings → Runners** but remains unconfigured until a compatible service is available. Administrators can replace or disable any endpoint there.
+
 6. Run automated checks:
 
 ```bash
@@ -473,21 +475,15 @@ Web design runner (dev): http://localhost:3456
 
 The initial production runbook is [Deploying Cognelo on Ubuntu with Apache](../DEPLOYMENT_UBUNTU_APACHE.md). Its production reference uses two VPSs: an application/database host with Apache, TLS, isolated systemd services, PostgreSQL, and persistent uploads, plus a dedicated Judge0/Playwright sandbox host connected through a WireGuard point-to-point network. The sandbox containers remain on an internal Docker network and fixed-address systemd socket proxies expose only the selected host listeners; the runbook also documents an explicitly accepted fixed-IP firewall-only exception and a shared-stack exception for instances in the same operator trust boundary. It also covers production administrator bootstrap, backups, capacity guidance, and additional isolated Cognelo instances. For the concise tagged-release procedure—including a database backup, optional sandbox update, migration, activation, smoke test, and rollback—use [Upgrading Cognelo](../DEPLOYMENT_UPGRADE_UBUNTU_APACHE.md). Every production GitHub Release must include the explicit upgrade section defined by the [release notes template](../RELEASE_NOTES_TEMPLATE.md); operators are not expected to infer manual actions from code diffs. Before creating a tag or release, the exact current commit must pass all migrations and checks against a freshly supplied production-database clone and receive explicit manual pre-production approval. The tag is then created from that unchanged approved commit.
 
-Judge0-related environment variables:
+Judge0 image override:
 
 ```text
-JUDGE0_BASE_URL=http://localhost:2358
 JUDGE0_IMAGE=ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2
-JUDGE0_AUTH_HEADER=X-Auth-Token
-JUDGE0_AUTH_TOKEN=dev-local-token
-JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS=true
 ```
 
-Web design runner environment variable:
+Runner base URLs, request authentication, enablement, and Judge0's per-process/thread behavior are database-backed administrator settings under `/settings/runners`; they are not application environment variables. The registry exposes Judge0, Web Design, and SageMath primary entries and permits multiple ordered rows per type for future round-robin selection. The current resolver uses the first enabled runner. Optional auth tokens are encrypted and public API responses expose only whether a token exists.
 
-```text
-WEB_DESIGN_RUNNER_URL=http://localhost:3456
-```
+Each runner card has a connection-and-capability test. Judge0 verifies authenticated language discovery and a real synchronous sandbox submission. The Web Design runner must answer `GET /health` with `ok: true` and advertise `run` plus `screenshot`. A future SageMath runner must answer the same health contract and advertise `sagemath` plus `execute`; no Sage activity consumes that endpoint yet.
 
 Email credential encryption key:
 
@@ -495,7 +491,7 @@ Email credential encryption key:
 EMAIL_CREDENTIALS_ENCRYPTION_KEY=<64 hexadecimal characters from `openssl rand -hex 32`>
 ```
 
-This key encrypts SMTP passwords and Microsoft Graph client secrets stored in PostgreSQL and keys the HMAC hashes used for one-time email-verification codes. Keep it stable, instance-specific, backed up with the environment configuration, and outside source control. Email delivery is configured by administrators at `/settings/email`. SMTP works with any relay provider; Microsoft Graph uses an Entra application with `Mail.Send` application permission and administrator consent. The test action may target any valid address and always uses the last saved configuration.
+This key encrypts SMTP passwords, Microsoft Graph client secrets, and execution-runner authentication tokens stored in PostgreSQL, and keys the HMAC hashes used for one-time email-verification codes. Keep it stable, instance-specific, backed up with the environment configuration, and outside source control. Email delivery is configured by administrators at `/settings/email`. SMTP works with any relay provider; Microsoft Graph uses an Entra application with `Mail.Send` application permission and administrator consent. The test action may target any valid address and always uses the last saved configuration.
 
 ## Frontend Notes
 
@@ -510,6 +506,7 @@ This key encrypts SMTP passwords and Microsoft Graph client secrets stored in Po
 - Users can update their first and last name and change their password after confirming the current password; email changes are reserved for administrators.
 - AI agent connection settings live under `/settings/ai-agents`; users can create personal connections, choose their question-authoring helper, and admins can create global connections for later course use.
 - Administrators configure outbound email under `/settings/email` using either an SMTP relay or Microsoft Graph app-only OAuth credentials. Stored passwords/secrets are encrypted and never returned to the browser. The test message can target any valid address. Cognelo uses the guarded system-mail path to send first-login verification codes to active accounts and, when the teacher opts in, grade-challenge answers to the challenging student; all future account and notification messages must use that same eligibility boundary.
+- Administrators configure external execution services under `/settings/runners`. Each endpoint has its own configuration and capability test, runner tokens stay encrypted, and dependent plugins resolve only enabled services through core. SageMath is registered for forthcoming symbolic-mathematics and linear-algebra activity plugins but is not otherwise used yet.
 - Plugin authoring screens can use the selected question-authoring AI agent through server-side plugin routes; the MCQ plugin uses this to generate validated MCQ source from a teacher description.
 - Bank and course activity descriptions serve as student prompts and accept up to 30,000 characters so reading-comprehension activities can include complete passages.
 - All core and plugin authoring/settings forms should register unsaved-change state through `useUnsavedChangesGuard` from `@cognelo/activity-ui`. Registered forms show a shared confirmation dialog before internal navigation, with actions to continue editing, save and leave, or discard changes. Browser refresh/close uses the native browser warning.

@@ -126,6 +126,12 @@ enum EmailDeliveryTransport {
   microsoft_graph
 }
 
+enum ExecutionRunnerType {
+  judge0
+  web_design
+  sagemath
+}
+
 enum MediaAssetStatus {
   staged
   active
@@ -170,6 +176,7 @@ model User {
   gradedGrades                       Grade[]                      @relation("GradeGrader")
   gradeEvents                        GradeEvent[]                 @relation("GradeEventActor")
   updatedEmailDeliveryConfigurations EmailDeliveryConfiguration[] @relation("EmailDeliveryConfigurationUpdater")
+  updatedExecutionRunners             ExecutionRunner[]            @relation("ExecutionRunnerUpdater")
   emailVerificationChallenge         EmailVerificationChallenge?
   mediaAssets                        MediaAsset[]                 @relation("MediaAssetCreator")
 
@@ -207,6 +214,25 @@ model EmailDeliveryConfiguration {
   updatedAt                  DateTime               @updatedAt
   updatedBy                  User?                  @relation("EmailDeliveryConfigurationUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
 
+  @@index([updatedById])
+}
+
+model ExecutionRunner {
+  id                 String              @id @default(cuid())
+  runnerType         ExecutionRunnerType
+  displayName        String
+  baseUrl            String
+  authHeader         String?
+  authTokenEncrypted String?
+  isEnabled          Boolean             @default(true)
+  position           Int                 @default(0)
+  settings           Json                @default("{}")
+  updatedById        String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  updatedBy          User?               @relation("ExecutionRunnerUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([runnerType, isEnabled, position])
   @@index([updatedById])
 }
 

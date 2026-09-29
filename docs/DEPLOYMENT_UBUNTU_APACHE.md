@@ -224,20 +224,13 @@ COGNELO_BACKGROUND_JOBS_DISABLED=false
 COGNELO_BACKGROUND_JOBS_CONCURRENCY=1
 COGNELO_BACKGROUND_JOBS_INTERVAL_MS=1000
 COGNELO_BACKGROUND_JOBS_WORKER_ID="app1-api-worker"
-
-JUDGE0_BASE_URL="http://10.80.0.2:2358"
-JUDGE0_AUTH_HEADER="X-Auth-Token"
-JUDGE0_AUTH_TOKEN="REPLACE_IF_CODING_EXERCISES_ARE_ENABLED"
-JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS=true
-
-WEB_DESIGN_RUNNER_URL="http://10.80.0.2:3456"
 ```
 
-These addresses use the WireGuard inventory in Section 2. For another instance, use its allocated WireGuard subnet and sandbox ports. Leave the corresponding activity plugin disabled until that dependency is secured and reachable.
+Runner addresses are configured after the sandbox deployment in Section 14. For another instance, use its allocated WireGuard subnet and sandbox ports. Leave the corresponding activity plugin disabled until that dependency is secured and reachable.
 
 `API_PUBLIC_URL` is embedded in short-lived Safe Exam Browser configuration links. In the documented same-origin Apache topology it must equal the public HTTPS application origin and `NEXT_PUBLIC_API_URL`. An internal Node address or an HTTP origin will make `sebs://` launch/configuration retrieval fail on student devices.
 
-`EMAIL_CREDENTIALS_ENCRYPTION_KEY` encrypts SMTP passwords and Microsoft Graph client secrets stored in the database and keys the HMAC hashes for one-time email-verification codes. It must be unique per Cognelo instance, must not be derived from `JWT_SECRET`, and must remain unchanged while encrypted email credentials or outstanding verification challenges exist. Losing it makes stored credentials unreadable and outstanding codes unusable; restore it together with the database or re-enter the credentials after setting a new key.
+`EMAIL_CREDENTIALS_ENCRYPTION_KEY` encrypts SMTP passwords, Microsoft Graph client secrets, and execution-runner authentication tokens stored in the database, and keys the HMAC hashes for one-time email-verification codes. It must be unique per Cognelo instance, must not be derived from `JWT_SECRET`, and must remain unchanged while encrypted credentials or outstanding verification challenges exist. Losing it makes stored credentials unreadable and outstanding codes unusable; restore it together with the database or re-enter the credentials after setting a new key.
 
 After deployment, an administrator configures **Settings → Email delivery**:
 
@@ -529,18 +522,20 @@ curl --fail https://app1.cognelo.org/api/health
 1. Open `https://app1.cognelo.org/login`.
 2. Sign in with the bootstrap administrator.
 3. Open **Settings → Plugins**.
-4. Activate and enable only the plugins needed by this instance.
-5. Keep coding-exercise plugins disabled until their sandbox dependency is secured.
-6. If the bootstrap credential was communicated to another operator, rotate it with the password-change form under **Settings → Profile**.
+4. Activate and enable only plugins without an external execution dependency at this stage.
+5. Keep execution-backed plugins disabled until Section 14 is complete and their **Settings → Runners** capability check passes.
+6. Leave SageMath disabled until a compatible service is deployed.
+7. If the bootstrap credential was communicated to another operator, rotate it with the password-change form under **Settings → Profile**.
 
 ## 14. Deploy Judge0 and the Playwright runner
 
 This section is required when the corresponding plugins are enabled:
 
-| Dependency                | Cognelo feature                             | Required application setting           |
-| ------------------------- | ------------------------------------------- | -------------------------------------- |
-| Judge0                    | Coding exercises                            | `JUDGE0_BASE_URL`, header, and token |
-| Cognelo Playwright runner | Web-design coding exercises and screenshots | `WEB_DESIGN_RUNNER_URL`              |
+| Dependency                | Cognelo feature                             | Required application setting                    |
+| ------------------------- | ------------------------------------------- | ----------------------------------------------- |
+| Judge0                    | Coding exercises                            | **Settings → Runners → Judge0**                  |
+| Cognelo Playwright runner | Web-design coding exercises and screenshots | **Settings → Runners → Web Design runner**       |
+| SageMath runner           | Future symbolic-math/linear-algebra plugins | **Settings → Runners → SageMath runner** (future) |
 
 MCQ, Parsons problems, tests composed only of those activities, and ordinary course materials do not use either service.
 
@@ -679,7 +674,7 @@ host processes in an unrelated group numbered `999` cannot traverse to it.
 Generate four independent values. Copy each output directly to its matching `REPLACE_*` entry in `runtime/judge0.conf`:
 
 ```bash
-openssl rand -hex 32  # AUTHN_TOKEN; also copied to Cognelo's JUDGE0_AUTH_TOKEN
+openssl rand -hex 32  # AUTHN_TOKEN; also saved in Settings → Runners → Judge0
 openssl rand -hex 32  # REDIS_PASSWORD
 openssl rand -hex 32  # POSTGRES_PASSWORD
 openssl rand -hex 64  # SECRET_KEY_BASE
@@ -688,14 +683,7 @@ sudo nano /srv/cognelo-sandboxes/app1/runtime/judge0.conf
 sudo grep -n 'REPLACE_' /srv/cognelo-sandboxes/app1/runtime/judge0.conf
 ```
 
-The final `grep` must print nothing. Preserve the Judge0 authentication token in the application host's `/srv/cognelo/app1/shared/.env`:
-
-```dotenv
-JUDGE0_BASE_URL="http://10.80.0.2:2358"
-JUDGE0_AUTH_HEADER="X-Auth-Token"
-JUDGE0_AUTH_TOKEN="PASTE_THE_SAME_AUTHN_TOKEN"
-JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS=true
-```
+The final `grep` must print nothing. In Cognelo, open **Settings → Runners → Judge0** and save base URL `http://10.80.0.2:2358`, authentication header `X-Auth-Token`, the same `AUTHN_TOKEN`, and enabled per-process/thread limits. Save the Web Design runner at `http://10.80.0.2:3456`. Use each card's capability test before activating the dependent plugin. Cognelo encrypts the Judge0 token in PostgreSQL with the instance credential key; it is not stored in the application `.env` or returned to the browser.
 
 The supplied Judge0 configuration enables the synchronous `wait=true` submissions Cognelo uses, permits Cognelo's per-process/thread limit flags, caps CPU at 5 seconds, wall time at 10 seconds, and memory at 128 MB, and disables submission networking, callbacks, command-line arguments, compiler options, batch requests, and additional files. Review these limits when Cognelo's execution contract changes. Judge0's complete option reference is its [versioned configuration file](https://github.com/judge0/judge0/blob/v1.13.1/judge0.conf).
 
@@ -964,12 +952,7 @@ public IPv4 addresses and use a firewall-only connection instead:
      to SANDBOX_PUBLIC_IPV4 port 3456 proto tcp
    ```
 
-4. Use the public restricted URLs in every consuming instance:
-
-   ```dotenv
-   JUDGE0_BASE_URL="http://SANDBOX_PUBLIC_IPV4:2358"
-   WEB_DESIGN_RUNNER_URL="http://SANDBOX_PUBLIC_IPV4:3456"
-   ```
+4. In every consuming instance, save the public restricted URLs under **Settings → Runners**: `http://SANDBOX_PUBLIC_IPV4:2358` for Judge0 and `http://SANDBOX_PUBLIC_IPV4:3456` for Web Design. Retain the Judge0 authentication header/token and run both capability tests.
 
 The listeners are host systemd sockets, so these connections pass through
 UFW's input policy; no Docker port is published. Verify from the application
@@ -1176,12 +1159,7 @@ WEB_DESIGN_RUNNER_IMAGE=cognelo/web-design-runner:cognelo-0.5.0
 PLAYWRIGHT_SECCOMP_PROFILE=/srv/cognelo-sandboxes/app2/runtime/seccomp_profile.json
 ```
 
-Use a separate WireGuard interface such as `wg1` with application address `10.80.0.5/30`, sandbox address `10.80.0.6/30`, and sandbox UDP port `51821`. Extend the sandbox firewall with only that peer and those instance-specific service ports. Its application `.env` uses:
-
-```dotenv
-JUDGE0_BASE_URL="http://10.80.0.6:2359"
-WEB_DESIGN_RUNNER_URL="http://10.80.0.6:3457"
-```
+Use a separate WireGuard interface such as `wg1` with application address `10.80.0.5/30`, sandbox address `10.80.0.6/30`, and sandbox UDP port `51821`. Extend the sandbox firewall with only that peer and those instance-specific service ports. In that instance's **Settings → Runners**, save `http://10.80.0.6:2359` for Judge0 and `http://10.80.0.6:3457` for Web Design, then run both capability tests.
 
 Separate sandbox projects remain the default because they avoid cross-instance
 database, token, queue, capacity, upgrade, and lifecycle coupling. The same
@@ -1473,11 +1451,11 @@ Common failure causes:
 - A plugin is absent from the picker: activate and enable it in administrator settings; also verify its external dependency when applicable.
 - Browser calls the wrong hostname: rebuild the web application after correcting `NEXT_PUBLIC_API_URL`; changing it only at runtime is insufficient.
 - Safe Exam Browser does not open the selected activity: verify SEB is installed, `API_PUBLIC_URL` is the public HTTPS origin, Apache proxies `/api`, and the browser was allowed to open the external `sebs://` application. If direct launch is blocked, use the dialog's configuration download and inspect the API journal for `SAFE_EXAM_BROWSER_*` errors.
-- Email configuration cannot save or test a credential: verify that `EMAIL_CREDENTIALS_ENCRYPTION_KEY` contains the same 64 hexadecimal characters used when the secret was stored, then inspect the API journal.
+- Email or runner configuration cannot save or test a credential: verify that `EMAIL_CREDENTIALS_ENCRYPTION_KEY` contains the same 64 hexadecimal characters used when the secret was stored, then inspect the API journal.
 - SMTP or Microsoft Graph rejects a test: verify relay credentials and TLS settings, or the Entra tenant/application IDs, client-secret validity, `Mail.Send` administrator consent, sender-mailbox access policy, and sender address.
 - Email arrives in spam: verify SPF, DKIM, and DMARC alignment for the visible sender domain and inspect the message authentication headers; changing Cognelo's transport alone does not repair domain reputation.
-- `ECONNREFUSED` for Judge0 or the runner: check the latest handshake with `wg show wg0` on the application host, then the WireGuard/UFW configuration and `docker compose ps` and logs on the sandbox host.
-- Judge0 returns `401 Unauthorized`: ensure `AUTHN_TOKEN` in `judge0.conf` exactly matches `JUDGE0_AUTH_TOKEN` in the instance `.env`, then restart the API after correcting it.
+- `ECONNREFUSED` for Judge0 or the runner: verify the saved endpoint in **Settings → Runners**, check the latest handshake with `wg show wg0` on the application host, then the WireGuard/UFW configuration and `docker compose ps` and logs on the sandbox host.
+- Judge0 returns `401 Unauthorized`: ensure `AUTHN_TOKEN` in `judge0.conf` exactly matches the encrypted token entered under **Settings → Runners → Judge0**, save it again if necessary, and repeat the capability test.
 - Judge0 returns a limit validation error: compare the limits sent by the coding-exercise plugin with `MAX_*` and `ALLOW_ENABLE_*` in `judge0.conf`.
 - Judge0 C/C++ submissions fail to link `sqrt`, threads, `dlopen`, or realtime functions: confirm `configure-languages.sql` is beside `sandbox.compose.yml`, inspect `docker compose ps -a judge0-language-config` and its logs, rerun the one-shot service, then recreate the workers. Do not enable submission-controlled compiler options as a workaround.
 - Chromium fails to launch: verify the runner image version matches `@playwright/test`, the official seccomp profile is readable, and the container is running as `pwuser`; inspect runner logs before changing security options.

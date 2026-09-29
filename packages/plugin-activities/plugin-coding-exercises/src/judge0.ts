@@ -1,5 +1,5 @@
 import { getServerEnv } from "@cognelo/config";
-import { AppError } from "@cognelo/core";
+import { AppError, resolveExecutionRunner } from "@cognelo/core";
 import { getJudge0LanguageCandidates } from "./coding-exercises";
 
 export type Judge0SubmissionInput = {
@@ -71,11 +71,9 @@ type Judge0EncodedSubmissionResponse = {
 };
 
 export async function listJudge0Languages(): Promise<Judge0Language[]> {
-  const env = getServerEnv();
-  const response = await fetch(`${env.JUDGE0_BASE_URL}/languages`, {
-    headers: {
-      [env.JUDGE0_AUTH_HEADER]: env.JUDGE0_AUTH_TOKEN
-    }
+  const runner = await resolveExecutionRunner("judge0", getServerEnv().EMAIL_CREDENTIALS_ENCRYPTION_KEY);
+  const response = await fetch(`${runner.baseUrl}/languages`, {
+    headers: runner.headers
   });
 
   if (!response.ok) {
@@ -143,12 +141,12 @@ export async function resolveJudge0Language(languageKey: string) {
 }
 
 export async function runJudge0Submission(input: Judge0SubmissionInput): Promise<Judge0SubmissionResult> {
-  const env = getServerEnv();
-  const response = await fetch(`${env.JUDGE0_BASE_URL}/submissions?base64_encoded=true&wait=true`, {
+  const runner = await resolveExecutionRunner("judge0", getServerEnv().EMAIL_CREDENTIALS_ENCRYPTION_KEY);
+  const response = await fetch(`${runner.baseUrl}/submissions?base64_encoded=true&wait=true`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      [env.JUDGE0_AUTH_HEADER]: env.JUDGE0_AUTH_TOKEN
+      ...runner.headers
     },
     body: JSON.stringify({
       language_id: input.languageId,
@@ -158,8 +156,10 @@ export async function runJudge0Submission(input: Judge0SubmissionInput): Promise
       cpu_time_limit: input.cpuTimeLimit,
       wall_time_limit: input.wallTimeLimit,
       memory_limit: input.memoryLimitKb,
-      enable_per_process_and_thread_time_limit: input.enablePerProcessAndThreadTimeLimit,
+      enable_per_process_and_thread_time_limit: input.enablePerProcessAndThreadTimeLimit
+        ?? runner.settings.enablePerProcessAndThreadLimits,
       enable_per_process_and_thread_memory_limit: input.enablePerProcessAndThreadMemoryLimit
+        ?? runner.settings.enablePerProcessAndThreadLimits
     })
   });
 

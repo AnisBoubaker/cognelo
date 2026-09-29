@@ -27,6 +27,7 @@ export function SettingsNav() {
         ...settingsItems,
         { href: "/settings/users", labelKey: "settings.usersNav", textKey: "settings.usersNavText" },
         { href: "/settings/email", labelKey: "settings.emailDeliveryNav", textKey: "settings.emailDeliveryNavText" },
+        { href: "/settings/runners", labelKey: "settings.runnersNav", textKey: "settings.runnersNavText" },
         { href: "/settings/plugins", labelKey: "settings.pluginsNav", textKey: "settings.pluginsNavText" },
         { href: "/settings/maintenance/media", labelKey: "settings.maintenanceNav", textKey: "settings.maintenanceNavText" }
       ]
