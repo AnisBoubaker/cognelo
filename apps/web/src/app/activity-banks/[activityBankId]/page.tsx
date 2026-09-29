@@ -1021,14 +1021,12 @@ export default function ActivityBankDetailPage() {
                   <progress aria-label={t("activityBankDetail.variationProgressLabel")} max={100} value={variationProgressPercent(variationJob)} />
                   <div className="activity-variation-progress-summary">
                     <span>{Math.round(variationProgressPercent(variationJob))}%</span>
-                    <span>{t("activityBankDetail.variationProgressCount", { completed: variationJob.progress.completed ?? 0, total: variationJob.progress.total ?? 1 })}</span>
+                    {variationJob.status !== "succeeded" ? <span>{t("activityBankDetail.variationProgressCount", { completed: variationJob.progress.completed ?? 0, total: variationJob.progress.total ?? 1 })}</span> : null}
                   </div>
                   {variationJob.status === "failed" ? <p className="error">{variationJob.error?.message ?? t("activityBankDetail.variationError")}</p> : null}
-                  {variationJob.status === "succeeded" ? <p>{t("activityBankDetail.variationComplete")}</p> : null}
                   {["succeeded", "failed", "cancelled"].includes(variationJob.status) ? (
                     <div className="dialog-actions">
                       <button className="secondary" type="button" onClick={closeVariationDialog}>{t("common.close")}</button>
-                      {variationJob.status === "succeeded" && variationJob.result?.activityId ? <button type="button" onClick={() => router.push(`/activity-banks/${bank?.id}/activities/${variationJob.result?.activityId}`)}>{t("activityBankDetail.openVariation")}</button> : null}
                     </div>
                   ) : null}
                 </div>
@@ -1319,7 +1317,7 @@ function variationProgressPercent(job: ActivityVariationJob) {
 
 function variationStatusText(job: ActivityVariationJob, t: I18nTranslate) {
   if (job.status === "failed") return t("activityBankDetail.variationFailed");
-  if (job.status === "succeeded") return t("activityBankDetail.variationComplete");
+  if (job.status === "succeeded") return t("activityBankDetail.variationComplete", { title: job.result?.title ?? "" });
   if (job.status === "queued") return t("activityBankDetail.variationQueued");
   const title = job.progress.currentActivityTitle ?? "";
   const step = job.progress.step ?? "content";

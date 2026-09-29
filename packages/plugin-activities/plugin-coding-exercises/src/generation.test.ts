@@ -22,7 +22,8 @@ const {
   generateCodingExercisePrompt,
   generateCodingExerciseRubric,
   generateCodingExerciseSolution,
-  generateCodingExerciseTests
+  generateCodingExerciseTests,
+  generateCodingExerciseVariationMetadata
 } = await import("./generation");
 
 const user = {
@@ -60,6 +61,37 @@ describe("coding exercise AI generation", () => {
         subject
       })
     ).resolves.toMatchObject({ attempts: 2 });
+  });
+
+  it("generates variation metadata that matches the new prompt instead of repeating the source", async () => {
+    mocks.generateQuestionAuthoringText
+      .mockResolvedValueOnce(JSON.stringify({
+        title: "Add one",
+        description: "Increment an integer."
+      }))
+      .mockResolvedValueOnce(JSON.stringify({
+        title: "Calculate a delivery surcharge",
+        description: "Compute a delivery surcharge from the supplied package weight."
+      }));
+
+    await expect(generateCodingExerciseVariationMetadata({
+      user,
+      prompt: "Read a package weight and print the applicable delivery surcharge.",
+      originalTitle: "Add one",
+      originalDescription: "Increment an integer.",
+      language: "python",
+      locale: "en",
+      subject
+    })).resolves.toMatchObject({
+      title: "Calculate a delivery surcharge",
+      description: "Compute a delivery surcharge from the supplied package weight.",
+      attempts: 2
+    });
+
+    const retryPrompt = mocks.generateQuestionAuthoringText.mock.calls[1]?.[1]?.userPrompt ?? "";
+    expect(retryPrompt).toContain("New student-facing prompt:");
+    expect(retryPrompt).toContain("Read a package weight");
+    expect(retryPrompt).toContain("must not repeat the original title");
   });
 
   it("generates solution payloads and returns impossible/error payloads", async () => {

@@ -44,6 +44,9 @@ describe("i18n helpers", () => {
   it("interpolates messages and preserves unknown variables", () => {
     expect(interpolate("Hello {name}, {missing}", { name: "Ada" })).toBe("Hello Ada, {missing}");
     expect(translateMessage("en", "dashboard.roles", { roles: "teacher" })).toBe("Roles: teacher");
+    expect(translateMessage("en", "activityBankDetail.variationComplete", { title: "Delivery surcharge" })).toBe(
+      'The new exercise is "Delivery surcharge".'
+    );
   });
 
   it("returns keys for missing translations and keeps subject wording stable", () => {

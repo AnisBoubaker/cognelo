@@ -2,18 +2,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   assertManage: vi.fn(),
+  deleteActivity: vi.fn(),
   enqueue: vi.fn(),
   getActivity: vi.fn(),
   getTest: vi.fn(),
   isRegistered: vi.fn(),
   register: vi.fn(),
   resolveHandler: vi.fn(),
+  runDeletedHooks: vi.fn(),
   startWorker: vi.fn()
 }));
 
 vi.mock("@cognelo/activity-sdk/server", () => ({
   resolveBankActivityVariationHandler: mocks.resolveHandler,
-  runBankActivityDeletedHooks: vi.fn(),
+  runBankActivityDeletedHooks: mocks.runDeletedHooks,
   runBankActivityDuplicatedHooks: vi.fn()
 }));
 vi.mock("@cognelo/core", () => ({
@@ -22,7 +24,7 @@ vi.mock("@cognelo/core", () => ({
   },
   NonRetryableBackgroundJobError: class NonRetryableBackgroundJobError extends Error {},
   assertCanManageActivityBank: mocks.assertManage,
-  deleteBankActivity: vi.fn(),
+  deleteBankActivity: mocks.deleteActivity,
   duplicateBankActivity: vi.fn(),
   duplicateBankTest: vi.fn(),
   enqueueBackgroundJob: mocks.enqueue,
@@ -37,7 +39,7 @@ vi.mock("@cognelo/core", () => ({
   updateBackgroundJobMetadata: vi.fn()
 }));
 
-const { enqueueActivityVariation } = await import("./activity-variations");
+const { cleanupVariation, enqueueActivityVariation } = await import("./activity-variations");
 
 describe("activity variation orchestration", () => {
   const user = { id: "teacher-1", email: "teacher@example.test", name: null, firstName: null, lastName: null, roles: ["teacher" as const] };
@@ -93,6 +95,31 @@ describe("activity variation orchestration", () => {
       locale: "en"
     })).rejects.toMatchObject({ code: "ACTIVITY_VARIATION_UNSUPPORTED" });
     expect(mocks.enqueue).not.toHaveBeenCalled();
+  });
+
+  it("retries plugin-private cleanup before considering a failed variation removed", async () => {
+    mocks.deleteActivity.mockResolvedValue({
+      deletedActivities: [{ bankActivityId: "copy-1", activityTypeKey: "coding-exercise" }]
+    });
+    mocks.runDeletedHooks
+      .mockRejectedValueOnce(new Error("temporary cleanup failure"))
+      .mockRejectedValueOnce(new Error("temporary cleanup failure"))
+      .mockResolvedValueOnce(undefined);
+
+    await expect(cleanupVariation(user, "bank-1", "copy-1")).resolves.toBeUndefined();
+    expect(mocks.runDeletedHooks).toHaveBeenCalledTimes(3);
+  });
+
+  it("surfaces plugin-private cleanup failure after three attempts", async () => {
+    mocks.deleteActivity.mockResolvedValue({
+      deletedActivities: [{ bankActivityId: "copy-1", activityTypeKey: "coding-exercise" }]
+    });
+    mocks.runDeletedHooks.mockRejectedValue(new Error("persistent cleanup failure"));
+
+    await expect(cleanupVariation(user, "bank-1", "copy-1")).rejects.toThrow(
+      "Plugin-private cleanup failed after three attempts"
+    );
+    expect(mocks.runDeletedHooks).toHaveBeenCalledTimes(3);
   });
 });
 

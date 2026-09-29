@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   generatePrompt: vi.fn(),
+  generateMetadata: vi.fn(),
   generateSolution: vi.fn(),
   generateTests: vi.fn(),
   listPrivate: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("@cognelo/core", () => ({
 }));
 vi.mock("./generation", () => ({
   generateCodingExercisePrompt: mocks.generatePrompt,
+  generateCodingExerciseVariationMetadata: mocks.generateMetadata,
   generateCodingExerciseSolution: mocks.generateSolution,
   generateCodingExerciseTests: mocks.generateTests
 }));
@@ -52,6 +54,11 @@ describe("coding exercise bank variations", () => {
       }
     });
     mocks.generatePrompt.mockResolvedValue({ prompt: "Write a different program that doubles the supplied integer." });
+    mocks.generateMetadata.mockResolvedValue({
+      title: "Double an integer",
+      description: "Read an integer and produce twice its value.",
+      attempts: 1
+    });
     mocks.generateSolution.mockResolvedValue({
       status: "ok",
       referenceSolution: "print(int(input()) * 2)",
@@ -83,7 +90,13 @@ describe("coding exercise bank variations", () => {
     });
 
     expect(mocks.updateBankActivity).toHaveBeenCalledWith(expect.anything(), "variation-1", expect.objectContaining({
+      title: "Double an integer",
+      description: "Read an integer and produce twice its value.",
       config: expect.objectContaining({ prompt: "Write a different program that doubles the supplied integer." })
+    }));
+    expect(mocks.generateTests).toHaveBeenCalledWith(expect.objectContaining({
+      visibleTestCount: 1,
+      hiddenTestCount: 1
     }));
     const privateSave = mocks.replacePrivate.mock.calls[0][0];
     expect(privateSave.bankActivityId).toBe("variation-1");
@@ -117,6 +130,32 @@ describe("coding exercise bank variations", () => {
       knowledge: { mode: "selected", concepts: [], selectedConcepts: [] },
       reportProgress: vi.fn(async () => undefined)
     })).rejects.toMatchObject({ code: "CODING_EXERCISE_VARIATION_TESTS_NOT_DISTINCT" });
+    expect(mocks.updateBankActivity).not.toHaveBeenCalled();
+    expect(mocks.replacePrivate).not.toHaveBeenCalled();
+  });
+
+  it("refuses to save a variation whose visible or hidden test count changed", async () => {
+    mocks.generateTests.mockResolvedValue({
+      status: "ok",
+      sampleTests: [
+        { id: "sample-new-1", title: "Doubles two", input: "2", output: "4", testCode: "" },
+        { id: "sample-new-2", title: "Doubles four", input: "4", output: "8", testCode: "" }
+      ],
+      hiddenTests: [{ id: "hidden-new", name: "Doubles three", stdin: "3", expectedOutput: "6", testCode: "", isEnabled: true, weight: 1 }]
+    });
+
+    await expect(createCodingExerciseBankActivityVariation({
+      user: { id: "teacher-1", email: "teacher@example.test", name: null, firstName: null, lastName: null, roles: ["teacher"] },
+      activityBankId: "bank-1",
+      sourceActivity: activity("source-1"),
+      activity: activity("variation-1"),
+      instructions: "",
+      locale: "en",
+      subject: { title: "Programming", description: "Introductory programming" },
+      knowledge: { mode: "selected", concepts: [], selectedConcepts: [] },
+      reportProgress: vi.fn(async () => undefined)
+    })).rejects.toMatchObject({ code: "CODING_EXERCISE_VARIATION_TEST_COUNT_MISMATCH" });
+
     expect(mocks.updateBankActivity).not.toHaveBeenCalled();
     expect(mocks.replacePrivate).not.toHaveBeenCalled();
   });

@@ -617,10 +617,9 @@ export const zhMessages = {
       variationProgressCount: "已完成 {completed}/{total} 个活动",
       variationQueued: "正在等待开始…",
       variationFailed: "无法创建变体。",
-      variationComplete: "变体已准备就绪。",
+      variationComplete: "新练习是“{title}”。",
       variationError: "无法创建活动变体。",
       variationStatusError: "无法检查变体进度。",
-      openVariation: "打开变体",
       variationStep: {
         content: "正在生成 {title}…",
         prompt: "正在为 {title} 生成新题目…",

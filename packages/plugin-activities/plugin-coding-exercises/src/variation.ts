@@ -8,7 +8,8 @@ import {
 import {
   generateCodingExercisePrompt,
   generateCodingExerciseSolution,
-  generateCodingExerciseTests
+  generateCodingExerciseTests,
+  generateCodingExerciseVariationMetadata
 } from "./generation";
 import { listBankCodingExerciseHiddenTests, replaceBankCodingExerciseHiddenTests } from "./hidden-tests";
 
@@ -39,6 +40,16 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
   if (promptResult.prompt.trim() === sourceConfig.prompt.trim()) {
     throw new AppError(422, "CODING_EXERCISE_VARIATION_NOT_DISTINCT", "The AI agent repeated the original programming exercise prompt.");
   }
+  await input.reportProgress({ fraction: 0.22, step: "prompt" });
+  const metadataResult = await generateCodingExerciseVariationMetadata({
+    user: input.user,
+    prompt: promptResult.prompt,
+    originalTitle: input.sourceActivity.title,
+    originalDescription: input.sourceActivity.description,
+    language: sourceConfig.language,
+    locale: input.locale,
+    subject: input.subject
+  });
 
   const visibleTestCount = sourceConfig.sampleTests.length;
   const hiddenTestCount = sourcePrivate.tests.length;
@@ -113,7 +124,14 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
 
   const nextPrivateConfig = mergeCodingExerciseGeneratedSolutionPrivateConfig(sourcePrivateConfig, solutionResult);
   const sampleTests = testsResult?.sampleTests ?? [];
-  const hiddenTests = (testsResult?.hiddenTests ?? []).map((test, index) => ({
+  const generatedHiddenTests = testsResult?.hiddenTests ?? [];
+  assertVariationTestCounts({
+    expectedVisible: visibleTestCount,
+    expectedHidden: hiddenTestCount,
+    actualVisible: sampleTests.length,
+    actualHidden: generatedHiddenTests.length
+  });
+  const hiddenTests = generatedHiddenTests.map((test, index) => ({
     ...test,
     weight: sourcePrivate.tests[index]?.weight ?? test.weight
   }));
@@ -126,7 +144,12 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
   };
 
   await input.reportProgress({ fraction: 0.82, step: "validating" });
-  await updateBankActivity(input.user, input.activity.id, { config: nextConfig, lifecycle: "draft" });
+  await updateBankActivity(input.user, input.activity.id, {
+    title: metadataResult.title,
+    description: metadataResult.description,
+    config: nextConfig,
+    lifecycle: "draft"
+  });
   await replaceBankCodingExerciseHiddenTests({
     activityBankId: input.activityBankId,
     bankActivityId: input.activity.id,
@@ -142,6 +165,21 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
   });
   await input.reportProgress({ fraction: 0.98, step: "saving" });
 };
+
+function assertVariationTestCounts(input: {
+  expectedVisible: number;
+  expectedHidden: number;
+  actualVisible: number;
+  actualHidden: number;
+}) {
+  if (input.actualVisible === input.expectedVisible && input.actualHidden === input.expectedHidden) return;
+  throw new AppError(
+    422,
+    "CODING_EXERCISE_VARIATION_TEST_COUNT_MISMATCH",
+    "The generated variation did not preserve the original visible and hidden test counts.",
+    input
+  );
+}
 
 function buildCodingVariationBrief(input: {
   description: string;
@@ -189,19 +227,21 @@ function buildTestabilityRetryBrief(
 }
 
 function recoverableTestGenerationFeedback(error: unknown) {
-  if (!(error instanceof AppError) || ![
+  if (!error || typeof error !== "object" || Array.isArray(error)) return null;
+  const appError = error as { code?: unknown; details?: unknown; message?: unknown };
+  if (typeof appError.code !== "string" || ![
     "CODING_EXERCISE_TEST_GENERATION_INVALID",
     "REFERENCE_SOLUTION_COMPILATION_FAILED"
-  ].includes(error.code)) {
+  ].includes(appError.code)) {
     return null;
   }
-  const details = error.details && typeof error.details === "object" && !Array.isArray(error.details)
-    ? error.details as { issues?: unknown }
+  const details = appError.details && typeof appError.details === "object" && !Array.isArray(appError.details)
+    ? appError.details as { issues?: unknown }
     : {};
   const issues = Array.isArray(details.issues)
     ? details.issues.filter((issue): issue is string => typeof issue === "string")
     : [];
-  return issues.length ? issues : [error.message];
+  return issues.length ? issues : [typeof appError.message === "string" ? appError.message : "Test generation failed."];
 }
 
 function testSuitesMatch(

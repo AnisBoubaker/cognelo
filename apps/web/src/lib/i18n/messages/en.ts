@@ -617,10 +617,9 @@ export const enMessages = {
       variationProgressCount: "{completed} of {total} activities",
       variationQueued: "Waiting to start…",
       variationFailed: "The variation could not be created.",
-      variationComplete: "The variation is ready.",
+      variationComplete: 'The new exercise is "{title}".',
       variationError: "Unable to create the activity variation.",
       variationStatusError: "Unable to check variation progress.",
-      openVariation: "Open variation",
       variationStep: {
         content: "Generating {title}…",
         prompt: "Generating a new prompt for {title}…",

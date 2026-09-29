@@ -370,10 +370,9 @@ export const arMessages = {
       variationProgressCount: "{completed} من {total} أنشطة",
       variationQueued: "بانتظار البدء…",
       variationFailed: "تعذّر إنشاء التنويع.",
-      variationComplete: "أصبح التنويع جاهزًا.",
+      variationComplete: "التمرين الجديد هو «{title}».",
       variationError: "تعذّر إنشاء تنويع النشاط.",
       variationStatusError: "تعذّر التحقق من تقدّم التنويع.",
-      openVariation: "فتح التنويع",
       variationStep: {
         content: "جارٍ إنشاء {title}…",
         prompt: "جارٍ إنشاء سؤال جديد لـ {title}…",
