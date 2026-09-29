@@ -166,7 +166,7 @@ const judge0Mocks = vi.hoisted(() => ({
 
 vi.mock("@cognelo/config", () => ({
   getServerEnv: () => ({
-    JUDGE0_ENABLE_PER_PROCESS_AND_THREAD_LIMITS: false
+    JWT_SECRET: "test-secret-that-is-at-least-32-characters"
   })
 }));
 

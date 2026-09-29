@@ -25,6 +25,7 @@ After release, the learner's grading report presents the available automatic-tes
 - `Activity.config` contains only student-safe prompt, language, starter/template projection, visible tests, and editor settings.
 - Reference solutions, hidden scaffolds/tests, rubrics, evaluations, and execution history use plugin-owned persistence.
 - Browsers call Cognelo plugin routes; only the server communicates with Judge0.
+- Administrators configure Judge0 under **Settings → Runners**. Its endpoint and encrypted token live in the core runner registry rather than application environment variables; the plugin resolves a runner through the pool-ready core selector for every request.
 - Execution output is bounded before persistence and in browser-facing responses; grading still uses the complete Judge0 result.
 - Course and bank copies have independent private rows connected by explicit lifecycle hooks.
 - Reusable bank Tests invoke those same hooks for each Test-owned child during bank copy, course import, course publication, duplication, and deletion.

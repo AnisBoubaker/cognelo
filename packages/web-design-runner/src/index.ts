@@ -47,7 +47,7 @@ const server = createServer(async (request, response) => {
   try {
     if (request.method === "GET" && request.url === "/health") {
       response.writeHead(200);
-      response.end(JSON.stringify({ ok: true }));
+      response.end(JSON.stringify({ ok: true, capabilities: ["run", "screenshot"] }));
       return;
     }
 

@@ -42,7 +42,7 @@ This document preserves detailed Web Design Coding Exercises decisions. Load onl
 - Core bank-version comparison must exclude private bundles/tests until they have immutable per-version snapshots; current bank-owned rows cannot accurately represent historical versions.
 - Generic web-design bank versions are publication milestones. Draft saves update mutable public/private authoring; only a changed Published save creates an immutable generic version, and private rows remain unversioned.
 - Web-design coding exercises declare the semantic `browser-code` activity icon; the platform owns its Tabler rendering.
-- Student run/submit routes use the Docker-backed `packages/web-design-runner` service through `WEB_DESIGN_RUNNER_URL`; sample tests are used for run and hidden tests are used for submit.
+- Student run/submit routes use the Docker-backed `packages/web-design-runner` service selected by the core execution-runner registry; sample tests are used for run and hidden tests are used for submit. The plugin must not own endpoint selection because future runner pools are a core concern.
 - Reference validation executes enabled teacher tests against the reference bundle before saving and stores per-test validation summaries for passed or skipped tests.
 
 ## Planned Next Modules

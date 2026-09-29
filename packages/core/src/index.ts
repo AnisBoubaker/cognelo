@@ -12,6 +12,7 @@ export * from "./course-content";
 export * from "./courses";
 export * from "./email-delivery";
 export * from "./email-verification";
+export * from "./execution-runners";
 export * from "./errors";
 export * from "./gradebook";
 export * from "./grade-challenges";

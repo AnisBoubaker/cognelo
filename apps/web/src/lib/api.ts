@@ -30,6 +30,8 @@ import type {
   EmailTestInput,
   EmailVerificationCodeInput,
   EmailVerificationRequest,
+  ExecutionRunnerConfigurationInput,
+  ExecutionRunnerType,
   MaterialKind,
   SubjectInput,
   SubjectProgrammingLanguage,
@@ -95,6 +97,27 @@ export type EmailDeliveryConfiguration = {
   graphClientId: string;
   hasGraphClientSecret: boolean;
   updatedAt: string | null;
+};
+
+export type ExecutionRunnerConfiguration = {
+  configured: boolean;
+  id: string | null;
+  runnerType: ExecutionRunnerType;
+  displayName: string;
+  baseUrl: string;
+  authHeader: string;
+  hasAuthToken: boolean;
+  isEnabled: boolean;
+  position: number;
+  settings: { enablePerProcessAndThreadLimits: boolean };
+  updatedAt: string | null;
+};
+
+export type ExecutionRunnerCapabilityResult = {
+  key: string;
+  label: string;
+  ok: boolean;
+  detail: string;
 };
 
 export type MediaGarbageCollectionResult = {
@@ -1290,6 +1313,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input)
     }),
+  executionRunnerConfigurations: () =>
+    request<{ configurations: ExecutionRunnerConfiguration[] }>("/settings/runners"),
+  updateExecutionRunnerConfiguration: (runnerType: ExecutionRunnerType, input: ExecutionRunnerConfigurationInput) =>
+    request<{ configuration: ExecutionRunnerConfiguration }>(`/settings/runners/${runnerType}`, {
+      method: "PUT",
+      body: JSON.stringify(input)
+    }),
+  testExecutionRunnerConnection: (runnerType: ExecutionRunnerType) =>
+    request<{ ok: boolean; capabilities: ExecutionRunnerCapabilityResult[] }>(`/settings/runners/${runnerType}/test`, { method: "POST" }),
   mediaMaintenanceOverview: () =>
     request<{ overview: MediaMaintenanceOverview }>("/maintenance/media"),
   runMediaMaintenance: () =>

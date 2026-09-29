@@ -190,6 +190,32 @@ export const EmailTestInputSchema = z.object({
 });
 export type EmailTestInput = z.infer<typeof EmailTestInputSchema>;
 
+export const ExecutionRunnerTypeSchema = z.enum(["judge0", "web_design", "sagemath"]);
+export type ExecutionRunnerType = z.infer<typeof ExecutionRunnerTypeSchema>;
+
+export const ExecutionRunnerConfigurationInputSchema = z.object({
+  displayName: z.string().trim().min(1).max(160),
+  baseUrl: z.string().trim().url().max(500).refine((value) => {
+    const url = new URL(value);
+    return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password;
+  }, "Runner URL must use HTTP or HTTPS and must not contain credentials."),
+  authHeader: z.string().trim().max(160).regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]*$/, "Authentication header is invalid.").optional().default(""),
+  authToken: z.string().max(2000).optional().default(""),
+  isEnabled: z.boolean().optional().default(true),
+  settings: z.object({
+    enablePerProcessAndThreadLimits: z.boolean().optional().default(true)
+  }).optional().default({ enablePerProcessAndThreadLimits: true })
+}).superRefine((value, context) => {
+  if (value.authToken && !value.authHeader) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["authHeader"],
+      message: "An authentication header is required when a token is provided."
+    });
+  }
+});
+export type ExecutionRunnerConfigurationInput = z.infer<typeof ExecutionRunnerConfigurationInputSchema>;
+
 export const EmailVerificationCodeInputSchema = z.object({
   code: z.string().trim().regex(/^\d{6}$/, "Verification code must contain exactly six digits.")
 });

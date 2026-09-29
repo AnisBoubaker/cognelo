@@ -15,6 +15,7 @@
 - Public config contains only student starter files, prompt, preview entry, and editor settings.
 - Teacher solution bundles, Playwright tests, screenshots, submissions, and results use plugin-owned persistence.
 - Fast preview is client-side and sandboxed; graded execution is server-mediated through the external runner.
+- Administrators configure the endpoint under **Settings → Runners**. Core persists the endpoint and optional encrypted authentication token and resolves it through the pool-ready runner selector.
 - Enabled tests must pass against the private reference bundle before they are saved.
 - Bank/course private data is copied, synchronized, duplicated, and deleted through explicit plugin hooks.
 - Reusable bank Tests invoke those hooks for every independently owned web-design child across bank copy, course import/publication, duplication, and deletion.

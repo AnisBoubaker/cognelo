@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { copyFile, mkdir, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -682,6 +682,7 @@ async function main() {
   const teacher = await upsertUser("teacher@cognelo.local", "Terry Teacher", ["course_manager", "teacher"]);
   const student = await upsertUser("student@cognelo.local", "Sam Student", ["student"]);
   const seedAiConnection = await upsertSeedAiConnection();
+  await seedExecutionRunners(admin.id);
 
   const teacherMetadata = asJsonRecord(teacher.metadata);
   const teacherAiPreferences = asJsonRecord(teacherMetadata.aiPreferences);
@@ -2982,6 +2983,47 @@ async function main() {
     activityId: "seed-activity-web-design-profile-card",
     metadata: { seed: true, note: "Root-level item to test mixed folder/root layout." }
   });
+}
+
+async function seedExecutionRunners(updatedById: string) {
+  await prisma.executionRunner.upsert({
+    where: { id: "execution-runner-judge0-primary" },
+    update: {},
+    create: {
+      id: "execution-runner-judge0-primary",
+      runnerType: "judge0",
+      displayName: "Judge0",
+      baseUrl: "http://localhost:2358",
+      authHeader: "X-Auth-Token",
+      authTokenEncrypted: encryptSeedCredential("dev-local-token"),
+      settings: { enablePerProcessAndThreadLimits: true },
+      updatedById
+    }
+  });
+  await prisma.executionRunner.upsert({
+    where: { id: "execution-runner-web_design-primary" },
+    update: {},
+    create: {
+      id: "execution-runner-web_design-primary",
+      runnerType: "web_design",
+      displayName: "Web Design runner",
+      baseUrl: "http://localhost:3456",
+      settings: {},
+      updatedById
+    }
+  });
+}
+
+function encryptSeedCredential(secret: string) {
+  const encryptionKey = process.env.EMAIL_CREDENTIALS_ENCRYPTION_KEY;
+  if (!encryptionKey || !/^[A-Fa-f0-9]{64}$/.test(encryptionKey)) {
+    throw new Error("EMAIL_CREDENTIALS_ENCRYPTION_KEY must be configured before seeding runner credentials.");
+  }
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", Buffer.from(encryptionKey, "hex"), iv);
+  const ciphertext = Buffer.concat([cipher.update(secret, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return ["v1", iv.toString("base64url"), tag.toString("base64url"), ciphertext.toString("base64url")].join(":");
 }
 
 main()
