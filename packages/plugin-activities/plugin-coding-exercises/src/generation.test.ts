@@ -161,6 +161,59 @@ describe("coding exercise AI generation", () => {
     expect(mocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(1);
   });
 
+  it("retains the complete immutable exercise context when execution validation retries tests", async () => {
+    const firstPayload = {
+      sampleTests: [{ id: "sample-1", title: "Factorial five", input: "5\n", output: "120\n" }],
+      hiddenTests: [{ id: "hidden-1", name: "Factorial three", stdin: "3\n", expectedOutput: "6\n" }]
+    };
+    const correctedPayload = {
+      sampleTests: [{ id: "sample-1", title: "Factorial five", input: "5\n", output: "120\n" }],
+      hiddenTests: [{ id: "hidden-1", name: "Factorial three", stdin: "3\n", expectedOutput: "6\n" }]
+    };
+    mocks.generateQuestionAuthoringText
+      .mockResolvedValueOnce(JSON.stringify(firstPayload))
+      .mockResolvedValueOnce(JSON.stringify(correctedPayload));
+    mocks.validateReferenceSolutionAgainstHiddenTests
+      .mockResolvedValueOnce({
+        accepted: false,
+        sampleTests: {
+          tests: [{
+            id: "sample-1",
+            name: "Factorial five",
+            passed: false,
+            statusId: 3,
+            statusLabel: "Accepted",
+            message: "Program output did not contain every expected line.",
+            expectedOutput: "120\n",
+            stdout: "1\n"
+          }]
+        },
+        hiddenTests: { tests: [] }
+      })
+      .mockResolvedValueOnce({ accepted: true, sampleTests: { tests: [] }, hiddenTests: { tests: [] } });
+
+    await expect(generateCodingExerciseTests({
+      user,
+      description: "Calculate factorials.",
+      prompt: "Read an integer and print its factorial.",
+      language: "c",
+      locale: "en",
+      subject,
+      referenceSolution: "int main(void) { int n; scanf(\"%d\", &n); printf(\"%d\\n\", factorial(n)); }",
+      templateSource: "{{ STUDENT_CODE }}",
+      templateVisibleLineNumbers: [],
+      visibleTestCount: 1,
+      hiddenTestCount: 1
+    })).resolves.toMatchObject({ attempts: 2 });
+
+    const retryPrompt = mocks.generateQuestionAuthoringText.mock.calls[1]?.[1]?.userPrompt ?? "";
+    expect(retryPrompt).toContain("failed execution validation");
+    expect(retryPrompt).toContain("<student_prompt>\nRead an integer and print its factorial.");
+    expect(retryPrompt).toContain("<reference_solution>\nint main(void)");
+    expect(retryPrompt).toContain("<template_source>\n{{ STUDENT_CODE }}");
+    expect(retryPrompt).toContain("Never add stdin unless the reference solution reads it");
+  });
+
   it("requires generated test names to be descriptive and no longer than fifty characters", async () => {
     mocks.generateQuestionAuthoringText
       .mockResolvedValueOnce(JSON.stringify({
