@@ -21,5 +21,6 @@
 - Reusable bank Tests invoke those hooks for every independently owned web-design child across bank copy, course import/publication, duplication, and deletion.
 - Every standalone submission creates a mode-tagged core attempt. The shared teacher inspector can navigate submitted HTML/CSS/JavaScript bundles from either mode; grade overrides are available only for summative attempts. Automatic regrading is not advertised because the plugin has no current-answer regrading handler.
 - Released automatic or teacher-overridden grades are challengeable through core and reopen that same **Review and grade** workflow.
+- Activity-bank variations preserve the selected concepts, file topology, test count/order/kinds/weights, technologies, and difficulty while generating a new prompt, student starter bundle, private solution bundle, and Playwright tests. The ordinary private reference validation and expected-result screenshot path run before completion.
 
 When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an invariant changed, and the relevant detailed section.

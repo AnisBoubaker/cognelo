@@ -16,6 +16,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent,
+  useCallback,
   useEffect,
   useRef,
   useState
@@ -29,9 +30,10 @@ import {
   type ActivityBankFolder,
   type ActivityDefinition,
   type ActivityType,
+  type ActivityVariationJob,
   type BankActivity
 } from "@/lib/api";
-import { defaultDuplicateBankActivityTitle } from "@/lib/activity-bank-titles";
+import { defaultDuplicateBankActivityTitle, defaultVariationBankActivityTitle } from "@/lib/activity-bank-titles";
 import { activityCreationConfig } from "@/lib/activity-creation-defaults";
 import { useI18n } from "@/lib/i18n";
 
@@ -71,6 +73,10 @@ export default function ActivityBankDetailPage() {
   const [duplicatingActivityId, setDuplicatingActivityId] = useState<string | null>(null);
   const [duplicatingActivity, setDuplicatingActivity] = useState<BankActivity | null>(null);
   const [duplicateTitle, setDuplicateTitle] = useState("");
+  const [variationActivity, setVariationActivity] = useState<BankActivity | null>(null);
+  const [variationInstructions, setVariationInstructions] = useState("");
+  const [variationJob, setVariationJob] = useState<ActivityVariationJob | null>(null);
+  const [creatingVariation, setCreatingVariation] = useState(false);
   const [movingActivity, setMovingActivity] = useState<BankActivity | null>(null);
   const [moveTargetBankId, setMoveTargetBankId] = useState("");
   const [activityActionMenuId, setActivityActionMenuId] = useState<string | null>(null);
@@ -104,17 +110,17 @@ export default function ActivityBankDetailPage() {
   const cancelFolderEditRef = useRef(false);
   const skipFolderBlurRef = useRef(false);
 
-  async function loadPage() {
+  const loadPage = useCallback(async () => {
     const [bankResult, typesResult, banksResult] = await Promise.all([api.activityBank(activityBankId), api.activityTypes(), api.activityBanks()]);
     setBank(bankResult.activityBank);
     setActivityBanks(banksResult.activityBanks);
     setActivityTypes(typesResult.activityTypes);
     setActivityDefinitions(typesResult.registeredDefinitions);
-  }
+  }, [activityBankId]);
 
   useEffect(() => {
     loadPage().catch((err) => setError(err instanceof Error ? err.message : t("activityBankDetail.loadError")));
-  }, [activityBankId]);
+  }, [loadPage, t]);
 
   useEffect(() => {
     if (!showActivityPicker && !showConceptFilter) {
@@ -148,6 +154,32 @@ export default function ActivityBankDetailPage() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [editingFolderId, editingFolderSelectAll, bank]);
+
+  const variationBankId = bank?.id;
+  const variationSourceActivityId = variationActivity?.id;
+  const variationJobId = variationJob?.id;
+  const variationJobStatus = variationJob?.status;
+
+  useEffect(() => {
+    if (!variationBankId || !variationSourceActivityId || !variationJobId || !variationJobStatus || !["queued", "running"].includes(variationJobStatus)) return;
+    let disposed = false;
+    const poll = async () => {
+      try {
+        const result = await api.bankActivityVariationJob(variationBankId, variationSourceActivityId, variationJobId);
+        if (disposed) return;
+        setVariationJob(result.job);
+        if (result.job.status === "succeeded") await loadPage();
+      } catch (err) {
+        if (!disposed) setError(err instanceof Error ? err.message : t("activityBankDetail.variationStatusError"));
+      }
+    };
+    const timer = window.setInterval(() => void poll(), 900);
+    void poll();
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, [loadPage, t, variationBankId, variationJobId, variationJobStatus, variationSourceActivityId]);
 
   async function createBankActivity(selectedActivityTypeKey: string) {
     if (!bank) {
@@ -269,6 +301,33 @@ export default function ActivityBankDetailPage() {
     } finally {
       setDuplicatingActivityId(null);
     }
+  }
+
+  async function createVariation(event: FormEvent) {
+    event.preventDefault();
+    if (!bank || !variationActivity || variationJob || creatingVariation) return;
+    setError("");
+    setCreatingVariation(true);
+    try {
+      const result = await api.createBankActivityVariation(bank.id, variationActivity.id, {
+        title: defaultVariationBankActivityTitle(variationActivity.title, locale),
+        instructions: variationInstructions,
+        locale
+      });
+      setVariationJob(result.job);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("activityBankDetail.variationError"));
+    } finally {
+      setCreatingVariation(false);
+    }
+  }
+
+  function closeVariationDialog() {
+    if (creatingVariation || (variationJob && ["queued", "running"].includes(variationJob.status))) return;
+    setVariationActivity(null);
+    setVariationInstructions("");
+    setVariationJob(null);
+    setCreatingVariation(false);
   }
 
   async function moveActivity(event: FormEvent) {
@@ -833,6 +892,7 @@ export default function ActivityBankDetailPage() {
                         <Link className="content-context-menu-item" href={`/activity-banks/${bank?.id}/activities/${activity.id}`} role="menuitem"><EditIcon /><span>{t("common.edit")}</span></Link>
                         {activity.lifecycle !== "published" ? <button className="content-context-menu-item" disabled={publishingActivityId !== null} onClick={() => void publishActivity(activity)} role="menuitem" type="button"><AppIcon name="check" /><span>{t("activityBankDetail.publishActivity")}</span></button> : null}
                         <button className="content-context-menu-item" disabled={duplicatingActivityId === activity.id} onClick={() => { setActivityActionMenuId(null); setDuplicatingActivity(activity); setDuplicateTitle(defaultDuplicateBankActivityTitle(activity.title)); }} role="menuitem" type="button"><DuplicateIcon /><span>{t("activityBankDetail.duplicateActivity")}</span></button>
+                        {activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.supportsVariations ? <button className="content-context-menu-item" onClick={() => { setActivityActionMenuId(null); setVariationActivity(activity); setVariationInstructions(""); setVariationJob(null); setCreatingVariation(false); }} role="menuitem" type="button"><AppIcon name="sync" /><span>{t("activityBankDetail.createVariation")}</span></button> : null}
                         <button className="content-context-menu-item" onClick={() => { setActivityActionMenuId(null); setMovingActivity(activity); setMoveTargetBankId(""); }} role="menuitem" type="button"><MoveIcon /><span>{t("activityBankDetail.moveActivity")}</span></button>
                         {(activity.versions?.length ?? 0) >= 2 ? <button className="content-context-menu-item" onClick={() => openVersionComparison(activity)} role="menuitem" type="button"><CompareIcon /><span>{t("bankActivityPage.compareVersions")}</span></button> : null}
                         <button className="content-context-menu-item is-danger" disabled={deletingActivityId === activity.id} onClick={() => { setActivityActionMenuId(null); setDeleteActivityState({ activity, courseCount: null }); }} role="menuitem" type="button"><RemoveIcon /><span>{t("common.remove")}</span></button>
@@ -931,6 +991,48 @@ export default function ActivityBankDetailPage() {
                 <div className="field"><label htmlFor="duplicate-bank-activity-name">{t("activityBankDetail.duplicateActivityTitleLabel")}</label><input id="duplicate-bank-activity-name" minLength={2} maxLength={160} required autoFocus value={duplicateTitle} onChange={(event) => setDuplicateTitle(event.target.value)} /></div>
                 <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setDuplicatingActivity(null)}>{t("common.cancel")}</button><button disabled={Boolean(duplicatingActivityId) || duplicateTitle.trim().length < 2} type="submit">{duplicatingActivityId ? t("common.saving") : t("activityBankDetail.duplicateActivity")}</button></div>
               </form>
+            </section>
+          </div>
+        ) : null}
+
+        {variationActivity ? (
+          <div className="dialog-backdrop" role="presentation">
+            <section aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="variation-bank-activity-title">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">{t("activityBankDetail.variationEyebrow")}</p>
+                  <h2 id="variation-bank-activity-title">{t("activityBankDetail.variationTitle")}</h2>
+                </div>
+                <button className="secondary icon-button" disabled={creatingVariation || Boolean(variationJob && ["queued", "running"].includes(variationJob.status))} type="button" onClick={closeVariationDialog} title={t("common.close")}><CloseIcon /></button>
+              </div>
+              {!variationJob ? (
+                <form className="form" onSubmit={createVariation}>
+                  <p>{t("activityBankDetail.variationMessage", { title: variationActivity.title })}</p>
+                  <div className="field">
+                    <label htmlFor="variation-ai-instructions">{t("activityBankDetail.variationInstructionsLabel")}</label>
+                    <textarea id="variation-ai-instructions" maxLength={4000} rows={6} autoFocus value={variationInstructions} onChange={(event) => setVariationInstructions(event.target.value)} placeholder={t("activityBankDetail.variationInstructionsPlaceholder")} />
+                    <small>{t("activityBankDetail.variationInstructionsHelp")}</small>
+                  </div>
+                  <div className="dialog-actions"><button className="secondary" disabled={creatingVariation} type="button" onClick={closeVariationDialog}>{t("common.cancel")}</button><button disabled={creatingVariation} type="submit">{t("activityBankDetail.createVariation")}</button></div>
+                </form>
+              ) : (
+                <div className="activity-variation-progress">
+                  <p>{variationStatusText(variationJob, t)}</p>
+                  <progress aria-label={t("activityBankDetail.variationProgressLabel")} max={100} value={variationProgressPercent(variationJob)} />
+                  <div className="activity-variation-progress-summary">
+                    <span>{Math.round(variationProgressPercent(variationJob))}%</span>
+                    <span>{t("activityBankDetail.variationProgressCount", { completed: variationJob.progress.completed ?? 0, total: variationJob.progress.total ?? 1 })}</span>
+                  </div>
+                  {variationJob.status === "failed" ? <p className="error">{variationJob.error?.message ?? t("activityBankDetail.variationError")}</p> : null}
+                  {variationJob.status === "succeeded" ? <p>{t("activityBankDetail.variationComplete")}</p> : null}
+                  {["succeeded", "failed", "cancelled"].includes(variationJob.status) ? (
+                    <div className="dialog-actions">
+                      <button className="secondary" type="button" onClick={closeVariationDialog}>{t("common.close")}</button>
+                      {variationJob.status === "succeeded" && variationJob.result?.activityId ? <button type="button" onClick={() => router.push(`/activity-banks/${bank?.id}/activities/${variationJob.result?.activityId}`)}>{t("activityBankDetail.openVariation")}</button> : null}
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </section>
           </div>
         ) : null}
@@ -1205,6 +1307,23 @@ function versionDiffLabels(t: I18nTranslate) {
     "field.title": t("bankActivityPage.versionDiffFieldTitle"), "field.description": t("bankActivityPage.versionDiffFieldDescription"), "field.lifecycle": t("bankActivityPage.versionDiffFieldLifecycle"), "field.activityType": t("bankActivityPage.versionDiffFieldType"), "field.knowledgeConcepts": t("bankActivityPage.versionDiffFieldConcepts"),
     "change.added": t("bankActivityPage.versionDiffAdded"), "change.removed": t("bankActivityPage.versionDiffRemoved"), "change.changed": t("bankActivityPage.versionDiffChanged")
   };
+}
+
+function variationProgressPercent(job: ActivityVariationJob) {
+  if (job.status === "succeeded") return 100;
+  const total = Math.max(1, job.progress.total ?? 1);
+  const completed = Math.max(0, job.progress.completed ?? 0);
+  const fraction = Math.max(0, Math.min(job.progress.fraction ?? 0, 0.99));
+  return Math.min(99, ((completed + fraction) / total) * 100);
+}
+
+function variationStatusText(job: ActivityVariationJob, t: I18nTranslate) {
+  if (job.status === "failed") return t("activityBankDetail.variationFailed");
+  if (job.status === "succeeded") return t("activityBankDetail.variationComplete");
+  if (job.status === "queued") return t("activityBankDetail.variationQueued");
+  const title = job.progress.currentActivityTitle ?? "";
+  const step = job.progress.step ?? "content";
+  return t(`activityBankDetail.variationStep.${step}`, { title });
 }
 
 function EditIcon() {

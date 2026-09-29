@@ -124,6 +124,9 @@ export const mcqPlugin: ActivityPlugin = {
       description: "Single-choice and multiple-choice activities authored in a text-first Markdown-like format.",
       defaultCategoryIds: ["generic", "all"],
       icon: "checklist",
+      authoring: {
+        supportsVariations: true
+      },
       i18n: {
         en: {
           name: "Multpiple choice questions",

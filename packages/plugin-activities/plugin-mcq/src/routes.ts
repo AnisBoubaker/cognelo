@@ -376,7 +376,7 @@ async function resolveSubjectContext(activityBankId: string | undefined, courseI
   throw new AppError(400, "SUBJECT_CONTEXT_REQUIRED", "Subject context is required for MCQ generation.");
 }
 
-async function generateValidMcqSource(input: {
+export async function generateValidMcqSource(input: {
   user: Parameters<typeof generateQuestionAuthoringText>[0];
   description: string;
   defaultCodeLanguage: string;

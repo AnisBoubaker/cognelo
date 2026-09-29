@@ -75,6 +75,29 @@ export type BankActivityDuplicatedHook = (input: {
   activityTypeKey: string;
 }) => Promise<void>;
 
+export type ActivityVariationKnowledge = {
+  mode: "selected";
+  concepts: Array<{ id: string; title: string; skills: string[]; skillIds: string[] }>;
+  selectedConcepts: Array<{ id: string; title: string; skills: string[]; skillIds: string[] }>;
+};
+
+export type BankActivityVariationProgress = {
+  fraction: number;
+  step: "content" | "prompt" | "solution" | "tests" | "validating" | "saving";
+};
+
+export type BankActivityVariationHandler = (input: {
+  user: CurrentUser;
+  activityBankId: string;
+  sourceActivity: ServerActivityRecord;
+  activity: ServerActivityRecord;
+  instructions: string;
+  locale: "en" | "fr" | "zh" | "ar";
+  subject: { title: string; description: string };
+  knowledge: ActivityVariationKnowledge;
+  reportProgress: (progress: BankActivityVariationProgress) => Promise<void>;
+}) => Promise<void>;
+
 export type CourseActivityDeletedHook = (input: {
   user: CurrentUser;
   courseId: string;
@@ -263,6 +286,10 @@ export type ServerActivityPlugin = {
     submit: CompositeExecutionSubmissionHandler;
     actions?: Readonly<Record<string, CompositeExecutionActionHandler>>;
   };
+  bankVariation?: {
+    activityTypeKeys: readonly string[];
+    createVariation: BankActivityVariationHandler;
+  };
   hooks?: {
     onCourseActivityCreatedFromBankVersion?: CourseActivityCreatedFromBankVersionHook;
     onCourseActivityDeleted?: CourseActivityDeletedHook;
@@ -369,6 +396,12 @@ export function resolveCompositeExecutionActionHandler(activityTypeKey: string, 
     plugin.compositeExecution?.activityTypeKeys.includes(activityTypeKey)
   )?.compositeExecution;
   return composite?.actions?.[action] ?? null;
+}
+
+export function resolveBankActivityVariationHandler(activityTypeKey: string) {
+  return serverPlugins.find((plugin) =>
+    plugin.bankVariation?.activityTypeKeys.includes(activityTypeKey)
+  )?.bankVariation?.createVariation ?? null;
 }
 
 export async function runCourseActivityCreatedFromBankVersionHooks(input: {

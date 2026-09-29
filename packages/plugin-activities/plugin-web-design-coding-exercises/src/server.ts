@@ -3,10 +3,15 @@ import { webDesignExerciseExpectedResultRoute, webDesignExerciseReviewAllRoute, 
 import { copyBankWebDesignExerciseData, copyBankWebDesignExerciseTestsToCourseActivity, copyCourseWebDesignExerciseData, copyCourseWebDesignExerciseDataToBankActivity, deleteBankWebDesignExerciseData, deleteCourseWebDesignExerciseData } from "./tests";
 import { submitWebDesignExercise, runWebDesignExercise, webDesignExerciseRunInputSchema } from "./executions";
 import { AppError } from "@cognelo/core";
+import { createWebDesignBankActivityVariation } from "./variation";
 
 export const webDesignCodingExercisesServerPlugin: ServerActivityPlugin = {
   key: "web-design-coding-exercises",
   routes: [webDesignExerciseTestsRoute, webDesignExerciseExpectedResultRoute, webDesignExerciseRunRoute, webDesignExerciseSubmitRoute, webDesignExerciseReviewAllRoute],
+  bankVariation: {
+    activityTypeKeys: ["web-design-coding-exercise"],
+    createVariation: createWebDesignBankActivityVariation
+  },
   compositeExecution: {
     activityTypeKeys: ["web-design-coding-exercise"],
     actions: {

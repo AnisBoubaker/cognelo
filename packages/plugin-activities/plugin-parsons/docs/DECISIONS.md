@@ -19,6 +19,7 @@ This document preserves detailed Parsons decisions. Load only the sections relev
 - Standalone summative submission requires explicit confirmation. Cancelling leaves the current arrangement intact; confirming waits for persistence to succeed and then returns the student to course content.
 - Order feedback should count minimally misplaced units rather than every downstream displaced line.
 - Parsons AI generation uses the platform knowledge modes. All modes provide the complete subject catalog as a curriculum boundary; selected skills additionally steer generation, suggestion maps the generated prompt and solution to exact subject skills in the unsaved host draft, and ignore neither reads nor changes that draft and performs no mapping pass.
+- Bank variation deep-copies first, then regenerates prompt and solution while preserving selected skills, language, complexity, the exact physical and non-empty solution line counts, and the applicability of the copied grouping structure. The copied groups and precedence rules therefore remain structurally valid and independently editable.
 
 ## Persistence Decisions
 

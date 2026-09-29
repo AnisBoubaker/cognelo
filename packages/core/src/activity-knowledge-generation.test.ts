@@ -1,9 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ generateQuestionAuthoringText: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  assertCanManageActivityBank: vi.fn(),
+  findActivityBank: vi.fn(),
+  generateQuestionAuthoringText: vi.fn()
+}));
+vi.mock("@cognelo/db", () => ({ prisma: { activityBank: { findUnique: mocks.findActivityBank } } }));
 vi.mock("./ai-agents", () => ({ generateQuestionAuthoringText: mocks.generateQuestionAuthoringText }));
+vi.mock("./subjects", () => ({ assertCanManageActivityBank: mocks.assertCanManageActivityBank }));
 
-import { activityKnowledgeGenerationPrompt, suggestActivityKnowledgeSelections } from "./activity-knowledge-generation";
+import {
+  activityKnowledgeGenerationPrompt,
+  getBankActivityVariationGenerationContext,
+  suggestActivityKnowledgeSelections
+} from "./activity-knowledge-generation";
 
 const user = { id: "teacher-1" } as Parameters<typeof suggestActivityKnowledgeSelections>[0]["user"];
 const catalog = {
@@ -12,7 +22,55 @@ const catalog = {
 };
 
 describe("activity knowledge generation", () => {
-  beforeEach(() => mocks.generateQuestionAuthoringText.mockReset());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.assertCanManageActivityBank.mockResolvedValue(undefined);
+  });
+
+  it("preserves exact activity selections even when a selected concept is no longer active in the catalog", async () => {
+    mocks.findActivityBank.mockResolvedValue({
+      subject: {
+        title: "Programming",
+        description: "Introductory programming",
+        teachingLanguage: "fr",
+        knowledgeConcepts: [{
+          id: "active-concept",
+          title: "Active concept",
+          skills: "",
+          skillRecords: [{ id: "active-skill", title: "Active skill" }]
+        }]
+      },
+      activities: [{
+        knowledgeConcepts: [{
+          conceptId: "inactive-concept",
+          selectsAllSkills: false,
+          selectedSkills: ["Legacy selected skill"],
+          selectedSkillIds: [],
+          concept: {
+            id: "inactive-concept",
+            title: "Inactive selected concept",
+            skills: "Legacy selected skill\nOther skill",
+            skillRecords: []
+          }
+        }]
+      }]
+    });
+
+    await expect(getBankActivityVariationGenerationContext(user, "bank-1", "activity-1")).resolves.toEqual({
+      locale: "fr",
+      subject: { title: "Programming", description: "Introductory programming" },
+      knowledge: {
+        mode: "selected",
+        concepts: [{ id: "active-concept", title: "Active concept", skills: ["Active skill"], skillIds: ["active-skill"] }],
+        selectedConcepts: [{
+          id: "inactive-concept",
+          title: "Inactive selected concept",
+          skills: ["Legacy selected skill"],
+          skillIds: ["inactive-concept:legacy-skill-1"]
+        }]
+      }
+    });
+  });
 
   it("adds the full catalog boundary and distinguishes explicitly selected skills", () => {
     const prompt = activityKnowledgeGenerationPrompt({

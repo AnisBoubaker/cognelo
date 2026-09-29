@@ -245,6 +245,7 @@ Key fields:
 - `defaultConfig`
 - `configSchema`
 - `metadataSchema`
+- `authoring.supportsVariations` when the activity provides a bank variation handler
 
 ### `ServerActivityPlugin`
 
@@ -266,8 +267,14 @@ type ServerActivityPlugin = {
     onCourseActivityCreatedFromBankVersion?: CourseActivityCreatedFromBankVersionHook;
     onCourseActivityPublishedToBank?: CourseActivityPublishedToBankHook;
   };
+  bankVariation?: {
+    activityTypeKeys: readonly string[];
+    createVariation: BankActivityVariationHandler;
+  };
 };
 ```
+
+Bank variation orchestration first performs the normal deep bank duplicate, including private-data hooks, then calls the owning handler with the original and independent target records, the complete knowledge catalog, the preserved selected skills, optional teacher instructions, and a progress callback. The handler must regenerate every activity-specific learner/private artifact that should differ, validate the result through its ordinary persistence boundary, and mutate only the target. A failure deletes the entire copied activity or reusable-Test graph.
 
 ### `ContentTypePlugin`
 

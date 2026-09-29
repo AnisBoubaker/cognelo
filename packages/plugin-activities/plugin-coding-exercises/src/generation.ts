@@ -93,8 +93,8 @@ const generatedTestsSchema = z
   .object({
     status: z.enum(["ok", "warning"]).optional().default("ok"),
     warningMessage: z.string().max(1200).optional().default(""),
-    sampleTests: z.array(generatedSampleTestSchema).min(1).max(codingExerciseMaxGeneratedTestCount),
-    hiddenTests: z.array(generatedHiddenTestSchema).min(1).max(codingExerciseMaxGeneratedTestCount)
+    sampleTests: z.array(generatedSampleTestSchema).max(codingExerciseMaxGeneratedTestCount),
+    hiddenTests: z.array(generatedHiddenTestSchema).max(codingExerciseMaxGeneratedTestCount)
   })
   .superRefine((tests, context) => {
     if (tests.status === "warning" && tests.warningMessage.trim().length < 10) {

@@ -22,6 +22,7 @@ import { createCodingExerciseTeacherFeedbackDraft, evaluateCodingExerciseAttempt
 import { regradeCodingExerciseAttempt } from "./regrading";
 import { getCodingExerciseStudentGradeReport } from "./student-grade-report";
 import { getCodingExerciseGradeCompletions } from "./grade-completion";
+import { createCodingExerciseBankActivityVariation } from "./variation";
 
 export { listCodingExerciseProgrammingLanguages } from "./judge0";
 
@@ -38,6 +39,10 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
     codingExerciseGenerateRubricRoute,
     codingExerciseGenerateTestsRoute
   ],
+  bankVariation: {
+    activityTypeKeys: ["coding-exercise"],
+    createVariation: createCodingExerciseBankActivityVariation
+  },
   grading: {
     gradeAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, pluginAttemptRef, activity }) => {
       if (!pluginAttemptRef) {

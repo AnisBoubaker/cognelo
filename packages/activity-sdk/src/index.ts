@@ -76,6 +76,7 @@ export type ActivityAiFeedbackContract = {
 
 export type ActivityAuthoringContract = {
   gradingTab?: boolean;
+  supportsVariations?: boolean;
 };
 
 export type ActivityProvider =
@@ -155,6 +156,9 @@ const coreDefinitions: ActivityDefinition[] = [
     },
     manualGrading: {
       rendererKey: "test-manual-grading"
+    },
+    authoring: {
+      supportsVariations: true
     },
     i18n: {
       en: {

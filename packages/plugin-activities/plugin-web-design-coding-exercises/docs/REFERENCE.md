@@ -76,6 +76,8 @@ Reusable bank Tests dispatch that same lifecycle per owned web-design child. A c
 
 The teacher authoring UI is tabbed, but it still behaves as one guarded form. Keep it registered with `useUnsavedChangesGuard` from `@cognelo/activity-ui`, and register any future web-design authoring/settings panels with the same dirty/save/discard pattern.
 
+The activity-bank **Create variation** action runs against an independent deep duplicate. Its plugin handler preserves exact file paths and the original test count/order/kinds/weights while generating a meaningfully different prompt, student starter code, private reference code, test names, and Playwright assertions at comparable complexity. Optional dialog instructions are generation-only. The handler saves through the ordinary test-management boundary, so every enabled test must pass the new reference bundle and any `{{ EXPECTED_RESULT }}` or cropped token produces a fresh screenshot. A reusable Test variation invokes this handler for each web-design child and includes validation in the progress report.
+
 ## Playwright Grading
 
 Implemented plugin subroutes:

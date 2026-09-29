@@ -8,10 +8,15 @@ import { parseParsonsConfig } from "./parsons";
 import { createInitialParsonsAttemptState, parsonsAttemptStateSchema } from "./attempt-types";
 import { parsonsAttemptRoute, parsonsGenerateRoute, parsonsGradebookAttemptsRoute, parsonsStudentSubmissionsRoute } from "./routes";
 import { evaluateParsonsAttemptStateForConfig } from "./attempts";
+import { createParsonsBankActivityVariation } from "./variation";
 
 export const parsonsServerPlugin: ServerActivityPlugin = {
   key: "parsons",
   routes: [parsonsAttemptRoute, parsonsGenerateRoute, parsonsGradebookAttemptsRoute, parsonsStudentSubmissionsRoute],
+  bankVariation: {
+    activityTypeKeys: ["parsons-problem"],
+    createVariation: createParsonsBankActivityVariation
+  },
   hooks: {
     onCourseActivityDeleted: async ({ activityTypeKey, activityId }) => {
       if (activityTypeKey === "parsons-problem") {

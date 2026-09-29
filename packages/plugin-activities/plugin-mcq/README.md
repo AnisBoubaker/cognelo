@@ -18,5 +18,6 @@
 - Standalone answers autosave through `ActivityResponseDraft`; compound Test answers use `TestItemAttempt`.
 - Formative **Check answers** and summative submissions both create mode-tagged core attempts. Only summative attempts use limits, gradebook selection, grading, and release visibility; teachers can inspect formative attempts read-only.
 - Optional model feedback can explain results but never changes deterministic MCQ grades and is not independently challengeable. The released deterministic grade and teacher-authored released feedback remain challengeable through the core workflow.
+- Activity-bank variations preserve the selected concepts, question count, code-language setting, and difficulty while generating a new student introduction, questions, choices, and independently audited answer key. Reusable Test variation applies the same operation to each MCQ child.
 
 When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an invariant changed, and the relevant detailed section.

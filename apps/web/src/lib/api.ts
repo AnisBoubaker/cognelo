@@ -442,6 +442,23 @@ export type BankActivity = {
   knowledgeConcepts?: ActivityKnowledgeConceptLink[];
 };
 
+export type ActivityVariationJob = {
+  id: string;
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+  progress: {
+    completed?: number;
+    currentActivityTitle?: string;
+    fraction?: number;
+    stage?: "queued" | "duplicating" | "generating" | "finalizing" | "complete";
+    step?: "content" | "prompt" | "solution" | "tests" | "validating" | "saving";
+    total?: number;
+  };
+  result: { activityId?: string; title?: string } | null;
+  error: { code?: string; message?: string } | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ActivityKnowledgeConceptLink = {
   conceptId: string;
   selectsAllSkills: boolean;
@@ -578,6 +595,7 @@ export type ActivityDefinition = {
   };
   authoring?: {
     gradingTab?: boolean;
+    supportsVariations?: boolean;
   };
   i18n?: Partial<
     Record<
@@ -1475,6 +1493,19 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ title })
     }),
+  createBankActivityVariation: (
+    activityBankId: string,
+    bankActivityId: string,
+    input: { title: string; instructions: string; locale: "en" | "fr" | "zh" | "ar" }
+  ) =>
+    request<{ job: ActivityVariationJob }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/variation`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  bankActivityVariationJob: (activityBankId: string, bankActivityId: string, jobId: string) =>
+    request<{ job: ActivityVariationJob }>(
+      `/activity-banks/${activityBankId}/activities/${bankActivityId}/variation?${new URLSearchParams({ jobId })}`
+    ),
   moveBankActivity: (activityBankId: string, bankActivityId: string, targetActivityBankId: string) =>
     request<{ activity: BankActivity }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/move`, {
       method: "POST",
