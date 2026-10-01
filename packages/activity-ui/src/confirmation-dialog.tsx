@@ -28,18 +28,26 @@ export function ConfirmationDialog({
   onConfirm
 }: ConfirmationDialogProps) {
   const titleId = useId();
+  const dialogRef = useRef<HTMLElement | null>(null);
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const isConfirmingRef = useRef(isConfirming);
+  const onCancelRef = useRef(onCancel);
+
+  isConfirmingRef.current = isConfirming;
+  onCancelRef.current = onCancel;
 
   useEffect(() => {
     if (!open) {
       return;
     }
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    confirmButtonRef.current?.focus();
+    if (!dialogRef.current?.contains(document.activeElement)) {
+      confirmButtonRef.current?.focus();
+    }
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !isConfirming) {
-        onCancel();
+      if (event.key === "Escape" && !isConfirmingRef.current) {
+        onCancelRef.current();
       }
     };
     document.addEventListener("keydown", handleKeyDown);
@@ -47,7 +55,7 @@ export function ConfirmationDialog({
       document.removeEventListener("keydown", handleKeyDown);
       previousFocusRef.current?.focus();
     };
-  }, [isConfirming, onCancel, open]);
+  }, [open]);
 
   if (!open) {
     return null;
@@ -63,7 +71,7 @@ export function ConfirmationDialog({
         }
       }}
     >
-      <section aria-labelledby={titleId} aria-modal="true" className="dialog-panel stack" role="dialog">
+      <section ref={dialogRef} aria-labelledby={titleId} aria-modal="true" className="dialog-panel stack" role="dialog">
         <div className="stack" style={{ gap: 8 }}>
           {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
           <h2 id={titleId}>{title}</h2>
