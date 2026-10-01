@@ -437,6 +437,11 @@ npm install
 npm run db:migrate:all
 ```
 
+The root `npm run db:migrate` command aliases this same combined migration
+path. Do not run raw `prisma migrate dev` against the shared database. The core
+Prisma schema intentionally excludes plugin-owned tables, so the raw Prisma
+command sees valid plugin tables as drift and can offer a destructive reset.
+
 After generating a Prisma client while development services are already running, restart those services with `npm run dev:stop` followed by `npm run dev`. Node may otherwise retain the previously generated client module even when application code hot-reloads. The shared development client also fingerprints the loaded Prisma schema so a hot reload does not reuse a schema-stale global singleton, but restarting is the guaranteed way to load regenerated client code.
 
 5. Seed sample data:

@@ -25,7 +25,7 @@
     "test:e2e:install": "playwright install chromium",
     "typecheck": "npm run typecheck --workspaces --if-present && tsc -p scripts/tsconfig.json",
     "db:generate": "npm run db:generate --workspaces --if-present",
-    "db:migrate": "npm run db:migrate --workspace @cognelo/db",
+    "db:migrate": "npm run db:migrate:all",
     "db:migrate:all": "set -a && . ./.env && set +a && node ./scripts/db-migrate-all.mjs",
     "db:seed": "npm run db:seed --workspace @cognelo/db",
     "db:studio": "npm run db:studio --workspace @cognelo/db",

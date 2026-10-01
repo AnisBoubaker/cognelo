@@ -25,7 +25,7 @@ This file is intentionally short. It records only cross-cutting decisions that a
 - Cookie-authenticated mutations enforce the configured browser origin. External execution services such as Judge0 and Playwright remain behind Cognelo server routes.
 - Administrators configure execution services in the database under **Settings → Runners**, including Judge0, Web Design, and the reserved SageMath integration. Authentication tokens are encrypted with the instance credential key and never returned to browsers. The schema permits multiple runners per type; core currently selects the first enabled row behind a selector boundary reserved for future round-robin pools.
 - Browser sessions use a rolling eight-hour HttpOnly cookie renewed by successful current-user checks. Temporary network, server, or database failures must preserve the mounted authenticated workspace and retry; only a confirmed invalid session may clear the user and redirect to sign-in.
-- Production schema changes require additive/idempotent migrations where possible, a fresh production-clone rehearsal, backups, explicit approval, smoke tests, and a documented rollback path.
+- Production schema changes require additive/idempotent migrations where possible, a fresh production-clone rehearsal, backups, explicit approval, smoke tests, and a documented rollback path. Use the combined `npm run db:migrate:all` path (`npm run db:migrate` is an alias); raw `prisma migrate dev` mistakes separately managed plugin tables for drift and must not be run against the shared database.
 
 ## Where Details Live
 
