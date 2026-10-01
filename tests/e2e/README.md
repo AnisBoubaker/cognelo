@@ -6,6 +6,7 @@ The Playwright suite covers the platform's critical browser journeys with real A
 - global administrator, course manager, teacher, and student boundaries, plus course owner, group teacher, and group TA permissions;
 - personal settings plus administrator user creation, filtering, plugin settings, and email settings;
 - teacher creation of subjects, activity banks, courses, groups, linked users, and pending participants;
+- knowledge-graph skill and misconception dialogs retaining input focus during controlled typing;
 - browser authoring, publication, course copying, assignment, and student completion for MCQ, Parsons, coding exercise, web-design coding exercise, and Coding Homework Grader activities;
 - authoring a core compound Test from reusable bank activities and completing its student assessment flow, plus authoring and publishing reusable bank Tests, preserving their owned activity copies after source deletion, importing their full graphs into courses, and publishing course-authored Tests back to a bank;
 - the placeholder activity's intentional unsupported authoring and learner states;
