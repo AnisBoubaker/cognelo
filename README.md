@@ -51,6 +51,10 @@ npm run db:seed
 npm run dev
 ```
 
+`npm run db:migrate` is a safe alias for `npm run db:migrate:all`. Do not run
+raw `prisma migrate dev` against this shared database: plugin-owned tables are
+managed separately and would be incorrectly reported as schema drift.
+
 The web app uses `http://localhost:3000`; the API uses `http://localhost:3001`.
 
 Some plugins need additional services:
