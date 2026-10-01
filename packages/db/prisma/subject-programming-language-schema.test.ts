@@ -9,7 +9,7 @@ const migration = readFileSync(
 
 describe("subject programming language schema", () => {
   it("stores an optional default for newly created programming exercises", () => {
-    expect(schema).toContain("programmingLanguage    String?");
+    expect(schema).toMatch(/programmingLanguage\s+String\?/);
     expect(migration).toContain('ADD COLUMN "programmingLanguage" TEXT');
   });
 });

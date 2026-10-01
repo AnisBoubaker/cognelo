@@ -220,9 +220,10 @@ export type CourseContentResource = {
 };
 
 export type ActivityKnowledgeGenerationRequest =
-  | { mode: "selected"; concepts: Array<{ id: string; title: string; skills: string[]; skillIds: string[] }>; selectedConcepts: Array<{ id: string; title: string; skills: string[]; skillIds: string[] }> }
-  | { mode: "suggest" | "ignore"; concepts: Array<{ id: string; title: string; skills: string[]; skillIds: string[] }> };
-export type GeneratedKnowledgeSelection = { conceptId: string; selectsAllSkills: boolean; selectedSkills: string[]; selectedSkillIds: string[] };
+  | { mode: "selected"; concepts: KnowledgeGenerationConcept[]; selectedConcepts: KnowledgeGenerationConcept[] }
+  | { mode: "suggest" | "ignore"; concepts: KnowledgeGenerationConcept[] };
+type KnowledgeGenerationConcept = { id: string; title: string; skills: string[]; skillIds: string[]; misconceptions: string[]; misconceptionIds: string[] };
+export type GeneratedKnowledgeSelection = { conceptId: string; selectsAllSkills: boolean; selectedSkills: string[]; selectedSkillIds: string[]; selectedMisconceptions: string[]; selectedMisconceptionIds: string[] };
 
 export type CodingExercisePromptGenerationInput = {
   description: string;
@@ -354,13 +355,24 @@ export type SubjectKnowledgeConcept = {
   subjectId: string;
   title: string;
   skills: string;
+  misconceptions: string[] | null;
   active?: boolean;
   skillRecords: SubjectKnowledgeSkill[];
+  misconceptionRecords: SubjectKnowledgeMisconception[];
   positionX: number;
   positionY: number;
 };
 
 export type SubjectKnowledgeSkill = {
+  id: string;
+  subjectId: string;
+  conceptId: string;
+  title: string;
+  position: number;
+  active: boolean;
+};
+
+export type SubjectKnowledgeMisconception = {
   id: string;
   subjectId: string;
   conceptId: string;
@@ -380,9 +392,15 @@ export type SkillDeletionImpact = KnowledgeDeletionImpact & {
   replacementSkills: Array<{ id: string; title: string }>;
 };
 
+export type MisconceptionDeletionImpact = KnowledgeDeletionImpact & {
+  misconception: { id: string; title: string };
+  replacementMisconceptions: Array<{ id: string; title: string }>;
+};
+
 export type ConceptDeletionImpact = KnowledgeDeletionImpact & {
   conceptId: string;
   skillCount: number;
+  misconceptionCount: number;
 };
 
 export type SubjectKnowledgePrerequisite = {
@@ -464,6 +482,8 @@ export type ActivityKnowledgeConceptLink = {
   selectsAllSkills: boolean;
   selectedSkills: string[];
   selectedSkillIds: string[];
+  selectedMisconceptions: string[];
+  selectedMisconceptionIds: string[];
   concept: SubjectKnowledgeConcept;
 };
 
@@ -1388,6 +1408,13 @@ export const api = {
     request<{ impact: SkillDeletionImpact }>(`/subjects/${subjectId}/concepts/${conceptId}/skills/${skillId}`),
   deleteSubjectKnowledgeSkill: (subjectId: string, conceptId: string, skillId: string, input: { mode: "remove" } | { mode: "replace"; replacementSkillId: string }) =>
     request<{ ok: true; impact: SkillDeletionImpact }>(`/subjects/${subjectId}/concepts/${conceptId}/skills/${skillId}`, {
+      method: "DELETE",
+      body: JSON.stringify(input)
+    }),
+  subjectKnowledgeMisconceptionDeletionImpact: (subjectId: string, conceptId: string, misconceptionId: string) =>
+    request<{ impact: MisconceptionDeletionImpact }>(`/subjects/${subjectId}/concepts/${conceptId}/misconceptions/${misconceptionId}`),
+  deleteSubjectKnowledgeMisconception: (subjectId: string, conceptId: string, misconceptionId: string, input: { mode: "remove" } | { mode: "replace"; replacementMisconceptionId: string }) =>
+    request<{ ok: true; impact: MisconceptionDeletionImpact }>(`/subjects/${subjectId}/concepts/${conceptId}/misconceptions/${misconceptionId}`, {
       method: "DELETE",
       body: JSON.stringify(input)
     }),

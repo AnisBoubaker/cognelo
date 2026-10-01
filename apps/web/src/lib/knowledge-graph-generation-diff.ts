@@ -12,6 +12,8 @@ export type KnowledgeGraphGenerationDiff = {
   deletedConcepts: KnowledgeGraphGenerationChange[];
   addedSkills: KnowledgeGraphGenerationChange[];
   deletedSkills: KnowledgeGraphGenerationChange[];
+  addedMisconceptions: KnowledgeGraphGenerationChange[];
+  deletedMisconceptions: KnowledgeGraphGenerationChange[];
 };
 
 export function diffKnowledgeGraphGeneration(
@@ -28,12 +30,18 @@ export function diffKnowledgeGraphGeneration(
     .map(({ id, title }) => ({ id, title }));
   const deletedSkills: KnowledgeGraphGenerationChange[] = [];
   const addedSkills: KnowledgeGraphGenerationChange[] = [];
+  const deletedMisconceptions: KnowledgeGraphGenerationChange[] = [];
+  const addedMisconceptions: KnowledgeGraphGenerationChange[] = [];
 
   for (const beforeConcept of before) {
     const afterConcept = afterById.get(beforeConcept.id);
     const afterSkillIds = new Set(afterConcept?.skillRecords.map((skill) => skill.id) ?? []);
     deletedSkills.push(...beforeConcept.skillRecords
       .filter((skill) => !afterSkillIds.has(skill.id))
+      .map(({ id, title }) => ({ id, title, conceptId: beforeConcept.id, conceptTitle: beforeConcept.title })));
+    const afterMisconceptionIds = new Set(afterConcept?.misconceptionRecords.map((item) => item.id) ?? []);
+    deletedMisconceptions.push(...beforeConcept.misconceptionRecords
+      .filter((item) => !afterMisconceptionIds.has(item.id))
       .map(({ id, title }) => ({ id, title, conceptId: beforeConcept.id, conceptTitle: beforeConcept.title })));
   }
   for (const afterConcept of after) {
@@ -42,7 +50,11 @@ export function diffKnowledgeGraphGeneration(
     addedSkills.push(...afterConcept.skillRecords
       .filter((skill) => !beforeSkillIds.has(skill.id))
       .map(({ id, title }) => ({ id, title, conceptId: afterConcept.id, conceptTitle: afterConcept.title })));
+    const beforeMisconceptionIds = new Set(beforeConcept?.misconceptionRecords.map((item) => item.id) ?? []);
+    addedMisconceptions.push(...afterConcept.misconceptionRecords
+      .filter((item) => !beforeMisconceptionIds.has(item.id))
+      .map(({ id, title }) => ({ id, title, conceptId: afterConcept.id, conceptTitle: afterConcept.title })));
   }
 
-  return { addedConcepts, deletedConcepts, addedSkills, deletedSkills };
+  return { addedConcepts, deletedConcepts, addedSkills, deletedSkills, addedMisconceptions, deletedMisconceptions };
 }

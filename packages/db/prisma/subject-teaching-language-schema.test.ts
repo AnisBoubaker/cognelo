@@ -9,7 +9,7 @@ const migration = readFileSync(
 
 describe("subject teaching language schema", () => {
   it("stores a backwards-compatible teaching language", () => {
-    expect(schema).toContain('teachingLanguage       String                         @default("en")');
+    expect(schema).toMatch(/teachingLanguage\s+String\s+@default\("en"\)/);
     expect(migration).toContain('ADD COLUMN "teachingLanguage" TEXT NOT NULL DEFAULT \'en\'');
   });
 });

@@ -27,7 +27,7 @@ export async function compareBankActivityVersions(
     textField("description", "Description", from.description, to.description),
     textField("lifecycle", "Lifecycle", from.lifecycle, to.lifecycle),
     textField("activityType", "Activity type", from.activityType.name, to.activityType.name),
-    listField("knowledgeConcepts", "Concepts and skills", conceptLabels(from.knowledgeConcepts), conceptLabels(to.knowledgeConcepts))
+    listField("knowledgeConcepts", "Knowledge targets", conceptLabels(from.knowledgeConcepts), conceptLabels(to.knowledgeConcepts))
   ].filter(hasChanges);
   const configChanges = structuredChanges(from.config, to.config);
   const metadataChanges = structuredChanges(from.metadata, to.metadata);
@@ -56,10 +56,11 @@ function hasChanges(field: ActivityVersionDiffField) {
   return field.kind === "structured" ? field.changes.length > 0 : stableValue(field.before) !== stableValue(field.after);
 }
 
-function conceptLabels(links: Array<{ conceptId: string; selectsAllSkills: boolean; selectedSkills: unknown; concept: { title: string } }>) {
+function conceptLabels(links: Array<{ conceptId: string; selectsAllSkills: boolean; selectedSkills: unknown; selectedMisconceptions: unknown; concept: { title: string } }>) {
   return links.map((link) => {
     const skills = Array.isArray(link.selectedSkills) ? link.selectedSkills.filter((skill): skill is string => typeof skill === "string") : [];
-    return link.selectsAllSkills ? link.concept.title : `${link.concept.title}: ${skills.join(", ")}`;
+    const misconceptions = Array.isArray(link.selectedMisconceptions) ? link.selectedMisconceptions.filter((item): item is string => typeof item === "string") : [];
+    return link.selectsAllSkills ? link.concept.title : `${link.concept.title}: ${[...skills, ...misconceptions].join(", ")}`;
   }).sort((a, b) => a.localeCompare(b));
 }
 

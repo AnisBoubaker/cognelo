@@ -7,6 +7,8 @@ type StoredConceptLink = {
   selectsAllSkills?: boolean;
   selectedSkills?: unknown;
   selectedSkillIds?: unknown;
+  selectedMisconceptions?: unknown;
+  selectedMisconceptionIds?: unknown;
 };
 
 export function selectionsFromStoredLinks(links: StoredConceptLink[] | undefined): ActivityKnowledgeConceptSelection[] {
@@ -18,12 +20,18 @@ export function selectionsFromStoredLinks(links: StoredConceptLink[] | undefined
       : [],
     selectedSkillIds: Array.isArray(link.selectedSkillIds)
       ? link.selectedSkillIds.filter((skillId): skillId is string => typeof skillId === "string")
+      : [],
+    selectedMisconceptions: Array.isArray(link.selectedMisconceptions)
+      ? link.selectedMisconceptions.filter((item): item is string => typeof item === "string")
+      : [],
+    selectedMisconceptionIds: Array.isArray(link.selectedMisconceptionIds)
+      ? link.selectedMisconceptionIds.filter((itemId): itemId is string => typeof itemId === "string")
       : []
   }));
 }
 
 export function selectionsFromLegacyIds(conceptIds: string[] | undefined): ActivityKnowledgeConceptSelection[] | undefined {
-  return conceptIds?.map((conceptId) => ({ conceptId, selectsAllSkills: true, selectedSkills: [], selectedSkillIds: [] }));
+  return conceptIds?.map((conceptId) => ({ conceptId, selectsAllSkills: true, selectedSkills: [], selectedSkillIds: [], selectedMisconceptions: [], selectedMisconceptionIds: [] }));
 }
 
 export function conceptSelectionCreates(selections: ActivityKnowledgeConceptSelection[]) {
@@ -31,7 +39,9 @@ export function conceptSelectionCreates(selections: ActivityKnowledgeConceptSele
     conceptId: selection.conceptId,
     selectsAllSkills: selection.selectsAllSkills,
     selectedSkills: selection.selectedSkills as Prisma.InputJsonValue,
-    selectedSkillIds: (selection.selectedSkillIds ?? []) as Prisma.InputJsonValue
+    selectedSkillIds: (selection.selectedSkillIds ?? []) as Prisma.InputJsonValue,
+    selectedMisconceptions: (selection.selectedMisconceptions ?? []) as Prisma.InputJsonValue,
+    selectedMisconceptionIds: (selection.selectedMisconceptionIds ?? []) as Prisma.InputJsonValue
   }));
 }
 
@@ -39,7 +49,13 @@ export async function assertValidConceptSelections(selections: ActivityKnowledge
   if (!selections.length) return;
   const concepts = await prisma.subjectKnowledgeConcept.findMany({
     where: { id: { in: selections.map((selection) => selection.conceptId) }, subjectId },
-    select: { id: true, skills: true, skillRecords: { where: { active: true }, select: { id: true, title: true } } }
+    select: {
+      id: true,
+      skills: true,
+      misconceptions: true,
+      skillRecords: { where: { active: true }, select: { id: true, title: true } },
+      misconceptionRecords: { where: { active: true }, select: { id: true, title: true } }
+    }
   });
   if (concepts.length !== selections.length) {
     throw new AppError(400, "KNOWLEDGE_CONCEPT_SUBJECT_MISMATCH", "Every selected knowledge concept must belong to the activity's subject.");
@@ -59,5 +75,19 @@ export async function assertValidConceptSelections(selections: ActivityKnowledge
     if ((selection.selectedSkillIds ?? []).some((skillId) => !availableSkillIds.has(skillId))) {
       throw new AppError(400, "KNOWLEDGE_SKILL_MISMATCH", "Every selected skill must currently belong to its knowledge concept.");
     }
+    const availableMisconceptions = new Set(concept.misconceptionRecords.length
+      ? concept.misconceptionRecords.map((item) => item.title)
+      : jsonStringArray(concept.misconceptions));
+    if ((selection.selectedMisconceptions ?? []).some((item) => !availableMisconceptions.has(item))) {
+      throw new AppError(400, "KNOWLEDGE_MISCONCEPTION_MISMATCH", "Every selected misconception must currently belong to its knowledge concept.");
+    }
+    const availableMisconceptionIds = new Set(concept.misconceptionRecords.map((item) => item.id));
+    if ((selection.selectedMisconceptionIds ?? []).some((itemId) => !availableMisconceptionIds.has(itemId))) {
+      throw new AppError(400, "KNOWLEDGE_MISCONCEPTION_MISMATCH", "Every selected misconception must currently belong to its knowledge concept.");
+    }
   }
+}
+
+function jsonStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }

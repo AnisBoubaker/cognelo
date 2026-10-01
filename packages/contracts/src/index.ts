@@ -295,14 +295,24 @@ export const SubjectKnowledgeSkillInputSchema = z.object({
 });
 export type SubjectKnowledgeSkillInput = z.infer<typeof SubjectKnowledgeSkillInputSchema>;
 
+export const SubjectKnowledgeMisconceptionInputSchema = z.object({
+  id: z.string().min(1).max(160),
+  title: z.string().trim().min(1).max(1000),
+  position: z.number().int().min(0).max(9999),
+  active: z.boolean().optional().default(true)
+});
+export type SubjectKnowledgeMisconceptionInput = z.infer<typeof SubjectKnowledgeMisconceptionInputSchema>;
+
 export const SubjectKnowledgeConceptInputSchema = z.object({
   title: z.string().trim().min(1).max(160),
   skills: z.string().max(4000).optional().default("").transform((value) =>
     value.split(/\r?\n/).map((skill) => skill.trim()).filter(Boolean).join("\n")
   ),
+  misconceptions: z.preprocess((value) => value ?? [], z.array(z.string().trim().min(1).max(1000)).max(200)).default([]),
   positionX: z.number().finite().optional().default(0),
   positionY: z.number().finite().optional().default(0),
-  skillRecords: z.array(SubjectKnowledgeSkillInputSchema).max(200).optional()
+  skillRecords: z.array(SubjectKnowledgeSkillInputSchema).max(200).optional(),
+  misconceptionRecords: z.array(SubjectKnowledgeMisconceptionInputSchema).max(200).optional()
 });
 export type SubjectKnowledgeConceptInput = z.infer<typeof SubjectKnowledgeConceptInputSchema>;
 
@@ -314,6 +324,12 @@ export const SubjectKnowledgeSkillDeletionSchema = z.discriminatedUnion("mode", 
   z.object({ mode: z.literal("replace"), replacementSkillId: RecordIdSchema })
 ]);
 export type SubjectKnowledgeSkillDeletion = z.infer<typeof SubjectKnowledgeSkillDeletionSchema>;
+
+export const SubjectKnowledgeMisconceptionDeletionSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("remove") }),
+  z.object({ mode: z.literal("replace"), replacementMisconceptionId: RecordIdSchema })
+]);
+export type SubjectKnowledgeMisconceptionDeletion = z.infer<typeof SubjectKnowledgeMisconceptionDeletionSchema>;
 
 export const SubjectKnowledgeHandleSchema = z.enum(["top", "right", "bottom", "left"]);
 
@@ -341,7 +357,8 @@ export type SubjectKnowledgeGraphDraft = z.infer<typeof SubjectKnowledgeGraphDra
 
 export const SubjectKnowledgeGraphDeletionsSchema = z.object({
   conceptIds: z.array(RecordIdSchema).max(200).refine((ids) => new Set(ids).size === ids.length, "Concept deletion identifiers must be unique."),
-  skillIds: z.array(RecordIdSchema).max(40000).refine((ids) => new Set(ids).size === ids.length, "Skill deletion identifiers must be unique.")
+  skillIds: z.array(RecordIdSchema).max(40000).refine((ids) => new Set(ids).size === ids.length, "Skill deletion identifiers must be unique."),
+  misconceptionIds: z.array(RecordIdSchema).max(40000).refine((ids) => new Set(ids).size === ids.length, "Misconception deletion identifiers must be unique.").default([])
 });
 export type SubjectKnowledgeGraphDeletions = z.infer<typeof SubjectKnowledgeGraphDeletionsSchema>;
 
@@ -417,9 +434,15 @@ export const ActivityKnowledgeConceptSelectionSchema = z.object({
   }),
   selectedSkillIds: z.array(RecordIdSchema).max(200).refine((ids) => new Set(ids).size === ids.length, {
     message: "Selected skill identifiers must be unique."
+  }).optional(),
+  selectedMisconceptions: z.array(z.string().trim().min(1).max(1000)).max(200).refine((items) => new Set(items).size === items.length, {
+    message: "Selected misconceptions must be unique."
+  }).optional(),
+  selectedMisconceptionIds: z.array(RecordIdSchema).max(200).refine((ids) => new Set(ids).size === ids.length, {
+    message: "Selected misconception identifiers must be unique."
   }).optional()
-}).refine((selection) => selection.selectsAllSkills || (selection.selectedSkillIds?.length ?? 0) > 0 || selection.selectedSkills.length > 0, {
-  message: "A concept selection must select the concept or at least one skill."
+}).refine((selection) => selection.selectsAllSkills || (selection.selectedSkillIds?.length ?? 0) > 0 || selection.selectedSkills.length > 0 || (selection.selectedMisconceptionIds?.length ?? 0) > 0 || (selection.selectedMisconceptions?.length ?? 0) > 0, {
+  message: "A concept selection must select the concept or at least one skill or misconception."
 });
 export type ActivityKnowledgeConceptSelection = z.infer<typeof ActivityKnowledgeConceptSelectionSchema>;
 

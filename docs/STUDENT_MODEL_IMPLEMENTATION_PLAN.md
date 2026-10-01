@@ -66,7 +66,7 @@ Cognelo already provides most upstream structures:
 
 - `SubjectKnowledgeConcept` and `SubjectKnowledgePrerequisite` define a subject-scoped knowledge graph.
 - `SubjectKnowledgeConcept.skills` contains observable skills as normalized newline-delimited text.
-- Bank activities, immutable activity versions, and course activities carry concept/skill selections.
+- Bank activities, immutable activity versions, and course activities carry concept/skill/misconception selections.
 - `ActivityAttempt`, `Grade`, and append-only `GradeEvent` records provide summative history.
 - Compound Tests preserve item-level results through `TestItemAttempt`.
 - Plugins can retain formative interaction events and plugin-specific grading dimensions.

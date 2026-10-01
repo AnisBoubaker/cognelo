@@ -23,7 +23,7 @@ export default function EditSubjectPage() {
   const [programmingLanguages, setProgrammingLanguages] = useState<ProgrammingLanguageOption[]>([]);
   const [graphConcepts, setGraphConcepts] = useState<SubjectKnowledgeConcept[]>([]);
   const [graphPrerequisites, setGraphPrerequisites] = useState<SubjectKnowledgePrerequisite[]>([]);
-  const [knowledgeGraphDeletions, setKnowledgeGraphDeletions] = useState<{ conceptIds: string[]; skillIds: string[] }>({ conceptIds: [], skillIds: [] });
+  const [knowledgeGraphDeletions, setKnowledgeGraphDeletions] = useState<{ conceptIds: string[]; skillIds: string[]; misconceptionIds: string[] }>({ conceptIds: [], skillIds: [], misconceptionIds: [] });
   const [savedSnapshot, setSavedSnapshot] = useState<{
     title: string;
     description: string;
@@ -56,7 +56,7 @@ export default function EditSubjectPage() {
         const prerequisites = result.subject.knowledgePrerequisites ?? [];
         setGraphConcepts(concepts);
         setGraphPrerequisites(prerequisites);
-        setKnowledgeGraphDeletions({ conceptIds: [], skillIds: [] });
+        setKnowledgeGraphDeletions({ conceptIds: [], skillIds: [], misconceptionIds: [] });
         setSavedSnapshot({ title: result.subject.title, description: result.subject.description ?? "", teachingLanguage: result.subject.teachingLanguage, programmingLanguage: result.subject.programmingLanguage ?? "", concepts, prerequisites });
       })
       .catch((err) => setError(err instanceof Error ? err.message : t("editSubject.loadError")));
@@ -86,7 +86,7 @@ export default function EditSubjectPage() {
     setProgrammingLanguage(savedSnapshot.programmingLanguage);
     setGraphConcepts(savedSnapshot.concepts);
     setGraphPrerequisites(savedSnapshot.prerequisites);
-    setKnowledgeGraphDeletions({ conceptIds: [], skillIds: [] });
+    setKnowledgeGraphDeletions({ conceptIds: [], skillIds: [], misconceptionIds: [] });
     setError("");
   }, [savedSnapshot]);
 
@@ -95,8 +95,8 @@ export default function EditSubjectPage() {
     setError("");
     try {
       const knowledgeGraph: SubjectKnowledgeGraphDraft = {
-        concepts: graphConcepts.map(({ id, title: conceptTitle, skills, skillRecords, positionX, positionY }) => ({
-          id, title: conceptTitle, skills, skillRecords, positionX, positionY
+        concepts: graphConcepts.map(({ id, title: conceptTitle, skills, misconceptions, skillRecords, misconceptionRecords, positionX, positionY }) => ({
+          id, title: conceptTitle, skills, misconceptions: misconceptions ?? [], skillRecords, misconceptionRecords, positionX, positionY
         })),
         prerequisites: graphPrerequisites.map(({ id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle }) => ({
           id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle
@@ -108,7 +108,7 @@ export default function EditSubjectPage() {
         teachingLanguage,
         programmingLanguage: programmingLanguage || null,
         knowledgeGraph,
-        knowledgeGraphDeletions: knowledgeGraphDeletions.conceptIds.length || knowledgeGraphDeletions.skillIds.length
+        knowledgeGraphDeletions: knowledgeGraphDeletions.conceptIds.length || knowledgeGraphDeletions.skillIds.length || knowledgeGraphDeletions.misconceptionIds.length
           ? knowledgeGraphDeletions
           : undefined
       });
@@ -225,22 +225,33 @@ export default function EditSubjectPage() {
                 savedConcepts={savedSnapshot.concepts}
                 savedPrerequisites={savedSnapshot.prerequisites}
                 onChange={(graph) => {
-                  setGraphConcepts(graph.concepts.map((concept) => ({ ...concept, subjectId, skillRecords: (concept.skillRecords ?? []).map((skill) => ({ ...skill, subjectId, conceptId: concept.id })) })));
+                  setGraphConcepts(graph.concepts.map((concept) => ({
+                    ...concept,
+                    subjectId,
+                    misconceptions: concept.misconceptions ?? [],
+                    skillRecords: (concept.skillRecords ?? []).map((skill) => ({ ...skill, subjectId, conceptId: concept.id })),
+                    misconceptionRecords: (concept.misconceptionRecords ?? []).map((item) => ({ ...item, subjectId, conceptId: concept.id }))
+                  })));
                   setGraphPrerequisites(graph.prerequisites.map((prerequisite) => ({ ...prerequisite, subjectId })));
                 }}
-                onPersistedDeletion={({ conceptId, skillId }) => {
+                onPersistedDeletion={({ conceptId, skillId, misconceptionId }) => {
                   setSavedSnapshot((current) => ({
                     ...current,
                     concepts: skillId
                       ? current.concepts.map((concept) => concept.id === conceptId
                         ? { ...concept, skillRecords: concept.skillRecords.filter((skill) => skill.id !== skillId), skills: concept.skillRecords.filter((skill) => skill.id !== skillId).map((skill) => skill.title).join("\n") }
                         : concept)
+                      : misconceptionId
+                        ? current.concepts.map((concept) => concept.id === conceptId
+                          ? { ...concept, misconceptionRecords: concept.misconceptionRecords.filter((item) => item.id !== misconceptionId), misconceptions: concept.misconceptionRecords.filter((item) => item.id !== misconceptionId).map((item) => item.title) }
+                          : concept)
                       : current.concepts.filter((concept) => concept.id !== conceptId),
-                    prerequisites: skillId ? current.prerequisites : current.prerequisites.filter((edge) => edge.sourceConceptId !== conceptId && edge.requiredConceptId !== conceptId)
+                    prerequisites: skillId || misconceptionId ? current.prerequisites : current.prerequisites.filter((edge) => edge.sourceConceptId !== conceptId && edge.requiredConceptId !== conceptId)
                   }));
                   setKnowledgeGraphDeletions((current) => ({
                     conceptIds: current.conceptIds.filter((id) => id !== conceptId),
-                    skillIds: skillId ? current.skillIds.filter((id) => id !== skillId) : current.skillIds
+                    skillIds: skillId ? current.skillIds.filter((id) => id !== skillId) : current.skillIds,
+                    misconceptionIds: misconceptionId ? current.misconceptionIds.filter((id) => id !== misconceptionId) : current.misconceptionIds
                   }));
                 }}
                 onAiGeneratedDeletions={setKnowledgeGraphDeletions}

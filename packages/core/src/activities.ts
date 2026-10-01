@@ -328,7 +328,9 @@ export async function duplicateCourseActivity(user: CurrentUser, courseId: strin
             conceptId: selection.conceptId,
             selectsAllSkills: selection.selectsAllSkills,
             selectedSkills: selection.selectedSkills as Prisma.InputJsonValue,
-            selectedSkillIds: selection.selectedSkillIds as Prisma.InputJsonValue
+            selectedSkillIds: selection.selectedSkillIds as Prisma.InputJsonValue,
+            selectedMisconceptions: selection.selectedMisconceptions as Prisma.InputJsonValue,
+            selectedMisconceptionIds: selection.selectedMisconceptionIds as Prisma.InputJsonValue
           }))
         }
       },

@@ -6,14 +6,15 @@ vi.mock("./media-assets", () => ({ reconcileMediaAssetReferences: vi.fn() }));
 const mockPrisma = vi.hoisted(() => ({
   subject: { findUnique: vi.fn() },
   subjectKnowledgeConcept: { findFirst: vi.fn(), findUniqueOrThrow: vi.fn() },
-  subjectKnowledgeSkill: { findFirst: vi.fn() }
+  subjectKnowledgeSkill: { findFirst: vi.fn() },
+  subjectKnowledgeMisconception: { findFirst: vi.fn() }
 }));
 
 vi.mock("@cognelo/db", () => ({ prisma: mockPrisma, Prisma: {} }));
 vi.mock("@cognelo/activity-sdk", () => ({ getActivityDefinition: vi.fn() }));
 vi.mock("./plugins", () => ({ assertActivityTypePluginEnabled: vi.fn() }));
 
-const { getSubjectKnowledgeConceptDeletionImpact, getSubjectKnowledgeSkillDeletionImpact } = await import("./subjects");
+const { getSubjectKnowledgeConceptDeletionImpact, getSubjectKnowledgeSkillDeletionImpact, getSubjectKnowledgeMisconceptionDeletionImpact } = await import("./subjects");
 
 const admin: CurrentUser = {
   id: "admin-1", email: "admin@example.test", name: null, firstName: null, lastName: null, roles: ["admin"]
@@ -29,13 +30,14 @@ describe("knowledge deletion impact", () => {
     mockPrisma.subjectKnowledgeConcept.findFirst.mockResolvedValue({
       id: "concept-1",
       skillRecords: [{ id: "skill-1" }, { id: "skill-2" }],
+      misconceptionRecords: [],
       bankActivityLinks: [{ bankActivityId: "bank-1" }, { bankActivityId: "bank-1" }],
       activityLinks: [{ activityId: "activity-1" }, { activityId: "activity-2" }],
       activityVersionLinks: [{ activityVersionId: "version-1" }]
     });
 
     await expect(getSubjectKnowledgeConceptDeletionImpact(admin, "subject-1", "concept-1")).resolves.toEqual({
-      conceptId: "concept-1", skillCount: 2, bankActivityCount: 1, courseActivityCount: 2, historicalVersionCount: 1
+      conceptId: "concept-1", skillCount: 2, misconceptionCount: 0, bankActivityCount: 1, courseActivityCount: 2, historicalVersionCount: 1
     });
   });
 
@@ -56,6 +58,29 @@ describe("knowledge deletion impact", () => {
       courseActivityCount: 1,
       historicalVersionCount: 1,
       replacementSkills: [{ id: "skill-2", title: "Write a loop" }]
+    });
+  });
+
+  it("counts whole-concept and explicit misconception targets without rewriting historical versions", async () => {
+    mockPrisma.subjectKnowledgeMisconception.findFirst.mockResolvedValue({ id: "misconception-1", title: "Assignment always creates an alias" });
+    mockPrisma.subjectKnowledgeConcept.findUniqueOrThrow.mockResolvedValue({
+      misconceptionRecords: [
+        { id: "misconception-1", title: "Assignment always creates an alias" },
+        { id: "misconception-2", title: "Variables have no type" }
+      ],
+      bankActivityLinks: [{ bankActivityId: "bank-1", selectsAllSkills: true, selectedMisconceptionIds: [], selectedMisconceptions: [] }],
+      activityLinks: [{ activityId: "activity-1", selectsAllSkills: false, selectedMisconceptionIds: ["misconception-1"], selectedMisconceptions: ["Assignment always creates an alias"] }],
+      activityVersionLinks: [
+        { activityVersionId: "version-old", selectedMisconceptionIds: ["misconception-2"], selectedMisconceptions: ["Variables have no type"] },
+        { activityVersionId: "version-new", selectedMisconceptionIds: ["misconception-1"], selectedMisconceptions: ["Assignment always creates an alias"] }
+      ]
+    });
+
+    await expect(getSubjectKnowledgeMisconceptionDeletionImpact(admin, "subject-1", "concept-1", "misconception-1")).resolves.toMatchObject({
+      bankActivityCount: 1,
+      courseActivityCount: 1,
+      historicalVersionCount: 1,
+      replacementMisconceptions: [{ id: "misconception-2", title: "Variables have no type" }]
     });
   });
 });

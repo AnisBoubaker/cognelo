@@ -18,7 +18,14 @@ import {
 const user = { id: "teacher-1" } as Parameters<typeof suggestActivityKnowledgeSelections>[0]["user"];
 const catalog = {
   mode: "suggest" as const,
-  concepts: [{ id: "loops", title: "Loops", skills: ["Trace a loop", "Write a counted loop"], skillIds: ["trace-loop", "write-loop"] }]
+  concepts: [{
+    id: "loops",
+    title: "Loops",
+    skills: ["Trace a loop", "Write a counted loop"],
+    skillIds: ["trace-loop", "write-loop"],
+    misconceptions: ["A loop condition is checked after every body execution"],
+    misconceptionIds: ["condition-order"]
+  }]
 };
 
 describe("activity knowledge generation", () => {
@@ -61,12 +68,14 @@ describe("activity knowledge generation", () => {
       subject: { title: "Programming", description: "Introductory programming" },
       knowledge: {
         mode: "selected",
-        concepts: [{ id: "active-concept", title: "Active concept", skills: ["Active skill"], skillIds: ["active-skill"] }],
+        concepts: [{ id: "active-concept", title: "Active concept", skills: ["Active skill"], skillIds: ["active-skill"], misconceptions: [], misconceptionIds: [] }],
         selectedConcepts: [{
           id: "inactive-concept",
           title: "Inactive selected concept",
           skills: ["Legacy selected skill"],
-          skillIds: ["inactive-concept:legacy-skill-1"]
+          skillIds: ["inactive-concept:legacy-skill-1"],
+          misconceptions: [],
+          misconceptionIds: []
         }]
       }
     });
@@ -103,7 +112,7 @@ describe("activity knowledge generation", () => {
   it("filters and deduplicates suggestions against the catalog as explicit skill snapshots", async () => {
     mocks.generateQuestionAuthoringText.mockResolvedValue(JSON.stringify({
       selections: [
-        { conceptId: "loops", skills: ["Trace a loop", "Invented skill"] },
+        { conceptId: "loops", skills: ["Trace a loop", "Invented skill"], misconceptions: ["A loop condition is checked after every body execution", "Invented misconception"] },
         { conceptId: "loops", skills: ["Trace a loop", "Write a counted loop"] },
         { conceptId: "unknown", skills: ["Anything"] }
       ]
@@ -113,7 +122,9 @@ describe("activity knowledge generation", () => {
       conceptId: "loops",
       selectsAllSkills: false,
       selectedSkills: ["Trace a loop", "Write a counted loop"],
-      selectedSkillIds: ["trace-loop", "write-loop"]
+      selectedSkillIds: ["trace-loop", "write-loop"],
+      selectedMisconceptions: ["A loop condition is checked after every body execution"],
+      selectedMisconceptionIds: ["condition-order"]
     }]);
   });
 
