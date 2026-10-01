@@ -42,7 +42,7 @@ export default function ActivityPage() {
       ]);
       setCourse(courseResult.course);
       setActivity(activityResult.activity);
-      conceptDraftRef.current = activityResult.activity.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills, selectedSkillIds: link.selectedSkillIds })) ?? [];
+      conceptDraftRef.current = activityResult.activity.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills, selectedSkillIds: link.selectedSkillIds, selectedMisconceptions: link.selectedMisconceptions, selectedMisconceptionIds: link.selectedMisconceptionIds })) ?? [];
       setActivityDefinitions(typeResult.registeredDefinitions);
       setHasQuestionAuthoringAgent(
         aiAgentResult.connections.some((connection) => connection.id === aiAgentResult.preferences.questionAuthoringAiAgentConnectionId && connection.isEnabled)
@@ -96,7 +96,7 @@ export default function ActivityPage() {
           <ActivityEditorTabs
             concepts={course?.subject?.knowledgeConcepts ?? []}
             prerequisites={course?.subject?.knowledgePrerequisites ?? []}
-            selectedConcepts={activity.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills, selectedSkillIds: link.selectedSkillIds })) ?? []}
+            selectedConcepts={activity.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills, selectedSkillIds: link.selectedSkillIds, selectedMisconceptions: link.selectedMisconceptions, selectedMisconceptionIds: link.selectedMisconceptionIds })) ?? []}
             onSaveConcepts={saveConcepts}
             onConceptDraftChange={updateConceptDraft}
             t={t}
@@ -129,7 +129,7 @@ export default function ActivityPage() {
           <ActivityEditorTabs
             concepts={course?.subject?.knowledgeConcepts ?? []}
             prerequisites={course?.subject?.knowledgePrerequisites ?? []}
-            selectedConcepts={activity.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills, selectedSkillIds: link.selectedSkillIds })) ?? []}
+            selectedConcepts={activity.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills, selectedSkillIds: link.selectedSkillIds, selectedMisconceptions: link.selectedMisconceptions, selectedMisconceptionIds: link.selectedMisconceptionIds })) ?? []}
             onSaveConcepts={saveConcepts}
             onConceptDraftChange={updateConceptDraft}
             t={t}

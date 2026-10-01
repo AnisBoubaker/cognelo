@@ -28,7 +28,9 @@ import {
   type SubjectKnowledgeGraphDraft,
   type SubjectKnowledgePrerequisite,
   type SubjectKnowledgeSkill,
+  type SubjectKnowledgeMisconception,
   type SkillDeletionImpact,
+  type MisconceptionDeletionImpact,
   type ConceptDeletionImpact
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -49,8 +51,8 @@ type Props = {
   teachingLanguage?: "en" | "fr" | "zh" | "ar";
   isVisible?: boolean;
   onChange?: (graph: SubjectKnowledgeGraphDraft) => void;
-  onPersistedDeletion?: (deletion: { conceptId: string; skillId?: string }) => void;
-  onAiGeneratedDeletions?: (deletions: { conceptIds: string[]; skillIds: string[] }) => void;
+  onPersistedDeletion?: (deletion: { conceptId: string; skillId?: string; misconceptionId?: string }) => void;
+  onAiGeneratedDeletions?: (deletions: { conceptIds: string[]; skillIds: string[]; misconceptionIds: string[] }) => void;
 };
 
 type ConceptNode = Node<{ label: string }>;
@@ -203,8 +205,12 @@ export function SubjectKnowledgeGraph({
   const [skillDialog, setSkillDialog] = useState<{ mode: "add" | "edit"; skillId?: string } | null>(null);
   const [skillDraft, setSkillDraft] = useState("");
   const [skillDeleteImpact, setSkillDeleteImpact] = useState<SkillDeletionImpact | null>(null);
+  const [misconceptionDialog, setMisconceptionDialog] = useState<{ mode: "add" | "edit"; misconceptionId?: string } | null>(null);
+  const [misconceptionDraft, setMisconceptionDraft] = useState("");
+  const [misconceptionDeleteImpact, setMisconceptionDeleteImpact] = useState<MisconceptionDeletionImpact | null>(null);
   const [conceptDeleteImpact, setConceptDeleteImpact] = useState<ConceptDeletionImpact | null>(null);
   const [replacementSkillId, setReplacementSkillId] = useState("");
+  const [replacementMisconceptionId, setReplacementMisconceptionId] = useState("");
   const [deleteMode, setDeleteMode] = useState<"remove" | "replace">("remove");
   const [dialogBusy, setDialogBusy] = useState(false);
   const [aiDirections, setAiDirections] = useState("");
@@ -277,7 +283,7 @@ export function SubjectKnowledgeGraph({
     setNodes(highlightConceptNodes(nextConcepts.map(toNode), nextPrerequisites, selectedId));
     setEdges(highlightEdges(toEdges(nextPrerequisites), selectedId));
     onChange?.({
-      concepts: nextConcepts.map(({ id, title, skills, skillRecords, positionX, positionY }) => ({ id, title, skills, skillRecords, positionX, positionY })),
+      concepts: nextConcepts.map(({ id, title, skills, misconceptions, skillRecords, misconceptionRecords, positionX, positionY }) => ({ id, title, skills, misconceptions: misconceptions ?? [], skillRecords, misconceptionRecords, positionX, positionY })),
       prerequisites: nextPrerequisites.map(({ id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle }) => ({
         id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle
       }))
@@ -294,8 +300,10 @@ export function SubjectKnowledgeGraph({
       subjectId,
       title,
       skills: "",
+      misconceptions: [],
       active: true,
       skillRecords: [],
+      misconceptionRecords: [],
       positionX: 80 + (index % 4) * 220,
       positionY: 80 + Math.floor(index / 4) * 140
     };
@@ -383,7 +391,7 @@ export function SubjectKnowledgeGraph({
     if (!selectedConcept) return;
     const persisted = savedConcepts.some((concept) => concept.id === selectedConcept.id);
     if (!persisted) {
-      setConceptDeleteImpact({ conceptId: selectedConcept.id, skillCount: selectedConcept.skillRecords.length, bankActivityCount: 0, courseActivityCount: 0, historicalVersionCount: 0 });
+      setConceptDeleteImpact({ conceptId: selectedConcept.id, skillCount: selectedConcept.skillRecords.length, misconceptionCount: selectedConcept.misconceptionRecords.length, bankActivityCount: 0, courseActivityCount: 0, historicalVersionCount: 0 });
       return;
     }
     try {
@@ -452,6 +460,71 @@ export function SubjectKnowledgeGraph({
     }
   }
 
+  function openMisconceptionDialog(mode: "add" | "edit", misconception?: SubjectKnowledgeMisconception) {
+    setMisconceptionDraft(misconception?.title ?? "");
+    setMisconceptionDialog({ mode, misconceptionId: misconception?.id });
+  }
+
+  function applyMisconceptionDialog() {
+    if (!selectedConcept || !misconceptionDraft.trim()) return;
+    const current = selectedConcept.misconceptionRecords ?? [];
+    const next = misconceptionDialog?.mode === "edit"
+      ? current.map((item) => item.id === misconceptionDialog.misconceptionId ? { ...item, title: misconceptionDraft.trim() } : item)
+      : [...current, {
+          id: crypto.randomUUID(), subjectId, conceptId: selectedConcept.id, title: misconceptionDraft.trim(), position: current.length, active: true
+        }];
+    const nextConcept = { ...selectedConcept, misconceptionRecords: next, misconceptions: next.map((item) => item.title) };
+    applyGraph(concepts.map((concept) => concept.id === selectedConcept.id ? nextConcept : concept), prerequisites);
+    selectConcept(nextConcept);
+    setMisconceptionDialog(null);
+  }
+
+  async function requestDeleteMisconception(misconception: SubjectKnowledgeMisconception) {
+    if (!selectedConcept) return;
+    const persisted = savedConcepts.some((concept) => concept.misconceptionRecords.some((candidate) => candidate.id === misconception.id));
+    if (!persisted) {
+      setMisconceptionDeleteImpact({
+        misconception: { id: misconception.id, title: misconception.title },
+        replacementMisconceptions: selectedConcept.misconceptionRecords.filter((candidate) => candidate.id !== misconception.id),
+        bankActivityCount: 0,
+        courseActivityCount: 0,
+        historicalVersionCount: 0
+      });
+      return;
+    }
+    try {
+      const impact = (await api.subjectKnowledgeMisconceptionDeletionImpact(subjectId, selectedConcept.id, misconception.id)).impact;
+      setDeleteMode(impact.bankActivityCount + impact.courseActivityCount > 0 && impact.replacementMisconceptions.length ? "replace" : "remove");
+      setReplacementMisconceptionId(impact.replacementMisconceptions[0]?.id ?? "");
+      setMisconceptionDeleteImpact(impact);
+    } catch (error) {
+      notify({ variant: "error", message: error instanceof Error ? error.message : t("knowledgeGraph.deleteError") });
+    }
+  }
+
+  async function confirmMisconceptionDeletion() {
+    if (!selectedConcept || !misconceptionDeleteImpact) return;
+    const persisted = savedConcepts.some((concept) => concept.misconceptionRecords.some((item) => item.id === misconceptionDeleteImpact.misconception.id));
+    setDialogBusy(true);
+    try {
+      if (persisted) {
+        await api.deleteSubjectKnowledgeMisconception(subjectId, selectedConcept.id, misconceptionDeleteImpact.misconception.id,
+          deleteMode === "replace" ? { mode: "replace", replacementMisconceptionId } : { mode: "remove" });
+        onPersistedDeletion?.({ conceptId: selectedConcept.id, misconceptionId: misconceptionDeleteImpact.misconception.id });
+      }
+      const next = selectedConcept.misconceptionRecords.filter((item) => item.id !== misconceptionDeleteImpact.misconception.id);
+      const nextConcept = { ...selectedConcept, misconceptionRecords: next, misconceptions: next.map((item) => item.title) };
+      applyGraph(concepts.map((concept) => concept.id === selectedConcept.id ? nextConcept : concept), prerequisites);
+      selectConcept(nextConcept);
+      setMisconceptionDeleteImpact(null);
+      notify({ variant: "success", message: t("knowledgeGraph.misconceptionDeleted") });
+    } catch (error) {
+      notify({ variant: "error", message: error instanceof Error ? error.message : t("knowledgeGraph.deleteError") });
+    } finally {
+      setDialogBusy(false);
+    }
+  }
+
   async function confirmConceptDeletion() {
     if (!selectedConcept || !conceptDeleteImpact) return;
     const persisted = savedConcepts.some((concept) => concept.id === selectedConcept.id);
@@ -504,6 +577,7 @@ export function SubjectKnowledgeGraph({
   async function deletedItemsHaveCurrentActivityLinks(diff: KnowledgeGraphGenerationDiff) {
     const savedConceptIds = new Set(savedConcepts.map((concept) => concept.id));
     const savedSkillIds = new Set(savedConcepts.flatMap((concept) => concept.skillRecords.map((skill) => skill.id)));
+    const savedMisconceptionIds = new Set(savedConcepts.flatMap((concept) => concept.misconceptionRecords.map((item) => item.id)));
     const deletedConceptIds = new Set(diff.deletedConcepts.map((concept) => concept.id));
     const impacts = await Promise.all([
       ...diff.deletedConcepts
@@ -511,7 +585,10 @@ export function SubjectKnowledgeGraph({
         .map((concept) => api.subjectKnowledgeConceptDeletionImpact(subjectId, concept.id).then((result) => result.impact)),
       ...diff.deletedSkills
         .filter((skill) => skill.conceptId && !deletedConceptIds.has(skill.conceptId) && savedSkillIds.has(skill.id))
-        .map((skill) => api.subjectKnowledgeSkillDeletionImpact(subjectId, skill.conceptId!, skill.id).then((result) => result.impact))
+        .map((skill) => api.subjectKnowledgeSkillDeletionImpact(subjectId, skill.conceptId!, skill.id).then((result) => result.impact)),
+      ...diff.deletedMisconceptions
+        .filter((item) => item.conceptId && !deletedConceptIds.has(item.conceptId) && savedMisconceptionIds.has(item.id))
+        .map((item) => api.subjectKnowledgeMisconceptionDeletionImpact(subjectId, item.conceptId!, item.id).then((result) => result.impact))
     ]);
     return impacts.some((impact) => impact.bankActivityCount + impact.courseActivityCount > 0);
   }
@@ -527,7 +604,7 @@ export function SubjectKnowledgeGraph({
         teachingLanguage,
         mode: generationMode,
         existingGraph: generationMode === "iterate" ? {
-          concepts: concepts.map(({ id, title, skills, skillRecords, positionX, positionY }) => ({ id, title, skills, skillRecords, positionX, positionY })),
+          concepts: concepts.map(({ id, title, skills, misconceptions, skillRecords, misconceptionRecords, positionX, positionY }) => ({ id, title, skills, misconceptions: misconceptions ?? [], skillRecords, misconceptionRecords, positionX, positionY })),
           prerequisites: prerequisites.map(({ id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle }) => ({
             id, sourceConceptId, requiredConceptId, sourceHandle, targetHandle
           }))
@@ -541,7 +618,8 @@ export function SubjectKnowledgeGraph({
         : newGraphHasActivityLinks;
       onAiGeneratedDeletions?.({
         conceptIds: savedDiff.deletedConcepts.map((concept) => concept.id),
-        skillIds: savedDiff.deletedSkills.filter((skill) => !skill.conceptId || !deletedConceptIds.has(skill.conceptId)).map((skill) => skill.id)
+        skillIds: savedDiff.deletedSkills.filter((skill) => !skill.conceptId || !deletedConceptIds.has(skill.conceptId)).map((skill) => skill.id),
+        misconceptionIds: savedDiff.deletedMisconceptions.filter((item) => !item.conceptId || !deletedConceptIds.has(item.conceptId)).map((item) => item.id)
       });
       applyGraph(result.concepts, result.prerequisites);
       selectConcept(null);
@@ -556,7 +634,7 @@ export function SubjectKnowledgeGraph({
 
   function revertGraph() {
     applyGraph(savedConcepts, savedPrerequisites);
-    onAiGeneratedDeletions?.({ conceptIds: [], skillIds: [] });
+    onAiGeneratedDeletions?.({ conceptIds: [], skillIds: [], misconceptionIds: [] });
     selectConcept(null);
     notify({ variant: "info", message: t("knowledgeGraph.reverted") });
   }
@@ -834,6 +912,24 @@ export function SubjectKnowledgeGraph({
                 </div>
                 <span className="muted">{t("knowledgeGraph.conceptSkillsHelp")}</span>
               </div>
+              <div className="field">
+                <div className="knowledge-skill-heading">
+                  <label>{t("knowledgeGraph.conceptMisconceptions")}</label>
+                  <button className="knowledge-skill-add" type="button" aria-label={t("knowledgeGraph.addMisconception")} title={t("knowledgeGraph.addMisconception")} onClick={() => openMisconceptionDialog("add")}>+</button>
+                </div>
+                <div className="knowledge-skill-list">
+                  {selectedConcept.misconceptionRecords.length ? selectedConcept.misconceptionRecords.map((item) => (
+                    <div className="knowledge-skill-chip" key={item.id}>
+                      <span>{item.title}</span>
+                      <span className="knowledge-skill-actions">
+                        <button type="button" aria-label={t("knowledgeGraph.editMisconception")} title={t("knowledgeGraph.editMisconception")} onClick={() => openMisconceptionDialog("edit", item)}>✎</button>
+                        <button type="button" aria-label={t("knowledgeGraph.deleteMisconception")} title={t("knowledgeGraph.deleteMisconception")} onClick={() => void requestDeleteMisconception(item)}>⌫</button>
+                      </span>
+                    </div>
+                  )) : <p className="muted">{t("knowledgeGraph.noMisconceptions")}</p>}
+                </div>
+                <span className="muted">{t("knowledgeGraph.conceptMisconceptionsHelp")}</span>
+              </div>
               <button className="button" disabled={!editTitle.trim()} type="submit">{t("knowledgeGraph.applyConcept")}</button>
               <button className="button danger" onClick={() => void requestDeleteConcept()} type="button">{t("knowledgeGraph.deleteConcept")}</button>
             </form>
@@ -881,7 +977,9 @@ export function SubjectKnowledgeGraph({
             {generationSummary.deletedConcepts.length ? <GenerationChangeList title={t("knowledgeGraph.aiDeletedConcepts")} items={generationSummary.deletedConcepts.map((item) => item.title)} /> : null}
             {generationSummary.addedSkills.length ? <GenerationChangeList title={t("knowledgeGraph.aiAddedSkills")} items={generationSummary.addedSkills.map((item) => t("knowledgeGraph.aiSkillChange", { skill: item.title, concept: item.conceptTitle ?? "" }))} /> : null}
             {generationSummary.deletedSkills.length ? <GenerationChangeList title={t("knowledgeGraph.aiDeletedSkills")} items={generationSummary.deletedSkills.map((item) => t("knowledgeGraph.aiSkillChange", { skill: item.title, concept: item.conceptTitle ?? "" }))} /> : null}
-            {!generationSummary.addedConcepts.length && !generationSummary.deletedConcepts.length && !generationSummary.addedSkills.length && !generationSummary.deletedSkills.length
+            {generationSummary.addedMisconceptions.length ? <GenerationChangeList title={t("knowledgeGraph.aiAddedMisconceptions")} items={generationSummary.addedMisconceptions.map((item) => t("knowledgeGraph.aiMisconceptionChange", { misconception: item.title, concept: item.conceptTitle ?? "" }))} /> : null}
+            {generationSummary.deletedMisconceptions.length ? <GenerationChangeList title={t("knowledgeGraph.aiDeletedMisconceptions")} items={generationSummary.deletedMisconceptions.map((item) => t("knowledgeGraph.aiMisconceptionChange", { misconception: item.title, concept: item.conceptTitle ?? "" }))} /> : null}
+            {!generationSummary.addedConcepts.length && !generationSummary.deletedConcepts.length && !generationSummary.addedSkills.length && !generationSummary.deletedSkills.length && !generationSummary.addedMisconceptions.length && !generationSummary.deletedMisconceptions.length
               ? <p>{t("knowledgeGraph.aiNoStructuralChanges")}</p>
               : null}
             <div className="dialog-actions">
@@ -925,11 +1023,44 @@ export function SubjectKnowledgeGraph({
       />
 
       <ConfirmationDialog
+        open={Boolean(misconceptionDialog)}
+        eyebrow={t("knowledgeGraph.conceptMisconceptions")}
+        title={t(misconceptionDialog?.mode === "edit" ? "knowledgeGraph.editMisconception" : "knowledgeGraph.addMisconception")}
+        message={<div className="field"><label htmlFor="knowledge-misconception-title">{t("knowledgeGraph.misconceptionDescription")}</label><input id="knowledge-misconception-title" autoFocus maxLength={1000} value={misconceptionDraft} onChange={(event) => setMisconceptionDraft(event.target.value)} /></div>}
+        confirmLabel={t("common.save")}
+        cancelLabel={t("common.cancel")}
+        onCancel={() => setMisconceptionDialog(null)}
+        onConfirm={applyMisconceptionDialog}
+      />
+
+      <ConfirmationDialog
+        open={Boolean(misconceptionDeleteImpact)}
+        eyebrow={t("knowledgeGraph.conceptMisconceptions")}
+        title={t("knowledgeGraph.deleteMisconceptionTitle")}
+        message={misconceptionDeleteImpact ? <div className="stack">
+          <p>{t("knowledgeGraph.deleteMisconceptionMessage", { misconception: misconceptionDeleteImpact.misconception.title })}</p>
+          <p>{t("knowledgeGraph.activityReferenceCount", { count: misconceptionDeleteImpact.bankActivityCount + misconceptionDeleteImpact.courseActivityCount })}</p>
+          {misconceptionDeleteImpact.historicalVersionCount ? <p>{t("knowledgeGraph.historicalReferenceCount", { count: misconceptionDeleteImpact.historicalVersionCount })}</p> : null}
+          {misconceptionDeleteImpact.bankActivityCount + misconceptionDeleteImpact.courseActivityCount > 0 ? <>
+            {misconceptionDeleteImpact.replacementMisconceptions.length ? <label className="knowledge-delete-option"><input checked={deleteMode === "replace"} name="misconception-delete-mode" type="radio" onChange={() => setDeleteMode("replace")} />{t("knowledgeGraph.deleteAndReplaceMisconception")}</label> : null}
+            {deleteMode === "replace" && misconceptionDeleteImpact.replacementMisconceptions.length ? <select value={replacementMisconceptionId} onChange={(event) => setReplacementMisconceptionId(event.target.value)}>{misconceptionDeleteImpact.replacementMisconceptions.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select> : null}
+            <label className="knowledge-delete-option"><input checked={deleteMode === "remove"} name="misconception-delete-mode" type="radio" onChange={() => setDeleteMode("remove")} />{t("knowledgeGraph.deleteAndRemove")}</label>
+          </> : null}
+        </div> : null}
+        confirmLabel={t("knowledgeGraph.confirmDeleteMisconception")}
+        cancelLabel={t("common.cancel")}
+        confirmVariant="danger"
+        isConfirming={dialogBusy}
+        onCancel={() => setMisconceptionDeleteImpact(null)}
+        onConfirm={confirmMisconceptionDeletion}
+      />
+
+      <ConfirmationDialog
         open={Boolean(conceptDeleteImpact)}
         eyebrow={t("knowledgeGraph.title")}
         title={t("knowledgeGraph.deleteConceptTitle")}
         message={conceptDeleteImpact ? <div className="stack">
-          <p>{t("knowledgeGraph.deleteConceptMessage", { count: conceptDeleteImpact.skillCount })}</p>
+          <p>{t("knowledgeGraph.deleteConceptMessage", { count: conceptDeleteImpact.skillCount, misconceptionCount: conceptDeleteImpact.misconceptionCount })}</p>
           <p>{t("knowledgeGraph.activityReferenceCount", { count: conceptDeleteImpact.bankActivityCount + conceptDeleteImpact.courseActivityCount })}</p>
           {conceptDeleteImpact.historicalVersionCount ? <p>{t("knowledgeGraph.historicalReferenceCount", { count: conceptDeleteImpact.historicalVersionCount })}</p> : null}
         </div> : null}

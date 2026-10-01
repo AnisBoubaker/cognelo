@@ -176,6 +176,19 @@ export async function startActivityAttempt(user: CurrentUser, input: StartActivi
               skillId: skill.id,
               skillTitle: skill.title
             }));
+          }),
+          knowledgeMisconceptionSnapshot: (context.groupActivity.activity.knowledgeConcepts ?? []).flatMap((link) => {
+            const selectedIds = new Set(stringArray(link.selectedMisconceptionIds));
+            const selectedTitles = new Set(stringArray(link.selectedMisconceptions));
+            const misconceptions = link.selectsAllSkills
+              ? link.concept.misconceptionRecords
+              : link.concept.misconceptionRecords.filter((item) => selectedIds.has(item.id) || selectedTitles.has(item.title));
+            return misconceptions.map((item) => ({
+              conceptId: link.conceptId,
+              conceptTitle: link.concept.title,
+              misconceptionId: item.id,
+              misconceptionTitle: item.title
+            }));
           })
         } as JsonInput
       }
@@ -1444,10 +1457,13 @@ async function resolveAssignedActivityAttemptContext(user: CurrentUser, input: S
               selectsAllSkills: true,
               selectedSkillIds: true,
               selectedSkills: true,
+              selectedMisconceptionIds: true,
+              selectedMisconceptions: true,
               concept: {
                 select: {
                   title: true,
-                  skillRecords: { where: { active: true }, orderBy: { position: "asc" }, select: { id: true, title: true } }
+                  skillRecords: { where: { active: true }, orderBy: { position: "asc" }, select: { id: true, title: true } },
+                  misconceptionRecords: { where: { active: true }, orderBy: { position: "asc" }, select: { id: true, title: true } }
                 }
               }
             }

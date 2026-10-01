@@ -10,7 +10,10 @@ const courseInclude = {
       materials: { orderBy: [{ position: "asc" as const }, { createdAt: "asc" as const }] },
       knowledgeConcepts: {
         where: { active: true },
-        include: { skillRecords: { where: { active: true }, orderBy: [{ position: "asc" as const }] } },
+        include: {
+          skillRecords: { where: { active: true }, orderBy: [{ position: "asc" as const }] },
+          misconceptionRecords: { where: { active: true }, orderBy: [{ position: "asc" as const }] }
+        },
         orderBy: [{ createdAt: "asc" as const }]
       },
       knowledgePrerequisites: { orderBy: [{ createdAt: "asc" as const }] }

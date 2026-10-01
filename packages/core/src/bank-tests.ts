@@ -937,12 +937,14 @@ async function nextTopLevelPosition(activityBankId: string, folderId: string | n
   return (last?.position ?? -1) + 1;
 }
 
-function copyConceptSelections(selections: Array<{ conceptId: string; selectsAllSkills: boolean; selectedSkills: unknown; selectedSkillIds: unknown }>) {
+function copyConceptSelections(selections: Array<{ conceptId: string; selectsAllSkills: boolean; selectedSkills: unknown; selectedSkillIds: unknown; selectedMisconceptions: unknown; selectedMisconceptionIds: unknown }>) {
   return selections.map((selection) => ({
     conceptId: selection.conceptId,
     selectsAllSkills: selection.selectsAllSkills,
     selectedSkills: selection.selectedSkills as Prisma.InputJsonValue,
-    selectedSkillIds: selection.selectedSkillIds as Prisma.InputJsonValue
+    selectedSkillIds: selection.selectedSkillIds as Prisma.InputJsonValue,
+    selectedMisconceptions: selection.selectedMisconceptions as Prisma.InputJsonValue,
+    selectedMisconceptionIds: selection.selectedMisconceptionIds as Prisma.InputJsonValue
   }));
 }
 

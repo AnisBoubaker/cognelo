@@ -77,8 +77,8 @@ export type BankActivityDuplicatedHook = (input: {
 
 export type ActivityVariationKnowledge = {
   mode: "selected";
-  concepts: Array<{ id: string; title: string; skills: string[]; skillIds: string[] }>;
-  selectedConcepts: Array<{ id: string; title: string; skills: string[]; skillIds: string[] }>;
+  concepts: Array<{ id: string; title: string; skills: string[]; skillIds: string[]; misconceptions: string[]; misconceptionIds: string[] }>;
+  selectedConcepts: Array<{ id: string; title: string; skills: string[]; skillIds: string[]; misconceptions: string[]; misconceptionIds: string[] }>;
 };
 
 export type BankActivityVariationProgress = {

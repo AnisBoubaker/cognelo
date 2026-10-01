@@ -9,7 +9,9 @@ const knowledgeConceptSchema = z.object({
   id: z.string().min(1).max(120),
   title: z.string().min(1).max(500),
   skills: z.array(z.string().min(1).max(1000)).max(100),
-  skillIds: z.array(z.string().min(1).max(160)).max(100).optional()
+  skillIds: z.array(z.string().min(1).max(160)).max(100).optional(),
+  misconceptions: z.array(z.string().min(1).max(1000)).max(100).optional(),
+  misconceptionIds: z.array(z.string().min(1).max(160)).max(100).optional()
 });
 
 const knowledgeCatalogSchema = z.array(knowledgeConceptSchema).max(500).default([]);
@@ -35,7 +37,10 @@ export async function getBankActivityVariationGenerationContext(
         include: {
           knowledgeConcepts: {
             where: { active: true },
-            include: { skillRecords: { where: { active: true }, orderBy: [{ position: "asc" }] } },
+            include: {
+              skillRecords: { where: { active: true }, orderBy: [{ position: "asc" }] },
+              misconceptionRecords: { where: { active: true }, orderBy: [{ position: "asc" }] }
+            },
             orderBy: [{ createdAt: "asc" }]
           }
         }
@@ -45,7 +50,7 @@ export async function getBankActivityVariationGenerationContext(
         include: {
           knowledgeConcepts: {
             include: {
-              concept: { include: { skillRecords: { orderBy: [{ position: "asc" }] } } }
+              concept: { include: { skillRecords: { orderBy: [{ position: "asc" }] }, misconceptionRecords: { orderBy: [{ position: "asc" }] } } }
             }
           }
         }
@@ -63,13 +68,17 @@ export async function getBankActivityVariationGenerationContext(
     if (selection.selectsAllSkills) return [concept];
     const selectedSkillIds = jsonStringArray(selection.selectedSkillIds);
     const selectedSkills = jsonStringArray(selection.selectedSkills);
+    const selectedMisconceptionIds = jsonStringArray(selection.selectedMisconceptionIds);
+    const selectedMisconceptions = jsonStringArray(selection.selectedMisconceptions);
     const selectedIndexes = concept.skills
       .map((skill, index) => ({ skill, index }))
       .filter(({ skill, index }) => selectedSkillIds.includes(concept.skillIds[index]) || selectedSkills.includes(skill));
     return [{
       ...concept,
       skills: selectedIndexes.map(({ skill }) => skill),
-      skillIds: selectedIndexes.map(({ index }) => concept.skillIds[index])
+      skillIds: selectedIndexes.map(({ index }) => concept.skillIds[index]),
+      misconceptions: (concept.misconceptions ?? []).filter((item, index) => selectedMisconceptionIds.includes(concept.misconceptionIds?.[index] ?? "") || selectedMisconceptions.includes(item)),
+      misconceptionIds: (concept.misconceptionIds ?? []).filter((itemId, index) => selectedMisconceptionIds.includes(itemId) || selectedMisconceptions.includes((concept.misconceptions ?? [])[index] ?? ""))
     }];
   });
 
@@ -84,14 +93,22 @@ function toVariationConcept(concept: {
   id: string;
   title: string;
   skills: string;
+  misconceptions: unknown;
   skillRecords: Array<{ id: string; title: string }>;
+  misconceptionRecords?: Array<{ id: string; title: string }>;
 }) {
   const legacySkills = concept.skills.split(/\r?\n/).map((skill) => skill.trim()).filter(Boolean);
   const skills = concept.skillRecords.length ? concept.skillRecords.map((skill) => skill.title) : legacySkills;
   const skillIds = concept.skillRecords.length
     ? concept.skillRecords.map((skill) => skill.id)
     : skills.map((_, index) => `${concept.id}:legacy-skill-${index + 1}`);
-  return { id: concept.id, title: concept.title, skills, skillIds };
+  const legacyMisconceptions = jsonStringArray(concept.misconceptions);
+  const misconceptionRecords = concept.misconceptionRecords ?? [];
+  const misconceptions = misconceptionRecords.length ? misconceptionRecords.map((item) => item.title) : legacyMisconceptions;
+  const misconceptionIds = misconceptionRecords.length
+    ? misconceptionRecords.map((item) => item.id)
+    : misconceptions.map((_, index) => `${concept.id}:legacy-misconception-${index + 1}`);
+  return { id: concept.id, title: concept.title, skills, skillIds, misconceptions, misconceptionIds };
 }
 
 export function activityKnowledgeGenerationPrompt(knowledge: ActivityGenerationKnowledge) {
@@ -102,7 +119,8 @@ export function activityKnowledgeGenerationPrompt(knowledge: ActivityGenerationK
         "Do not treat every catalog skill as a required target for this activity.",
         ...knowledge.concepts.flatMap((concept) => [
           `Concept: ${concept.title}`,
-          ...concept.skills.map((skill) => `- ${skill}`)
+          ...concept.skills.map((skill) => `- ${skill}`),
+          ...(concept.misconceptions ?? []).map((item) => `- Misconception to address: ${item}`)
         ])
       ]
     : ["No knowledge catalog is available. Use the subject title, description, and teacher instructions as the boundary."];
@@ -111,13 +129,14 @@ export function activityKnowledgeGenerationPrompt(knowledge: ActivityGenerationK
 
   const selected = knowledge.selectedConcepts.length
     ? [
-        "The generated activity must specifically assess or practice these selected learning skills:",
+        "The generated activity must specifically assess or practice these selected learning skills and misconceptions:",
         ...knowledge.selectedConcepts.flatMap((concept) => [
       `Concept: ${concept.title}`,
-      ...concept.skills.map((skill) => `- ${skill}`)
+      ...concept.skills.map((skill) => `- ${skill}`),
+      ...(concept.misconceptions ?? []).map((item) => `- Misconception to address: ${item}`)
         ])
       ]
-    : ["No knowledge skills are currently selected. Do not infer additional skills as specific generation targets."];
+    : ["No knowledge skills or misconceptions are currently selected. Do not infer additional targets."];
 
   return [...boundary, "", ...selected].join("\n");
 }
@@ -125,7 +144,8 @@ export function activityKnowledgeGenerationPrompt(knowledge: ActivityGenerationK
 const suggestionSchema = z.object({
   selections: z.array(z.object({
     conceptId: z.string().min(1),
-    skills: z.array(z.string().min(1)).default([])
+    skills: z.array(z.string().min(1)).default([]),
+    misconceptions: z.array(z.string().min(1)).default([])
   })).max(500)
 });
 
@@ -140,13 +160,14 @@ export async function suggestActivityKnowledgeSelections(input: {
   const catalog = input.knowledge.concepts.map((concept) => ({
     conceptId: concept.id,
     concept: concept.title,
-    skills: concept.skills
+    skills: concept.skills,
+    misconceptions: concept.misconceptions ?? []
   }));
   let userPrompt = [
-    "Select the skills genuinely assessed or practiced by this generated activity.",
+    "Select the skills genuinely assessed or practiced and the misconceptions explicitly elicited or addressed by this generated activity.",
     "A skill is something the learner can perform or an observable learning goal.",
-    "Use only exact conceptId and skill strings from the catalog. Select no more than needed.",
-    "Return only JSON in this shape: {\"selections\":[{\"conceptId\":\"...\",\"skills\":[\"exact skill\"]}]}",
+    "Use only exact conceptId, skill, and misconception strings from the catalog. Select no more than needed.",
+    "Return only JSON in this shape: {\"selections\":[{\"conceptId\":\"...\",\"skills\":[\"exact skill\"],\"misconceptions\":[\"exact misconception\"]}]}",
     "Return {\"selections\":[]} when none apply.",
     "",
     "Knowledge catalog:",
@@ -158,36 +179,40 @@ export async function suggestActivityKnowledgeSelections(input: {
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const raw = await generateQuestionAuthoringText(input.user, {
-      systemPrompt: "You map generated learning activities to an authoritative knowledge-skill catalog. Return valid JSON only.",
+      systemPrompt: "You map generated learning activities to an authoritative catalog of knowledge skills and misconceptions. Return valid JSON only.",
       userPrompt,
       maxOutputTokens: 2500
     });
     const parsed = parseJson(raw);
     const validated = suggestionSchema.safeParse(parsed);
     if (validated.success) {
-      const concepts = new Map(input.knowledge.concepts.map((concept) => [concept.id, new Set(concept.skills)]));
-      const selectedByConcept = new Map<string, Set<string>>();
+      const concepts = new Map(input.knowledge.concepts.map((concept) => [concept.id, concept]));
+      const selectedByConcept = new Map<string, { skills: Set<string>; misconceptions: Set<string> }>();
       for (const selection of validated.data.selections) {
         const available = concepts.get(selection.conceptId);
         if (!available) continue;
-        const selected = selectedByConcept.get(selection.conceptId) ?? new Set<string>();
-        selection.skills.filter((skill) => available.has(skill)).forEach((skill) => selected.add(skill));
-        if (selected.size) selectedByConcept.set(selection.conceptId, selected);
+        const selected = selectedByConcept.get(selection.conceptId) ?? { skills: new Set<string>(), misconceptions: new Set<string>() };
+        selection.skills.filter((skill) => available.skills.includes(skill)).forEach((skill) => selected.skills.add(skill));
+        selection.misconceptions.filter((item) => (available.misconceptions ?? []).includes(item)).forEach((item) => selected.misconceptions.add(item));
+        if (selected.skills.size || selected.misconceptions.size) selectedByConcept.set(selection.conceptId, selected);
       }
-      return [...selectedByConcept].map(([conceptId, skills]) => {
+      return [...selectedByConcept].map(([conceptId, selected]) => {
         const concept = input.knowledge.concepts.find((candidate) => candidate.id === conceptId)!;
-        const selectedSkills = [...skills];
+        const selectedSkills = [...selected.skills];
+        const selectedMisconceptions = [...selected.misconceptions];
         return {
           conceptId,
           selectsAllSkills: false,
           selectedSkills,
-          selectedSkillIds: selectedSkills.map((skill) => concept.skillIds?.[concept.skills.indexOf(skill)]).filter((skillId): skillId is string => Boolean(skillId))
+          selectedSkillIds: selectedSkills.map((skill) => concept.skillIds?.[concept.skills.indexOf(skill)]).filter((skillId): skillId is string => Boolean(skillId)),
+          selectedMisconceptions,
+          selectedMisconceptionIds: selectedMisconceptions.map((item) => concept.misconceptionIds?.[(concept.misconceptions ?? []).indexOf(item)]).filter((itemId): itemId is string => Boolean(itemId))
         };
       });
     }
     userPrompt = `The previous response was invalid. Return the requested JSON only.\n\nPrevious response:\n${raw}`;
   }
-  throw new AppError(422, "ACTIVITY_KNOWLEDGE_SUGGESTION_INVALID", "The AI agent could not select valid skills for the generated activity.");
+  throw new AppError(422, "ACTIVITY_KNOWLEDGE_SUGGESTION_INVALID", "The AI agent could not select valid knowledge targets for the generated activity.");
 }
 
 function parseJson(value: string) {

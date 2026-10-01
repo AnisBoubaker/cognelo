@@ -176,7 +176,7 @@ model User {
   gradedGrades                       Grade[]                      @relation("GradeGrader")
   gradeEvents                        GradeEvent[]                 @relation("GradeEventActor")
   updatedEmailDeliveryConfigurations EmailDeliveryConfiguration[] @relation("EmailDeliveryConfigurationUpdater")
-  updatedExecutionRunners             ExecutionRunner[]            @relation("ExecutionRunnerUpdater")
+  updatedExecutionRunners            ExecutionRunner[]            @relation("ExecutionRunnerUpdater")
   emailVerificationChallenge         EmailVerificationChallenge?
   mediaAssets                        MediaAsset[]                 @relation("MediaAssetCreator")
 
@@ -329,23 +329,24 @@ model Course {
 }
 
 model Subject {
-  id                     String                         @id @default(cuid())
-  title                  String
-  description            String                         @default("")
-  teachingLanguage       String                         @default("en")
-  programmingLanguage    String?
-  metadata               Json                           @default("{}")
-  createdById            String
-  createdAt              DateTime                       @default(now())
-  updatedAt              DateTime                       @updatedAt
-  createdBy              User                           @relation("SubjectCreator", fields: [createdById], references: [id])
-  courses                Course[]
-  materials              SubjectMaterial[]
-  activityBanks          ActivityBank[]
-  knowledgeConcepts      SubjectKnowledgeConcept[]
-  knowledgeSkills        SubjectKnowledgeSkill[]
-  knowledgePrerequisites SubjectKnowledgePrerequisite[]
-  mediaAssetReferences   MediaAssetReference[]
+  id                      String                          @id @default(cuid())
+  title                   String
+  description             String                          @default("")
+  teachingLanguage        String                          @default("en")
+  programmingLanguage     String?
+  metadata                Json                            @default("{}")
+  createdById             String
+  createdAt               DateTime                        @default(now())
+  updatedAt               DateTime                        @updatedAt
+  createdBy               User                            @relation("SubjectCreator", fields: [createdById], references: [id])
+  courses                 Course[]
+  materials               SubjectMaterial[]
+  activityBanks           ActivityBank[]
+  knowledgeConcepts       SubjectKnowledgeConcept[]
+  knowledgeSkills         SubjectKnowledgeSkill[]
+  knowledgeMisconceptions SubjectKnowledgeMisconception[]
+  knowledgePrerequisites  SubjectKnowledgePrerequisite[]
+  mediaAssetReferences    MediaAssetReference[]
 
   @@index([createdById])
   @@index([updatedAt])
@@ -356,6 +357,7 @@ model SubjectKnowledgeConcept {
   subjectId             String
   title                 String
   skills                String                            @default("")
+  misconceptions        Json?
   active                Boolean                           @default(true)
   positionX             Float                             @default(0)
   positionY             Float                             @default(0)
@@ -368,11 +370,29 @@ model SubjectKnowledgeConcept {
   activityVersionLinks  ActivityVersionKnowledgeConcept[]
   activityLinks         ActivityKnowledgeConcept[]
   skillRecords          SubjectKnowledgeSkill[]
+  misconceptionRecords  SubjectKnowledgeMisconception[]
 
   @@index([subjectId])
 }
 
 model SubjectKnowledgeSkill {
+  id        String                  @id @default(cuid())
+  subjectId String
+  conceptId String
+  title     String
+  position  Int
+  active    Boolean                 @default(true)
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+  subject   Subject                 @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  concept   SubjectKnowledgeConcept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  @@index([conceptId, position])
+  @@index([subjectId, active])
+  @@index([conceptId, active])
+}
+
+model SubjectKnowledgeMisconception {
   id        String                  @id @default(cuid())
   subjectId String
   conceptId String
@@ -812,39 +832,45 @@ model Activity {
 }
 
 model BankActivityKnowledgeConcept {
-  bankActivityId   String
-  conceptId        String
-  selectsAllSkills Boolean                 @default(true)
-  selectedSkills   Json                    @default("[]")
-  selectedSkillIds Json                    @default("[]")
-  bankActivity     BankActivity            @relation(fields: [bankActivityId], references: [id], onDelete: Cascade)
-  concept          SubjectKnowledgeConcept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  bankActivityId           String
+  conceptId                String
+  selectsAllSkills         Boolean                 @default(true)
+  selectedSkills           Json                    @default("[]")
+  selectedSkillIds         Json                    @default("[]")
+  selectedMisconceptions   Json                    @default("[]")
+  selectedMisconceptionIds Json                    @default("[]")
+  bankActivity             BankActivity            @relation(fields: [bankActivityId], references: [id], onDelete: Cascade)
+  concept                  SubjectKnowledgeConcept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
 
   @@id([bankActivityId, conceptId])
   @@index([conceptId])
 }
 
 model ActivityVersionKnowledgeConcept {
-  activityVersionId String
-  conceptId         String
-  selectsAllSkills  Boolean                 @default(true)
-  selectedSkills    Json                    @default("[]")
-  selectedSkillIds  Json                    @default("[]")
-  activityVersion   ActivityVersion         @relation(fields: [activityVersionId], references: [id], onDelete: Cascade)
-  concept           SubjectKnowledgeConcept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  activityVersionId        String
+  conceptId                String
+  selectsAllSkills         Boolean                 @default(true)
+  selectedSkills           Json                    @default("[]")
+  selectedSkillIds         Json                    @default("[]")
+  selectedMisconceptions   Json                    @default("[]")
+  selectedMisconceptionIds Json                    @default("[]")
+  activityVersion          ActivityVersion         @relation(fields: [activityVersionId], references: [id], onDelete: Cascade)
+  concept                  SubjectKnowledgeConcept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
 
   @@id([activityVersionId, conceptId])
   @@index([conceptId])
 }
 
 model ActivityKnowledgeConcept {
-  activityId       String
-  conceptId        String
-  selectsAllSkills Boolean                 @default(true)
-  selectedSkills   Json                    @default("[]")
-  selectedSkillIds Json                    @default("[]")
-  activity         Activity                @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  concept          SubjectKnowledgeConcept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  activityId               String
+  conceptId                String
+  selectsAllSkills         Boolean                 @default(true)
+  selectedSkills           Json                    @default("[]")
+  selectedSkillIds         Json                    @default("[]")
+  selectedMisconceptions   Json                    @default("[]")
+  selectedMisconceptionIds Json                    @default("[]")
+  activity                 Activity                @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  concept                  SubjectKnowledgeConcept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
 
   @@id([activityId, conceptId])
   @@index([conceptId])

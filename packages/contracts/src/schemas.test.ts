@@ -366,17 +366,23 @@ describe("shared contract schemas", () => {
     }).knowledgeGraph?.concepts).toHaveLength(2);
     expect(SubjectUpdateSchema.parse({
       knowledgeGraph: {
-        concepts: [{ id: "variables", title: "Variables", skills: "  Declare a variable  \n\nAssign a value  ", positionX: 0, positionY: 0 }],
+        concepts: [{ id: "variables", title: "Variables", skills: "  Declare a variable  \n\nAssign a value  ", misconceptions: null, positionX: 0, positionY: 0 }],
         prerequisites: []
       }
     }).knowledgeGraph?.concepts[0]?.skills).toBe("Declare a variable\nAssign a value");
+    expect(SubjectUpdateSchema.parse({
+      knowledgeGraph: {
+        concepts: [{ id: "variables", title: "Variables", skills: "Declare a variable", misconceptions: null, positionX: 0, positionY: 0 }],
+        prerequisites: []
+      }
+    }).knowledgeGraph?.concepts[0]?.misconceptions).toEqual([]);
     expect(SubjectUpdateSchema.parse({
       knowledgeGraph: {
         concepts: [{ id: "variables", title: "Variables", skills: "Declare a variable", positionX: 0, positionY: 0 }],
         prerequisites: []
       },
       knowledgeGraphDeletions: { conceptIds: ["removed-concept"], skillIds: ["removed-skill"] }
-    }).knowledgeGraphDeletions).toEqual({ conceptIds: ["removed-concept"], skillIds: ["removed-skill"] });
+    }).knowledgeGraphDeletions).toEqual({ conceptIds: ["removed-concept"], skillIds: ["removed-skill"], misconceptionIds: [] });
     expect(() => SubjectUpdateSchema.parse({
       knowledgeGraphDeletions: { conceptIds: ["removed-concept"], skillIds: [] }
     })).toThrow();

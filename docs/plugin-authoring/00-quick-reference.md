@@ -274,7 +274,7 @@ type ServerActivityPlugin = {
 };
 ```
 
-Bank variation orchestration first performs the normal deep bank duplicate, including private-data hooks, then calls the owning handler with the original and independent target records, the complete knowledge catalog, the preserved selected skills, optional teacher instructions, and a progress callback. The handler must regenerate every activity-specific learner/private artifact that should differ, validate the result through its ordinary persistence boundary, and mutate only the target. The completed job reports the target's final stored title. A failure deletes the entire copied activity or reusable-Test graph; plugin-private deletion hooks are retried three times and a persistent cleanup failure is reported explicitly.
+Bank variation orchestration first performs the normal deep bank duplicate, including private-data hooks, then calls the owning handler with the original and independent target records, the complete knowledge catalog, the preserved selected skills and misconceptions, optional teacher instructions, and a progress callback. The handler must regenerate every activity-specific learner/private artifact that should differ, validate the result through its ordinary persistence boundary, and mutate only the target. The completed job reports the target's final stored title. A failure deletes the entire copied activity or reusable-Test graph; plugin-private deletion hooks are retried three times and a persistent cleanup failure is reported explicitly.
 
 ### `ContentTypePlugin`
 

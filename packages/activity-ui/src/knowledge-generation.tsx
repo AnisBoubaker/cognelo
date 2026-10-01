@@ -3,12 +3,12 @@
 import { createContext, useContext, type ReactNode } from "react";
 
 export type ActivityKnowledgeGenerationMode = "selected" | "suggest" | "ignore";
-export type ActivityKnowledgeGenerationConcept = { id: string; title: string; skills: string[]; skillIds: string[] };
+export type ActivityKnowledgeGenerationConcept = { id: string; title: string; skills: string[]; skillIds: string[]; misconceptions: string[]; misconceptionIds: string[] };
 export type ActivityKnowledgeGenerationRequest =
   | { mode: "selected"; concepts: ActivityKnowledgeGenerationConcept[]; selectedConcepts: ActivityKnowledgeGenerationConcept[] }
   | { mode: "suggest"; concepts: ActivityKnowledgeGenerationConcept[] }
   | { mode: "ignore"; concepts: ActivityKnowledgeGenerationConcept[] };
-export type GeneratedKnowledgeSelection = { conceptId: string; selectsAllSkills: boolean; selectedSkills: string[]; selectedSkillIds: string[] };
+export type GeneratedKnowledgeSelection = { conceptId: string; selectsAllSkills: boolean; selectedSkills: string[]; selectedSkillIds: string[]; selectedMisconceptions: string[]; selectedMisconceptionIds: string[] };
 
 type KnowledgeGenerationContextValue = {
   mode: ActivityKnowledgeGenerationMode;
@@ -53,8 +53,8 @@ export function KnowledgeGenerationModeField({
 }
 
 const knowledgeGenerationCopy = {
-  en: { title: "Knowledge alignment", selected: "Use selected skills", suggest: "Suggest skills", ignore: "Ignore skills", help: "Choose how this AI generation uses the activity's knowledge links." },
-  fr: { title: "Alignement des connaissances", selected: "Utiliser les compétences choisies", suggest: "Suggérer des compétences", ignore: "Ignorer les compétences", help: "Choisissez comment cette génération utilise les liens de connaissances de l’activité." },
-  zh: { title: "知识关联", selected: "使用已选技能", suggest: "推荐技能", ignore: "忽略技能", help: "选择此次 AI 生成如何使用活动的知识关联。" },
-  ar: { title: "مواءمة المعرفة", selected: "استخدام المهارات المحددة", suggest: "اقتراح مهارات", ignore: "تجاهل المهارات", help: "اختر كيفية استخدام توليد الذكاء الاصطناعي لروابط المعرفة في النشاط." }
+  en: { title: "Knowledge alignment", selected: "Use selected targets", suggest: "Suggest targets", ignore: "Ignore targets", help: "Choose how this AI generation uses the activity's skills and misconceptions." },
+  fr: { title: "Alignement des connaissances", selected: "Utiliser les cibles choisies", suggest: "Suggérer des cibles", ignore: "Ignorer les cibles", help: "Choisissez comment cette génération utilise les compétences et les conceptions erronées de l’activité." },
+  zh: { title: "知识关联", selected: "使用已选目标", suggest: "推荐目标", ignore: "忽略目标", help: "选择此次 AI 生成如何使用活动的技能和错误观念。" },
+  ar: { title: "مواءمة المعرفة", selected: "استخدام الأهداف المحددة", suggest: "اقتراح أهداف", ignore: "تجاهل الأهداف", help: "اختر كيفية استخدام توليد الذكاء الاصطناعي للمهارات والمفاهيم الخاطئة في النشاط." }
 } as const;

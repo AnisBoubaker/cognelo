@@ -8,6 +8,7 @@ function concept(id: string, title: string, skills: Array<[string, string]>): Su
     subjectId: "subject-1",
     title,
     skills: skills.map(([, skillTitle]) => skillTitle).join("\n"),
+    misconceptions: [],
     active: true,
     positionX: 0,
     positionY: 0,
@@ -18,7 +19,8 @@ function concept(id: string, title: string, skills: Array<[string, string]>): Su
       title: skillTitle,
       position,
       active: true
-    }))
+    })),
+    misconceptionRecords: []
   };
 }
 
@@ -43,7 +45,9 @@ describe("AI knowledge graph generation diff", () => {
       deletedSkills: [
         { id: "assign", title: "Assign a value", conceptId: "variables", conceptTitle: "Variables" },
         { id: "trace", title: "Trace a loop", conceptId: "loops", conceptTitle: "Loops" }
-      ]
+      ],
+      addedMisconceptions: [],
+      deletedMisconceptions: []
     });
   });
 

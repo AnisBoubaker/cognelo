@@ -9,7 +9,8 @@ const tx = vi.hoisted(() => ({
   subject: { findUniqueOrThrow: vi.fn(), update: vi.fn() },
   subjectKnowledgeConcept: { create: vi.fn(), findMany: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn() },
   subjectKnowledgePrerequisite: { create: vi.fn(), deleteMany: vi.fn() },
-  subjectKnowledgeSkill: { create: vi.fn(), update: vi.fn(), updateMany: vi.fn() }
+  subjectKnowledgeSkill: { create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+  subjectKnowledgeMisconception: { create: vi.fn(), update: vi.fn(), updateMany: vi.fn() }
 }));
 
 const mockPrisma = vi.hoisted(() => ({
@@ -32,6 +33,8 @@ const retainedConcept = {
   title: "Retained",
   skills: "Keep skill",
   skillRecords: [{ id: "skill-keep", title: "Keep skill", position: 0, active: true }],
+  misconceptions: [],
+  misconceptionRecords: [],
   positionX: 0,
   positionY: 0
 };
@@ -49,7 +52,7 @@ describe("saving AI-disclosed knowledge graph deletions", () => {
   it("keeps rejecting omitted concepts that were not disclosed by AI generation", async () => {
     tx.subjectKnowledgeConcept.findMany.mockResolvedValue([
       retainedConcept,
-      { id: "concept-removed", title: "Removed", skills: "", skillRecords: [] }
+      { id: "concept-removed", title: "Removed", skills: "", misconceptions: [], skillRecords: [], misconceptionRecords: [] }
     ]);
 
     await expect(updateSubject(admin, "subject-1", {
@@ -64,7 +67,7 @@ describe("saving AI-disclosed knowledge graph deletions", () => {
   it("retires an AI-disclosed concept and removes only its current activity links", async () => {
     tx.subjectKnowledgeConcept.findMany.mockResolvedValue([
       retainedConcept,
-      { id: "concept-removed", title: "Removed", skills: "Old skill", skillRecords: [{ id: "skill-old", title: "Old skill", position: 0, active: true }] }
+      { id: "concept-removed", title: "Removed", skills: "Old skill", misconceptions: [], skillRecords: [{ id: "skill-old", title: "Old skill", position: 0, active: true }], misconceptionRecords: [] }
     ]);
 
     await updateSubject(admin, "subject-1", {
@@ -97,5 +100,30 @@ describe("saving AI-disclosed knowledge graph deletions", () => {
       where: { bankActivityId_conceptId: { bankActivityId: "bank-1", conceptId: "concept-retained" } }
     });
     expect(tx.subjectKnowledgeSkill.update).toHaveBeenCalledWith({ where: { id: "skill-remove" }, data: { active: false } });
+  });
+
+  it("writes an explicit misconception array and creates stable misconception records", async () => {
+    tx.subjectKnowledgeConcept.findMany.mockResolvedValue([retainedConcept]);
+    const misconception = {
+      id: "misconception-1",
+      title: "Assignment changes both variables because it creates an alias",
+      position: 0,
+      active: true
+    };
+
+    await updateSubject(admin, "subject-1", {
+      knowledgeGraph: {
+        concepts: [{ ...retainedConcept, misconceptions: [misconception.title], misconceptionRecords: [misconception] }],
+        prerequisites: []
+      }
+    });
+
+    expect(tx.subjectKnowledgeConcept.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: retainedConcept.id },
+      data: expect.objectContaining({ misconceptions: [misconception.title] })
+    }));
+    expect(tx.subjectKnowledgeMisconception.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ id: misconception.id, subjectId: "subject-1", conceptId: retainedConcept.id, title: misconception.title })
+    });
   });
 });

@@ -27,9 +27,39 @@ function conceptSkills(concept: SubjectKnowledgeConcept) {
   return concept.skillRecords?.length ? concept.skillRecords.map((skill) => skill.title) : concept.skills.split(/\r?\n/).map((skill) => skill.trim()).filter(Boolean);
 }
 
+function conceptMisconceptions(concept: SubjectKnowledgeConcept) {
+  return concept.misconceptionRecords?.length ? concept.misconceptionRecords.map((item) => item.title) : (concept.misconceptions ?? []);
+}
+
+function selectedSkillTitles(concept: SubjectKnowledgeConcept, selection: ActivityKnowledgeConceptSelection | undefined) {
+  if (selection?.selectsAllSkills) return conceptSkills(concept);
+  const ids = new Set(selection?.selectedSkillIds ?? []);
+  const titles = new Set(selection?.selectedSkills ?? []);
+  return conceptSkills(concept).filter((title) => {
+    const record = concept.skillRecords.find((item) => item.title === title);
+    return titles.has(title) || Boolean(record && ids.has(record.id));
+  });
+}
+
+function selectedMisconceptionTitles(concept: SubjectKnowledgeConcept, selection: ActivityKnowledgeConceptSelection | undefined) {
+  if (selection?.selectsAllSkills) return conceptMisconceptions(concept);
+  const ids = new Set(selection?.selectedMisconceptionIds ?? []);
+  const titles = new Set(selection?.selectedMisconceptions ?? []);
+  return conceptMisconceptions(concept).filter((title) => {
+    const record = concept.misconceptionRecords.find((item) => item.title === title);
+    return titles.has(title) || Boolean(record && ids.has(record.id));
+  });
+}
+
 function canonicalSelections(selections: ActivityKnowledgeConceptSelection[]) {
   return JSON.stringify(selections
-    .map((selection) => ({ ...selection, selectedSkills: [...selection.selectedSkills].sort(), selectedSkillIds: [...(selection.selectedSkillIds ?? [])].sort() }))
+    .map((selection) => ({
+      ...selection,
+      selectedSkills: [...selection.selectedSkills].sort(),
+      selectedSkillIds: [...(selection.selectedSkillIds ?? [])].sort(),
+      selectedMisconceptions: [...(selection.selectedMisconceptions ?? [])].sort(),
+      selectedMisconceptionIds: [...(selection.selectedMisconceptionIds ?? [])].sort()
+    }))
     .sort((left, right) => left.conceptId.localeCompare(right.conceptId)));
 }
 
@@ -83,12 +113,19 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
   const visibleConcepts = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
     return normalizedQuery
-      ? orderedConcepts.filter((concept) => `${concept.title} ${concept.skills}`.toLocaleLowerCase().includes(normalizedQuery))
+      ? orderedConcepts.filter((concept) => `${concept.title} ${concept.skills} ${conceptMisconceptions(concept).join(" ")}`.toLocaleLowerCase().includes(normalizedQuery))
       : orderedConcepts;
   }, [orderedConcepts, query]);
   const activeConcept = concepts.find((concept) => concept.id === activeConceptId) ?? visibleConcepts[0] ?? null;
   const generationRequest = useMemo<ActivityKnowledgeGenerationRequest>(() => {
-    const catalog = concepts.map((concept) => ({ id: concept.id, title: concept.title, skills: conceptSkills(concept), skillIds: concept.skillRecords.map((skill) => skill.id) }));
+    const catalog = concepts.map((concept) => ({
+      id: concept.id,
+      title: concept.title,
+      skills: conceptSkills(concept),
+      skillIds: concept.skillRecords.map((skill) => skill.id),
+      misconceptions: conceptMisconceptions(concept),
+      misconceptionIds: concept.misconceptionRecords.map((item) => item.id)
+    }));
     if (generationMode === "ignore") return { mode: "ignore", concepts: catalog };
     if (generationMode === "suggest") {
       return { mode: "suggest", concepts: catalog };
@@ -101,8 +138,10 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
         return concept ? [{
           id: concept.id,
           title: concept.title,
-          skills: selection.selectsAllSkills ? conceptSkills(concept) : selection.selectedSkills,
-          skillIds: selection.selectsAllSkills ? concept.skillRecords.map((skill) => skill.id) : (selection.selectedSkillIds ?? [])
+          skills: selectedSkillTitles(concept, selection),
+          skillIds: selection.selectsAllSkills ? concept.skillRecords.map((skill) => skill.id) : (selection.selectedSkillIds ?? []),
+          misconceptions: selectedMisconceptionTitles(concept, selection),
+          misconceptionIds: selection.selectsAllSkills ? concept.misconceptionRecords.map((item) => item.id) : (selection.selectedMisconceptionIds ?? [])
         }] : [];
       })
     };
@@ -128,7 +167,14 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
 
   function setWholeConcept(concept: SubjectKnowledgeConcept, checked: boolean) {
     setDraftSelections((current) => checked
-      ? [...current.filter((selection) => selection.conceptId !== concept.id), { conceptId: concept.id, selectsAllSkills: true, selectedSkills: conceptSkills(concept), selectedSkillIds: concept.skillRecords.map((skill) => skill.id) }]
+      ? [...current.filter((selection) => selection.conceptId !== concept.id), {
+          conceptId: concept.id,
+          selectsAllSkills: true,
+          selectedSkills: conceptSkills(concept),
+          selectedSkillIds: concept.skillRecords.map((skill) => skill.id),
+          selectedMisconceptions: conceptMisconceptions(concept),
+          selectedMisconceptionIds: concept.misconceptionRecords.map((item) => item.id)
+        }]
       : current.filter((selection) => selection.conceptId !== concept.id));
   }
 
@@ -136,12 +182,30 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
     const skills = conceptSkills(concept);
     setDraftSelections((current) => {
       const existing = current.find((selection) => selection.conceptId === concept.id);
-      const selected = existing?.selectsAllSkills ? skills : (existing?.selectedSkills ?? []);
+      const selected = selectedSkillTitles(concept, existing);
       const nextSkills = checked ? [...new Set([...selected, skill])] : selected.filter((candidate) => candidate !== skill);
       const nextSkillIds = concept.skillRecords.filter((candidate) => nextSkills.includes(candidate.title)).map((candidate) => candidate.id);
+      const selectedMisconceptions = selectedMisconceptionTitles(concept, existing);
+      const selectedMisconceptionIds = concept.misconceptionRecords.filter((candidate) => selectedMisconceptions.includes(candidate.title)).map((candidate) => candidate.id);
       const withoutConcept = current.filter((selection) => selection.conceptId !== concept.id);
-      return nextSkills.length
-        ? [...withoutConcept, { conceptId: concept.id, selectsAllSkills: false, selectedSkills: nextSkills, selectedSkillIds: nextSkillIds }]
+      return nextSkills.length || selectedMisconceptions.length
+        ? [...withoutConcept, { conceptId: concept.id, selectsAllSkills: false, selectedSkills: nextSkills, selectedSkillIds: nextSkillIds, selectedMisconceptions, selectedMisconceptionIds }]
+        : withoutConcept;
+    });
+  }
+
+  function setMisconception(concept: SubjectKnowledgeConcept, misconception: string, checked: boolean) {
+    const misconceptions = conceptMisconceptions(concept);
+    setDraftSelections((current) => {
+      const existing = current.find((selection) => selection.conceptId === concept.id);
+      const selected = selectedMisconceptionTitles(concept, existing);
+      const nextMisconceptions = checked ? [...new Set([...selected, misconception])] : selected.filter((candidate) => candidate !== misconception);
+      const nextMisconceptionIds = concept.misconceptionRecords.filter((candidate) => nextMisconceptions.includes(candidate.title)).map((candidate) => candidate.id);
+      const selectedSkills = selectedSkillTitles(concept, existing);
+      const selectedSkillIds = concept.skillRecords.filter((candidate) => selectedSkills.includes(candidate.title)).map((candidate) => candidate.id);
+      const withoutConcept = current.filter((selection) => selection.conceptId !== concept.id);
+      return selectedSkills.length || nextMisconceptions.length
+        ? [...withoutConcept, { conceptId: concept.id, selectsAllSkills: false, selectedSkills, selectedSkillIds, selectedMisconceptions: nextMisconceptions, selectedMisconceptionIds: nextMisconceptionIds }]
         : withoutConcept;
     });
   }
@@ -208,7 +272,7 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
                   <div className="activity-concept-list" role="list" aria-label={t("activityConcepts.conceptList")}>
                     {visibleConcepts.map((concept) => {
                       const selection = selectionFor(concept.id);
-                      const selectedCount = selection?.selectsAllSkills ? conceptSkills(concept).length : selection?.selectedSkills.length ?? 0;
+                      const selectedCount = selectedSkillTitles(concept, selection).length + selectedMisconceptionTitles(concept, selection).length;
                       return (
                         <div className={`activity-concept-row${activeConcept?.id === concept.id ? " is-active" : ""}`} key={concept.id} role="listitem">
                           <ConceptCheckbox
@@ -219,7 +283,7 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
                           />
                           <button type="button" onClick={() => setActiveConceptId(concept.id)}>
                             <span>{concept.title}</span>
-                            {selectedCount ? <span className="activity-concept-count">{t("activityConcepts.skillsSelected", { count: selectedCount })}</span> : null}
+                            {selectedCount ? <span className="activity-concept-count">{t("activityConcepts.targetsSelected", { count: selectedCount })}</span> : null}
                           </button>
                         </div>
                       );
@@ -232,9 +296,15 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
                         <div><p className="eyebrow">{t("activityConcepts.skillsEyebrow")}</p><h3>{activeConcept.title}</h3></div>
                         {conceptSkills(activeConcept).length ? conceptSkills(activeConcept).map((skill) => {
                           const selection = selectionFor(activeConcept.id);
-                          const checked = selection?.selectsAllSkills || selection?.selectedSkills.includes(skill) || false;
+                          const checked = selectedSkillTitles(activeConcept, selection).includes(skill);
                           return <label className="activity-skill-row" key={skill}><input type="checkbox" checked={checked} onChange={(event) => setSkill(activeConcept, skill, event.target.checked)} /><span>{skill}</span></label>;
                         }) : <p className="muted">{t("activityConcepts.noSkills")}</p>}
+                        <div><p className="eyebrow">{t("activityConcepts.misconceptionsEyebrow")}</p></div>
+                        {conceptMisconceptions(activeConcept).length ? conceptMisconceptions(activeConcept).map((misconception) => {
+                          const selection = selectionFor(activeConcept.id);
+                          const checked = selectedMisconceptionTitles(activeConcept, selection).includes(misconception);
+                          return <label className="activity-skill-row" key={misconception}><input type="checkbox" checked={checked} onChange={(event) => setMisconception(activeConcept, misconception, event.target.checked)} /><span>{misconception}</span></label>;
+                        }) : <p className="muted">{t("activityConcepts.noMisconceptions")}</p>}
                       </>
                     ) : <p className="muted">{t("activityConcepts.selectConceptHelp")}</p>}
                   </div>
