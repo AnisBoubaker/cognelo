@@ -2235,6 +2235,7 @@ export function CodingExerciseActivityView({
                     </div>
                     <pre
                       aria-labelledby="coding-test-output-label"
+                      className="coding-exercise-output-text"
                       style={{
                         background: "rgba(13, 27, 71, 0.035)",
                         border: "1px solid rgba(13, 27, 71, 0.08)",
@@ -2821,7 +2822,7 @@ function ExecutionCard({
       {execution.kind === "run" ? (
         <div className="field">
           <label>{formatCodingExercisesMessage(locale, "runInput")}</label>
-          <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+          <pre className="coding-exercise-output-text" style={{ margin: 0, whiteSpace: "pre-wrap" }}>
             {execution.stdin || formatCodingExercisesMessage(locale, "noRunInput")}
           </pre>
         </div>
@@ -2829,19 +2830,19 @@ function ExecutionCard({
       {execution.stdout ? (
         <div className="field">
           <label>{formatCodingExercisesMessage(locale, "stdout")}</label>
-          <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{execution.stdout}</pre>
+          <pre className="coding-exercise-output-text" style={{ margin: 0, whiteSpace: "pre-wrap" }}>{execution.stdout}</pre>
         </div>
       ) : null}
       {execution.stderr ? (
         <div className="field">
           <label>{formatCodingExercisesMessage(locale, "stderr")}</label>
-          <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{execution.stderr}</pre>
+          <pre className="coding-exercise-output-text" style={{ margin: 0, whiteSpace: "pre-wrap" }}>{execution.stderr}</pre>
         </div>
       ) : null}
       {execution.compileOutput ? (
         <div className="field">
           <label>{formatCodingExercisesMessage(locale, "compileOutput")}</label>
-          <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{execution.compileOutput}</pre>
+          <pre className="coding-exercise-output-text" style={{ margin: 0, whiteSpace: "pre-wrap" }}>{execution.compileOutput}</pre>
         </div>
       ) : null}
       {execution.message ? <p className="muted">{execution.message}</p> : null}
