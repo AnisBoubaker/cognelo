@@ -4,7 +4,7 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
 - Keep this plugin separate from Programming Exercises: browser preview and Playwright grading have different trust and runtime boundaries from Judge0.
 - Student starter files are public config; solution files, tests, screenshots, and grading artifacts are private plugin data.
-- The learner browser may run only its own bundle in a sandboxed iframe. Graded execution goes through Cognelo to the external Playwright runner.
+- The learner browser may run only its own bundle in a sandboxed iframe. Graded execution goes through Cognelo to the external Playwright runner. Browser modal APIs are allowed only inside that learner-authored preview; Cognelo teacher UI uses the platform shared dialog provider.
 - The endpoint and optional authentication token are admin-managed core runner settings, not plugin environment variables. Resolve them through core so later round-robin pooling remains a platform concern.
 - Saving enabled tests is reference-validation dependent and atomic; failed validation leaves prior tests unchanged.
 - Expected-result prompt tokens expose only generated PNG artifacts, never solution source.

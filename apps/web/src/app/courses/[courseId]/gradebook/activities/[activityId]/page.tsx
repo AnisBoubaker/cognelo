@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { useNotifications } from "@cognelo/activity-ui";
+import { useDialogs, useNotifications } from "@cognelo/activity-ui";
 import { createMcqClient } from "@cognelo/plugin-mcq";
 import { createParsonsClient } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
@@ -37,6 +37,7 @@ export default function GradebookActivityResultsPage() {
   const router = useRouter();
   const groupId = searchParams.get("groupId") || undefined;
   const { t } = useI18n();
+  const dialogs = useDialogs();
   const notifications = useNotifications();
   const mcqClient = useMemo(() => createMcqClient(apiRequest), []);
   const parsonsClient = useMemo(() => createParsonsClient(apiRequest), []);
@@ -233,7 +234,7 @@ export default function GradebookActivityResultsPage() {
       notifications.error(t("courseDetail.regradeUnavailable"));
       return;
     }
-    if (!window.confirm(t("courseDetail.regradeConfirm", { name: row.participantName }))) {
+    if (!await dialogs.confirm({ message: t("courseDetail.regradeConfirm", { name: row.participantName }) })) {
       return;
     }
 
@@ -259,7 +260,7 @@ export default function GradebookActivityResultsPage() {
     const confirmKey = getGradebookActivityActions(row.activityTypeKey).aiAssessmentChangesGrade
       ? "courseDetail.aiAssessmentGradingConfirm"
       : "courseDetail.aiAssessmentFeedbackConfirm";
-    if (!window.confirm(t(confirmKey, { name: row.participantName }))) return;
+    if (!await dialogs.confirm({ message: t(confirmKey, { name: row.participantName }) })) return;
     setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:ai-feedback`);
     try {
       await api.generateActivityAttemptAiFeedback(courseId, attempt.id);
@@ -285,7 +286,7 @@ export default function GradebookActivityResultsPage() {
     const confirmKey = activityActions.aiAssessmentChangesGrade
       ? "courseDetail.aiAssessmentGradingAllConfirm"
       : "courseDetail.aiAssessmentFeedbackAllConfirm";
-    if (!window.confirm(t(confirmKey, { count: eligible.length }))) return;
+    if (!await dialogs.confirm({ message: t(confirmKey, { count: eligible.length }) })) return;
     setSavingGradeKey("__all:ai-feedback");
     try {
       let completed = 0;
@@ -465,7 +466,7 @@ export default function GradebookActivityResultsPage() {
       notifications.error(t("courseDetail.regradeUnavailable"));
       return;
     }
-    if (!window.confirm(t("courseDetail.regradeAllConfirm", { count: rowsWithAttempts.length }))) {
+    if (!await dialogs.confirm({ message: t("courseDetail.regradeAllConfirm", { count: rowsWithAttempts.length }) })) {
       return;
     }
 
@@ -512,6 +513,13 @@ export default function GradebookActivityResultsPage() {
       return;
     }
     router.push(manualGradingHref(courseId, activityId, groupId, row.participantId));
+  }
+
+  async function confirmLeaveFeedbackReview(state: AiFeedbackReviewState) {
+    return !hasUnsavedFeedbackReview(state) || dialogs.confirm({
+      message: t("courseDetail.feedbackReviewDiscardConfirm"),
+      confirmVariant: "danger"
+    });
   }
 
   return (
@@ -643,13 +651,17 @@ export default function GradebookActivityResultsPage() {
             className="dialog-backdrop"
             role="presentation"
             onMouseDown={(event) => {
-              if (event.target === event.currentTarget && canLeaveFeedbackReview(feedbackReview, t("courseDetail.feedbackReviewDiscardConfirm"))) setFeedbackReview(null);
+              if (event.target === event.currentTarget) void confirmLeaveFeedbackReview(feedbackReview).then((confirmed) => {
+                if (confirmed) setFeedbackReview(null);
+              });
             }}
           >
             <AiFeedbackReviewPanel
               state={feedbackReview}
               onClose={() => {
-                if (canLeaveFeedbackReview(feedbackReview, t("courseDetail.feedbackReviewDiscardConfirm"))) setFeedbackReview(null);
+                void confirmLeaveFeedbackReview(feedbackReview).then((confirmed) => {
+                  if (confirmed) setFeedbackReview(null);
+                });
               }}
               onFeedbackChange={(draft) => setFeedbackReview((current) => {
                 if (!current) return current;
@@ -671,7 +683,9 @@ export default function GradebookActivityResultsPage() {
                 preserveTeacherGrade: true
               } : current)}
               onSelectIndex={(selectedIndex) => {
-                if (canLeaveFeedbackReview(feedbackReview, t("courseDetail.feedbackReviewDiscardConfirm"))) void loadFeedbackReview(feedbackReview.rows, selectedIndex);
+                void confirmLeaveFeedbackReview(feedbackReview).then((confirmed) => {
+                  if (confirmed) void loadFeedbackReview(feedbackReview.rows, selectedIndex);
+                });
               }}
               onSave={saveFeedbackReview}
               t={t}
@@ -771,16 +785,12 @@ function AiFeedbackReviewPanel({ state, onClose, onFeedbackChange, onGradeChange
   );
 }
 
-function canLeaveFeedbackReview(state: AiFeedbackReviewState, confirmMessage: string) {
-  if (
-    !state.review ||
-    !state.draft ||
-    (
-      JSON.stringify(state.review.feedback) === JSON.stringify(state.draft) &&
-      !state.gradeTouched
-    )
-  ) return true;
-  return window.confirm(confirmMessage);
+function hasUnsavedFeedbackReview(state: AiFeedbackReviewState) {
+  return Boolean(
+    state.review &&
+    state.draft &&
+    (JSON.stringify(state.review.feedback) !== JSON.stringify(state.draft) || state.gradeTouched)
+  );
 }
 
 function GradebookStudentRow({

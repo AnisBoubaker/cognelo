@@ -1,4 +1,4 @@
-import { createAuthenticatedApi, expect, test } from "./fixtures/auth";
+import { confirmSharedDialog, createAuthenticatedApi, expect, test } from "./fixtures/auth";
 import {
   createBankActivityThroughUi,
   createCourseActivity,
@@ -147,15 +147,15 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     await gradebook.getByLabel("Status").selectOption("graded");
     const exportLink = page.getByRole("link", { name: "Export CSV" });
     await expect(exportLink).toHaveAttribute("href", /activityId=.*status=graded/);
-    page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "Release", exact: true }).click();
+    await confirmSharedDialog(page);
     await expect(page.getByRole("button", { name: "Hide", exact: true })).toBeVisible();
 
-    page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "Hide", exact: true }).click();
+    await confirmSharedDialog(page);
     await expect(page.getByRole("button", { name: "Release", exact: true })).toBeVisible();
-    page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "Release", exact: true }).click();
+    await confirmSharedDialog(page);
   });
 
   test("student sees only the released selected grade, not raw grading payloads", async ({ studentPage: page }) => {
@@ -188,8 +188,8 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     await expect(page.getByText("TA", { exact: true })).toBeVisible();
     await expect(page.getByText("Pending first login", { exact: true })).toBeVisible();
 
-    page.once("dialog", (dialog) => void dialog.accept());
     await page.getByText(email, { exact: true }).locator("..").getByRole("button", { name: "Remove participant" }).click();
+    await confirmSharedDialog(page, "Remove");
     await expect(page.getByText(email, { exact: true })).toHaveCount(0);
   });
 

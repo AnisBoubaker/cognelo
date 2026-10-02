@@ -34,6 +34,11 @@ export const frMessages = {
       unsavedStatus: "Vous avez des modifications non enregistrées.",
       time: "Heure"
     },
+    dialogs: {
+      confirm: "Confirmer",
+      confirmTitle: "Veuillez confirmer",
+      promptTitle: "Saisir les renseignements"
+    },
     activityCategories: {
       generic: "Activité générique",
       programming: "Programmation",

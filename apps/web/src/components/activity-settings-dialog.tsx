@@ -1,6 +1,7 @@
 "use client";
 
 import type { ActivityAssignmentOverrideField } from "@cognelo/contracts";
+import { useDialogs } from "@cognelo/activity-ui";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import {
@@ -58,6 +59,7 @@ const summativeOverrideFields = new Set<ActivityAssignmentOverrideField>([
 
 export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }: ActivitySettingsDialogProps) {
   const { t } = useI18n();
+  const dialogs = useDialogs();
   const [activeTab, setActiveTab] = useState<ActivitySettingsTab>("general");
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [draft, setDraft] = useState<ActivitySettingsDraft | null>(null);
@@ -154,7 +156,10 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
     event.preventDefault();
     if (!draft) return;
     const convertsSummativeToFormative = savedAssessmentMode === "summative" && draft.assessmentMode === "formative";
-    if (convertsSummativeToFormative && !window.confirm(t("groupPage.summativeToFormativeConfirm"))) return;
+    if (convertsSummativeToFormative && !await dialogs.confirm({
+      message: t("groupPage.summativeToFormativeConfirm"),
+      confirmVariant: "danger"
+    })) return;
     setSaving(true);
     setError("");
     try {

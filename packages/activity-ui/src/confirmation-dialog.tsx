@@ -10,6 +10,7 @@ export type ConfirmationDialogProps = {
   cancelLabel: string;
   eyebrow?: string;
   confirmVariant?: "default" | "danger";
+  confirmDisabled?: boolean;
   isConfirming?: boolean;
   onCancel: () => void;
   onConfirm: () => void | Promise<void>;
@@ -23,6 +24,7 @@ export function ConfirmationDialog({
   cancelLabel,
   eyebrow,
   confirmVariant = "default",
+  confirmDisabled = false,
   isConfirming = false,
   onCancel,
   onConfirm
@@ -84,7 +86,7 @@ export function ConfirmationDialog({
           <button
             ref={confirmButtonRef}
             className={confirmVariant === "danger" ? "danger" : undefined}
-            disabled={isConfirming}
+            disabled={isConfirming || confirmDisabled}
             type="button"
             onClick={() => void onConfirm()}
           >

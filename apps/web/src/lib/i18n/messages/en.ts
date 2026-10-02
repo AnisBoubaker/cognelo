@@ -34,6 +34,11 @@ export const enMessages = {
       unsavedStatus: "You have unsaved changes.",
       time: "Time"
     },
+    dialogs: {
+      confirm: "Confirm",
+      confirmTitle: "Please confirm",
+      promptTitle: "Enter information"
+    },
     activityCategories: {
       generic: "Generic Activity",
       programming: "Programming",

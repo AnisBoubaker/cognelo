@@ -1,6 +1,6 @@
 "use client";
 
-import { MarkdownRenderer } from "@cognelo/activity-ui";
+import { MarkdownRenderer, useDialogs } from "@cognelo/activity-ui";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import { CodingExerciseStudentGradeReport } from "@cognelo/plugin-coding-exercises";
 import Link from "next/link";
@@ -49,6 +49,7 @@ export default function CourseGroupPage() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const { locale, t } = useI18n();
+  const dialogs = useDialogs();
   const [course, setCourse] = useState<Course | null>(null);
   const [group, setGroup] = useState<CourseGroup | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
@@ -194,9 +195,9 @@ export default function CourseGroupPage() {
   }, [courseId, groupId, t, user, gradebookActivityId, gradebookStatus]);
 
   async function setGradebookRelease(gradebookItemId: string, released: boolean, activityTitle: string) {
-    const confirmed = window.confirm(
-      t(released ? "courseDetail.releaseGradesConfirm" : "courseDetail.hideGradesConfirm", { title: activityTitle })
-    );
+    const confirmed = await dialogs.confirm({
+      message: t(released ? "courseDetail.releaseGradesConfirm" : "courseDetail.hideGradesConfirm", { title: activityTitle })
+    });
     if (!confirmed) {
       return;
     }
@@ -850,7 +851,11 @@ export default function CourseGroupPage() {
 
   async function removeContentItem(item: CourseContentItem) {
     const title = contentItemTitle(item);
-    const confirmed = window.confirm(t("courseDetail.removeContentItemConfirm", { title }));
+    const confirmed = await dialogs.confirm({
+      message: t("courseDetail.removeContentItemConfirm", { title }),
+      confirmLabel: t("common.remove"),
+      confirmVariant: "danger"
+    });
     if (!confirmed) {
       return;
     }
@@ -1076,7 +1081,11 @@ export default function CourseGroupPage() {
   }
 
   async function removeAssignment(assignmentId: string, title: string) {
-    const confirmed = window.confirm(t("groupPage.removeAssignmentConfirm", { title }));
+    const confirmed = await dialogs.confirm({
+      message: t("groupPage.removeAssignmentConfirm", { title }),
+      confirmLabel: t("common.remove"),
+      confirmVariant: "danger"
+    });
     if (!confirmed) {
       return;
     }
@@ -1237,9 +1246,11 @@ export default function CourseGroupPage() {
   }
 
   async function removeParticipant(participant: GroupParticipant) {
-    const confirmed = window.confirm(
-      t("groupPage.removeParticipantConfirm", { name: `${participant.firstName} ${participant.lastName}`.trim() })
-    );
+    const confirmed = await dialogs.confirm({
+      message: t("groupPage.removeParticipantConfirm", { name: `${participant.firstName} ${participant.lastName}`.trim() }),
+      confirmLabel: t("common.remove"),
+      confirmVariant: "danger"
+    });
     if (!confirmed) {
       return;
     }

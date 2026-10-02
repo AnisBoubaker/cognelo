@@ -12,6 +12,7 @@ The Playwright suite covers the platform's critical browser journeys with real A
 - the placeholder activity's intentional unsupported authoring and learner states;
 - summative assignment policy, draft autosave and resume, multiple attempts, attempt limits, automatic grading, gradebook filtering/export, release/hide controls, and student grade visibility;
 - consistent detailed-gradebook actions, including the Programming Exercise review surface that combines submitted work, rubric feedback, and the editable final grade;
+- shared accessible confirmation dialogs for grade release, AI assessment, participant removal, and other guarded actions instead of native browser popups;
 - activity-settings dialog layout and placeholders, Cancel behavior, formative/summative field filtering, Assign-to-all preservation, unassignment cleanup, inheritance and every group override category, save/reopen persistence, assigned/unassigned access, group visibility, upcoming and expired availability, Safe Exam Browser gating, and effective per-group gradebook policy;
 - bank activity publication from the editor and list, version comparison, duplication, and movement between banks; and
 - group settings updates and restoration.

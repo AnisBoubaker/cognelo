@@ -2,7 +2,7 @@
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
-import { EditActionBar, MarkdownRenderer, MonacoCodeEditor, getEditActionBarCopy, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { EditActionBar, MarkdownRenderer, MonacoCodeEditor, getEditActionBarCopy, useDialogs, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   buildWebDesignPreviewDocument,
   defaultWebDesignExerciseConfig,
@@ -1532,6 +1532,7 @@ function WebDesignTestsPanel({
   testsLoaded: boolean;
   webDesignClient?: WebDesignExerciseClient;
 }) {
+  const dialogs = useDialogs();
   const notifications = useNotifications();
   const [referenceFiles, setReferenceFiles] = useState<WebDesignExerciseFile[]>(() => currentFiles.map((file) => ({ ...file })));
   const [expandedTestIds, setExpandedTestIds] = useState<string[]>([]);
@@ -1636,8 +1637,8 @@ function WebDesignTestsPanel({
     }
   }
 
-  function removeTest(testId: string) {
-    if (!window.confirm(copy.confirmRemoveTest)) {
+  async function removeTest(testId: string) {
+    if (!await dialogs.confirm({ message: copy.confirmRemoveTest, confirmVariant: "danger", confirmLabel: copy.remove })) {
       return;
     }
 
@@ -1717,7 +1718,7 @@ function WebDesignTestSection({
   kind: WebDesignExerciseTestKind;
   saving: boolean;
   onAddTest: () => void;
-  onRemoveTest: (testId: string) => void;
+  onRemoveTest: (testId: string) => void | Promise<void>;
   onToggleTest: (testId: string) => void;
   onUpdateTest: (testId: string, patch: Partial<WebDesignExerciseTestRecord>) => void;
   tests: WebDesignExerciseTestRecord[];
@@ -1766,7 +1767,7 @@ function WebDesignTestSection({
                   <input type="checkbox" checked={test.isEnabled} onChange={(event) => onUpdateTest(test.id, { isEnabled: event.target.checked })} />
                   {copy.enabled}
                 </label>
-                <button type="button" className="danger icon-button" onClick={() => onRemoveTest(test.id)} title={copy.remove} aria-label={copy.remove}>
+                <button type="button" className="danger icon-button" onClick={() => void onRemoveTest(test.id)} title={copy.remove} aria-label={copy.remove}>
                   <WebDesignActionIcon name="remove" />
                 </button>
               </div>

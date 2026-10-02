@@ -502,6 +502,8 @@ This key encrypts SMTP passwords, Microsoft Graph client secrets, and execution-
 
 ## Frontend Notes
 
+`DialogProvider` renders queued confirmations and text prompts through the accessible shared dialog with localized defaults. Cognelo application and plugin code does not use native `window.alert`, `window.confirm`, or `window.prompt`; sandboxed learner-authored previews may still expose browser modal APIs when that activity explicitly requires them.
+
 - Login, settings, subjects, activity banks, courses, course detail, and edit flows are translated in English, French, and Chinese.
 - Locale selection is client-side and persisted in `localStorage`.
 - The header and login page use the Cognelo logo from the repo's brand assets.

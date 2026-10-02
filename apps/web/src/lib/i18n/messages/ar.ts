@@ -34,6 +34,11 @@ export const arMessages = {
       unsavedStatus: "لديك تغييرات غير محفوظة.",
       time: "الوقت"
     },
+    dialogs: {
+      confirm: "تأكيد",
+      confirmTitle: "يرجى التأكيد",
+      promptTitle: "أدخل المعلومات"
+    },
     activityCategories: {
       generic: "نشاط عام",
       programming: "برمجة",
