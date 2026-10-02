@@ -342,6 +342,9 @@ describe("coding exercise AI generation", () => {
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("title/name of at most 50 characters");
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("exit code 0");
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("floating-point comparisons");
+    expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain(
+      "Every output/expectedOutput must contain at least one non-empty line"
+    );
 
     mocks.validateReferenceSolutionAgainstHiddenTests.mockResolvedValue({ accepted: false, sampleTests: { tests: [] }, hiddenTests: { tests: [] } });
     mocks.generateQuestionAuthoringText.mockResolvedValue(JSON.stringify({ sampleTests: [], hiddenTests: [] }));
@@ -360,6 +363,64 @@ describe("coding exercise AI generation", () => {
         hiddenTestCount: 1
       })
     ).rejects.toMatchObject({ status: 422, code: "CODING_EXERCISE_TEST_GENERATION_INVALID" });
+  });
+
+  it("retries generated tests with empty contains-lines output before calling Judge0", async () => {
+    mocks.generateQuestionAuthoringText
+      .mockResolvedValueOnce(JSON.stringify({
+        sampleTests: [{
+          id: "sample-1",
+          title: "Count no matches",
+          input: "",
+          output: "\n",
+          testCode: "assert count_occurrences([], 2) == 0"
+        }],
+        hiddenTests: [{
+          id: "hidden-1",
+          name: "Count repeated matches",
+          stdin: "",
+          expectedOutput: "3",
+          testCode: "print(count_occurrences([2, 2, 2], 2))"
+        }]
+      }))
+      .mockResolvedValueOnce(JSON.stringify({
+        sampleTests: [{
+          id: "sample-1",
+          title: "Count no matches",
+          input: "",
+          output: "0",
+          testCode: "print(count_occurrences([], 2))"
+        }],
+        hiddenTests: [{
+          id: "hidden-1",
+          name: "Count repeated matches",
+          stdin: "",
+          expectedOutput: "3",
+          testCode: "print(count_occurrences([2, 2, 2], 2))"
+        }]
+      }));
+
+    await expect(generateCodingExerciseTests({
+      user,
+      description: "Count matching values in a list",
+      prompt: "Write count_occurrences to count a target value in a list.",
+      language: "python",
+      locale: "en",
+      subject,
+      referenceSolution: "def count_occurrences(values, target):\n    return values.count(target)",
+      templateSource: "{{ STUDENT_CODE }}\n\n{{ TEST_CODE }}",
+      templateVisibleLineNumbers: [],
+      visibleTestCount: 1,
+      hiddenTestCount: 1
+    })).resolves.toMatchObject({
+      attempts: 2,
+      sampleTests: [{ output: "0" }]
+    });
+
+    expect(mocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(1);
+    const correctionPrompt = mocks.generateQuestionAuthoringText.mock.calls[1]?.[1]?.userPrompt ?? "";
+    expect(correctionPrompt).toContain("Contains lines requires at least one non-empty expected line.");
+    expect(correctionPrompt).toContain("assertions alone are insufficient");
   });
 
   it("stops retrying when Judge0 cannot compile the reviewed reference solution", async () => {

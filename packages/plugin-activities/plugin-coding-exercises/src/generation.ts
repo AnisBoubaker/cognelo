@@ -12,6 +12,7 @@ import {
   sampleTestSchema
 } from "./coding-exercises";
 import { validateReferenceSolutionAgainstHiddenTests } from "./executions";
+import { validateCodingExerciseOutputMatcher } from "./output-matcher";
 
 type SubjectContext = {
   title: string;
@@ -605,6 +606,7 @@ function buildTestsGenerationSystemPrompt(input: {
     `- Never generate more than ${codingExerciseMaxGeneratedTestCount} tests of either kind.`,
     "- Generate enough hidden tests to cover normal cases, edge cases, and common mistakes.",
     "- Every visible and hidden test must use outputMatchMode contains_lines with containsLinesOrderMatters false. Do not use exact or regex matching.",
+    "- Every output/expectedOutput must contain at least one non-empty line. Empty or whitespace-only expected output is invalid for contains_lines matching.",
     "- Hidden tests may intentionally reproduce the same test case as a visible test with different input values. This is useful for detecting solutions that hard-code the visible examples, so do not reject that overlap as duplication.",
     `- Give every test a concise, descriptive title/name of at most ${maxGeneratedTestNameLength} characters. State the behavior and expected result when practical, for example "Factorial -3 should give 0" instead of a generic label such as "Negative case".`,
     "- IDs must be stable, lowercase, and unique.",
@@ -618,7 +620,7 @@ function buildTestsGenerationSystemPrompt(input: {
     `- If the template does not contain ${codingExerciseTestInsertionToken}, every testCode field must be empty and tests must use stdin plus expected output only.`,
     "- For full-program tests, put input in input/stdin and expected printed output in output/expectedOutput.",
     "- For callable-unit tests, usually leave input/stdin empty and put setup, calls, assertions, and printed output in testCode.",
-    "- Use assertions only when they do not hide the required expected output; the validation still compares stdout to output/expectedOutput.",
+    "- testCode must print the result named in output/expectedOutput. Assertions alone are insufficient because validation compares stdout to output/expectedOutput.",
     "- warningMessage and error message must be concise, actionable, and written in the current UI/content language.",
     "",
     `Current UI/content language: ${localeName(input.locale)}.`,
@@ -826,6 +828,18 @@ async function validateGeneratedTests(input: {
         .map((test) => test.name)
         .join(", ")}.`
     );
+  }
+  for (const test of tests.sampleTests) {
+    const outputMatcherIssue = validateCodingExerciseOutputMatcher(test.output, test);
+    if (outputMatcherIssue) {
+      issues.push(`Visible test ${JSON.stringify(test.title || test.id)} has invalid expected output: ${outputMatcherIssue}`);
+    }
+  }
+  for (const test of tests.hiddenTests) {
+    const outputMatcherIssue = validateCodingExerciseOutputMatcher(test.expectedOutput, test);
+    if (outputMatcherIssue) {
+      issues.push(`Hidden test ${JSON.stringify(test.name || test.id)} has invalid expected output: ${outputMatcherIssue}`);
+    }
   }
 
   const privateConfig = parseCodingExercisePrivateConfig({
@@ -1148,6 +1162,7 @@ function buildTestCorrectionPrompt(
     "Replace or remove every failing test; do not merely repeat its mathematically expected result.",
     "The reference solution and template are immutable. Re-read them below before changing any input, testCode, or expected output.",
     "Never add stdin unless the reference solution reads it, and never add testCode unless the template contains {{ TEST_CODE }}.",
+    "Every output/expectedOutput must contain at least one non-empty line. When testCode is used, it must print that expected result; assertions alone are insufficient.",
     "Do not include inputs for which the reference solution exits with a non-zero status.",
     "Avoid floating-point values exactly on a comparison threshold when binary representation can change the branch.",
     "Expected output must match the reference solution's actual stdout byte for byte.",
