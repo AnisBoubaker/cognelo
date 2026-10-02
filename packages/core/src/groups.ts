@@ -223,13 +223,11 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
     gradebookSettings: generalGradebookSettings,
     contentPlacement: generalContentPlacement
   };
-  const hasStoredAssignments = groups.some((group) => group.activities.length > 0);
-
   return {
     general,
     groups: groups.map((group) => {
       const assignment = group.activities[0] ?? null;
-      const assigned = assignment ? true : !hasStoredAssignments;
+      const assigned = assignment !== null;
       const assignmentGradebookSettings = assignment?.gradebookItem
         ? gradebookSettingsFromItem(assignment.gradebookItem)
         : generalGradebookSettings;

@@ -226,16 +226,12 @@ describe("group services", () => {
     expect(mockPrisma.courseGroupActivity.findMany).not.toHaveBeenCalled();
   });
 
-  it("treats every current group as assigned when an existing activity has no assignment data", async () => {
+  it("treats every current group as unassigned when a new activity has no assignment rows", async () => {
     mockPrisma.activity.findFirst.mockResolvedValue({
       id: "activity-1",
       courseId: "course-1",
-      title: "Legacy activity",
-      metadata: {
-        allGroupsAssignment: {
-          contentPlacement: { parentId: "stale-folder", isVisible: true }
-        }
-      },
+      title: "New activity",
+      metadata: {},
       activityType: { key: "mcq" }
     });
     mockPrisma.courseGroup.findMany.mockResolvedValue([
@@ -244,7 +240,7 @@ describe("group services", () => {
     ]);
     mockPrisma.courseContentItem.findFirst.mockResolvedValue({
       parentId: "folder-1",
-      titleSnapshot: "Legacy activity",
+      titleSnapshot: "New activity",
       isVisible: true,
       metadata: {}
     });
@@ -255,8 +251,51 @@ describe("group services", () => {
         contentPlacement: { parentId: "folder-1", isVisible: true }
       },
       groups: [
-        { groupId: "group-1", assigned: true, overrideFields: [] },
-        { groupId: "group-2", assigned: true, overrideFields: [] }
+        { groupId: "group-1", assigned: false, overrideFields: [] },
+        { groupId: "group-2", assigned: false, overrideFields: [] }
+      ]
+    });
+  });
+
+  it("uses materialized group assignment rows instead of stale course-wide metadata", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      courseId: "course-1",
+      title: "Partially assigned activity",
+      metadata: {
+        allGroupsAssignment: {
+          enabled: true,
+          assignedGroupIds: ["group-1", "group-2"]
+        }
+      },
+      activityType: { key: "mcq" }
+    });
+    mockPrisma.courseGroup.findMany.mockResolvedValue([
+      {
+        id: "group-1",
+        title: "Group 1",
+        activities: [{
+          id: "assignment-1",
+          availableFrom: null,
+          availableUntil: null,
+          metadata: {},
+          gradebookItem: null,
+          contentItems: []
+        }]
+      },
+      { id: "group-2", title: "Group 2", activities: [] }
+    ]);
+    mockPrisma.courseContentItem.findFirst.mockResolvedValue({
+      parentId: null,
+      titleSnapshot: "Partially assigned activity",
+      isVisible: true,
+      metadata: {}
+    });
+
+    await expect(getCourseActivityAssignmentSettings(teacherUser, "course-1", "activity-1")).resolves.toMatchObject({
+      groups: [
+        { groupId: "group-1", assigned: true },
+        { groupId: "group-2", assigned: false }
       ]
     });
   });
