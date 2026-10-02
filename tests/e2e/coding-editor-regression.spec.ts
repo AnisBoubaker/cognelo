@@ -21,7 +21,7 @@ test.describe("coding exercise editor boundaries", () => {
     await removeActivitySuite(data);
   });
 
-  test("keeps an empty protected editor on one line and types from the cursor", async ({ teacherPage, studentPage }) => {
+  test("keeps the protected editor and unbroken output within workspace boundaries", async ({ teacherPage, studentPage }) => {
     test.setTimeout(180_000);
     if (!data) throw new Error("The activity suite was not provisioned.");
 
@@ -67,8 +67,48 @@ test.describe("coding exercise editor boundaries", () => {
     await studentPage.keyboard.type("abc");
     await expect.poll(() => getLastMonacoModelValue(studentPage)).toBe("abc");
     await expect(studentEditorSurface.locator(".view-line")).toHaveCount(1);
+
+    const longOutput = "x".repeat(4_000);
+    await setLastMonacoModelValue(studentPage, `print('${longOutput}')`);
+    await studentPage.getByRole("button", { name: "Run test" }).click();
+    const testOutput = studentPage.getByLabel("Test output");
+    await expect
+      .poll(async () => (await testOutput.textContent())?.length ?? 0, { timeout: 60_000 })
+      .toBeGreaterThan(3_900);
+    const outputStaysContained = await testOutput.evaluate((element) => {
+      const outputBounds = element.getBoundingClientRect();
+      const runner = element.closest<HTMLElement>(".coding-exercise-test-runner");
+      const workspace = element.closest<HTMLElement>(".coding-exercise-student-workspace");
+      const runnerBounds = runner?.getBoundingClientRect();
+      const workspaceBounds = workspace?.getBoundingClientRect();
+      return Boolean(
+        runner &&
+        workspace &&
+        runnerBounds &&
+        workspaceBounds &&
+        outputBounds.left >= runnerBounds.left - 1 &&
+        outputBounds.right <= runnerBounds.right + 1 &&
+        runnerBounds.right <= workspaceBounds.right + 1 &&
+        element.scrollWidth <= element.clientWidth + 1 &&
+        workspace.scrollWidth <= workspace.clientWidth + 1
+      );
+    });
+    expect(outputStaysContained).toBe(true);
   });
 });
+
+async function setLastMonacoModelValue(page: Page, value: string) {
+  await page.evaluate((nextValue) => {
+    const monaco = (
+      globalThis as typeof globalThis & {
+        monaco?: { editor?: { getModels?: () => Array<{ setValue: (value: string) => void }> } };
+      }
+    ).monaco;
+    const model = monaco?.editor?.getModels?.().at(-1);
+    if (!model) throw new Error("The Monaco model was not available.");
+    model.setValue(nextValue);
+  }, value);
+}
 
 async function getLastMonacoModelValue(page: Page) {
   return page.evaluate(() => {

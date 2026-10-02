@@ -4678,6 +4678,7 @@ a.card:hover,
   display: grid;
   grid-template-areas: "editor divider runner";
   grid-template-columns: minmax(360px, var(--coding-exercise-editor-width, 2fr)) 12px minmax(280px, 1fr);
+  min-width: 0;
 }
 
 .coding-exercise-student-workspace.has-actions {
@@ -4724,6 +4725,7 @@ a.card:hover,
   flex-direction: column;
   grid-area: runner;
   min-height: 0;
+  min-width: 0;
 }
 
 .coding-exercise-test-information {
@@ -4749,7 +4751,10 @@ a.card:hover,
   border-radius: 8px;
   margin: 0;
   max-height: 132px;
+  max-width: 100%;
+  min-width: 0;
   overflow: auto;
+  overflow-wrap: anywhere;
   padding: 10px 12px;
   white-space: pre-wrap;
 }
@@ -4772,10 +4777,20 @@ a.card:hover,
   flex: 1 1 128px;
   grid-template-rows: auto minmax(128px, 1fr);
   min-height: 0;
+  min-width: 0;
 }
 
 .coding-exercise-test-output > pre {
   height: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.coding-exercise-output-text {
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .coding-exercise-workspace-divider {
