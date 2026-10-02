@@ -430,29 +430,30 @@ export default function CourseDetailPage() {
     setError("");
     setIsAddingActivity(true);
     try {
-      const activityId = bankActivity.activityType.key === "test"
-        ? (await api.createTestFromBank(courseId, {
-            bankActivityId: bankActivity.id,
-            activityVersionId: bankActivity.currentVersionId ?? undefined,
-            lifecycle: "draft",
-            position: course?.activities?.length ?? 0,
-            contentPlacement: buildPickerContentPlacement(bankActivity.title)
-          })).test.activityId
-        : (await api.createActivity(courseId, {
-            title: bankActivity.title,
-            activityTypeKey: bankActivity.activityType.key,
-            bankActivityId: bankActivity.id,
-            activityVersionId: bankActivity.currentVersionId ?? undefined,
-            lifecycle: "draft",
-            description: bankActivity.description,
-            config: {},
-            metadata: { researchTags: [] },
-            position: course?.activities?.length ?? 0,
-            contentPlacement: buildPickerContentPlacement(bankActivity.title)
-          })).activity.id;
+      if (bankActivity.activityType.key === "test") {
+        await api.createTestFromBank(courseId, {
+          bankActivityId: bankActivity.id,
+          activityVersionId: bankActivity.currentVersionId ?? undefined,
+          lifecycle: "draft",
+          position: course?.activities?.length ?? 0,
+          contentPlacement: buildPickerContentPlacement(bankActivity.title)
+        });
+      } else {
+        await api.createActivity(courseId, {
+          title: bankActivity.title,
+          activityTypeKey: bankActivity.activityType.key,
+          bankActivityId: bankActivity.id,
+          activityVersionId: bankActivity.currentVersionId ?? undefined,
+          lifecycle: "draft",
+          description: bankActivity.description,
+          config: {},
+          metadata: { researchTags: [] },
+          position: course?.activities?.length ?? 0,
+          contentPlacement: buildPickerContentPlacement(bankActivity.title)
+        });
+      }
       setShowActivityPicker(false);
       await refresh();
-      router.push(`/courses/${courseId}/activities/${activityId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("courseDetail.createActivityError"));
     } finally {
