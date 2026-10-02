@@ -34,6 +34,11 @@ export const zhMessages = {
       unsavedStatus: "你有未保存的更改。",
       time: "时间"
     },
+    dialogs: {
+      confirm: "确认",
+      confirmTitle: "请确认",
+      promptTitle: "输入信息"
+    },
     activityCategories: {
       generic: "通用活动",
       programming: "编程",

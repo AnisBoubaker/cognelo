@@ -14,14 +14,12 @@ test.describe("consistent gradebook review actions", () => {
     await expect(page.getByRole("button", { name: "Grade All Manually" })).toHaveCount(0);
     await expect(page.getByText("Unavailable", { exact: true })).toHaveCount(0);
 
-    let aiConfirmationMessage = "";
-    page.once("dialog", async (dialog) => {
-      aiConfirmationMessage = dialog.message();
-      await dialog.dismiss();
-    });
     await page.getByRole("button", { name: "Assess with AI", exact: true }).first().click();
+    const aiConfirmation = page.getByRole("dialog", { name: "Please confirm" });
+    const aiConfirmationMessage = await aiConfirmation.locator(".muted").innerText();
     expect(aiConfirmationMessage).toContain("evaluate the rubric, generate feedback, and update");
     expect(aiConfirmationMessage).toContain("Automatic grading will not be rerun");
+    await aiConfirmation.getByRole("button", { name: "Cancel", exact: true }).click();
 
     const autoGradedStudentRow = page.locator(".table-row-gradebook-detail").filter({ hasText: "programming.a01@cognelo.local" });
     await autoGradedStudentRow.getByRole("button", { name: "Review and grade", exact: true }).click();

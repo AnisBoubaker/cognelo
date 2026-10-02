@@ -1,6 +1,6 @@
 "use client";
 
-import { ContextMenu, MarkdownRenderer } from "@cognelo/activity-ui";
+import { ContextMenu, MarkdownRenderer, useDialogs } from "@cognelo/activity-ui";
 import { resolveLocalizedText, type ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -64,6 +64,7 @@ export default function CourseDetailPage() {
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const { locale, t } = useI18n();
+  const dialogs = useDialogs();
   const [course, setCourse] = useState<Course | null>(null);
   const [contentGroup, setContentGroup] = useState<CourseGroup | null>(null);
   const [contentViewSelectorMode, setContentViewSelectorMode] = useState<"course" | "group">(
@@ -215,9 +216,9 @@ export default function CourseDetailPage() {
   }, [editingFolderId, editingFolderSelectAll, contentItems]);
 
   async function setGradebookRelease(gradebookItemId: string, released: boolean, activityTitle: string) {
-    const confirmed = window.confirm(
-      t(released ? "courseDetail.releaseGradesConfirm" : "courseDetail.hideGradesConfirm", { title: activityTitle })
-    );
+    const confirmed = await dialogs.confirm({
+      message: t(released ? "courseDetail.releaseGradesConfirm" : "courseDetail.hideGradesConfirm", { title: activityTitle })
+    });
     if (!confirmed) {
       return;
     }
@@ -240,9 +241,9 @@ export default function CourseDetailPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      t(released ? "courseDetail.releaseGradesConfirm" : "courseDetail.hideGradesConfirm", { title: activityTitle })
-    );
+    const confirmed = await dialogs.confirm({
+      message: t(released ? "courseDetail.releaseGradesConfirm" : "courseDetail.hideGradesConfirm", { title: activityTitle })
+    });
     if (!confirmed) {
       return;
     }
@@ -809,7 +810,11 @@ export default function CourseDetailPage() {
 
   async function removeContentItem(item: CourseContentItem) {
     const title = contentItemTitle(item);
-    const confirmed = window.confirm(t("courseDetail.removeContentItemConfirm", { title }));
+    const confirmed = await dialogs.confirm({
+      message: t("courseDetail.removeContentItemConfirm", { title }),
+      confirmLabel: t("common.remove"),
+      confirmVariant: "danger"
+    });
     if (!confirmed) {
       return;
     }

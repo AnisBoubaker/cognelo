@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNotifications } from "@cognelo/activity-ui";
+import { useDialogs, useNotifications } from "@cognelo/activity-ui";
 import { createCodingHomeworkGraderClient, type CodingHomeworkGradebookAttemptRecord } from "@cognelo/plugin-coding-homework-grader";
 import { createMcqClient, type McqSubmission } from "@cognelo/plugin-mcq";
 import { createParsonsClient, type ParsonsGradebookAttemptRecord } from "@cognelo/plugin-parsons";
@@ -50,6 +50,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
   onSaved?: () => Promise<void> | void;
 }) {
   const { locale, t } = useI18n();
+  const dialogs = useDialogs();
   const notifications = useNotifications();
   const codingHomeworkClient = useMemo(() => createCodingHomeworkGraderClient(apiRequest), []);
   const mcqClient = useMemo(() => createMcqClient(apiRequest), []);
@@ -241,7 +242,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
       notifications.error(t("courseDetail.regradeUnavailable"));
       return;
     }
-    if (!window.confirm(t("courseDetail.regradeConfirm", { name: row.participantName }))) return;
+    if (!await dialogs.confirm({ message: t("courseDetail.regradeConfirm", { name: row.participantName }) })) return;
     setSavingAction("regrade");
     try {
       const result = await api.regradeActivityAttempt(courseId, attempt.id, { reason: t("courseDetail.regradeReason") });
@@ -264,10 +265,19 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
       notifications.error(t("courseDetail.deleteSubmissionUnavailable"));
       return;
     }
-    const reason = window.prompt(t("courseDetail.deleteSubmissionPrompt"));
+    const reason = await dialogs.prompt({
+      title: t("courseDetail.deleteSubmission"),
+      inputLabel: t("courseDetail.deleteSubmissionPrompt"),
+      maxLength: 1000
+    });
     if (reason === null) return;
     const normalizedReason = reason.trim() || t("courseDetail.deleteSubmissionReasonFallback");
-    if (!window.confirm(t("courseDetail.deleteSubmissionConfirm", { name: row.participantName, number: coreAttempt.attemptNumber }))) return;
+    if (!await dialogs.confirm({
+      title: t("courseDetail.deleteSubmission"),
+      message: t("courseDetail.deleteSubmissionConfirm", { name: row.participantName, number: coreAttempt.attemptNumber }),
+      confirmLabel: t("courseDetail.deleteSubmission"),
+      confirmVariant: "danger"
+    })) return;
     setSavingAction("delete");
     try {
       await api.deleteActivitySubmission(courseId, coreAttempt.id, { reason: normalizedReason });
@@ -296,13 +306,16 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
   }
 
   const selectedAttempt = manualReview?.attempts[manualReview.selectedIndex] ?? null;
-  const close = () => {
-    if (!feedbackReview || canLeaveFeedbackReview(feedbackReview, t("courseDetail.feedbackReviewDiscardConfirm"))) onClose();
+  const close = async () => {
+    if (!feedbackReview || !hasUnsavedFeedbackReview(feedbackReview) || await dialogs.confirm({
+      message: t("courseDetail.feedbackReviewDiscardConfirm"),
+      confirmVariant: "danger"
+    })) onClose();
   };
 
   return (
     <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) close();
+      if (event.target === event.currentTarget) void close();
     }}>
       {feedbackRenderer ? feedbackReview ? (
           <AiFeedbackReviewPanel
@@ -438,11 +451,12 @@ function AiFeedbackReviewPanel({ row, state, onClose, onFeedbackChange, onGradeC
   );
 }
 
-function canLeaveFeedbackReview(state: FeedbackReviewState, confirmMessage: string) {
-  if (!state.review || !state.draft || (JSON.stringify(state.review.feedback) === JSON.stringify(state.draft) && !state.gradeTouched)) {
-    return true;
-  }
-  return window.confirm(confirmMessage);
+function hasUnsavedFeedbackReview(state: FeedbackReviewState) {
+  return Boolean(
+    state.review &&
+    state.draft &&
+    (JSON.stringify(state.review.feedback) !== JSON.stringify(state.draft) || state.gradeTouched)
+  );
 }
 
 function selectedFeedbackAttempt(row: CourseGradebookRow) {

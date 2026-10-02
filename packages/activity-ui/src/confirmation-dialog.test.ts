@@ -13,4 +13,8 @@ describe("ConfirmationDialog focus lifecycle", () => {
   it("preserves an autofocus field already focused inside the dialog", () => {
     expect(dialogSource).toContain("dialogRef.current?.contains(document.activeElement)");
   });
+
+  it("can disable confirmation while a shared prompt is incomplete", () => {
+    expect(dialogSource).toContain("disabled={isConfirming || confirmDisabled}");
+  });
 });

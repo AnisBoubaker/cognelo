@@ -79,6 +79,13 @@ export async function loginWithCredentialsThroughUi(page: Page, account: Credent
   await expect(page.getByRole("button", { name: "Open account menu" })).toBeVisible();
 }
 
+export async function confirmSharedDialog(page: Page, confirmLabel = "Confirm") {
+  const dialog = page.getByRole("dialog", { name: "Please confirm" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: confirmLabel, exact: true }).click();
+  await expect(dialog).toBeHidden();
+}
+
 async function provideAuthenticatedPage(
   browser: Browser,
   role: AuthRole,

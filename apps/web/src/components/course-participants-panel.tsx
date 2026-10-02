@@ -1,6 +1,6 @@
 "use client";
 
-import { ConfirmationDialog } from "@cognelo/activity-ui";
+import { ConfirmationDialog, useDialogs } from "@cognelo/activity-ui";
 import { ChangeEvent, FocusEvent, FormEvent, useEffect, useState } from "react";
 import { AppIcon } from "@/components/app-icon";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
@@ -68,6 +68,7 @@ export function CourseParticipantsPanel({
   onChanged: () => Promise<void>;
 }) {
   const { t } = useI18n();
+  const dialogs = useDialogs();
   const [groupDetails, setGroupDetails] = useState<Record<string, CourseGroup>>({});
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [editor, setEditor] = useState<GroupEditor | null>(null);
@@ -277,7 +278,11 @@ export function CourseParticipantsPanel({
   }
 
   async function removeParticipant(group: CourseGroup, participant: GroupParticipant) {
-    if (!window.confirm(t("groupPage.removeParticipantConfirm", { name: `${participant.firstName} ${participant.lastName}`.trim() }))) return;
+    if (!await dialogs.confirm({
+      message: t("groupPage.removeParticipantConfirm", { name: `${participant.firstName} ${participant.lastName}`.trim() }),
+      confirmLabel: t("common.remove"),
+      confirmVariant: "danger"
+    })) return;
     setRemovingParticipantId(participant.id);
     setError("");
     try {

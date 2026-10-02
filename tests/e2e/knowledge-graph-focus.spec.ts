@@ -50,6 +50,19 @@ test.describe.serial("knowledge graph dialog focus", () => {
     if (subjectId) await prisma.subject.deleteMany({ where: { id: subjectId } });
   });
 
+  test("uses the shared text prompt for rich-text links", async ({ teacherPage: page }) => {
+    await page.goto(`/subjects/${subjectId}/edit`);
+    await page.getByRole("button", { name: "Link", exact: true }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Link" });
+    const input = dialog.getByLabel("Enter the link URL");
+    await expect(dialog).toBeVisible();
+    await expect(input).toBeFocused();
+    await expect(input).toHaveValue("https://");
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(dialog).toBeHidden();
+  });
+
   test("keeps skill and misconception inputs focused while typing", async ({ teacherPage: page }) => {
     await page.goto(`/subjects/${subjectId}/edit`);
     await page.getByRole("tab", { name: "Knowledge graph" }).click();

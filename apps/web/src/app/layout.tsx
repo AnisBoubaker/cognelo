@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { AuthProvider } from "@/components/auth-provider";
+import { AppDialogProvider } from "@/components/dialog-provider";
 import { AppNotificationProvider } from "@/components/notification-provider";
 import { UnsavedChangesProvider } from "@/components/unsaved-changes-provider";
 import { documentLocaleBootstrapScript } from "@/lib/document-locale";
@@ -27,7 +28,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <AuthProvider>
           <I18nProvider>
             <AppNotificationProvider>
-              <UnsavedChangesProvider>{children}</UnsavedChangesProvider>
+              <AppDialogProvider>
+                <UnsavedChangesProvider>{children}</UnsavedChangesProvider>
+              </AppDialogProvider>
             </AppNotificationProvider>
           </I18nProvider>
         </AuthProvider>

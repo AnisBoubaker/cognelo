@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useNotifications } from "@cognelo/activity-ui";
+import { useDialogs, useNotifications } from "@cognelo/activity-ui";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { SettingsNav } from "@/components/settings-nav";
@@ -35,6 +35,7 @@ const emptyForm: FormState = {
 export default function AiAgentSettingsPage() {
   const { user } = useAuth();
   const { t } = useI18n();
+  const dialogs = useDialogs();
   const notifications = useNotifications();
   const [connections, setConnections] = useState<AiAgentConnection[]>([]);
   const [questionAuthoringAgentId, setQuestionAuthoringAgentId] = useState("");
@@ -130,7 +131,11 @@ export default function AiAgentSettingsPage() {
   }
 
   async function deleteConnection(connection: AiAgentConnection) {
-    if (!window.confirm(t("settings.aiAgentDeleteConfirm", { name: connection.displayName }))) {
+    if (!await dialogs.confirm({
+      message: t("settings.aiAgentDeleteConfirm", { name: connection.displayName }),
+      confirmLabel: t("common.remove"),
+      confirmVariant: "danger"
+    })) {
       return;
     }
     setError("");

@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures/auth";
+import { confirmSharedDialog, expect, test } from "./fixtures/auth";
 import { provisionLearningFlow, removeLearningFlow, type LearningFlowData } from "./fixtures/learning-flow";
 
 test.describe("student submission and teacher grading", () => {
@@ -34,8 +34,8 @@ test.describe("student submission and teacher grading", () => {
     await teacherPage.goto(`/courses/${data.courseId}?tab=gradebook`);
     await expect(teacherPage.getByRole("heading", { name: "Course gradebook" })).toBeVisible();
     await expect(teacherPage.getByRole("button", { name: `Expand ${data.activityTitle}` })).toBeVisible();
-    teacherPage.once("dialog", (dialog) => void dialog.accept());
     await teacherPage.getByRole("button", { name: "Release", exact: true }).click();
+    await confirmSharedDialog(teacherPage);
     await expect(teacherPage.getByRole("button", { name: "Hide", exact: true })).toBeVisible();
 
     await studentPage.goto(`/courses/${data.courseId}/groups/${data.groupId}?tab=grades`);

@@ -14,6 +14,7 @@
 
 - Public config contains only student starter files, prompt, preview entry, and editor settings.
 - Teacher solution bundles, Playwright tests, screenshots, submissions, and results use plugin-owned persistence.
+- Teacher test removal uses the platform shared confirmation dialog; native modal APIs remain limited to learner-authored code inside the sandboxed preview.
 - Fast preview is client-side and sandboxed; graded execution is server-mediated through the external runner.
 - Administrators configure the endpoint under **Settings → Runners**. Core persists the endpoint and optional encrypted authentication token and resolves it through the pool-ready runner selector.
 - Enabled tests must pass against the private reference bundle before they are saved.

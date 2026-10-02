@@ -12,6 +12,7 @@ import {
   useState
 } from "react";
 import { CodeEditor } from "./code-editor";
+import { useDialogs } from "./dialog-provider";
 import { EquationEditorDialog } from "./equation-editor-dialog";
 import { ImageEditorDialog } from "./image-editor-dialog";
 import { markdownImageWidth, readMarkdownImageSize, writeMarkdownImageSize, type MarkdownImageSize } from "./image-sizing";
@@ -410,6 +411,7 @@ export function RichTextEditor({
   ariaLabel,
   uploadImage = defaultMediaImageUpload
 }: RichTextEditorProps) {
+  const dialogs = useDialogs();
   const [mode, setMode] = useState<"visual" | "markdown">("visual");
   const [equationDialog, setEquationDialog] = useState<EquationDialogState | null>(null);
   const [tableDialogOpen, setTableDialogOpen] = useState(false);
@@ -508,11 +510,19 @@ export function RichTextEditor({
     }
   }
 
-  function addLink() {
+  async function addLink() {
     if (disabled) {
       return;
     }
-    const url = window.prompt(copy.linkPrompt, "https://");
+    saveSelection();
+    const url = await dialogs.prompt({
+      title: copy.link,
+      inputLabel: copy.linkPrompt,
+      inputType: "url",
+      defaultValue: "https://",
+      required: true,
+      confirmLabel: copy.link
+    });
     if (url?.trim()) {
       runCommand("createLink", url.trim());
     }
@@ -938,7 +948,7 @@ export function RichTextEditor({
             <button aria-label={copy.numberedList} title={copy.numberedList} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("insertOrderedList")}>
               1. List
             </button>
-            <button aria-label={copy.link} title={copy.link} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={addLink}>
+            <button aria-label={copy.link} title={copy.link} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => void addLink()}>
               🔗
             </button>
             <button aria-label={copy.unlink} title={copy.unlink} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("unlink")}>
