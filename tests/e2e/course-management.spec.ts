@@ -53,7 +53,8 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     await expect(settings.getByRole("tab", { name: "Exceptions" })).toBeVisible();
     await expect(settings.getByRole("combobox", { name: "Folder" })).toHaveCount(0);
     await settings.getByRole("tab", { name: "Group assignment" }).click();
-    await expect(settings.getByLabel("Assigned")).toBeChecked();
+    await expect(settings.getByLabel("Assigned")).not.toBeChecked();
+    await settings.getByLabel("Assigned").check();
     await expect(settings.getByRole("checkbox", { name: "Folder" })).toHaveCount(0);
     await expect(settings.getByRole("checkbox", { name: "Points possible" })).toHaveCount(0);
     const firstOverrideCheckbox = settings.locator(".activity-override-toggle input[type='checkbox']").first();
@@ -242,6 +243,24 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     );
     await page.getByRole("button", { name: "Save multiple choice questions" }).click();
     await secondVersionSaved;
+
+    await page.goto(`/courses/${data.courseId}?tab=content`);
+    await page.getByRole("button", { name: "Content tree actions" }).click();
+    await page.getByRole("menuitem", { name: "New activity" }).click();
+    const coursePicker = page.getByRole("dialog", { name: "Choose course element" });
+    await coursePicker.getByLabel("Activity bank").selectOption(data.activityBankId);
+    const imported = page.waitForResponse(
+      (response) =>
+        response.ok() &&
+        response.request().method() === "POST" &&
+        response.url().endsWith(`/api/courses/${data.courseId}/activities`)
+    );
+    await coursePicker.getByRole("button", { name: title }).click();
+    await imported;
+    await expect(coursePicker).toBeHidden();
+    await expect(page).toHaveURL(`/courses/${data.courseId}?tab=content`);
+    await expect(page.getByText(title, { exact: true }).first()).toBeVisible();
+
     await page.goto(`/activity-banks/${data.activityBankId}`);
 
     await page.getByRole("button", { name: `Actions for ${title}` }).click();
