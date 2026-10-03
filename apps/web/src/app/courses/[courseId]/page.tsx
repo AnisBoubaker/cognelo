@@ -10,6 +10,7 @@ import {
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
   PointerEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -35,9 +36,7 @@ import {
   CourseGroup,
   CourseContentItem,
   CourseContentResource,
-  CourseGradebook,
-  CourseGradebookItemSummary,
-  CourseGradebookRow,
+  CourseGradebookSummary,
   CourseMaterial,
   GradebookStatus,
   Subject
@@ -62,6 +61,7 @@ export default function CourseDetailPage() {
   const courseId = params.courseId;
   const router = useRouter();
   const searchParams = useSearchParams();
+  const activeCourseTab = resolveCourseWorkspaceTab(searchParams.get("tab"));
   const { user, loading: authLoading } = useAuth();
   const { locale, t } = useI18n();
   const dialogs = useDialogs();
@@ -79,8 +79,10 @@ export default function CourseDetailPage() {
   const [activityBanks, setActivityBanks] = useState<ActivityBank[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [aiAgentConnections, setAiAgentConnections] = useState<AiAgentConnection[]>([]);
-  const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
+  const [gradebook, setGradebook] = useState<CourseGradebookSummary | null>(null);
   const [contentItems, setContentItems] = useState<CourseContentItem[]>([]);
+  const [contentLoading, setContentLoading] = useState(true);
+  const [gradebookLoading, setGradebookLoading] = useState(activeCourseTab === "gradebook");
   const [gradebookGroupId, setGradebookGroupId] = useState(() => searchParams.get("tab") === "gradebook" ? searchParams.get("groupId") ?? "" : "");
   const [gradebookActivityId, setGradebookActivityId] = useState("");
   const [gradebookStatus, setGradebookStatus] = useState<GradebookStatus>("all");
@@ -123,6 +125,7 @@ export default function CourseDetailPage() {
   const cancelFolderEditRef = useRef(false);
   const skipFolderBlurRef = useRef(false);
   const initializedGroupSelectionCourseIdRef = useRef<string | null>(null);
+  const refreshRequestIdRef = useRef(0);
   const requestedContentGroupId = searchParams.get("view") === "group" ? searchParams.get("groupId") : null;
 
   useEffect(() => {
@@ -132,68 +135,104 @@ export default function CourseDetailPage() {
     }
   }, [requestedContentGroupId]);
 
-  async function refresh() {
-    const [courseResult, typeResult] = await Promise.all([api.course(courseId), api.activityTypes()]);
-    setCourse(courseResult.course);
-    setActivityTypes(typeResult.activityTypes);
-    setActivityDefinitions(typeResult.registeredDefinitions);
-    const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
-    const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher" || role === "ta";
-    if (userCanManage) {
-      const canViewSubjectCatalog = user?.roles.some((userRole) =>
+  const refresh = useCallback(async () => {
+    const requestId = ++refreshRequestIdRef.current;
+    const isCurrentRequest = () => refreshRequestIdRef.current === requestId;
+    setContentLoading(activeCourseTab === "content");
+    setGradebookLoading(activeCourseTab === "gradebook");
+
+    try {
+      const [courseResult, typeResult] = await Promise.all([api.course(courseId), api.activityTypes()]);
+      if (!isCurrentRequest()) return;
+      setCourse(courseResult.course);
+      setActivityTypes(typeResult.activityTypes);
+      setActivityDefinitions(typeResult.registeredDefinitions);
+      const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
+      const userCanManage = Boolean(user?.roles.includes("admin") || role === "owner" || role === "teacher" || role === "ta");
+      if (!userCanManage) {
+        setGradebook(null);
+        setContentItems([]);
+        setContentTypeDefinitions([]);
+        setActiveContentTypeDefinitions([]);
+        setContentResources([]);
+        setSubjects([]);
+        setContentGroup(null);
+        setActivityBanks([]);
+        setContentLoading(false);
+        setGradebookLoading(false);
+        return;
+      }
+
+      const canViewSubjectCatalog = Boolean(user?.roles.some((userRole) =>
         userRole === "admin" || userRole === "course_manager" || userRole === "teacher"
-      );
+      ));
       const validContentGroupId = requestedContentGroupId && courseResult.course.groups?.some((group) => group.id === requestedContentGroupId)
         ? requestedContentGroupId
         : null;
-      const [gradebookResult, contentResult, contentTypesResult, contentResourcesResult, subjectsResult, contentGroupResult] = await Promise.all([
-        api.courseGradebook(courseId, {
-          groupId: gradebookGroupId || undefined,
-          activityId: gradebookActivityId || undefined,
-          status: gradebookStatus
-        }),
-        validContentGroupId ? api.groupContent(courseId, validContentGroupId) : api.courseContent(courseId),
-        api.courseContentTypes(courseId),
-        validContentGroupId ? api.groupContentResources(courseId, validContentGroupId) : api.courseContentResources(courseId),
-        canViewSubjectCatalog
-          ? api.subjects()
-          : Promise.resolve({ subjects: courseResult.course.subject ? [courseResult.course.subject] : [] }),
-        validContentGroupId ? api.group(courseId, validContentGroupId) : Promise.resolve(null)
-      ]);
-      setGradebook(gradebookResult.gradebook);
-      setContentItems(contentResult.contentItems);
-      setContentTypeDefinitions(contentTypesResult.contentTypes);
-      setActiveContentTypeDefinitions(contentTypesResult.activeContentTypes ?? contentTypesResult.contentTypes);
-      setContentResources(contentResourcesResult.resources);
-      setSubjects(subjectsResult.subjects);
-      setContentGroup(contentGroupResult?.group ?? null);
-    } else {
-      setGradebook(null);
-      setContentItems([]);
-      setContentTypeDefinitions([]);
-      setActiveContentTypeDefinitions([]);
-      setContentResources([]);
-      setSubjects([]);
-      setContentGroup(null);
+      const contentRequest = activeCourseTab === "content"
+        ? Promise.all([
+            validContentGroupId ? api.groupContent(courseId, validContentGroupId) : api.courseContent(courseId),
+            api.courseContentTypes(courseId),
+            validContentGroupId ? api.groupContentResources(courseId, validContentGroupId) : api.courseContentResources(courseId),
+            validContentGroupId ? api.group(courseId, validContentGroupId) : Promise.resolve(null)
+          ]).then(([contentResult, contentTypesResult, contentResourcesResult, contentGroupResult]) => {
+            if (!isCurrentRequest()) return;
+            setContentItems(contentResult.contentItems);
+            setContentTypeDefinitions(contentTypesResult.contentTypes);
+            setActiveContentTypeDefinitions(contentTypesResult.activeContentTypes ?? contentTypesResult.contentTypes);
+            setContentResources(contentResourcesResult.resources);
+            setContentGroup(contentGroupResult?.group ?? null);
+          }).finally(() => {
+            if (isCurrentRequest()) setContentLoading(false);
+          })
+        : Promise.resolve();
+      const subjectsRequest = (canViewSubjectCatalog
+        ? api.subjects()
+        : Promise.resolve({ subjects: courseResult.course.subject ? [courseResult.course.subject] : [] })
+      ).then((subjectsResult) => {
+        if (isCurrentRequest()) setSubjects(subjectsResult.subjects);
+      });
+      const gradebookRequest = activeCourseTab === "gradebook"
+        ? api.courseGradebookSummary(courseId, {
+            groupId: gradebookGroupId || undefined,
+            activityId: gradebookActivityId || undefined,
+            status: gradebookStatus
+          }).then((gradebookResult) => {
+            if (isCurrentRequest()) setGradebook(gradebookResult.gradebook);
+          }).finally(() => {
+            if (isCurrentRequest()) setGradebookLoading(false);
+          })
+        : Promise.resolve();
+      const aiConnectionsRequest = api
+        .aiAgentConnections()
+        .then((aiAgentResult) => {
+          if (isCurrentRequest()) {
+            setAiAgentConnections(aiAgentResult.connections.filter((connection) => connection.isEnabled));
+          }
+        })
+        .catch(() => {
+          if (isCurrentRequest()) setAiAgentConnections([]);
+        });
+      const banksRequest = canViewSubjectCatalog && courseResult.course.subjectId
+        ? api.activityBanks(courseResult.course.subjectId).then((banksResult) => {
+            if (isCurrentRequest()) setActivityBanks(banksResult.activityBanks);
+          })
+        : Promise.resolve().then(() => {
+            if (isCurrentRequest()) setActivityBanks([]);
+          });
+
+      await Promise.all([contentRequest, subjectsRequest, gradebookRequest, aiConnectionsRequest, banksRequest]);
+    } catch (err) {
+      if (!isCurrentRequest()) return;
+      setContentLoading(false);
+      setGradebookLoading(false);
+      throw err;
     }
-    api
-      .aiAgentConnections()
-      .then((aiAgentResult) => setAiAgentConnections(aiAgentResult.connections.filter((connection) => connection.isEnabled)))
-      .catch(() => setAiAgentConnections([]));
-    const canViewSubjectCatalog = user?.roles.some((role) =>
-      role === "admin" || role === "course_manager" || role === "teacher"
-    );
-    if (userCanManage && canViewSubjectCatalog && courseResult.course.subjectId) {
-      const banksResult = await api.activityBanks(courseResult.course.subjectId);
-      setActivityBanks(banksResult.activityBanks);
-    } else {
-      setActivityBanks([]);
-    }
-  }
+  }, [activeCourseTab, courseId, gradebookActivityId, gradebookGroupId, gradebookStatus, requestedContentGroupId, user]);
 
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("courseDetail.loadError")));
-  }, [courseId, t, user, gradebookGroupId, gradebookActivityId, gradebookStatus, requestedContentGroupId]);
+  }, [refresh, t]);
 
   useEffect(() => {
     if (!editingFolderId) {
@@ -287,8 +326,14 @@ export default function CourseDetailPage() {
     [gradebook?.groups, locale]
   );
   const studentRedirectGroupId = course && !canManage ? sortedCourseGroups[0]?.id : null;
-  const gradebookActivities = buildGradebookActivitySummaries(gradebook?.items ?? [], gradebook?.rows ?? []);
-  const gradebookOverview = buildGradebookOverview(gradebookActivities);
+  const gradebookActivities = gradebook?.activitySummaries ?? [];
+  const gradebookOverview = gradebook?.overview ?? {
+    activityCount: 0,
+    submissionCount: 0,
+    gradedCount: 0,
+    meanScore: null,
+    meanMaxScore: null
+  };
 
   useEffect(() => {
     if (!course || course.id !== courseId || initializedGroupSelectionCourseIdRef.current === courseId) {
@@ -603,7 +648,6 @@ export default function CourseDetailPage() {
   const settingsContentResource = settingsContentItem?.contentResourceId ? contentResourceById.get(settingsContentItem.contentResourceId) ?? null : null;
   const settingsContentType = settingsContentResource ? contentTypeByKey.get(settingsContentResource.contentTypeKey) ?? null : null;
   const SettingsContentTypeRenderer = resolveContentTypeSettingsRenderer(settingsContentType?.settingsRendererKey);
-  const activeCourseTab = resolveCourseWorkspaceTab(searchParams.get("tab"));
   const activeCourseSettingsSection: CourseSettingsSection = searchParams.get("section") === "ai" ? "ai" : "general";
   const pickerPlacementPanel = (
     <div className="grid compact-form-grid activity-picker-placement">
@@ -1404,7 +1448,9 @@ export default function CourseDetailPage() {
                         </div>
                       </div>
 
-                      {visibleContentItems.length ? (
+                      {contentLoading ? (
+                        <p className="muted">{t("common.loading")}</p>
+                      ) : visibleContentItems.length ? (
                         <div className="table-list">
                           {!contentGroup ? (
                             <div
@@ -1756,6 +1802,9 @@ export default function CourseDetailPage() {
                         </a>
                       </div>
 
+                      {gradebookLoading ? (
+                        <p className="muted">{t("common.loading")}</p>
+                      ) : <>
                       <div className="form inline-panel gradebook-filters">
                         <div className="field">
                           <label htmlFor="gradebook-group-filter">{t("courseDetail.groupFilter")}</label>
@@ -1928,6 +1977,7 @@ export default function CourseDetailPage() {
                       ) : (
                         <p className="muted">{t("courseDetail.noGradebookRows")}</p>
                       )}
+                      </>}
                     </section>
                   )
                 },
@@ -2239,126 +2289,6 @@ function formatMeanGrade(score: number | null, maxScore: number | null) {
     return "-";
   }
   return `${formatGradeNumber(score)} / ${formatGradeNumber(maxScore)}`;
-}
-
-type GradebookGroupSummary = {
-  groupId: string;
-  groupTitle: string;
-  gradebookItemId: string;
-  gradesReleased: boolean;
-  assessmentMode: "formative" | "summative";
-  studentCount: number;
-  submissionCount: number;
-  gradedCount: number;
-  incompleteGradeCount: number;
-  meanScore: number | null;
-  meanMaxScore: number | null;
-};
-
-type GradebookActivitySummary = {
-  activityId: string;
-  activityTitle: string;
-  activityTypeName: string;
-  assessmentMode: "formative" | "summative";
-  gradebookItemIds: string[];
-  allGradesReleased: boolean;
-  submissionCount: number;
-  gradedCount: number;
-  incompleteGradeCount: number;
-  meanScore: number | null;
-  meanMaxScore: number | null;
-  groups: GradebookGroupSummary[];
-};
-
-function buildGradebookActivitySummaries(items: CourseGradebookItemSummary[], rows: CourseGradebookRow[]): GradebookActivitySummary[] {
-  const rowsByItem = new Map<string, CourseGradebookRow[]>();
-  for (const row of rows) {
-    const existing = rowsByItem.get(row.gradebookItemId) ?? [];
-    existing.push(row);
-    rowsByItem.set(row.gradebookItemId, existing);
-  }
-
-  const itemsByActivity = new Map<string, CourseGradebookItemSummary[]>();
-  for (const item of items) {
-    const existing = itemsByActivity.get(item.activityId) ?? [];
-    existing.push(item);
-    itemsByActivity.set(item.activityId, existing);
-  }
-
-  return [...itemsByActivity.values()]
-    .map((activityItems) => {
-      const first = activityItems[0];
-      const activityRows = activityItems.flatMap((item) => rowsByItem.get(item.gradebookItemId) ?? []);
-      const groups = activityItems
-        .map((item) => summarizeGradebookGroup(item, rowsByItem.get(item.gradebookItemId) ?? []))
-        .sort((left, right) => left.groupTitle.localeCompare(right.groupTitle));
-
-      return {
-        activityId: first.activityId,
-        activityTitle: first.activityTitle,
-        activityTypeName: first.activityTypeName,
-        assessmentMode: first.assessmentMode,
-        gradebookItemIds: activityItems.map((item) => item.gradebookItemId),
-        allGradesReleased: groups.length > 0 && groups.every((group) => group.gradesReleased),
-        submissionCount: sum(groups.map((group) => group.submissionCount)),
-        gradedCount: sum(groups.map((group) => group.gradedCount)),
-        incompleteGradeCount: sum(groups.filter((group) => !group.gradesReleased).map((group) => group.incompleteGradeCount)),
-        ...meanGradeForRows(activityRows),
-        groups
-      };
-    })
-    .sort((left, right) => left.activityTitle.localeCompare(right.activityTitle));
-}
-
-function summarizeGradebookGroup(item: CourseGradebookItemSummary, rows: CourseGradebookRow[]): GradebookGroupSummary {
-  return {
-    groupId: item.groupId,
-    groupTitle: item.groupTitle,
-    gradebookItemId: item.gradebookItemId,
-    gradesReleased: item.gradesReleased,
-    assessmentMode: item.assessmentMode,
-    studentCount: item.studentCount,
-    submissionCount: sum(rows.map((row) => row.submittedAttemptCount)),
-    gradedCount: rows.filter((row) => row.score !== null).length,
-    incompleteGradeCount: item.incompleteGradeCount,
-    ...meanGradeForRows(rows)
-  };
-}
-
-function buildGradebookOverview(activities: GradebookActivitySummary[]) {
-  const rowsForMean = activities.flatMap((activity) =>
-    activity.meanScore === null || activity.meanMaxScore === null
-      ? []
-      : [{ score: activity.meanScore, maxScore: activity.meanMaxScore }]
-  );
-
-  return {
-    activityCount: activities.length,
-    submissionCount: sum(activities.map((activity) => activity.submissionCount)),
-    gradedCount: sum(activities.map((activity) => activity.gradedCount)),
-    meanScore: rowsForMean.length ? roundGrade(rowsForMean.reduce((total, row) => total + row.score, 0) / rowsForMean.length) : null,
-    meanMaxScore: rowsForMean.length ? roundGrade(rowsForMean.reduce((total, row) => total + row.maxScore, 0) / rowsForMean.length) : null
-  };
-}
-
-function meanGradeForRows(rows: CourseGradebookRow[]) {
-  const gradedRows = rows.filter((row) => row.score !== null);
-  if (!gradedRows.length) {
-    return { meanScore: null, meanMaxScore: null };
-  }
-
-  return {
-    meanScore: roundGrade(gradedRows.reduce((total, row) => total + (row.score ?? 0), 0) / gradedRows.length),
-    meanMaxScore: roundGrade(gradedRows.reduce((total, row) => total + row.maxScore, 0) / gradedRows.length)
-  };
-}
-
-function sum(values: number[]) {
-  return values.reduce((total, value) => total + value, 0);
-}
-
-function roundGrade(value: number) {
-  return Math.round(value * 100) / 100;
 }
 
 function compareGroupTitles(left: string, right: string, locale: string) {

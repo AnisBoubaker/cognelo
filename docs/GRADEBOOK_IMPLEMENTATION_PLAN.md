@@ -457,6 +457,7 @@ First plugin integration target:
 - Completed: add activity submissions view through the gradebook activity/status filters and per-activity rows.
 - Completed: add participant history view through per-row attempt history summaries.
 - Completed: course-wide teacher gradebook now defaults to activity-level summaries with submission count, graded count, mean grade, all-groups release/hide, detailed-results navigation, and expandable group-specific summaries with group release/hide controls. Group gradebook uses the same activity-summary layout scoped to the current group.
+- Completed: the course workspace requests that overview through `GET /api/courses/:courseId/gradebook?view=summary` only while the Gradebook tab is active. The server returns course/activity/group aggregates without learner rows or attempt histories; detailed views and CSV export retain the full data they require.
 - Completed: detailed results navigation supports course-wide activity results and group-scoped activity results through `?groupId=:groupId`.
 - Completed: detailed-results back links return to the course Gradebook tab and preserve `groupId` when the report is group-scoped.
 - Completed: detailed activity results page lists per-student results and supports a Parsons "See answer" overlay with previous/next submission navigation and an "Include attempts" option for non-submission attempts/events.

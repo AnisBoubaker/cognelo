@@ -43,8 +43,41 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
 
   test("teacher assigns a summative activity with the full attempt and grading policy", async ({ teacherPage: page }) => {
     if (!data) throw new Error("The activity suite was not provisioned.");
-    await page.goto(`/courses/${data.courseId}?tab=content`);
-    await page.getByRole("button", { name: `Actions for ${activityTitle}` }).click();
+    const gradebookRequests: string[] = [];
+    const trackGradebookRequest = (request: import("@playwright/test").Request) => {
+      if (new URL(request.url()).pathname === `/api/courses/${data.courseId}/gradebook`) {
+        gradebookRequests.push(request.url());
+      }
+    };
+    let releaseContent: () => void = () => undefined;
+    const contentGate = new Promise<void>((resolve) => {
+      releaseContent = resolve;
+    });
+    let markContentRequested: () => void = () => undefined;
+    const contentRequested = new Promise<void>((resolve) => {
+      markContentRequested = resolve;
+    });
+    const contentUrl = new RegExp(`/api/courses/${data.courseId}/content(?:\\?|$)`);
+    await page.route(contentUrl, async (route) => {
+      markContentRequested();
+      await contentGate;
+      await route.continue();
+    });
+    page.on("request", trackGradebookRequest);
+    try {
+      await page.goto(`/courses/${data.courseId}?tab=content`);
+      await contentRequested;
+      const contentPanel = page.getByRole("tabpanel", { name: "Content" });
+      await expect(contentPanel.getByText("Loading...", { exact: true })).toBeVisible();
+      await expect(contentPanel.getByText("No content items yet.", { exact: true })).toHaveCount(0);
+      expect(gradebookRequests).toEqual([]);
+      releaseContent();
+      await page.getByRole("button", { name: `Actions for ${activityTitle}` }).click();
+    } finally {
+      releaseContent();
+      page.off("request", trackGradebookRequest);
+      await page.unroute(contentUrl);
+    }
     await page.getByRole("menuitem", { name: "Settings" }).click();
     const settings = page.getByRole("dialog", { name: activityTitle });
     const dialogBounds = await settings.boundingBox();
@@ -140,8 +173,22 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
 
   test("teacher filters, exports, releases, and hides group gradebook results", async ({ teacherPage: page }) => {
     if (!data) throw new Error("The activity suite was not provisioned.");
+    const contentRequests: string[] = [];
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === `/api/courses/${data.courseId}/content`) {
+        contentRequests.push(request.url());
+      }
+    });
+    const gradebookSummaryLoaded = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return response.ok()
+        && url.pathname === `/api/courses/${data.courseId}/gradebook`
+        && url.searchParams.get("view") === "summary";
+    });
     await page.goto(`/courses/${data.courseId}?tab=gradebook`);
+    await gradebookSummaryLoaded;
     await expect(page.getByRole("heading", { name: "Course gradebook" })).toBeVisible();
+    expect(contentRequests).toEqual([]);
     const gradebook = page.getByRole("tabpanel", { name: "Gradebook" });
     await gradebook.getByLabel("Group", { exact: true }).selectOption(data.groupId);
     await gradebook.getByLabel("Activity").selectOption({ label: activityTitle });

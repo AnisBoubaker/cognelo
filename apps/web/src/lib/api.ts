@@ -1003,6 +1003,49 @@ export type CourseGradebook = {
   rows: CourseGradebookRow[];
 };
 
+export type CourseGradebookSummary = {
+  filters: CourseGradebook["filters"];
+  groups: CourseGradebook["groups"];
+  activities: CourseGradebook["activities"];
+  overview: {
+    activityCount: number;
+    submissionCount: number;
+    gradedCount: number;
+    meanScore: number | null;
+    meanMaxScore: number | null;
+  };
+  activitySummaries: CourseGradebookActivitySummary[];
+};
+
+export type CourseGradebookGroupSummary = {
+  groupId: string;
+  groupTitle: string;
+  gradebookItemId: string;
+  gradesReleased: boolean;
+  assessmentMode: "formative" | "summative";
+  studentCount: number;
+  submissionCount: number;
+  gradedCount: number;
+  incompleteGradeCount: number;
+  meanScore: number | null;
+  meanMaxScore: number | null;
+};
+
+export type CourseGradebookActivitySummary = {
+  activityId: string;
+  activityTitle: string;
+  activityTypeName: string;
+  assessmentMode: "formative" | "summative";
+  gradebookItemIds: string[];
+  allGradesReleased: boolean;
+  submissionCount: number;
+  gradedCount: number;
+  incompleteGradeCount: number;
+  meanScore: number | null;
+  meanMaxScore: number | null;
+  groups: CourseGradebookGroupSummary[];
+};
+
 export type CourseGradebookItemSummary = {
   gradebookItemId: string;
   groupId: string;
@@ -1558,6 +1601,19 @@ export const api = {
     }
     const query = params.toString();
     return request<{ gradebook: CourseGradebook }>(`/courses/${courseId}/gradebook${query ? `?${query}` : ""}`);
+  },
+  courseGradebookSummary: (courseId: string, filters?: { groupId?: string; activityId?: string; status?: GradebookStatus }) => {
+    const params = new URLSearchParams({ view: "summary" });
+    if (filters?.groupId) {
+      params.set("groupId", filters.groupId);
+    }
+    if (filters?.activityId) {
+      params.set("activityId", filters.activityId);
+    }
+    if (filters?.status && filters.status !== "all") {
+      params.set("status", filters.status);
+    }
+    return request<{ gradebook: CourseGradebookSummary }>(`/courses/${courseId}/gradebook?${params.toString()}`);
   },
   courseGradebookCsvUrl: (courseId: string, filters?: { groupId?: string; activityId?: string; status?: GradebookStatus }) => {
     const params = new URLSearchParams({ format: "csv" });
