@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getCourseGradebook, getCourseGradebookCsv, type CourseGradebookStatusFilter } from "@cognelo/core";
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 import { resolveCourseGradebookCompletions } from "@/lib/gradebook-completion";
+import { summarizeCourseGradebook } from "@/lib/gradebook-summary";
 
 type Params = { params: Promise<{ courseId: string }> };
 
@@ -33,30 +34,32 @@ export async function GET(request: NextRequest, { params }: Params) {
       });
     }
 
-    const gradebook = await resolveCourseGradebookCompletions(
+    let gradebook = await resolveCourseGradebookCompletions(
       user,
       courseId,
       await getCourseGradebook(user, courseId, filters)
     );
-    if (filters.status === "all") {
-      return json({ gradebook });
-    }
-
-    const completeGradebook = await resolveCourseGradebookCompletions(
-      user,
-      courseId,
-      await getCourseGradebook(user, courseId, { ...filters, status: "all" })
-    );
-    const readinessByItem = new Map(completeGradebook.items.map((item) => [item.gradebookItemId, item]));
-    return json({
-      gradebook: {
+    if (filters.status !== "all") {
+      const completeGradebook = await resolveCourseGradebookCompletions(
+        user,
+        courseId,
+        await getCourseGradebook(user, courseId, { ...filters, status: "all" })
+      );
+      const readinessByItem = new Map(completeGradebook.items.map((item) => [item.gradebookItemId, item]));
+      gradebook = {
         ...gradebook,
         items: gradebook.items.map((item) => ({
           ...item,
           incompleteGradeCount: readinessByItem.get(item.gradebookItemId)?.incompleteGradeCount ?? item.incompleteGradeCount,
           canReleaseGrades: readinessByItem.get(item.gradebookItemId)?.canReleaseGrades ?? item.canReleaseGrades
         }))
-      }
+      };
+    }
+
+    return json({
+      gradebook: searchParams.get("view") === "summary"
+        ? summarizeCourseGradebook(gradebook)
+        : gradebook
     });
   });
 }

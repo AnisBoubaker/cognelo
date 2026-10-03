@@ -127,6 +127,26 @@ describe("web API client", () => {
     );
   });
 
+  it("requests the compact gradebook summary for the course overview", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ gradebook: { activitySummaries: [] } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+
+    await api.courseGradebookSummary("course-1", {
+      groupId: "group-1",
+      activityId: "activity-1",
+      status: "graded"
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      `${expectedApiUrl}/api/courses/course-1/gradebook?view=summary&groupId=group-1&activityId=activity-1&status=graded`,
+      expect.any(Object)
+    );
+  });
+
   it("dispatches the unauthorized event on 401 responses", async () => {
     const dispatchEvent = vi.fn();
     vi.stubGlobal("window", { dispatchEvent });
