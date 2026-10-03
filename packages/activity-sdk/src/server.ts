@@ -194,6 +194,17 @@ export type PluginAiFeedbackResult = {
   gradingResult?: PluginGradingResult;
 };
 
+export type PluginAiGradingTemplate = {
+  coreAttemptId: string;
+  submission: Record<string, unknown>;
+  feedback: Record<string, unknown>;
+};
+
+export type PluginAiGradingBatchGuidance = {
+  instructions: string;
+  templates: readonly PluginAiGradingTemplate[];
+};
+
 export type PluginAiFeedbackHandler = (input: {
   user: CurrentUser;
   courseId: string;
@@ -209,6 +220,7 @@ export type PluginAiFeedbackHandler = (input: {
     pluginAttemptRef: string | null;
     state: Record<string, unknown>;
   };
+  batchGuidance?: PluginAiGradingBatchGuidance;
 }) => Promise<PluginAiFeedbackResult>;
 
 export type PluginAiFeedbackTeacherReviewContext = {
@@ -238,6 +250,18 @@ export type PluginAiFeedbackTeacherReviewHandler = {
     feedback: Record<string, unknown>;
     gradingResult?: PluginGradingResult;
   };
+};
+
+export type PluginAiGradingBatchHandler = {
+  getInstructions: (
+    input: PluginAiFeedbackTeacherReviewContext
+  ) => Promise<string> | string;
+  updateInstructions: (
+    input: PluginAiFeedbackTeacherReviewContext & { instructions: string }
+  ) => Promise<void> | void;
+  isTemplateComplete: (
+    input: PluginAiFeedbackTeacherReviewContext & { feedback: Record<string, unknown> }
+  ) => Promise<boolean> | boolean;
 };
 
 export type CompositeExecutionSubmissionHandler = (input: {
@@ -280,6 +304,7 @@ export type ServerActivityPlugin = {
   aiFeedback?: {
     evaluateAttempt: PluginAiFeedbackHandler;
     teacherReview?: PluginAiFeedbackTeacherReviewHandler;
+    batchGrading?: PluginAiGradingBatchHandler;
   };
   compositeExecution?: {
     activityTypeKeys: readonly string[];
@@ -383,6 +408,12 @@ export function resolvePluginAiFeedbackTeacherReviewHandler(activityTypeKey: str
   return serverPlugins.find((plugin) =>
     plugin.aiFeedback?.teacherReview && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
   )?.aiFeedback?.teacherReview ?? null;
+}
+
+export function resolvePluginAiGradingBatchHandler(activityTypeKey: string) {
+  return serverPlugins.find((plugin) =>
+    plugin.aiFeedback?.batchGrading && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
+  )?.aiFeedback?.batchGrading ?? null;
 }
 
 export function resolveCompositeExecutionSubmissionHandler(activityTypeKey: string) {

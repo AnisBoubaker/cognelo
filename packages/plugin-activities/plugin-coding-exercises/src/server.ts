@@ -18,7 +18,16 @@ import {
   submitCodingExercise
 } from "./executions";
 import { AppError } from "@cognelo/core";
-import { createCodingExerciseTeacherFeedbackDraft, evaluateCodingExerciseAttemptWithAi, getCodingExerciseAiFeedbackTeacherSubmission, reviseCodingExerciseAiFeedback, snapshotCodingExerciseAiFeedbackConfig } from "./ai-feedback";
+import {
+  createCodingExerciseTeacherFeedbackDraft,
+  evaluateCodingExerciseAttemptWithAi,
+  getCodingExerciseAiFeedbackTeacherSubmission,
+  getCodingExerciseAiGradingInstructions,
+  isCodingExerciseAiGradingTemplateComplete,
+  reviseCodingExerciseAiFeedback,
+  snapshotCodingExerciseAiFeedbackConfig,
+  updateCodingExerciseAiGradingInstructions
+} from "./ai-feedback";
 import { regradeCodingExerciseAttempt } from "./regrading";
 import { getCodingExerciseStudentGradeReport } from "./student-grade-report";
 import { getCodingExerciseGradeCompletions } from "./grade-completion";
@@ -62,7 +71,7 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
     getCompletions: getCodingExerciseGradeCompletions
   },
   aiFeedback: {
-    evaluateAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, pluginAttemptRef, activity, triggerKind }) => {
+    evaluateAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, pluginAttemptRef, activity, triggerKind, batchGuidance }) => {
       if (!pluginAttemptRef) {
         throw new AppError(409, "CODING_EXERCISE_SUBMISSION_REQUIRED", "This attempt does not reference a coding exercise submission.");
       }
@@ -75,7 +84,8 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
         executionId: pluginAttemptRef,
         activity,
         assessmentMode: "summative",
-        triggerKind
+        triggerKind,
+        batchGuidance
       });
     },
     teacherReview: {
@@ -118,6 +128,11 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
           } : {})
         };
       }
+    },
+    batchGrading: {
+      getInstructions: ({ activityId }) => getCodingExerciseAiGradingInstructions(activityId),
+      updateInstructions: ({ activityId, instructions }) => updateCodingExerciseAiGradingInstructions(activityId, instructions),
+      isTemplateComplete: ({ feedback }) => isCodingExerciseAiGradingTemplateComplete(feedback)
     }
   },
   compositeExecution: {

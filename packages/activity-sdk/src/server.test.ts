@@ -9,6 +9,7 @@ import {
   resolvePluginGradeCompletionHandler,
   resolvePluginStudentGradeReportHandler,
   resolvePluginAiFeedbackHandler,
+  resolvePluginAiGradingBatchHandler,
   resolvePluginRoute,
   runBankActivityDeletedHooks,
   runBankActivityDeletedHooksForPlugins,
@@ -110,6 +111,16 @@ describe("server activity SDK", () => {
     expect(resolvePluginAiFeedbackHandler("coding-exercise")).toBeTypeOf("function");
     expect(resolvePluginAiFeedbackHandler("mcq")).toBeTypeOf("function");
     expect(resolvePluginAiFeedbackHandler("placeholder")).toBeNull();
+  });
+
+  it("resolves guided batch grading only for AI-grading plugins that implement it", () => {
+    expect(resolvePluginAiGradingBatchHandler("coding-exercise")).toMatchObject({
+      getInstructions: expect.any(Function),
+      updateInstructions: expect.any(Function),
+      isTemplateComplete: expect.any(Function)
+    });
+    expect(resolvePluginAiGradingBatchHandler("mcq")).toBeNull();
+    expect(resolvePluginAiGradingBatchHandler("placeholder")).toBeNull();
   });
 
   it("resolves composite execution handlers by activity type without coupling the Test runtime to a plugin", () => {

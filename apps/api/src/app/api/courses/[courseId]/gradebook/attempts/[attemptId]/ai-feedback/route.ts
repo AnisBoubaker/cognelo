@@ -1,10 +1,24 @@
 import { NextRequest } from "next/server";
-import { resolvePluginAiFeedbackHandler, resolvePluginAiFeedbackTeacherReviewHandler } from "@cognelo/activity-sdk/server";
+import {
+  resolvePluginAiFeedbackHandler,
+  resolvePluginAiFeedbackTeacherReviewHandler,
+  resolvePluginAiGradingBatchHandler,
+  type PluginAiFeedbackTeacherReviewContext,
+  type PluginAiGradingBatchGuidance
+} from "@cognelo/activity-sdk/server";
 import { AppError, getActivityAttemptRegradeContext, getTeacherAttemptAiFeedbackReview, getTestAttemptReview, recordActivityAttemptAiFeedback, recordActivityAttemptGradingResult, recordAiFeedbackResearchEvent, recordTestItemAiFeedback, regradeTestAttempt, reviseTeacherAttemptAiFeedback } from "@cognelo/core";
 import type { Prisma } from "@cognelo/db";
+import { z } from "zod";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
+import { validateAiGradingTemplateAttemptIds } from "@/lib/ai-grading-batch";
 
 type Params = { params: Promise<{ courseId: string; attemptId: string }> };
+
+const generateSchema = z.object({
+  triggerKind: z.enum(["teacher_single", "teacher_selection", "teacher_batch"]).optional(),
+  instructions: z.string().trim().min(1).max(8000).optional(),
+  templateAttemptIds: z.array(z.string().min(1)).max(3).optional()
+}).strict();
 
 export function OPTIONS() {
   return options();
@@ -121,8 +135,8 @@ export async function POST(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, attemptId } = await params;
-    const body = await readJson(request).catch(() => ({})) as { triggerKind?: unknown };
-    const triggerKind = body.triggerKind === "teacher_batch" || body.triggerKind === "teacher_selection" ? body.triggerKind : "teacher_single";
+    const body = generateSchema.parse(await readJson(request).catch(() => ({})));
+    const triggerKind = body.triggerKind ?? "teacher_single";
     const context = await getActivityAttemptRegradeContext(user, courseId, attemptId);
     await recordAiFeedbackResearchEvent({
       eventType: "teacher_evaluation_started",
@@ -199,6 +213,17 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (!evaluateAttempt) {
       throw new AppError(409, "PLUGIN_AI_FEEDBACK_UNAVAILABLE", "This activity type does not support AI assessment feedback.");
     }
+    const batchGuidance = triggerKind === "teacher_batch" && body.instructions !== undefined
+      ? await resolveBatchGuidance({
+          user,
+          courseId,
+          targetAttemptId: attemptId,
+          targetActivityId: context.activityId,
+          activityTypeKey: context.activityTypeKey,
+          instructions: body.instructions,
+          templateAttemptIds: body.templateAttemptIds ?? []
+        })
+      : undefined;
     const evaluation = await evaluateAttempt({
       user,
       courseId: context.courseId,
@@ -207,7 +232,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       coreAttemptId: context.attemptId,
       pluginAttemptRef: context.pluginAttemptRef,
       activity: context.activity,
-      triggerKind
+      triggerKind,
+      batchGuidance
     });
     const result = evaluation.gradingResult
       ? await recordActivityAttemptGradingResult(user, {
@@ -260,4 +286,46 @@ export async function POST(request: NextRequest, { params }: Params) {
     });
     return json({ evaluation, result });
   });
+}
+
+async function resolveBatchGuidance(input: {
+  user: Awaited<ReturnType<typeof requireUser>>;
+  courseId: string;
+  targetAttemptId: string;
+  targetActivityId: string;
+  activityTypeKey: string;
+  instructions: string;
+  templateAttemptIds: string[];
+}): Promise<PluginAiGradingBatchGuidance> {
+  const batchGrading = resolvePluginAiGradingBatchHandler(input.activityTypeKey);
+  const teacherReview = resolvePluginAiFeedbackTeacherReviewHandler(input.activityTypeKey);
+  if (!batchGrading || !teacherReview) {
+    throw new AppError(409, "PLUGIN_AI_BATCH_GRADING_UNAVAILABLE", "This activity type does not support guided batch AI grading.");
+  }
+  const uniqueTemplateIds = validateAiGradingTemplateAttemptIds(input.targetAttemptId, input.templateAttemptIds);
+  const templates = await Promise.all(uniqueTemplateIds.map(async (templateAttemptId) => {
+    const context = await getActivityAttemptRegradeContext(input.user, input.courseId, templateAttemptId);
+    if (context.activityId !== input.targetActivityId || context.activityTypeKey !== input.activityTypeKey || !["submitted", "graded"].includes(context.lifecycle)) {
+      throw new AppError(400, "AI_BATCH_TEMPLATE_INVALID", "Every grading template must be a submitted attempt for the same activity.");
+    }
+    const reviewContext: PluginAiFeedbackTeacherReviewContext = {
+      user: input.user,
+      courseId: context.courseId,
+      groupId: context.groupId,
+      activityId: context.activityId,
+      coreAttemptId: context.attemptId,
+      pluginAttemptRef: context.pluginAttemptRef,
+      activity: context.activity
+    };
+    const review = await getTeacherAttemptAiFeedbackReview(input.user, input.courseId, templateAttemptId);
+    if (!review.feedback || !await batchGrading.isTemplateComplete({ ...reviewContext, feedback: review.feedback })) {
+      throw new AppError(400, "AI_BATCH_TEMPLATE_INCOMPLETE", "Every grading template must contain a completed rubric and teacher comments.");
+    }
+    return {
+      coreAttemptId: templateAttemptId,
+      submission: await teacherReview.getSubmission(reviewContext),
+      feedback: review.feedback
+    };
+  }));
+  return { instructions: input.instructions, templates };
 }

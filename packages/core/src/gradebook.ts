@@ -95,6 +95,7 @@ export type OverrideGradebookGradeInput = {
 
 export type ActivityAttemptRegradeContext = {
   attemptId: string;
+  attemptNumber: number;
   lifecycle: string;
   courseId: string;
   groupId: string;
@@ -822,17 +823,14 @@ export async function getActivityAttemptRegradeContext(
       groupActivity: true
     }
   });
-
-  if (!attempt) {
-    throw notFound("Activity attempt");
-  }
+  if (!attempt) throw notFound("Activity attempt");
   if (attempt.assessmentMode === "formative") {
     throw new AppError(409, "FORMATIVE_ATTEMPT_NOT_GRADEABLE", "Formative attempts cannot be regraded.");
   }
-
   const activity = attempt.activity;
   return {
     attemptId: attempt.id,
+    attemptNumber: attempt.attemptNumber,
     lifecycle: attempt.lifecycle,
     courseId: attempt.courseId,
     groupId: attempt.groupId,
@@ -863,6 +861,68 @@ export async function getActivityAttemptRegradeContext(
       }
     }
   };
+}
+
+export async function getActivityAttemptRegradeContexts(
+  user: CurrentUser,
+  courseId: string,
+  attemptIds: readonly string[]
+): Promise<ActivityAttemptRegradeContext[]> {
+  await canManageCourseOrThrow(user, courseId);
+  const uniqueAttemptIds = [...new Set(attemptIds)];
+  const attempts = await prisma.activityAttempt.findMany({
+    where: { id: { in: uniqueAttemptIds }, courseId },
+    include: {
+      activity: {
+        include: {
+          activityType: true
+        }
+      },
+      groupActivity: true
+    }
+  });
+  const byId = new Map(attempts.map((attempt) => [attempt.id, attempt]));
+  return uniqueAttemptIds.map((attemptId) => {
+    const attempt = byId.get(attemptId);
+    if (!attempt) throw notFound("Activity attempt");
+    if (attempt.assessmentMode === "formative") {
+      throw new AppError(409, "FORMATIVE_ATTEMPT_NOT_GRADEABLE", "Formative attempts cannot be regraded.");
+    }
+    const activity = attempt.activity;
+    return {
+      attemptId: attempt.id,
+      attemptNumber: attempt.attemptNumber,
+      lifecycle: attempt.lifecycle,
+      courseId: attempt.courseId,
+      groupId: attempt.groupId,
+      activityId: attempt.activityId,
+      pluginAttemptRef: attempt.pluginAttemptRef,
+      activityTypeKey: activity.activityType.key,
+      activity: {
+        id: activity.id,
+        bankActivityId: activity.bankActivityId,
+        activityVersionId: activity.activityVersionId,
+        title: activity.title,
+        description: activity.description,
+        lifecycle: activity.lifecycle,
+        config: (activity.config as Record<string, unknown> | null) ?? undefined,
+        metadata: (activity.metadata as Record<string, unknown> | null) ?? undefined,
+        assignment: {
+          id: attempt.groupActivity.id,
+          availableFrom: attempt.groupActivity.availableFrom,
+          availableUntil: attempt.groupActivity.availableUntil,
+          config: (attempt.groupActivity.config as Record<string, unknown> | null) ?? undefined,
+          metadata: (attempt.groupActivity.metadata as Record<string, unknown> | null) ?? undefined,
+          position: attempt.groupActivity.position
+        },
+        activityType: {
+          key: activity.activityType.key,
+          name: activity.activityType.name,
+          description: activity.activityType.description
+        }
+      }
+    };
+  });
 }
 
 export type CourseGradebookStatusFilter = "all" | "missing" | "late" | "needs_grading" | "graded";

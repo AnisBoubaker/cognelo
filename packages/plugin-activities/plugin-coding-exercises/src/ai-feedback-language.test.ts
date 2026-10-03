@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   recordAiFeedbackResearchEvent: vi.fn(),
   courseFindUnique: vi.fn(),
   referenceFindUnique: vi.fn(),
+  referenceUpdate: vi.fn(),
   executionFindFirst: vi.fn(),
   evaluationFindFirst: vi.fn(),
   evaluationCreate: vi.fn(),
@@ -33,7 +34,7 @@ vi.mock("@cognelo/db", () => ({
 
 vi.mock("./db-client", () => ({
   prisma: {
-    pluginCodingExerciseReferenceSolution: { findUnique: mocks.referenceFindUnique },
+    pluginCodingExerciseReferenceSolution: { findUnique: mocks.referenceFindUnique, update: mocks.referenceUpdate },
     pluginCodingExerciseExecution: { findFirst: mocks.executionFindFirst },
     pluginCodingExerciseAiEvaluation: {
       findFirst: mocks.evaluationFindFirst,
@@ -47,7 +48,7 @@ vi.mock("./executions", () => ({
 }));
 
 const { AppError } = await import("@cognelo/core");
-const { evaluateCodingExerciseAttemptWithAi } = await import("./ai-feedback");
+const { evaluateCodingExerciseAttemptWithAi, updateCodingExerciseAiGradingInstructions } = await import("./ai-feedback");
 
 function evaluationInput(triggerKind: "teacher_single" | "formative_submission" = "teacher_single") {
   return {
@@ -180,6 +181,73 @@ describe("coding exercise generated feedback language", () => {
         })
       })
     }));
+  });
+
+  it("uses batch instructions and reviewed examples without sending learner identity to the model", async () => {
+    await evaluateCodingExerciseAttemptWithAi({
+      ...evaluationInput(),
+      triggerKind: "teacher_batch",
+      batchGuidance: {
+        instructions: "Apply the teacher's calibration consistently.",
+        templates: [{
+          coreAttemptId: "template-attempt-1",
+          submission: { kind: "coding-exercise", sourceCode: "print(2)", resultSummary: { earnedWeight: 1, totalWeight: 2 } },
+          feedback: { summary: "Partially correct", criteria: [{ id: "correctness", scorePercent: 50, feedback: "One case is missing." }] }
+        }]
+      }
+    });
+
+    expect(mocks.evaluationCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        rubricSnapshot: expect.objectContaining({
+          instructions: "Apply the teacher's calibration consistently.",
+          configuredInstructions: "Évaluer la solution.",
+          templateAttemptIds: ["template-attempt-1"]
+        }),
+        requestPayload: expect.objectContaining({
+          gradingTemplates: [{
+            submission: expect.objectContaining({ sourceCode: "print(2)" }),
+            feedback: expect.objectContaining({ summary: "Partially correct" })
+          }]
+        })
+      })
+    }));
+    const requestPayload = mocks.generateAiAgentText.mock.calls[0]?.[1]?.userPrompt ?? "";
+    expect(requestPayload).not.toContain("template-attempt-1");
+    expect(requestPayload).not.toContain("student@example");
+  });
+
+  it("updates only the course activity instructions while preserving the private rubric configuration", async () => {
+    mocks.referenceFindUnique.mockResolvedValueOnce({
+      privateConfig: {
+        hiddenSupportCode: "private helper",
+        aiFeedback: {
+          enabled: true,
+          gradingEnabled: true,
+          instructions: "Old guidance",
+          testWeightPercent: 60,
+          aiWeightPercent: 40,
+          criteria: [{ id: "correctness", title: "Exactitude", description: "Évaluer le résultat.", weightPercent: 100 }]
+        }
+      }
+    });
+
+    await updateCodingExerciseAiGradingInstructions("activity-1", "Updated guidance");
+
+    expect(mocks.referenceUpdate).toHaveBeenCalledWith({
+      where: { activityId: "activity-1" },
+      data: {
+        privateConfig: expect.objectContaining({
+          hiddenSupportCode: "private helper",
+          aiFeedback: expect.objectContaining({
+            instructions: "Updated guidance",
+            testWeightPercent: 60,
+            aiWeightPercent: 40,
+            criteria: [expect.objectContaining({ id: "correctness" })]
+          })
+        })
+      }
+    });
   });
 
   it("gives teachers an actionable error when the configured model is unavailable", async () => {

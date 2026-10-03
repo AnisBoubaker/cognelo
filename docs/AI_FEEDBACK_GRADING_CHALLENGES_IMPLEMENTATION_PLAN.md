@@ -89,7 +89,7 @@ The model is always resolved server-side. Provider keys, raw credentials, privat
 - Teacher revisions may update learner-visible narrative feedback before or after release, including while a challenge is open. A plugin may also expose editable rubric percentages and return a validated grading result; Programming Exercises then recompute the AI and combined scores with the immutable deterministic result and configured weights, and core records the change through its audited regrade path. Core preserves the immutable original evaluation artifact and challenge hash, records previous/next feedback and research telemetry, and links post-challenge teacher revisions to the challenge ID.
 - Student-safe summative AI feedback is exposed only after the associated `GradebookItem` is released.
 
-Teacher-triggered batch grading processes attempts sequentially and independently, so one provider or parsing failure does not erase successful results for other attempts. The completion notice reports the failure count and most common actionable reason rather than expanding every learner name. A durable maximum batch size plus cancellation and timeout UX remain Phase 6 hardening.
+Teacher-triggered batch grading processes attempts sequentially and independently, so one provider or parsing failure does not erase successful results for other attempts. For direct AI-grading plugins, the shared preparation dialog preloads current activity instructions and lists already graded attempts whose plugin-owned rubric and comment content is complete. Teachers may select up to three consistency examples. Selected examples are excluded from reassessment; every target request revalidates them as complete graded attempts for the same activity and passes only the plugin-sanitized submission/feedback pair, never learner identity. Edited instructions apply to the current run, while a default-on checkbox optionally persists them once before processing. The completion notice reports the failure count and most common actionable reason rather than expanding every learner name. A durable maximum batch size plus cancellation and timeout UX remain Phase 6 hardening.
 
 ## Responsibility Boundary
 
@@ -119,6 +119,7 @@ Teacher-triggered batch grading processes attempts sequentially and independentl
 - detailed immutable evaluation artifacts, including private raw model output;
 - plugin-specific student feedback and teacher review renderers;
 - plugin-specific teacher submission loading and server-side validation of editable feedback fields;
+- plugin-owned batch instruction loading/updating and template-completeness validation for every direct AI-grading activity type;
 - plugin-specific granular learning/research signals where available.
 
 ## Implemented Plugin Contracts
@@ -131,6 +132,8 @@ The SDK now exposes capabilities distinct from existing deterministic automatic 
 - `aiFeedback.teacherReview.getSubmission` for the plugin-specific submitted answer
 - `aiFeedback.teacherReview.createFeedbackDraft` for a valid empty plugin-owned teacher feedback shape
 - `aiFeedback.teacherReview.reviseFeedback` for whitelisting and validating editable feedback fields and optionally returning a plugin grading result when rubric scores are teacher-editable
+- `aiFeedback.batchGrading.getInstructions`, `updateInstructions`, and `isTemplateComplete` for the shared guided-batch dialog and server-side template revalidation
+- optional `batchGuidance` on `aiFeedback.evaluateAttempt`, containing the run instructions and at most three sanitized reviewed examples
 
 Server plugins need an evaluation handler that receives an immutable attempt/submission context plus the resolved course model and returns a validated result resembling:
 
@@ -329,7 +332,7 @@ The normalized event should include stable references, timestamps, assessment mo
 
 ### Phase 0 — Confirm The Contract
 
-Status: complete. Grade release is blocked when pending or failed required grading leaves submitted work ungraded or partial; feedback-only pending work remains a separate teacher-controlled action. The web batch is bounded by the attempts currently loaded for the activity and processes them sequentially.
+Status: complete. Grade release is blocked when pending or failed required grading leaves submitted work ungraded or partial; feedback-only pending work remains a separate teacher-controlled action. The web batch is bounded by the attempts currently loaded for the activity and processes them sequentially. Direct AI-grading plugins use the shared guided-batch contract; Programming Exercises implement the initial instruction/template policy. Compound Test orchestration continues to delegate to child-owned configuration rather than pretending the parent has one instruction setting.
 
 - Confirm course settings, trigger semantics, visibility, direct teacher execution, challenge rules, and research fields.
 - Completed: block release when required grading is incomplete, without blocking true non-submissions or feedback-only activities.
@@ -347,7 +350,7 @@ Status: complete. Course settings, SDK contracts, secure model resolution, norma
 
 ### Phase 2 — Programming Exercise Pilot
 
-Status: complete. Programming Exercises support a private unnamed general grading rubric that remains available to teachers without automatic feedback, immediate formative evaluation when automation is enabled, teacher-triggered summative evaluation, configurable deterministic/rubric weighting, strict two-attempt structured-output validation, immutable private evaluation artifacts, submission-time private rubric snapshots, and teacher review of submitted code, latest successful hidden-test outcomes, and editable summary/strength/improvement/criterion scores and narrative. A confirmed draft action clears all learner-facing narrative while preserving scores and grade components, allowing selected learners to receive manually written experimental feedback through the same audited save path. Course and bank editors expose a dedicated host Grading tab after Concepts with nested Rubric and Test cases side tabs. Rubrics may be generated only from a title, student prompt, and reference solution; both rubric and assessment-feedback generation resolve the Subject teaching language server-side.
+Status: complete. Programming Exercises support a private unnamed general grading rubric that remains available to teachers without automatic feedback, immediate formative evaluation when automation is enabled, teacher-triggered summative evaluation, configurable deterministic/rubric weighting, strict two-attempt structured-output validation, immutable private evaluation artifacts, submission-time private rubric snapshots, and teacher review of submitted code, latest successful hidden-test outcomes, and editable summary/strength/improvement/criterion scores and narrative. Whole-activity grading batches preload current instructions and may use up to three complete graded attempts as identity-free consistency examples; selected examples are not reassessed, and edited instructions can be run-only or persisted once to the course activity. A confirmed draft action clears all learner-facing narrative while preserving scores and grade components, allowing selected learners to receive manually written experimental feedback through the same audited save path. Course and bank editors expose a dedicated host Grading tab after Concepts with nested Rubric and Test cases side tabs. Rubrics may be generated only from a title, student prompt, and reference solution; both rubric and assessment-feedback generation resolve the Subject teaching language server-side.
 Teacher correction workflows additionally append test-only reruns against current hidden tests and regenerate summative feedback against the current rubric and latest saved tests. Neither action invokes the other; the original submission snapshot and earlier evaluation artifacts remain immutable.
 
 The development seed includes a reproducible two-section Programming Exercise batch at the submitted-but-not-evaluated boundary. This permits teacher single/batch generation, review, editing, release, learner review, challenge, and research-event testing without requiring Judge0 to execute dozens of fixture submissions during seeding. A clean course receives the fallback seed model, while reseeding preserves a teacher-selected assessment-feedback model and explicit feedback switch.

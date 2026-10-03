@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reviseCodingExerciseAiFeedback } from "./ai-feedback";
+import { isCodingExerciseAiGradingTemplateComplete, reviseCodingExerciseAiFeedback } from "./ai-feedback";
 
 const current = {
   kind: "ai_assessment_feedback",
@@ -88,5 +88,14 @@ describe("coding exercise feedback revision", () => {
       improvements: [],
       criteria: [{ id: "different", scorePercent: 50, feedback: "No" }]
     })).toThrow("original rubric criteria");
+  });
+
+  it("accepts only reviewed feedback with rubric explanations and narrative comments as a batch template", () => {
+    expect(isCodingExerciseAiGradingTemplateComplete(current)).toBe(true);
+    expect(isCodingExerciseAiGradingTemplateComplete({ ...current, summary: "", strengths: [], improvements: [] })).toBe(false);
+    expect(isCodingExerciseAiGradingTemplateComplete({
+      ...current,
+      criteria: [{ ...current.criteria[0], feedback: "" }]
+    })).toBe(false);
   });
 });

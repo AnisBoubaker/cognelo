@@ -1230,6 +1230,16 @@ export type TeacherAiFeedbackReview = {
   submission: Record<string, unknown>;
 };
 
+export type AiGradingBatchSetup = {
+  available: boolean;
+  instructions: string;
+  templates: Array<{
+    attemptId: string;
+    participantName: string;
+    attemptNumber: number;
+  }>;
+};
+
 export type CourseTestAttemptReview = {
   id: string;
   attemptNumber: number;
@@ -1657,7 +1667,21 @@ export const api = {
         body: JSON.stringify(input ?? {})
       }
     ),
-  generateActivityAttemptAiFeedback: (courseId: string, attemptId: string, input?: { triggerKind?: "teacher_single" | "teacher_selection" | "teacher_batch" }) =>
+  prepareActivityAiGradingBatch: (courseId: string, activityId: string, attemptIds: string[]) =>
+    request<AiGradingBatchSetup>(`/courses/${courseId}/gradebook/activities/${activityId}/ai-grading-batch`, {
+      method: "POST",
+      body: JSON.stringify({ attemptIds })
+    }),
+  updateActivityAiGradingInstructions: (courseId: string, activityId: string, attemptId: string, instructions: string) =>
+    request<{ updated: true }>(`/courses/${courseId}/gradebook/activities/${activityId}/ai-grading-batch`, {
+      method: "PATCH",
+      body: JSON.stringify({ attemptId, instructions })
+    }),
+  generateActivityAttemptAiFeedback: (courseId: string, attemptId: string, input?: {
+    triggerKind?: "teacher_single" | "teacher_selection" | "teacher_batch";
+    instructions?: string;
+    templateAttemptIds?: string[];
+  }) =>
     request<{ evaluation: { feedbackRef: string; feedbackVersion: number }; result: unknown }>(
       `/courses/${courseId}/gradebook/attempts/${attemptId}/ai-feedback`,
       { method: "POST", body: JSON.stringify(input ?? {}) }
