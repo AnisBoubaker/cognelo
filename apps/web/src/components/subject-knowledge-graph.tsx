@@ -20,7 +20,7 @@ import {
   useEdgesState,
   useNodesState
 } from "@xyflow/react";
-import { ConfirmationDialog, useNotifications } from "@cognelo/activity-ui";
+import { ConfirmationDialog, ProgressDialog, useNotifications } from "@cognelo/activity-ui";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   api,
@@ -988,6 +988,14 @@ export function SubjectKnowledgeGraph({
           </div>
         </div>
       ) : null}
+
+      <ProgressDialog
+        open={generating || checkingGenerationImpact}
+        eyebrow={t("knowledgeGraph.aiSection")}
+        title={t("knowledgeGraph.aiGenerating")}
+        message={t(generationMode === "iterate" ? "knowledgeGraph.aiModeIterateHelp" : "knowledgeGraph.aiModeNewHelp")}
+        progressLabel={t("knowledgeGraph.aiGenerating")}
+      />
 
       <ConfirmationDialog
         open={Boolean(skillDialog)}

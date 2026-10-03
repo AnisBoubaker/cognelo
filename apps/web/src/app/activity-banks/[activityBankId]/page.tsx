@@ -6,7 +6,7 @@ import {
   listActivityCategories,
   type ActivityCategoryId
 } from "@cognelo/activity-sdk/categories";
-import { ActivityVersionDiffView, ConfirmationDialog, ContextMenu } from "@cognelo/activity-ui";
+import { ActivityVersionDiffView, ConfirmationDialog, ContextMenu, ProgressDialog } from "@cognelo/activity-ui";
 import type { ActivityVersionDiff } from "@cognelo/contracts";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -995,7 +995,7 @@ export default function ActivityBankDetailPage() {
           </div>
         ) : null}
 
-        {variationActivity ? (
+        {variationActivity && !variationJob && !creatingVariation ? (
           <div className="dialog-backdrop" role="presentation">
             <section aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="variation-bank-activity-title">
               <div className="section-heading">
@@ -1003,37 +1003,54 @@ export default function ActivityBankDetailPage() {
                   <p className="eyebrow">{t("activityBankDetail.variationEyebrow")}</p>
                   <h2 id="variation-bank-activity-title">{t("activityBankDetail.variationTitle")}</h2>
                 </div>
-                <button className="secondary icon-button" disabled={creatingVariation || Boolean(variationJob && ["queued", "running"].includes(variationJob.status))} type="button" onClick={closeVariationDialog} title={t("common.close")}><CloseIcon /></button>
+                <button className="secondary icon-button" type="button" onClick={closeVariationDialog} title={t("common.close")}><CloseIcon /></button>
               </div>
-              {!variationJob ? (
-                <form className="form" onSubmit={createVariation}>
-                  <p>{t("activityBankDetail.variationMessage", { title: variationActivity.title })}</p>
-                  <div className="field">
-                    <label htmlFor="variation-ai-instructions">{t("activityBankDetail.variationInstructionsLabel")}</label>
-                    <textarea id="variation-ai-instructions" maxLength={4000} rows={6} autoFocus value={variationInstructions} onChange={(event) => setVariationInstructions(event.target.value)} placeholder={t("activityBankDetail.variationInstructionsPlaceholder")} />
-                    <small>{t("activityBankDetail.variationInstructionsHelp")}</small>
-                  </div>
-                  <div className="dialog-actions"><button className="secondary" disabled={creatingVariation} type="button" onClick={closeVariationDialog}>{t("common.cancel")}</button><button disabled={creatingVariation} type="submit">{t("activityBankDetail.createVariation")}</button></div>
-                </form>
-              ) : (
-                <div className="activity-variation-progress">
-                  <p>{variationStatusText(variationJob, t)}</p>
-                  <progress aria-label={t("activityBankDetail.variationProgressLabel")} max={100} value={variationProgressPercent(variationJob)} />
-                  <div className="activity-variation-progress-summary">
-                    <span>{Math.round(variationProgressPercent(variationJob))}%</span>
-                    {variationJob.status !== "succeeded" ? <span>{t("activityBankDetail.variationProgressCount", { completed: variationJob.progress.completed ?? 0, total: variationJob.progress.total ?? 1 })}</span> : null}
-                  </div>
-                  {variationJob.status === "failed" ? <p className="error">{variationJob.error?.message ?? t("activityBankDetail.variationError")}</p> : null}
-                  {["succeeded", "failed", "cancelled"].includes(variationJob.status) ? (
-                    <div className="dialog-actions">
-                      <button className="secondary" type="button" onClick={closeVariationDialog}>{t("common.close")}</button>
-                    </div>
-                  ) : null}
+              <form className="form" onSubmit={createVariation}>
+                <p>{t("activityBankDetail.variationMessage", { title: variationActivity.title })}</p>
+                <div className="field">
+                  <label htmlFor="variation-ai-instructions">{t("activityBankDetail.variationInstructionsLabel")}</label>
+                  <textarea id="variation-ai-instructions" maxLength={4000} rows={6} autoFocus value={variationInstructions} onChange={(event) => setVariationInstructions(event.target.value)} placeholder={t("activityBankDetail.variationInstructionsPlaceholder")} />
+                  <small>{t("activityBankDetail.variationInstructionsHelp")}</small>
                 </div>
-              )}
+                <div className="dialog-actions"><button className="secondary" type="button" onClick={closeVariationDialog}>{t("common.cancel")}</button><button type="submit">{t("activityBankDetail.createVariation")}</button></div>
+              </form>
             </section>
           </div>
         ) : null}
+
+        <ProgressDialog
+          open={Boolean(duplicatingActivityId)}
+          eyebrow={duplicatingActivity?.title}
+          title={t("activityBankDetail.duplicateActivity")}
+          progressLabel={t("common.operationProgress")}
+        />
+
+        <ProgressDialog
+          open={Boolean(publishingActivityId)}
+          eyebrow={bank?.activities?.find((activity) => activity.id === publishingActivityId)?.title}
+          title={t("activityBankDetail.publishActivity")}
+          progressLabel={t("common.operationProgress")}
+        />
+
+        <ProgressDialog
+          open={Boolean(variationActivity && (creatingVariation || variationJob))}
+          eyebrow={t("activityBankDetail.variationEyebrow")}
+          title={t("activityBankDetail.variationTitle")}
+          message={variationJob ? variationStatusText(variationJob, t) : t("activityBankDetail.variationQueued")}
+          progress={variationJob ? variationProgressPercent(variationJob) : null}
+          progressLabel={t("activityBankDetail.variationProgressLabel")}
+          progressSummary={variationJob && variationJob.status !== "succeeded"
+            ? t("activityBankDetail.variationProgressCount", { completed: variationJob.progress.completed ?? 0, total: variationJob.progress.total ?? 1 })
+            : undefined}
+          status={variationJob?.status === "failed"
+            ? "error"
+            : variationJob && ["succeeded", "cancelled"].includes(variationJob.status)
+              ? "success"
+              : "running"}
+          error={variationJob?.status === "failed" ? variationJob.error?.message ?? t("activityBankDetail.variationError") : undefined}
+          closeLabel={t("common.close")}
+          onClose={closeVariationDialog}
+        />
 
         {movingActivity && bank ? (
           <div className="dialog-backdrop" role="presentation">

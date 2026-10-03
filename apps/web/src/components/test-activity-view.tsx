@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ConfirmationDialog, EditActionBar, MarkdownRenderer, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { ConfirmationDialog, EditActionBar, MarkdownRenderer, ProgressDialog, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
 import {
@@ -71,6 +71,7 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
   const [description, setDescription] = useState(activity.description);
   const [savedSettings, setSavedSettings] = useState("");
   const [busy, setBusy] = useState(false);
+  const [longRunningAuthoringTitle, setLongRunningAuthoringTitle] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [itemPendingRemoval, setItemPendingRemoval] = useState<CourseTestItem | null>(null);
   const [showActivityPicker, setShowActivityPicker] = useState(false);
@@ -175,6 +176,7 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
 
   async function duplicateCurrentTest() {
     setBusy(true);
+    setLongRunningAuthoringTitle("Duplicating Test");
     try {
       const result = await api.duplicateTest(courseId, activity.id);
       notifications.success("Test duplicated. The copy is an editable draft.");
@@ -183,12 +185,14 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
       notifications.error(reason instanceof Error ? reason.message : "The Test could not be duplicated.");
     } finally {
       setBusy(false);
+      setLongRunningAuthoringTitle(null);
     }
   }
 
   async function publishCurrentTestToBank() {
     if (!publishBankId) return;
     setBusy(true);
+    setLongRunningAuthoringTitle("Publishing Test to activity bank");
     try {
       const result = await api.publishTestToBank(courseId, activity.id, { activityBankId: publishBankId, title: title.trim() });
       notifications.success("Test added to the activity bank as a reusable published Test.");
@@ -197,6 +201,7 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
       notifications.error(reason instanceof Error ? reason.message : "The Test could not be added to the activity bank.");
     } finally {
       setBusy(false);
+      setLongRunningAuthoringTitle(null);
     }
   }
 
@@ -408,6 +413,12 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
           </section>
         </div>
       ) : null}
+      <ProgressDialog
+        open={longRunningAuthoringTitle !== null}
+        eyebrow={test.activity.title}
+        title={longRunningAuthoringTitle ?? "Processing Test"}
+        progressLabel={longRunningAuthoringTitle ?? "Test operation progress"}
+      />
     </div>
   );
 }
@@ -430,6 +441,7 @@ function TestStudentRuntime({
   const [furthestVisitedIndex, setFurthestVisitedIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [longRunningStudentAction, setLongRunningStudentAction] = useState<"start" | "submit" | null>(null);
   const [pendingSaveCount, setPendingSaveCount] = useState(0);
   const [showStartConfirmation, setShowStartConfirmation] = useState(false);
   const [showSubmitConfirmation, setShowSubmitConfirmation] = useState(false);
@@ -518,6 +530,7 @@ function TestStudentRuntime({
 
   async function startTest() {
     setBusy(true);
+    setLongRunningStudentAction("start");
     try {
       const result = await api.startTestAttempt(courseId, groupId, activity.id, sessionId);
       applyRuntime(result.runtime);
@@ -527,6 +540,7 @@ function TestStudentRuntime({
       notifications.error(reason instanceof Error ? reason.message : t("courseDetail.testStartError"));
     } finally {
       setBusy(false);
+      setLongRunningStudentAction(null);
     }
   }
 
@@ -537,6 +551,7 @@ function TestStudentRuntime({
       return;
     }
     setBusy(true);
+    setLongRunningStudentAction("submit");
     try {
       const result = await api.submitTestAttempt(courseId, groupId, activity.id, runtime.attempt.id, sessionId);
       applyRuntime(result.runtime);
@@ -547,6 +562,7 @@ function TestStudentRuntime({
       notifications.error(reason instanceof Error ? reason.message : t("courseDetail.testSubmitError"));
     } finally {
       setBusy(false);
+      setLongRunningStudentAction(null);
     }
   }
 
@@ -626,6 +642,12 @@ function TestStudentRuntime({
           isConfirming={busy}
           onCancel={() => setShowStartConfirmation(false)}
           onConfirm={startTest}
+        />
+        <ProgressDialog
+          open={longRunningStudentAction === "start"}
+          eyebrow={runtime.test.activity.title}
+          title={t("courseDetail.testStarting")}
+          progressLabel={t("common.operationProgress")}
         />
       </section>
     );
@@ -723,6 +745,12 @@ function TestStudentRuntime({
         isConfirming={busy}
         onCancel={() => setShowSubmitConfirmation(false)}
         onConfirm={finishTest}
+      />
+      <ProgressDialog
+        open={longRunningStudentAction === "submit"}
+        eyebrow={runtime.test.activity.title}
+        title={t("courseDetail.testSubmitting")}
+        progressLabel={t("common.operationProgress")}
       />
     </div>
   );

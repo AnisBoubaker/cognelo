@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CodeEditor, CodeRenderer, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, codeLanguageOptions, getEditActionBarCopy, normalizeCodeLanguage, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
+import { CodeEditor, CodeRenderer, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, ProgressDialog, codeLanguageOptions, getEditActionBarCopy, normalizeCodeLanguage, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   createParsonsGroup,
   createParsonsPrecedenceRule,
@@ -1122,6 +1122,13 @@ export function ParsonsActivityView({
           </div>
         </div>
       ) : null}
+      <ProgressDialog
+        open={generating}
+        eyebrow={t("parsons.generate")}
+        title={t("parsons.generating")}
+        message={t("parsons.generateHelp")}
+        progressLabel={t("parsons.generating")}
+      />
     </>
   );
 }

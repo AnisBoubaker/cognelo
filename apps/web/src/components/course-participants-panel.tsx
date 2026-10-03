@@ -1,6 +1,6 @@
 "use client";
 
-import { ConfirmationDialog, useDialogs } from "@cognelo/activity-ui";
+import { ConfirmationDialog, ProgressDialog, useDialogs } from "@cognelo/activity-ui";
 import { ChangeEvent, FocusEvent, FormEvent, useEffect, useState } from "react";
 import { AppIcon } from "@/components/app-icon";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
@@ -522,6 +522,20 @@ export function CourseParticipantsPanel({
           </section>
         </div>
       ) : null}
+
+      <ProgressDialog
+        open={Boolean(participantImport?.importing)}
+        eyebrow={participantImport?.group.title}
+        title={t("groupPage.importParticipantsTitle")}
+        message={t("groupPage.importParticipantsText")}
+        progress={participantImport?.rows.length
+          ? ((participantImport.completed / participantImport.rows.length) * 100)
+          : 0}
+        progressLabel={t("groupPage.importingParticipants")}
+        progressSummary={participantImport
+          ? t("groupPage.importProgress", { completed: participantImport.completed, total: participantImport.rows.length })
+          : undefined}
+      />
 
       {deleteState?.step === "options" ? <div className="dialog-backdrop" role="presentation"><section aria-labelledby="participant-group-delete-title" aria-modal="true" className="dialog-panel" role="dialog"><div><p className="eyebrow">{t("courseDetail.deleteGroupEyebrow")}</p><h2 id="participant-group-delete-title">{t("courseDetail.deleteGroupTitle")}</h2></div><p>{t("courseDetail.deleteGroupParticipantsMessage", { title: deleteState.group.title, count: deleteState.participants.length })}</p><form className="form" onSubmit={submitDeleteOptions}><label className="checkbox-row"><input checked={deleteState.mode === "move"} name="participant-group-delete-mode" type="radio" onChange={() => setDeleteState({ ...deleteState, mode: "move" })} /><span>{t("courseDetail.moveGroupParticipants")}</span></label>{deleteState.mode === "move" ? <div className="field"><label htmlFor="participant-destination-group">{t("courseDetail.destinationGroup")}</label><select id="participant-destination-group" required value={deleteState.targetGroupId} onChange={(event) => setDeleteState({ ...deleteState, targetGroupId: event.target.value })}><option value="">{t("courseDetail.chooseDestinationGroup")}</option>{groups.filter((group) => group.id !== deleteState.group.id).map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}</select><p className="muted">{t("courseDetail.moveGroupParticipantsHelp")}</p></div> : null}<label className="checkbox-row"><input checked={deleteState.mode === "delete"} name="participant-group-delete-mode" type="radio" onChange={() => setDeleteState({ ...deleteState, mode: "delete" })} /><span>{t("courseDetail.deleteGroupParticipants")}</span></label>{error ? <p className="error">{error}</p> : null}<div className="dialog-actions"><button className="secondary" type="button" onClick={() => setDeleteState(null)}>{t("common.cancel")}</button><button className={deleteState.mode === "delete" ? "danger" : ""} disabled={saving || (deleteState.mode === "move" && !deleteState.targetGroupId)} type="submit">{saving ? t("common.saving") : t("courseDetail.continueGroupDeletion")}</button></div></form></section></div> : null}
       <ConfirmationDialog open={deleteState?.step === "confirm-empty"} eyebrow={t("courseDetail.deleteGroupEyebrow")} title={t("courseDetail.deleteGroupTitle")} message={t("courseDetail.deleteEmptyGroupConfirm", { title: deleteState?.group.title ?? "" })} confirmLabel={t("courseDetail.deleteGroupAction")} cancelLabel={t("common.cancel")} confirmVariant="danger" isConfirming={saving} onCancel={() => setDeleteState(null)} onConfirm={() => void deleteGroup({ action: "delete" })} />
