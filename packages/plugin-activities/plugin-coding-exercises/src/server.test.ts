@@ -17,8 +17,12 @@ const executionMocks = vi.hoisted(() => ({
 const aiFeedbackMocks = vi.hoisted(() => ({
   createCodingExerciseTeacherFeedbackDraft: vi.fn(),
   evaluateCodingExerciseAttemptWithAi: vi.fn(),
+  getCodingExerciseAiFeedbackTeacherSubmission: vi.fn(),
+  getCodingExerciseAiGradingInstructions: vi.fn(),
+  isCodingExerciseAiGradingTemplateComplete: vi.fn(),
   reviseCodingExerciseAiFeedback: vi.fn(),
-  snapshotCodingExerciseAiFeedbackConfig: vi.fn()
+  snapshotCodingExerciseAiFeedbackConfig: vi.fn(),
+  updateCodingExerciseAiGradingInstructions: vi.fn()
 }));
 
 vi.mock("./hidden-tests", () => hiddenTestMocks);
@@ -198,6 +202,27 @@ describe("coding exercises server plugin lifecycle hooks", () => {
       activityId: "activity-1",
       executionId: "execution-1"
     });
+  });
+
+  it("exposes shared batch grading instructions and template completeness", async () => {
+    aiFeedbackMocks.getCodingExerciseAiGradingInstructions.mockResolvedValue("Use this rubric consistently.");
+    aiFeedbackMocks.isCodingExerciseAiGradingTemplateComplete.mockReturnValue(true);
+    const context = {
+      user: testUser(),
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      coreAttemptId: "attempt-1",
+      pluginAttemptRef: "execution-1",
+      activity: testActivity("coding-exercise")
+    };
+
+    await expect(codingExercisesServerPlugin.aiFeedback?.batchGrading?.getInstructions(context)).resolves.toBe("Use this rubric consistently.");
+    await codingExercisesServerPlugin.aiFeedback?.batchGrading?.updateInstructions({ ...context, instructions: "Updated guidance." });
+    expect(await codingExercisesServerPlugin.aiFeedback?.batchGrading?.isTemplateComplete({ ...context, feedback: { summary: "Reviewed" } })).toBe(true);
+
+    expect(aiFeedbackMocks.updateCodingExerciseAiGradingInstructions).toHaveBeenCalledWith("activity-1", "Updated guidance.");
+    expect(aiFeedbackMocks.isCodingExerciseAiGradingTemplateComplete).toHaveBeenCalledWith({ summary: "Reviewed" });
   });
 
   it("does not regrade when a teacher changes narrative feedback only", async () => {

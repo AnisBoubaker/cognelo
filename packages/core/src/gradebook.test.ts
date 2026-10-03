@@ -27,6 +27,7 @@ const mockPrisma = vi.hoisted(() => ({
   activityAttempt: {
     count: vi.fn(),
     findFirst: vi.fn(),
+    findMany: vi.fn(),
     findUnique: vi.fn(),
     update: vi.fn()
   },
@@ -62,6 +63,7 @@ vi.mock("./authorization", () => authMocks);
 
 const {
   getActivityAttemptRegradeContext,
+  getActivityAttemptRegradeContexts,
   getActivityAttemptAvailability,
   getCourseGradebook,
   getStudentReleasedGrades,
@@ -1405,6 +1407,45 @@ describe("gradebook attempt services", () => {
         assignment: { id: "assignment-1" }
       }
     });
+  });
+
+  it("loads batch grading contexts in one query and preserves requested order", async () => {
+    authMocks.canManageCourse.mockResolvedValueOnce(true);
+    const attempt = (id: string) => ({
+      id,
+      lifecycle: "graded",
+      assessmentMode: "summative",
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      pluginAttemptRef: `plugin-${id}`,
+      activity: {
+        id: "activity-1",
+        bankActivityId: null,
+        activityVersionId: "version-1",
+        title: "Loops",
+        description: "Reorder the loop.",
+        lifecycle: "published",
+        config: { prompt: "Build it" },
+        metadata: {},
+        activityType: { key: "parsons-problem", name: "Parsons problem", description: "Reorder code" }
+      },
+      groupActivity: {
+        id: "assignment-1",
+        availableFrom: null,
+        availableUntil: null,
+        config: {},
+        metadata: { assessmentMode: "summative" },
+        position: 0
+      }
+    });
+    mockPrisma.activityAttempt.findMany.mockResolvedValue([attempt("attempt-2"), attempt("attempt-1")]);
+
+    await expect(getActivityAttemptRegradeContexts(teacherUser, "course-1", ["attempt-1", "attempt-2"])).resolves.toMatchObject([
+      { attemptId: "attempt-1", pluginAttemptRef: "plugin-attempt-1" },
+      { attemptId: "attempt-2", pluginAttemptRef: "plugin-attempt-2" }
+    ]);
+    expect(mockPrisma.activityAttempt.findMany).toHaveBeenCalledTimes(1);
   });
 
   it("returns only released student grade summaries without attempt history details", async () => {
