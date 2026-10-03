@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ConfirmationDialog, useNotifications } from "@cognelo/activity-ui";
+import { ConfirmationDialog, ProgressDialog, useNotifications } from "@cognelo/activity-ui";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { MaintenanceNav } from "@/components/maintenance-nav";
@@ -175,6 +175,13 @@ export default function MediaMaintenancePage() {
           isConfirming={cleaning}
           onCancel={() => setConfirmingCleanup(false)}
           onConfirm={runCleanup}
+        />
+        <ProgressDialog
+          open={cleaning}
+          title={t("settings.maintenanceCleaning")}
+          progressLabel={t("settings.maintenanceCleaning")}
+          eyebrow={t("settings.maintenanceMediaEyebrow")}
+          message={t("settings.maintenanceCleanupPreviewText")}
         />
       </main>
     </AppShell>

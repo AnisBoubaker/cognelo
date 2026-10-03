@@ -10,5 +10,6 @@ export * from "./markdown-renderer";
 export * from "./knowledge-generation";
 export * from "./monaco-code-editor";
 export * from "./notifications";
+export * from "./progress-dialog";
 export * from "./rich-text-editor";
 export * from "./unsaved-changes";

@@ -503,7 +503,7 @@ State-driven UI:
 - Before available: use normal core assignment availability.
 - No submission: show homework statement, structure requirements, temporary conformance check, and final ZIP upload.
 - Preflight check: students may temporarily upload a ZIP to verify required files, folders, and functions before final submission; these checks do not create gradebook attempts or challenge questions.
-- Processing: show progress/status.
+- Processing: show progress/status. Complete: the shared blocking progress dialog spans the final upload request and the subsequent background-job polling interval until questions are ready or processing fails; preflight and teacher processing operations use the same indeterminate component.
 - Challenge ready: show generated free-response questions.
 - Ready for grading: show submitted ZIP metadata and submitted answers, read-only.
 - Graded: show released grade only through normal gradebook release behavior.

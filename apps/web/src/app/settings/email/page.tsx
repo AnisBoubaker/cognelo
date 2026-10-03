@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { EditActionBar, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { EditActionBar, ProgressDialog, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { EmailDeliveryConfigurationInput } from "@cognelo/contracts";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
@@ -301,6 +301,13 @@ export default function EmailSettingsPage() {
             ) : null}
           </div>
         </div>
+        <ProgressDialog
+          open={testing}
+          title={t("settings.emailTestTitle")}
+          progressLabel={t("settings.emailTesting")}
+          eyebrow={t("settings.emailTestEyebrow")}
+          message={recipientEmail}
+        />
       </main>
     </AppShell>
   );

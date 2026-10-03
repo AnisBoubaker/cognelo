@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { CodeEditor, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, RichTextEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
+import { CodeEditor, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, ProgressDialog, RichTextEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   parseMcqSource,
   type McqChoice,
@@ -609,13 +609,16 @@ export function McqActivityView({
     if (!isSummativeStudentSession || !submissionClient?.submit) {
       setSubmitted(true);
       setAiFeedback(null);
-      if (submissionClient?.feedback) {
-        try {
+      setSubmitting(true);
+      try {
+        if (submissionClient?.feedback) {
           const feedback = await submissionClient.feedback(activity.id, studentAnswers);
           if (aiFeedbackEnabled) setAiFeedback(feedback);
-        } catch {
-          if (aiFeedbackEnabled) notifications.error(copy.aiFeedbackError);
         }
+      } catch {
+        if (aiFeedbackEnabled) notifications.error(copy.aiFeedbackError);
+      } finally {
+        setSubmitting(false);
       }
       return;
     }
@@ -654,6 +657,7 @@ export function McqActivityView({
 
   if (canManage) {
     return (
+      <>
       <form className="section stack" onSubmit={saveMcq}>
         <div className="stack">
           <h2>{copy.authoringTitle}</h2>
@@ -856,6 +860,14 @@ export function McqActivityView({
         />
 
       </form>
+      <ProgressDialog
+        open={generating}
+        eyebrow={copy.generateSection}
+        title={copy.generating}
+        message={copy.generateHelp}
+        progressLabel={copy.generating}
+      />
+      </>
     );
   }
 
@@ -976,6 +988,12 @@ export function McqActivityView({
           </div>
         </div>
       ) : null}
+      <ProgressDialog
+        open={submitting}
+        eyebrow={activity.title}
+        title={isSummativeStudentSession ? copy.saving : copy.generating}
+        progressLabel={isSummativeStudentSession ? copy.saving : copy.generating}
+      />
     </section>
   );
 }

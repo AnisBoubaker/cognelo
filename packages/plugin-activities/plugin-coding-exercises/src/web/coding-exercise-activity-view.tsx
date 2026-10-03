@@ -3,7 +3,7 @@
 import { type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
-import { CodeEditor, CodeRenderer, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, RichTextEditor, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
+import { CodeEditor, CodeRenderer, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, ProgressDialog, RichTextEditor, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   alignCodingExerciseStarterCodeToTemplate,
   balanceCodingExerciseAiRubricCriterionWeights,
@@ -1292,6 +1292,21 @@ export function CodingExerciseActivityView({
   const testGenerationCountsValid = [visibleTestGenerationCount, hiddenTestGenerationCount].every(
     (count) => Number.isInteger(count) && count >= 1 && count <= codingExerciseMaxGeneratedTestCount
   );
+  const longRunningTitle = generatingPrompt
+    ? t("generatingPrompt")
+    : generatingSolution
+      ? t("generatingSolution")
+      : generatingTests
+        ? t("generatingTests")
+        : generatingRubric
+          ? t("generatingRubric")
+          : workingAction === "run"
+            ? t("running")
+            : workingAction === "submit"
+              ? t("submitting")
+              : saving
+                ? t("saving")
+                : null;
 
   return (
     <section className="section stack">
@@ -2333,6 +2348,12 @@ export function CodingExerciseActivityView({
           ) : null}
         </div>
       )}
+      <ProgressDialog
+        open={Boolean(longRunningTitle)}
+        eyebrow={activity.title}
+        title={longRunningTitle ?? t("saving")}
+        progressLabel={longRunningTitle ?? t("saving")}
+      />
     </section>
   );
 }

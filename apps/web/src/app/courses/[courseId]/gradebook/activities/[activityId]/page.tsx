@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { useDialogs, useNotifications } from "@cognelo/activity-ui";
+import { ProgressDialog, useDialogs, useNotifications } from "@cognelo/activity-ui";
 import { createMcqClient } from "@cognelo/plugin-mcq";
 import { createParsonsClient } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
@@ -44,6 +44,12 @@ export default function GradebookActivityResultsPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
   const [savingGradeKey, setSavingGradeKey] = useState<string | null>(null);
+  const [progressOperation, setProgressOperation] = useState<{
+    title: string;
+    message?: string;
+    completed?: number;
+    total?: number;
+  } | null>(null);
   const [reviewAndGradeRow, setReviewAndGradeRow] = useState<CourseGradebookRow | null>(null);
   const [reviewAll, setReviewAll] = useState<{
     loading: boolean;
@@ -239,6 +245,10 @@ export default function GradebookActivityResultsPage() {
     }
 
     setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:regrade`);
+    setProgressOperation({
+      title: t("courseDetail.regradeRunning"),
+      message: row.participantName
+    });
     try {
       const result = await api.regradeActivityAttempt(courseId, attempt.id, { reason: t("courseDetail.regradeReason") });
       await refresh();
@@ -248,6 +258,7 @@ export default function GradebookActivityResultsPage() {
       notifications.error(err instanceof Error ? err.message : t("courseDetail.regradeError"));
     } finally {
       setSavingGradeKey(null);
+      setProgressOperation(null);
     }
   }
 
@@ -262,6 +273,10 @@ export default function GradebookActivityResultsPage() {
       : "courseDetail.aiAssessmentFeedbackConfirm";
     if (!await dialogs.confirm({ message: t(confirmKey, { name: row.participantName }) })) return;
     setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:ai-feedback`);
+    setProgressOperation({
+      title: t("courseDetail.aiAssessmentRunning"),
+      message: row.participantName
+    });
     try {
       await api.generateActivityAttemptAiFeedback(courseId, attempt.id);
       await refresh();
@@ -270,6 +285,7 @@ export default function GradebookActivityResultsPage() {
       notifications.error(err instanceof Error ? err.message : t("courseDetail.aiFeedbackError"));
     } finally {
       setSavingGradeKey(null);
+      setProgressOperation(null);
     }
   }
 
@@ -288,15 +304,22 @@ export default function GradebookActivityResultsPage() {
       : "courseDetail.aiAssessmentFeedbackAllConfirm";
     if (!await dialogs.confirm({ message: t(confirmKey, { count: eligible.length }) })) return;
     setSavingGradeKey("__all:ai-feedback");
+    setProgressOperation({
+      title: t("courseDetail.aiAssessmentRunning"),
+      completed: 0,
+      total: eligible.length
+    });
     try {
       let completed = 0;
       const failureReasons: string[] = [];
-      for (const { attempt } of eligible) {
+      for (const [index, { attempt }] of eligible.entries()) {
         try {
           await api.generateActivityAttemptAiFeedback(courseId, attempt.id, { triggerKind: "teacher_batch" });
           completed += 1;
         } catch (err) {
           failureReasons.push(err instanceof Error ? err.message : t("courseDetail.aiFeedbackError"));
+        } finally {
+          setProgressOperation((current) => current ? { ...current, completed: index + 1 } : current);
         }
       }
       await refresh();
@@ -317,6 +340,7 @@ export default function GradebookActivityResultsPage() {
       notifications.error(err instanceof Error ? err.message : t("courseDetail.aiFeedbackError"));
     } finally {
       setSavingGradeKey(null);
+      setProgressOperation(null);
     }
   }
 
@@ -471,11 +495,16 @@ export default function GradebookActivityResultsPage() {
     }
 
     setSavingGradeKey("__all:regrade");
+    setProgressOperation({
+      title: t("courseDetail.regradeRunning"),
+      completed: 0,
+      total: rowsWithAttempts.length
+    });
     try {
       let graded = 0;
       let pending = 0;
       let failed = 0;
-      for (const row of rowsWithAttempts) {
+      for (const [index, row] of rowsWithAttempts.entries()) {
         const attempt = selectedSubmittedAttempt(row);
         if (attempt) {
           try {
@@ -486,6 +515,7 @@ export default function GradebookActivityResultsPage() {
             failed += 1;
           }
         }
+        setProgressOperation((current) => current ? { ...current, completed: index + 1 } : current);
       }
       await refresh();
       notifications.success(t("courseDetail.regradeBatchSummary", { graded, pending, failed }));
@@ -493,6 +523,7 @@ export default function GradebookActivityResultsPage() {
       notifications.error(err instanceof Error ? err.message : t("courseDetail.regradeError"));
     } finally {
       setSavingGradeKey(null);
+      setProgressOperation(null);
     }
   }
 
@@ -605,6 +636,23 @@ export default function GradebookActivityResultsPage() {
             <p className="muted">{t("courseDetail.noGradebookRows")}</p>
           )}
         </section>
+
+        <ProgressDialog
+          open={Boolean(progressOperation)}
+          eyebrow={t("courseDetail.gradebookEyebrow")}
+          title={progressOperation?.title ?? t("common.loading")}
+          message={progressOperation?.message}
+          progress={progressOperation?.total
+            ? ((progressOperation.completed ?? 0) / progressOperation.total) * 100
+            : null}
+          progressLabel={t("common.operationProgress")}
+          progressSummary={progressOperation?.total
+            ? t("courseDetail.batchActionProgress", {
+                completed: progressOperation.completed ?? 0,
+                total: progressOperation.total
+              })
+            : undefined}
+        />
 
         {reviewAndGradeRow ? (
           <ReviewAndGradeDialog

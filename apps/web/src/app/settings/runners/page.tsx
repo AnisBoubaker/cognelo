@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { EditActionBar, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { EditActionBar, ProgressDialog, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { ExecutionRunnerConfigurationInput, ExecutionRunnerType } from "@cognelo/contracts";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
@@ -300,6 +300,13 @@ export default function RunnerSettingsPage() {
             ) : null}
           </section>
         </div>
+        <ProgressDialog
+          open={testing !== null}
+          title={testing ? runnerTitle(testing, t) : t("settings.runnerTest")}
+          progressLabel={t("settings.runnerTesting")}
+          eyebrow={t("settings.runnersEyebrow")}
+          message={t("settings.runnerTesting")}
+        />
       </main>
     </AppShell>
   );

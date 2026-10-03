@@ -1,7 +1,14 @@
 "use client";
 
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { EditActionBar, MarkdownRenderer, getEditActionBarCopy, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import {
+  EditActionBar,
+  MarkdownRenderer,
+  ProgressDialog,
+  getEditActionBarCopy,
+  useNotifications,
+  useUnsavedChangesGuard
+} from "@cognelo/activity-ui";
 import {
   type CodingHomeworkAssignmentRecord,
   type CodingHomeworkAttachmentRecord,
@@ -154,6 +161,7 @@ export function CodingHomeworkGraderActivityView({
   const [loading, setLoading] = useState(Boolean(canManage && authoringClient));
   const [documentationPreview, setDocumentationPreview] = useState<CodingHomeworkDocumentationPreview | null>(null);
   const [loadingDocumentation, setLoadingDocumentation] = useState(false);
+  const [showDocumentationProgress, setShowDocumentationProgress] = useState(false);
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
   const [extractingDocumentation, setExtractingDocumentation] = useState(false);
   const [preflightResult, setPreflightResult] = useState<CodingHomeworkPreflightResult | null>(null);
@@ -312,6 +320,7 @@ export function CodingHomeworkGraderActivityView({
       }
 
       setLoadingDocumentation(true);
+      setShowDocumentationProgress(Boolean(options?.notify));
       try {
         const preview = await authoringClient.getDocumentationPreview(activity.id);
         setDocumentationPreview(preview);
@@ -322,6 +331,7 @@ export function CodingHomeworkGraderActivityView({
         notifications.error(error instanceof Error ? error.message : copy.saveError);
       } finally {
         setLoadingDocumentation(false);
+        setShowDocumentationProgress(false);
       }
     },
     [activity.id, authoringClient, copy.documentationUpdated, copy.saveError, notifications]
@@ -655,47 +665,63 @@ export function CodingHomeworkGraderActivityView({
   if (!canManage) {
     const submissionStatus = latestSubmission?.submission.status ?? null;
     const processingSubmission = isSubmissionProcessing(submissionStatus) && !challengeQuestions.length;
+    const studentLongRunningTitle = runningPreflight
+      ? copy.preflight
+      : submitting
+        ? copy.submission
+        : processingSubmission
+          ? copy.submissionProcessing
+          : null;
     return (
-      <section className="section stack" aria-busy={processingSubmission}>
-        <h2>{activity.title}</h2>
-        {loadingStudentAssignment ? <p>{copy.loading}</p> : <MarkdownRenderer markdown={studentAssignment?.assignment.promptMarkdown || activity.description} />}
-        {studentAssignment?.assignment.promptPdf && activityFileUrl ? (
-          <p><a className="button secondary" href={activityFileUrl(studentAssignment.assignment.promptPdf.id)} target="_blank" rel="noreferrer">{copy.viewPdf}</a></p>
-        ) : null}
-        {studentAssignment?.assignment.providedFiles.length && activityFileUrl ? (
-          <div className="stack">
-            <h3>{copy.providedFiles}</h3>
-            {studentAssignment.assignment.providedFiles.map((file) => (
-              <a key={file.id} href={activityFileUrl(file.id)} target="_blank" rel="noreferrer">{file.originalName}</a>
-            ))}
-          </div>
-        ) : null}
-        <PreflightPanel copy={copy} disabled={processingSubmission} preflightResult={preflightResult} runningPreflight={runningPreflight} onUpload={runPreflight} />
-        {submissionClient ? (
-          <>
-            <SubmissionPanel
-              copy={copy}
-              disabled={processingSubmission}
-              latestSubmission={latestSubmission}
-              onUpload={submitFinalSubmission}
-              submissionResult={submissionResult}
-              submitting={submitting}
-            />
-            <ChallengeQuestionsPanel
-              answers={challengeAnswers}
-              copy={copy}
-              questions={challengeQuestions}
-              saving={savingAnswers}
-              status={latestSubmission?.submission.status ?? null}
-              submitting={submittingAnswers}
-              onAnswerChange={(questionId, answer) => setChallengeAnswers((current) => ({ ...current, [questionId]: answer }))}
-              onSave={() => void saveChallengeAnswers()}
-              onSubmit={() => void submitChallengeAnswers()}
-            />
-            {processingSubmission ? <ProcessingWaitPanel copy={copy} startedAt={latestSubmission?.submission.createdAt ?? null} /> : null}
-          </>
-        ) : null}
-      </section>
+      <>
+        <section className="section stack" aria-busy={processingSubmission}>
+          <h2>{activity.title}</h2>
+          {loadingStudentAssignment ? <p>{copy.loading}</p> : <MarkdownRenderer markdown={studentAssignment?.assignment.promptMarkdown || activity.description} />}
+          {studentAssignment?.assignment.promptPdf && activityFileUrl ? (
+            <p><a className="button secondary" href={activityFileUrl(studentAssignment.assignment.promptPdf.id)} target="_blank" rel="noreferrer">{copy.viewPdf}</a></p>
+          ) : null}
+          {studentAssignment?.assignment.providedFiles.length && activityFileUrl ? (
+            <div className="stack">
+              <h3>{copy.providedFiles}</h3>
+              {studentAssignment.assignment.providedFiles.map((file) => (
+                <a key={file.id} href={activityFileUrl(file.id)} target="_blank" rel="noreferrer">{file.originalName}</a>
+              ))}
+            </div>
+          ) : null}
+          <PreflightPanel copy={copy} disabled={processingSubmission} preflightResult={preflightResult} runningPreflight={runningPreflight} onUpload={runPreflight} />
+          {submissionClient ? (
+            <>
+              <SubmissionPanel
+                copy={copy}
+                disabled={processingSubmission}
+                latestSubmission={latestSubmission}
+                onUpload={submitFinalSubmission}
+                submissionResult={submissionResult}
+                submitting={submitting}
+              />
+              <ChallengeQuestionsPanel
+                answers={challengeAnswers}
+                copy={copy}
+                questions={challengeQuestions}
+                saving={savingAnswers}
+                status={latestSubmission?.submission.status ?? null}
+                submitting={submittingAnswers}
+                onAnswerChange={(questionId, answer) => setChallengeAnswers((current) => ({ ...current, [questionId]: answer }))}
+                onSave={() => void saveChallengeAnswers()}
+                onSubmit={() => void submitChallengeAnswers()}
+              />
+              {processingSubmission ? <ProcessingWaitPanel copy={copy} startedAt={latestSubmission?.submission.createdAt ?? null} /> : null}
+            </>
+          ) : null}
+        </section>
+        <ProgressDialog
+          open={studentLongRunningTitle !== null}
+          title={studentLongRunningTitle ?? copy.submission}
+          progressLabel={studentLongRunningTitle ?? copy.submission}
+          eyebrow={activity.title}
+          message={processingSubmission ? copy.submissionProcessingDetail : undefined}
+        />
+      </>
     );
   }
 
@@ -707,8 +733,27 @@ export function CodingHomeworkGraderActivityView({
     );
   }
 
+  const teacherLongRunningTitle = uploadingPdf
+    ? copy.uploadPdf
+    : importingRequirements
+      ? copy.importRequirements
+      : uploadingProvidedFile
+        ? copy.uploadProvidedFile
+        : creatingSnapshot
+          ? copy.documentationSnapshot
+          : extractingDocumentation
+            ? copy.extractDocumentation
+            : showDocumentationProgress
+              ? copy.preview
+              : runningPreflight
+                ? copy.preflight
+                : saving
+                  ? copy.save
+                  : null;
+
   return (
-    <form className="section stack" onSubmit={saveForm}>
+    <>
+      <form className="section stack" onSubmit={saveForm}>
       <div className="section-heading">
         <div>
           <p className="eyebrow">{copy.teacherSetup}</p>
@@ -984,7 +1029,19 @@ export function CodingHomeworkGraderActivityView({
         onSave={() => saveHomework()}
         saveDisabled={!authoringClient || !onSave}
       />
-    </form>
+      </form>
+      <ProgressDialog
+        open={teacherLongRunningTitle !== null}
+        title={teacherLongRunningTitle ?? copy.save}
+        progressLabel={teacherLongRunningTitle ?? copy.save}
+        eyebrow={activity.title}
+        message={
+          creatingSnapshot || extractingDocumentation || showDocumentationProgress
+            ? copy.documentation
+            : undefined
+        }
+      />
+    </>
   );
 }
 

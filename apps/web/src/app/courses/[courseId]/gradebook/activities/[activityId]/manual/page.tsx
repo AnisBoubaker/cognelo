@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { CodeRenderer, useNotifications } from "@cognelo/activity-ui";
+import { CodeRenderer, ProgressDialog, useNotifications } from "@cognelo/activity-ui";
 import { createCodingHomeworkGraderClient, type CodingHomeworkGradebookAttemptRecord } from "@cognelo/plugin-coding-homework-grader";
 import {
   createMcqClient,
@@ -65,6 +65,7 @@ export default function ManualActivityGradingPage() {
   const [draftsByRowKey, setDraftsByRowKey] = useState<Record<string, DraftGrade>>({});
   const [loadingAttempts, setLoadingAttempts] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState<{ completed: number; total: number } | null>(null);
   const [appliedParticipantId, setAppliedParticipantId] = useState<string | null>(null);
 
   async function refresh() {
@@ -251,20 +252,21 @@ export default function ManualActivityGradingPage() {
 
   async function saveCurrentPage() {
     setSaving(true);
+    const rowsToSave = pageRows.filter((row) => {
+      const attempts = attemptsByRowKey[rowKey(row)] ?? [];
+      const selectedAttempt = attempts[selectedAttemptIndexByRowKey[rowKey(row)] ?? 0] ?? null;
+      const draft = draftsByRowKey[rowKey(row)];
+      return row.assessmentMode === "summative"
+        && assessmentModeForManualAttempt(row, selectedAttempt) === "summative"
+        && Boolean(draft?.score.trim());
+    });
+    setSaveProgress({ completed: 0, total: rowsToSave.length });
     try {
-      for (const row of pageRows) {
+      for (const [index, row] of rowsToSave.entries()) {
         const attempts = attemptsByRowKey[rowKey(row)] ?? [];
         const selectedAttempt = attempts[selectedAttemptIndexByRowKey[rowKey(row)] ?? 0] ?? null;
-        if (row.assessmentMode === "formative" || assessmentModeForManualAttempt(row, selectedAttempt) === "formative") {
-          continue;
-        }
         const draft = draftsByRowKey[rowKey(row)];
-        if (!draft) {
-          continue;
-        }
-        if (!draft.score.trim()) {
-          continue;
-        }
+        if (!draft) continue;
         const mcqAnswers = draft.questionScores
           ? buildMcqReviewAnswers(activityConfigByRowKey[rowKey(row)] ?? {}, selectedAttempt as McqSubmission, row.maxScore)
           : [];
@@ -287,6 +289,7 @@ export default function ManualActivityGradingPage() {
           reason: draft.feedback.trim() || null,
           feedbackText: draft.feedback.trim() || null
         });
+        setSaveProgress({ completed: index + 1, total: rowsToSave.length });
       }
       await refresh();
       notifications.success(t("courseDetail.manualGradingSaved"));
@@ -296,6 +299,7 @@ export default function ManualActivityGradingPage() {
       return false;
     } finally {
       setSaving(false);
+      setSaveProgress(null);
     }
   }
 
@@ -607,6 +611,14 @@ export default function ManualActivityGradingPage() {
             <p className="muted">{t("courseDetail.noGradebookRows")}</p>
           )}
         </section>
+        <ProgressDialog
+          open={saveProgress !== null}
+          title={t("common.saving")}
+          progressLabel={t("common.operationProgress")}
+          eyebrow={activityTitle}
+          progress={saveProgress && saveProgress.total > 0 ? (saveProgress.completed / saveProgress.total) * 100 : 0}
+          progressSummary={saveProgress ? t("courseDetail.batchActionProgress", saveProgress) : undefined}
+        />
       </main>
     </AppShell>
   );

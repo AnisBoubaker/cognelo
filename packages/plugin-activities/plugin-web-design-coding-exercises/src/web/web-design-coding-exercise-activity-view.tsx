@@ -2,7 +2,7 @@
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
-import { EditActionBar, MarkdownRenderer, MonacoCodeEditor, getEditActionBarCopy, useDialogs, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { EditActionBar, MarkdownRenderer, MonacoCodeEditor, ProgressDialog, getEditActionBarCopy, useDialogs, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   buildWebDesignPreviewDocument,
   defaultWebDesignExerciseConfig,
@@ -977,6 +977,7 @@ export function WebDesignCodingExerciseActivityView({
     ] as const;
 
     return (
+      <>
       <form className="section stack" onSubmit={saveExercise}>
         <div className="stack">
           <h2>{copy.authoringTitle}</h2>
@@ -1091,6 +1092,13 @@ export function WebDesignCodingExerciseActivityView({
           saveDisabled={Boolean(validationError)}
         />
       </form>
+      <ProgressDialog
+        open={saving || validatingTests}
+        eyebrow={activity.title}
+        title={copy.saving}
+        progressLabel={copy.saving}
+      />
+      </>
     );
   }
 
@@ -1152,6 +1160,12 @@ export function WebDesignCodingExerciseActivityView({
           />
         </div>
       ) : null}
+      <ProgressDialog
+        open={executingKind !== null}
+        eyebrow={activity.title}
+        title={executingKind === "submit" ? copy.submitting : copy.runningTests}
+        progressLabel={executingKind === "submit" ? copy.submitting : copy.runningTests}
+      />
     </>
   );
 }

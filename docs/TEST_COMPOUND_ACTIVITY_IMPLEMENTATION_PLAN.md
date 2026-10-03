@@ -369,6 +369,8 @@ The Test editor includes:
 
 Opening an item embeds its normal plugin authoring view in a Test-specific route. The child remains invisible in ordinary course activity lists.
 
+Whole-Test duplication and course-to-bank publication deep-copy the owned child graph and therefore display the shared blocking, indeterminate progress dialog until the operation finishes.
+
 ## Student UX
 
 The Test opens as one assigned activity. The shell provides:
@@ -386,6 +388,8 @@ The Test opens as one assigned activity. The shell provides:
 When a new attempt is blocked by grade release, the due date, or the attempt limit, the student Test shell remains visible with a disabled start action and a localized explanation. The assigned-activity tab shell must not hide the Test renderer merely because attempt availability is false.
 
 No child activity should expose standalone submit, attempt-limit, grade-release, or assignment controls.
+
+Starting an attempt and final submission also use the shared blocking, indeterminate progress dialog. Final submission may dispatch several child graders, so the confirmation remains underneath a non-dismissible progress surface until the server returns the completed runtime.
 
 ## Version and Edit Safety
 
@@ -533,4 +537,4 @@ Each phase requires:
 - Phase 3 assignment and content integration implemented: Test is enabled through its dedicated creation flow, assignments are summative-only, direct and settings-dialog materialization reuse the existing content and gradebook paths, later groups remain unassigned, and contained children cannot be assigned or placed independently.
 - Phase 4 execution and the first MCQ adapter are implemented. Students receive a dedicated Test start/resume and navigation shell rather than the teacher authoring form. Core persists one parent attempt plus generic per-item attempts. MCQ answers autosave without an individual submit button; **Submit Test** dispatches every child through capability/handler/renderer registries designed for additional plugins and then submits the parent once.
 - Phase 5 grading and review are implemented: parent aggregation, normal gradebook/release/audit integration, Test breakdowns, item-level manual adjustment with parent recomputation, parent override preservation, Test regrading, individual attempt review, and extensible aggregate review.
-- Phase 6 is implemented. MCQ, Parsons, coding exercise, and web-design coding exercise use plugin-owned composite execution/review adapters; Test attempts use immutable revisions; duplication copies generic and plugin-owned data; deadlines and no-resume rules are server-enforced; final submission is idempotent and concurrency-safe; and the student shell includes localized, accessible timing, navigation, save, and submission states.
+- Phase 6 is implemented. MCQ, Parsons, coding exercise, and web-design coding exercise use plugin-owned composite execution/review adapters; Test attempts use immutable revisions; duplication copies generic and plugin-owned data; deadlines and no-resume rules are server-enforced; final submission is idempotent and concurrency-safe; and the student shell includes localized, accessible timing, navigation, save, submission, and blocking long-operation progress states.

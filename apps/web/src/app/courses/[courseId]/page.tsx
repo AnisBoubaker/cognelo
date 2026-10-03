@@ -1,6 +1,6 @@
 "use client";
 
-import { ContextMenu, MarkdownRenderer, useDialogs } from "@cognelo/activity-ui";
+import { ContextMenu, MarkdownRenderer, ProgressDialog, useDialogs } from "@cognelo/activity-ui";
 import { resolveLocalizedText, type ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -87,11 +87,13 @@ export default function CourseDetailPage() {
   const [gradebookActivityId, setGradebookActivityId] = useState("");
   const [gradebookStatus, setGradebookStatus] = useState<GradebookStatus>("all");
   const [savingReleaseItemId, setSavingReleaseItemId] = useState<string | null>(null);
+  const [gradeReleaseProgress, setGradeReleaseProgress] = useState<{ completed: number; total: number; released: boolean } | null>(null);
   const [expandedGradebookActivityIds, setExpandedGradebookActivityIds] = useState<Set<string>>(new Set());
   const [showActivityPicker, setShowActivityPicker] = useState(false);
   const [pickerParentId, setPickerParentId] = useState("");
   const [pickerIsVisible, setPickerIsVisible] = useState(true);
   const [isAddingActivity, setIsAddingActivity] = useState(false);
+  const [attachingBankActivityTitle, setAttachingBankActivityTitle] = useState<string | null>(null);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingFolderTitle, setEditingFolderTitle] = useState("");
   const [editingFolderSelectAll, setEditingFolderSelectAll] = useState(false);
@@ -119,6 +121,7 @@ export default function CourseDetailPage() {
   const [isDuplicatingCourseActivity, setIsDuplicatingCourseActivity] = useState(false);
   const [bankSyncDialog, setBankSyncDialog] = useState<{ activityId: string; title: string; sync: ActivityBankSyncStatus } | null>(null);
   const [bankSyncLoading, setBankSyncLoading] = useState(false);
+  const [performingBankSync, setPerformingBankSync] = useState(false);
   const [bankSyncError, setBankSyncError] = useState("");
   const [bankSyncConfirmation, setBankSyncConfirmation] = useState<BankSyncAction | null>(null);
   const folderTitleInputRef = useRef<HTMLInputElement | null>(null);
@@ -288,14 +291,26 @@ export default function CourseDetailPage() {
     }
 
     setSavingReleaseItemId(uniqueItemIds.join(":"));
+    setGradeReleaseProgress({ completed: 0, total: uniqueItemIds.length, released });
     setError("");
     try {
-      await Promise.all(uniqueItemIds.map((itemId) => api.setGradebookItemRelease(courseId, itemId, { released })));
+      const results = await Promise.allSettled(uniqueItemIds.map(async (itemId) => {
+        try {
+          await api.setGradebookItemRelease(courseId, itemId, { released });
+        } finally {
+          setGradeReleaseProgress((current) => current
+            ? { ...current, completed: current.completed + 1 }
+            : current);
+        }
+      }));
+      const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+      if (failure) throw failure.reason;
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("courseDetail.gradeReleaseError"));
     } finally {
       setSavingReleaseItemId(null);
+      setGradeReleaseProgress(null);
     }
   }
 
@@ -474,6 +489,7 @@ export default function CourseDetailPage() {
   async function attachBankActivity(bankActivity: NonNullable<ActivityBank["activities"]>[number]) {
     setError("");
     setIsAddingActivity(true);
+    setAttachingBankActivityTitle(bankActivity.title);
     try {
       if (bankActivity.activityType.key === "test") {
         await api.createTestFromBank(courseId, {
@@ -503,6 +519,7 @@ export default function CourseDetailPage() {
       setError(err instanceof Error ? err.message : t("courseDetail.createActivityError"));
     } finally {
       setIsAddingActivity(false);
+      setAttachingBankActivityTitle(null);
     }
   }
 
@@ -932,6 +949,7 @@ export default function CourseDetailPage() {
   async function performBankSync(action: BankSyncAction) {
     if (!bankSyncDialog) return;
     setBankSyncLoading(true);
+    setPerformingBankSync(true);
     setBankSyncError("");
     try {
       await api.syncCourseActivityWithBank(courseId, bankSyncDialog.activityId, action);
@@ -942,6 +960,7 @@ export default function CourseDetailPage() {
       setBankSyncError(err instanceof Error ? err.message : t("courseDetail.bankSyncError"));
     } finally {
       setBankSyncLoading(false);
+      setPerformingBankSync(false);
     }
   }
 
@@ -2143,6 +2162,38 @@ export default function CourseDetailPage() {
                 onSelectBankActivity={attachBankActivity}
               />
             ) : null}
+            <ProgressDialog
+              open={performingBankSync}
+              title={t("courseDetail.bankSyncConfirmAction")}
+              progressLabel={t("common.operationProgress")}
+              eyebrow={bankSyncDialog?.title ?? t("courseDetail.bankSyncEyebrow")}
+            />
+            <ProgressDialog
+              open={attachingBankActivityTitle !== null}
+              title={t("courseDetail.activityShellTitle")}
+              progressLabel={t("common.operationProgress")}
+              eyebrow={attachingBankActivityTitle ?? undefined}
+            />
+            <ProgressDialog
+              open={isDuplicatingCourseActivity}
+              title={t("courseDetail.duplicateActivity")}
+              progressLabel={t("common.operationProgress")}
+              eyebrow={duplicateCourseActivityTitle}
+            />
+            <ProgressDialog
+              open={gradeReleaseProgress !== null}
+              title={t(gradeReleaseProgress?.released ? "courseDetail.releaseGrades" : "courseDetail.hideGrades")}
+              progressLabel={t("common.operationProgress")}
+              progress={gradeReleaseProgress
+                ? (gradeReleaseProgress.completed / gradeReleaseProgress.total) * 100
+                : 0}
+              progressSummary={gradeReleaseProgress
+                ? t("courseDetail.batchActionProgress", {
+                    completed: gradeReleaseProgress.completed,
+                    total: gradeReleaseProgress.total
+                  })
+                : undefined}
+            />
           </>
         ) : (
           <p>Loading course...</p>

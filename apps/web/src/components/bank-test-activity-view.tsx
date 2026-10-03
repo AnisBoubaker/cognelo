@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ConfirmationDialog, EditActionBar, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { ConfirmationDialog, EditActionBar, ProgressDialog, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
 import {
   api,
@@ -37,6 +37,7 @@ export function BankTestActivityView({ activity, bank, locale, onActivityUpdated
   const [description, setDescription] = useState(activity.description);
   const [savedSettings, setSavedSettings] = useState("");
   const [busy, setBusy] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [itemPendingRemoval, setItemPendingRemoval] = useState<BankTestItem | null>(null);
   const [showActivityPicker, setShowActivityPicker] = useState(false);
@@ -197,6 +198,7 @@ export function BankTestActivityView({ activity, bank, locale, onActivityUpdated
           secondaryActions={(
             <button className="button secondary" disabled={busy || hasUnsavedSettings} type="button" onClick={async () => {
               setBusy(true);
+              setDuplicating(true);
               try {
                 const result = await api.duplicateBankActivity(bank.id, activity.id, `${test.activity.title} (copy)`);
                 notifications.success("Reusable Test duplicated as a draft.");
@@ -205,6 +207,7 @@ export function BankTestActivityView({ activity, bank, locale, onActivityUpdated
                 notifications.error(reason instanceof Error ? reason.message : "The Test could not be duplicated.");
               } finally {
                 setBusy(false);
+                setDuplicating(false);
               }
             }}>Duplicate Test</button>
           )}
@@ -281,6 +284,12 @@ export function BankTestActivityView({ activity, bank, locale, onActivityUpdated
           const removed = await perform(() => api.deleteBankTestItem(bank.id, activity.id, itemPendingRemoval.id), "Activity removed from the reusable Test.");
           if (removed) setItemPendingRemoval(null);
         }}
+      />
+      <ProgressDialog
+        open={duplicating}
+        eyebrow={test.activity.title}
+        title="Duplicate reusable Test"
+        progressLabel="Duplication progress"
       />
     </div>
   );

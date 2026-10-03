@@ -3434,6 +3434,10 @@ a.card:hover,
   width: min(100%, 560px);
 }
 
+.progress-dialog-backdrop {
+  z-index: 1100;
+}
+
 .dialog-panel.activity-settings-dialog {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -3914,19 +3918,18 @@ a.card:hover,
   justify-content: flex-end;
 }
 
-.activity-variation-progress {
+.progress-dialog-body {
   display: grid;
   gap: 14px;
-  margin-top: 18px;
 }
 
-.activity-variation-progress progress {
+.progress-dialog-body progress {
   accent-color: var(--brand-blue);
   height: 16px;
   width: 100%;
 }
 
-.activity-variation-progress-summary {
+.progress-dialog-summary {
   color: var(--muted);
   display: flex;
   font-size: 13px;
