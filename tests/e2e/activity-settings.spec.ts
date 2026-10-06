@@ -1,6 +1,6 @@
 import { prisma } from "@cognelo/db";
 import type { APIRequestContext, APIResponse, Locator, Page } from "@playwright/test";
-import { createAuthenticatedApi, expect, test } from "./fixtures/auth";
+import { confirmSharedDialog, createAuthenticatedApi, expect, test } from "./fixtures/auth";
 import {
   createCourseActivity,
   provisionActivitySuite,
@@ -435,6 +435,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
     await reopened.getByRole("tab", { name: "Group assignment", exact: true }).click();
     await expect(reopened.locator(".activity-override-field")).toHaveCount(3);
     await reopened.getByRole("button", { name: "Save settings", exact: true }).click();
+    await confirmSharedDialog(page);
     await expect(reopened).toBeHidden();
 
     const verificationApi = await createAuthenticatedApi("teacher");

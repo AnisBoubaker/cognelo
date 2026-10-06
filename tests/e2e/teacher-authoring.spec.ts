@@ -16,7 +16,7 @@ test.describe("teacher authoring and course setup", () => {
     await page.goto("/subjects");
     await page.getByRole("button", { name: "Add", exact: true }).click();
     await page.getByLabel("Title").fill(subjectTitle);
-    await page.getByLabel("Description").fill("Created by the Playwright teacher flow.");
+    await page.locator("#subject-description").fill("Created by the Playwright teacher flow.");
     await page.getByRole("button", { name: "Create", exact: true }).click();
     await expect(page.getByRole("link", { name: new RegExp(subjectTitle) })).toBeVisible();
 

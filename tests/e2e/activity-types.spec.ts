@@ -204,6 +204,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     });
 
     await expect(teacherPage.getByRole("heading", { name: "Coding exercise authoring" })).toBeVisible();
+    await teacherPage.getByLabel("Language", { exact: true }).selectOption("python");
     await teacherPage.getByLabel("Title", { exact: true }).fill(title);
     await teacherPage.getByLabel("Description").fill("Read a name and print a greeting.");
     const promptField = teacherPage.locator('label[for="coding-prompt"]').locator("..");
@@ -331,6 +332,8 @@ test.describe.serial("authoring and completing every activity type", () => {
       .locator("..")
       .getByRole("textbox")
       .fill(solution);
+    await teacherPage.getByRole("tab", { name: "Grading", exact: true }).click();
+    await teacherPage.getByRole("tab", { name: "Test cases", exact: true }).click();
     await teacherPage.getByRole("button", { name: "Add sample test" }).click();
     const sampleTestToggle = teacherPage.getByRole("button", { name: "sample-2" });
     await expect(sampleTestToggle).toBeVisible({ timeout: 10_000 });
@@ -365,6 +368,8 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(reopenedPromptField.locator("table th")).toHaveCount(3);
     await expect(reopenedPromptField.getByRole("button", { name: "Edit image" })).toHaveAttribute("alt", "Terminal velocity formula diagram");
     await expect(reopenedPromptField.getByRole("button", { name: "Edit image" })).toHaveAttribute("style", /width: 60%; height: auto/);
+    await teacherPage.getByRole("tab", { name: "Grading", exact: true }).click();
+    await teacherPage.getByRole("tab", { name: "Test cases", exact: true }).click();
     await teacherPage.getByRole("button", { name: "Visible greeting" }).click();
     await expect(teacherPage.locator("#sample-output-match-mode-1")).toHaveValue("contains_lines");
     await expect(teacherPage.getByLabel("Require lines in this order")).toBeChecked();
@@ -399,7 +404,8 @@ test.describe.serial("authoring and completing every activity type", () => {
     await replaceCodeEditorContents(studentPage, title, solution);
     const testSelector = studentPage.locator("#coding-visible-sample");
     await testSelector.click();
-    await studentPage.getByRole("menuitemradio", { name: "Visible greeting" }).evaluate((element: HTMLElement) => element.click());
+    await studentPage.getByRole("menuitemradio", { name: "Visible greeting" }).press("Enter");
+    await expect(testSelector).toContainText("Visible greeting");
     const testRunner = studentPage.getByRole("button", { name: "Run test" }).locator("xpath=ancestor::section[1]");
     await expect(testRunner.getByRole("group", { name: "Input (one value per line)" })).toContainText("Ada");
     await expect(testRunner.getByRole("group", { name: "Expected output" })).toContainText("Hello, Ada!");
@@ -429,9 +435,19 @@ test.describe.serial("authoring and completing every activity type", () => {
     await studentPage.getByRole("button", { name: "Exit full screen" }).click();
     await expect(workspaceShell).not.toHaveClass(/is-full-screen/);
 
-    await testSelector.press("ArrowDown");
+    const runTest = testRunner.getByRole("button", { name: "Run test" });
+    await expect(runTest).toBeEnabled({ timeout: 10_000 });
+    await runTest.click();
+    await expect(testRunner.getByRole("img", { name: "Passed" })).toBeVisible({ timeout: 60_000 });
+    await expect(testRunner.getByLabel("Test output")).toContainText("Hello, Ada!");
+    const currentRuns = studentPage.getByRole("heading", { name: "Recent runs" }).locator("..");
+    await expect(currentRuns).toContainText("Input");
+    await expect(currentRuns).toContainText("Ada");
+    await expect(currentRuns).toContainText("Hello, Ada!");
+
+    await testSelector.click();
     await expect(studentPage.getByRole("menuitemradio", { name: "Personalized test" })).toBeVisible();
-    await studentPage.getByRole("menuitemradio", { name: "Personalized test" }).evaluate((element: HTMLElement) => element.click());
+    await studentPage.getByRole("menuitemradio", { name: "Personalized test" }).press("Enter");
     const personalizedInput = testRunner.getByRole("textbox", { name: "Input (one value per line)" });
     await expect(personalizedInput).toBeEditable();
     await expect(testRunner.getByRole("group", { name: "Expected output" })).toHaveCount(0);
@@ -443,18 +459,6 @@ test.describe.serial("authoring and completing every activity type", () => {
     expect(personalizedButtonBox?.height).toBeLessThan(80);
     expect(personalizedOutputBox?.height).toBeGreaterThanOrEqual(128);
 
-    await testSelector.press("ArrowDown");
-    await expect(studentPage.getByRole("menuitemradio", { name: "Visible greeting" })).toBeVisible();
-    await studentPage.getByRole("menuitemradio", { name: "Visible greeting" }).evaluate((element: HTMLElement) => element.click());
-    const runTest = testRunner.getByRole("button", { name: "Run test" });
-    await expect(runTest).toBeEnabled({ timeout: 10_000 });
-    await runTest.click();
-    await expect(testRunner.getByRole("img", { name: "Passed" })).toBeVisible({ timeout: 60_000 });
-    await expect(testRunner.getByLabel("Test output")).toContainText("Hello, Ada!");
-    const currentRuns = studentPage.getByRole("heading", { name: "Recent runs" }).locator("..");
-    await expect(currentRuns).toContainText("Input");
-    await expect(currentRuns).toContainText("Ada");
-    await expect(currentRuns).toContainText("Hello, Ada!");
     const submitForGrading = studentPage.getByRole("button", { name: "Submit for grading" });
     await expect(submitForGrading).toBeEnabled({ timeout: 10_000 });
     await submitForGrading.click();
@@ -666,8 +670,18 @@ test.describe.serial("authoring and completing every activity type", () => {
     await openStudentActivity(studentPage, data, title);
     await studentPage.getByRole("button", { name: "Start Test" }).click();
     await studentPage.getByRole("dialog", { name: "Start this Test now?" }).getByRole("button", { name: "Start Test" }).click();
+    const mcqAnswerSaved = studentPage.waitForResponse((response) => {
+      if (!response.ok() || response.request().method() !== "PUT" || !response.url().includes("/test/items/")) return false;
+      const body = response.request().postDataJSON() as { state?: { answers?: Record<string, string[]> } } | null;
+      return Object.values(body?.state?.answers ?? {}).some((answers) => answers.length > 0);
+    });
     await studentPage.getByLabel("42", { exact: true }).check();
+    await mcqAnswerSaved;
+    const parsonsStateInitialized = studentPage.waitForResponse(
+      (response) => response.ok() && response.request().method() === "PUT" && response.url().includes("/test/items/")
+    );
     await studentPage.getByRole("button", { name: "Next activity" }).click();
+    await parsonsStateInitialized;
     await expect(studentPage.getByRole("heading", { name: parsonsTitle, exact: true })).toBeVisible();
     await studentPage.getByRole("button", { name: "Submit Test" }).click();
     await studentPage.getByRole("dialog", { name: "Submit the entire Test?" }).getByRole("button", { name: "Submit Test" }).click();

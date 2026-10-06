@@ -126,6 +126,7 @@ test.describe.serial("timed Test countdown", () => {
     expect(timerBeforeScroll.y).toBeGreaterThan(accountBounds.y + accountBounds.height);
     await studentPage.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await expect.poll(() => studentPage.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    await expect.poll(async () => (await timer.boundingBox())?.y ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(13);
     const timerAfterScroll = await timer.boundingBox();
     if (!timerAfterScroll) throw new Error("The Test timer disappeared while scrolling.");
     expect(timerAfterScroll.y).toBeLessThan(timerBeforeScroll.y);
