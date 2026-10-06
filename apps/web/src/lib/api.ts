@@ -1081,6 +1081,8 @@ export type CourseGradebookRow = {
   participantId: string;
   participantName: string;
   participantEmail: string;
+  participantFirstName: string;
+  participantLastName: string;
   externalId?: string | null;
   status: Exclude<GradebookStatus, "all">;
   score: number | null;
@@ -1637,6 +1639,17 @@ export const api = {
       params.set("status", filters.status);
     }
     return `${API_URL}/api/courses/${courseId}/gradebook?${params.toString()}`;
+  },
+  courseActivityGradeExportUrl: (
+    courseId: string,
+    activityId: string,
+    options: { format: "csv" | "xlsx"; fileName: string; groupId?: string }
+  ) => {
+    const params = new URLSearchParams({ format: options.format, fileName: options.fileName });
+    if (options.groupId) {
+      params.set("groupId", options.groupId);
+    }
+    return `${API_URL}/api/courses/${courseId}/gradebook/activities/${activityId}/export?${params.toString()}`;
   },
   setGradebookItemRelease: (courseId: string, gradebookItemId: string, input: { released: boolean }) =>
     request<{ gradebookItem: { id: string; gradesReleased: boolean } }>(

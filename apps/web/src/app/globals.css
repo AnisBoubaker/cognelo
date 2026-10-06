@@ -3918,6 +3918,30 @@ a.card:hover,
   justify-content: flex-end;
 }
 
+.grade-export-file-name {
+  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.grade-export-file-name input {
+  border-bottom-right-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.grade-export-file-name span {
+  align-items: center;
+  align-self: stretch;
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  border-left: 0;
+  border-radius: 0 8px 8px 0;
+  color: var(--muted);
+  display: flex;
+  font-weight: 700;
+  padding: 0 12px;
+}
+
 .progress-dialog-body {
   display: grid;
   gap: 14px;

@@ -147,7 +147,7 @@ Teachers see:
 - activity submissions view
 - individual student history
 - filters for group, activity, missing, late, and needs grading
-- CSV export
+- CSV or XLSX per-activity final-grade export from content and gradebook surfaces, with optional group scope and an editable identifiable filename
 - later LMS-compatible export
 
 Students see:
@@ -468,6 +468,7 @@ First plugin integration target:
   - late
   - needs grading
 - Completed: add CSV export.
+- Completed: add a shared per-activity export dialog to the content context menu, gradebook activity/group rows, and detailed-results page. The dedicated endpoint emits exactly email, first name, last name, and normalized final grade in CSV or XLSX; plugin-declared partial grades and ungraded/missing rows are excluded.
 
 ### Phase 6A: Formative/Summative Assignment Mode - Completed
 
