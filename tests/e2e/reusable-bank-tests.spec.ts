@@ -80,13 +80,15 @@ test.describe.serial("reusable bank Tests", () => {
       const coursePicker = page.getByRole("dialog", { name: "Choose course element" });
       await coursePicker.getByLabel("Activity bank").selectOption(data.activityBankId);
       await coursePicker.getByRole("button", { name: new RegExp(`^${escapeRegex(bankTestTitle)}`) }).click();
-      await expect(page.getByRole("heading", { name: "Assessment details" })).toBeVisible();
-      await expect(page.getByText(`1. ${sourceTitle}`, { exact: true })).toBeVisible();
+      await expect(coursePicker).toBeHidden();
+      await expect(page).toHaveURL(`/courses/${data.courseId}?tab=content`);
+      await expect(page.getByText(bankTestTitle, { exact: true }).first()).toBeVisible();
 
-      const importedShellId = page.url().match(/\/activities\/([^/?#]+)/)?.[1];
-      if (!importedShellId) throw new Error("The imported course Test ID was not present in the URL.");
-      const imported = await prisma.test.findUniqueOrThrow({
-        where: { activityId: importedShellId },
+      const imported = await prisma.test.findFirstOrThrow({
+        where: {
+          courseId: data.courseId,
+          activity: { title: bankTestTitle, bankActivityId: bankTestActivityId }
+        },
         include: { activity: true, items: { include: { activity: true } } }
       });
       expect(imported.activity.bankActivityId).toBe(bankTestActivityId);

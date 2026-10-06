@@ -41,7 +41,10 @@ test.describe.serial("global and course role boundaries", () => {
       "/settings/plugins"
     ]) {
       await page.goto(path);
-      await expect(page).toHaveURL(/\/login$/);
+      await expect(page).toHaveURL(/\/login\?returnTo=/);
+      const loginUrl = new URL(page.url());
+      expect(loginUrl.pathname).toBe("/login");
+      expect(loginUrl.searchParams.get("returnTo")).toBe(path);
     }
   });
 
