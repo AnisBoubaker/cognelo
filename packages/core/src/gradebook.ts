@@ -1033,6 +1033,8 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         participantId: participant.id,
         participantName: formatParticipantName(participant),
         participantEmail: participant.email,
+        participantFirstName: participant.firstName,
+        participantLastName: participant.lastName,
         externalId: participant.externalId,
         status,
         score: effectiveGrade?.normalizedScore ?? null,

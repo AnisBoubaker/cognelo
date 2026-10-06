@@ -10,6 +10,7 @@ import { AppShell } from "@/components/app-shell";
 import { TestReviewAllPanel } from "@/components/test-review-all-panel";
 import { ActivityReviewAllPanel, toActivityReviewResponse, type ActivityReviewResponse } from "@/components/activity-review-all-panel";
 import { ReviewAndGradeDialog } from "@/components/review-and-grade-dialog";
+import { GradebookExportDialog } from "@/components/gradebook-export-dialog";
 import {
   api,
   apiRequest,
@@ -62,6 +63,7 @@ export default function GradebookActivityResultsPage() {
     error: string;
   } | null>(null);
   const [reviewAndGradeRow, setReviewAndGradeRow] = useState<CourseGradebookRow | null>(null);
+  const [showGradeExport, setShowGradeExport] = useState(false);
   const [reviewAll, setReviewAll] = useState<{
     loading: boolean;
     error: string;
@@ -669,6 +671,9 @@ export default function GradebookActivityResultsPage() {
             </p>
           </div>
           <div className="hero-actions">
+            <button className="button secondary" disabled={!course || !gradebook} type="button" onClick={() => setShowGradeExport(true)}>
+              {t("courseDetail.exportGrades")}
+            </button>
             <Link className="button secondary" href={backHref}>
               {backLabel}
             </Link>
@@ -756,6 +761,20 @@ export default function GradebookActivityResultsPage() {
               })
             : undefined}
         />
+
+        {showGradeExport && course && gradebook ? (
+          <GradebookExportDialog
+            target={{
+              courseId,
+              courseTitle: course.title,
+              activityId,
+              activityTitle,
+              groupId,
+              groupName: groupTitle ?? t("courseDetail.allGroups")
+            }}
+            onClose={() => setShowGradeExport(false)}
+          />
+        ) : null}
 
         {aiGradingBatchDialog ? (
           <div className="dialog-backdrop" role="presentation">

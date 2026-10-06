@@ -121,6 +121,8 @@ function gradebookRow(overrides: {
     participantId: overrides.participantId,
     participantName: "Private learner",
     participantEmail: "private@example.invalid",
+    participantFirstName: "Private",
+    participantLastName: "Learner",
     externalId: null,
     status: overrides.score === null ? "missing" as const : "graded" as const,
     score: overrides.score,

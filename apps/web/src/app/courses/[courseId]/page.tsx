@@ -24,6 +24,7 @@ import { useAuth } from "@/components/auth-provider";
 import { CourseSettingsPanel, type CourseSettingsSection } from "@/components/course-settings-panel";
 import { CourseParticipantsPanel } from "@/components/course-participants-panel";
 import { CourseGradeChallengesPanel } from "@/components/course-grade-challenges-panel";
+import { GradebookExportDialog, type GradebookExportTarget } from "@/components/gradebook-export-dialog";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import {
   api,
@@ -111,6 +112,7 @@ export default function CourseDetailPage() {
   const [materialActionError, setMaterialActionError] = useState("");
   const [contentContextMenu, setContentContextMenu] = useState<ContentContextMenu | null>(null);
   const [contentContextMenuAnchor, setContentContextMenuAnchor] = useState<HTMLButtonElement | null>(null);
+  const [gradebookExportTarget, setGradebookExportTarget] = useState<GradebookExportTarget | null>(null);
   const [pickerFolderMenuOpen, setPickerFolderMenuOpen] = useState(false);
   const [contentHeaderMenuOpen, setContentHeaderMenuOpen] = useState(false);
   const [contentHeaderMenuAnchor, setContentHeaderMenuAnchor] = useState<HTMLButtonElement | null>(null);
@@ -1668,6 +1670,27 @@ export default function CourseDetailPage() {
                                         </Link>
                                       )
                                     ) : null}
+                                    {item.kind === "activity" && activity ? (
+                                      <button
+                                        className="content-context-menu-item"
+                                        role="menuitem"
+                                        type="button"
+                                        onClick={() => {
+                                          setContentContextMenu(null);
+                                          setGradebookExportTarget({
+                                            courseId,
+                                            courseTitle: course?.title ?? t("courseDetail.courseView"),
+                                            activityId: activity.id,
+                                            activityTitle: activity.title,
+                                            groupId: contentGroup?.id,
+                                            groupName: contentGroup?.title ?? t("courseDetail.allGroups")
+                                          });
+                                        }}
+                                      >
+                                        <MaterialActionIcon name="download" />
+                                        <span>{t("courseDetail.exportGrades")}</span>
+                                      </button>
+                                    ) : null}
                                     {item.kind === "folder" && !contentGroup ? (
                                       <>
                                         <button
@@ -1941,6 +1964,21 @@ export default function CourseDetailPage() {
                                   ) : null}
                                 </div>
                                 <div className="table-actions">
+                                  <button
+                                    className="button secondary"
+                                    type="button"
+                                    onClick={() => setGradebookExportTarget({
+                                      courseId,
+                                      courseTitle: course?.title ?? t("courseDetail.courseView"),
+                                      activityId: activity.activityId,
+                                      activityTitle: activity.activityTitle,
+                                      groupId: gradebookGroupId || undefined,
+                                      groupName: sortedGradebookGroups.find((group) => group.id === gradebookGroupId)?.title
+                                        ?? t("courseDetail.allGroups")
+                                    })}
+                                  >
+                                    {t("courseDetail.exportGrades")}
+                                  </button>
                                   <Link className="button secondary" href={`/courses/${courseId}/gradebook/activities/${activity.activityId}`}>
                                     {t("courseDetail.detailedResults")}
                                   </Link>
@@ -1979,6 +2017,20 @@ export default function CourseDetailPage() {
                                         ) : null}
                                       </div>
                                       <div className="table-actions">
+                                        <button
+                                          className="button secondary"
+                                          type="button"
+                                          onClick={() => setGradebookExportTarget({
+                                            courseId,
+                                            courseTitle: course?.title ?? t("courseDetail.courseView"),
+                                            activityId: activity.activityId,
+                                            activityTitle: activity.activityTitle,
+                                            groupId: group.groupId,
+                                            groupName: group.groupTitle
+                                          })}
+                                        >
+                                          {t("courseDetail.exportGrades")}
+                                        </button>
                                         <Link
                                           className="button secondary"
                                           href={`/courses/${courseId}/gradebook/activities/${activity.activityId}?groupId=${group.groupId}`}
@@ -2033,6 +2085,9 @@ export default function CourseDetailPage() {
               <div className="drag-preview" style={{ left: dragPreview.x + 14, top: dragPreview.y + 14 }}>
                 {dragPreview.title}
               </div>
+            ) : null}
+            {gradebookExportTarget ? (
+              <GradebookExportDialog target={gradebookExportTarget} onClose={() => setGradebookExportTarget(null)} />
             ) : null}
             {duplicatingCourseActivity ? (
               <div className="dialog-backdrop" role="presentation">
