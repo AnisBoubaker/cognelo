@@ -10,11 +10,16 @@ The Playwright suite covers the platform's critical browser journeys with real A
 - browser authoring, publication, course copying, assignment, and student completion for MCQ, Parsons, coding exercise, web-design coding exercise, and Coding Homework Grader activities;
 - authoring a core compound Test from reusable bank activities and completing its student assessment flow, plus authoring and publishing reusable bank Tests, preserving their owned activity copies after source deletion, importing their full graphs into courses, and publishing course-authored Tests back to a bank;
 - the placeholder activity's intentional unsupported authoring and learner states;
-- summative assignment policy, draft autosave and resume, multiple attempts, attempt limits, automatic grading, gradebook filtering/export, release/hide controls, and student grade visibility;
+- summative assignment policy, draft autosave and resume, multiple attempts, attempt limits, automatic grading, gradebook filtering, per-activity CSV/XLSX export from the gradebook and course-content menu, release/hide controls, and student grade visibility;
+- partial-grade identification, exclusion from exports, publication blocking, and the valid no-submission release case;
+- formative/summative conversion semantics, including the destructive-change confirmation, conversion of existing summative attempts, preservation of formative attempts after switching back, and separation of new summative attempts;
+- student grade challenges, in-place teacher review and audited grade changes, teacher responses, resolved-item filtering, and open-before-resolved ordering;
+- guided batch AI grading with up to three reviewed templates, instruction persistence, progress feedback, and exclusion of selected templates from regrading;
 - consistent detailed-gradebook actions, including the Programming Exercise review surface that combines submitted work, rubric feedback, and the editable final grade;
 - shared accessible confirmation dialogs for grade release, AI assessment, participant removal, and other guarded actions instead of native browser popups;
 - activity-settings dialog layout and placeholders, Cancel behavior, formative/summative field filtering, Assign-to-all preservation, unassignment cleanup, inheritance and every group override category, save/reopen persistence, assigned/unassigned access, group visibility, upcoming and expired availability, Safe Exam Browser gating, and effective per-group gradebook policy;
-- bank activity publication from the editor and list, version comparison, duplication, and movement between banks; and
+- bank activity publication from the editor and list, version comparison, duplication, movement between banks, and AI-assisted variation progress for both individual activities and compound Tests;
+- administrator-managed Judge0, web-design, and SageMath execution-runner endpoints, including per-endpoint capability checks; and
 - group settings updates and restoration.
 
 Browser interactions use accessible roles, labels, and visible text. Direct structural selectors are limited to stable editor surfaces that cannot be uniquely addressed or verified through an accessible name. Teardown invokes the public activity and bank deletion routes first so plugin-private records receive their lifecycle hooks, then uses direct database access only as an exact-ID fallback for records created by that test run. Stateful tests provision disposable, currently available scenarios through authenticated public API routes because durable seed courses can legitimately have expired availability dates. The ZIP-upload path builds its fixture in memory instead of committing a binary archive.
