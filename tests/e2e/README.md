@@ -55,3 +55,7 @@ The broad activity suite exercises real plugin integrations. Coding exercise run
 An E2E run is observational unless the task explicitly asks for product fixes. When a browser test exposes an application defect, preserve the evidence, document expected and observed behavior, and open or link a GitHub issue; do not change product code as part of the run. A stable known defect may use Playwright's expected-failure annotation only when it includes the issue URL, so the intended behavior remains executable and an unexpected recovery is reported. Test-code mistakes and fixture defects may still be corrected to let the requested product paths execute.
 
 The maximum-attempt integrity check waits for each submission to finish, verifies the exhausted activity exposes only submission history, and confirms a direct extra submission request is rejected. The released-grade visibility check asserts that the selected released grade appears to the learner without exposing raw grading payloads.
+
+## Planned authorization expansion
+
+The accepted section-scoped staff model and the deeper administrator, course-designer, teacher, TA, and multi-teacher scenario catalog are documented in [Role Authorization And Multi-Teacher E2E Plan](../../docs/ROLE_AUTHORIZATION_E2E_IMPLEMENTATION_PLAN.md). Those scenarios are intentionally marked as not yet implemented or executed; the coverage list above describes the current suite.
