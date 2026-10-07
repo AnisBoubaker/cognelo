@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { strFromU8, unzipSync } from "fflate";
 import { confirmSharedDialog, createAuthenticatedApi, expect, test } from "./fixtures/auth";
 import {
   createBankActivityThroughUi,
@@ -171,7 +173,7 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     }
   });
 
-  test("teacher filters, exports, releases, and hides group gradebook results", async ({ teacherPage: page }) => {
+  test("teacher filters, exports CSV and XLSX grades, releases, and hides group results", async ({ teacherPage: page }) => {
     if (!data) throw new Error("The activity suite was not provisioned.");
     const contentRequests: string[] = [];
     page.on("request", (request) => {
@@ -195,6 +197,42 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     await gradebook.getByLabel("Status").selectOption("graded");
     const exportLink = page.getByRole("link", { name: "Export CSV" });
     await expect(exportLink).toHaveAttribute("href", /activityId=.*status=graded/);
+
+    await page.getByRole("button", { name: "Export grades", exact: true }).first().click();
+    let exportDialog = page.getByRole("dialog", { name: "Export activity grades" });
+    await expect(exportDialog.getByLabel("Format")).toHaveValue("csv");
+    await expect(exportDialog.getByLabel("File name")).toHaveValue(
+      new RegExp(`^${escapeRegex(data.courseTitle)}-${escapeRegex(data.groupTitle)}-${escapeRegex(activityTitle)}-\\d{4}-\\d{2}-\\d{2}`)
+    );
+    await exportDialog.getByLabel("File name").fill(`E2E grades ${data.token}`);
+    const csvDownloadPromise = page.waitForEvent("download");
+    await exportDialog.getByRole("button", { name: "Export grades", exact: true }).click();
+    const csvDownload = await csvDownloadPromise;
+    expect(csvDownload.suggestedFilename()).toBe(`E2E grades ${data.token}.csv`);
+    const csvPath = await csvDownload.path();
+    if (!csvPath) throw new Error("The CSV download did not expose a local path.");
+    const csv = (await readFile(csvPath, "utf8")).replace(/^\uFEFF/, "");
+    expect(csv).toContain("email,first name,last name,grade\r\n");
+    expect(csv).toContain("student@cognelo.local,Sam,Student,25\r\n");
+
+    await page.getByRole("button", { name: "Export grades", exact: true }).first().click();
+    exportDialog = page.getByRole("dialog", { name: "Export activity grades" });
+    await exportDialog.getByLabel("Format").selectOption("xlsx");
+    await exportDialog.getByLabel("File name").fill(`E2E grades ${data.token}`);
+    const xlsxDownloadPromise = page.waitForEvent("download");
+    await exportDialog.getByRole("button", { name: "Export grades", exact: true }).click();
+    const xlsxDownload = await xlsxDownloadPromise;
+    expect(xlsxDownload.suggestedFilename()).toBe(`E2E grades ${data.token}.xlsx`);
+    const xlsxPath = await xlsxDownload.path();
+    if (!xlsxPath) throw new Error("The XLSX download did not expose a local path.");
+    const workbook = unzipSync(await readFile(xlsxPath));
+    const worksheet = strFromU8(workbook["xl/worksheets/sheet1.xml"]);
+    expect(worksheet).toContain("email");
+    expect(worksheet).toContain("first name");
+    expect(worksheet).toContain("last name");
+    expect(worksheet).toContain("student@cognelo.local");
+    expect(worksheet).toContain("<v>25</v>");
+
     await page.getByRole("button", { name: "Release", exact: true }).click();
     await confirmSharedDialog(page);
     await expect(page.getByRole("button", { name: "Hide", exact: true })).toBeVisible();
@@ -204,6 +242,13 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     await expect(page.getByRole("button", { name: "Release", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Release", exact: true }).click();
     await confirmSharedDialog(page);
+
+    await page.goto(`/courses/${data.courseId}?tab=content`);
+    await page.getByRole("button", { name: `Actions for ${activityTitle}` }).click();
+    await page.getByRole("menuitem", { name: "Export grades", exact: true }).click();
+    const contentExportDialog = page.getByRole("dialog", { name: "Export activity grades" });
+    await expect(contentExportDialog.getByLabel("Format")).toHaveValue("csv");
+    await contentExportDialog.getByRole("button", { name: "Cancel", exact: true }).click();
   });
 
   test("student sees only the released selected grade, not raw grading payloads", async ({ studentPage: page }) => {
@@ -363,4 +408,8 @@ async function submitCurrentMcqAttempt(page: import("@playwright/test").Page, ch
   const response = await submissionFinished;
   expect(response.ok()).toBeTruthy();
   await expect(page).toHaveURL(/\/courses\/[^/]+\/groups\/[^/]+$/);
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
