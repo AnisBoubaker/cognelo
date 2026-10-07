@@ -1,9 +1,10 @@
 import type { Locator, Page, Request } from "@playwright/test";
 import { prisma } from "@cognelo/db";
-import { expect, test } from "./fixtures/auth";
+import { createAuthenticatedApi, credentialsFor, expect, test } from "./fixtures/auth";
 import {
   assignCourseTest,
   copyAndAssignBankActivity,
+  courseActivityIdForBankActivity,
   createBankActivityThroughUi,
   createCourseTestThroughUi,
   openStudentActivity,
@@ -85,12 +86,45 @@ async function verifySharedRichTextEditorLayout(page: Page, field: Locator) {
   await expect(editor).not.toHaveClass(/is-full-screen/);
 }
 
+async function selectCodingSampleTest(page: Page, triggerId: string, label: string) {
+  await page.evaluate(({ id, optionLabel }) => new Promise<void>((resolve, reject) => {
+    const selectMountedOption = () => {
+      const option = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
+        .find((candidate) => candidate.textContent?.trim() === optionLabel);
+      if (!option) return false;
+      option.click();
+      resolve();
+      return true;
+    };
+    if (selectMountedOption()) return;
+
+    const observer = new MutationObserver(() => {
+      if (!selectMountedOption()) return;
+      observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    const trigger = document.getElementById(id);
+    if (!(trigger instanceof HTMLButtonElement)) {
+      observer.disconnect();
+      reject(new Error(`Coding sample selector ${id} was not found.`));
+      return;
+    }
+    trigger.click();
+    window.setTimeout(() => {
+      observer.disconnect();
+      reject(new Error(`Coding sample option ${optionLabel} did not mount.`));
+    }, 5_000);
+  }), { id: triggerId, optionLabel: label });
+}
+
 test.describe.serial("authoring and completing every activity type", () => {
   let data: ActivitySuiteData | undefined;
   let mcqBankActivityId = "";
   let mcqTitle = "";
   let parsonsBankActivityId = "";
   let parsonsTitle = "";
+  let testActivityId = "";
+  let testTitle = "";
 
   test.beforeAll(async () => {
     data = await provisionActivitySuite();
@@ -403,8 +437,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(studentPage.getByText("Grace", { exact: true })).toHaveCount(0);
     await replaceCodeEditorContents(studentPage, title, solution);
     const testSelector = studentPage.locator("#coding-visible-sample");
-    await testSelector.click();
-    await studentPage.getByRole("menuitemradio", { name: "Visible greeting" }).press("Enter");
+    await selectCodingSampleTest(studentPage, "coding-visible-sample", "Visible greeting");
     await expect(testSelector).toContainText("Visible greeting");
     const testRunner = studentPage.getByRole("button", { name: "Run test" }).locator("xpath=ancestor::section[1]");
     await expect(testRunner.getByRole("group", { name: "Input (one value per line)" })).toContainText("Ada");
@@ -445,9 +478,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(currentRuns).toContainText("Ada");
     await expect(currentRuns).toContainText("Hello, Ada!");
 
-    await testSelector.click();
-    await expect(studentPage.getByRole("menuitemradio", { name: "Personalized test" })).toBeVisible();
-    await studentPage.getByRole("menuitemradio", { name: "Personalized test" }).press("Enter");
+    await selectCodingSampleTest(studentPage, "coding-visible-sample", "Personalized test");
     const personalizedInput = testRunner.getByRole("textbox", { name: "Input (one value per line)" });
     await expect(personalizedInput).toBeEditable();
     await expect(testRunner.getByRole("group", { name: "Expected output" })).toHaveCount(0);
@@ -649,8 +680,8 @@ test.describe.serial("authoring and completing every activity type", () => {
     if (!data || !mcqBankActivityId || !parsonsBankActivityId) {
       throw new Error("The reusable MCQ and Parsons bank activities were not authored.");
     }
-    const title = `E2E composed Test ${data.token}`;
-    const testActivityId = await createCourseTestThroughUi(teacherPage, data, title);
+    testTitle = `E2E composed Test ${data.token}`;
+    testActivityId = await createCourseTestThroughUi(teacherPage, data, testTitle);
 
     await teacherPage.getByRole("button", { name: "Add activity", exact: true }).click();
     let picker = teacherPage.getByRole("dialog", { name: "Add activity to Test" });
@@ -665,9 +696,9 @@ test.describe.serial("authoring and completing every activity type", () => {
     await picker.getByRole("button", { name: new RegExp(`^${escapeRegex(parsonsTitle)}`) }).click();
     await expect(picker).toBeHidden();
     await expect(teacherPage.getByText(`2. ${parsonsTitle}`, { exact: true })).toBeVisible();
-    await assignCourseTest(data, testActivityId, title);
+    await assignCourseTest(data, testActivityId, testTitle);
 
-    await openStudentActivity(studentPage, data, title);
+    await openStudentActivity(studentPage, data, testTitle);
     await studentPage.getByRole("button", { name: "Start Test" }).click();
     await studentPage.getByRole("dialog", { name: "Start this Test now?" }).getByRole("button", { name: "Start Test" }).click();
     const mcqAnswerSaved = studentPage.waitForResponse((response) => {
@@ -687,9 +718,91 @@ test.describe.serial("authoring and completing every activity type", () => {
     await studentPage.getByRole("dialog", { name: "Submit the entire Test?" }).getByRole("button", { name: "Submit Test" }).click();
     await expect(studentPage).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));
     const testRow = studentPage
-      .getByText(title, { exact: true })
+      .getByText(testTitle, { exact: true })
       .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' table-main ')][1]");
     await expect(testRow.getByText("Submitted", { exact: true })).toBeVisible();
+  });
+
+  test("teacher reviews plugin submissions, reruns grading, and grades an item inside a Test", async ({ teacherPage }) => {
+    test.setTimeout(240_000);
+    if (!data || !mcqBankActivityId || !parsonsBankActivityId || !testActivityId) {
+      throw new Error("The submitted activities needed for grading coverage are unavailable.");
+    }
+
+    const api = await createAuthenticatedApi("teacher");
+    let mcqActivityId = "";
+    let parsonsActivityId = "";
+    try {
+      [mcqActivityId, parsonsActivityId] = await Promise.all([
+        courseActivityIdForBankActivity(api, data, mcqBankActivityId),
+        courseActivityIdForBankActivity(api, data, parsonsBankActivityId)
+      ]);
+    } finally {
+      await api.dispose();
+    }
+
+    const studentEmail = credentialsFor("student").email;
+
+    await teacherPage.goto(`/courses/${data.courseId}/gradebook/activities/${mcqActivityId}`);
+    const mcqRow = teacherPage
+      .getByText(studentEmail, { exact: true })
+      .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' table-row-gradebook-detail ')][1]");
+    await mcqRow.getByRole("button", { name: "Rerun automatic grading" }).click();
+    const regradeConfirmation = teacherPage.getByRole("dialog").filter({ hasText: "Rerun automatic grading" });
+    const regraded = teacherPage.waitForResponse((response) =>
+      response.request().method() === "POST" && response.url().endsWith("/regrade")
+    );
+    await regradeConfirmation.getByRole("button", { name: "Confirm" }).click();
+    expect((await regraded).ok()).toBeTruthy();
+    await expect(teacherPage.getByRole("dialog", { name: "Rerunning automatic grading" })).toBeHidden();
+    await expect(mcqRow.getByText("10 / 10", { exact: true })).toBeVisible();
+
+    await mcqRow.getByRole("button", { name: "Review and grade" }).click();
+    const mcqReview = teacherPage.getByRole("dialog").filter({ has: teacherPage.getByRole("heading", { name: "Student answer" }) });
+    await expect(mcqReview.getByText("42", { exact: true })).toBeVisible();
+    await mcqReview.getByRole("spinbutton").fill("8");
+    await mcqReview.getByLabel("Summary").fill("Manual MCQ review from the E2E grading workflow.");
+    await mcqReview.getByRole("button", { name: "Save review", exact: true }).click();
+    await expect(teacherPage.getByText("Review and grade saved.", { exact: true })).toBeVisible();
+    await expect(teacherPage.getByText("8 / 10", { exact: true })).toBeVisible();
+    await mcqReview.getByRole("button", { name: "Close" }).click();
+
+    await teacherPage.goto(`/courses/${data.courseId}/gradebook/activities/${parsonsActivityId}`);
+    const parsonsRow = teacherPage
+      .getByText(studentEmail, { exact: true })
+      .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' table-row-gradebook-detail ')][1]");
+    await parsonsRow.getByRole("button", { name: "Review and grade" }).click();
+    const parsonsReview = teacherPage.getByRole("dialog").filter({ has: teacherPage.getByRole("heading", { name: "Student answer" }) });
+    await expect(parsonsReview).toContainText("print('E2E Parsons')");
+    await parsonsReview.getByLabel("Enter a score out of 10.").fill("7");
+    await parsonsReview.getByLabel("Feedback").fill("Manual Parsons review from the E2E grading workflow.");
+    const parsonsOverrideSaved = teacherPage.waitForResponse((response) =>
+      response.request().method() === "PATCH" && response.url().endsWith("/override")
+    );
+    await parsonsReview.locator("form").evaluate((form: HTMLFormElement) => form.requestSubmit());
+    expect((await parsonsOverrideSaved).ok()).toBeTruthy();
+    await expect(teacherPage.getByText("7 / 10", { exact: true })).toBeVisible();
+    await parsonsReview.getByRole("button", { name: "Close" }).click();
+
+    await teacherPage.goto(`/courses/${data.courseId}/gradebook/activities/${testActivityId}`);
+    const testRow = teacherPage
+      .getByText(studentEmail, { exact: true })
+      .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' table-row-gradebook-detail ')][1]");
+    await testRow.getByRole("button", { name: "Review and grade" }).click();
+    const testReview = teacherPage.getByRole("dialog").filter({ has: teacherPage.getByRole("heading", { name: "Grade Test manually" }) });
+    await expect(testReview.getByRole("heading", { name: mcqTitle })).toBeVisible();
+    await expect(testReview.getByRole("heading", { name: parsonsTitle })).toBeVisible();
+    await testReview.getByLabel(`${mcqTitle} score`).fill("0.6");
+    const mcqItem = testReview
+      .getByRole("heading", { name: mcqTitle })
+      .locator("xpath=ancestor::article[1]");
+    await mcqItem.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(testReview).toBeHidden();
+
+    await testRow.getByRole("button", { name: "Review and grade" }).click();
+    const reopenedTestReview = teacherPage.getByRole("dialog").filter({ has: teacherPage.getByRole("heading", { name: "Grade Test manually" }) });
+    await expect(reopenedTestReview.getByRole("heading", { name: mcqTitle }).locator("xpath=ancestor::article[1]")).toContainText("0.6 / 1");
+    await reopenedTestReview.getByRole("button", { name: "Close" }).click();
   });
 
   test("placeholder activities expose their intentional no-answer state without submission controls", async ({ teacherPage, studentPage }) => {

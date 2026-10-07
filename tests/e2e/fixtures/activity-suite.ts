@@ -126,6 +126,23 @@ export async function removeActivitySuite(data: ActivitySuiteData | undefined) {
   const api = await createAuthenticatedApi("teacher");
   let cleanupError: unknown;
   try {
+    let contentResources: Array<{ id: string }> = [];
+    try {
+      ({ resources: contentResources } = await responseJson<{ resources: Array<{ id: string }> }>(
+        await api.get(`/api/courses/${data.courseId}/content-resources`)
+      ));
+    } catch (error) {
+      cleanupError = error;
+    }
+    for (const resource of contentResources) {
+      try {
+        await responseJson(
+          await api.delete(`/api/courses/${data.courseId}/content-resources/${resource.id}`)
+        );
+      } catch (error) {
+        cleanupError ??= error;
+      }
+    }
     let activities: Array<{ id: string }> = [];
     try {
       ({ activities } = await responseJson<{ activities: Array<{ id: string }> }>(
