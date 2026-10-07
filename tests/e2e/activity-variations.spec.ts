@@ -100,6 +100,53 @@ test.describe("AI-assisted activity variations", () => {
       total: 2
     });
   });
+
+  test("cleans up a failed midpoint job and allows the teacher to retry immediately", async ({ teacherPage: page }) => {
+    if (!data) throw new Error("The variation fixture was not provisioned.");
+    const before = await prisma.bankActivity.count({ where: { bankId: data.activityBankId } });
+    const endpoint = `**/api/activity-banks/${data.activityBankId}/activities/${sourceActivityId}/variation*`;
+    let pollCount = 0;
+    await page.route(endpoint, async (route) => {
+      const now = new Date().toISOString();
+      const status = route.request().method() === "POST" || pollCount++ === 0 ? "running" : "failed";
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          job: {
+            id: `failed-${sourceActivityId}`,
+            status,
+            progress: { completed: 0, fraction: 0.58, stage: "generating", step: "tests", total: 1 },
+            result: null,
+            error: status === "failed"
+              ? { code: "INVALID_GENERATED_TESTS", message: "The AI agent could not generate valid coding exercise tests." }
+              : null,
+            createdAt: now,
+            updatedAt: now
+          }
+        })
+      });
+    });
+
+    await page.goto(`/activity-banks/${data.activityBankId}`);
+    await page.getByRole("button", { name: `Actions for ${sourceTitle}` }).click();
+    await page.getByRole("menuitem", { name: "Create variation", exact: true }).click();
+    await page.getByRole("dialog", { name: "Create an activity variation" }).getByRole("button", { name: "Create variation", exact: true }).click();
+    const progress = page.getByRole("dialog", { name: "Create an activity variation" });
+    await expect(progress).toContainText("The variation could not be created.");
+    await expect(progress).toContainText("could not generate valid coding exercise tests");
+    await expect.poll(async () => prisma.bankActivity.count({ where: { bankId: data.activityBankId } })).toBe(before);
+    await progress.getByRole("button", { name: "Close", exact: true }).click();
+    await page.unroute(endpoint);
+
+    await runMockedVariation(page, {
+      activityBankId: data.activityBankId,
+      activityId: sourceActivityId,
+      sourceTitle,
+      resultTitle: `E2E retry succeeded ${data.token}`,
+      instructions: "Retry after the failed generation.",
+      total: 1
+    });
+  });
 });
 
 async function runMockedVariation(page: Page, input: {
