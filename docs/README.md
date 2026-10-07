@@ -42,6 +42,7 @@ Open these only when changing or reviewing the named area:
 - [Content-type plugins](CONTENT_TYPE_PLUGIN_IMPLEMENTATION_PLAN.md)
 - [Course content tree](COURSE_CONTENT_TREE_IMPLEMENTATION_PLAN.md)
 - [Gradebook](GRADEBOOK_IMPLEMENTATION_PLAN.md)
+- [Role authorization and multi-teacher E2E plan](ROLE_AUTHORIZATION_E2E_IMPLEMENTATION_PLAN.md)
 - [Student model](STUDENT_MODEL_IMPLEMENTATION_PLAN.md)
 - [Compound Test activity](TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md)
 - [Edit action bar rollout inventory](EDIT_ACTION_BAR_ROLLOUT_INVENTORY.md)

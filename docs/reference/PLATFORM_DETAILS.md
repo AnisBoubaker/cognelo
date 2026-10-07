@@ -258,6 +258,8 @@ The web app keeps plugin-specific React wiring in registries: activity renderers
 - **Student** can view course sections where they are registered.
 - Course roles are separate from global roles, leaving room for TAs, assistants, section leaders, and future custom roles.
 
+The current implementation treats course `owner`, `teacher`, and `ta` memberships as the same broad course-management capability. Adding an existing section teacher or TA also creates one of those course memberships, while staff-participant removal does not symmetrically remove it. The accepted, not-yet-implemented direction is to keep explicit course owners/teachers course-wide and make section teachers/TAs section-scoped without implicit promotion. The migration, capability split, and planned browser coverage are recorded in [Role Authorization And Multi-Teacher E2E Plan](../ROLE_AUTHORIZATION_E2E_IMPLEMENTATION_PLAN.md).
+
 ## Database Design
 
 Core Prisma entities include:
