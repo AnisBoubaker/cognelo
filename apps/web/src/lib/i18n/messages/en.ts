@@ -186,6 +186,7 @@ export const enMessages = {
       runnerEnabled: "Enabled",
       runnerDisplayName: "Display name",
       runnerBaseUrl: "Base URL",
+      runnerBaseUrlRequired: "Enter a base URL before saving this runner.",
       runnerAuthHeader: "Authentication header (optional)",
       runnerAuthToken: "Authentication token",
       runnerAuthHelp: "Leave both authentication fields empty when the runner does not require a token.",

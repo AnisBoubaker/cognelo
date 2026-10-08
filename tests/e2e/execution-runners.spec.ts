@@ -21,6 +21,47 @@ const runnerFixtures: Record<RunnerType, {
 };
 
 test.describe("execution runner administration", () => {
+  test("shows an unconfigured runner as disabled and explains that its URL is required before saving", async ({ adminPage: page }) => {
+    let saveRequests = 0;
+    await page.route("**/api/settings/runners", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          configurations: [
+            runnerFixtures.judge0,
+            runnerFixtures.web_design,
+            {
+              id: null,
+              runnerType: "sagemath",
+              displayName: "SageMath runner",
+              baseUrl: "",
+              authHeader: "",
+              hasAuthToken: false,
+              isEnabled: false,
+              position: 0,
+              configured: false,
+              settings: { enablePerProcessAndThreadLimits: true },
+              updatedAt: null
+            }
+          ]
+        })
+      });
+    });
+    await page.route(/\/api\/settings\/runners\/sagemath$/, async (route) => {
+      saveRequests += 1;
+      await route.fulfill({ status: 500, contentType: "application/json", body: "{}" });
+    });
+
+    await page.goto("/settings/runners");
+    const sageCard = page.locator("article").filter({ has: page.getByRole("heading", { name: "SageMath runner", exact: true }) });
+    const enabled = sageCard.getByLabel("Enabled");
+    await expect(enabled).not.toBeChecked();
+    await enabled.check();
+    await page.getByRole("button", { name: "Save runner settings", exact: true }).click();
+    await expect(page.locator("p.error").getByText("Enter a base URL before saving this runner.", { exact: true })).toBeVisible();
+    expect(saveRequests).toBe(0);
+  });
+
   test("saves SageMath with the other runner types and tests every endpoint's required capabilities", async ({ adminPage: page }) => {
     const saved: Array<{ runnerType: RunnerType; body: Record<string, unknown> }> = [];
     const tested: RunnerType[] = [];
