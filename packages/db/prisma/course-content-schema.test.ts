@@ -14,6 +14,10 @@ const groupVisibilityMigration = readFileSync(
   new URL("./migrations/202608160001_group_content_visibility_overrides/migration.sql", import.meta.url),
   "utf8"
 );
+const assignmentIntegrityMigration = readFileSync(
+  new URL("./migrations/202610070003_assignment_content_integrity/migration.sql", import.meta.url),
+  "utf8"
+);
 
 describe("course content tree schema foundation", () => {
   it("declares the shared course content item model and kind enum", () => {
@@ -61,5 +65,14 @@ describe("course content tree schema foundation", () => {
     expect(groupVisibilityMigration).toContain('CREATE TABLE "CourseGroupContentVisibilityOverride"');
     expect(groupVisibilityMigration).toContain('CourseGroupContentVisibilityOverride_groupId_fkey');
     expect(groupVisibilityMigration).toContain('CourseGroupContentVisibilityOverride_contentItemId_fkey');
+  });
+
+  it("repairs and enforces one reachable content placement for every activity assignment", () => {
+    expect(assignmentIntegrityMigration).toContain('INSERT INTO "CourseContentItem"');
+    expect(assignmentIntegrityMigration).toContain('cognelo_materialize_assignment_content_item');
+    expect(assignmentIntegrityMigration).toContain('cognelo_require_assignment_content_item');
+    expect(assignmentIntegrityMigration).toContain('DEFERRABLE INITIALLY DEFERRED');
+    expect(assignmentIntegrityMigration).toContain('CourseGroupActivity_assignment_content_item_guard');
+    expect(assignmentIntegrityMigration).toContain('CourseContentItem_assignment_content_item_guard');
   });
 });

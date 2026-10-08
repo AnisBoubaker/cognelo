@@ -1331,6 +1331,20 @@ describe("group services", () => {
         titleSnapshot: "Trace loops"
       }
     });
+    expect(tx.courseContentItem.create).toHaveBeenCalledWith({
+      data: {
+        courseId: "course-1",
+        groupId: "group-1",
+        parentId: null,
+        kind: "activity",
+        titleSnapshot: "Trace loops",
+        position: 0,
+        isVisible: true,
+        activityId: "activity-1",
+        courseGroupActivityId: "assignment-created",
+        metadata: {}
+      }
+    });
   });
 
   it("creates group content placement when assigning an activity to a group", async () => {

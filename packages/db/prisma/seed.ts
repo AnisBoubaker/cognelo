@@ -2673,10 +2673,22 @@ async function main() {
     });
   }
 
+  // Seed-owned folders may contain assignment-backed placements. Move those
+  // durable assignment rows out of the subtree before pruning/rebuilding the
+  // disposable seed structure so the gradebook/content invariant is never
+  // broken, even transiently.
+  await prisma.courseContentItem.updateMany({
+    where: {
+      courseId: course.id,
+      courseGroupActivityId: { not: null }
+    },
+    data: { parentId: null }
+  });
   await prisma.courseContentItem.deleteMany({
     where: {
       courseId: course.id,
-      id: { startsWith: "seed-content-" }
+      id: { startsWith: "seed-content-" },
+      courseGroupActivityId: null
     }
   });
 
@@ -2837,17 +2849,23 @@ async function main() {
     metadata: { seed: true }
   });
 
-  const codingHomeworkContentItem = await upsertCourseContentItem({
-    id: "seed-content-section-a-coding-homework",
-    courseId: course.id,
-    groupId: group.id,
-    parentId: week3Folder.id,
-    kind: "activity",
-    titleSnapshot: "Homework: INF-155 TP1 Labyrinthe",
-    position: 2,
-    activityId: CODING_HOMEWORK_ACTIVITY_ID,
-    courseGroupActivityId: codingHomeworkAssignment.id,
-    metadata: { seed: true }
+  const codingHomeworkPlacement = await prisma.courseContentItem.findFirstOrThrow({
+    where: { courseGroupActivityId: codingHomeworkAssignment.id, kind: "activity" },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+  });
+  const codingHomeworkContentItem = await prisma.courseContentItem.update({
+    where: { id: codingHomeworkPlacement.id },
+    data: {
+      courseId: course.id,
+      groupId: group.id,
+      parentId: week3Folder.id,
+      kind: "activity",
+      titleSnapshot: "Homework: INF-155 TP1 Labyrinthe",
+      position: 2,
+      activityId: CODING_HOMEWORK_ACTIVITY_ID,
+      courseGroupActivityId: codingHomeworkAssignment.id,
+      metadata: { seed: true }
+    }
   });
 
   await upsertCourseContentItem({
