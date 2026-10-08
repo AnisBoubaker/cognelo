@@ -8,12 +8,79 @@ const studentEmail = "programming.a01@cognelo.local";
 
 test.describe("student programming grading report", () => {
   let gradebookItemId = "";
+  let participantId = "";
   let originallyReleased = false;
+  let originalGrade: Awaited<ReturnType<typeof prisma.grade.findUnique>> = null;
 
   test.beforeAll(async () => {
-    const item = await prisma.gradebookItem.findFirstOrThrow({ where: { activityId, groupId } });
-    gradebookItemId = item.id;
+    const attempt = await prisma.activityAttempt.findFirstOrThrow({
+      where: { activityId, groupId, participant: { email: studentEmail } },
+      orderBy: { attemptNumber: "desc" }
+    });
+    const item = await prisma.gradebookItem.findUniqueOrThrow({ where: { id: attempt.gradebookItemId } });
+    gradebookItemId = attempt.gradebookItemId;
+    participantId = attempt.participantId;
     originallyReleased = item.gradesReleased;
+    originalGrade = await prisma.grade.findUnique({
+      where: { gradebookItemId_participantId: { gradebookItemId, participantId } }
+    });
+
+    const result = {
+      kind: "coding-exercise",
+      studentFeedback: {
+        kind: "assessment_feedback",
+        feedbackText: "Teacher note for the learner.",
+        details: {
+          summary: "Solid approach with one edge case to revisit.",
+          strengths: ["The solution is readable and follows the requested output format."],
+          improvements: ["Review the ordering logic for every input permutation."],
+          deterministicScore: 60,
+          aiScore: 85,
+          gradingEnabled: true,
+          testWeightPercent: 60,
+          aiWeightPercent: 40,
+          criteria: [{
+            id: "algorithm-correctness",
+            title: "Algorithm correctness",
+            weightPercent: 100,
+            scorePercent: 85,
+            feedback: "The main approach is correct; verify the remaining edge case."
+          }]
+        }
+      }
+    };
+
+    await prisma.grade.upsert({
+      where: { gradebookItemId_participantId: { gradebookItemId, participantId } },
+      update: {
+        userId: attempt.userId,
+        selectedAttemptId: attempt.id,
+        rawScore: 70,
+        rawMaxScore: 100,
+        normalizedScore: 70,
+        normalizedMaxScore: 100,
+        isPass: true,
+        source: "manual",
+        isActive: true,
+        rawResult: result,
+        normalizedResult: result
+      },
+      create: {
+        gradebookItemId,
+        participantId,
+        userId: attempt.userId,
+        selectedAttemptId: attempt.id,
+        rawScore: 70,
+        rawMaxScore: 100,
+        normalizedScore: 70,
+        normalizedMaxScore: 100,
+        isPass: true,
+        source: "manual",
+        isActive: true,
+        rawResult: result,
+        normalizedResult: result
+      }
+    });
     await prisma.gradebookItem.update({ where: { id: item.id }, data: { gradesReleased: true } });
   });
 
@@ -23,6 +90,30 @@ test.describe("student programming grading report", () => {
         where: { id: gradebookItemId },
         data: { gradesReleased: originallyReleased }
       });
+    }
+    if (originalGrade) {
+      await prisma.grade.update({
+        where: { id: originalGrade.id },
+        data: {
+          rawScore: originalGrade.rawScore,
+          rawMaxScore: originalGrade.rawMaxScore,
+          normalizedScore: originalGrade.normalizedScore,
+          normalizedMaxScore: originalGrade.normalizedMaxScore,
+          isPass: originalGrade.isPass,
+          latePenaltyApplied: originalGrade.latePenaltyApplied,
+          latePenaltyPercent: originalGrade.latePenaltyPercent,
+          gradedByUserId: originalGrade.gradedByUserId,
+          gradedAt: originalGrade.gradedAt,
+          source: originalGrade.source,
+          isActive: originalGrade.isActive,
+          selectedAttemptId: originalGrade.selectedAttemptId,
+          rawResult: originalGrade.rawResult,
+          normalizedResult: originalGrade.normalizedResult,
+          metadata: originalGrade.metadata
+        }
+      });
+    } else if (gradebookItemId && participantId) {
+      await prisma.grade.deleteMany({ where: { gradebookItemId, participantId } });
     }
   });
 
