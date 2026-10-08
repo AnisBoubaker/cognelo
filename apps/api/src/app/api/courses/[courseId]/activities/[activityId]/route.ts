@@ -1,16 +1,12 @@
 import { NextRequest } from "next/server";
-import { runCourseActivityDeletedHooks } from "@cognelo/activity-sdk/server";
 import {
   canManageCourse,
-  deleteActivity,
-  deleteTest,
   getActivity,
-  getActivityForDeletion,
   getActivityForGradebook,
-  getTestForDeletion,
   updateActivity
 } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
+import { deleteCourseActivityWithHooks } from "@/lib/course-activity-deletion";
 
 type Params = { params: Promise<{ courseId: string; activityId: string }> };
 
@@ -40,29 +36,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   });
 }
 
-export async function DELETE(_request: NextRequest, { params }: Params) {
+export async function DELETE(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, activityId } = await params;
-    const activity = await getActivityForDeletion(user, courseId, activityId);
-    if (activity.testDefinition) {
-      const test = await getTestForDeletion(user, courseId, activityId);
-      for (const item of test.items) {
-        await runCourseActivityDeletedHooks({
-          user,
-          courseId,
-          activityId: item.activityId,
-          activityTypeKey: item.activity.activityType.key
-        });
-      }
-      return json(await deleteTest(user, courseId, activityId));
-    }
-    await runCourseActivityDeletedHooks({
-      user,
-      courseId,
-      activityId,
-      activityTypeKey: activity.activityType.key
-    });
-    return json(await deleteActivity(user, courseId, activityId));
+    return json(await deleteCourseActivityWithHooks(user, courseId, activityId, {
+      confirmRecordedAttempts: new URL(request.url).searchParams.get("confirmRecordedAttempts") === "true"
+    }));
   });
 }

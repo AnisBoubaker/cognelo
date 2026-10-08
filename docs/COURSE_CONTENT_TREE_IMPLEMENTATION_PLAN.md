@@ -547,6 +547,8 @@ Implemented scope: the course activity picker is now a course-element picker. It
 
 Implemented scope: the course Content tab renders folders, materials, and activities together and is now the canonical teacher surface. Its compact Course/Group perspective selector keeps the teacher on the same page: Course shows the course-level tree and full creation/settings/removal actions, while Group loads the selected group's effective tree and permits visibility overrides without exposing structural move or remove controls. When an inherited activity also has an assignment-backed group placement, the inherited row remains canonical for folder, ordering, and visibility while the selected group's assignment ID is merged into that row for assigned-activity actions. This prevents a group override and a materialized all-groups placement from producing contradictory effective state, action labels, or drag eligibility. The same canonical depth-first tree order now drives activity rows and selectors in the gradebook; shared placements win over group duplicates, group-only activities use their earliest relevant placement, and unplaced activities remain visible afterward under a deterministic fallback. The active selector option expands while inactive options remain icon-only. Entering Group immediately chooses the last valid group used during the mounted page session or the first locale-aware alphabetical group; reloading resets to the first group, and dropdown labels over 20 characters are truncated. Manager visits to older group URLs redirect into the matching course-page perspective. Student group workspaces remain separate and section-first. Content rows in Course mode retain the settings overlays for course activities and plugin-backed resources. Every activity context menu also opens the shared final-grade export dialog; Course perspective exports all assigned groups and Group perspective scopes it to the selected group. Content requests resolve independently from gradebook data, and an explicit loading state prevents a transient empty-tree message. Gradebook controls remain in the course Gradebook tab and its aggregate data is requested only when that tab is active.
 
+Folder deletion now performs a server-side descendant preflight instead of relying on the database's placement cascade. It is rejected as one batch when any contained activity has recorded attempts, and the shared dialog lists each protected activity so the teacher can move it elsewhere or delete it deliberately through the individual activity flow. With no protected activity, the host runs every owning plugin's deletion hook—including Test child hooks—and removes the contained activity records before the folder subtree. Individual deletion of an activity with attempts requires a separate permanent-data-loss warning before the normal confirmation, plus an explicit API confirmation flag; direct placement-only deletion is rejected. When an obsolete group placement remains under the folder while the authoritative shared placement has moved elsewhere, that duplicate placement is preserved outside the deleted subtree.
+
 Verification completed after Phase 7:
 
 - `npm run typecheck`
@@ -628,6 +630,10 @@ Core tests should cover:
 - hide descendants through hidden parent
 - list teacher tree with hidden items
 - list student tree without hidden items
+- reject a folder deletion batch and report every contained activity with attempts
+- delete contained no-attempt activities through their plugin lifecycle before deleting a folder
+- require a distinct recorded-attempt warning before the ordinary individual activity confirmation
+- reject direct activity-placement deletion
 
 API tests should cover:
 

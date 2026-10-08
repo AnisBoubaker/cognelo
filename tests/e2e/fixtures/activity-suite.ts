@@ -153,7 +153,9 @@ export async function removeActivitySuite(data: ActivitySuiteData | undefined) {
     }
     for (const activity of activities) {
       try {
-        await responseJson(await api.delete(`/api/courses/${data.courseId}/activities/${activity.id}`));
+        await responseJson(
+          await api.delete(`/api/courses/${data.courseId}/activities/${activity.id}?confirmRecordedAttempts=true`)
+        );
       } catch (error) {
         cleanupError ??= error;
       }

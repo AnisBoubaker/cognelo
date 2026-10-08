@@ -17,4 +17,8 @@ describe("ConfirmationDialog focus lifecycle", () => {
   it("can disable confirmation while a shared prompt is incomplete", () => {
     expect(dialogSource).toContain("disabled={isConfirming || confirmDisabled}");
   });
+
+  it("can omit the cancel action for shared informational alerts", () => {
+    expect(dialogSource).toContain("{cancelLabel ? (");
+  });
 });

@@ -320,11 +320,25 @@ export async function getTestForDeletion(user: CurrentUser, courseId: string, ac
   return test;
 }
 
-export async function deleteTest(user: CurrentUser, courseId: string, activityId: string) {
+export async function deleteTest(
+  user: CurrentUser,
+  courseId: string,
+  activityId: string,
+  options: { confirmRecordedAttempts?: boolean } = {}
+) {
   await assertCanManageCourse(user, courseId);
   const test = await prisma.test.findFirst({ where: { courseId, activityId }, include: { items: { select: { activityId: true } } } });
   if (!test) {
     throw notFound("Test");
+  }
+  const recordedAttemptCount = await prisma.activityAttempt.count({ where: { activityId } });
+  if (recordedAttemptCount > 0 && options.confirmRecordedAttempts !== true) {
+    throw new AppError(
+      409,
+      "ACTIVITY_RECORDED_ATTEMPTS_CONFIRMATION_REQUIRED",
+      "This activity has recorded attempts. Confirm their permanent deletion before deleting the activity.",
+      { activityId, recordedAttemptCount }
+    );
   }
   await prisma.$transaction(async (tx) => {
     if (test.items.length) {

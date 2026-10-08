@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { deleteContentItem, updateContentItem } from "@cognelo/core";
+import { deleteContentItem, getCourseContentItemDeletionImpact, updateContentItem } from "@cognelo/core";
+import { runCourseActivityDeletionHooks } from "@/lib/course-activity-deletion";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; contentItemId: string }> };
@@ -20,6 +21,13 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, contentItemId } = await params;
+    const impact = await getCourseContentItemDeletionImpact(user, courseId, contentItemId);
+    if (impact.blockedActivities.length) {
+      return json(await deleteContentItem(user, courseId, contentItemId));
+    }
+    for (const activity of impact.activities) {
+      await runCourseActivityDeletionHooks(user, courseId, activity);
+    }
     return json(await deleteContentItem(user, courseId, contentItemId));
   });
 }

@@ -30,6 +30,13 @@ export type ConfirmDialogOptions = {
   title?: string;
 };
 
+export type AlertDialogOptions = {
+  confirmLabel?: string;
+  eyebrow?: string;
+  message: ReactNode;
+  title?: string;
+};
+
 export type PromptDialogOptions = {
   cancelLabel?: string;
   confirmLabel?: string;
@@ -45,10 +52,12 @@ export type PromptDialogOptions = {
 };
 
 type DialogRequest =
+  | { kind: "alert"; options: AlertDialogOptions; resolve: () => void }
   | { kind: "confirm"; options: ConfirmDialogOptions; resolve: (value: boolean) => void }
   | { kind: "prompt"; options: PromptDialogOptions; resolve: (value: string | null) => void };
 
 type DialogContextValue = {
+  alert: (options: AlertDialogOptions) => Promise<void>;
   confirm: (options: ConfirmDialogOptions) => Promise<boolean>;
   prompt: (options: PromptDialogOptions) => Promise<string | null>;
 };
@@ -58,12 +67,13 @@ const unavailable = async () => {
 };
 
 const DialogContext = createContext<DialogContextValue>({
+  alert: unavailable,
   confirm: unavailable,
   prompt: unavailable
 });
 
 function cancelledValue(request: DialogRequest) {
-  return request.kind === "confirm" ? false : null;
+  return request.kind === "confirm" ? false : request.kind === "prompt" ? null : true;
 }
 
 export function DialogProvider({ children, labels }: { children: ReactNode; labels: DialogLabels }) {
@@ -86,7 +96,8 @@ export function DialogProvider({ children, labels }: { children: ReactNode; labe
   const finish = useCallback((value: boolean | string | null) => {
     const current = activeRef.current;
     if (!current) return;
-    if (current.kind === "confirm") current.resolve(value === true);
+    if (current.kind === "alert") current.resolve();
+    else if (current.kind === "confirm") current.resolve(value === true);
     else current.resolve(typeof value === "string" ? value : null);
 
     const next = queueRef.current.shift() ?? null;
@@ -100,12 +111,14 @@ export function DialogProvider({ children, labels }: { children: ReactNode; labe
     activeRef.current = null;
     queueRef.current = [];
     for (const request of pending) {
-      if (request.kind === "confirm") request.resolve(false);
+      if (request.kind === "alert") request.resolve();
+      else if (request.kind === "confirm") request.resolve(false);
       else request.resolve(null);
     }
   }, []);
 
   const context = useMemo<DialogContextValue>(() => ({
+    alert: (options) => new Promise<void>((resolve) => activate({ kind: "alert", options, resolve })),
     confirm: (options) => new Promise<boolean>((resolve) => activate({ kind: "confirm", options, resolve })),
     prompt: (options) => new Promise<string | null>((resolve) => activate({ kind: "prompt", options, resolve }))
   }), [activate]);
@@ -145,7 +158,7 @@ export function DialogProvider({ children, labels }: { children: ReactNode; labe
           </div>
         ) : active?.options.message ?? null}
         confirmLabel={active?.options.confirmLabel ?? labels.confirm}
-        cancelLabel={active?.options.cancelLabel ?? labels.cancel}
+        cancelLabel={active?.kind === "alert" ? undefined : active?.options.cancelLabel ?? labels.cancel}
         confirmVariant={active?.kind === "confirm" ? active.options.confirmVariant : "default"}
         confirmDisabled={promptInvalid}
         onCancel={() => finish(active ? cancelledValue(active) : null)}

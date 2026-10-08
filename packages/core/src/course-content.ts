@@ -767,14 +767,191 @@ function mergeGroupAssignmentsIntoSharedActivityPlacements<
     });
 }
 
+export type CourseContentDeletionActivity = {
+  activityId: string;
+  activityTypeKey: string;
+  isTest: boolean;
+  title: string;
+  recordedAttemptCount: number;
+  testItems: Array<{ activityId: string; activityTypeKey: string }>;
+};
+
+export type CourseContentItemDeletionImpact = {
+  contentItemId: string;
+  kind: string;
+  parentId: string | null;
+  activities: CourseContentDeletionActivity[];
+  blockedActivities: CourseContentDeletionActivity[];
+  preservedActivityContentItemIds: string[];
+};
+
+export async function getCourseContentItemDeletionImpact(
+  user: CurrentUser,
+  courseId: string,
+  contentItemId: string,
+  scope: ContentScope = {}
+): Promise<CourseContentItemDeletionImpact> {
+  await assertCanManageCourse(user, courseId);
+  return resolveCourseContentItemDeletionImpact(courseId, contentItemId, scope);
+}
+
 export async function deleteContentItem(user: CurrentUser, courseId: string, contentItemId: string, scope: ContentScope = {}) {
   await assertCanManageCourse(user, courseId);
-  const item = await prisma.courseContentItem.findFirst({ where: { id: contentItemId, courseId, ...scopeWhere(scope) } });
+  const impact = await resolveCourseContentItemDeletionImpact(courseId, contentItemId, scope);
+  if (impact.kind === "activity") {
+    throw new AppError(
+      409,
+      "ACTIVITY_CONTENT_DELETE_REQUIRES_ACTIVITY_DELETE",
+      "Delete the activity itself instead of deleting only its course-content placement."
+    );
+  }
+  if (impact.blockedActivities.length) {
+    throw new AppError(
+      409,
+      "CONTENT_FOLDER_ACTIVITIES_HAVE_ATTEMPTS",
+      "This folder contains activities with recorded attempts and cannot be deleted as a batch.",
+      {
+        activities: impact.blockedActivities.map((activity) => ({
+          activityId: activity.activityId,
+          title: activity.title,
+          recordedAttemptCount: activity.recordedAttemptCount
+        }))
+      }
+    );
+  }
+
+  if (impact.kind === "folder" && (impact.activities.length || impact.preservedActivityContentItemIds.length)) {
+    await prisma.$transaction(async (transaction) => {
+      if (impact.preservedActivityContentItemIds.length) {
+        await transaction.courseContentItem.updateMany({
+          where: { id: { in: impact.preservedActivityContentItemIds } },
+          data: { parentId: impact.parentId }
+        });
+      }
+      const testItemActivityIds = impact.activities.flatMap((activity) => activity.testItems.map((item) => item.activityId));
+      if (testItemActivityIds.length) {
+        await transaction.activity.deleteMany({ where: { id: { in: testItemActivityIds } } });
+      }
+      if (impact.activities.length) {
+        await transaction.activity.deleteMany({
+          where: { id: { in: impact.activities.map((activity) => activity.activityId) } }
+        });
+      }
+      await transaction.courseContentItem.delete({ where: { id: contentItemId } });
+    });
+    return { ok: true };
+  }
+
+  await prisma.courseContentItem.delete({ where: { id: contentItemId } });
+  return { ok: true };
+}
+
+async function resolveCourseContentItemDeletionImpact(
+  courseId: string,
+  contentItemId: string,
+  scope: ContentScope
+): Promise<CourseContentItemDeletionImpact> {
+  const item = await prisma.courseContentItem.findFirst({
+    where: { id: contentItemId, courseId, ...scopeWhere(scope) },
+    select: { id: true, kind: true, parentId: true }
+  });
   if (!item) {
     throw notFound("Course content item");
   }
-  await prisma.courseContentItem.delete({ where: { id: contentItemId } });
-  return { ok: true };
+  if (item.kind !== "folder") {
+    return {
+      contentItemId: item.id,
+      kind: item.kind,
+      parentId: item.parentId,
+      activities: [],
+      blockedActivities: [],
+      preservedActivityContentItemIds: []
+    };
+  }
+
+  const courseItems = await prisma.courseContentItem.findMany({
+    where: { courseId },
+    select: {
+      id: true,
+      parentId: true,
+      groupId: true,
+      activity: {
+        select: {
+          id: true,
+          title: true,
+          activityType: { select: { key: true } },
+          _count: { select: { activityAttempts: true } },
+          testDefinition: {
+            select: {
+              items: {
+                select: {
+                  activity: { select: { id: true, activityType: { select: { key: true } } } }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+  const childIdsByParent = new Map<string, string[]>();
+  for (const courseItem of courseItems) {
+    if (!courseItem.parentId) continue;
+    childIdsByParent.set(courseItem.parentId, [...(childIdsByParent.get(courseItem.parentId) ?? []), courseItem.id]);
+  }
+  const descendantIds = new Set<string>();
+  const pending = [...(childIdsByParent.get(contentItemId) ?? [])];
+  while (pending.length) {
+    const descendantId = pending.pop() as string;
+    if (descendantIds.has(descendantId)) continue;
+    descendantIds.add(descendantId);
+    pending.push(...(childIdsByParent.get(descendantId) ?? []));
+  }
+
+  const activityPlacementsById = new Map<string, typeof courseItems>();
+  for (const courseItem of courseItems) {
+    if (!courseItem.activity) continue;
+    activityPlacementsById.set(courseItem.activity.id, [
+      ...(activityPlacementsById.get(courseItem.activity.id) ?? []),
+      courseItem
+    ]);
+  }
+  const activitiesById = new Map<string, CourseContentDeletionActivity>();
+  const preservedActivityContentItemIds: string[] = [];
+  for (const [activityId, placements] of activityPlacementsById) {
+    const descendantPlacements = placements.filter((placement) => descendantIds.has(placement.id));
+    if (!descendantPlacements.length) continue;
+    const sharedPlacements = placements.filter((placement) => placement.groupId === null);
+    const shouldDeleteActivity = sharedPlacements.length
+      ? sharedPlacements.some((placement) => descendantIds.has(placement.id))
+      : placements.every((placement) => descendantIds.has(placement.id));
+    if (!shouldDeleteActivity) {
+      preservedActivityContentItemIds.push(...descendantPlacements.map((placement) => placement.id));
+      continue;
+    }
+    const activity = placements[0].activity;
+    if (!activity) continue;
+    activitiesById.set(activity.id, {
+      activityId,
+      activityTypeKey: activity.activityType.key,
+      isTest: activity.testDefinition !== null,
+      title: activity.title,
+      recordedAttemptCount: activity._count.activityAttempts,
+      testItems: activity.testDefinition?.items.map((testItem) => ({
+        activityId: testItem.activity.id,
+        activityTypeKey: testItem.activity.activityType.key
+      })) ?? []
+    });
+  }
+  const activities = [...activitiesById.values()];
+  return {
+    contentItemId: item.id,
+    kind: item.kind,
+    parentId: item.parentId,
+    activities,
+    blockedActivities: activities.filter((activity) => activity.recordedAttemptCount > 0),
+    preservedActivityContentItemIds
+  };
 }
 
 function normalizeScope(input: ContentScope) {
