@@ -1,8 +1,27 @@
 import { describe, expect, it, vi } from "vitest";
+import type { CurrentUser } from "@cognelo/contracts";
 import { ApiError } from "./api";
-import { createSessionRefresher } from "./session-refresh";
+import { areCurrentUsersEqual, createSessionRefresher } from "./session-refresh";
 
 describe("session refresher", () => {
+  it("recognizes an unchanged authenticated user regardless of role order", () => {
+    const current: CurrentUser = {
+      id: "user-1",
+      email: "teacher@example.test",
+      name: "Ada Teacher",
+      firstName: "Ada",
+      lastName: "Teacher",
+      roles: ["teacher", "course_manager"],
+      mustChangePassword: false,
+      emailVerified: true
+    };
+
+    expect(areCurrentUsersEqual(current, { ...current, roles: ["course_manager", "teacher"] })).toBe(true);
+    expect(areCurrentUsersEqual(current, { ...current, firstName: "Grace" })).toBe(false);
+    expect(areCurrentUsersEqual(current, { ...current, roles: ["teacher"] })).toBe(false);
+    expect(areCurrentUsersEqual(null, current)).toBe(false);
+  });
+
   it("keeps a valid user when a temporary server failure occurs", async () => {
     const onAuthenticated = vi.fn();
     const onUnauthorized = vi.fn();

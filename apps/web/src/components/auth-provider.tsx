@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { CurrentUser } from "@cognelo/contracts";
 import { api, API_UNAUTHORIZED_EVENT } from "@/lib/api";
-import { createSessionRefresher } from "@/lib/session-refresh";
+import { areCurrentUsersEqual, createSessionRefresher } from "@/lib/session-refresh";
 
 type AuthState = {
   user: CurrentUser | null;
@@ -27,7 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refresherRef.current = createSessionRefresher({
       check: api.me,
       onAuthenticated: (result) => {
-        setUser(result.user);
+        setUser((current) => areCurrentUsersEqual(current, result.user) ? current : result.user);
         setSessionUnavailable(false);
         setLoading(false);
       },

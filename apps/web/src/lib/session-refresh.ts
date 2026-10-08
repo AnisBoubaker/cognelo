@@ -1,4 +1,5 @@
 import { ApiError } from "./api";
+import type { CurrentUser } from "@cognelo/contracts";
 
 type SessionRefresherOptions<T> = {
   check: () => Promise<T>;
@@ -39,4 +40,19 @@ export function createSessionRefresher<T>(options: SessionRefresherOptions<T>) {
 
 export function isUnauthorizedSessionError(error: unknown) {
   return error instanceof ApiError && (error.status === 401 || error.code === "UNAUTHORIZED");
+}
+
+export function areCurrentUsersEqual(left: CurrentUser | null, right: CurrentUser) {
+  return Boolean(
+    left &&
+    left.id === right.id &&
+    left.email === right.email &&
+    left.name === right.name &&
+    left.firstName === right.firstName &&
+    left.lastName === right.lastName &&
+    left.mustChangePassword === right.mustChangePassword &&
+    left.emailVerified === right.emailVerified &&
+    left.roles.length === right.roles.length &&
+    left.roles.every((role) => right.roles.includes(role))
+  );
 }

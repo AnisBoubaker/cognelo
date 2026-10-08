@@ -5,7 +5,7 @@ import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import { CodingExerciseStudentGradeReport } from "@cognelo/plugin-coding-exercises";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { CSSProperties, FocusEvent, FormEvent, PointerEvent, useEffect, useState } from "react";
+import { CSSProperties, FocusEvent, FormEvent, PointerEvent, useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ActivityTypeIcon, AppIcon, FolderContentIcon as SharedFolderContentIcon } from "@/components/app-icon";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
@@ -128,7 +128,7 @@ export default function CourseGroupPage() {
     }
   }, [canManage, courseId, group, groupId, router]);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     setError("");
     setContentLoaded(false);
     const [courseResult, groupResult, typeResult] = await Promise.all([
@@ -198,11 +198,11 @@ export default function CourseGroupPage() {
         )
       );
     }
-  }
+  }, [courseId, gradebookActivityId, gradebookStatus, groupId]);
 
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("groupPage.loadError")));
-  }, [courseId, groupId, t, user, gradebookActivityId, gradebookStatus]);
+  }, [refresh, t]);
 
   async function setGradebookRelease(gradebookItemId: string, released: boolean, activityTitle: string) {
     const confirmed = await dialogs.confirm({
