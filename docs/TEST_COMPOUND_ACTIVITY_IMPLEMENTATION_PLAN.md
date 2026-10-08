@@ -402,6 +402,34 @@ Edit safety rules:
 
 Reusable bank Test publications are also immutable composition snapshots. Draft edits update the mutable `BankTest` graph and return the shell to Draft. Publishing reuses the latest version when the complete generic graph is unchanged; otherwise it publishes changed children, creates a new shell `ActivityVersion`, and records the ordered `BankTestVersionItem` snapshot. Plugin-private authoring data retains the platform's existing limitation: it is copied independently but is current bank state rather than version-snapshotted private state.
 
+## Deferred design: interventions during an active Test
+
+This section records an unresolved product discussion for a later session. None of the possible behavior below is accepted yet, and it must not be implemented without revisiting the product decisions with the user.
+
+### Current behavior and limitation
+
+- After the first Test attempt starts, the supported service routes reject changes to Test settings, contained activity public configuration, and guarded plugin-private authoring such as Programming Exercise templates, reference solutions, rubrics, and hidden tests.
+- A Test attempt records its settings, ordered item manifest, immutable `TestRevision`, and child-configuration fingerprints when it starts.
+- The active student runtime does not poll for authored-content changes or compare the recorded child fingerprint with the live child before every action. Display and composite execution currently read the live child `Activity`; Programming Exercise submission reads the live plugin-private template and hidden-test rows. Safety therefore depends on every mutation path honoring the post-attempt authoring lock.
+- The browser counts down from the server-provided deadline and initiates submission at zero after pending saves finish. There is no server-scheduled submission exactly at the deadline. Reloading an expired active attempt causes the browser to observe zero and initiate submission, while the server rejects further child writes after expiry.
+- Consequently, teachers cannot currently extend an active attempt, correct a public prompt/sample test, or repair a grading test through a supported workflow. Duplicating the Test affects future use only; external communication and later manual grade compensation are the available workarounds.
+
+### Questions to revisit before implementation
+
+- Should an active Test permit time changes, and if so should the teacher add minutes, set a replacement deadline, or choose either operation?
+- What scopes are required: every active attempt, one group, selected learners, future attempts that have not started, or combinations of these?
+- Should reducing active time ever be permitted, or should early termination be a separate explicit operation?
+- What happens when an extension races with browser-initiated automatic submission, or when the previous deadline has passed but final submission has not completed?
+- How and how quickly should open student pages learn about an intervention: polling, server push, action responses, or another mechanism?
+- Which public corrections may be applied to an active attempt: typographical prompt fixes, visible sample-test inputs/outputs, starter code, or broader activity configuration?
+- How should students be informed about a correction, and must the system preserve when each learner first saw the original and corrected versions?
+- Should a correction apply to all active attempts uniformly, or can its scope differ by group or learner without compromising fairness?
+- How should grading-affecting corrections work for hidden tests, templates, points, or required items: replace and regrade consistently, accept multiple versions, neutralize the affected item, award credit, or use another policy?
+- Which changes require confirmation, a teacher-entered reason, append-only audit history, student notification, and later reporting?
+- Must active display and execution be rebuilt to use the immutable `TestRevision` plus versioned plugin-private snapshots before any intervention workflow is safe, or is a different consistency boundary preferred?
+
+Possible mechanisms discussed included append-only attempt amendments, per-attempt effective deadlines, audited scopes, student-visible correction notices, and server-authoritative handling of stale automatic submissions. These are ideas for the later design discussion, not agreed requirements.
+
 ## API and Service Boundaries
 
 Core service modules: `packages/core/src/tests.ts` for course authoring/execution and `packages/core/src/bank-tests.ts` for reusable Test ownership and bank/course deep-copy boundaries.
