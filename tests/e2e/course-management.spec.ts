@@ -8,6 +8,7 @@ import {
   provisionActivitySuite,
   publishCurrentBankActivity,
   removeActivitySuite,
+  responseJson,
   type ActivitySuiteData
 } from "./fixtures/activity-suite";
 
@@ -340,6 +341,59 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
       }
       if (folderId) {
         await teacherApi.delete(`/api/courses/${data.courseId}/content/${folderId}`);
+      }
+      await teacherApi.dispose();
+    }
+  });
+
+  test("direct group assignment without placement still creates reachable learner content", async ({ studentPage: page }) => {
+    if (!data) throw new Error("The activity suite was not provisioned.");
+    const title = `E2E assignment integrity ${data.token}`;
+    const teacherApi = await createAuthenticatedApi("teacher");
+    let createdActivityId = "";
+    try {
+      const { activity } = await responseJson<{ activity: { id: string } }>(
+        await teacherApi.post(`/api/courses/${data.courseId}/activities`, {
+          data: {
+            activityTypeKey: "mcq",
+            config: {
+              aiGenerationInstructions: "",
+              aiQuestionCount: 5,
+              defaultCodeLanguage: "none",
+              randomizeChoices: false,
+              source: "## Reachability\nCan the learner reach this assignment?\n\n- [x] Yes\n- [ ] No"
+            },
+            description: "Verify assignment-backed content integrity.",
+            lifecycle: "published",
+            metadata: { e2e: true },
+            position: 0,
+            title
+          }
+        })
+      );
+      createdActivityId = activity.id;
+      const { assignment } = await responseJson<{ assignment: { id: string } }>(
+        await teacherApi.post(`/api/courses/${data.courseId}/groups/${data.groupId}/activities`, {
+          data: {
+            activityId: createdActivityId,
+            metadata: { assessmentMode: "formative" }
+          }
+        })
+      );
+
+      const { contentItems } = await responseJson<{
+        contentItems: Array<{ activityId?: string | null; courseGroupActivityId?: string | null }>;
+      }>(await teacherApi.get(`/api/courses/${data.courseId}/groups/${data.groupId}/content?visibleOnly=true`));
+      expect(contentItems).toContainEqual(expect.objectContaining({
+        activityId: createdActivityId,
+        courseGroupActivityId: assignment.id
+      }));
+
+      await page.goto(`/courses/${data.courseId}/groups/${data.groupId}`);
+      await expect(page.getByRole("link", { name: title, exact: true })).toBeVisible();
+    } finally {
+      if (createdActivityId) {
+        await teacherApi.delete(`/api/courses/${data.courseId}/activities/${createdActivityId}`);
       }
       await teacherApi.dispose();
     }

@@ -1106,16 +1106,14 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
       gradebookSettings: data.gradebookSettings ? normalizeGradebookItemSettings(data.gradebookSettings) : undefined
     });
 
-    if (data.contentPlacement) {
-      await ensureAssignmentContentItem(tx, {
-        courseId,
-        groupId,
-        groupActivityId: assignment.id,
-        activityId: assignment.activityId,
-        title: activity.title,
-        placement: data.contentPlacement
-      });
-    }
+    await ensureAssignmentContentItem(tx, {
+      courseId,
+      groupId,
+      groupActivityId: assignment.id,
+      activityId: assignment.activityId,
+      title: activity.title,
+      placement: data.contentPlacement
+    });
 
     return assignment;
   });
@@ -1236,11 +1234,7 @@ async function ensureAssignmentContentItem(
     placement: GroupActivityInput["contentPlacement"] | CourseWideContentPlacement;
   }
 ) {
-  if (!input.placement) {
-    return;
-  }
-
-  const parentId = "parentId" in input.placement ? (input.placement.parentId ?? null) : null;
+  const parentId = input.placement && "parentId" in input.placement ? (input.placement.parentId ?? null) : null;
   if (parentId) {
     const parent = await tx.courseContentItem.findFirst({
       where: { id: parentId, courseId: input.courseId, groupId: null, kind: "folder" },
@@ -1252,7 +1246,7 @@ async function ensureAssignmentContentItem(
   }
 
   const position =
-    input.placement.position ??
+    input.placement?.position ??
     (await tx.courseContentItem.count({
       where: {
         courseId: input.courseId,
@@ -1265,12 +1259,12 @@ async function ensureAssignmentContentItem(
     groupId: input.groupId,
     parentId,
     kind: "activity" as const,
-    titleSnapshot: input.placement.titleSnapshot ?? input.title,
+    titleSnapshot: input.placement?.titleSnapshot ?? input.title,
     position,
-    isVisible: input.placement.isVisible,
+    isVisible: input.placement?.isVisible ?? true,
     activityId: input.activityId,
     courseGroupActivityId: input.groupActivityId,
-    metadata: input.placement.metadata as Prisma.InputJsonValue
+    metadata: (input.placement?.metadata ?? {}) as Prisma.InputJsonValue
   };
 
   const existing = await tx.courseContentItem.findFirst({

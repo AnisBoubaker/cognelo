@@ -549,6 +549,8 @@ Implemented scope: the course Content tab renders folders, materials, and activi
 
 Folder deletion now performs a server-side descendant preflight instead of relying on the database's placement cascade. It is rejected as one batch when any contained activity has recorded attempts, and the shared dialog lists each protected activity so the teacher can move it elsewhere or delete it deliberately through the individual activity flow. With no protected activity, the host runs every owning plugin's deletion hook—including Test child hooks—and removes the contained activity records before the folder subtree. Individual deletion of an activity with attempts requires a separate permanent-data-loss warning before the normal confirmation, plus an explicit API confirmation flag; direct placement-only deletion is rejected. When an obsolete group placement remains under the folder while the authoritative shared placement has moved elsewhere, that duplicate placement is preserved outside the deleted subtree.
 
+Assignment reachability is now a persistence invariant rather than a UI convention. Every `CourseGroupActivity` has a matching group-scoped activity content item. Core assignment services materialize a visible root item when no placement is supplied, and the database does the same for direct/legacy assignment inserts. Deferred constraint triggers reject deleting or corrupting the last matching content item while its assignment remains, including a raw folder cascade that would previously leave a gradebook-only activity. The additive migration repairs existing orphan assignments using the shared activity placement when available and otherwise places them at the group root. The seed moves durable assignment items out of seed-owned subtrees before rebuilding those folders.
+
 Verification completed after Phase 7:
 
 - `npm run typecheck`
@@ -634,6 +636,9 @@ Core tests should cover:
 - delete contained no-attempt activities through their plugin lifecycle before deleting a folder
 - require a distinct recorded-attempt warning before the ordinary individual activity confirmation
 - reject direct activity-placement deletion
+- materialize a default content item when an assignment omits placement
+- repair historical assignments that have no valid assignment-backed content item
+- reject deleting the final valid placement while its assignment survives
 
 API tests should cover:
 
