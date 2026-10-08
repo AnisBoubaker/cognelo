@@ -3,7 +3,7 @@
 import { MarkdownRenderer } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { StudentPreviewBanner } from "@/components/student-preview-banner";
 import { studentPreviewRenderers } from "@/lib/activity-renderers";
@@ -20,22 +20,32 @@ export default function StudentViewActivityPage() {
   const [activity, setActivity] = useState<Activity | null>(null);
   const [definitions, setDefinitions] = useState<ActivityDefinition[]>([]);
   const [error, setError] = useState("");
+  const loadError = t("studentView.loadError");
+  const studentPreview = useMemo(() => ({ sessionId }), [sessionId]);
 
   useEffect(() => {
     window.history.replaceState({}, "", `/courses/${courseId}/groups/${groupId}/student-view/activities/${activityId}?previewSession=${encodeURIComponent(sessionId)}`);
   }, [activityId, courseId, groupId, sessionId]);
 
   useEffect(() => {
+    let isActive = true;
+    setError("");
     Promise.all([
       api.studentPreviewWorkspace(courseId, groupId),
       api.studentPreviewActivity(courseId, groupId, activityId),
       api.activityTypes()
     ]).then(([workspaceResult, activityResult, typeResult]) => {
+      if (!isActive) return;
       setWorkspace(workspaceResult.workspace);
       setActivity(activityResult.activity);
       setDefinitions(typeResult.registeredDefinitions);
-    }).catch((reason) => setError(reason instanceof Error ? reason.message : t("studentView.loadError")));
-  }, [activityId, courseId, groupId, t]);
+    }).catch((reason) => {
+      if (isActive) setError(reason instanceof Error ? reason.message : loadError);
+    });
+    return () => {
+      isActive = false;
+    };
+  }, [activityId, courseId, groupId, loadError]);
 
   const definition = activity
     ? definitions.find((candidate) => candidate.key === activity.activityType.key)
@@ -74,7 +84,7 @@ export default function StudentViewActivityPage() {
             locale={locale}
             onSave={async () => activity}
             onSubmitted={() => undefined}
-            studentPreview={{ sessionId }}
+            studentPreview={studentPreview}
             studentViewMode="attempt"
             t={t}
           />

@@ -1,49 +1,60 @@
 "use client";
 
-import { MarkdownRenderer } from "@cognelo/activity-ui";
-import Link from "next/link";
+import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { ActivityTypeIcon, FolderContentIcon } from "@/components/app-icon";
+import { StudentCourseContent } from "@/components/student-course-content";
 import { StudentPreviewBanner } from "@/components/student-preview-banner";
-import { api, type ActivityDefinition, type CourseContentItem, type CourseContentResource, type StudentPreviewWorkspace } from "@/lib/api";
-import { clearStudentPreviewSession } from "@/lib/student-preview-state-host";
+import {
+  api,
+  type ActivityDefinition,
+  type ActivityType,
+  type CourseContentResource,
+  type StudentPreviewWorkspace
+} from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { clearStudentPreviewSession } from "@/lib/student-preview-state-host";
 
 export default function StudentViewPage() {
   const { courseId, groupId } = useParams<{ courseId: string; groupId: string }>();
   const searchParams = useSearchParams();
   const { locale, t } = useI18n();
   const [workspace, setWorkspace] = useState<StudentPreviewWorkspace | null>(null);
-  const [definitions, setDefinitions] = useState<ActivityDefinition[]>([]);
+  const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
+  const [activityDefinitions, setActivityDefinitions] = useState<ActivityDefinition[]>([]);
+  const [contentTypeDefinitions, setContentTypeDefinitions] = useState<ContentTypeDefinition[]>([]);
   const [resources, setResources] = useState<CourseContentResource[]>([]);
   const [error, setError] = useState("");
   const [sessionId, setSessionId] = useState(() => searchParams.get("previewSession") || crypto.randomUUID());
+  const loadError = t("studentView.loadError");
 
   useEffect(() => {
     window.history.replaceState({}, "", studentViewUrl(courseId, groupId, sessionId));
   }, [courseId, groupId, sessionId]);
 
   useEffect(() => {
+    let isActive = true;
+    setError("");
     Promise.all([
       api.studentPreviewWorkspace(courseId, groupId),
       api.activityTypes(),
+      api.courseContentTypes(courseId),
       api.groupContentResources(courseId, groupId)
-    ]).then(([workspaceResult, typeResult, resourceResult]) => {
+    ]).then(([workspaceResult, activityTypeResult, contentTypeResult, resourceResult]) => {
+      if (!isActive) return;
       setWorkspace(workspaceResult.workspace);
-      setDefinitions(typeResult.registeredDefinitions);
+      setActivityTypes(activityTypeResult.activityTypes);
+      setActivityDefinitions(activityTypeResult.registeredDefinitions);
+      setContentTypeDefinitions(contentTypeResult.activeContentTypes ?? contentTypeResult.contentTypes);
       setResources(resourceResult.resources);
-    }).catch((reason) => setError(reason instanceof Error ? reason.message : t("studentView.loadError")));
-  }, [courseId, groupId, t]);
-
-  const rows = useMemo(() => flattenContent(workspace?.contentItems ?? []), [workspace?.contentItems]);
-  const activityByAssignment = useMemo(() => new Map(
-    (workspace?.group.activities ?? []).map((assignment) => [assignment.id, assignment])
-  ), [workspace?.group.activities]);
-  const resourceById = useMemo(() => new Map(resources.map((resource) => [resource.id, resource])), [resources]);
-  const courseMaterialById = useMemo(() => new Map((workspace?.course.materials ?? []).map((material) => [material.id, material])), [workspace?.course.materials]);
-  const groupMaterialById = useMemo(() => new Map((workspace?.group.materials ?? []).map((material) => [material.id, material])), [workspace?.group.materials]);
+    }).catch((reason) => {
+      if (isActive) setError(reason instanceof Error ? reason.message : loadError);
+    });
+    return () => {
+      isActive = false;
+    };
+  }, [courseId, groupId, loadError]);
 
   function resetPreview() {
     clearStudentPreviewSession(courseId, groupId, sessionId);
@@ -58,9 +69,13 @@ export default function StudentViewPage() {
           <>
             <section className="hero-panel hero-panel-compact">
               <div className="hero-meta">
-                <p className="eyebrow">{workspace.group.title}</p>
-                <h1>{workspace.course.title}</h1>
-                {workspace.course.description ? <MarkdownRenderer markdown={workspace.course.description} className="muted" compact /> : null}
+                <p className="eyebrow">
+                  {t("groupPage.eyebrow")} · {workspace.group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}
+                </p>
+                <h1>{workspace.course.title}: {workspace.group.title}</h1>
+                {workspace.group.availableFrom || workspace.group.availableUntil ? (
+                  <p className="muted">{formatAvailabilityWindow(workspace.group.availableFrom, workspace.group.availableUntil, t)}</p>
+                ) : null}
               </div>
             </section>
             {!workspace.isAvailable ? (
@@ -70,36 +85,26 @@ export default function StudentViewPage() {
               </section>
             ) : (
               <section className="section stack">
-                <div><p className="eyebrow">{t("courseDetail.contentEyebrow")}</p><h2>{t("courseDetail.contentTab")}</h2></div>
-                {rows.length ? (
-                  <div className="table-list">
-                    {rows.map(({ item, depth }) => {
-                      const assignment = item.courseGroupActivityId ? activityByAssignment.get(item.courseGroupActivityId) : null;
-                      const activity = assignment?.activity;
-                      const definition = activity ? definitions.find((candidate) => candidate.key === activity.activityType.key) : null;
-                      const title = item.titleSnapshot || activity?.title || t("courseDetail.untitledFolder");
-                      const resource = item.contentResourceId ? resourceById.get(item.contentResourceId) : null;
-                      const courseMaterial = item.materialId ? courseMaterialById.get(item.materialId) : null;
-                      const groupMaterial = item.materialId ? groupMaterialById.get(item.materialId) : null;
-                      const href = activity
-                        ? `/courses/${courseId}/groups/${groupId}/student-view/activities/${activity.id}?previewSession=${encodeURIComponent(sessionId)}`
-                        : resourceHref(courseId, groupId, resource)
-                          ?? (courseMaterial ? api.groupCourseMaterialDownloadUrl(courseId, groupId, courseMaterial.id) : null)
-                          ?? (groupMaterial ? api.groupMaterialDownloadUrl(courseId, groupId, groupMaterial.id) : null);
-                      return (
-                        <div className={`table-row table-row-content-tree is-student-content ${item.kind === "folder" ? "is-folder-row" : ""}`} key={item.id} style={{ paddingLeft: 14 + depth * 20 }}>
-                          <div className="table-main table-main-stack">
-                            <span className="content-item-icon">
-                              {item.kind === "folder" ? <FolderContentIcon collapsed={false} /> : item.kind === "activity" ? <ActivityTypeIcon iconName={definition?.icon ?? "placeholder"} /> : null}
-                            </span>
-                            <strong>{href ? resource || courseMaterial || groupMaterial ? <a href={href} rel="noreferrer" target="_blank">{title}</a> : <Link href={href}>{title}</Link> : title}</strong>
-                            {activity ? <span className="metadata-badge is-activity-type">{definition?.i18n?.[locale]?.name ?? definition?.name ?? activity.activityType.name}</span> : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : <p className="muted">{t("courseDetail.noContentItems")}</p>}
+                <div><h2>{t("courseDetail.contentEyebrow")}</h2></div>
+                <StudentCourseContent
+                  activityDefinitions={activityDefinitions}
+                  activityHref={(activityId) => `/courses/${courseId}/groups/${groupId}/student-view/activities/${activityId}?previewSession=${encodeURIComponent(sessionId)}`}
+                  activityTypes={activityTypes}
+                  assignments={workspace.group.activities ?? []}
+                  contentItems={workspace.contentItems}
+                  contentResources={resources}
+                  contentTypeDefinitions={contentTypeDefinitions}
+                  courseId={courseId}
+                  courseMaterials={workspace.course.materials ?? []}
+                  courseMetadata={workspace.course.metadata}
+                  folderHref={(folderId) => `${studentViewUrl(courseId, groupId, sessionId)}&folder=${encodeURIComponent(folderId)}`}
+                  groupId={groupId}
+                  groupMaterials={workspace.group.materials ?? []}
+                  locale={locale}
+                  selectedFolderId={searchParams.get("folder")}
+                  storageScope="preview"
+                  t={t}
+                />
               </section>
             )}
           </>
@@ -109,28 +114,28 @@ export default function StudentViewPage() {
   );
 }
 
-function flattenContent(items: CourseContentItem[]) {
-  const byParent = new Map<string | null, CourseContentItem[]>();
-  items.forEach((item) => {
-    const parent = item.parentId ?? null;
-    byParent.set(parent, [...(byParent.get(parent) ?? []), item]);
-  });
-  byParent.forEach((children) => children.sort((left, right) => left.position - right.position));
-  const result: Array<{ item: CourseContentItem; depth: number }> = [];
-  const visit = (parentId: string | null, depth: number) => (byParent.get(parentId) ?? []).forEach((item) => {
-    result.push({ item, depth });
-    visit(item.id, depth + 1);
-  });
-  visit(null, 0);
-  return result;
-}
-
-function resourceHref(courseId: string, groupId: string, resource?: CourseContentResource | null) {
-  if (!resource) return null;
-  if (typeof resource.metadata?.storedName === "string") return api.groupContentResourceDownloadUrl(courseId, groupId, resource.id);
-  return typeof resource.metadata?.url === "string" ? resource.metadata.url : null;
-}
-
 function studentViewUrl(courseId: string, groupId: string, sessionId: string) {
   return `/courses/${courseId}/groups/${groupId}/student-view?previewSession=${encodeURIComponent(sessionId)}`;
+}
+
+function formatAvailabilityWindow(
+  availableFrom: string | null | undefined,
+  availableUntil: string | null | undefined,
+  t: (key: string, vars?: Record<string, string | number>) => string
+) {
+  const format = (value: string) => {
+    const date = new Date(value);
+    const isMidnight = date.getHours() === 0
+      && date.getMinutes() === 0
+      && date.getSeconds() === 0
+      && date.getMilliseconds() === 0;
+    return new Intl.DateTimeFormat(undefined, isMidnight
+      ? { year: "numeric", month: "short", day: "numeric" }
+      : { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: false, hourCycle: "h23" }
+    ).format(date);
+  };
+  if (availableFrom && availableUntil) return t("groupPage.availableWindow", { from: format(availableFrom), until: format(availableUntil) });
+  if (availableFrom) return t("groupPage.availableAfter", { from: format(availableFrom) });
+  if (availableUntil) return t("groupPage.availableBefore", { until: format(availableUntil) });
+  return t("groupPage.availableAlways");
 }
