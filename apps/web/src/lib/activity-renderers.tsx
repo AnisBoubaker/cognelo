@@ -38,6 +38,7 @@ import { TestActivityView, type TestStudentItemRendererContext } from "@/compone
 import { TestManualGradingPanel } from "@/components/test-manual-grading-panel";
 import { useActivityEditorGradingPortalTarget } from "@/components/activity-editor-tabs";
 import { createStandaloneActivityDraftHost } from "@/lib/activity-response-draft-host";
+import { createStudentPreviewStateHost } from "@/lib/student-preview-state-host";
 import type { Locale } from "@/lib/i18n";
 import {
   itemScorePercentage,
@@ -69,6 +70,7 @@ type ActivityRendererProps<T extends ElementType> = ComponentProps<T> & {
   studentViewMode?: "attempt" | "previous";
   onNewAttemptAvailabilityChange?: (canStartNewAttempt: boolean) => void;
   onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
+  studentPreview?: { sessionId: string };
 };
 
 type RenderableActivity = {
@@ -144,8 +146,17 @@ function useStandaloneResponseDraftHost(input: {
   courseId?: string;
   groupActivityId?: string;
   groupId?: string;
+  studentPreview?: { sessionId: string };
 }) {
   return useMemo(() => {
+    if (input.studentPreview && input.courseId && input.groupId) {
+      return createStudentPreviewStateHost<Record<string, unknown>>({
+        courseId: input.courseId,
+        groupId: input.groupId,
+        activityId: input.activityId,
+        sessionId: input.studentPreview.sessionId
+      });
+    }
     if (input.canManage || !input.courseId || !input.groupId || !input.groupActivityId) {
       return undefined;
     }
@@ -159,7 +170,7 @@ function useStandaloneResponseDraftHost(input: {
         }
       }
     });
-  }, [input.activityId, input.canManage, input.courseId, input.groupActivityId, input.groupId]);
+  }, [input.activityId, input.canManage, input.courseId, input.groupActivityId, input.groupId, input.studentPreview]);
 }
 
 function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActivityView>) {
@@ -173,9 +184,18 @@ function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActi
     studentViewMode,
     onNewAttemptAvailabilityChange,
     onPreviousSubmissionsAvailabilityChange,
+    studentPreview,
     ...activityProps
   } = props;
   const courseId = activityRouteCourseId ?? activityProps.course?.id;
+  const previewStateHost = useStandaloneResponseDraftHost({
+    activityId: activityProps.activity.id,
+    canManage: false,
+    courseId,
+    groupActivityId: activityProps.activity.assignment?.id,
+    groupId,
+    studentPreview
+  });
   const parsonsClient = useMemo(() => createParsonsClient(apiRequest), []);
   const aiGenerationClient = useMemo(
     () =>
@@ -188,7 +208,28 @@ function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActi
     [activityProps.activity.id, activityProps.canManage, courseId, hasQuestionAuthoringAgent, parsonsClient]
   );
   const attemptsClient = useMemo(
-    () => ({
+    () => studentPreview && previewStateHost ? ({
+      ensureAttempt: async (_activityId: string, _courseId: string, input?: { forceNew?: boolean }) => {
+        if (input?.forceNew) await previewStateHost.clear?.();
+        const stored = input?.forceNew ? null : await previewStateHost.load();
+        const parsed = parsonsAttemptStateSchema.safeParse(stored);
+        const latestState = parsed.success ? parsed.data : createInitialParsonsAttemptState(parseParsonsConfig(activityProps.activity.config));
+        if (!parsed.success) await previewStateHost.save(latestState);
+        const now = new Date().toISOString();
+        return { attempt: { id: `student-preview-${studentPreview.sessionId}`, status: "in_progress" as const, startedAt: now, lastInteractionAt: now, completedAt: null, latestState }, attemptAvailability: { canStart: true, reason: null } };
+      },
+      listSubmissions: async () => ({ submissions: [] }),
+      updateAttempt: async (_activityId: string, _courseId: string, input: { state?: ReturnType<typeof createInitialParsonsAttemptState>; result?: unknown; submit?: boolean; complete?: boolean }) => {
+        const stored = await previewStateHost.load();
+        const parsed = parsonsAttemptStateSchema.safeParse(input.state ?? stored);
+        let latestState = parsed.success ? parsed.data : createInitialParsonsAttemptState(parseParsonsConfig(activityProps.activity.config));
+        if (input.result) latestState = { ...latestState, lastEvaluation: input.result as typeof latestState.lastEvaluation };
+        await previewStateHost.save(latestState);
+        const now = new Date().toISOString();
+        const completed = input.submit === true || input.complete === true;
+        return { attempt: { id: `student-preview-${studentPreview.sessionId}`, status: completed ? "completed" as const : "in_progress" as const, startedAt: now, lastInteractionAt: now, completedAt: completed ? now : null, latestState } };
+      }
+    }) : ({
       ensureAttempt: async (activityId: string, courseId: string, input?: { forceNew?: boolean }) => {
         const result = groupId
           ? await parsonsClient.ensureGroupAttempt(courseId, groupId, activityId, input)
@@ -217,7 +258,7 @@ function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActi
         return { attempt: result.attempt };
       }
     }),
-    [groupId, parsonsClient]
+    [activityProps.activity.config, groupId, parsonsClient, previewStateHost, studentPreview]
   );
   return (
     <ParsonsActivityView
@@ -244,6 +285,7 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
     studentViewMode,
     onNewAttemptAvailabilityChange,
     onPreviousSubmissionsAvailabilityChange,
+    studentPreview,
     ...activityProps
   } = props;
   const courseId = activityRouteCourseId ?? activityProps.course?.id;
@@ -252,7 +294,8 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
     canManage: activityProps.canManage,
     courseId,
     groupActivityId: activityProps.activity.assignment?.id,
-    groupId
+    groupId,
+    studentPreview
   });
   const aiGenerationClient = useMemo(
     () =>
@@ -297,19 +340,24 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
         };
       },
       runCode: async (courseId: string, activityId: string, input: Parameters<typeof api.runCodingExercise>[2]) => {
-        const result = groupId
+        const result = studentPreview && groupId
+          ? await api.executeStudentPreviewAction<{ execution: CodingExerciseExecution }>(courseId, groupId, activityId, "run", input)
+          : groupId
           ? await api.runGroupCodingExercise(courseId, groupId, activityId, input)
           : await api.runCodingExercise(courseId, activityId, input);
         return { execution: result.execution as CodingExerciseExecution };
       },
       listRuns: async (courseId: string, activityId: string) => {
+        if (studentPreview) return { executions: [] };
         const result = groupId
           ? await api.groupCodingExerciseRuns(courseId, groupId, activityId)
           : await api.codingExerciseRuns(courseId, activityId);
         return { executions: result.executions as CodingExerciseExecution[] };
       },
       submitCode: async (courseId: string, activityId: string, input: { sourceCode: string }) => {
-        const result = groupId
+        const result = studentPreview && groupId
+          ? await api.executeStudentPreviewAction<Awaited<ReturnType<typeof api.submitGroupCodingExercise>>>(courseId, groupId, activityId, "submit", input)
+          : groupId
           ? await api.submitGroupCodingExercise(courseId, groupId, activityId, input)
           : await api.submitCodingExercise(courseId, activityId, input);
         return {
@@ -320,19 +368,21 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
         };
       },
       listSubmissions: async (courseId: string, activityId: string) => {
+        if (studentPreview) return { executions: [] };
         const result = groupId
           ? await api.groupCodingExerciseSubmissions(courseId, groupId, activityId)
           : await api.codingExerciseSubmissions(courseId, activityId);
         return { executions: result.executions as CodingExerciseExecution[] };
       },
       listHistory: async (courseId: string, activityId: string) => {
+        if (studentPreview) return { currentRuns: [], attempts: [], availability: { canStart: true, reason: null, maxAttempts: null, usedAttempts: 0, attemptsRemaining: null } };
         const result = groupId
           ? await api.groupCodingExerciseHistory(courseId, groupId, activityId)
           : await api.codingExerciseHistory(courseId, activityId);
         return result;
       }
     }),
-    [groupId]
+    [groupId, studentPreview]
   );
   return (
     <CodingExerciseActivityView
@@ -360,6 +410,7 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
     studentViewMode: _studentViewMode,
     onNewAttemptAvailabilityChange: _onNewAttemptAvailabilityChange,
     onPreviousSubmissionsAvailabilityChange: _onPreviousSubmissionsAvailabilityChange,
+    studentPreview,
     ...activityProps
   } = props;
   const courseId = activityRouteCourseId ?? activityProps.course?.id;
@@ -404,6 +455,7 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
     };
   }, [codingHomeworkClient, courseId, groupId]);
   const submissionClient = useMemo(() => {
+    if (studentPreview) return undefined;
     if (!courseId || !groupId) {
       return undefined;
     }
@@ -417,7 +469,7 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
       submitAnswers: (activityId: string, input: Parameters<typeof codingHomeworkClient.submitGroupChallengeAnswers>[3]) =>
         codingHomeworkClient.submitGroupChallengeAnswers(courseId, groupId, activityId, input)
     };
-  }, [codingHomeworkClient, courseId, groupId]);
+  }, [codingHomeworkClient, courseId, groupId, studentPreview]);
   return (
     <CodingHomeworkGraderActivityView
       {...activityProps}
@@ -446,6 +498,7 @@ function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<ty
     studentViewMode: _studentViewMode,
     onNewAttemptAvailabilityChange: _onNewAttemptAvailabilityChange,
     onPreviousSubmissionsAvailabilityChange: _onPreviousSubmissionsAvailabilityChange,
+    studentPreview,
     ...activityProps
   } = props;
   const courseId = activityRouteCourseId ?? activityProps.course?.id;
@@ -454,7 +507,8 @@ function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<ty
     canManage: activityProps.canManage,
     courseId,
     groupActivityId: activityProps.activity.assignment?.id,
-    groupId
+    groupId,
+    studentPreview
   });
   return (
     <WebDesignCodingExerciseActivityView
@@ -484,24 +538,30 @@ function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<ty
             : await api.webDesignExerciseExpectedResult(courseId, activityId);
         },
         runCode: async (courseId, activityId, input) => {
-          const result = groupId
+          const result = studentPreview && groupId
+            ? await api.executeStudentPreviewAction<{ submission: WebDesignExerciseSubmission }>(courseId, groupId, activityId, "run", input)
+            : groupId
             ? await api.runGroupWebDesignExercise(courseId, groupId, activityId, input)
             : await api.runWebDesignExercise(courseId, activityId, input);
           return { submission: result.submission as WebDesignExerciseSubmission };
         },
         listRuns: async (courseId, activityId) => {
+          if (studentPreview) return { submissions: [] };
           const result = groupId
             ? await api.groupWebDesignExerciseRuns(courseId, groupId, activityId)
             : await api.webDesignExerciseRuns(courseId, activityId);
           return { submissions: result.submissions as WebDesignExerciseSubmission[] };
         },
         submitCode: async (courseId, activityId, input) => {
-          const result = groupId
+          const result = studentPreview && groupId
+            ? await api.executeStudentPreviewAction<{ submission: WebDesignExerciseSubmission }>(courseId, groupId, activityId, "submit", input)
+            : groupId
             ? await api.submitGroupWebDesignExercise(courseId, groupId, activityId, input)
             : await api.submitWebDesignExercise(courseId, activityId, input);
           return { submission: result.submission as WebDesignExerciseSubmission };
         },
         listSubmissions: async (courseId, activityId) => {
+          if (studentPreview) return { submissions: [] };
           const result = groupId
             ? await api.groupWebDesignExerciseSubmissions(courseId, groupId, activityId)
             : await api.webDesignExerciseSubmissions(courseId, activityId);
@@ -524,6 +584,7 @@ function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView
     studentViewMode,
     onNewAttemptAvailabilityChange,
     onPreviousSubmissionsAvailabilityChange,
+    studentPreview,
     ...activityProps
   } = props;
   const courseId = activityRouteCourseId;
@@ -533,11 +594,31 @@ function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView
     canManage: activityProps.canManage,
     courseId,
     groupActivityId: activityProps.activity.assignment?.id,
-    groupId
+    groupId,
+    studentPreview
   });
   const submissionClient = useMemo(() => {
     if (!courseId || !groupId) {
       return undefined;
+    }
+    if (studentPreview && responseDraftHost) {
+      return {
+        getStatus: async () => ({
+          submission: null,
+          draft: (await responseDraftHost.load()) as { answers: Record<string, string[]> } | null,
+          grade: null,
+          attempts: [],
+          availability: { attemptsRemaining: null, canStart: true, reason: null, gradesReleased: false }
+        }),
+        save: async (_activityId: string, answers: Record<string, string[]>) => { await responseDraftHost.save({ answers }); },
+        submit: async (activityId: string, answers: Record<string, string[]>) => {
+          const result = await api.executeStudentPreviewAction<{ submission: { answers: Record<string, string[]> } }>(courseId, groupId, activityId, "submit", { answers });
+          await responseDraftHost.save({ answers });
+          return result;
+        },
+        feedback: async (activityId: string, answers: Record<string, string[]>) =>
+          (await api.executeStudentPreviewAction<{ feedback: Record<string, unknown> }>(courseId, groupId, activityId, "feedback", { answers })).feedback
+      };
     }
     return {
       getStatus: async (activityId: string) => {
@@ -565,7 +646,7 @@ function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView
         return result.evaluation?.feedback ?? {};
       }
     };
-  }, [courseId, groupId, mcqClient, responseDraftHost]);
+  }, [courseId, groupId, mcqClient, responseDraftHost, studentPreview]);
   return (
     <McqActivityView
       {...activityProps}

@@ -27,7 +27,7 @@ vi.mock("./runner", () => ({
   runWebDesignTestsInRunner: mocks.runWebDesignTestsInRunner
 }));
 
-const { listRecentWebDesignExerciseSubmissions, runWebDesignExercise, submitWebDesignExercise } = await import("./executions");
+const { listRecentWebDesignExerciseSubmissions, previewWebDesignExercise, runWebDesignExercise, submitWebDesignExercise } = await import("./executions");
 
 const now = new Date("2026-01-01T00:00:00.000Z");
 const file = { id: "index", path: "index.html", language: "html" as const, starterCode: "<main></main>", isEditable: true, orderIndex: 0 };
@@ -93,5 +93,18 @@ describe("web design execution persistence", () => {
 
     mockPrisma.pluginWebDesignExerciseSubmission.findMany.mockResolvedValue([submission()]);
     await expect(listRecentWebDesignExerciseSubmissions({ activityId: "activity-1", userId: "user-1", kind: "run" })).resolves.toHaveLength(1);
+  });
+
+  it("runs a Student view preview without creating submission or test-result rows", async () => {
+    await expect(previewWebDesignExercise({
+      activityId: "activity-1",
+      userId: "teacher-1",
+      kind: "submit",
+      input: { files: [file] }
+    })).resolves.toMatchObject({ kind: "submit", status: "completed", resultSummary: { studentPreview: true } });
+
+    expect(mockPrisma.pluginWebDesignExerciseSubmission.create).not.toHaveBeenCalled();
+    expect(mockPrisma.pluginWebDesignExerciseSubmission.update).not.toHaveBeenCalled();
+    expect(mockPrisma.pluginWebDesignExerciseTestResult.createMany).not.toHaveBeenCalled();
   });
 });

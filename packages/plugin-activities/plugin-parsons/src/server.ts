@@ -60,6 +60,25 @@ export const parsonsServerPlugin: ServerActivityPlugin = {
         gradingResult: buildParsonsGradingResult(evaluation)
       };
     }
+  },
+  studentPreview: {
+    activityTypeKeys: ["parsons-problem"],
+    actions: {
+      evaluate: async ({ activity, payload }) => {
+        const config = parseParsonsConfig(activity.config);
+        const parsedState = parsonsAttemptStateSchema.safeParse(payload);
+        const state = parsedState.success ? parsedState.data : createInitialParsonsAttemptState(config);
+        const evaluation = evaluateParsonsAttemptStateForConfig(state, config);
+        return { state: { ...state, lastEvaluation: evaluation }, evaluation };
+      },
+      submit: async ({ activity, payload }) => {
+        const config = parseParsonsConfig(activity.config);
+        const parsedState = parsonsAttemptStateSchema.safeParse(payload);
+        const state = parsedState.success ? parsedState.data : createInitialParsonsAttemptState(config);
+        const evaluation = evaluateParsonsAttemptStateForConfig(state, config);
+        return { state: { ...state, lastEvaluation: evaluation }, evaluation, gradingResult: buildParsonsGradingResult(evaluation) };
+      }
+    }
   }
 };
 

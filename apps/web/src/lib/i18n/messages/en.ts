@@ -796,6 +796,7 @@ export const enMessages = {
       participantCount: "{count} participants",
       editGroup: "Edit group",
       contentViewSelectorLabel: "Course content perspective",
+      studentView: "Student view",
       courseView: "Course",
       groupView: "Group",
       groupViewSelect: "Choose a group perspective",
@@ -1496,6 +1497,17 @@ export const enMessages = {
       hiddenInGroup: "Hidden in this group.",
       hiddenByFolder: "Hidden because its parent folder is hidden.",
       courseMaterialVisibilityError: "Unable to update inherited material visibility."
+    },
+    studentView: {
+      bannerTitle: "Student view — {group}",
+      bannerText: "Work completed here is temporary and is not saved to any student record.",
+      reset: "Reset preview",
+      loadError: "Student view could not be loaded.",
+      groupUnavailableTitle: "This group is not available to students",
+      groupUnavailableText: "Students currently cannot open this group because it is unpublished or outside its availability window.",
+      safeExamBrowserNotice: "This activity requires Safe Exam Browser for students. Student view remains available because preview work is never recorded.",
+      uploadActivityUnavailable: "This upload-based activity can be inspected here, but its submission workflow is unavailable in Student view because it requires a durable processing workspace.",
+      unsupportedActivity: "This activity type does not provide a Student view renderer yet."
     },
     parsons: parsonsMessages.en
   } satisfies MessageTree;

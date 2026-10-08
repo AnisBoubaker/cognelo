@@ -789,6 +789,7 @@ export const frMessages = {
       participantCount: "{count} participants",
       editGroup: "Modifier le groupe",
       contentViewSelectorLabel: "Perspective du contenu du cours",
+      studentView: "Vue étudiante",
       courseView: "Cours",
       groupView: "Groupe",
       groupViewSelect: "Choisir la perspective d’un groupe",
@@ -1466,6 +1467,17 @@ export const frMessages = {
       hiddenInGroup: "Masquee dans ce groupe.",
       hiddenByFolder: "Masquee parce que son dossier parent est masque.",
       courseMaterialVisibilityError: "Impossible de mettre a jour la visibilite de la ressource heritee."
+    },
+    studentView: {
+      bannerTitle: "Vue étudiante — {group}",
+      bannerText: "Le travail effectué ici est temporaire et n’est enregistré dans aucun dossier étudiant.",
+      reset: "Réinitialiser l’aperçu",
+      loadError: "Impossible de charger la vue étudiante.",
+      groupUnavailableTitle: "Ce groupe n’est pas accessible aux étudiants",
+      groupUnavailableText: "Les étudiants ne peuvent pas ouvrir ce groupe actuellement, car il n’est pas publié ou se trouve hors de sa période de disponibilité.",
+      safeExamBrowserNotice: "Cette activité exige Safe Exam Browser pour les étudiants. La vue étudiante reste accessible puisque le travail d’aperçu n’est jamais enregistré.",
+      uploadActivityUnavailable: "Cette activité avec téléversement peut être consultée ici, mais son flux de soumission n’est pas disponible dans la vue étudiante, car il exige un espace de traitement persistant.",
+      unsupportedActivity: "Ce type d’activité ne fournit pas encore de rendu pour la vue étudiante."
     },
     parsons: parsonsMessages.fr
   } satisfies MessageTree;

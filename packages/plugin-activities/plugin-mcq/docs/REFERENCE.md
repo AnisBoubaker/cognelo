@@ -33,6 +33,8 @@ The main MCQ source is written as text.
 
 ## Current State
 
+Teacher Student view uses the same parser and deterministic answer-key grader but keeps answers in browser session storage. Its SDK preview handlers return an ephemeral submission/result and never call the core attempt or plugin AI-evaluation persistence paths.
+
 The plugin stores authored content in generic bank/course activity config. Assigning from an activity bank therefore uses the platform's generic config copy. Every standalone formative **Check answers** action and summative submission is persisted as a mode-tagged core `ActivityAttempt`; only summative attempts are graded through the shared gradebook workflow or counted against summative limits. Teachers can inspect either mode, while a learner opening a summative activity sees only its summative submission history. The plugin also owns private immutable `PluginMcqAiEvaluation` rows for generated assessment feedback artifacts; those rows are operational evaluation data, not authored activity data.
 
 Unsubmitted standalone answers autosave through the core `ActivityResponseDraft` state host for both formative and summative MCQs. Reloading or a periodic account refresh restores that draft without replacing newer in-memory answers. Final summative submission clears the draft after the graded attempt is recorded. Embedded Test MCQs remain on the Test execution host and continue to autosave into `TestItemAttempt`; they never use the standalone draft route.

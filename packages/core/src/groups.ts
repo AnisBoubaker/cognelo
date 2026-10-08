@@ -19,6 +19,7 @@ import { getActivityDefinition } from "@cognelo/activity-sdk";
 import {
   assertCanManageCourse,
   assertCanManageGroupRoster,
+  assertCanPreviewGroupAsStudent,
   assertCanViewCourse,
   canGradeGroup,
   canManageCourse,
@@ -761,6 +762,28 @@ export async function listGroupActivityAssignments(user: CurrentUser, courseId: 
 
 export async function getGroupAssignedActivity(user: CurrentUser, courseId: string, groupId: string, activityId: string) {
   const group = await assertCanViewGroup(user, courseId, groupId);
+  return getGroupAssignedActivityRecord(user, courseId, groupId, activityId, group, false);
+}
+
+export async function getGroupAssignedActivityForStudentPreview(
+  user: CurrentUser,
+  courseId: string,
+  groupId: string,
+  activityId: string
+) {
+  await assertCanPreviewGroupAsStudent(user, courseId, groupId);
+  const group = await assertGroupBelongsToCourse(courseId, groupId);
+  return getGroupAssignedActivityRecord(user, courseId, groupId, activityId, group, true);
+}
+
+async function getGroupAssignedActivityRecord(
+  user: CurrentUser,
+  courseId: string,
+  groupId: string,
+  activityId: string,
+  group: Awaited<ReturnType<typeof assertGroupBelongsToCourse>>,
+  forceStudentRules: boolean
+) {
   const assignment = await prisma.courseGroupActivity.findFirst({
     where: { groupId, activityId },
     include: {
@@ -774,10 +797,12 @@ export async function getGroupAssignedActivity(user: CurrentUser, courseId: stri
     throw notFound("Group activity assignment");
   }
 
-  if (!(isAdmin(user) || (await canManageCourse(user, courseId)))) {
+  if (forceStudentRules || !(isAdmin(user) || (await canManageCourse(user, courseId)))) {
     const now = new Date();
     if (
       group.status !== "published" ||
+      (group.availableFrom && group.availableFrom > now) ||
+      (group.availableUntil && group.availableUntil < now) ||
       (assignment.availableFrom && assignment.availableFrom > now)
     ) {
       throw new AppError(403, "GROUP_ACTIVITY_NOT_AVAILABLE", "This activity is not currently available in the group.");

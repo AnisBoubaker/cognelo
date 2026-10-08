@@ -805,6 +805,13 @@ export type CourseTestRuntime = {
   hasPreviousSubmissions: boolean;
 };
 
+export type StudentPreviewWorkspace = {
+  course: Pick<Course, "id" | "title" | "description" | "status" | "metadata" | "materials">;
+  group: Pick<CourseGroup, "id" | "title" | "status" | "availableFrom" | "availableUntil" | "materials" | "activities">;
+  contentItems: CourseContentItem[];
+  isAvailable: boolean;
+};
+
 export type ActivityResponseDraft = {
   id: string;
   state: Record<string, unknown>;
@@ -1872,6 +1879,22 @@ export const api = {
     request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}`),
   groupActivity: (courseId: string, groupId: string, activityId: string) =>
     request<{ activity: Activity }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}`),
+  studentPreviewWorkspace: (courseId: string, groupId: string) =>
+    request<{ workspace: StudentPreviewWorkspace }>(`/courses/${courseId}/groups/${groupId}/student-preview`),
+  studentPreviewActivity: (courseId: string, groupId: string, activityId: string) =>
+    request<{ activity: Activity }>(`/courses/${courseId}/groups/${groupId}/student-preview/activities/${activityId}`),
+  executeStudentPreviewAction: <TResult>(courseId: string, groupId: string, activityId: string, action: string, payload: unknown) =>
+    request<TResult>(
+      `/courses/${courseId}/groups/${groupId}/student-preview/activities/${activityId}/actions/${encodeURIComponent(action)}`,
+      { method: "POST", body: JSON.stringify(payload) }
+    ),
+  studentPreviewTestRuntime: (courseId: string, groupId: string, activityId: string) =>
+    request<{ runtime: CourseTestRuntime }>(`/courses/${courseId}/groups/${groupId}/student-preview/activities/${activityId}/test`),
+  executeStudentPreviewTestItemAction: <TResult>(courseId: string, groupId: string, activityId: string, testItemId: string, action: string, payload: unknown) =>
+    request<TResult>(
+      `/courses/${courseId}/groups/${groupId}/student-preview/activities/${activityId}/test/items/${testItemId}/actions/${encodeURIComponent(action)}`,
+      { method: "POST", body: JSON.stringify(payload) }
+    ),
   groupActivitySafeExamBrowserAccess: (courseId: string, groupId: string, activityId: string) =>
     request<{ access: SafeExamBrowserAccess }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/seb`

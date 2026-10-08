@@ -9,6 +9,7 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Saving enabled tests is reference-validation dependent and atomic; failed validation leaves prior tests unchanged.
 - Expected-result prompt tokens expose only generated PNG artifacts, never solution source.
 - Standalone drafts use `ActivityResponseDraft`; embedded Test drafts use `TestItemAttempt`.
+- Teacher Student view stores files in the browser and invokes Playwright without creating plugin submission/test-result rows, core attempts, grades, or analytics.
 - Every standalone submission creates a core attempt tagged with its assessment mode. The shared gradebook review page may inspect all submitted file bundles, but applies a core manual-grade override only to summative work; automatic regrading remains hidden until this plugin implements a current-answer grading handler.
 - Released final grades are challengeable through core; challenge review must reuse that same file-aware gradebook surface and audited override path.
 - Teacher review routes consume core course capabilities: explicit course teachers/admins work course-wide, while section teachers/TAs are restricted to their assigned groups. Test mutation, authoring, and grade release remain course-management operations.

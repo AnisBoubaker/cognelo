@@ -5,6 +5,7 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Groups are line ranges; strict/flexible grouping and precedence rules are part of generic activity config.
 - Order feedback counts minimally misplaced units instead of cascading every downstream displacement.
 - Learner attempts and move/indent/reset/check/submit events are plugin-owned; teacher previews remain ephemeral.
+- Student view implements that ephemeral rule with browser-scoped state and pure evaluation; it must not write attempt or research-event rows.
 - Core owns authoring copy/version behavior, including reusable bank-Test child graphs, plus mode-tagged formative/summative attempts, summative gradebook release, and audited regrades.
 - Bank variations keep the exact concept, skill, and misconception selections, source language, group/rule configuration, and exact physical and non-empty solution line counts so copied line ranges stay valid, while regenerating a genuinely different prompt and solution at comparable complexity.
 - Summative activity UI does not reveal correctness before release; released feedback is sanitized and deterministic.

@@ -19,6 +19,8 @@ Teacher-entered released grades and feedback are challengeable through the core 
 
 Finalized challenge answers create a core attempt tagged with the assignment mode. Formative attempts remain available to the teacher's read-only inspector; only summative attempts may receive a grade.
 
+Course Student view currently exposes this upload-based activity for inspection only. Its ZIP submission workflow stays disabled because the existing pipeline requires durable attachments and background jobs; preview must not borrow academic records and delete them afterward.
+
 ## Read By Topic
 
 - [Current capabilities and phase summary](docs/REFERENCE.md#current-state)

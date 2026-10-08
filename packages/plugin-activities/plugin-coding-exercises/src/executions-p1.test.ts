@@ -196,7 +196,9 @@ const {
   getLatestCodingExerciseTestResult,
   regradeCodingExerciseTests,
   runCodingExercise,
+  runCodingExercisePreview,
   submitCodingExercise,
+  submitCodingExercisePreview,
   validateReferenceSolutionAgainstHiddenTests
 } = await import("./executions");
 
@@ -285,6 +287,36 @@ describe("coding exercise executions", () => {
       stdout: "2",
       resultSummary: { accepted: true, phase: "finished" }
     });
+  });
+
+  it("executes preview runs and submissions without creating or updating execution records", async () => {
+    judge0Mocks.runJudge0Submission.mockResolvedValue({
+      token: "preview-token",
+      stdout: "2",
+      stderr: null,
+      compile_output: null,
+      message: null,
+      time: "0.01",
+      memory: 512,
+      status: { id: 3, description: "Accepted" }
+    });
+
+    await expect(runCodingExercisePreview({
+      activityId: "activity-1",
+      userId: "teacher-1",
+      activityConfig,
+      input: { sourceCode: "print(2)", stdin: "1", expectedOutput: "2" }
+    })).resolves.toMatchObject({ kind: "run", status: "completed", resultSummary: { studentPreview: true } });
+    await expect(submitCodingExercisePreview({
+      activityId: "activity-1",
+      userId: "teacher-1",
+      activityConfig,
+      input: { sourceCode: "print(2)" }
+    })).resolves.toMatchObject({ kind: "submit", resultSummary: { studentPreview: true, testCount: 2 } });
+
+    expect(dbMocks.prisma.pluginCodingExerciseExecution.create).not.toHaveBeenCalled();
+    expect(dbMocks.prisma.pluginCodingExerciseExecution.update).not.toHaveBeenCalled();
+    expect(dbMocks.prisma.pluginCodingExerciseTestEvaluation.create).not.toHaveBeenCalled();
   });
 
   it("compares full output but saves and returns only a bounded prefix", async () => {

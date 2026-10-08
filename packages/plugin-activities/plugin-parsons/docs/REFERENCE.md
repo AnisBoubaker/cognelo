@@ -114,6 +114,8 @@ Summative submissions do not show correctness feedback during the activity. When
 
 ## UX Notes
 
+Course Student view injects an ephemeral attempts client backed by browser session storage. Checks and submission use the pure evaluator and never create plugin attempts or movement/research events.
+
 - student rows render in a compact editor-like style
 - syntax highlighting and line numbers come from shared `@cognelo/activity-ui`
 - teacher authoring is registered with the shared `useUnsavedChangesGuard`; future Parsons authoring/settings forms should register the same dirty/save/discard behavior

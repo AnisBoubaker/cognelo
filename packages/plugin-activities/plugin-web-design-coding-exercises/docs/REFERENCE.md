@@ -82,6 +82,8 @@ The activity-bank **Create variation** action runs against an independent deep d
 
 ## Playwright Grading
 
+Student view runs the selected sample or hidden suite through Playwright but constructs the response in memory. It does not create `PluginWebDesignExerciseSubmission` or test-result rows and is available only through the SDK stateless preview dispatcher.
+
 Implemented plugin subroutes:
 
 ```text

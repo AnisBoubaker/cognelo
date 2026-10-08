@@ -11,6 +11,7 @@ import {
   resolvePluginAiFeedbackHandler,
   resolvePluginAiGradingBatchHandler,
   resolvePluginRoute,
+  resolveStudentPreviewExecutionHandler,
   runBankActivityDeletedHooks,
   runBankActivityDeletedHooksForPlugins,
   runActivityAttemptDeletedHooksForPlugins,
@@ -130,6 +131,13 @@ describe("server activity SDK", () => {
     expect(resolveCompositeExecutionActionHandler("coding-exercise", "run")).toBeTypeOf("function");
     expect(resolveCompositeExecutionActionHandler("coding-exercise", "submit")).toBeNull();
     expect(resolveCompositeExecutionSubmissionHandler("placeholder")).toBeNull();
+  });
+
+  it("resolves only explicitly stateless Student view handlers", () => {
+    expect(resolveStudentPreviewExecutionHandler("coding-exercise", "run")).toBeTypeOf("function");
+    expect(resolveStudentPreviewExecutionHandler("coding-exercise", "submit")).toBeTypeOf("function");
+    expect(resolveStudentPreviewExecutionHandler("mcq", "feedback")).toBeTypeOf("function");
+    expect(resolveStudentPreviewExecutionHandler("placeholder", "submit")).toBeNull();
   });
 
   it("resolves bank variation handlers for every Test-capable activity plugin", () => {

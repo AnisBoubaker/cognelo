@@ -287,6 +287,14 @@ export type CompositeExecutionActionHandler = (input: {
   payload: unknown;
 }) => Promise<unknown>;
 
+export type StudentPreviewExecutionHandler = (input: {
+  user: CurrentUser;
+  courseId: string;
+  groupId: string;
+  activity: ServerActivityRecord;
+  payload: unknown;
+}) => Promise<unknown>;
+
 export type ServerActivityPlugin = {
   key: string;
   routes?: readonly PluginRouteDefinition[];
@@ -310,6 +318,12 @@ export type ServerActivityPlugin = {
     activityTypeKeys: readonly string[];
     submit: CompositeExecutionSubmissionHandler;
     actions?: Readonly<Record<string, CompositeExecutionActionHandler>>;
+  };
+  /** Stateless execution only. Handlers registered here must not write learner,
+   * attempt, grade, analytics, or plugin execution records. */
+  studentPreview?: {
+    activityTypeKeys: readonly string[];
+    actions: Readonly<Record<string, StudentPreviewExecutionHandler>>;
   };
   bankVariation?: {
     activityTypeKeys: readonly string[];
@@ -427,6 +441,13 @@ export function resolveCompositeExecutionActionHandler(activityTypeKey: string, 
     plugin.compositeExecution?.activityTypeKeys.includes(activityTypeKey)
   )?.compositeExecution;
   return composite?.actions?.[action] ?? null;
+}
+
+export function resolveStudentPreviewExecutionHandler(activityTypeKey: string, action: string) {
+  const preview = serverPlugins.find((plugin) =>
+    plugin.studentPreview?.activityTypeKeys.includes(activityTypeKey)
+  )?.studentPreview;
+  return preview?.actions[action] ?? null;
 }
 
 export function resolveBankActivityVariationHandler(activityTypeKey: string) {

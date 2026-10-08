@@ -40,6 +40,8 @@ Current config shape:
 
 ## Current State
 
+Student view is inspection-only. A future interactive preview requires a separately named expiring workspace for ZIPs and derived analysis, with no core-attempt or grade linkage and guaranteed cleanup; ordinary student preflight/submission rows are not a preview transport.
+
 The plugin now has the complete manual-grading workflow: teacher authoring, prior-documentation snapshot/extraction, plugin-owned assignment/provided files, the first C parser adapter, ZIP preflight validation, final ZIP submission storage, submitted-function candidate analysis, challenge question generation, student challenge answers, core attempts, and teacher gradebook review. It is registered as `coding-homework-grader`, uses the package `@cognelo/plugin-coding-homework-grader`, and owns its authoring, attachment, snapshot, submission, challenge-question, and review records.
 
 The teacher authoring form is registered with `useUnsavedChangesGuard` from `@cognelo/activity-ui` so navigation uses the platform-wide unsaved-change dialog. Teacher uploads, documentation preview/snapshot/extraction, preflight, and save operations display the shared blocking, indeterminate progress dialog.

@@ -137,6 +137,7 @@ const mockPrisma = vi.hoisted(() => ({
 const authMocks = vi.hoisted(() => ({
   assertCanManageGroupRoster: vi.fn(),
   assertCanManageCourse: vi.fn(),
+  assertCanPreviewGroupAsStudent: vi.fn(),
   assertCanViewCourse: vi.fn(),
   canGradeGroup: vi.fn(),
   canManageCourse: vi.fn(),
@@ -167,6 +168,7 @@ const {
   getCourseActivityAssignmentSettings,
   getCourseMaterialForGroupDownload,
   getGroupAssignedActivity,
+  getGroupAssignedActivityForStudentPreview,
   hideCourseMaterialForGroup,
   listGroupActivityAssignments,
   listCourseGroups,
@@ -1065,6 +1067,47 @@ describe("group services", () => {
       status: 403,
       code: "GROUP_ACTIVITY_NOT_AVAILABLE"
     });
+  });
+
+  it("enforces learner availability and visibility even when a manager opens Student view", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({
+      id: "group-1",
+      courseId: "course-1",
+      status: "draft",
+      availableFrom: null,
+      availableUntil: null
+    });
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({
+      id: "assignment-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      availableFrom: null,
+      availableUntil: null,
+      activity: { id: "activity-1" }
+    });
+
+    await expect(getGroupAssignedActivityForStudentPreview(teacherUser, "course-1", "group-1", "activity-1"))
+      .rejects.toMatchObject({ status: 403, code: "GROUP_ACTIVITY_NOT_AVAILABLE" });
+    expect(authMocks.assertCanPreviewGroupAsStudent).toHaveBeenCalledWith(teacherUser, "course-1", "group-1");
+
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({
+      id: "group-1",
+      courseId: "course-1",
+      status: "published",
+      availableFrom: null,
+      availableUntil: null
+    });
+    mockPrisma.courseContentItem.findMany.mockResolvedValue([{
+      id: "hidden-item",
+      parentId: null,
+      isVisible: false,
+      groupId: "group-1",
+      kind: "activity",
+      activityId: "activity-1",
+      courseGroupActivityId: "assignment-1"
+    }]);
+    await expect(getGroupAssignedActivityForStudentPreview(teacherUser, "course-1", "group-1", "activity-1"))
+      .rejects.toMatchObject({ status: 403, code: "GROUP_ACTIVITY_HIDDEN" });
   });
 
   it("omits hidden assignments from student group details", async () => {

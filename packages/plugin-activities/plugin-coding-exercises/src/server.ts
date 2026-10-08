@@ -15,7 +15,9 @@ import {
   codingExerciseRunInputSchema,
   codingExerciseSubmitInputSchema,
   runCodingExercise,
-  submitCodingExercise
+  runCodingExercisePreview,
+  submitCodingExercise,
+  submitCodingExercisePreview
 } from "./executions";
 import { AppError } from "@cognelo/core";
 import {
@@ -170,6 +172,30 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
           metadata: { kind: "coding-exercise", executionId: execution.id }
         }
       };
+    }
+  },
+  studentPreview: {
+    activityTypeKeys: ["coding-exercise"],
+    actions: {
+      run: async ({ activity, payload, user }) => ({
+        execution: await runCodingExercisePreview({
+          activityId: activity.id,
+          userId: user.id,
+          activityConfig: activity.config,
+          input: codingExerciseRunInputSchema.parse(payload)
+        })
+      }),
+      submit: async ({ activity, payload, user }) => ({
+        execution: await submitCodingExercisePreview({
+          activityId: activity.id,
+          userId: user.id,
+          activityConfig: activity.config,
+          input: codingExerciseSubmitInputSchema.parse(payload)
+        }),
+        availability: { canStart: true, reason: null, maxAttempts: null, usedAttempts: 0, attemptsRemaining: null },
+        aiFeedback: null,
+        aiFeedbackError: null
+      })
     }
   },
   hooks: {

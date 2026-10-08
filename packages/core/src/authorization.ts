@@ -171,6 +171,27 @@ export async function assertCanManageGroupRoster(user: CurrentUser, courseId: st
   }
 }
 
+/**
+ * Authorizes the non-recording student projection for a specific group.
+ *
+ * Course managers and administrators may preview every group. A section
+ * teacher may preview only the group they teach. Teaching assistants are
+ * intentionally excluded: previewing an assessment as a learner is a
+ * teaching capability, not a grading capability.
+ */
+export async function assertCanPreviewGroupAsStudent(user: CurrentUser, courseId: string, groupId: string) {
+  if (await canManageCourse(user, courseId)) {
+    return;
+  }
+  const participant = await prisma.courseGroupParticipant.findFirst({
+    where: { userId: user.id, groupId, role: "teacher", group: { courseId } },
+    select: { id: true }
+  });
+  if (!participant) {
+    throw forbidden();
+  }
+}
+
 export async function assertCanReleaseCourseGrades(user: CurrentUser, courseId: string) {
   const capabilities = await getCourseCapabilities(user, courseId);
   if (!capabilities.canReleaseGrades) {
