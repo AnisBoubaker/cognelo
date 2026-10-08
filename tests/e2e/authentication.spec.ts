@@ -63,4 +63,55 @@ test.describe("authentication", () => {
 
     await expect(page).toHaveURL(/\/login\?returnTo=/);
   });
+
+  test("renews a valid session on focus without reloading course content or gradebook", async ({ teacherPage: page }) => {
+    const courseId = "seed-course-programming-101";
+    const courseDataRequests: string[] = [];
+    const trackCourseData = (request: import("@playwright/test").Request) => {
+      const url = new URL(request.url());
+      if (
+        url.pathname === `/api/courses/${courseId}/content` ||
+        url.pathname === `/api/courses/${courseId}/gradebook`
+      ) {
+        courseDataRequests.push(url.toString());
+      }
+    };
+
+    await page.goto(`/courses/${courseId}?tab=content`);
+    await expect(page.getByRole("tabpanel", { name: "Content" })).toBeVisible();
+    page.on("request", trackCourseData);
+
+    const contentSessionCheck = page.waitForResponse((response) =>
+      response.ok() && new URL(response.url()).pathname === "/api/users/me"
+    );
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await contentSessionCheck;
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
+    expect(courseDataRequests).toEqual([]);
+
+    const initialGradebookLoad = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return response.ok() &&
+        url.pathname === `/api/courses/${courseId}/gradebook` &&
+        url.searchParams.get("view") === "summary";
+    });
+    await page.getByRole("tab", { name: "Gradebook" }).click();
+    await initialGradebookLoad;
+    await expect(page.getByRole("tabpanel", { name: "Gradebook" })).toBeVisible();
+    courseDataRequests.length = 0;
+
+    const gradebookSessionCheck = page.waitForResponse((response) =>
+      response.ok() && new URL(response.url()).pathname === "/api/users/me"
+    );
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await gradebookSessionCheck;
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
+    expect(courseDataRequests).toEqual([]);
+
+    page.off("request", trackCourseData);
+  });
 });

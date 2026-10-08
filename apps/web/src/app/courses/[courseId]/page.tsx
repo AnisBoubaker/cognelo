@@ -133,6 +133,9 @@ export default function CourseDetailPage() {
   const initializedGroupSelectionCourseIdRef = useRef<string | null>(null);
   const refreshRequestIdRef = useRef(0);
   const requestedContentGroupId = searchParams.get("view") === "group" ? searchParams.get("groupId") : null;
+  const canViewSubjectCatalog = Boolean(user?.roles.some((userRole) =>
+    userRole === "admin" || userRole === "course_manager" || userRole === "teacher"
+  ));
 
   useEffect(() => {
     setContentViewSelectorMode(requestedContentGroupId ? "group" : "course");
@@ -168,9 +171,6 @@ export default function CourseDetailPage() {
         return;
       }
 
-      const canViewSubjectCatalog = Boolean(user?.roles.some((userRole) =>
-        userRole === "admin" || userRole === "course_manager" || userRole === "teacher"
-      ));
       const validContentGroupId = requestedContentGroupId && courseResult.course.groups?.some((group) => group.id === requestedContentGroupId)
         ? requestedContentGroupId
         : null;
@@ -233,7 +233,7 @@ export default function CourseDetailPage() {
       setGradebookLoading(false);
       throw err;
     }
-  }, [activeCourseTab, courseId, gradebookActivityId, gradebookGroupId, gradebookStatus, requestedContentGroupId, user]);
+  }, [activeCourseTab, canViewSubjectCatalog, courseId, gradebookActivityId, gradebookGroupId, gradebookStatus, requestedContentGroupId]);
 
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("courseDetail.loadError")));
