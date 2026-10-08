@@ -1506,7 +1506,7 @@ export const enMessages = {
       groupUnavailableTitle: "This group is not available to students",
       groupUnavailableText: "Students currently cannot open this group because it is unpublished or outside its availability window.",
       safeExamBrowserNotice: "This activity requires Safe Exam Browser for students. Student view remains available because preview work is never recorded.",
-      uploadActivityUnavailable: "This upload-based activity can be inspected here, but its submission workflow is unavailable in Student view because it requires a durable processing workspace.",
+      readOnlyActivity: "This activity can be inspected here, but its response workflow is intentionally disabled because it requires durable processing state.",
       unsupportedActivity: "This activity type does not provide a Student view renderer yet."
     },
     parsons: parsonsMessages.en

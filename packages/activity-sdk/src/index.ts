@@ -84,6 +84,14 @@ export type ActivityAuthoringContract = {
   supportsVariations?: boolean;
 };
 
+export type ActivityStudentViewContract =
+  | {
+      mode: "interactive";
+      execution: "client" | "core" | "plugin";
+    }
+  | { mode: "read_only" }
+  | { mode: "unsupported" };
+
 export type ActivityProvider =
   | { kind: "core"; key: string }
   | { kind: "plugin"; key: string };
@@ -102,6 +110,7 @@ export type ActivityDefinition = {
   manualGrading?: ActivityManualGradingContract;
   aiFeedback?: ActivityAiFeedbackContract;
   authoring?: ActivityAuthoringContract;
+  studentView: ActivityStudentViewContract;
   i18n?: Partial<Record<PluginLocale, ActivityMessages>>;
   defaultConfig?: Record<string, unknown>;
   configSchema?: z.ZodTypeAny;
@@ -149,6 +158,7 @@ const coreDefinitions: ActivityDefinition[] = [
     defaultCategoryIds: ["generic"],
     isEnabledByDefault: true,
     icon: "clipboard-check",
+    studentView: { mode: "interactive", execution: "core" },
     grading: {
       supportsAttempts: true,
       supportsAutoGrading: true,
@@ -204,7 +214,48 @@ function registerActivityDefinition(definition: ActivityDefinition, provider: Ac
   if (definitions.has(definition.key)) {
     throw new Error(`Activity type already registered: ${definition.key}`);
   }
+  if (!definition.studentView) {
+    throw new Error(`Activity type must declare Student view support: ${definition.key}`);
+  }
+  if (definition.grading?.supportsCompositeExecution && definition.studentView.mode !== "interactive") {
+    throw new Error(`Test-capable activity types must provide interactive Student view support: ${definition.key}`);
+  }
   definitions.set(definition.key, { ...definition, provider });
+}
+
+export function validateStudentViewClientContracts(input: {
+  definitions: readonly ActivityDefinition[];
+  interactiveActivityTypeKeys: readonly string[];
+  testItemActivityTypeKeys: readonly string[];
+}) {
+  const definitionsByKey = new Map(input.definitions.map((definition) => [definition.key, definition]));
+  const interactiveKeys = new Set(input.interactiveActivityTypeKeys);
+  const testItemKeys = new Set(input.testItemActivityTypeKeys);
+
+  for (const key of interactiveKeys) {
+    const definition = definitionsByKey.get(key);
+    if (!definition) throw new Error(`Student view renderer registered for unknown activity type: ${key}`);
+    if (definition.studentView.mode !== "interactive") {
+      throw new Error(`Non-interactive activity type has a Student view renderer: ${key}`);
+    }
+  }
+
+  for (const definition of input.definitions) {
+    if (definition.studentView.mode === "interactive" && !interactiveKeys.has(definition.key)) {
+      throw new Error(`Interactive activity type is missing a Student view renderer: ${definition.key}`);
+    }
+    if (definition.grading?.supportsCompositeExecution && !testItemKeys.has(definition.key)) {
+      throw new Error(`Test-capable activity type is missing a Student view Test-item renderer: ${definition.key}`);
+    }
+  }
+
+  for (const key of testItemKeys) {
+    const definition = definitionsByKey.get(key);
+    if (!definition) throw new Error(`Student view Test-item renderer registered for unknown activity type: ${key}`);
+    if (!definition.grading?.supportsCompositeExecution || definition.studentView.mode !== "interactive") {
+      throw new Error(`Invalid Student view Test-item renderer registration: ${key}`);
+    }
+  }
 }
 
 export function getActivityDefinition(key: string) {

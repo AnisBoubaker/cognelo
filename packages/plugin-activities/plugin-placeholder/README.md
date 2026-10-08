@@ -20,6 +20,8 @@ The placeholder plugin exists as a minimal activity shell while a real pedagogic
 
 This plugin intentionally relies only on core bank/course activity records for real activity behavior.
 
+It explicitly declares Student view as unsupported, so the preview route shows a safe unavailable message instead of falling back to an ordinary renderer. Any future learner interaction must add an explicit non-recording preview adapter before changing that declaration.
+
 Its linked course copies therefore use the platform's generic bank synchronization without a plugin hook. Core locks bank-to-course retrieval after any attempt, while course-to-bank publication remains available to users with bank-write permission.
 
 Its immutable bank versions are also compared entirely by the shared core diff visualizer.

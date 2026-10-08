@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, API_UNAUTHORIZED_EVENT } from "./api";
+import { api, apiRequest, ApiError, API_UNAUTHORIZED_EVENT } from "./api";
 
 describe("web API client", () => {
   const expectedApiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -31,6 +31,36 @@ describe("web API client", () => {
         body: JSON.stringify({ email: "teacher@example.test", password: "secret" })
       })
     );
+  });
+
+  it("blocks ordinary mutation endpoints from a Student view window", async () => {
+    vi.stubGlobal("window", {
+      dispatchEvent: vi.fn(),
+      location: { pathname: "/courses/course-1/groups/group-1/student-view/activities/activity-1" }
+    });
+
+    await expect(apiRequest("/courses/course-1/groups/group-1/activities/assigned/activity-1/submissions", {
+      method: "POST",
+      body: JSON.stringify({ answer: true })
+    })).rejects.toMatchObject({ code: "STUDENT_PREVIEW_PERSISTENCE_BLOCKED", status: 409 });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("allows dedicated stateless mutation endpoints from a Student view window", async () => {
+    vi.stubGlobal("window", {
+      dispatchEvent: vi.fn(),
+      location: { pathname: "/courses/course-1/groups/group-1/student-view/activities/activity-1" }
+    });
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    }));
+
+    await expect(apiRequest("/courses/course-1/groups/group-1/student-preview/activities/activity-1/actions/submit", {
+      method: "POST",
+      body: JSON.stringify({ answer: true })
+    })).resolves.toEqual({ ok: true });
+    expect(fetch).toHaveBeenCalledOnce();
   });
 
   it("throws ApiError instances with code and details from error bodies", async () => {

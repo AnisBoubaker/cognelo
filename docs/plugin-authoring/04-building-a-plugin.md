@@ -35,6 +35,7 @@ export const tracingQuizPlugin: ActivityPlugin = {
       key: "tracing-quiz",
       name: "Tracing quiz",
       description: "Predict program execution and output.",
+      studentView: { mode: "unsupported" },
       defaultConfig: {
         language: "python",
         starterCode: "",
@@ -118,6 +119,8 @@ Then register the renderer in:
 - [apps/web/src/lib/activity-renderers.tsx](../../apps/web/src/lib/activity-renderers.tsx)
 
 When you need transient confirmation or error feedback in plugin UI, prefer `useNotifications()` over a plugin-specific inline save banner.
+
+The normal renderer is never used automatically in teacher Student view. To support that surface, change the definition to `studentView: { mode: "interactive", execution: "plugin" }`, add an explicit `studentPreviewRenderers` entry, and register stateless preview actions on the server plugin. Choose `read_only` when the prompt may be inspected but the response workflow cannot safely avoid durable state.
 
 ## Step 4: Add Plugin Routes If Needed
 
@@ -249,7 +252,8 @@ For beginners, this sequence is usually easier than trying to build everything a
 5. add plugin route(s)
 6. add database storage
 7. add bank-to-course copy hooks for plugin-owned private data
-8. add research instrumentation
+8. choose and implement the explicit Student view mode
+9. add research instrumentation
 
 ## A Good First Milestone
 

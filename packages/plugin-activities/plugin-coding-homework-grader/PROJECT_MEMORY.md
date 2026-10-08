@@ -6,7 +6,7 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Consume prior content only through generic content-type extraction and vector-search dispatchers. Never branch on concrete content types here.
 - The parser registry is language-neutral; C is the first conservative adapter. Add languages through adapters, not pipeline branches.
 - ZIP preflight creates temporary plugin records only. A mode-tagged core attempt is created after every challenge answer is finalized, not at upload time; formative attempts remain review-only and summative attempts are gradeable.
-- Student view is inspection-only for this plugin until an expiring non-academic upload workspace exists; never emulate preview by creating and deleting normal preflight/submission records.
+- The definition declares `studentView: { mode: "read_only" }` until an expiring non-academic upload workspace exists; never emulate preview by creating and deleting normal preflight/submission records.
 - Final-submission processing is idempotent, background-job based, append-audited, and replace-on-reprocess for derived functions/questions.
 - Released teacher-entered grades/feedback are challengeable through core; review must return to the plugin's existing manual-grading surface and audited override path.
 - Teacher submission review and grading consume core course capabilities: explicit course teachers/admins work course-wide, while section teachers/TAs are restricted to their assigned groups. Assignment authoring, snapshots, and grade release remain course-management operations.

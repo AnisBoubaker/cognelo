@@ -13,7 +13,8 @@ import {
   listCoreActivityDefinitions,
   listActivityDefinitions,
   listActivityPlugins,
-  listPluginDatabaseModules
+  listPluginDatabaseModules,
+  validateStudentViewClientContracts
 } from "./index";
 
 describe("activity SDK registry", () => {
@@ -54,8 +55,28 @@ describe("activity SDK registry", () => {
     expect(messages?.name).toBeTruthy();
     expect(messages?.description).toBeTruthy();
 
-    const fallback = getActivityMessages({ key: "x", name: "Fallback", description: "Default" }, "zh");
+    const fallback = getActivityMessages({ key: "x", name: "Fallback", description: "Default", studentView: { mode: "unsupported" } }, "zh");
     expect(fallback).toEqual({ name: "Fallback", description: "Default", defaultTitle: "Fallback" });
+  });
+
+  it("requires explicit, fail-closed Student view renderer registrations", () => {
+    const definitions = listActivityDefinitions();
+    expect(getActivityDefinition("mcq")?.studentView).toEqual({ mode: "interactive", execution: "plugin" });
+    expect(getActivityDefinition("test")?.studentView).toEqual({ mode: "interactive", execution: "core" });
+    expect(getActivityDefinition("coding-homework-grader")?.studentView).toEqual({ mode: "read_only" });
+    expect(getActivityDefinition("placeholder")?.studentView).toEqual({ mode: "unsupported" });
+
+    expect(() => validateStudentViewClientContracts({
+      definitions,
+      interactiveActivityTypeKeys: ["test", "coding-exercise", "parsons-problem", "web-design-coding-exercise"],
+      testItemActivityTypeKeys: ["coding-exercise", "mcq", "parsons-problem", "web-design-coding-exercise"]
+    })).toThrow("Interactive activity type is missing a Student view renderer: mcq");
+
+    expect(() => validateStudentViewClientContracts({
+      definitions,
+      interactiveActivityTypeKeys: ["test", "coding-exercise", "mcq", "parsons-problem", "placeholder", "web-design-coding-exercise"],
+      testItemActivityTypeKeys: ["coding-exercise", "mcq", "parsons-problem", "web-design-coding-exercise"]
+    })).toThrow("Non-interactive activity type has a Student view renderer: placeholder");
   });
 
   it("marks all-category activities and explicit category assignments", () => {

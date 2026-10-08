@@ -5,6 +5,7 @@ import { parsonsServerPlugin } from "@cognelo/plugin-parsons/server";
 import { placeholderServerPlugin } from "@cognelo/plugin-placeholder/server";
 import { mcqServerPlugin } from "@cognelo/plugin-mcq/server";
 import { webDesignCodingExercisesServerPlugin } from "@cognelo/plugin-web-design-coding-exercises/server";
+import type { ActivityDefinition } from "./index";
 
 export type ServerActivityRecord = {
   id: string;
@@ -360,6 +361,50 @@ const serverPlugins: readonly ServerActivityPlugin[] = [
   codingExercisesServerPlugin,
   webDesignCodingExercisesServerPlugin
 ];
+
+export function validateStudentPreviewServerContracts(
+  definitions: readonly Pick<ActivityDefinition, "key" | "studentView">[],
+  plugins: readonly ServerActivityPlugin[]
+) {
+  const definitionsByKey = new Map(definitions.map((definition) => [definition.key, definition]));
+  const previewPluginByActivityType = new Map<string, string>();
+
+  for (const plugin of plugins) {
+    const preview = plugin.studentPreview;
+    if (!preview) continue;
+    if (!Object.keys(preview.actions).length) {
+      throw new Error(`Student view server registration has no actions: ${plugin.key}`);
+    }
+    for (const activityTypeKey of preview.activityTypeKeys) {
+      const definition = definitionsByKey.get(activityTypeKey);
+      if (!definition) {
+        throw new Error(`Student view server registration references an unknown activity type: ${activityTypeKey}`);
+      }
+      if (definition.studentView.mode !== "interactive" || definition.studentView.execution !== "plugin") {
+        throw new Error(`Activity type cannot register plugin Student view actions: ${activityTypeKey}`);
+      }
+      const existingPlugin = previewPluginByActivityType.get(activityTypeKey);
+      if (existingPlugin) {
+        throw new Error(`Activity type has duplicate Student view server registrations: ${activityTypeKey} (${existingPlugin}, ${plugin.key})`);
+      }
+      previewPluginByActivityType.set(activityTypeKey, plugin.key);
+    }
+  }
+
+  for (const definition of definitions) {
+    if (
+      definition.studentView.mode === "interactive"
+      && definition.studentView.execution === "plugin"
+      && !previewPluginByActivityType.has(definition.key)
+    ) {
+      throw new Error(`Interactive plugin activity type is missing Student view server actions: ${definition.key}`);
+    }
+  }
+}
+
+export function listServerActivityPlugins() {
+  return [...serverPlugins];
+}
 
 function normalizePath(path: string | readonly string[]) {
   const segments: readonly string[] = typeof path === "string" ? path.split("/") : path;

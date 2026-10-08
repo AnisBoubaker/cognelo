@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   getAssignedGroupActivityAttemptSource,
+  listServerActivityPlugins,
   listPluginRoutes,
   resolveCompositeExecutionActionHandler,
   resolveCompositeExecutionSubmissionHandler,
@@ -12,6 +13,7 @@ import {
   resolvePluginAiGradingBatchHandler,
   resolvePluginRoute,
   resolveStudentPreviewExecutionHandler,
+  validateStudentPreviewServerContracts,
   runBankActivityDeletedHooks,
   runBankActivityDeletedHooksForPlugins,
   runActivityAttemptDeletedHooksForPlugins,
@@ -20,6 +22,7 @@ import {
   type ServerActivityRecord,
   type ServerActivityPlugin
 } from "./server";
+import { listActivityDefinitions } from "./index";
 
 const user = {
   id: "user-1",
@@ -45,6 +48,13 @@ const activity: ServerActivityRecord = {
 };
 
 describe("server activity SDK", () => {
+  it("keeps every registered activity's Student view server contract consistent", () => {
+    expect(() => validateStudentPreviewServerContracts(
+      listActivityDefinitions(),
+      listServerActivityPlugins()
+    )).not.toThrow();
+  });
+
   it("extracts assigned group activity attempt source from plugin route context", () => {
     expect(
       getAssignedGroupActivityAttemptSource({
@@ -138,6 +148,26 @@ describe("server activity SDK", () => {
     expect(resolveStudentPreviewExecutionHandler("coding-exercise", "submit")).toBeTypeOf("function");
     expect(resolveStudentPreviewExecutionHandler("mcq", "feedback")).toBeTypeOf("function");
     expect(resolveStudentPreviewExecutionHandler("placeholder", "submit")).toBeNull();
+  });
+
+  it("rejects missing, mismatched, and duplicate Student view server registrations", () => {
+    const definition = { key: "interactive", studentView: { mode: "interactive", execution: "plugin" } } as const;
+    const handler = vi.fn(async () => ({}));
+
+    expect(() => validateStudentPreviewServerContracts([definition], [])).toThrow(
+      "Interactive plugin activity type is missing Student view server actions: interactive"
+    );
+    expect(() => validateStudentPreviewServerContracts(
+      [{ key: "read-only", studentView: { mode: "read_only" } }],
+      [{ key: "plugin", studentPreview: { activityTypeKeys: ["read-only"], actions: { submit: handler } } }]
+    )).toThrow("Activity type cannot register plugin Student view actions: read-only");
+    expect(() => validateStudentPreviewServerContracts(
+      [definition],
+      [
+        { key: "first", studentPreview: { activityTypeKeys: ["interactive"], actions: { submit: handler } } },
+        { key: "second", studentPreview: { activityTypeKeys: ["interactive"], actions: { submit: handler } } }
+      ]
+    )).toThrow("Activity type has duplicate Student view server registrations: interactive");
   });
 
   it("resolves bank variation handlers for every Test-capable activity plugin", () => {
