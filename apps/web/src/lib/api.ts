@@ -551,6 +551,27 @@ export type CourseContentItem = {
   metadata?: Record<string, unknown>;
 };
 
+export type ActivityDeletionImpact = {
+  activityId: string;
+  title: string;
+  recordedAttemptCount: number;
+};
+
+export type CourseContentDeletionActivity = ActivityDeletionImpact & {
+  activityTypeKey: string;
+  isTest: boolean;
+  testItems: Array<{ activityId: string; activityTypeKey: string }>;
+};
+
+export type CourseContentItemDeletionImpact = {
+  contentItemId: string;
+  kind: CourseContentItem["kind"];
+  parentId: string | null;
+  activities: CourseContentDeletionActivity[];
+  blockedActivities: CourseContentDeletionActivity[];
+  preservedActivityContentItemIds: string[];
+};
+
 export type CourseGroup = {
   id: string;
   title: string;
@@ -2319,13 +2340,21 @@ export const api = {
     request<{ ok: true }>(`/courses/${courseId}/content/${contentItemId}`, {
       method: "DELETE"
     }),
+  contentItemDeletionImpact: (courseId: string, contentItemId: string) =>
+    request<{ impact: CourseContentItemDeletionImpact }>(
+      `/courses/${courseId}/content/${contentItemId}/deletion-impact`
+    ),
   updateActivity: (courseId: string, activityId: string, input: ActivityUpdate) =>
     request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}`, {
       method: "PATCH",
       body: JSON.stringify(input)
     }),
-  deleteActivity: (courseId: string, activityId: string) =>
-    request<{ ok: true }>(`/courses/${courseId}/activities/${activityId}`, {
+  activityDeletionImpact: (courseId: string, activityId: string) =>
+    request<{ impact: ActivityDeletionImpact }>(
+      `/courses/${courseId}/activities/${activityId}/deletion-impact`
+    ),
+  deleteActivity: (courseId: string, activityId: string, options: { confirmRecordedAttempts?: boolean } = {}) =>
+    request<{ ok: true }>(`/courses/${courseId}/activities/${activityId}${options.confirmRecordedAttempts ? "?confirmRecordedAttempts=true" : ""}`, {
       method: "DELETE"
     }),
   deleteMaterial: (courseId: string, materialId: string) =>

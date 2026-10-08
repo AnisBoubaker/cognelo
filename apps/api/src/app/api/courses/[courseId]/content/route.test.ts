@@ -5,10 +5,12 @@ const mocks = vi.hoisted(() => ({
   createContentFolder: vi.fn(),
   createMaterialContentItem: vi.fn(),
   deleteContentItem: vi.fn(),
+  getCourseContentItemDeletionImpact: vi.fn(),
   listContentItems: vi.fn(),
   readJson: vi.fn(),
   requireUser: vi.fn(),
-  updateContentItem: vi.fn()
+  updateContentItem: vi.fn(),
+  runCourseActivityDeletionHooks: vi.fn()
 }));
 
 vi.mock("@cognelo/core", () => ({
@@ -16,8 +18,13 @@ vi.mock("@cognelo/core", () => ({
   createContentFolder: mocks.createContentFolder,
   createMaterialContentItem: mocks.createMaterialContentItem,
   deleteContentItem: mocks.deleteContentItem,
+  getCourseContentItemDeletionImpact: mocks.getCourseContentItemDeletionImpact,
   listContentItems: mocks.listContentItems,
   updateContentItem: mocks.updateContentItem
+}));
+
+vi.mock("@/lib/course-activity-deletion", () => ({
+  runCourseActivityDeletionHooks: mocks.runCourseActivityDeletionHooks
 }));
 
 vi.mock("@/lib/http", () => ({
@@ -33,6 +40,7 @@ const folderRoute = await import("./folders/route");
 const materialRoute = await import("./materials/route");
 const activityRoute = await import("./activities/route");
 const itemRoute = await import("./[contentItemId]/route");
+const deletionImpactRoute = await import("./[contentItemId]/deletion-impact/route");
 
 const params = { params: Promise.resolve({ courseId: "course-1" }) };
 
@@ -46,6 +54,12 @@ describe("course content routes", () => {
     mocks.createActivityContentItem.mockResolvedValue({ id: "activity-item-1" });
     mocks.updateContentItem.mockResolvedValue({ id: "item-1", isVisible: false });
     mocks.deleteContentItem.mockResolvedValue({ ok: true });
+    mocks.getCourseContentItemDeletionImpact.mockResolvedValue({
+      contentItemId: "item-1",
+      kind: "content",
+      activities: [],
+      blockedActivities: []
+    });
   });
 
   it("lists course content items and forwards visible-only filtering", async () => {
@@ -104,5 +118,69 @@ describe("course content routes", () => {
       { isVisible: false }
     );
     expect(mocks.deleteContentItem).toHaveBeenCalledWith({ id: "teacher-1", roles: ["teacher"] }, "course-1", "item-1");
+  });
+
+  it("reports folder deletion impact and runs activity cleanup hooks before an allowed batch", async () => {
+    const impact = {
+      contentItemId: "folder-1",
+      kind: "folder",
+      blockedActivities: [],
+      activities: [{
+        activityId: "activity-1",
+        activityTypeKey: "mcq",
+        isTest: false,
+        title: "Loops",
+        recordedAttemptCount: 0,
+        testItems: []
+      }]
+    };
+    mocks.getCourseContentItemDeletionImpact.mockResolvedValue(impact);
+    const itemParams = { params: Promise.resolve({ courseId: "course-1", contentItemId: "folder-1" }) };
+
+    const impactResponse = await deletionImpactRoute.GET(new Request("http://test.local"), itemParams);
+    await expect(impactResponse.json()).resolves.toEqual({ impact });
+
+    await itemRoute.DELETE(new Request("http://test.local") as never, itemParams);
+    expect(mocks.runCourseActivityDeletionHooks).toHaveBeenCalledWith(
+      { id: "teacher-1", roles: ["teacher"] },
+      "course-1",
+      impact.activities[0]
+    );
+    expect(mocks.deleteContentItem).toHaveBeenCalledWith(
+      { id: "teacher-1", roles: ["teacher"] },
+      "course-1",
+      "folder-1"
+    );
+  });
+
+  it("does not run activity cleanup hooks when any folder activity has recorded attempts", async () => {
+    const protectedActivity = {
+      activityId: "activity-1",
+      activityTypeKey: "mcq",
+      isTest: false,
+      title: "Loops",
+      recordedAttemptCount: 2,
+      testItems: []
+    };
+    mocks.getCourseContentItemDeletionImpact.mockResolvedValue({
+      contentItemId: "folder-1",
+      kind: "folder",
+      blockedActivities: [protectedActivity],
+      activities: [protectedActivity]
+    });
+    mocks.deleteContentItem.mockRejectedValueOnce(Object.assign(
+      new Error("This folder contains activities with recorded attempts."),
+      { code: "CONTENT_FOLDER_ACTIVITIES_HAVE_ATTEMPTS", status: 409 }
+    ));
+
+    await expect(itemRoute.DELETE(
+      new Request("http://test.local") as never,
+      { params: Promise.resolve({ courseId: "course-1", contentItemId: "folder-1" }) }
+    )).rejects.toMatchObject({
+      code: "CONTENT_FOLDER_ACTIVITIES_HAVE_ATTEMPTS",
+      status: 409
+    });
+
+    expect(mocks.runCourseActivityDeletionHooks).not.toHaveBeenCalled();
   });
 });

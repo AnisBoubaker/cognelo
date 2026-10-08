@@ -869,21 +869,60 @@ export default function CourseDetailPage() {
 
   async function removeContentItem(item: CourseContentItem) {
     const title = contentItemTitle(item);
-    const confirmed = await dialogs.confirm({
-      message: t("courseDetail.removeContentItemConfirm", { title }),
-      confirmLabel: t("common.remove"),
-      confirmVariant: "danger"
-    });
-    if (!confirmed) {
-      return;
-    }
-
     setMaterialActionError("");
     try {
+      if (item.kind === "folder") {
+        const { impact } = await api.contentItemDeletionImpact(courseId, item.id);
+        if (impact.blockedActivities.length) {
+          await dialogs.alert({
+            title: t("courseDetail.folderDeleteBlockedTitle"),
+            confirmLabel: t("common.close"),
+            message: (
+              <div className="stack">
+                <p>{t("courseDetail.folderDeleteBlockedMessage")}</p>
+                <ul>
+                  {impact.blockedActivities.map((activity) => (
+                    <li key={activity.activityId}>
+                      {activity.title} — {t("courseDetail.recordedAttemptCount", { count: activity.recordedAttemptCount })}
+                    </li>
+                  ))}
+                </ul>
+                <p>{t("courseDetail.folderDeleteBlockedHelp")}</p>
+              </div>
+            )
+          });
+          return;
+        }
+      }
+
+      let confirmRecordedAttempts = false;
+      if (!contentGroup && item.activityId) {
+        const { impact } = await api.activityDeletionImpact(courseId, item.activityId);
+        if (impact.recordedAttemptCount > 0) {
+          confirmRecordedAttempts = await dialogs.confirm({
+            title: t("courseDetail.activityAttemptsWarningTitle"),
+            message: t("courseDetail.activityAttemptsWarningMessage", {
+              count: impact.recordedAttemptCount,
+              title: impact.title
+            }),
+            confirmLabel: t("courseDetail.continueToDeleteConfirmation"),
+            confirmVariant: "danger"
+          });
+          if (!confirmRecordedAttempts) return;
+        }
+      }
+
+      const confirmed = await dialogs.confirm({
+        message: t("courseDetail.removeContentItemConfirm", { title }),
+        confirmLabel: t("common.remove"),
+        confirmVariant: "danger"
+      });
+      if (!confirmed) return;
+
       if (contentGroup && item.courseGroupActivityId) {
         await api.deleteGroupActivityAssignment(courseId, contentGroup.id, item.courseGroupActivityId);
       } else if (item.activityId) {
-        await api.deleteActivity(courseId, item.activityId);
+        await api.deleteActivity(courseId, item.activityId, { confirmRecordedAttempts });
       } else if (item.materialId) {
         if (contentGroup && item.groupId && groupMaterialById.has(item.materialId)) {
           await api.deleteGroupMaterial(courseId, contentGroup.id, item.materialId);

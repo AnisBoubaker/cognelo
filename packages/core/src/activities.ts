@@ -591,7 +591,42 @@ async function resolveEnabledActivityTypeId(activityTypeKey: string) {
   return activityType.id;
 }
 
-export async function deleteActivity(user: CurrentUser, courseId: string, activityId: string) {
+export type ActivityDeletionImpact = {
+  activityId: string;
+  title: string;
+  recordedAttemptCount: number;
+};
+
+export async function getActivityDeletionImpact(
+  user: CurrentUser,
+  courseId: string,
+  activityId: string
+): Promise<ActivityDeletionImpact> {
+  await assertCanManageCourse(user, courseId);
+  const activity = await prisma.activity.findFirst({
+    where: { id: activityId, courseId },
+    select: {
+      id: true,
+      title: true,
+      _count: { select: { activityAttempts: true } }
+    }
+  });
+  if (!activity) {
+    throw notFound("Activity");
+  }
+  return {
+    activityId: activity.id,
+    title: activity.title,
+    recordedAttemptCount: activity._count.activityAttempts
+  };
+}
+
+export async function deleteActivity(
+  user: CurrentUser,
+  courseId: string,
+  activityId: string,
+  options: { confirmRecordedAttempts?: boolean } = {}
+) {
   await assertCanManageCourse(user, courseId);
   const activity = await prisma.activity.findFirst({ where: { id: activityId, courseId }, include: { testItem: true } });
   if (!activity) {
@@ -599,6 +634,15 @@ export async function deleteActivity(user: CurrentUser, courseId: string, activi
   }
   if (activity.testItem) {
     throw new AppError(409, "TEST_ITEM_ACTIVITY_OWNED", "Remove this activity from its Test instead.");
+  }
+  const recordedAttemptCount = await prisma.activityAttempt.count({ where: { activityId } });
+  if (recordedAttemptCount > 0 && options.confirmRecordedAttempts !== true) {
+    throw new AppError(
+      409,
+      "ACTIVITY_RECORDED_ATTEMPTS_CONFIRMATION_REQUIRED",
+      "This activity has recorded attempts. Confirm their permanent deletion before deleting the activity.",
+      { activityId, title: activity.title, recordedAttemptCount }
+    );
   }
   await prisma.activity.delete({ where: { id: activityId } });
   return { ok: true };

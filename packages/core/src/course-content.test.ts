@@ -4,6 +4,7 @@ import type { CurrentUser } from "@cognelo/contracts";
 const mockPrisma = vi.hoisted(() => ({
   $transaction: vi.fn(),
   activity: {
+    deleteMany: vi.fn(),
     findFirst: vi.fn()
   },
   courseContentItem: {
@@ -12,7 +13,8 @@ const mockPrisma = vi.hoisted(() => ({
     delete: vi.fn(),
     findFirst: vi.fn(),
     findMany: vi.fn(),
-    update: vi.fn()
+    update: vi.fn(),
+    updateMany: vi.fn()
   },
   courseContentResource: {
     create: vi.fn(),
@@ -112,6 +114,7 @@ describe("course content services", () => {
     vi.clearAllMocks();
     mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof mockPrisma) => unknown) => handler(mockPrisma));
     mockPrisma.courseContentItem.count.mockResolvedValue(0);
+    mockPrisma.courseContentItem.findMany.mockResolvedValue([]);
     mockPrisma.courseGroupContentVisibilityOverride.findMany.mockResolvedValue([]);
     authMocks.canManageCourse.mockResolvedValue(true);
     pluginMocks.assertContentResourcePluginActive.mockResolvedValue(undefined);
@@ -816,5 +819,109 @@ describe("course content services", () => {
 
     await expect(deleteContentItem(teacherUser, "course-1", "item-1")).resolves.toEqual({ ok: true });
     expect(mockPrisma.courseContentItem.delete).toHaveBeenCalledWith({ where: { id: "item-1" } });
+  });
+
+  it("blocks folder batch deletion and reports every contained activity with recorded attempts", async () => {
+    mockPrisma.courseContentItem.findFirst.mockResolvedValue({ id: "folder-1", kind: "folder" });
+    mockPrisma.courseContentItem.findMany.mockResolvedValue([
+      { id: "nested-folder", parentId: "folder-1", activity: null },
+      {
+        id: "activity-item-1",
+        parentId: "nested-folder",
+        activity: {
+          id: "activity-1",
+          title: "Loops",
+          activityType: { key: "parsons-problem" },
+          _count: { activityAttempts: 2 },
+          testDefinition: null
+        }
+      },
+      {
+        id: "activity-item-2",
+        parentId: "folder-1",
+        activity: {
+          id: "activity-2",
+          title: "Branches",
+          activityType: { key: "mcq" },
+          _count: { activityAttempts: 1 },
+          testDefinition: null
+        }
+      }
+    ]);
+
+    await expect(deleteContentItem(teacherUser, "course-1", "folder-1")).rejects.toMatchObject({
+      status: 409,
+      code: "CONTENT_FOLDER_ACTIVITIES_HAVE_ATTEMPTS",
+      details: {
+        activities: [
+          { activityId: "activity-1", title: "Loops", recordedAttemptCount: 2 },
+          { activityId: "activity-2", title: "Branches", recordedAttemptCount: 1 }
+        ]
+      }
+    });
+    expect(mockPrisma.activity.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.courseContentItem.delete).not.toHaveBeenCalled();
+  });
+
+  it("batch-deletes contained no-attempt activities and Test children before deleting a folder", async () => {
+    mockPrisma.courseContentItem.findFirst.mockResolvedValue({ id: "folder-1", kind: "folder" });
+    mockPrisma.courseContentItem.findMany.mockResolvedValue([
+      {
+        id: "activity-item-1",
+        parentId: "folder-1",
+        activity: {
+          id: "test-activity",
+          title: "Quiz",
+          activityType: { key: "test" },
+          _count: { activityAttempts: 0 },
+          testDefinition: {
+            items: [{ activity: { id: "test-child-1", activityType: { key: "mcq" } } }]
+          }
+        }
+      }
+    ]);
+
+    await expect(deleteContentItem(teacherUser, "course-1", "folder-1")).resolves.toEqual({ ok: true });
+    expect(mockPrisma.activity.deleteMany).toHaveBeenNthCalledWith(1, {
+      where: { id: { in: ["test-child-1"] } }
+    });
+    expect(mockPrisma.activity.deleteMany).toHaveBeenNthCalledWith(2, {
+      where: { id: { in: ["test-activity"] } }
+    });
+    expect(mockPrisma.courseContentItem.delete).toHaveBeenCalledWith({ where: { id: "folder-1" } });
+  });
+
+  it("preserves a stale group placement when the shared activity was moved outside the deleted folder", async () => {
+    mockPrisma.courseContentItem.findFirst.mockResolvedValue({ id: "folder-1", kind: "folder", parentId: "unit-1" });
+    const activity = {
+      id: "activity-1",
+      title: "Loops",
+      activityType: { key: "mcq" },
+      _count: { activityAttempts: 0 },
+      testDefinition: null
+    };
+    mockPrisma.courseContentItem.findMany.mockResolvedValue([
+      { id: "shared-placement", parentId: null, groupId: null, activity },
+      { id: "stale-group-placement", parentId: "folder-1", groupId: "group-1", activity }
+    ]);
+
+    await expect(deleteContentItem(teacherUser, "course-1", "folder-1")).resolves.toEqual({ ok: true });
+
+    expect(mockPrisma.courseContentItem.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["stale-group-placement"] } },
+      data: { parentId: "unit-1" }
+    });
+    expect(mockPrisma.activity.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.courseContentItem.delete).toHaveBeenCalledWith({ where: { id: "folder-1" } });
+  });
+
+  it("rejects deleting only an activity placement", async () => {
+    mockPrisma.courseContentItem.findFirst.mockResolvedValue({ id: "activity-item-1", kind: "activity" });
+
+    await expect(deleteContentItem(teacherUser, "course-1", "activity-item-1")).rejects.toMatchObject({
+      status: 409,
+      code: "ACTIVITY_CONTENT_DELETE_REQUIRES_ACTIVITY_DELETE"
+    });
+    expect(mockPrisma.courseContentItem.delete).not.toHaveBeenCalled();
   });
 });

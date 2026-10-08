@@ -260,6 +260,91 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     await expect(page.getByText(/rawScore|rawResult|selectedAttemptId/)).toHaveCount(0);
   });
 
+  test("teacher cannot batch-delete a folder containing an activity with attempts and gets a separate individual warning", async ({
+    teacherPage: page
+  }) => {
+    if (!data) throw new Error("The activity suite was not provisioned.");
+    const folderTitle = `E2E protected attempts ${data.token}`;
+    const teacherApi = await createAuthenticatedApi("teacher");
+    let folderId = "";
+    let contentItemId = "";
+    try {
+      const contentResponse = await teacherApi.get(`/api/courses/${data.courseId}/content`);
+      expect(contentResponse.ok()).toBeTruthy();
+      const content = await contentResponse.json() as {
+        contentItems: Array<{ id: string; activityId?: string | null }>;
+      };
+      contentItemId = content.contentItems.find((item) => item.activityId === activityId)?.id ?? "";
+      expect(contentItemId).not.toBe("");
+
+      const folderResponse = await teacherApi.post(`/api/courses/${data.courseId}/content/folders`, {
+        data: { title: folderTitle }
+      });
+      expect(folderResponse.ok()).toBeTruthy();
+      folderId = ((await folderResponse.json()) as { contentItem: { id: string } }).contentItem.id;
+
+      const moved = await teacherApi.patch(`/api/courses/${data.courseId}/content/${contentItemId}`, {
+        data: { parentId: folderId }
+      });
+      expect(moved.ok()).toBeTruthy();
+
+      const bypassAttempt = await teacherApi.delete(`/api/courses/${data.courseId}/content/${folderId}`);
+      expect(bypassAttempt.status()).toBe(409);
+      const bypassError = await bypassAttempt.json() as {
+        error: {
+          code: string;
+          details: { activities: Array<{ activityId: string; title: string; recordedAttemptCount: number }> };
+        };
+      };
+      expect(bypassError).toMatchObject({
+        error: {
+          code: "CONTENT_FOLDER_ACTIVITIES_HAVE_ATTEMPTS",
+          details: {
+            activities: [
+              {
+                activityId,
+                title: activityTitle
+              }
+            ]
+          }
+        }
+      });
+      const recordedAttemptCount = bypassError.error.details.activities[0]?.recordedAttemptCount ?? 0;
+      expect(recordedAttemptCount).toBeGreaterThan(0);
+
+      await page.goto(`/courses/${data.courseId}?tab=content`);
+      await page.getByRole("button", { name: `Actions for ${folderTitle}` }).click();
+      await page.getByRole("menuitem", { name: "Remove", exact: true }).click();
+      const folderWarning = page.getByRole("dialog", { name: "Folder cannot be deleted" });
+      await expect(folderWarning).toContainText(activityTitle);
+      await expect(folderWarning).toContainText(`${recordedAttemptCount} recorded attempt(s)`);
+      await expect(folderWarning.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+      await folderWarning.getByRole("button", { name: "Close", exact: true }).click();
+      await expect(page.getByText(folderTitle, { exact: true })).toBeVisible();
+
+      await page.getByRole("button", { name: `Actions for ${activityTitle}` }).click();
+      await page.getByRole("menuitem", { name: "Remove", exact: true }).click();
+      const attemptWarning = page.getByRole("dialog", { name: "This activity has recorded attempts" });
+      await expect(attemptWarning).toContainText(`${recordedAttemptCount} recorded attempt(s)`);
+      await attemptWarning.getByRole("button", { name: "Continue", exact: true }).click();
+
+      const ordinaryConfirmation = page.getByRole("dialog", { name: "Please confirm" });
+      await expect(ordinaryConfirmation).toContainText(`Delete "${activityTitle}" from this course?`);
+      await ordinaryConfirmation.getByRole("button", { name: "Cancel", exact: true }).click();
+      await expect(page.getByText(activityTitle, { exact: true })).toBeVisible();
+    } finally {
+      if (contentItemId) {
+        await teacherApi.patch(`/api/courses/${data.courseId}/content/${contentItemId}`, {
+          data: { parentId: null }
+        });
+      }
+      if (folderId) {
+        await teacherApi.delete(`/api/courses/${data.courseId}/content/${folderId}`);
+      }
+      await teacherApi.dispose();
+    }
+  });
+
   test("teacher adds and removes a pending TA participant through the group UI", async ({ teacherPage: page }) => {
     if (!data) throw new Error("The activity suite was not provisioned.");
     const email = `e2e-pending-ta-${data.token}@example.invalid`;

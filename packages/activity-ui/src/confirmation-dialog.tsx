@@ -7,7 +7,7 @@ export type ConfirmationDialogProps = {
   title: string;
   message: ReactNode;
   confirmLabel: string;
-  cancelLabel: string;
+  cancelLabel?: string;
   eyebrow?: string;
   confirmVariant?: "default" | "danger";
   confirmDisabled?: boolean;
@@ -80,9 +80,11 @@ export function ConfirmationDialog({
           <div className="muted">{message}</div>
         </div>
         <div className="dialog-actions">
-          <button className="secondary" disabled={isConfirming} type="button" onClick={onCancel}>
-            {cancelLabel}
-          </button>
+          {cancelLabel ? (
+            <button className="secondary" disabled={isConfirming} type="button" onClick={onCancel}>
+              {cancelLabel}
+            </button>
+          ) : null}
           <button
             ref={confirmButtonRef}
             className={confirmVariant === "danger" ? "danger" : undefined}

@@ -22,6 +22,7 @@ const mockPrisma = vi.hoisted(() => ({
   $transaction: vi.fn(async (handler: (transaction: typeof tx) => unknown) => handler(tx)),
   activity: {
     create: vi.fn(),
+    delete: vi.fn(),
     findFirst: vi.fn(),
     update: vi.fn()
   },
@@ -66,7 +67,7 @@ vi.mock("@cognelo/activity-sdk", () => ({
 vi.mock("./authorization", () => authMocks);
 vi.mock("./plugins", () => pluginMocks);
 
-const { createActivity, deleteActivity, getActivity, listActivities } = await import("./activities");
+const { createActivity, deleteActivity, getActivity, getActivityDeletionImpact, listActivities } = await import("./activities");
 const { updateActivity } = await import("./activities");
 
 const teacherUser: CurrentUser = {
@@ -323,6 +324,42 @@ describe("activity services", () => {
     await expect(deleteActivity(teacherUser, "course-1", "activity-1")).rejects.toMatchObject({
       status: 404,
       code: "NOT_FOUND"
+    });
+  });
+
+  it("requires an explicit second-stage confirmation before deleting recorded attempts", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      title: "Loops",
+      courseId: "course-1",
+      testItem: null
+    });
+    mockPrisma.activityAttempt.count.mockResolvedValue(3);
+
+    await expect(deleteActivity(teacherUser, "course-1", "activity-1")).rejects.toMatchObject({
+      status: 409,
+      code: "ACTIVITY_RECORDED_ATTEMPTS_CONFIRMATION_REQUIRED",
+      details: { activityId: "activity-1", title: "Loops", recordedAttemptCount: 3 }
+    });
+    expect(mockPrisma.activity.delete).not.toHaveBeenCalled();
+
+    await expect(deleteActivity(teacherUser, "course-1", "activity-1", {
+      confirmRecordedAttempts: true
+    })).resolves.toEqual({ ok: true });
+    expect(mockPrisma.activity.delete).toHaveBeenCalledWith({ where: { id: "activity-1" } });
+  });
+
+  it("reports recorded attempts before the activity deletion workflow starts", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      title: "Loops",
+      _count: { activityAttempts: 2 }
+    });
+
+    await expect(getActivityDeletionImpact(teacherUser, "course-1", "activity-1")).resolves.toEqual({
+      activityId: "activity-1",
+      title: "Loops",
+      recordedAttemptCount: 2
     });
   });
 

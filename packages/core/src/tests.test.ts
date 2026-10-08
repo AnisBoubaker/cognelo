@@ -33,7 +33,7 @@ vi.mock("@cognelo/activity-sdk", () => ({
   getActivityProviderForActivityType: vi.fn(() => ({ kind: "plugin", key: "mcq" }))
 }));
 
-const { createTest, createTestItem, duplicateTest, updateTestItem } = await import("./tests");
+const { createTest, createTestItem, deleteTest, duplicateTest, updateTestItem } = await import("./tests");
 
 const teacher: CurrentUser = {
   id: "teacher-1",
@@ -70,6 +70,23 @@ describe("Test authoring services", () => {
     expect(tx.courseContentItem.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ activityId: "activity-test", kind: "activity", titleSnapshot: "Midterm", isVisible: true })
     });
+  });
+
+  it("requires explicit confirmation before deleting a Test with recorded attempts", async () => {
+    db.test.findFirst.mockResolvedValue({ id: "test-1", items: [] });
+    db.activityAttempt.count.mockResolvedValue(2);
+
+    await expect(deleteTest(teacher, "course-1", "activity-test")).rejects.toMatchObject({
+      status: 409,
+      code: "ACTIVITY_RECORDED_ATTEMPTS_CONFIRMATION_REQUIRED",
+      details: { activityId: "activity-test", recordedAttemptCount: 2 }
+    });
+    expect(tx.activity.delete).not.toHaveBeenCalled();
+
+    await expect(deleteTest(teacher, "course-1", "activity-test", {
+      confirmRecordedAttempts: true
+    })).resolves.toEqual({ ok: true });
+    expect(tx.activity.delete).toHaveBeenCalledWith({ where: { id: "activity-test" } });
   });
 
   it("creates a contained local plugin activity as a Test item", async () => {
