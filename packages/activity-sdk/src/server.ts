@@ -353,14 +353,19 @@ export function getAssignedGroupActivityAttemptSource(context: PluginRouteContex
   };
 }
 
-const serverPlugins: readonly ServerActivityPlugin[] = [
-  placeholderServerPlugin,
-  codingHomeworkGraderServerPlugin,
-  parsonsServerPlugin,
-  mcqServerPlugin,
-  codingExercisesServerPlugin,
-  webDesignCodingExercisesServerPlugin
-];
+// Rebuild the list from live ESM bindings whenever it is used. Development hot
+// reload can replace one plugin module without re-evaluating this SDK module;
+// retaining a one-time array would then dispatch through the stale plugin object.
+function currentServerPlugins(): readonly ServerActivityPlugin[] {
+  return [
+    placeholderServerPlugin,
+    codingHomeworkGraderServerPlugin,
+    parsonsServerPlugin,
+    mcqServerPlugin,
+    codingExercisesServerPlugin,
+    webDesignCodingExercisesServerPlugin
+  ];
+}
 
 export function validateStudentPreviewServerContracts(
   definitions: readonly Pick<ActivityDefinition, "key" | "studentView">[],
@@ -403,7 +408,7 @@ export function validateStudentPreviewServerContracts(
 }
 
 export function listServerActivityPlugins() {
-  return [...serverPlugins];
+  return [...currentServerPlugins()];
 }
 
 function normalizePath(path: string | readonly string[]) {
@@ -414,7 +419,7 @@ function normalizePath(path: string | readonly string[]) {
 export function resolvePluginRoute(activityTypeKey: string, path: readonly string[]) {
   const normalizedPath = normalizePath(path);
 
-  for (const plugin of serverPlugins) {
+  for (const plugin of currentServerPlugins()) {
     for (const route of plugin.routes ?? []) {
       if (normalizePath(route.path) !== normalizedPath) {
         continue;
@@ -430,7 +435,7 @@ export function resolvePluginRoute(activityTypeKey: string, path: readonly strin
 }
 
 export function listPluginRoutes() {
-  return serverPlugins.flatMap((plugin) =>
+  return currentServerPlugins().flatMap((plugin) =>
     (plugin.routes ?? []).map((route) => ({
       pluginKey: plugin.key,
       path: normalizePath(route.path),
@@ -440,56 +445,56 @@ export function listPluginRoutes() {
 }
 
 export function resolvePluginGradingHandler(activityTypeKey: string) {
-  return serverPlugins.find((plugin) =>
+  return currentServerPlugins().find((plugin) =>
     plugin.grading?.gradeAttempt && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
   )?.grading?.gradeAttempt ?? null;
 }
 
 export function resolvePluginStudentGradeReportHandler(activityTypeKey: string) {
-  return serverPlugins.find((plugin) =>
+  return currentServerPlugins().find((plugin) =>
     plugin.studentGradeReport?.activityTypeKeys.includes(activityTypeKey)
   )?.studentGradeReport?.getReport ?? null;
 }
 
 export function resolvePluginGradeCompletionHandler(activityTypeKey: string) {
-  return serverPlugins.find((plugin) =>
+  return currentServerPlugins().find((plugin) =>
     plugin.gradeCompletion?.activityTypeKeys.includes(activityTypeKey)
   )?.gradeCompletion?.getCompletions ?? null;
 }
 
 export function resolvePluginAiFeedbackHandler(activityTypeKey: string) {
-  return serverPlugins.find((plugin) =>
+  return currentServerPlugins().find((plugin) =>
     plugin.aiFeedback?.evaluateAttempt && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
   )?.aiFeedback?.evaluateAttempt ?? null;
 }
 
 export function resolvePluginAiFeedbackTeacherReviewHandler(activityTypeKey: string) {
-  return serverPlugins.find((plugin) =>
+  return currentServerPlugins().find((plugin) =>
     plugin.aiFeedback?.teacherReview && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
   )?.aiFeedback?.teacherReview ?? null;
 }
 
 export function resolvePluginAiGradingBatchHandler(activityTypeKey: string) {
-  return serverPlugins.find((plugin) =>
+  return currentServerPlugins().find((plugin) =>
     plugin.aiFeedback?.batchGrading && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
   )?.aiFeedback?.batchGrading ?? null;
 }
 
 export function resolveCompositeExecutionSubmissionHandler(activityTypeKey: string) {
-  return serverPlugins.find((plugin) =>
+  return currentServerPlugins().find((plugin) =>
     plugin.compositeExecution?.activityTypeKeys.includes(activityTypeKey)
   )?.compositeExecution?.submit ?? null;
 }
 
 export function resolveCompositeExecutionActionHandler(activityTypeKey: string, action: string) {
-  const composite = serverPlugins.find((plugin) =>
+  const composite = currentServerPlugins().find((plugin) =>
     plugin.compositeExecution?.activityTypeKeys.includes(activityTypeKey)
   )?.compositeExecution;
   return composite?.actions?.[action] ?? null;
 }
 
 export function resolveStudentPreviewExecutionHandler(activityTypeKey: string, action: string) {
-  for (const plugin of serverPlugins) {
+  for (const plugin of currentServerPlugins()) {
     if (plugin.studentPreview?.activityTypeKeys.includes(activityTypeKey)) {
       return plugin.studentPreview.actions[action] ?? null;
     }
@@ -498,7 +503,7 @@ export function resolveStudentPreviewExecutionHandler(activityTypeKey: string, a
 }
 
 export function resolveBankActivityVariationHandler(activityTypeKey: string) {
-  return serverPlugins.find((plugin) =>
+  return currentServerPlugins().find((plugin) =>
     plugin.bankVariation?.activityTypeKeys.includes(activityTypeKey)
   )?.bankVariation?.createVariation ?? null;
 }
@@ -510,7 +515,7 @@ export async function runCourseActivityCreatedFromBankVersionHooks(input: {
   bankActivityId: string;
   activityVersionId: string;
 }) {
-  await runCourseActivityCreatedFromBankVersionHooksForPlugins(serverPlugins, input);
+  await runCourseActivityCreatedFromBankVersionHooksForPlugins(currentServerPlugins(), input);
 }
 
 export async function runCourseActivityCreatedFromBankVersionHooksForPlugins(
@@ -534,7 +539,7 @@ export async function runBankActivityDeletedHooks(input: {
   bankActivityId: string;
   activityTypeKey: string;
 }) {
-  await runBankActivityDeletedHooksForPlugins(serverPlugins, input);
+  await runBankActivityDeletedHooksForPlugins(currentServerPlugins(), input);
 }
 
 export async function runCourseActivityDeletedHooks(input: {
@@ -543,7 +548,7 @@ export async function runCourseActivityDeletedHooks(input: {
   activityId: string;
   activityTypeKey: string;
 }) {
-  await runCourseActivityDeletedHooksForPlugins(serverPlugins, input);
+  await runCourseActivityDeletedHooksForPlugins(currentServerPlugins(), input);
 }
 
 export async function runCourseActivityDuplicatedHooks(input: {
@@ -552,13 +557,13 @@ export async function runCourseActivityDuplicatedHooks(input: {
   sourceActivityId: string;
   activity: ServerActivityRecord;
 }) {
-  for (const plugin of serverPlugins) {
+  for (const plugin of currentServerPlugins()) {
     await plugin.hooks?.onCourseActivityDuplicated?.(input);
   }
 }
 
 export async function runCourseActivityPublishedToBankHooks(input: Parameters<CourseActivityPublishedToBankHook>[0]) {
-  for (const plugin of serverPlugins) {
+  for (const plugin of currentServerPlugins()) {
     await plugin.hooks?.onCourseActivityPublishedToBank?.(input);
   }
 }
@@ -592,7 +597,7 @@ export async function runBankActivityDeletedHooksForPlugins(
 }
 
 export async function runBankActivityDuplicatedHooks(input: Parameters<BankActivityDuplicatedHook>[0]) {
-  return runBankActivityDuplicatedHooksForPlugins(serverPlugins, input);
+  return runBankActivityDuplicatedHooksForPlugins(currentServerPlugins(), input);
 }
 
 export async function runBankActivityDuplicatedHooksForPlugins(
@@ -615,7 +620,7 @@ export async function runActivityAttemptDeletedHooks(input: {
   reason: string;
   deletedAt: Date | string;
 }) {
-  await runActivityAttemptDeletedHooksForPlugins(serverPlugins, input);
+  await runActivityAttemptDeletedHooksForPlugins(currentServerPlugins(), input);
 }
 
 export async function runActivityAttemptDeletedHooksForPlugins(

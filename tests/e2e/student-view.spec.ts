@@ -6,8 +6,10 @@ import { createCourseActivity, provisionActivitySuite, removeActivitySuite, resp
 test.describe.serial("teacher Student view", () => {
   let data: ActivitySuiteData | undefined;
   let activityId = "";
+  let codingActivityId = "";
   let parsonsActivityId = "";
   let title = "";
+  let codingTitle = "";
   let parsonsTitle = "";
 
   test.beforeAll(async () => {
@@ -39,11 +41,35 @@ test.describe.serial("teacher Student view", () => {
         stripIndentation: false
       }
     });
+    codingTitle = `E2E Student view coding ${data.token}`;
+    codingActivityId = await createCourseActivity(data, {
+      activityTypeKey: "coding-exercise",
+      description: "Run a programming exercise without recording a learner attempt.",
+      title: codingTitle,
+      config: {
+        executionMode: "template",
+        language: "python",
+        maxEditorSeconds: 1800,
+        prompt: "Print the exact text shown in the expected output.",
+        sampleTests: [{
+          containsLinesOrderMatters: false,
+          id: "sample-1",
+          input: "",
+          output: "Student view works\n",
+          outputMatchMode: "exact",
+          testCode: "",
+          title: "Print the expected text"
+        }],
+        starterCode: "print('Student view works')",
+        studentTemplateSource: "{{ STUDENT_CODE }}"
+      }
+    });
     const api = await createAuthenticatedApi("teacher");
     try {
       for (const [position, activity] of [
         { id: activityId, title },
-        { id: parsonsActivityId, title: parsonsTitle }
+        { id: parsonsActivityId, title: parsonsTitle },
+        { id: codingActivityId, title: codingTitle }
       ].entries()) {
         await responseJson(await api.post(`/api/courses/${data.courseId}/groups/${data.groupId}/activities`, {
           data: {
@@ -123,6 +149,32 @@ test.describe.serial("teacher Student view", () => {
       await api.dispose();
     }
     expect(await academicRecordCounts(data.courseId, data.groupId, parsonsActivityId)).toEqual(before);
+  });
+
+  test("runs a programming exercise through the Student view server registry", async ({ teacherPage }) => {
+    test.setTimeout(120_000);
+    if (!data) throw new Error("The activity suite was not provisioned.");
+    const api = await createAuthenticatedApi("teacher");
+    try {
+      const response = await api.post(
+        `/api/courses/${data.courseId}/groups/${data.groupId}/student-preview/activities/${codingActivityId}/actions/run`,
+        { data: {} }
+      );
+      const body = await response.text();
+      expect(body).not.toContain("STUDENT_PREVIEW_ACTION_UNAVAILABLE");
+      expect(response.status()).toBe(400);
+    } finally {
+      await api.dispose();
+    }
+
+    const before = await academicRecordCounts(data.courseId, data.groupId, codingActivityId);
+    await teacherPage.goto(`/courses/${data.courseId}/groups/${data.groupId}/student-view`);
+    await teacherPage.getByRole("link", { name: codingTitle, exact: true }).click();
+    const testRunner = teacherPage.getByRole("button", { name: "Run test" }).locator("xpath=ancestor::section[1]");
+    await testRunner.getByRole("button", { name: "Run test" }).click();
+    await expect(testRunner.getByRole("img", { name: "Passed" })).toBeVisible({ timeout: 60_000 });
+    await expect(testRunner.getByLabel("Test output")).toContainText("Student view works");
+    expect(await academicRecordCounts(data.courseId, data.groupId, codingActivityId)).toEqual(before);
   });
 
   test("shows the learner content presentation and downloads course files", async ({ teacherPage }) => {
