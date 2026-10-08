@@ -967,6 +967,88 @@ export type SetGradebookItemReleaseInput = {
   now?: Date;
 };
 
+type GradebookContentPlacement = {
+  id: string;
+  parentId: string | null;
+  groupId: string | null;
+  kind: string;
+  titleSnapshot: string | null;
+  position: number;
+  activityId: string | null;
+  courseGroupActivityId: string | null;
+  createdAt: Date;
+};
+
+function buildGradebookActivityOrder<
+  T extends { activityId: string; groupId: string; groupActivity: { id: string } }
+>(items: T[], contentItems: GradebookContentPlacement[]) {
+  const childrenByParent = new Map<string, GradebookContentPlacement[]>();
+  for (const contentItem of contentItems) {
+    const parentId = contentItem.parentId ?? "root";
+    const children = childrenByParent.get(parentId) ?? [];
+    children.push(contentItem);
+    childrenByParent.set(parentId, children);
+  }
+
+  const compareContentItems = (left: GradebookContentPlacement, right: GradebookContentPlacement) => (
+    left.position - right.position ||
+    (left.titleSnapshot ?? "").localeCompare(right.titleSnapshot ?? "") ||
+    left.createdAt.getTime() - right.createdAt.getTime() ||
+    left.id.localeCompare(right.id)
+  );
+  for (const children of childrenByParent.values()) {
+    children.sort(compareContentItems);
+  }
+
+  const flattened: GradebookContentPlacement[] = [];
+  const visited = new Set<string>();
+  const walk = (parentId: string) => {
+    for (const contentItem of childrenByParent.get(parentId) ?? []) {
+      if (visited.has(contentItem.id)) continue;
+      visited.add(contentItem.id);
+      flattened.push(contentItem);
+      walk(contentItem.id);
+    }
+  };
+  walk("root");
+  for (const contentItem of [...contentItems].sort(compareContentItems)) {
+    if (!visited.has(contentItem.id)) {
+      flattened.push(contentItem);
+    }
+  }
+
+  const sharedPlacementByActivityId = new Map<string, number>();
+  const placementByGroupActivityId = new Map<string, number>();
+  const placementByGroupAndActivity = new Map<string, number>();
+  flattened.forEach((contentItem, index) => {
+    if (contentItem.kind !== "activity" || !contentItem.activityId) return;
+    if (contentItem.groupId === null && !sharedPlacementByActivityId.has(contentItem.activityId)) {
+      sharedPlacementByActivityId.set(contentItem.activityId, index);
+    }
+    if (contentItem.courseGroupActivityId && !placementByGroupActivityId.has(contentItem.courseGroupActivityId)) {
+      placementByGroupActivityId.set(contentItem.courseGroupActivityId, index);
+    }
+    if (contentItem.groupId) {
+      const key = `${contentItem.groupId}:${contentItem.activityId}`;
+      if (!placementByGroupAndActivity.has(key)) {
+        placementByGroupAndActivity.set(key, index);
+      }
+    }
+  });
+
+  const orderByActivityId = new Map<string, number>();
+  for (const item of items) {
+    const order = sharedPlacementByActivityId.get(item.activityId)
+      ?? placementByGroupActivityId.get(item.groupActivity.id)
+      ?? placementByGroupAndActivity.get(`${item.groupId}:${item.activityId}`);
+    if (order !== undefined) {
+      const existing = orderByActivityId.get(item.activityId);
+      orderByActivityId.set(item.activityId, existing === undefined ? order : Math.min(existing, order));
+    }
+  }
+  return orderByActivityId;
+}
+
 export async function getCourseGradebook(user: CurrentUser, courseId: string, filters: CourseGradebookFilters = {}) {
   const capabilities = await assertCanViewCourseGradebook(user, courseId);
   if (
@@ -978,62 +1060,87 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
   }
   await ensureCourseGradebookItems(courseId);
   const statusFilter = filters.status ?? "all";
-  const items = await prisma.gradebookItem.findMany({
-    where: {
-      courseId,
-      ...(filters.groupId
-        ? { groupId: filters.groupId }
-        : capabilities.gradingGroupIds !== null
-          ? { groupId: { in: capabilities.gradingGroupIds } }
-          : {}),
-      ...(filters.activityId ? { activityId: filters.activityId } : {})
-    },
-    include: {
-      group: {
-        select: {
-          id: true,
-          title: true,
-          participants: {
-            where: { role: "student" },
-            orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { email: "asc" }],
-            include: {
-              user: { select: { id: true, email: true, name: true } }
+  const [unorderedItems, contentItems] = await Promise.all([
+    prisma.gradebookItem.findMany({
+      where: {
+        courseId,
+        ...(filters.groupId
+          ? { groupId: filters.groupId }
+          : capabilities.gradingGroupIds !== null
+            ? { groupId: { in: capabilities.gradingGroupIds } }
+            : {}),
+        ...(filters.activityId ? { activityId: filters.activityId } : {})
+      },
+      include: {
+        group: {
+          select: {
+            id: true,
+            title: true,
+            participants: {
+              where: { role: "student" },
+              orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { email: "asc" }],
+              include: {
+                user: { select: { id: true, email: true, name: true } }
+              }
             }
           }
-        }
-      },
-      activity: {
-        select: {
-          id: true,
-          title: true,
-          activityType: { select: { key: true, name: true } }
-        }
-      },
-      groupActivity: {
-        select: {
-          id: true,
-          availableFrom: true,
-          availableUntil: true,
-          metadata: true
-        }
-      },
-      grades: {
-        include: {
-          selectedAttempt: true
-        }
-      },
-      attempts: {
-        orderBy: [{ attemptNumber: "asc" }]
-      },
-      events: {
-        where: { eventType: "submission_deleted" },
-        include: {
-          actor: { select: { id: true, name: true, email: true } }
         },
-        orderBy: [{ createdAt: "desc" }]
+        activity: {
+          select: {
+            id: true,
+            title: true,
+            activityType: { select: { key: true, name: true } }
+          }
+        },
+        groupActivity: {
+          select: {
+            id: true,
+            availableFrom: true,
+            availableUntil: true,
+            metadata: true
+          }
+        },
+        grades: {
+          include: {
+            selectedAttempt: true
+          }
+        },
+        attempts: {
+          orderBy: [{ attemptNumber: "asc" }]
+        },
+        events: {
+          where: { eventType: "submission_deleted" },
+          include: {
+            actor: { select: { id: true, name: true, email: true } }
+          },
+          orderBy: [{ createdAt: "desc" }]
+        }
       }
-    },
-    orderBy: [{ group: { title: "asc" } }, { titleSnapshot: "asc" }]
+    }),
+    prisma.courseContentItem.findMany({
+      where: { courseId },
+      select: {
+        id: true,
+        parentId: true,
+        groupId: true,
+        kind: true,
+        titleSnapshot: true,
+        position: true,
+        activityId: true,
+        courseGroupActivityId: true,
+        createdAt: true
+      }
+    })
+  ]);
+  const activityOrder = buildGradebookActivityOrder(unorderedItems, contentItems);
+  const items = [...unorderedItems].sort((left, right) => {
+    const leftOrder = activityOrder.get(left.activityId) ?? Number.POSITIVE_INFINITY;
+    const rightOrder = activityOrder.get(right.activityId) ?? Number.POSITIVE_INFINITY;
+    return leftOrder - rightOrder
+      || (left.titleSnapshot || left.activity.title).localeCompare(right.titleSnapshot || right.activity.title)
+      || left.activityId.localeCompare(right.activityId)
+      || left.group.title.localeCompare(right.group.title)
+      || left.groupId.localeCompare(right.groupId);
   });
 
   const groups = new Map<string, { id: string; title: string }>();
@@ -1118,7 +1225,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
       status: statusFilter
     },
     groups: [...groups.values()].sort((left, right) => left.title.localeCompare(right.title)),
-    activities: [...activities.values()].sort((left, right) => left.title.localeCompare(right.title)),
+    activities: [...activities.values()],
     items: items.map((item) => ({
       gradebookItemId: item.id,
       groupId: item.group.id,
