@@ -2,6 +2,8 @@
 
 `@cognelo/plugin-web-design-coding-exercises` provides the `web-design-coding-exercise` activity type. Learners edit teacher-defined HTML/CSS/JavaScript starter files, preview them in a sandboxed iframe, and run or submit them against Playwright tests through an external runner.
 
+Teacher review routes consume core grade capabilities: explicit course teachers/admins work course-wide, while section teachers/TAs can inspect and grade only assigned sections. Test mutation, authoring, and grade release remain course-management operations.
+
 ## Read By Topic
 
 - [Public/private data and bank/course lifecycle](docs/REFERENCE.md#architecture-boundary)

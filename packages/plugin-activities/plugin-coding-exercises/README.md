@@ -2,6 +2,8 @@
 
 `@cognelo/plugin-coding-exercises` provides the `coding-exercise` activity type. Teachers author prompts, starter/template code, reference solutions, visible and hidden tests, rubrics, and optional automatic feedback. Learners write and run code in Monaco, submit against hidden tests through Judge0, resume drafts, and review prior submissions.
 
+Teacher review routes consume core grade capabilities: explicit course teachers/admins work course-wide, while section teachers/TAs can inspect and grade only assigned sections. Authoring, hidden-test mutation, grade release, and persisted activity-wide AI-instruction changes remain course-management operations.
+
 Student and teacher code surfaces opt out of browser translation and writing assistance, including the Monaco fallback and code embedded in rendered Markdown instructions. Ordinary instructional prose remains eligible for translation.
 
 Student template protection omits whitespace-only hidden boundaries, keeps the cursor within the live editable region, and lets select-all clear the student answer without removing protected scaffold code.

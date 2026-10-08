@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   assertCanManageCourse: vi.fn(),
+  assertCanManageCourseOrViewGradebook: vi.fn(),
   clearActivityResponseDraft: vi.fn(),
   recordActivityAttemptGradingResult: vi.fn(),
   startActivityAttempt: vi.fn(),
@@ -19,6 +20,7 @@ vi.mock("@cognelo/core", async () => {
   return {
     ...actual,
     assertCanManageCourse: mocks.assertCanManageCourse,
+    assertCanManageCourseOrViewGradebook: mocks.assertCanManageCourseOrViewGradebook,
     clearActivityResponseDraft: mocks.clearActivityResponseDraft,
     recordActivityAttemptGradingResult: mocks.recordActivityAttemptGradingResult,
     startActivityAttempt: mocks.startActivityAttempt,

@@ -20,6 +20,11 @@ const generateSchema = z.object({
   templateAttemptIds: z.array(z.string().min(1)).max(3).optional()
 }).strict();
 
+const reviseSchema = z.object({
+  feedback: z.unknown(),
+  expectedFeedbackHash: z.string().nullable()
+}).strict();
+
 export function OPTIONS() {
   return options();
 }
@@ -55,7 +60,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, attemptId } = await params;
-    const body = await readJson(request) as { feedback?: unknown };
+    const body = reviseSchema.parse(await readJson(request));
     const context = await getActivityAttemptRegradeContext(user, courseId, attemptId);
     const teacherReview = resolvePluginAiFeedbackTeacherReviewHandler(context.activityTypeKey);
     if (!teacherReview) {
@@ -77,7 +82,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       currentFeedback,
       feedback: body.feedback
     });
-    const revised = await reviseTeacherAttemptAiFeedback(user, courseId, attemptId, revision.feedback);
+    const revised = await reviseTeacherAttemptAiFeedback(
+      user,
+      courseId,
+      attemptId,
+      revision.feedback,
+      body.expectedFeedbackHash
+    );
     const revisedAiWeightPercent = (revised.feedback as Record<string, unknown>).aiWeightPercent;
     const grading = revision.gradingResult
       ? await recordActivityAttemptGradingResult(user, {

@@ -44,6 +44,10 @@ export function credentialsFor(role: AuthRole) {
 }
 
 export async function createAuthenticatedApi(role: AuthRole): Promise<APIRequestContext> {
+  return createAuthenticatedApiWithCredentials(credentialsFor(role));
+}
+
+export async function createAuthenticatedApiWithCredentials(account: Credentials): Promise<APIRequestContext> {
   const context = await playwrightRequest.newContext({
     baseURL: API_BASE_URL,
     extraHTTPHeaders: {
@@ -51,11 +55,11 @@ export async function createAuthenticatedApi(role: AuthRole): Promise<APIRequest
       Origin: WEB_BASE_URL
     }
   });
-  const response = await context.post("/api/auth/login", { data: credentialsFor(role) });
+  const response = await context.post("/api/auth/login", { data: account });
   if (!response.ok()) {
     const body = await response.text();
     await context.dispose();
-    throw new Error(`Unable to authenticate the ${role} E2E account (${response.status()}): ${body}`);
+    throw new Error(`Unable to authenticate the E2E account ${account.email} (${response.status()}): ${body}`);
   }
   return context;
 }

@@ -254,6 +254,52 @@ describe("AI agent services", () => {
     });
   });
 
+  it("falls back deterministically when higher-priority course staff have no usable connection", async () => {
+    const fallbackConnectionId = "cly0000000000000000000000";
+    mockPrisma.course.findUnique.mockResolvedValue({
+      createdById: "teacher-1",
+      memberships: [
+        {
+          role: "teacher",
+          userId: "teacher-2",
+          user: { metadata: { aiPreferences: { questionAuthoringAiAgentConnectionId: fallbackConnectionId } } }
+        },
+        {
+          role: "owner",
+          userId: "teacher-1",
+          user: { metadata: { aiPreferences: { questionAuthoringAiAgentConnectionId: connectionId } } }
+        }
+      ]
+    });
+    mockPrisma.aiAgentConnection.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: fallbackConnectionId,
+        ownerId: "teacher-2",
+        provider: "ollama",
+        apiKey: null
+      });
+
+    await expect(getCourseTeacherQuestionAuthoringAiAgentConnection(
+      { ...teacherUser, id: "student-1", roles: ["student"] },
+      "course-1"
+    )).resolves.toMatchObject({ id: fallbackConnectionId });
+    expect(mockPrisma.aiAgentConnection.findFirst).toHaveBeenNthCalledWith(1, {
+      where: {
+        id: connectionId,
+        isEnabled: true,
+        OR: [{ ownerId: "teacher-1" }, { ownerId: null }]
+      }
+    });
+    expect(mockPrisma.aiAgentConnection.findFirst).toHaveBeenNthCalledWith(2, {
+      where: {
+        id: fallbackConnectionId,
+        isEnabled: true,
+        OR: [{ ownerId: "teacher-2" }, { ownerId: null }]
+      }
+    });
+  });
+
   it("calls OpenAI-compatible, Claude, and Ollama providers and maps failed requests", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     mockPrisma.user.findUnique.mockResolvedValue({

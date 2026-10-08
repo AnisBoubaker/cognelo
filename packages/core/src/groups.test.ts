@@ -4,6 +4,9 @@ import type { CurrentUser } from "@cognelo/contracts";
 const bcryptMocks = vi.hoisted(() => ({ compare: vi.fn(), hash: vi.fn() }));
 
 const tx = vi.hoisted(() => ({
+  courseAuditEvent: {
+    create: vi.fn()
+  },
   activity: {
     findMany: vi.fn(),
     findFirst: vi.fn(),
@@ -52,6 +55,7 @@ const tx = vi.hoisted(() => ({
     create: vi.fn(),
     createMany: vi.fn(),
     delete: vi.fn(),
+    findFirst: vi.fn(),
     findMany: vi.fn(),
     updateMany: vi.fn()
   },
@@ -131,8 +135,10 @@ const mockPrisma = vi.hoisted(() => ({
 }));
 
 const authMocks = vi.hoisted(() => ({
+  assertCanManageGroupRoster: vi.fn(),
   assertCanManageCourse: vi.fn(),
   assertCanViewCourse: vi.fn(),
+  canGradeGroup: vi.fn(),
   canManageCourse: vi.fn(),
   isAdmin: vi.fn()
 }));
@@ -212,6 +218,7 @@ describe("group services", () => {
     tx.gradebookItem.findUnique.mockResolvedValue(null);
     tx.courseGroupActivity.update.mockImplementation((input) => mockPrisma.courseGroupActivity.update(input));
     authMocks.canManageCourse.mockResolvedValue(true);
+    authMocks.canGradeGroup.mockResolvedValue(false);
     authMocks.isAdmin.mockReturnValue(false);
     mockPrisma.test.findFirst.mockResolvedValue({
       items: [{ activity: { title: "Knowledge check", activityType: { key: "mcq" } } }]

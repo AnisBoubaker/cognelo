@@ -20,6 +20,11 @@ enum CourseMembershipRole {
   student
 }
 
+enum CourseMembershipSource {
+  explicit
+  section_derived
+}
+
 enum MaterialKind {
   folder
   text
@@ -175,6 +180,7 @@ model User {
   grades                             Grade[]                      @relation("GradeUser")
   gradedGrades                       Grade[]                      @relation("GradeGrader")
   gradeEvents                        GradeEvent[]                 @relation("GradeEventActor")
+  courseAuditEvents                  CourseAuditEvent[]           @relation("CourseAuditEventActor")
   updatedEmailDeliveryConfigurations EmailDeliveryConfiguration[] @relation("EmailDeliveryConfigurationUpdater")
   updatedExecutionRunners            ExecutionRunner[]            @relation("ExecutionRunnerUpdater")
   emailVerificationChallenge         EmailVerificationChallenge?
@@ -322,6 +328,7 @@ model Course {
   contentItems     CourseContentItem[]
   contentResources CourseContentResource[]
   tests            Test[]
+  auditEvents      CourseAuditEvent[]
 
   @@index([subjectId])
   @@index([status])
@@ -485,18 +492,40 @@ model ActivityBankFolder {
 }
 
 model CourseMembership {
-  id        String               @id @default(cuid())
+  id        String                 @id @default(cuid())
   courseId  String
   userId    String
   role      CourseMembershipRole
-  createdAt DateTime             @default(now())
-  updatedAt DateTime             @updatedAt
-  course    Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source    CourseMembershipSource @default(explicit)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+  course    Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([courseId, userId, role])
   @@index([courseId])
   @@index([userId])
+  @@index([courseId, source])
+}
+
+model CourseAuditEvent {
+  id            String   @id @default(cuid())
+  courseId      String
+  actorUserId   String?
+  eventType     String
+  targetType    String?
+  targetId      String?
+  previousValue Json?
+  nextValue     Json?
+  metadata      Json     @default("{}")
+  createdAt     DateTime @default(now())
+  course        Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  actor         User?    @relation("CourseAuditEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([courseId, createdAt])
+  @@index([actorUserId])
+  @@index([eventType, createdAt])
+  @@index([targetType, targetId])
 }
 
 model CourseMaterial {

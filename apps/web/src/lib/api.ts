@@ -334,6 +334,21 @@ export type Course = {
   materials?: CourseMaterial[];
   activities?: Activity[];
   groups?: CourseGroup[];
+  permissions?: CourseCapabilities;
+};
+
+export type CourseCapabilities = {
+  canViewCourse: boolean;
+  canManageCourse: boolean;
+  canManageCourseStaff: boolean;
+  canViewGradebook: boolean;
+  canGrade: boolean;
+  canReleaseGrades: boolean;
+  canExportGrades: boolean;
+  canViewChallenges: boolean;
+  canRespondChallenges: boolean;
+  gradingGroupIds: string[] | null;
+  sectionRoles: Array<{ groupId: string; role: "teacher" | "ta" }>;
 };
 
 export type Subject = {
@@ -503,7 +518,9 @@ export type ActivityVersion = {
 export type CourseMembership = {
   id: string;
   role: "owner" | "teacher" | "ta" | "student";
+  source: "explicit" | "section_derived";
   userId: string;
+  user?: { id: string; email: string; name?: string | null };
 };
 
 export type CourseMaterial = {
@@ -1087,6 +1104,7 @@ export type CourseGradebookRow = {
   status: Exclude<GradebookStatus, "all">;
   score: number | null;
   maxScore: number;
+  gradeUpdatedAt: string | null;
   gradeSource: "auto" | "manual" | "override" | "regrade" | null;
   isPass: boolean | null;
   latePenaltyApplied: boolean;
@@ -1116,6 +1134,7 @@ export type CourseGradebookRow = {
 
 export type GradebookMutationGrade = {
   id: string;
+  updatedAt: string;
   selectedAttemptId: string | null;
   normalizedScore: number;
   normalizedMaxScore: number;
@@ -1221,6 +1240,7 @@ export type StudentGradeFeedback = {
 export type TeacherAiFeedbackReview = {
   attemptId: string;
   gradeId: string | null;
+  gradeUpdatedAt: string | null;
   gradesReleased: boolean;
   activityTypeKey: string;
   participant: {
@@ -1600,6 +1620,13 @@ export const api = {
     }),
   courses: () => request<{ courses: Course[] }>("/courses"),
   course: (courseId: string) => request<{ course: Course }>(`/courses/${courseId}`),
+  addCourseMembership: (courseId: string, input: { userId: string; role: "owner" | "teacher" }) =>
+    request<{ membership: CourseMembership }>(`/courses/${courseId}/memberships`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  removeCourseMembership: (courseId: string, membershipId: string) =>
+    request<{ ok: true }>(`/courses/${courseId}/memberships/${membershipId}`, { method: "DELETE" }),
   courseGradebook: (courseId: string, filters?: { groupId?: string; activityId?: string; status?: GradebookStatus }) => {
     const params = new URLSearchParams();
     if (filters?.groupId) {
@@ -1663,7 +1690,14 @@ export const api = {
     courseId: string,
     gradebookItemId: string,
     participantId: string,
-    input: { score: number; maxScore?: number; isPass?: boolean | null; reason?: string | null; feedbackText?: string | null }
+    input: {
+      score: number;
+      maxScore?: number;
+      isPass?: boolean | null;
+      reason?: string | null;
+      feedbackText?: string | null;
+      expectedGradeUpdatedAt: string | null;
+    }
   ) =>
     request<{ grade: GradebookMutationGrade }>(
       `/courses/${courseId}/gradebook/items/${gradebookItemId}/participants/${participantId}/override`,
@@ -1701,10 +1735,21 @@ export const api = {
     ),
   activityAttemptAiFeedbackReview: (courseId: string, attemptId: string) =>
     request<{ review: TeacherAiFeedbackReview }>(`/courses/${courseId}/gradebook/attempts/${attemptId}/ai-feedback`),
-  reviseActivityAttemptAiFeedback: (courseId: string, attemptId: string, feedback: unknown) =>
-    request<{ feedback: Record<string, unknown>; teacherRevision: number; feedbackHash: string; grade: GradebookMutationGrade | null }>(
+  reviseActivityAttemptAiFeedback: (
+    courseId: string,
+    attemptId: string,
+    feedback: unknown,
+    expectedFeedbackHash: string | null
+  ) =>
+    request<{
+      feedback: Record<string, unknown>;
+      teacherRevision: number;
+      feedbackHash: string;
+      gradeUpdatedAt: string | null;
+      grade: GradebookMutationGrade | null;
+    }>(
       `/courses/${courseId}/gradebook/attempts/${attemptId}/ai-feedback`,
-      { method: "PATCH", body: JSON.stringify({ feedback }) }
+      { method: "PATCH", body: JSON.stringify({ feedback, expectedFeedbackHash }) }
     ),
   recordActivityAttemptAiFeedbackViewed: (courseId: string, attemptId: string) =>
     request<{ recorded: number }>(`/courses/${courseId}/gradebook/attempts/${attemptId}/ai-feedback/view`, { method: "POST" }),
@@ -1792,9 +1837,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input)
     }),
-  groupParticipantCandidate: (courseId: string, email: string) =>
+  groupParticipantCandidate: (courseId: string, email: string, groupId?: string) =>
     request<{ candidate: GroupParticipantCandidate | null }>(
-      `/courses/${courseId}/groups/participant-candidates?email=${encodeURIComponent(email)}`
+      `/courses/${courseId}/groups/participant-candidates?email=${encodeURIComponent(email)}${groupId ? `&groupId=${encodeURIComponent(groupId)}` : ""}`
     ),
   removeGroupParticipant: (courseId: string, groupId: string, participantId: string) =>
     request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}/participants/${participantId}`, {

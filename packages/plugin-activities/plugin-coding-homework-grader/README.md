@@ -2,6 +2,10 @@
 
 `@cognelo/plugin-coding-homework-grader` provides the `coding-homework-grader` activity type for ZIP-based programming assignments. It supports teacher assignment/files/requirements authoring, prior-course documentation snapshots, ZIP validation, C function analysis, generated challenge questions, student answers, core attempts, and teacher manual grading.
 
+Teacher submission review and grading consume core grade capabilities: explicit course teachers/admins work course-wide, while section teachers/TAs are limited to assigned sections. Assignment authoring, snapshots, and grade release remain course-management operations.
+
+Student-triggered challenge generation uses explicit course staff question-authoring preferences in creator, owner, then teacher order. Unusable preferences are skipped without exposing credentials, and generation fails only when no usable configured fallback remains.
+
 ## Workflow
 
 ```text

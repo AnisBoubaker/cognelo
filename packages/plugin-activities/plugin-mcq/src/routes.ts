@@ -6,6 +6,7 @@ import {
   activityGenerationKnowledgeSchema,
   assertCanManageActivityBank,
   assertCanManageCourse,
+  assertCanGradeGroup,
   generateQuestionAuthoringText,
   activityKnowledgeGenerationPrompt,
   suggestActivityKnowledgeSelections,
@@ -233,7 +234,7 @@ export const mcqGradebookAttemptsRoute: PluginRouteDefinition = {
       if (!context.courseId || !context.groupId) {
         throw new AppError(400, "GROUP_CONTEXT_REQUIRED", "Gradebook attempts require a group activity context.");
       }
-      await assertCanManageCourse(context.user, context.courseId);
+      await assertCanGradeGroup(context.user, context.courseId, context.groupId);
       const participantId = new URL(request.url).searchParams.get("participantId");
       if (!participantId) {
         throw new AppError(400, "PARTICIPANT_REQUIRED", "A participant is required.");

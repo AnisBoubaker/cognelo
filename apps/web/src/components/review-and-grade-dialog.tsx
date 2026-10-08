@@ -187,14 +187,22 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
     setFeedbackReview((current) => current ? { ...current, saving: true, error: "" } : current);
     try {
       const feedbackResult = feedbackChanged
-        ? await api.reviseActivityAttemptAiFeedback(courseId, feedbackReview.review.attemptId, feedbackReview.draft)
+        ? await api.reviseActivityAttemptAiFeedback(
+            courseId,
+            feedbackReview.review.attemptId,
+            feedbackReview.draft,
+            typeof feedbackReview.review.feedback.feedbackHash === "string"
+              ? feedbackReview.review.feedback.feedbackHash
+              : null
+          )
         : null;
       const shouldPreserveTeacherGrade = feedbackReview.preserveTeacherGrade && Boolean(feedbackResult?.grade);
       const overrideResult = (gradeChanged || shouldPreserveTeacherGrade) && parsedGrade !== null
         ? await api.overrideGradebookGrade(courseId, row.gradebookItemId, row.participantId, {
             score: parsedGrade,
             maxScore: row.maxScore,
-            reason: t("courseDetail.reviewAndGradeReason")
+            reason: t("courseDetail.reviewAndGradeReason"),
+            expectedGradeUpdatedAt: feedbackResult?.grade?.updatedAt ?? feedbackResult?.gradeUpdatedAt ?? row.gradeUpdatedAt
           })
         : null;
       const finalGrade = overrideResult?.grade.normalizedScore ?? feedbackResult?.grade?.normalizedScore ?? feedbackReview.initialGrade;
@@ -226,7 +234,8 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
         score: input.score,
         maxScore: input.maxScore,
         reason: input.reason,
-        feedbackText: input.feedbackText ?? input.reason
+        feedbackText: input.feedbackText ?? input.reason,
+        expectedGradeUpdatedAt: row.gradeUpdatedAt
       });
       await onSaved?.();
     } catch (err) {

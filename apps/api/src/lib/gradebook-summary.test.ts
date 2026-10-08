@@ -127,6 +127,7 @@ function gradebookRow(overrides: {
     status: overrides.score === null ? "missing" as const : "graded" as const,
     score: overrides.score,
     maxScore: 20,
+    gradeUpdatedAt: overrides.score === null ? null : "2026-10-03T00:01:01.000Z",
     gradeSource: overrides.score === null ? null : "auto" as const,
     isPass: overrides.score === null ? null : true,
     latePenaltyApplied: false,

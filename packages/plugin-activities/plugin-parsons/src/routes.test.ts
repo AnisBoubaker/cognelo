@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  assertCanGradeGroup: vi.fn(),
   assertCanManageCourse: vi.fn(),
   ensureParsonsAttempt: vi.fn(),
   findLatestParsonsAttempt: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("@cognelo/core", async () => {
   const actual = await vi.importActual<typeof import("@cognelo/core")>("@cognelo/core");
   return {
     ...actual,
+    assertCanGradeGroup: mocks.assertCanGradeGroup,
     assertCanManageCourse: mocks.assertCanManageCourse,
     getActivityAttemptAvailability: mocks.getActivityAttemptAvailability,
     recordActivityAttemptGradingResult: mocks.recordActivityAttemptGradingResult,
@@ -295,7 +297,7 @@ describe("Parsons plugin routes", () => {
       attempts: [{ id: "attempt-1", status: "completed", latestState: submittedState, submittedState }]
     });
 
-    expect(mocks.assertCanManageCourse).toHaveBeenCalledWith(teacher, "course-1");
+    expect(mocks.assertCanGradeGroup).toHaveBeenCalledWith(teacher, "course-1", "group-1");
     expect(mocks.listParsonsGradebookAttempts).toHaveBeenCalledWith(
       expect.objectContaining({
         activityId: "activity-1",

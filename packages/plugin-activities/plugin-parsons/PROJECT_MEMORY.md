@@ -9,4 +9,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Bank variations keep the exact concept, skill, and misconception selections, source language, group/rule configuration, and exact physical and non-empty solution line counts so copied line ranges stay valid, while regenerating a genuinely different prompt and solution at comparable complexity.
 - Summative activity UI does not reveal correctness before release; released feedback is sanitized and deterministic.
 - Released final grades are challengeable through core; challenge review must reuse the Parsons **Review and grade** surface and audited grade paths.
+- Gradebook attempt review and grading consume core course capabilities: explicit course teachers/admins work course-wide, while section teachers/TAs are restricted to their assigned groups. Authoring and grade release remain course-management operations.
 - Teacher authoring uses the shared guarded draft and `EditActionBar`.

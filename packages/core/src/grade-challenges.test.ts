@@ -15,7 +15,11 @@ const mockPrisma = vi.hoisted(() => ({
 const recordResearch = vi.hoisted(() => vi.fn());
 
 vi.mock("@cognelo/db", () => ({ prisma: mockPrisma, Prisma: {} }));
-vi.mock("./authorization", () => ({ assertCanManageCourse: vi.fn() }));
+vi.mock("./authorization", () => ({
+  assertCanGradeGroup: vi.fn(),
+  assertCanManageCourse: vi.fn(),
+  assertCanViewCourseGradebook: vi.fn().mockResolvedValue({ gradingGroupIds: null })
+}));
 vi.mock("./ai-feedback", () => ({ recordAiFeedbackResearchEvent: recordResearch }));
 const { createGradeChallenge, listCourseGradeChallenges, resolveGradeChallenge } = await import("./grade-challenges");
 

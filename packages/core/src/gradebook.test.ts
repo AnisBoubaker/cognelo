@@ -50,13 +50,20 @@ const mockPrisma = vi.hoisted(() => ({
 }));
 
 const authMocks = vi.hoisted(() => ({
+  assertCanGradeGroup: vi.fn(),
+  assertCanReleaseCourseGrades: vi.fn(),
   assertCanViewCourse: vi.fn(),
+  assertCanViewCourseGradebook: vi.fn().mockResolvedValue({ gradingGroupIds: null }),
   canManageCourse: vi.fn(),
   isAdmin: vi.fn()
 }));
 
 vi.mock("@cognelo/db", () => ({
-  prisma: mockPrisma
+  prisma: mockPrisma,
+  Prisma: {
+    TransactionIsolationLevel: { Serializable: "Serializable" },
+    PrismaClientKnownRequestError: class PrismaClientKnownRequestError extends Error {}
+  }
 }));
 
 vi.mock("./authorization", () => authMocks);

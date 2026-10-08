@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   assertCanManageActivityBank: vi.fn(),
   assertCanManageCourse: vi.fn(),
+  assertCanManageCourseOrViewGradebook: vi.fn(),
   clearActivityResponseDraft: vi.fn(),
   getActivityAttemptAvailability: vi.fn(),
   recordActivityAttemptGradingResult: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock("@cognelo/core", async () => {
     ...actual,
     assertCanManageActivityBank: mocks.assertCanManageActivityBank,
     assertCanManageCourse: mocks.assertCanManageCourse,
+    assertCanManageCourseOrViewGradebook: mocks.assertCanManageCourseOrViewGradebook,
     clearActivityResponseDraft: mocks.clearActivityResponseDraft,
     getActivityAttemptAvailability: mocks.getActivityAttemptAvailability,
     recordActivityAttemptGradingResult: mocks.recordActivityAttemptGradingResult,
@@ -295,7 +297,7 @@ describe("coding exercise plugin routes", () => {
         readJson: async () => ({ tests: [], referenceSolution: "print(1)" })
       })
     ).resolves.toEqual({ tests: [{ id: "hidden-1" }] });
-    expect(mocks.assertCanManageCourse).toHaveBeenCalledWith(context.user, "course-1");
+    expect(mocks.assertCanManageCourseOrViewGradebook).toHaveBeenCalledWith(context.user, "course-1");
   });
 
   it("generates prompt, solution, tests, and rubrics with subject context", async () => {

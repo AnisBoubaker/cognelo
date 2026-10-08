@@ -43,7 +43,7 @@ describe("teacher feedback revision route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.requireUser.mockResolvedValue({ id: "teacher-1", roles: ["teacher"] });
-    mocks.readJson.mockResolvedValue({ feedback: { summary: "Reviewed" } });
+    mocks.readJson.mockResolvedValue({ feedback: { summary: "Reviewed" }, expectedFeedbackHash: "original-hash" });
     mocks.getContext.mockResolvedValue({
       attemptId: "attempt-1",
       lifecycle: "graded",

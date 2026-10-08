@@ -1,6 +1,8 @@
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import {
   AppError,
+  assertCanViewCourseGradebook,
+  assertCanManageCourseOrViewGradebook,
   assertCanManageActivityBank,
   assertCanManageCourse,
   clearActivityResponseDraft,
@@ -70,9 +72,16 @@ export const codingExerciseReviewAllRoute: PluginRouteDefinition = {
   methods: {
     GET: async ({ context }) => {
       const courseId = requireCourseId(context.courseId);
-      await assertCanManageCourse(context.user, courseId);
+      const capabilities = await assertCanViewCourseGradebook(context.user, courseId);
       const participants = await prisma.courseGroupParticipant.findMany({
-        where: { group: { courseId }, role: "student", userId: { not: null } },
+        where: {
+          group: {
+            courseId,
+            ...(capabilities.gradingGroupIds !== null ? { id: { in: capabilities.gradingGroupIds } } : {})
+          },
+          role: "student",
+          userId: { not: null }
+        },
         select: { id: true, userId: true }
       });
       const executions = await listCodingExerciseReviewExecutionAttempts({ activityId: context.activity.id, userIds: participants.flatMap((participant) => participant.userId ? [participant.userId] : []) });
@@ -381,7 +390,7 @@ export const codingExerciseHiddenTestsRoute: PluginRouteDefinition = {
       }
 
       const courseId = requireCourseId(context.courseId);
-      await assertCanManageCourse(context.user, courseId);
+      await assertCanManageCourseOrViewGradebook(context.user, courseId);
       const result = await listCodingExerciseHiddenTests({
         activityId: context.activity.id
       });

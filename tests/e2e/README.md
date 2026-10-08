@@ -3,7 +3,7 @@
 The Playwright suite covers the platform's critical browser journeys with real API and database integration:
 
 - anonymous access control, sign-in, first-time activation UI, and sign-out;
-- global administrator, course manager, teacher, and student boundaries, plus course owner, group teacher, and group TA permissions;
+- global administrator, course manager, teacher, and student boundaries; explicit multi-teacher course staffing; section-scoped teacher/TA grading, roster, release, and identifier-tampering boundaries; immediate partial/final revocation; final-owner protection; and preservation of academic history;
 - personal settings, profile and password changes, email verification, forced password replacement, and fresh-session sign-in, plus administrator user creation, confirmation, filtering, and password reset;
 - administrator AI-model CRUD and preference selection, retained email-secret handling and test-email progress, activity/content plugin lifecycle controls, and media-cleanup progress and results;
 - teacher creation of subjects, activity banks, courses, groups, linked users, and pending participants, plus existing-account matching, CSV validation/import progress and totals, participant removal, and moving a learner between groups without breaking access;
@@ -56,6 +56,6 @@ An E2E run is observational unless the task explicitly asks for product fixes. W
 
 The maximum-attempt integrity check waits for each submission to finish, verifies the exhausted activity exposes only submission history, and confirms a direct extra submission request is rejected. The released-grade visibility check asserts that the selected released grade appears to the learner without exposing raw grading payloads.
 
-## Planned authorization expansion
+## Authorization scenario catalog
 
-The accepted section-scoped staff model and the deeper administrator, course-designer, teacher, TA, and multi-teacher scenario catalog are documented in [Role Authorization And Multi-Teacher E2E Plan](../../docs/ROLE_AUTHORIZATION_E2E_IMPLEMENTATION_PLAN.md). Those scenarios are intentionally marked as not yet implemented or executed; the coverage list above describes the current suite.
+The implemented section-scoped staff model, resolved policy decisions, and administrator, course-designer, teacher, TA, and multi-teacher traceability catalog are documented in [Role Authorization And Multi-Teacher E2E Plan](../../docs/ROLE_AUTHORIZATION_E2E_IMPLEMENTATION_PLAN.md). `access-control.spec.ts` covers global navigation/API boundaries and the course-designer grading policy; `staff-authorization.spec.ts` provisions independent co-teacher, section-teacher, TA, unrelated-teacher, and learner accounts across two sections and proves durable grants, denial, audit attribution, stale-edit rejection, removal, ownership transfer, and academic-data preservation.

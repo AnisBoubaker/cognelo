@@ -1,8 +1,8 @@
 # Role Authorization And Multi-Teacher E2E Plan
 
-Status: accepted design direction; documentation only. No authorization code, migration, fixture, or E2E scenario in this document has been implemented or executed yet.
+Status: implemented and covered by the repository unit/API/Playwright suites on 2026-10-07. Scenario IDs are a traceability catalog; related assertions may be grouped into one stateful Playwright test.
 
-This is the starting point for the next implementation session. It defines the intended separation between global roles, course-wide staff, and section-scoped staff, records the current risks, and lists the browser scenarios that must prove both authorization and real feature behavior.
+This document defines the separation between global roles, course-wide staff, and section-scoped staff, records the resolved product policies, and maps the executable coverage that proves authorization and real feature behavior.
 
 ## Scope
 
@@ -17,21 +17,19 @@ The work covers:
 
 It does not change learner permissions except where learner actions are needed to prove a staff workflow end to end.
 
-## Current Implementation Snapshot
-
-The current implementation is broader than the accepted target:
+## Implemented Model
 
 - Global roles are `admin`, `course_manager`, `teacher`, and `student`.
 - Course memberships are separate and include `owner`, `teacher`, `ta`, and `student`.
 - Section/group participants include `teacher`, `ta`, and `student`.
-- `canManageCourse` currently treats course `owner`, `teacher`, and `ta` memberships identically.
-- Adding an existing user as a section teacher or TA creates a matching course membership, thereby granting broad course management.
-- Removing a section participant only cleans up the derived course membership for students. A removed teacher or TA can therefore retain course access.
+- Course membership provenance is `explicit` or `section_derived`; only explicit owners/teachers confer course management.
+- Adding section staff creates a derived discoverability membership without course-wide authority.
+- Removing the final matching section assignment removes the derived membership immediately; other assigned sections remain accessible.
 - A course has one `createdById`, although it may have multiple staff memberships.
 - Activity banks and personal AI connections are individually owned. Course membership does not transfer their ownership.
-- Student-triggered question-authoring AI currently chooses a configured staff preference deterministically: course creator first, then another owner, then a teacher.
+- Student-triggered question-authoring AI chooses a usable configured staff preference deterministically: course creator first, then another owner, then a teacher. Disabled, missing, unauthorized, or keyless non-local connections are skipped; the request fails without exposing credentials only when no usable explicit course-staff connection remains.
 
-The implicit promotion and asymmetric removal are the leading suspects for the previously unreliable multi-teacher behavior.
+Course and section capabilities are computed centrally and returned with the course DTO so UI visibility follows the same scope as API enforcement. Grade/feedback writes reject stale optimistic versions, staff/roster/course/settings mutations append actor-attributed `CourseAuditEvent` rows, and existing grade/feedback/challenge event streams retain their actor attribution.
 
 ## Accepted Authorization Direction
 
@@ -48,7 +46,7 @@ The implicit promotion and asymmetric removal are the leading suspects for the p
 
 Adding a user as a section teacher or TA must not implicitly make that user a course-wide teacher or manager. Section staff can view and act only within their assigned sections. Course-wide access requires a separate explicit course membership.
 
-The implementation should stop using one broad `canManageCourse` decision for all operations. It should introduce capability checks for at least:
+The implementation uses operation-specific capability checks instead of one broad `canManageCourse` decision, covering:
 
 - viewing a course and a section;
 - managing course structure and settings;
@@ -88,16 +86,14 @@ The implementation should stop using one broad `canManageCourse` decision for al
 
 A section TA may inspect attempts, prepare or save grades and feedback, and work with challenges for learners in assigned sections. A TA may not manage course structure, course settings, staff, other sections, activity banks, or global resources. Final release/hide authority remains with an administrator, course owner, or explicit course teacher unless a later product decision deliberately adds a separate release capability.
 
-## Decisions To Confirm Before Implementation
+## Resolved Policy Decisions
 
-These details were not required to settle the accepted section-scope direction, but the implementation session must resolve them before assertions are written:
-
-1. Whether a course designer who becomes course owner may grade, or needs an additional teacher membership.
-2. Whether an explicit course-level `ta` membership should remain. The preferred default is to avoid it and represent TA access through section assignments.
-3. Whether a section teacher may release grades for only that section. TAs do not release by default.
-4. Whether TAs may send a final challenge response or only prepare the response for a teacher.
-5. Whether concurrent edits use optimistic version rejection, an explicit conflict dialog, or documented last-write-wins behavior. Silent overwrites are not acceptable.
-6. Whether course AI selection should keep creator/owner/teacher priority or move to an explicit course-level selection.
+1. A pure course designer who becomes owner may design/manage the course but needs the global teacher role to grade.
+2. Explicit course-level `ta` membership is rejected; TAs are assigned to sections.
+3. Section teachers and TAs cannot release/hide grades. Release remains course-wide for administrators, explicit course teachers, and global-teacher owners.
+4. TAs may send final challenge responses for learners in assigned sections.
+5. Concurrent grade and feedback edits use optimistic version rejection with an explicit HTTP 409 conflict; the teacher reloads before saving.
+6. Student question-authoring AI uses deterministic creator, owner, then teacher priority, considers only explicit course memberships, skips unusable preferred connections, and fails safely when no usable fallback remains.
 
 ## Required E2E Design Rules
 
@@ -164,7 +160,7 @@ Do not reuse one browser context for distinct people. Multi-user scenarios need 
 - **DES-05 — Reuse without source mutation:** reuse curriculum or bank content and verify that the source remains unchanged.
 - **DES-06 — No global administration:** deny user, runner, email, plugin, and maintenance administration.
 - **DES-07 — Unrelated-resource isolation:** deny changes to another designer's subject, course, or bank without explicit authorization.
-- **DES-08 — Gradebook policy:** assert the course-designer grading decision selected before implementation.
+- **DES-08 — Gradebook policy:** verify that a pure course designer/owner can design the course but cannot grade without the global teacher role.
 
 ### Explicit course teacher
 
@@ -196,7 +192,7 @@ Do not reuse one browser context for distinct people. Multi-user scenarios need 
 - **SEC-08 — Course-structure denial:** section staff cannot change course structure, settings, or course-wide staff.
 - **SEC-09 — Bank/global denial:** section staff cannot modify banks, curriculum, users, runners, plugins, or global settings without a separate role.
 - **SEC-10 — TA release denial:** a TA can save permitted grading work but cannot release or hide grades.
-- **SEC-11 — Section-teacher release policy:** assert the section-teacher release decision selected before implementation.
+- **SEC-11 — Section-teacher release policy:** verify that a section teacher cannot release or hide grades while an explicit course teacher can.
 - **SEC-12 — Partial removal:** removing one of several section assignments retains access to the remaining sections only.
 - **SEC-13 — Final removal:** removing the final section assignment immediately removes section-derived access.
 
@@ -231,15 +227,13 @@ Do not reuse one browser context for distinct people. Multi-user scenarios need 
 - **FLOW-02 — Challenge lifecycle:** teacher releases; learner challenges; scoped staff reviews; course teacher regrades/resolves; learner sees the result and optional notification.
 - **FLOW-03 — Staff transition:** original teacher creates and grades; second teacher takes over; original teacher is removed; course data and historical ownership remain correct.
 
-## Implementation Sequence For The Next Session
+## Executable Coverage Map
 
-1. Resolve the six open decisions above and turn the capability matrix into named core authorization functions.
-2. Decide how to distinguish explicit course memberships from legacy memberships derived from section participants.
-3. Design a safe migration/backfill. Existing broad staff access must not be silently revoked without identifying affected users.
-4. Update service-layer authorization first; UI visibility must consume the same effective capabilities rather than duplicate role checks.
-5. Add reusable E2E personas and course/section membership helpers.
-6. Implement the scenarios in small files grouped by authorization, role, multi-teacher behavior, and cross-role workflows.
-7. Run focused suites first, then the complete E2E suite. Product failures remain product defects; do not weaken desired assertions to match current behavior.
+- `packages/core/src/authorization.test.ts`, `courses.test.ts`, `groups.test.ts`, `gradebook.test.ts`, and `ai-feedback-review.test.ts` cover the capability split, provenance, symmetric cleanup, actor events, release denial, and stale-write conflicts at the service boundary.
+- `tests/e2e/access-control.spec.ts` covers RBAC-01..07, the global administrator/teacher/student boundaries, DES-06/DES-08, TCH-14, and the section-teacher/TA UI distinction.
+- `tests/e2e/staff-authorization.spec.ts` uses independent accounts and two sections to cover SEC-01..13 and MT-01..22, including idempotent explicit assignment, independent sessions, shared roster/grade visibility, identifier substitution, section roster authority, TA release denial, sequential and stale concurrent grading, actor history, linked-bank and personal-connection isolation, safe settings preservation, deterministic AI fallback, partial/final revocation, academic-data preservation, creator departure, and final-owner protection.
+- The existing administrator, account, course lifecycle/management, authoring, activity-bank, learning-flow, grading, challenge, export, runner, and graph specs cover ADM-01..08, DES-01..07, TCH-01..15, FLOW-01/02, and the feature mechanics composed by FLOW-03. Ownership and connection-isolation services additionally retain their focused unit/API tests.
+- Closely related catalog entries are deliberately grouped in stateful scenarios so expensive setup is shared without weakening any durable/API/UI assertion. There are no expected-failure annotations for this model.
 
 ## Definition Of Done
 
@@ -250,3 +244,5 @@ Do not reuse one browser context for distinct people. Multi-user scenarios need 
 - Multi-teacher edits and grade changes preserve actor history and never silently lose data.
 - Bank and personal AI ownership remain isolated.
 - Every scenario above is implemented and passing, or is retained as an expected failure linked to a tracked product defect.
+
+The implementation meets these conditions. The authoritative current run counts belong in test output rather than this durable design document.

@@ -11,6 +11,7 @@ import { ActivityTypeIcon, AppIcon, FolderContentIcon as SharedFolderContentIcon
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
+import { CourseGradeChallengesPanel } from "@/components/course-grade-challenges-panel";
 import { SettingsSectionNav } from "@/components/settings-nav";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import {
@@ -110,12 +111,16 @@ export default function CourseGroupPage() {
   const [assignmentError, setAssignmentError] = useState("");
   const [contentActionError, setContentActionError] = useState("");
 
-  const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
-  const canManage =
-    user?.roles.includes("admin") ||
-    membershipRole === "owner" ||
-    membershipRole === "teacher" ||
-    membershipRole === "ta";
+  const canManage = Boolean(course?.permissions?.canManageCourse);
+  const canGradeCurrentGroup = Boolean(
+    course?.permissions?.canGrade && (
+      course.permissions.gradingGroupIds === null || course.permissions.gradingGroupIds.includes(groupId)
+    )
+  );
+  const canReleaseGrades = Boolean(course?.permissions?.canReleaseGrades);
+  const canManageRoster = Boolean(
+    canManage || course?.permissions?.sectionRoles.some((assignment) => assignment.groupId === groupId && assignment.role === "teacher")
+  );
 
   useEffect(() => {
     if (canManage && group) {
@@ -139,10 +144,15 @@ export default function CourseGroupPage() {
     setGroupAvailableUntil(toDateTimeLocalValue(groupResult.group.availableUntil));
     setActivityTypes(typeResult.activityTypes);
     setActivityDefinitions(typeResult.registeredDefinitions);
-    const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
-    const userCanManage = user?.roles.includes("admin") || role === "owner" || role === "teacher" || role === "ta";
+    const userCanManage = Boolean(courseResult.course.permissions?.canManageCourse);
+    const userCanGradeGroup = Boolean(
+      courseResult.course.permissions?.canGrade && (
+        courseResult.course.permissions.gradingGroupIds === null ||
+        courseResult.course.permissions.gradingGroupIds.includes(groupId)
+      )
+    );
     const [contentResult, contentTypesResult, contentResourcesResult] = await Promise.all([
-      api.groupContent(courseId, groupId, { visibleOnly: !userCanManage }),
+      api.groupContent(courseId, groupId, { visibleOnly: !userCanManage && !userCanGradeGroup }),
       api.courseContentTypes(courseId),
       api.groupContentResources(courseId, groupId)
     ]);
@@ -151,7 +161,7 @@ export default function CourseGroupPage() {
     setActiveContentTypeDefinitions(contentTypesResult.activeContentTypes ?? contentTypesResult.contentTypes);
     setContentResources(contentResourcesResult.resources);
     setContentLoaded(true);
-    if (userCanManage) {
+    if (userCanManage || userCanGradeGroup) {
       const gradebookResult = await api.courseGradebook(courseId, {
         groupId,
         activityId: gradebookActivityId || undefined,
@@ -514,7 +524,7 @@ export default function CourseGroupPage() {
     );
   }
 
-  if (group && course && !canManage) {
+  if (group && course && !canManage && !canGradeCurrentGroup) {
     return (
       <AppShell>
         <main className="page stack">
@@ -1228,7 +1238,7 @@ export default function CourseGroupPage() {
     setParticipantError("");
     setCheckingParticipantEmail(true);
     try {
-      const result = await api.groupParticipantCandidate(courseId, nextEmail);
+      const result = await api.groupParticipantCandidate(courseId, nextEmail, groupId);
       setParticipantCandidate(result.candidate);
       if (result.candidate) {
         setParticipantFirstName(result.candidate.firstName);
@@ -1310,7 +1320,7 @@ export default function CourseGroupPage() {
                           <h2>{t("groupPage.assignedActivitiesTitle")}</h2>
                           <p className="muted">{t("groupPage.assignedActivitiesText")}</p>
                         </div>
-                        {canManage ? (
+                        {canManageRoster ? (
                           <button
                             aria-label={isAssigningActivity ? t("common.cancel") : t("groupPage.assignActivityTitle")}
                             className="secondary icon-button section-action-icon-button"
@@ -1867,7 +1877,7 @@ export default function CourseGroupPage() {
                               <span className="gradebook-number">{activity.gradedCount}</span>
                               <strong className="gradebook-number">{formatMeanGrade(activity.meanScore, activity.meanMaxScore)}</strong>
                               <div className="table-actions">
-                                {activity.assessmentMode === "summative" ? <button
+                                {activity.assessmentMode === "summative" && canReleaseGrades ? <button
                                   className="button secondary"
                                   disabled={
                                     savingReleaseItemId === activity.gradebookItemId
@@ -1915,14 +1925,14 @@ export default function CourseGroupPage() {
                           <h2>{t("groupPage.participantsTitle")}</h2>
                           <p className="muted">{t("groupPage.participantsText")}</p>
                         </div>
-                        {canManage ? (
+                        {canManageRoster ? (
                           <button className="secondary" type="button" onClick={() => setIsAddingParticipant((current) => !current)}>
                             {isAddingParticipant ? t("common.cancel") : t("groupPage.addParticipant")}
                           </button>
                         ) : null}
                       </div>
 
-                      {canManage && isAddingParticipant ? (
+                      {canManageRoster && isAddingParticipant ? (
                         <form className="form inline-panel" onSubmit={addParticipant}>
                           <div>
                             <p className="eyebrow">{t("groupPage.addParticipantEyebrow")}</p>
@@ -2038,7 +2048,7 @@ export default function CourseGroupPage() {
                                 {participant.userId ? t("groupPage.participantStatusLinked") : t("groupPage.participantStatusPending")}
                               </span>
                               <div className="table-actions">
-                                {canManage ? (
+                                {canManageRoster ? (
                                   <button
                                     aria-label={t("groupPage.removeParticipant")}
                                     className="danger icon-button"
@@ -2060,6 +2070,11 @@ export default function CourseGroupPage() {
                       {participantError ? <p className="error">{participantError}</p> : null}
                     </section>
                   )
+                },
+                {
+                  id: "challenges",
+                  label: t("courseDetail.challengesTab"),
+                  render: () => <CourseGradeChallengesPanel courseId={courseId} />
                 },
                 {
                   id: "settings",
@@ -2120,7 +2135,11 @@ export default function CourseGroupPage() {
                       </section>
                     )
                 }
-              ].filter((tab) => tab.id !== "activities" && tab.id !== "materials")}
+              ].filter((tab) =>
+                tab.id !== "activities" &&
+                tab.id !== "materials" &&
+                (canManage || tab.id !== "settings")
+              )}
             />
             {dragPreview ? (
               <div className="drag-preview" style={{ left: dragPreview.x + 14, top: dragPreview.y + 14 }}>

@@ -672,7 +672,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await studentPage.getByRole("button", { name: "Save draft" }).click();
     await expect(studentPage.getByText("Answers saved.")).toBeVisible();
     await studentPage.getByRole("button", { name: "Submit answers" }).click();
-    await expect(studentPage.getByText("Submission complete", { exact: true })).toBeVisible();
+    await expect(studentPage.getByText("Submission complete", { exact: true }).first()).toBeVisible();
   });
 
   test("teacher composes a Test from authored activities and the student completes the whole assessment", async ({ teacherPage, studentPage }) => {

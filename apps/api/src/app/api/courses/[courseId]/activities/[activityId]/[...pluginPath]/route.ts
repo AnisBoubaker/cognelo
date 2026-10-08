@@ -1,6 +1,13 @@
 import { NextRequest } from "next/server";
 import { resolvePluginRoute } from "@cognelo/activity-sdk/server";
-import { AppError, assertActivityTypePluginEnabled, assertCanManageCourse, getActivity } from "@cognelo/core";
+import {
+  AppError,
+  assertActivityTypePluginEnabled,
+  assertCanManageCourse,
+  assertCanViewCourseGradebook,
+  getActivity,
+  getActivityForGradebook
+} from "@cognelo/core";
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; activityId: string; pluginPath: string[] }> };
@@ -14,8 +21,20 @@ export function OPTIONS() {
 async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params["params"]>) {
   const user = await requireUser();
   const { courseId, activityId, pluginPath } = params;
-  await assertCanManageCourse(user, courseId);
-  const activity = await getActivity(user, courseId, activityId);
+  const gradebookRead = request.method === "GET" && new Set([
+    "coding-exercises/review-all",
+    "coding-exercises/hidden-tests",
+    "web-design-coding-exercises/tests",
+    "web-design-coding-exercises/review-all"
+  ]).has(pluginPath.join("/"));
+  if (gradebookRead) {
+    await assertCanViewCourseGradebook(user, courseId);
+  } else {
+    await assertCanManageCourse(user, courseId);
+  }
+  const activity = gradebookRead
+    ? await getActivityForGradebook(user, courseId, activityId)
+    : await getActivity(user, courseId, activityId);
   await assertActivityTypePluginEnabled(activity.activityType.key);
   const route = resolvePluginRoute(activity.activityType.key, pluginPath);
 

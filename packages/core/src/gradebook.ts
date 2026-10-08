@@ -1,6 +1,13 @@
-import { prisma, type Prisma } from "@cognelo/db";
+import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
-import { assertCanViewCourse, canManageCourse, isAdmin } from "./authorization";
+import {
+  assertCanGradeGroup,
+  assertCanReleaseCourseGrades,
+  assertCanViewCourse,
+  assertCanViewCourseGradebook,
+  canManageCourse,
+  isAdmin
+} from "./authorization";
 import { AppError, forbidden, notFound } from "./errors";
 import { gradeChallengeTargetForGrade } from "./grade-challenge-targets";
 
@@ -89,6 +96,7 @@ export type OverrideGradebookGradeInput = {
   isPass?: boolean | null;
   reason?: string | null;
   feedbackText?: string | null;
+  expectedGradeUpdatedAt?: string | null;
   metadata?: JsonInput;
   now?: Date;
 };
@@ -409,7 +417,6 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
         metadata: (input.metadata ?? {}) as JsonInput
       }
     });
-
     const gradedAttempt = await tx.activityAttempt.update({
       where: { id: attempt.id },
       data: {
@@ -443,7 +450,7 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
 }
 
 export async function deleteActivitySubmission(user: CurrentUser, courseId: string, input: DeleteActivitySubmissionInput) {
-  await canManageCourseOrThrow(user, courseId);
+  await assertCanViewCourseGradebook(user, courseId);
   const reason = input.reason.trim();
   if (!reason) {
     throw new AppError(400, "SUBMISSION_DELETE_REASON_REQUIRED", "A deletion reason is required.");
@@ -461,6 +468,7 @@ export async function deleteActivitySubmission(user: CurrentUser, courseId: stri
   if (!attempt) {
     throw notFound("Activity attempt");
   }
+  await assertCanGradeGroup(user, courseId, attempt.groupId);
   if (attempt.lifecycle === "deleted") {
     throw new AppError(400, "SUBMISSION_ALREADY_DELETED", "This submission has already been deleted.");
   }
@@ -572,7 +580,7 @@ export async function deleteActivitySubmission(user: CurrentUser, courseId: stri
 }
 
 export async function overrideGradebookGrade(user: CurrentUser, courseId: string, input: OverrideGradebookGradeInput) {
-  await canManageCourseOrThrow(user, courseId);
+  await assertCanViewCourseGradebook(user, courseId);
   const now = input.now ?? new Date();
   const item = await prisma.gradebookItem.findFirst({
     where: {
@@ -603,6 +611,7 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
   if (!item) {
     throw notFound("Gradebook item");
   }
+  await assertCanGradeGroup(user, courseId, item.groupId);
   if (assignmentAssessmentMode(item.groupActivity?.metadata) !== "summative") {
     throw new AppError(409, "FORMATIVE_GRADE_NOT_ALLOWED", "Formative activity attempts can be reviewed but not graded.");
   }
@@ -626,7 +635,8 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
     normalizedScore: input.score,
     normalizedMaxScore: maxScore
   });
-  return prisma.$transaction(async (tx) => {
+  try {
+    return await prisma.$transaction(async (tx) => {
     const previousGrade = await tx.grade.findUnique({
       where: {
         gradebookItemId_participantId: {
@@ -635,6 +645,12 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
         }
       }
     });
+    if (input.expectedGradeUpdatedAt !== undefined) {
+      const actualUpdatedAt = previousGrade?.updatedAt.toISOString() ?? null;
+      if (actualUpdatedAt !== input.expectedGradeUpdatedAt) {
+        throw gradeEditConflict();
+      }
+    }
     const latestAttempt = await tx.activityAttempt.findFirst({
       where: {
         gradebookItemId: item.id,
@@ -724,8 +740,18 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
       }
     });
 
-    return grade;
-  });
+      return grade;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  } catch (error) {
+    if (
+      input.expectedGradeUpdatedAt !== undefined &&
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === "P2002" || error.code === "P2034")
+    ) {
+      throw gradeEditConflict();
+    }
+    throw error;
+  }
 }
 
 export async function recordActivityAttemptAiFeedback(
@@ -739,12 +765,13 @@ export async function recordActivityAttemptAiFeedback(
     feedbackHash: string;
   }
 ) {
-  await canManageCourseOrThrow(user, courseId);
+  await assertCanViewCourseGradebook(user, courseId);
   const attempt = await prisma.activityAttempt.findFirst({
     where: { id: input.attemptId, courseId },
-    select: { id: true, gradebookItemId: true, participantId: true, assessmentMode: true }
+    select: { id: true, gradebookItemId: true, participantId: true, groupId: true, assessmentMode: true }
   });
   if (!attempt) throw notFound("Activity attempt");
+  await assertCanGradeGroup(user, courseId, attempt.groupId);
   if (attempt.assessmentMode === "formative") {
     throw new AppError(409, "FORMATIVE_ATTEMPT_NOT_GRADEABLE", "Formative attempts cannot receive gradebook feedback.");
   }
@@ -811,7 +838,7 @@ export async function getActivityAttemptRegradeContext(
   courseId: string,
   attemptId: string
 ): Promise<ActivityAttemptRegradeContext> {
-  await canManageCourseOrThrow(user, courseId);
+  await assertCanViewCourseGradebook(user, courseId);
   const attempt = await prisma.activityAttempt.findFirst({
     where: { id: attemptId, courseId },
     include: {
@@ -824,6 +851,7 @@ export async function getActivityAttemptRegradeContext(
     }
   });
   if (!attempt) throw notFound("Activity attempt");
+  await assertCanGradeGroup(user, courseId, attempt.groupId);
   if (attempt.assessmentMode === "formative") {
     throw new AppError(409, "FORMATIVE_ATTEMPT_NOT_GRADEABLE", "Formative attempts cannot be regraded.");
   }
@@ -868,7 +896,7 @@ export async function getActivityAttemptRegradeContexts(
   courseId: string,
   attemptIds: readonly string[]
 ): Promise<ActivityAttemptRegradeContext[]> {
-  await canManageCourseOrThrow(user, courseId);
+  await assertCanViewCourseGradebook(user, courseId);
   const uniqueAttemptIds = [...new Set(attemptIds)];
   const attempts = await prisma.activityAttempt.findMany({
     where: { id: { in: uniqueAttemptIds }, courseId },
@@ -881,6 +909,7 @@ export async function getActivityAttemptRegradeContexts(
       groupActivity: true
     }
   });
+  await Promise.all(attempts.map((attempt) => assertCanGradeGroup(user, courseId, attempt.groupId)));
   const byId = new Map(attempts.map((attempt) => [attempt.id, attempt]));
   return uniqueAttemptIds.map((attemptId) => {
     const attempt = byId.get(attemptId);
@@ -939,13 +968,24 @@ export type SetGradebookItemReleaseInput = {
 };
 
 export async function getCourseGradebook(user: CurrentUser, courseId: string, filters: CourseGradebookFilters = {}) {
-  await canManageCourseOrThrow(user, courseId);
+  const capabilities = await assertCanViewCourseGradebook(user, courseId);
+  if (
+    filters.groupId &&
+    capabilities.gradingGroupIds !== null &&
+    !capabilities.gradingGroupIds.includes(filters.groupId)
+  ) {
+    throw forbidden();
+  }
   await ensureCourseGradebookItems(courseId);
   const statusFilter = filters.status ?? "all";
   const items = await prisma.gradebookItem.findMany({
     where: {
       courseId,
-      ...(filters.groupId ? { groupId: filters.groupId } : {}),
+      ...(filters.groupId
+        ? { groupId: filters.groupId }
+        : capabilities.gradingGroupIds !== null
+          ? { groupId: { in: capabilities.gradingGroupIds } }
+          : {}),
       ...(filters.activityId ? { activityId: filters.activityId } : {})
     },
     include: {
@@ -1039,6 +1079,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         status,
         score: effectiveGrade?.normalizedScore ?? null,
         maxScore: effectiveGrade?.normalizedMaxScore ?? item.pointsPossible,
+        gradeUpdatedAt: effectiveGrade?.updatedAt?.toISOString() ?? null,
         gradeSource: effectiveGrade?.source ?? null,
         isPass: effectiveGrade?.isPass ?? null,
         latePenaltyApplied: effectiveGrade?.latePenaltyApplied ?? false,
@@ -1165,7 +1206,7 @@ export async function setGradebookItemRelease(
   gradebookItemId: string,
   input: SetGradebookItemReleaseInput
 ) {
-  await canManageCourseOrThrow(user, courseId);
+  await assertCanReleaseCourseGrades(user, courseId);
   const now = input.now ?? new Date();
   const item = await prisma.gradebookItem.findFirst({
     where: { id: gradebookItemId, courseId },
@@ -1618,13 +1659,6 @@ async function assertCanUseAttempt(
   if (participant.userId === user.id) {
     return;
   }
-  if (await canManageCourse(user, courseId)) {
-    return;
-  }
-  throw forbidden();
-}
-
-async function canManageCourseOrThrow(user: CurrentUser, courseId: string) {
   if (await canManageCourse(user, courseId)) {
     return;
   }
@@ -2161,6 +2195,14 @@ function gradeCandidateFromSnapshot(attemptId: string, value: Record<string, unk
       normalizedResult: asJsonObject(value.normalizedResult) ?? {}
     }
   ];
+}
+
+function gradeEditConflict() {
+  return new AppError(
+    409,
+    "GRADE_EDIT_CONFLICT",
+    "This grade changed after the review dialog was opened. Reload the latest grading record before saving again."
+  );
 }
 
 function gradedAttemptSnapshot(candidate: GradedAttemptCandidate) {

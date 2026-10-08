@@ -130,7 +130,8 @@ export async function getCourseTeacherQuestionAuthoringAiAgentConnection(user: C
       createdById: true,
       memberships: {
         where: {
-          role: { in: ["owner", "teacher"] }
+          role: { in: ["owner", "teacher"] },
+          source: "explicit"
         },
         select: {
           role: true,
@@ -151,29 +152,23 @@ export async function getCourseTeacherQuestionAuthoringAiAgentConnection(user: C
       userId: membership.userId,
       preferences: getAiPreferences(membership.user.metadata)
     }))
-    .find((entry) => entry.preferences.questionAuthoringAiAgentConnectionId);
+    .filter((entry) => entry.preferences.questionAuthoringAiAgentConnectionId);
 
-  const connectionId = staffPreferences?.preferences.questionAuthoringAiAgentConnectionId ?? null;
-  if (!connectionId || !staffPreferences) {
-    throw new AppError(400, "AI_AGENT_NOT_CONFIGURED", "No course teacher AI agent is configured for question authoring.");
-  }
-
-  const connection = await prisma.aiAgentConnection.findFirst({
-    where: {
-      id: connectionId,
-      isEnabled: true,
-      OR: [{ ownerId: staffPreferences.userId }, { ownerId: null }]
+  for (const staffPreference of staffPreferences) {
+    const connectionId = staffPreference.preferences.questionAuthoringAiAgentConnectionId;
+    if (!connectionId) continue;
+    const connection = await prisma.aiAgentConnection.findFirst({
+      where: {
+        id: connectionId,
+        isEnabled: true,
+        OR: [{ ownerId: staffPreference.userId }, { ownerId: null }]
+      }
+    });
+    if (connection && (connection.apiKey || connection.provider === "ollama")) {
+      return connection;
     }
-  });
-
-  if (!connection) {
-    throw notFound("AI agent connection");
   }
-  if (!connection.apiKey && connection.provider !== "ollama") {
-    throw new AppError(400, "AI_AGENT_KEY_MISSING", "The selected course teacher AI agent connection does not have an API key.");
-  }
-
-  return connection;
+  throw new AppError(400, "AI_AGENT_NOT_CONFIGURED", "No usable course teacher AI agent is configured for question authoring.");
 }
 
 export async function getCourseStudentSupportAiAgentConnection(user: CurrentUser, courseId: string) {
