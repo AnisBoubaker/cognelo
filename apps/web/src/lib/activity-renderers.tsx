@@ -1,7 +1,7 @@
 import type { ComponentProps, ComponentType, ElementType, ReactNode } from "react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { getActivityDefinition } from "@cognelo/activity-sdk";
+import { getActivityDefinition, listActivityDefinitions, validateStudentViewClientContracts } from "@cognelo/activity-sdk";
 import { CodeRenderer } from "@cognelo/activity-ui";
 import {
   CodingExerciseActivityView,
@@ -1356,6 +1356,25 @@ export const activityRenderers = {
   mcq: McqActivityRenderer,
   "web-design-coding-exercise": WebDesignCodingExerciseActivityRenderer
 } as const;
+
+/**
+ * Explicit fail-closed registry for the Student view route. Never fall back to
+ * activityRenderers here: every entry must deliberately adapt writes to the
+ * browser-scoped state host or the stateless preview API.
+ */
+export const studentPreviewRenderers = {
+  test: TestActivityRenderer,
+  "coding-exercise": CodingExerciseActivityRenderer,
+  "parsons-problem": ParsonsActivityRenderer,
+  mcq: McqActivityRenderer,
+  "web-design-coding-exercise": WebDesignCodingExerciseActivityRenderer
+} as const;
+
+validateStudentViewClientContracts({
+  definitions: listActivityDefinitions(),
+  interactiveActivityTypeKeys: Object.keys(studentPreviewRenderers),
+  testItemActivityTypeKeys: Object.keys(testItemRenderers)
+});
 
 export const bankActivityRenderers: Record<string, (context: BankActivityRendererContext) => ReactNode> = {
   "coding-exercise": CodingExerciseBankActivityRenderer,

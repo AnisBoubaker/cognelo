@@ -17,7 +17,7 @@ Gradebook attempt review and grading use core grade scope, so explicit course te
 - Reusable bank Tests copy Parsons children into Test-owned bank activities and later into independent course children; learner attempt/event rows are never copied.
 - Student state and event history use plugin-owned `PluginParsonsAttempt` and `PluginParsonsAttemptEvent` tables.
 - Teacher/admin previews are ephemeral and must not pollute learner research data.
-- Course Student view preserves that invariant with session-scoped browser state and deterministic, non-persistent evaluation.
+- The definition declares interactive, plugin-executed Student view support and preserves that invariant with session-scoped browser state and deterministic, non-persistent evaluation.
 - Formative checks and summative submissions create mode-tagged core attempts linked to the richer plugin attempt. Only summative attempts are graded, suppress correctness until release, and support teacher regrades; formative checks remain read-only teacher evidence.
 - The released deterministic or teacher-overridden grade is challengeable through the core workflow and returns to the existing Parsons **Review and grade** surface.
 - Activity-bank variations preserve the selected concepts, skills, and misconceptions, language, grouping/precedence structure, line count, and difficulty while generating a meaningfully different prompt and reference solution. The copied activity is independent, including inside reusable Test variations.

@@ -5,6 +5,7 @@ This file is for placeholder-plugin memory only.
 ## Current Decisions
 
 - The placeholder plugin should stay minimal.
+- It declares `studentView: { mode: "unsupported" }`; preview must fail closed until the plugin gains an explicit non-recording adapter.
 - It is a reference example for the plugin boundary more than a feature-heavy activity.
 - If it ever grows real behavior, that behavior should remain inside this package.
 - If it ever grows custom authoring or settings forms, those forms must use the shared unsaved-change guard.

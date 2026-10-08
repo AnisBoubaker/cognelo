@@ -10,7 +10,7 @@ Student template protection omits whitespace-only hidden boundaries, keeps the c
 
 The learner test runner contains and wraps execution output even when a program emits a very long line without spaces, so output cannot widen the responsive editor/test layout or push the runner off-screen.
 
-Teacher Student view reuses the learner editor and real Judge0 validation through stateless preview handlers. Preview source stays in browser session storage and no execution, attempt, grade, or analytics row is written.
+The activity definition declares interactive, plugin-executed Student view support. Teacher Student view reuses the learner editor and real Judge0 validation through stateless preview handlers. Preview source stays in browser session storage and no execution, attempt, grade, or analytics row is written.
 
 New exercises inherit the owning Subject's optional default programming language when they are created in a course, activity bank, course Test, or reusable bank Test. The choices come from the programming languages exposed by the configured Judge0 instance. A Subject can declare multiple languages; both that value and a missing default leave the exercise at `--- Choose ---`. Saving, generation, validation, execution, and submission remain unavailable until the exercise has one language. Existing and copied exercises keep their saved language.
 

@@ -1476,7 +1476,7 @@ export const frMessages = {
       groupUnavailableTitle: "Ce groupe n’est pas accessible aux étudiants",
       groupUnavailableText: "Les étudiants ne peuvent pas ouvrir ce groupe actuellement, car il n’est pas publié ou se trouve hors de sa période de disponibilité.",
       safeExamBrowserNotice: "Cette activité exige Safe Exam Browser pour les étudiants. La vue étudiante reste accessible puisque le travail d’aperçu n’est jamais enregistré.",
-      uploadActivityUnavailable: "Cette activité avec téléversement peut être consultée ici, mais son flux de soumission n’est pas disponible dans la vue étudiante, car il exige un espace de traitement persistant.",
+      readOnlyActivity: "Cette activité peut être consultée ici, mais son flux de réponse est désactivé intentionnellement, car il exige un état de traitement persistant.",
       unsupportedActivity: "Ce type d’activité ne fournit pas encore de rendu pour la vue étudiante."
     },
     parsons: parsonsMessages.fr

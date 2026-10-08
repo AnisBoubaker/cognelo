@@ -655,6 +655,12 @@ export type ActivityDefinition = {
     gradingTab?: boolean;
     supportsVariations?: boolean;
   };
+  studentView: {
+    mode: "interactive";
+    execution: "client" | "core" | "plugin";
+  } | {
+    mode: "read_only" | "unsupported";
+  };
   i18n?: Partial<
     Record<
       "en" | "fr" | "zh" | "ar",
@@ -1346,6 +1352,7 @@ function notifyUnauthorized() {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  assertStudentViewRequestIsSafe(path, init);
   const response = await fetch(`${API_URL}/api${path}`, {
     cache: "no-store",
     ...init,
@@ -1368,6 +1375,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     });
   }
   return body as T;
+}
+
+function assertStudentViewRequestIsSafe(path: string, init?: RequestInit) {
+  if (typeof window === "undefined" || !window.location?.pathname?.includes("/student-view")) return;
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") return;
+  if (path.includes("/student-preview/")) return;
+  throw new ApiError("Student view cannot call an endpoint that records changes.", {
+    code: "STUDENT_PREVIEW_PERSISTENCE_BLOCKED",
+    status: 409
+  });
 }
 
 export function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {

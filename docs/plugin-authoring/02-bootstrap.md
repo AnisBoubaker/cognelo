@@ -79,6 +79,7 @@ export const myActivityPlugin: ActivityPlugin = {
       key: "my-activity",
       name: "My activity",
       description: "A new Cognelo activity type.",
+      studentView: { mode: "unsupported" },
       i18n: {
         en: {
           name: "My activity",
@@ -105,6 +106,10 @@ A plugin can define one or more activity types. Many plugins only define one, bu
 ### `defaultConfig`
 
 This is the starting config for newly created activities. It should be safe and valid.
+
+### `studentView`
+
+Every activity must explicitly declare `interactive`, `read_only`, or `unsupported`. Start with `unsupported`; Student view will fail closed until you deliberately add a non-recording preview adapter.
 
 ### `db`
 

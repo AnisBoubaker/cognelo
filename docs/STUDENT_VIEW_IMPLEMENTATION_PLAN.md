@@ -19,6 +19,18 @@ Preview answers live under a session-scoped `sessionStorage` key. The dedicated 
 
 Programming Exercises execute Judge0 directly without `PluginCodingExerciseExecution`. Web Design Coding Exercises invoke the Playwright runner without plugin submission/test-result rows. MCQ and Parsons evaluation is deterministic and non-persistent. Compound Tests keep parent/item state in the browser and dispatch child actions through the same stateless handlers; starting and finishing a preview Test never creates a core attempt.
 
+## Required activity contract
+
+Every `ActivityDefinition` must declare exactly one `studentView` mode:
+
+- `interactive`, with `execution: "client" | "core" | "plugin"`;
+- `read_only`; or
+- `unsupported`.
+
+The registries fail closed. An interactive type must have an entry in the dedicated `studentPreviewRenderers` registry; Test-capable types must also have a Test-item renderer. Interactive plugin execution additionally requires exactly one non-empty `ServerActivityPlugin.studentPreview` registration. Read-only and unsupported types cannot register either interactive renderer or plugin preview actions. Registry mismatches throw during application startup and are covered by SDK tests.
+
+Student view never falls back to the normal activity renderer registry. As defense in depth, the shared browser API client rejects every non-read-only request from a `/student-view` page unless its URL is inside the dedicated `/student-preview` namespace. This turns an accidental call to an ordinary draft, attempt, submission, or plugin mutation route into `STUDENT_PREVIEW_PERSISTENCE_BLOCKED` before the request leaves the browser.
+
 ## Deliberate limitation
 
 Coding Homework Grader requires ZIP attachments, background processing, and multi-step durable derived state. Its Student view therefore shows the assignment but disables the submission workflow. A future implementation must use a separately named, expiring preview workspace with no core attempt/grade linkage and guaranteed cleanup; it must not reuse academic submission rows and delete them afterward.
@@ -30,3 +42,4 @@ Coding Homework Grader requires ZIP attachments, background processing, and mult
 - Runner tests prove preview execution returns genuine results without calling plugin persistence clients.
 - Activity SDK tests ensure only explicitly registered stateless preview handlers can be dispatched.
 - Browser coverage should verify new-window navigation, absence of Grades, hidden content, reset behavior, stateless activity interaction, compound Tests, and denied cross-group section-teacher access.
+- SDK coverage must reject a missing client adapter, an interactive renderer on a non-interactive definition, a missing or mismatched plugin server adapter, and duplicate server ownership.

@@ -13,6 +13,7 @@ export const placeholderPlugin: ActivityPlugin = {
       description: "A generic shell used while a pedagogical activity is being designed.",
       defaultCategoryIds: ["miscellaneous"],
       icon: "placeholder",
+      studentView: { mode: "unsupported" },
       i18n: {
         en: {
           name: "Placeholder activity",

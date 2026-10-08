@@ -97,6 +97,7 @@ export const tracingQuizPlugin: ActivityPlugin = {
       key: "tracing-quiz",
       name: "Tracing quiz",
       description: "Predict the output of a short program.",
+      studentView: { mode: "unsupported" },
       i18n: {
         en: {
           name: "Tracing quiz",
@@ -151,6 +152,8 @@ That means the platform can already:
 - register the activity type
 - seed it as an available activity type
 - validate it when created or updated
+
+The explicit `unsupported` declaration makes the teacher's Student view fail closed for now. When you later implement a non-recording preview adapter, change it to `{ mode: "interactive", execution: "plugin" }`, register the activity in `studentPreviewRenderers`, and add stateless `ServerActivityPlugin.studentPreview` actions. Use `read_only` only when the authored activity may be inspected but its response workflow cannot safely run without durable state.
 
 ## Step 3: Register The Plugin In The SDK
 

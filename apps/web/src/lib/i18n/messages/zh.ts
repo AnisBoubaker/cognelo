@@ -1475,7 +1475,7 @@ export const zhMessages = {
       groupUnavailableTitle: "学生目前无法访问此小组",
       groupUnavailableText: "此小组尚未发布或不在开放时间内，因此学生目前无法打开。",
       safeExamBrowserNotice: "学生使用此活动时需要 Safe Exam Browser。由于预览内容不会被记录，学生视图仍可使用。",
-      uploadActivityUnavailable: "可在此查看此上传型活动，但学生视图不支持其提交流程，因为该流程需要持久的处理工作区。",
+      readOnlyActivity: "可在此查看此活动，但其作答流程需要持久处理状态，因此已被有意停用。",
       unsupportedActivity: "此活动类型尚未提供学生视图。"
     },
     parsons: parsonsMessages.zh

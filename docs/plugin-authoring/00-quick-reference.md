@@ -42,14 +42,15 @@ If a plugin adds AI-assisted generation that writes into authoring/configuration
 1. Create `packages/plugin-activities/plugin-your-plugin`
 2. Export an `ActivityPlugin`
 3. Register it in `packages/activity-sdk/src/index.ts`
-4. If needed, export a `ServerActivityPlugin`
-5. Register it in `packages/activity-sdk/src/server.ts`
-6. If needed, export a React renderer
-7. Register it in `apps/web/src/lib/activity-renderers.tsx`
-8. If needed, add plugin tables in `packages/db/prisma/schema.prisma`
-9. If the plugin exposes any authoring or settings form, register unsaved-change behavior with `useUnsavedChangesGuard`
-10. If the plugin stores private bank-owned data, add a server hook to copy it into course-owned plugin tables when a bank version is assigned to a course. This is mandatory; core does not know how to copy plugin-owned rows.
-11. If needed, add browser API helpers in `apps/web/src/lib/api.ts`
+4. Declare `studentView` as `interactive`, `read_only`, or `unsupported`
+5. If needed, export a `ServerActivityPlugin`
+6. Register it in `packages/activity-sdk/src/server.ts`
+7. If needed, export a React renderer
+8. Register it in `apps/web/src/lib/activity-renderers.tsx`; interactive Student view support also requires the dedicated preview registry
+9. If needed, add plugin tables in `packages/db/prisma/schema.prisma`
+10. If the plugin exposes any authoring or settings form, register unsaved-change behavior with `useUnsavedChangesGuard`
+11. If the plugin stores private bank-owned data, add a server hook to copy it into course-owned plugin tables when a bank version is assigned to a course. This is mandatory; core does not know how to copy plugin-owned rows.
+12. If needed, add browser API helpers in `apps/web/src/lib/api.ts`
 
 ## Minimal Content Type Plugin Flow
 
@@ -122,6 +123,8 @@ export const activityRenderers = {
   "your-activity-type": YourActivityView
 } as const;
 ```
+
+Interactive Student view types must also be registered in `studentPreviewRenderers`. This is intentionally a separate map: the preview route never falls back to an ordinary renderer.
 
 ### Content type definition registry
 
@@ -246,6 +249,9 @@ Key fields:
 - `configSchema`
 - `metadataSchema`
 - `authoring.supportsVariations` when the activity provides a bank variation handler
+- required `studentView`: `{ mode: "interactive", execution: "client" | "core" | "plugin" }`, `{ mode: "read_only" }`, or `{ mode: "unsupported" }`
+
+For `interactive` + `plugin`, register non-persistent actions under `ServerActivityPlugin.studentPreview`. They may read private tests but may not create attempts, drafts, grades, analytics, or plugin execution/submission rows. Interactive types also require a dedicated frontend preview adapter. Test-capable activity types must be interactive and provide a Test-item renderer. Registry validation aborts startup on missing, mismatched, or duplicate registrations.
 
 ### `ServerActivityPlugin`
 
@@ -270,6 +276,10 @@ type ServerActivityPlugin = {
   bankVariation?: {
     activityTypeKeys: readonly string[];
     createVariation: BankActivityVariationHandler;
+  };
+  studentPreview?: {
+    activityTypeKeys: readonly string[];
+    actions: Readonly<Record<string, StudentPreviewExecutionHandler>>;
   };
 };
 ```
@@ -363,6 +373,7 @@ export const tracingQuizPlugin: ActivityPlugin = {
       key: "tracing-quiz",
       name: "Tracing quiz",
       description: "Predict program output.",
+      studentView: { mode: "unsupported" },
       defaultConfig: {
         prompt: "What does this print?",
         language: "python",

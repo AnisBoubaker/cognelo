@@ -1,11 +1,12 @@
 "use client";
 
+import { MarkdownRenderer } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { StudentPreviewBanner } from "@/components/student-preview-banner";
-import { activityRenderers } from "@/lib/activity-renderers";
+import { studentPreviewRenderers } from "@/lib/activity-renderers";
 import { api, type Activity, type ActivityDefinition, type StudentPreviewWorkspace } from "@/lib/api";
 import { clearStudentPreviewSession } from "@/lib/student-preview-state-host";
 import { useI18n } from "@/lib/i18n";
@@ -36,8 +37,12 @@ export default function StudentViewActivityPage() {
     }).catch((reason) => setError(reason instanceof Error ? reason.message : t("studentView.loadError")));
   }, [activityId, courseId, groupId, t]);
 
-  const Renderer = activity && definitions.some((definition) => definition.key === activity.activityType.key)
-    ? activityRenderers[activity.activityType.key as keyof typeof activityRenderers]
+  const definition = activity
+    ? definitions.find((candidate) => candidate.key === activity.activityType.key)
+    : null;
+  const studentViewMode = definition?.studentView.mode ?? "unsupported";
+  const Renderer = activity && studentViewMode === "interactive"
+    ? studentPreviewRenderers[activity.activityType.key as keyof typeof studentPreviewRenderers]
     : null;
   const backHref = `/courses/${courseId}/groups/${groupId}/student-view?previewSession=${encodeURIComponent(sessionId)}`;
 
@@ -56,8 +61,8 @@ export default function StudentViewActivityPage() {
         </section>
         {error ? <p className="error">{error}</p> : null}
         {activity?.assignment?.metadata?.requireSafeExamBrowser === true ? <p className="inline-panel">{t("studentView.safeExamBrowserNotice")}</p> : null}
-        {activity?.activityType.key === "coding-homework-grader" ? (
-          <section className="section stack"><h2>{activity.title}</h2><p className="muted">{t("studentView.uploadActivityUnavailable")}</p></section>
+        {activity && studentViewMode === "read_only" ? (
+          <section className="section stack"><h2>{activity.title}</h2><MarkdownRenderer markdown={activity.description} /><p className="muted">{t("studentView.readOnlyActivity")}</p></section>
         ) : activity && Renderer && workspace ? (
           <Renderer
             key={sessionId}
