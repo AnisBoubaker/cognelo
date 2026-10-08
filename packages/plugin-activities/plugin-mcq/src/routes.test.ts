@@ -504,7 +504,7 @@ describe("MCQ generation route", () => {
 
     await expect(
       mcqGradebookAttemptsRoute.methods.GET?.({
-        request: new Request("http://test.local?participantId=participant-1"),
+        request: new Request("http://test.local?participantId=participant-1&attemptId=core-attempt-1"),
         context: { ...context, groupId: "group-1" },
         readJson: async () => ({})
       })
@@ -517,5 +517,8 @@ describe("MCQ generation route", () => {
       ]
     });
     expect(mocks.assertCanGradeGroup).toHaveBeenCalledWith(context.user, "course-1", "group-1");
+    expect(mocks.prisma.activityAttempt.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "core-attempt-1", participantId: "participant-1" })
+    }));
   });
 });

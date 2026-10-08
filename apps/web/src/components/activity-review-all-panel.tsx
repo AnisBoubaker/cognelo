@@ -22,7 +22,7 @@ export type ActivityReviewResponse = {
   rubricResults?: CodingRubricResult[];
 };
 
-export function ActivityReviewAllPanel({ activityTypeKey, activityTitle, config, responses, solution, tests, rubricCriteria, mcqReport, loading, error, onClose, t }: {
+export function ActivityReviewAllPanel({ activityTypeKey, activityTitle, config, responses, solution, tests, rubricCriteria, mcqReport, loading, error, embedded = false, onClose, t }: {
   activityTypeKey: string;
   activityTitle: string;
   config: Record<string, unknown>;
@@ -33,14 +33,18 @@ export function ActivityReviewAllPanel({ activityTypeKey, activityTitle, config,
   mcqReport?: ReactNode;
   loading: boolean;
   error: string;
-  onClose: () => void;
+  embedded?: boolean;
+  onClose?: () => void;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   return (
-    <section className="dialog-panel answer-overlay test-review-overlay" role="dialog" aria-modal="true">
+    <section
+      className={embedded ? "stack" : "dialog-panel answer-overlay test-review-overlay"}
+      {...(embedded ? {} : { role: "dialog", "aria-modal": true })}
+    >
       <div className="section-heading">
         <div><p className="eyebrow">{activityTitle}</p><h2>{t("courseDetail.reviewAll")}</h2></div>
-        <button className="button secondary" type="button" onClick={onClose}>{t("common.close")}</button>
+        {!embedded && onClose ? <button className="button secondary" type="button" onClick={onClose}>{t("common.close")}</button> : null}
       </div>
       {loading ? <p className="muted">{t("courseDetail.loadingStudentAnswers")}</p> : null}
       {error ? <p className="error">{error}</p> : null}

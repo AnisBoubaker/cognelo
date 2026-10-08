@@ -460,6 +460,8 @@ First plugin integration target:
 - Completed: the course workspace requests that overview through `GET /api/courses/:courseId/gradebook?view=summary` only while the Gradebook tab is active. The server returns course/activity/group aggregates without learner rows or attempt histories; detailed views and CSV export retain the full data they require.
 - Completed: detailed results navigation supports course-wide activity results and group-scoped activity results through `?groupId=:groupId`.
 - Completed: detailed-results back links return to the course Gradebook tab and preserve `groupId` when the report is group-scoped.
+- Completed: authorized graders opening an activity from course content enter the same detailed-results workspace with inline **Class overview** and **Student results** tabs; content-origin navigation defaults to Class overview and the header retains a permission-gated **Edit activity** action. Designers without gradebook access still open the editor, and learner/group-projection activity URLs are unchanged.
+- Completed: per-student dialogs open on the newest current-mode submission and fetch only that plugin/Test payload initially. Navigating backward fetches each older attempt on demand; older and formative attempts are inspection-only.
 - Completed: detailed activity results page lists per-student results and supports a Parsons "See answer" overlay with previous/next submission navigation and an "Include attempts" option for non-submission attempts/events.
 - Completed: add filters:
   - group

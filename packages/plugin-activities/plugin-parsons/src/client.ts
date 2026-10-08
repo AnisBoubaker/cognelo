@@ -104,12 +104,13 @@ export function createParsonsClient(request: ParsonsPluginRequest) {
       courseId: string,
       groupId: string,
       activityId: string,
-      input: { participantId: string; includeAttempts?: boolean }
+      input: { attemptId?: string; participantId: string; includeAttempts?: boolean }
     ) => {
       const params = new URLSearchParams({ participantId: input.participantId });
       if (input.includeAttempts) {
         params.set("includeAttempts", "true");
       }
+      if (input.attemptId) params.set("attemptId", input.attemptId);
       return request<{
         participant: {
           id: string;

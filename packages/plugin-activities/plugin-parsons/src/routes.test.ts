@@ -284,7 +284,7 @@ describe("Parsons plugin routes", () => {
 
     await expect(
       parsonsGradebookAttemptsRoute.methods.GET?.({
-        request: new Request("http://test.local?participantId=participant-1&includeAttempts=true"),
+        request: new Request("http://test.local?participantId=participant-1&includeAttempts=true&attemptId=attempt-1"),
         context: {
           ...context,
           user: teacher,
@@ -302,7 +302,8 @@ describe("Parsons plugin routes", () => {
       expect.objectContaining({
         activityId: "activity-1",
         userId: "student-1",
-        includeAttempts: true
+        includeAttempts: true,
+        attemptId: "attempt-1"
       })
     );
     expect(mocks.prisma.activityAttempt.findMany).toHaveBeenCalledWith(

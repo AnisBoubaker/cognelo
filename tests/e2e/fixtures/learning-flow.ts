@@ -93,7 +93,7 @@ export async function provisionLearningFlow(): Promise<LearningFlowData> {
           gradebookSettings: {
             pointsPossible: 10,
             attemptLimitMode: "max_attempts",
-            maxAttempts: 1,
+            maxAttempts: 2,
             gradeStrategy: "latest"
           },
           position: 0,

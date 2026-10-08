@@ -13,6 +13,7 @@ export function TestReviewAllPanel({
   submissions,
   loading,
   error,
+  embedded = false,
   onClose,
   renderItem,
   t
@@ -22,7 +23,8 @@ export function TestReviewAllPanel({
   submissions: TestReviewAllSubmission[];
   loading: boolean;
   error: string;
-  onClose: () => void;
+  embedded?: boolean;
+  onClose?: () => void;
   renderItem: (context: TestReviewAllItemContext) => ReactNode;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
@@ -30,14 +32,17 @@ export function TestReviewAllPanel({
   const report = buildTestReportSummary(submissions, participantCount);
 
   return (
-    <section className="dialog-panel answer-overlay test-review-overlay" role="dialog" aria-modal="true">
+    <section
+      className={embedded ? "stack" : "dialog-panel answer-overlay test-review-overlay"}
+      {...(embedded ? {} : { role: "dialog", "aria-modal": true })}
+    >
       <div className="section-heading">
         <div>
           <p className="eyebrow">{t("courseDetail.testOverview")}</p>
           <h2>{t("courseDetail.reviewAll")}</h2>
           <p className="muted">{activityTitle} · {t("courseDetail.latestCompletedTestAttempts", { count: submissions.length })}</p>
         </div>
-        <button className="button secondary" type="button" onClick={onClose}>{t("common.close")}</button>
+        {!embedded && onClose ? <button className="button secondary" type="button" onClick={onClose}>{t("common.close")}</button> : null}
       </div>
 
       {loading ? <p className="muted">{t("courseDetail.loadingStudentAnswers")}</p> : null}

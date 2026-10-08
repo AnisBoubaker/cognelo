@@ -1300,7 +1300,9 @@ export default function CourseDetailPage() {
       return assignment ? `/courses/${courseId}/groups/${contentGroup.id}/activities/assigned/${assignment.activity.id}` : null;
     }
     if (item.activityId && courseActivityById.has(item.activityId)) {
-      return `/courses/${courseId}/activities/${item.activityId}`;
+      return course?.permissions?.canViewGradebook
+        ? `/courses/${courseId}/gradebook/activities/${item.activityId}?origin=content&report=overview`
+        : `/courses/${courseId}/activities/${item.activityId}`;
     }
     if (item.materialId && courseMaterialById.has(item.materialId)) {
       return materialHref(courseMaterialById.get(item.materialId) as CourseMaterial) ?? null;

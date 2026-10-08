@@ -110,6 +110,7 @@ type ManualGradingRendererContext = {
   activityConfig?: Record<string, unknown>;
   locale: Locale;
   attempts: Array<ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview>;
+  attemptCount: number;
   selectedAttempt: ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview | null;
   selectedIndex: number;
   includeAttempts: boolean;
@@ -133,6 +134,7 @@ export type AiFeedbackReviewRendererContext = {
   feedback: Record<string, unknown>;
   submission: Record<string, unknown>;
   onFeedbackChange: (feedback: Record<string, unknown>) => void;
+  readOnly?: boolean;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
