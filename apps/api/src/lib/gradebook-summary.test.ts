@@ -97,7 +97,46 @@ describe("summarizeCourseGradebook", () => {
     expect(JSON.stringify(summary)).not.toContain("participant-1");
     expect(JSON.stringify(summary)).not.toContain("attempt-secret");
   });
+
+  it("preserves the course-content activity order supplied by the core gradebook", () => {
+    const summary = summarizeCourseGradebook({
+      filters: { groupId: null, activityId: null, status: "all" },
+      groups: [{ id: "group-a", title: "Section A" }],
+      activities: [
+        { id: "activity-zebra", title: "Zebra first" },
+        { id: "activity-alpha", title: "Alpha second" }
+      ],
+      items: [
+        gradebookItem({ activityId: "activity-zebra", activityTitle: "Zebra first", gradebookItemId: "item-zebra" }),
+        gradebookItem({ activityId: "activity-alpha", activityTitle: "Alpha second", gradebookItemId: "item-alpha" })
+      ],
+      rows: []
+    } as Parameters<typeof summarizeCourseGradebook>[0]);
+
+    expect(summary.activitySummaries.map((activity) => activity.activityId)).toEqual([
+      "activity-zebra",
+      "activity-alpha"
+    ]);
+  });
 });
+
+function gradebookItem(input: { activityId: string; activityTitle: string; gradebookItemId: string }) {
+  return {
+    gradebookItemId: input.gradebookItemId,
+    groupId: "group-a",
+    groupTitle: "Section A",
+    activityId: input.activityId,
+    activityTitle: input.activityTitle,
+    activityTypeKey: "mcq",
+    activityTypeName: "Multiple choice",
+    assessmentMode: "summative" as const,
+    gradesReleased: false,
+    pointsPossible: 10,
+    studentCount: 0,
+    incompleteGradeCount: 0,
+    canReleaseGrades: true
+  };
+}
 
 function gradebookRow(overrides: {
   gradebookItemId: string;

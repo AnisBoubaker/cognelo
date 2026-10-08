@@ -67,8 +67,7 @@ export function summarizeCourseGradebook(gradebook: ResolvedCourseGradebook) {
         ...meanGradeForRows(activityRows),
         groups
       };
-    })
-    .sort((left, right) => left.activityTitle.localeCompare(right.activityTitle));
+    });
 
   return {
     filters: gradebook.filters,

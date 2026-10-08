@@ -41,6 +41,9 @@ const mockPrisma = vi.hoisted(() => ({
   courseGroup: {
     findFirst: vi.fn()
   },
+  courseContentItem: {
+    findMany: vi.fn()
+  },
   gradebookItem: {
     createMany: vi.fn(),
     findFirst: vi.fn(),
@@ -142,6 +145,7 @@ describe("gradebook attempt services", () => {
     mockPrisma.courseGroupActivity.findFirst.mockResolvedValue(groupActivity);
     mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue(participant);
     mockPrisma.activityAttempt.count.mockResolvedValue(0);
+    mockPrisma.courseContentItem.findMany.mockResolvedValue([]);
     mockPrisma.gradebookItem.findMany.mockResolvedValue([]);
     mockPrisma.gradebookItem.upsert.mockResolvedValue({ id: "gradebook-item-1" });
     mockPrisma.courseGroupActivity.findMany.mockResolvedValue([]);
@@ -838,6 +842,109 @@ describe("gradebook attempt services", () => {
         ]
       }]
     });
+  });
+
+  it("orders gradebook activities by their depth-first course content placement", async () => {
+    authMocks.canManageCourse.mockResolvedValue(true);
+    const makeItem = (input: { id: string; activityId: string; assignmentId: string; title: string }) => ({
+      id: input.id,
+      activityId: input.activityId,
+      groupId: "group-1",
+      titleSnapshot: input.title,
+      pointsPossible: 100,
+      gradesReleased: false,
+      group: { id: "group-1", title: "Section A", participants: [] },
+      activity: {
+        id: input.activityId,
+        title: input.title,
+        activityType: { key: "mcq", name: "Multiple choice" }
+      },
+      groupActivity: {
+        id: input.assignmentId,
+        availableFrom: null,
+        availableUntil: null,
+        metadata: { assessmentMode: "summative" }
+      },
+      grades: [],
+      attempts: [],
+      events: []
+    });
+    mockPrisma.gradebookItem.findMany.mockResolvedValue([
+      makeItem({ id: "item-unplaced", activityId: "activity-alpha", assignmentId: "assignment-alpha", title: "Alpha unplaced" }),
+      makeItem({ id: "item-last", activityId: "activity-beta", assignmentId: "assignment-beta", title: "Beta last" }),
+      makeItem({ id: "item-first", activityId: "activity-zebra", assignmentId: "assignment-zebra", title: "Zebra first" })
+    ]);
+    const createdAt = new Date("2026-10-07T12:00:00.000Z");
+    mockPrisma.courseContentItem.findMany.mockResolvedValue([
+      {
+        id: "folder-1",
+        parentId: null,
+        groupId: null,
+        kind: "folder",
+        titleSnapshot: "Unit one",
+        position: 0,
+        activityId: null,
+        courseGroupActivityId: null,
+        createdAt
+      },
+      {
+        id: "material-1",
+        parentId: "folder-1",
+        groupId: null,
+        kind: "content",
+        titleSnapshot: "Read first",
+        position: 0,
+        activityId: null,
+        courseGroupActivityId: null,
+        createdAt
+      },
+      {
+        id: "placement-first",
+        parentId: "folder-1",
+        groupId: null,
+        kind: "activity",
+        titleSnapshot: "Zebra first",
+        position: 1,
+        activityId: "activity-zebra",
+        courseGroupActivityId: null,
+        createdAt
+      },
+      {
+        id: "duplicate-group-placement",
+        parentId: null,
+        groupId: "group-1",
+        kind: "activity",
+        titleSnapshot: "Zebra first",
+        position: 99,
+        activityId: "activity-zebra",
+        courseGroupActivityId: "assignment-zebra",
+        createdAt
+      },
+      {
+        id: "placement-last",
+        parentId: null,
+        groupId: null,
+        kind: "activity",
+        titleSnapshot: "Beta last",
+        position: 1,
+        activityId: "activity-beta",
+        courseGroupActivityId: null,
+        createdAt
+      }
+    ]);
+
+    const gradebook = await getCourseGradebook(teacherUser, "course-1");
+
+    expect(gradebook.activities.map((activity) => activity.id)).toEqual([
+      "activity-zebra",
+      "activity-beta",
+      "activity-alpha"
+    ]);
+    expect(gradebook.items.map((item) => item.activityId)).toEqual([
+      "activity-zebra",
+      "activity-beta",
+      "activity-alpha"
+    ]);
   });
 
   it("treats stale attempt-derived grades as missing when every submission was deleted", async () => {
