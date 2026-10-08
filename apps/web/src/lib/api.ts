@@ -1902,7 +1902,15 @@ export const api = {
       `/courses/${courseId}/activities/${activityId}/coding-exercises/hidden-tests`
     ),
   codingExerciseReviewAll: (courseId: string, activityId: string) =>
-    request<{ submissions: Array<{ participantId: string; execution: CodingExerciseExecution; attempts: CodingExerciseExecution[] }> }>(
+    request<{ submissions: Array<{
+      participantId: string;
+      execution: CodingExerciseExecution;
+      attempts: CodingExerciseExecution[];
+      rubricEvaluations: Array<{
+        executionId: string;
+        criteria: Array<{ criterionId: string; scorePercent: number }>;
+      }>;
+    }> }>(
       `/courses/${courseId}/activities/${activityId}/coding-exercises/review-all`
     ),
   saveCodingExerciseHiddenTests: (

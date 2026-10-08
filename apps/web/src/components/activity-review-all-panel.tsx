@@ -4,6 +4,11 @@ import { CodeRenderer } from "@cognelo/activity-ui";
 import { parsonsAttemptStateSchema, parseParsonsConfig } from "@cognelo/plugin-parsons";
 import type { ReactNode } from "react";
 import type { CourseGradebookRow } from "@/lib/api";
+import {
+  summarizeCodingRubricCriterion,
+  type CodingRubricCriterion,
+  type CodingRubricResult
+} from "@/lib/activity-review-all";
 
 export type ActivityReviewResponse = {
   participantId: string;
@@ -14,15 +19,17 @@ export type ActivityReviewResponse = {
   maxScore: number;
   isPass: boolean | null;
   testResults?: Array<{ testId: string; name: string; passed: boolean }>;
+  rubricResults?: CodingRubricResult[];
 };
 
-export function ActivityReviewAllPanel({ activityTypeKey, activityTitle, config, responses, solution, tests, mcqReport, loading, error, onClose, t }: {
+export function ActivityReviewAllPanel({ activityTypeKey, activityTitle, config, responses, solution, tests, rubricCriteria, mcqReport, loading, error, onClose, t }: {
   activityTypeKey: string;
   activityTitle: string;
   config: Record<string, unknown>;
   responses: ActivityReviewResponse[];
   solution: unknown;
   tests?: Array<{ id: string; name: string }>;
+  rubricCriteria?: CodingRubricCriterion[];
   mcqReport?: ReactNode;
   loading: boolean;
   error: string;
@@ -40,7 +47,7 @@ export function ActivityReviewAllPanel({ activityTypeKey, activityTitle, config,
       {!loading && !error ? (
         activityTypeKey === "mcq" ? mcqReport
           : activityTypeKey === "parsons-problem" ? <ParsonsReport config={config} responses={responses} t={t} />
-          : activityTypeKey === "coding-exercise" ? <CodingReport config={config} responses={responses} solution={solution} tests={tests ?? []} />
+          : activityTypeKey === "coding-exercise" ? <CodingReport config={config} responses={responses} solution={solution} tests={tests ?? []} rubricCriteria={rubricCriteria ?? []} t={t} />
           : activityTypeKey === "web-design-coding-exercise" ? <WebDesignReport responses={responses} solution={solution} tests={tests ?? []} />
           : <GlobalSolution config={config} solution={solution} />
       ) : null}
@@ -63,10 +70,17 @@ function ParsonsReport({ config, responses, t }: { config: Record<string, unknow
   </div>;
 }
 
-function CodingReport({ config, responses, solution, tests }: { config: Record<string, unknown>; responses: ActivityReviewResponse[]; solution: unknown; tests: Array<{ id: string; name: string }> }) {
+function CodingReport({ config, responses, solution, tests, rubricCriteria, t }: {
+  config: Record<string, unknown>;
+  responses: ActivityReviewResponse[];
+  solution: unknown;
+  tests: Array<{ id: string; name: string }>;
+  rubricCriteria: CodingRubricCriterion[];
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
   const code = typeof solution === "string" ? solution : "";
   const language = typeof config.language === "string" ? config.language : "text";
-  return <div className="stack"><section className="inline-panel stack"><h3>Correct solution</h3>{code ? <CodeRenderer code={code} language={language} showLineNumbers /> : <p className="muted">No reference solution is available.</p>}</section><PerTestResults responses={responses} tests={tests} /></div>;
+  return <div className="stack"><section className="inline-panel stack"><h3>Correct solution</h3>{code ? <CodeRenderer code={code} language={language} showLineNumbers /> : <p className="muted">No reference solution is available.</p>}</section><RubricResults criteria={rubricCriteria} responses={responses} t={t} /><PerTestResults responses={responses} tests={tests} /></div>;
 }
 
 function WebDesignReport({ responses, solution, tests }: { responses: ActivityReviewResponse[]; solution: unknown; tests: Array<{ id: string; name: string }> }) {
@@ -97,6 +111,37 @@ function PerTestResults({ responses, tests }: { responses: ActivityReviewRespons
   })}</section>;
 }
 
+function RubricResults({ criteria, responses, t }: {
+  criteria: CodingRubricCriterion[];
+  responses: ActivityReviewResponse[];
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  if (!criteria.length) return null;
+  return <section className="inline-panel stack"><h3>{t("courseDetail.rubricResults")}</h3>{criteria.map((criterion) => {
+    const summary = summarizeCodingRubricCriterion(responses, criterion.id);
+    return <div className="rubric-overview-criterion stack stack-tight" key={criterion.id}>
+      <div className="rubric-overview-title">
+        <strong>{criterion.title}</strong>
+        <span className="muted">{t("courseDetail.rubricCriterionWeight", { weight: criterion.weightPercent })}</span>
+      </div>
+      <p>{criterion.description}</p>
+      {summary.count ? <>
+        <p className="muted">{t("courseDetail.rubricCriterionSummary", { average: summary.average ?? 0, count: summary.count })}</p>
+        <div className="aggregate-stacked-bar" aria-label={t("courseDetail.rubricScoreDistribution", { title: criterion.title })}>
+          {summary.bands.map((band, index) => band.responses.length ? <span
+            className={`aggregate-stacked-segment rubric-score-band rubric-score-band-${index + 1}`}
+            key={band.minimum}
+            style={{ flexGrow: band.responses.length / summary.count }}
+            title={rubricNames(band.responses)}
+          >
+            {band.label}: {band.responses.length}
+          </span> : null)}
+        </div>
+      </> : <p className="muted">{t("courseDetail.noRubricResults")}</p>}
+    </div>;
+  })}</section>;
+}
+
 function Distribution({ title, buckets, suffix }: { title: string; buckets: Array<{ value: number; responses: ActivityReviewResponse[] }>; suffix: string }) {
   const maximum = Math.max(1, ...buckets.map((entry) => entry.responses.length));
   return <section className="inline-panel stack"><h3>{title}</h3><div className="aggregate-bars">{buckets.map((entry) => <div className="aggregate-bar-column" key={entry.value}><span className="aggregate-bar-value">{entry.responses.length}</span><span className="aggregate-bar" style={{ height: `${Math.max(8, entry.responses.length / maximum * 140)}px` }} title={names(entry.responses)} /><span>{entry.value}{suffix}</span></div>)}</div></section>;
@@ -108,6 +153,9 @@ function BarSegment({ className, label, responses, total }: { className: string;
 }
 
 function names(responses: ActivityReviewResponse[]) { return responses.map((response) => `${response.participantName} (${response.groupTitle})`).join("\n"); }
+function rubricNames(results: Array<{ response: ActivityReviewResponse; scorePercent: number }>) {
+  return results.map(({ response, scorePercent }) => `${response.participantName} (${response.groupTitle}): ${scorePercent}%`).join("\n");
+}
 function bucket<T>(values: T[], getValue: (value: T) => number, getResponse: (value: T) => ActivityReviewResponse) {
   const map = new Map<number, ActivityReviewResponse[]>();
   for (const value of values) map.set(getValue(value), [...(map.get(getValue(value)) ?? []), getResponse(value)]);

@@ -85,6 +85,21 @@ export const codingExerciseReviewAllRoute: PluginRouteDefinition = {
         select: { id: true, userId: true }
       });
       const executions = await listCodingExerciseReviewExecutionAttempts({ activityId: context.activity.id, userIds: participants.flatMap((participant) => participant.userId ? [participant.userId] : []) });
+      const evaluations = executions.length ? await codingExercisePrisma.pluginCodingExerciseAiEvaluation.findMany({
+        where: {
+          activityId: context.activity.id,
+          executionId: { in: executions.map((execution) => execution.id) },
+          status: "completed"
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: { executionId: true, criterionScores: true }
+      }) : [];
+      const rubricByExecutionId = new Map<string, Array<{ criterionId: string; scorePercent: number }>>();
+      for (const evaluation of evaluations) {
+        if (!rubricByExecutionId.has(evaluation.executionId)) {
+          rubricByExecutionId.set(evaluation.executionId, reviewRubricScores(evaluation.criterionScores));
+        }
+      }
       const byUserId = new Map<string, typeof executions>();
       for (const execution of executions) {
         byUserId.set(execution.userId, [...(byUserId.get(execution.userId) ?? []), execution]);
@@ -92,12 +107,35 @@ export const codingExerciseReviewAllRoute: PluginRouteDefinition = {
       return {
         submissions: participants.flatMap((participant) => {
           const attempts = participant.userId ? byUserId.get(participant.userId) ?? [] : [];
-          return attempts.length ? [{ participantId: participant.id, execution: attempts[0], attempts }] : [];
+          return attempts.length ? [{
+            participantId: participant.id,
+            execution: attempts[0],
+            attempts,
+            rubricEvaluations: attempts.flatMap((execution) => {
+              const criteria = rubricByExecutionId.get(execution.id);
+              return criteria?.length ? [{ executionId: execution.id, criteria }] : [];
+            })
+          }] : [];
         })
       };
     }
   }
 };
+
+function reviewRubricScores(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  const scores = new Map<string, { criterionId: string; scorePercent: number }>();
+  for (const item of value) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const candidate = item as Record<string, unknown>;
+    const criterionId = typeof candidate.criterionId === "string" ? candidate.criterionId.trim() : "";
+    const scorePercent = candidate.scorePercent;
+    if (criterionId && typeof scorePercent === "number" && Number.isFinite(scorePercent) && scorePercent >= 0 && scorePercent <= 100 && !scores.has(criterionId)) {
+      scores.set(criterionId, { criterionId, scorePercent: Math.round(scorePercent * 100) / 100 });
+    }
+  }
+  return [...scores.values()];
+}
 
 async function resolveSubjectContext(activityBankId: string | undefined, courseId: string | undefined): Promise<SubjectContext> {
   if (activityBankId) {

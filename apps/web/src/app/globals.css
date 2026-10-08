@@ -3117,6 +3117,13 @@ a.card:hover,
 .aggregate-stacked-segment { align-items: center; color: white; cursor: help; display: flex; font-weight: 800; justify-content: center; min-width: 90px; padding: 12px; }
 .aggregate-stacked-segment.is-pass { background: #15803d; }
 .aggregate-stacked-segment.is-fail { background: #dc2626; }
+.rubric-overview-criterion + .rubric-overview-criterion { border-top: 1px solid var(--line); padding-top: 18px; }
+.rubric-overview-title { align-items: baseline; display: flex; flex-wrap: wrap; gap: 8px 14px; justify-content: space-between; }
+.rubric-score-band-1 { background: #b91c1c; }
+.rubric-score-band-2 { background: #c2410c; }
+.rubric-score-band-3 { background: #a16207; }
+.rubric-score-band-4 { background: #2563eb; }
+.rubric-score-band-5 { background: #15803d; }
 .aggregate-bars { align-items: end; display: flex; gap: 14px; min-height: 190px; overflow-x: auto; padding: 12px 4px 0; }
 .aggregate-bar-column { align-items: center; display: grid; flex: 1 0 72px; gap: 6px; justify-items: center; }
 .aggregate-bar { background: var(--brand-blue); border-radius: 7px 7px 2px 2px; cursor: help; max-width: 90px; min-width: 38px; width: 70%; }

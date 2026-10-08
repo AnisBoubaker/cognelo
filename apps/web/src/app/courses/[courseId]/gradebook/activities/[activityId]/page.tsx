@@ -9,6 +9,7 @@ import { createParsonsClient } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
 import { TestReviewAllPanel } from "@/components/test-review-all-panel";
 import { ActivityReviewAllPanel, toActivityReviewResponse, type ActivityReviewResponse } from "@/components/activity-review-all-panel";
+import { codingRubricResultsFromFeedback, type CodingRubricCriterion } from "@/lib/activity-review-all";
 import { ReviewAndGradeDialog } from "@/components/review-and-grade-dialog";
 import { GradebookExportDialog } from "@/components/gradebook-export-dialog";
 import {
@@ -73,6 +74,7 @@ export default function GradebookActivityResultsPage() {
     responses?: ActivityReviewResponse[];
     solution?: unknown;
     tests?: Array<{ id: string; name: string }>;
+    rubricCriteria?: CodingRubricCriterion[];
     mcqContext?: Parameters<typeof renderTestReviewAllItem>[0];
   } | null>(null);
   const [feedbackReview, setFeedbackReview] = useState<{
@@ -123,15 +125,24 @@ export default function GradebookActivityResultsPage() {
         const activityResult = await api.activity(courseId, activityId);
         let solution: unknown = null;
         let tests: Array<{ id: string; name: string }> = [];
+        let rubricCriteria: CodingRubricCriterion[] = [];
         let aggregateResults = new Map<string, Array<{ testId: string; name: string; passed: boolean }>>();
+        let aggregateRubricResults = new Map<string, Array<{ criterionId: string; scorePercent: number }>>();
         if (activityTypeKey === "coding-exercise") {
           const [definition, review] = await Promise.all([api.codingExerciseHiddenTests(courseId, activityId), api.codingExerciseReviewAll(courseId, activityId)]);
           solution = definition.referenceSolution?.sourceCode ?? null;
           tests = definition.tests.filter((test) => test.isEnabled).map((test) => ({ id: test.id, name: test.name }));
+          rubricCriteria = definition.referenceSolution?.privateConfig.aiFeedback.criteria ?? [];
           aggregateResults = new Map(review.submissions.flatMap(({ participantId, attempts }) => {
             const row = rows.find((candidate) => candidate.participantId === participantId);
             const execution = row ? matchingPluginAttempt(row, attempts) : null;
             return execution ? [[participantId, normalizeCodingTestResults(execution.resultSummary.tests)] as const] : [];
+          }));
+          aggregateRubricResults = new Map(review.submissions.flatMap(({ participantId, attempts, rubricEvaluations }) => {
+            const row = rows.find((candidate) => candidate.participantId === participantId);
+            const execution = row ? matchingPluginAttempt(row, attempts) : null;
+            const evaluation = execution ? rubricEvaluations.find((candidate) => candidate.executionId === execution.id) : null;
+            return evaluation ? [[participantId, evaluation.criteria] as const] : [];
           }));
         }
         if (activityTypeKey === "web-design-coding-exercise") {
@@ -156,7 +167,18 @@ export default function GradebookActivityResultsPage() {
           }
           return { row, state: null };
         }));
-        const responses = loaded.map(({ row, state }) => ({ ...toActivityReviewResponse(row, state), testResults: aggregateResults.get(row.participantId) }));
+        const responses = loaded.map(({ row, state }) => {
+          const currentRubricResults = codingRubricResultsFromFeedback(row.feedback);
+          return {
+            ...toActivityReviewResponse(row, state),
+            testResults: aggregateResults.get(row.participantId),
+            ...(activityTypeKey === "coding-exercise" ? {
+              rubricResults: currentRubricResults.length
+                ? currentRubricResults
+                : aggregateRubricResults.get(row.participantId) ?? []
+            } : {})
+          };
+        });
         let mcqContext: Parameters<typeof renderTestReviewAllItem>[0] | undefined;
         if (activityTypeKey === "mcq") {
           const makeItem = (response?: ActivityReviewResponse) => ({
@@ -176,7 +198,7 @@ export default function GradebookActivityResultsPage() {
             t
           } as Parameters<typeof renderTestReviewAllItem>[0];
         }
-        setReviewAll({ loading: false, error: "", submissions: [], activityTypeKey, config: activityResult.activity.config ?? {}, responses, solution, tests, mcqContext });
+        setReviewAll({ loading: false, error: "", submissions: [], activityTypeKey, config: activityResult.activity.config ?? {}, responses, solution, tests, rubricCriteria, mcqContext });
         return;
       }
       const reviewTargets = rows.flatMap((row) => {
@@ -900,6 +922,7 @@ export default function GradebookActivityResultsPage() {
               responses={reviewAll.responses ?? []}
               solution={reviewAll.solution}
               tests={reviewAll.tests}
+              rubricCriteria={reviewAll.rubricCriteria}
               mcqReport={reviewAll.mcqContext ? renderTestReviewAllItem(reviewAll.mcqContext) : null}
               loading={reviewAll.loading}
               error={reviewAll.error}
