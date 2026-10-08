@@ -511,6 +511,7 @@ export const arMessages = {
       runnerEnabled: "مفعّل",
       runnerDisplayName: "اسم العرض",
       runnerBaseUrl: "عنوان URL الأساسي",
+      runnerBaseUrlRequired: "أدخل عنوان URL أساسياً قبل حفظ هذا المشغل.",
       runnerAuthHeader: "ترويسة المصادقة (اختيارية)",
       runnerAuthToken: "رمز المصادقة",
       runnerAuthHelp: "اترك حقلي المصادقة فارغين إذا كان المشغل لا يتطلب رمزاً.",

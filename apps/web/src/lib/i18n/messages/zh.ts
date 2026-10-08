@@ -186,6 +186,7 @@ export const zhMessages = {
       runnerEnabled: "已启用",
       runnerDisplayName: "显示名称",
       runnerBaseUrl: "基础 URL",
+      runnerBaseUrlRequired: "保存此运行器前请输入基础 URL。",
       runnerAuthHeader: "身份验证标头（可选）",
       runnerAuthToken: "身份验证令牌",
       runnerAuthHelp: "如果运行器不需要令牌，请将两个身份验证字段留空。",

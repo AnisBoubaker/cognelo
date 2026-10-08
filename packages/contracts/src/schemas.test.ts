@@ -80,6 +80,10 @@ describe("shared contract schemas", () => {
       displayName: "Runner",
       baseUrl: "ftp://runner.example.test"
     })).toThrow();
+    expect(ExecutionRunnerConfigurationInputSchema.safeParse({
+      displayName: "Runner",
+      baseUrl: ""
+    }).success).toBe(false);
     expect(() => ExecutionRunnerConfigurationInputSchema.parse({
       displayName: "Runner",
       baseUrl: "https://runner.example.test",

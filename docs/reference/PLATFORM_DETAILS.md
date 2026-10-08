@@ -494,7 +494,7 @@ Judge0 image override:
 JUDGE0_IMAGE=ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2
 ```
 
-Runner base URLs, request authentication, enablement, and Judge0's per-process/thread behavior are database-backed administrator settings under `/settings/runners`; they are not application environment variables. The registry exposes Judge0, Web Design, and SageMath primary entries and permits multiple ordered rows per type for future round-robin selection. The current resolver uses the first enabled runner. Optional auth tokens are encrypted and public API responses expose only whether a token exists.
+Runner base URLs, request authentication, enablement, and Judge0's per-process/thread behavior are database-backed administrator settings under `/settings/runners`; they are not application environment variables. The registry exposes Judge0, Web Design, and SageMath primary entries and permits multiple ordered rows per type for future round-robin selection. The current resolver uses the first enabled runner. Optional auth tokens are encrypted and public API responses expose only whether a token exists. A type with no saved endpoint is presented as disabled; enabling or otherwise saving it requires a valid HTTP(S) base URL, and malformed input must return a validation response rather than an internal error.
 
 Each runner card has a connection-and-capability test. Judge0 verifies authenticated language discovery and a real synchronous sandbox submission. The Web Design runner must answer `GET /health` with `ok: true` and advertise `run` plus `screenshot`. A future SageMath runner must answer the same health contract and advertise `sagemath` plus `execute`; no Sage activity consumes that endpoint yet.
 

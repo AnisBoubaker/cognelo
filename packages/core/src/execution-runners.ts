@@ -356,7 +356,7 @@ function toPublicConfiguration(
         baseUrl: "",
         authHeader: runnerType === "judge0" ? "X-Auth-Token" : "",
         hasAuthToken: false,
-        isEnabled: true,
+        isEnabled: false,
         position: 0,
         settings: { enablePerProcessAndThreadLimits: true },
         updatedAt: null

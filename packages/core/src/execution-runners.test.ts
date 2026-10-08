@@ -45,9 +45,9 @@ describe("execution runner registry", () => {
   it("keeps configuration admin-only and always lists all supported runner types", async () => {
     await expect(listExecutionRunnerConfigurations(teacher)).rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
     await expect(listExecutionRunnerConfigurations(admin)).resolves.toEqual([
-      expect.objectContaining({ configured: false, runnerType: "judge0" }),
-      expect.objectContaining({ configured: false, runnerType: "web_design" }),
-      expect.objectContaining({ configured: false, runnerType: "sagemath" })
+      expect.objectContaining({ configured: false, isEnabled: false, runnerType: "judge0" }),
+      expect.objectContaining({ configured: false, isEnabled: false, runnerType: "web_design" }),
+      expect.objectContaining({ configured: false, isEnabled: false, runnerType: "sagemath" })
     ]);
   });
 

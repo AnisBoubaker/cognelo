@@ -76,6 +76,9 @@ export default function RunnerSettingsPage() {
       const dirtyTypes = runnerTypes.filter((runnerType) => (
         JSON.stringify(forms[runnerType]) !== JSON.stringify(savedForms[runnerType])
       ));
+      if (dirtyTypes.some((runnerType) => !forms[runnerType].baseUrl.trim())) {
+        throw new Error(t("settings.runnerBaseUrlRequired"));
+      }
       const updated = await Promise.all(dirtyTypes.map(async (runnerType) => {
         const form = forms[runnerType];
         const input: ExecutionRunnerConfigurationInput = {
@@ -318,7 +321,7 @@ function emptyRunner(displayName: string, authHeader = ""): RunnerForm {
     baseUrl: "",
     authHeader,
     authToken: "",
-    isEnabled: true,
+    isEnabled: false,
     enablePerProcessAndThreadLimits: true
   };
 }

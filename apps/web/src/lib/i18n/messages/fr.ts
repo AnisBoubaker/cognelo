@@ -186,6 +186,7 @@ export const frMessages = {
       runnerEnabled: "Activé",
       runnerDisplayName: "Nom affiché",
       runnerBaseUrl: "URL de base",
+      runnerBaseUrlRequired: "Saisissez une URL de base avant d’enregistrer cet exécuteur.",
       runnerAuthHeader: "En-tête d’authentification (facultatif)",
       runnerAuthToken: "Jeton d’authentification",
       runnerAuthHelp: "Laissez les deux champs d’authentification vides si l’exécuteur n’exige pas de jeton.",

@@ -199,8 +199,12 @@ export type ExecutionRunnerType = z.infer<typeof ExecutionRunnerTypeSchema>;
 export const ExecutionRunnerConfigurationInputSchema = z.object({
   displayName: z.string().trim().min(1).max(160),
   baseUrl: z.string().trim().url().max(500).refine((value) => {
-    const url = new URL(value);
-    return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password;
+    try {
+      const url = new URL(value);
+      return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password;
+    } catch {
+      return false;
+    }
   }, "Runner URL must use HTTP or HTTPS and must not contain credentials."),
   authHeader: z.string().trim().max(160).regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]*$/, "Authentication header is invalid.").optional().default(""),
   authToken: z.string().max(2000).optional().default(""),
