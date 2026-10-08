@@ -489,10 +489,12 @@ export function resolveCompositeExecutionActionHandler(activityTypeKey: string, 
 }
 
 export function resolveStudentPreviewExecutionHandler(activityTypeKey: string, action: string) {
-  const preview = serverPlugins.find((plugin) =>
-    plugin.studentPreview?.activityTypeKeys.includes(activityTypeKey)
-  )?.studentPreview;
-  return preview?.actions[action] ?? null;
+  for (const plugin of serverPlugins) {
+    if (plugin.studentPreview?.activityTypeKeys.includes(activityTypeKey)) {
+      return plugin.studentPreview.actions[action] ?? null;
+    }
+  }
+  return null;
 }
 
 export function resolveBankActivityVariationHandler(activityTypeKey: string) {

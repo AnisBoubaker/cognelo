@@ -8,6 +8,7 @@ Implemented for course/group content and the learner renderers used by MCQ, Pars
 
 - In a course's group content perspective, **Student view** opens a separate browser window. Section teachers receive the same action for their assigned group.
 - The preview contains the student-visible content projection for that group and never includes the Grades tab.
+- The preview and the real learner course page use the same `StudentCourseContent` component for folder tabs/accordions, activity badges, availability locks, icons, and material links. Preview-specific code supplies only alternate activity URLs and omits learner-specific grades/submission badges.
 - Group publication and availability, content visibility (including hidden ancestors and group overrides), and activity availability are enforced as learner rules even though the authenticated actor remains a teacher.
 - A persistent banner identifies the selected group and states that work is not saved. **Reset preview** clears the browser session state. Safe Exam Browser requirements are explained but do not block preview because no academic record can be created.
 
@@ -27,7 +28,7 @@ Every `ActivityDefinition` must declare exactly one `studentView` mode:
 - `read_only`; or
 - `unsupported`.
 
-The registries fail closed. An interactive type must have an entry in the dedicated `studentPreviewRenderers` registry; Test-capable types must also have a Test-item renderer. Interactive plugin execution additionally requires exactly one non-empty `ServerActivityPlugin.studentPreview` registration. Read-only and unsupported types cannot register either interactive renderer or plugin preview actions. Registry mismatches throw during application startup and are covered by SDK tests.
+The registries fail closed. An interactive type must have an entry in the dedicated `studentPreviewRenderers` registry; Test-capable types must also have a Test-item renderer. Interactive plugin execution additionally requires exactly one non-empty `ServerActivityPlugin.studentPreview` registration. Read-only and unsupported types cannot register either interactive renderer or plugin preview actions. Registry mismatches abort production startup and are covered directly by SDK tests. Development skips the cross-registry startup assertion because Next.js hot reload can temporarily expose a partially updated module graph; individual preview routes still fail closed when an action has no handler. Restart the API development process after adding or changing server plugin registrations.
 
 Student view never falls back to the normal activity renderer registry. As defense in depth, the shared browser API client rejects every non-read-only request from a `/student-view` page unless its URL is inside the dedicated `/student-preview` namespace. This turns an accidental call to an ordinary draft, attempt, submission, or plugin mutation route into `STUDENT_PREVIEW_PERSISTENCE_BLOCKED` before the request leaves the browser.
 
@@ -42,4 +43,5 @@ Coding Homework Grader requires ZIP attachments, background processing, and mult
 - Runner tests prove preview execution returns genuine results without calling plugin persistence clients.
 - Activity SDK tests ensure only explicitly registered stateless preview handlers can be dispatched.
 - Browser coverage should verify new-window navigation, absence of Grades, hidden content, reset behavior, stateless activity interaction, compound Tests, and denied cross-group section-teacher access.
+- Browser coverage also verifies that the preview workspace does not refetch during ordinary rerenders, Parsons server actions survive a clean registry load, and learner-visible uploaded files download from Student view.
 - SDK coverage must reject a missing client adapter, an interactive renderer on a non-interactive definition, a missing or mismatched plugin server adapter, and duplicate server ownership.
