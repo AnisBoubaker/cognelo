@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   assertCanManageActivityBank: vi.fn(),
   assertCanManageCourse: vi.fn(),
   assertCanManageCourseOrViewGradebook: vi.fn(),
+  assertCanViewCourseGradebook: vi.fn(),
   clearActivityResponseDraft: vi.fn(),
   getActivityAttemptAvailability: vi.fn(),
   recordActivityAttemptGradingResult: vi.fn(),
@@ -15,12 +16,15 @@ const mocks = vi.hoisted(() => ({
   generateCodingExerciseTests: vi.fn(),
   listCodingExerciseHiddenTests: vi.fn(),
   listCodingExerciseAttemptHistory: vi.fn(),
+  listCodingExerciseReviewExecutionAttempts: vi.fn(),
   listRecentCodingExerciseExecutions: vi.fn(),
   replaceCodingExerciseHiddenTests: vi.fn(),
   runCodingExercise: vi.fn(),
   submitCodingExercise: vi.fn(),
   prisma: {
     course: { findUnique: vi.fn() },
+    courseGroupParticipant: { findMany: vi.fn() },
+    pluginCodingExerciseAiEvaluation: { findMany: vi.fn() },
     pluginCodingExerciseReferenceSolution: { findUnique: vi.fn() },
     pluginCodingExerciseExecution: { update: vi.fn() }
   }
@@ -33,6 +37,7 @@ vi.mock("@cognelo/core", async () => {
     assertCanManageActivityBank: mocks.assertCanManageActivityBank,
     assertCanManageCourse: mocks.assertCanManageCourse,
     assertCanManageCourseOrViewGradebook: mocks.assertCanManageCourseOrViewGradebook,
+    assertCanViewCourseGradebook: mocks.assertCanViewCourseGradebook,
     clearActivityResponseDraft: mocks.clearActivityResponseDraft,
     getActivityAttemptAvailability: mocks.getActivityAttemptAvailability,
     recordActivityAttemptGradingResult: mocks.recordActivityAttemptGradingResult,
@@ -49,6 +54,7 @@ vi.mock("./executions", async () => {
   return {
     ...actual,
     listCodingExerciseAttemptHistory: mocks.listCodingExerciseAttemptHistory,
+    listCodingExerciseReviewExecutionAttempts: mocks.listCodingExerciseReviewExecutionAttempts,
     listRecentCodingExerciseExecutions: mocks.listRecentCodingExerciseExecutions,
     runCodingExercise: mocks.runCodingExercise,
     submitCodingExercise: mocks.submitCodingExercise
@@ -80,6 +86,7 @@ const {
   codingExerciseGenerateTestsRoute,
   codingExerciseHistoryRoute,
   codingExerciseHiddenTestsRoute,
+  codingExerciseReviewAllRoute,
   codingExerciseRunRoute,
   codingExerciseSubmitRoute
 } = await import("./routes");
@@ -108,6 +115,10 @@ describe("coding exercise plugin routes", () => {
       currentRuns: [{ id: "run-current", kind: "run" }],
       attempts: [{ submission: { id: "submit-1", kind: "submit" }, runs: [{ id: "run-1", kind: "run" }] }]
     });
+    mocks.assertCanViewCourseGradebook.mockResolvedValue({ gradingGroupIds: null });
+    mocks.prisma.courseGroupParticipant.findMany.mockResolvedValue([]);
+    mocks.prisma.pluginCodingExerciseAiEvaluation.findMany.mockResolvedValue([]);
+    mocks.listCodingExerciseReviewExecutionAttempts.mockResolvedValue([]);
     mocks.runCodingExercise.mockResolvedValue({ id: "run-1" });
     mocks.submitCodingExercise.mockResolvedValue({ id: "submit-1" });
     mocks.prisma.pluginCodingExerciseExecution.update.mockResolvedValue({ id: "submit-1" });
@@ -131,6 +142,50 @@ describe("coding exercise plugin routes", () => {
     mocks.generateCodingExerciseRubric.mockResolvedValue({ criteria: [] });
     mocks.generateCodingExerciseSolution.mockResolvedValue({ referenceSolution: "print(1)" });
     mocks.generateCodingExerciseTests.mockResolvedValue({ hiddenTests: [] });
+  });
+
+  it("lists current-attempt rubric evaluations for the teacher class overview", async () => {
+    mocks.assertCanViewCourseGradebook.mockResolvedValue({ gradingGroupIds: ["group-1"] });
+    mocks.prisma.courseGroupParticipant.findMany.mockResolvedValue([{ id: "participant-1", userId: "student-1" }]);
+    mocks.listCodingExerciseReviewExecutionAttempts.mockResolvedValue([
+      { id: "execution-2", userId: "student-1" },
+      { id: "execution-1", userId: "student-1" }
+    ]);
+    mocks.prisma.pluginCodingExerciseAiEvaluation.findMany.mockResolvedValue([
+      {
+        executionId: "execution-2",
+        criterionScores: [
+          { criterionId: "correctness", scorePercent: 87.125, feedback: "Current" },
+          { criterionId: "invalid", scorePercent: 120 }
+        ]
+      },
+      {
+        executionId: "execution-2",
+        criterionScores: [{ criterionId: "correctness", scorePercent: 20, feedback: "Older" }]
+      }
+    ]);
+
+    await expect(codingExerciseReviewAllRoute.methods.GET?.({
+      request: new Request("http://test.local"),
+      context,
+      readJson: async () => ({})
+    })).resolves.toEqual({
+      submissions: [{
+        participantId: "participant-1",
+        execution: { id: "execution-2", userId: "student-1" },
+        attempts: [
+          { id: "execution-2", userId: "student-1" },
+          { id: "execution-1", userId: "student-1" }
+        ],
+        rubricEvaluations: [{
+          executionId: "execution-2",
+          criteria: [{ criterionId: "correctness", scorePercent: 87.13 }]
+        }]
+      }]
+    });
+    expect(mocks.prisma.courseGroupParticipant.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ group: { courseId: "course-1", id: { in: ["group-1"] } } })
+    }));
   });
 
   it("runs, submits, and lists coding exercise executions", async () => {

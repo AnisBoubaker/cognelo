@@ -14,6 +14,19 @@ test.describe("consistent gradebook review actions", () => {
     await expect(page.getByRole("button", { name: "Grade All Manually" })).toHaveCount(0);
     await expect(page.getByText("Unavailable", { exact: true })).toHaveCount(0);
 
+    await page.getByRole("button", { name: "Class overview", exact: true }).click();
+    const classOverview = page.getByRole("dialog");
+    await expect(classOverview.getByRole("heading", { name: "Rubric results" })).toBeVisible();
+    await expect(classOverview.getByText("Algorithm correctness", { exact: true })).toBeVisible();
+    await expect(classOverview.getByText("The program computes the median for every ordering, including repeated and negative values.", { exact: true })).toBeVisible();
+    await expect(classOverview.getByText("Weight: 50%", { exact: true })).toBeVisible();
+    const rubricCriteria = classOverview.locator(".rubric-overview-criterion");
+    await expect(rubricCriteria).toHaveCount(3);
+    for (let index = 0; index < 3; index += 1) {
+      await expect(rubricCriteria.nth(index).getByText(/^(Average: .*% · \d+ graded|No graded rubric results)$/)).toBeVisible();
+    }
+    await classOverview.getByRole("button", { name: "Close", exact: true }).click();
+
     await page.getByRole("button", { name: "Assess with AI", exact: true }).first().click();
     const aiConfirmation = page.getByRole("dialog", { name: "Please confirm" });
     const aiConfirmationMessage = await aiConfirmation.locator(".muted").innerText();
