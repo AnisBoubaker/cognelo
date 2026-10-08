@@ -15,7 +15,7 @@ vi.mock("@cognelo/db", () => ({
   prisma: mockPrisma
 }));
 
-const { assertCanCreateCourse, assertCanManageCourse, assertCanViewCourse, canManageCourse, getCourseCapabilities } = await import("./authorization");
+const { assertCanCreateCourse, assertCanManageCourse, assertCanPreviewGroupAsStudent, assertCanViewCourse, canManageCourse, getCourseCapabilities } = await import("./authorization");
 
 const user = (roles: CurrentUser["roles"], id = "user-1"): CurrentUser => ({
   id,
@@ -98,6 +98,23 @@ describe("authorization helpers", () => {
       status: 403,
       code: "FORBIDDEN"
     });
+  });
+
+  it("allows course managers and the assigned section teacher to use Student view, but not TAs or students", async () => {
+    mockPrisma.courseMembership.findMany.mockResolvedValueOnce([{ role: "teacher", source: "explicit" }]);
+    await expect(assertCanPreviewGroupAsStudent(user(["teacher"]), "course-1", "group-1")).resolves.toBeUndefined();
+
+    mockPrisma.courseMembership.findMany.mockResolvedValueOnce([]);
+    mockPrisma.courseGroupParticipant.findFirst.mockResolvedValueOnce({ id: "section-teacher" });
+    await expect(assertCanPreviewGroupAsStudent(user(["teacher"]), "course-1", "group-1")).resolves.toBeUndefined();
+    expect(mockPrisma.courseGroupParticipant.findFirst).toHaveBeenLastCalledWith({
+      where: { userId: "user-1", groupId: "group-1", role: "teacher", group: { courseId: "course-1" } },
+      select: { id: true }
+    });
+
+    mockPrisma.courseMembership.findMany.mockResolvedValueOnce([]);
+    mockPrisma.courseGroupParticipant.findFirst.mockResolvedValueOnce(null);
+    await expect(assertCanPreviewGroupAsStudent(user(["teacher"]), "course-1", "group-1")).rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
   });
 
   it("reports learner visibility without granting gradebook capabilities", async () => {

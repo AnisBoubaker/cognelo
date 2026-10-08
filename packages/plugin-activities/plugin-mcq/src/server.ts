@@ -75,6 +75,29 @@ export const mcqServerPlugin: ServerActivityPlugin = {
       };
     }
   },
+  studentPreview: {
+    activityTypeKeys: ["mcq"],
+    actions: {
+      submit: async ({ activity, payload }) => {
+        const input = z.object({ answers: z.record(z.array(z.string().min(1).max(120)).default([])).default({}) }).parse(payload);
+        return {
+          submission: {
+            id: `student-preview-${crypto.randomUUID()}`,
+            attemptNumber: 1,
+            lifecycle: "submitted",
+            submittedAt: new Date().toISOString(),
+            gradedAt: null,
+            answers: input.answers
+          },
+          gradingResult: buildMcqGradingResultFromConfig(activity.config, input.answers)
+        };
+      },
+      feedback: async ({ activity, payload }) => {
+        const input = z.object({ answers: z.record(z.array(z.string().min(1).max(120)).default([])).default({}) }).parse(payload);
+        return { feedback: buildMcqGradingResultFromConfig(activity.config, input.answers).feedback ?? {} };
+      }
+    }
+  },
   hooks: {
     onCourseActivityDeleted: async ({ activityId, activityTypeKey }) => {
       if (activityTypeKey === "mcq") await prisma.pluginMcqAiEvaluation.deleteMany({ where: { activityId } });

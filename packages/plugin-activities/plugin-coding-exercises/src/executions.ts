@@ -286,6 +286,78 @@ export async function runCodingExercise(params: {
   }
 }
 
+export async function runCodingExercisePreview(params: {
+  activityId: string;
+  userId: string;
+  activityConfig: unknown;
+  input: CodingExerciseRunInput;
+}) {
+  const config = parseCodingExerciseConfig(params.activityConfig);
+  const input = codingExerciseRunInputSchema.parse(params.input);
+  const outputMatcher = toOutputMatcher(input);
+  if (input.compareOutput) assertValidOutputMatcher(input.expectedOutput, outputMatcher);
+  const [privateConfig, runtime] = await Promise.all([
+    getCodingExercisePrivateConfig({ activityId: params.activityId }),
+    resolveJudge0Language(config.language)
+  ]);
+  const sourceCode = buildCodingExerciseSource({
+    config,
+    privateConfig,
+    studentSourceCode: input.sourceCode,
+    testCode: input.compareOutput ? input.testCode : ""
+  });
+  try {
+    const result = await runJudge0Submission({
+      languageId: runtime.languageId,
+      sourceCode,
+      stdin: input.stdin,
+      expectedOutput: input.compareOutput ? getJudge0ExpectedOutput(input.expectedOutput, outputMatcher) : undefined,
+      cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
+      wallTimeLimit: 10,
+      memoryLimitKb: 128000
+    });
+    const comparison = evaluateJudge0Result(result, input.expectedOutput, outputMatcher, input.compareOutput);
+    const savedOutput = capJudge0Output(result);
+    const message = capExecutionText(result.message ?? comparison.message, MAX_EXECUTION_MESSAGE_BYTES);
+    const comparisonMessage = capExecutionText(comparison.message, MAX_EXECUTION_MESSAGE_BYTES);
+    return previewCodingExecutionRecord({
+      activityId: params.activityId,
+      userId: params.userId,
+      kind: "run",
+      status: comparison.matched ? "completed" : "failed",
+      languageKey: runtime.languageKey,
+      judge0LanguageId: runtime.languageId,
+      sourceCode: input.sourceCode,
+      stdin: input.stdin,
+      expectedOutput: input.expectedOutput,
+      judge0Token: result.token,
+      stdout: savedOutput.stdout ?? null,
+      stderr: savedOutput.stderr ?? null,
+      compileOutput: savedOutput.compileOutput ?? null,
+      message: message.value ?? null,
+      timeSeconds: result.time ?? null,
+      memoryKb: result.memory ?? null,
+      judge0StatusId: result.status?.id ?? null,
+      judge0StatusLabel: result.status?.description ?? null,
+      resultSummary: {
+        judge0LanguageName: runtime.languageName,
+        accepted: comparison.matched,
+        outputCompared: input.compareOutput,
+        outputMatchMode: input.outputMatchMode,
+        containsLinesOrderMatters: input.containsLinesOrderMatters,
+        comparisonMessage: comparisonMessage.value,
+        outputTruncated: savedOutput.outputTruncated || message.truncated || comparisonMessage.truncated,
+        executionMode: config.executionMode,
+        phase: "finished",
+        studentPreview: true
+      }
+    });
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError(502, "JUDGE0_EXECUTION_FAILED", "The remote code execution service could not complete the preview run.");
+  }
+}
+
 export async function listRecentCodingExerciseExecutions(params: {
   activityId: string;
   userId: string;
@@ -445,6 +517,55 @@ export async function submitCodingExercise(params: {
     }
 
     throw new AppError(502, "JUDGE0_SUBMISSION_FAILED", "The remote code execution service could not complete the submission.");
+  }
+}
+
+export async function submitCodingExercisePreview(params: {
+  activityId: string;
+  userId: string;
+  activityConfig: unknown;
+  input: z.infer<typeof codingExerciseSubmitInputSchema>;
+}) {
+  const config = parseCodingExerciseConfig(params.activityConfig);
+  const input = codingExerciseSubmitInputSchema.parse(params.input);
+  const [privateConfig, runtime, hiddenTests] = await Promise.all([
+    getCodingExercisePrivateConfig({ activityId: params.activityId }),
+    resolveJudge0Language(config.language),
+    prisma.pluginCodingExerciseHiddenTest.findMany({
+      where: { activityId: params.activityId, isEnabled: true },
+      orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }]
+    })
+  ]);
+  const normalizedHiddenTests = hiddenTests.map(toHiddenTestCase);
+  if (!normalizedHiddenTests.length) {
+    throw new AppError(400, "HIDDEN_TESTS_REQUIRED", "This coding exercise does not have any enabled hidden tests yet.");
+  }
+  try {
+    const evaluated = await executeHiddenTests({ config, privateConfig, runtime, hiddenTests: normalizedHiddenTests, sourceCode: input.sourceCode });
+    return previewCodingExecutionRecord({
+      activityId: params.activityId,
+      userId: params.userId,
+      kind: "submit",
+      status: evaluated.summary.accepted ? "completed" : "failed",
+      languageKey: runtime.languageKey,
+      judge0LanguageId: runtime.languageId,
+      sourceCode: input.sourceCode,
+      stdin: "",
+      expectedOutput: "",
+      judge0Token: evaluated.latestToken,
+      stdout: evaluated.latestStdout,
+      stderr: evaluated.latestStderr,
+      compileOutput: evaluated.latestCompileOutput,
+      message: evaluated.firstFailureMessage,
+      timeSeconds: evaluated.latestTime,
+      memoryKb: evaluated.latestMemory,
+      judge0StatusId: evaluated.latestStatusId,
+      judge0StatusLabel: evaluated.latestStatusLabel,
+      resultSummary: { ...evaluated.summary, studentPreview: true }
+    });
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError(502, "JUDGE0_SUBMISSION_FAILED", "The remote code execution service could not complete the preview submission.");
   }
 }
 
@@ -1018,6 +1139,16 @@ function toCodingExerciseExecutionRecord(execution: CodingExerciseExecutionRow) 
     createdAt: execution.createdAt.toISOString(),
     updatedAt: execution.updatedAt.toISOString()
   };
+}
+
+function previewCodingExecutionRecord(input: Omit<CodingExerciseExecutionRow, "id" | "createdAt" | "updatedAt">) {
+  const now = new Date();
+  return toCodingExerciseExecutionRecord({
+    ...input,
+    id: `student-preview-${crypto.randomUUID()}`,
+    createdAt: now,
+    updatedAt: now
+  });
 }
 
 function toReferenceSolutionRecord(referenceSolution: {

@@ -1,7 +1,7 @@
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import { webDesignExerciseExpectedResultRoute, webDesignExerciseReviewAllRoute, webDesignExerciseRunRoute, webDesignExerciseSubmitRoute, webDesignExerciseTestsRoute } from "./routes";
 import { copyBankWebDesignExerciseData, copyBankWebDesignExerciseTestsToCourseActivity, copyCourseWebDesignExerciseData, copyCourseWebDesignExerciseDataToBankActivity, deleteBankWebDesignExerciseData, deleteCourseWebDesignExerciseData } from "./tests";
-import { submitWebDesignExercise, runWebDesignExercise, webDesignExerciseRunInputSchema } from "./executions";
+import { previewWebDesignExercise, submitWebDesignExercise, runWebDesignExercise, webDesignExerciseRunInputSchema } from "./executions";
 import { AppError } from "@cognelo/core";
 import { createWebDesignBankActivityVariation } from "./variation";
 
@@ -38,6 +38,27 @@ export const webDesignCodingExercisesServerPlugin: ServerActivityPlugin = {
           metadata: { kind: "web-design-coding-exercise", submissionId: submission.id }
         }
       };
+    }
+  },
+  studentPreview: {
+    activityTypeKeys: ["web-design-coding-exercise"],
+    actions: {
+      run: async ({ activity, payload, user }) => ({
+        submission: await previewWebDesignExercise({
+          activityId: activity.id,
+          userId: user.id,
+          kind: "run",
+          input: webDesignExerciseRunInputSchema.parse(payload)
+        })
+      }),
+      submit: async ({ activity, payload, user }) => ({
+        submission: await previewWebDesignExercise({
+          activityId: activity.id,
+          userId: user.id,
+          kind: "submit",
+          input: webDesignExerciseRunInputSchema.parse(payload)
+        })
+      })
     }
   },
   hooks: {

@@ -42,6 +42,11 @@ export type ActivityGradingResult = {
 
 export type ActivityExecutionContext =
   | {
+      kind: "student_preview";
+      previewSessionId: string;
+      activityId: string;
+    }
+  | {
       kind: "standalone";
       groupActivityId: string;
       activityAttemptId: string | null;

@@ -115,6 +115,8 @@ For the beginner-friendly plugin authoring handbook, including step-by-step setu
 
 ## API Surface
 
+Student view uses `/api/courses/:courseId/groups/:groupId/student-preview` for the forced learner workspace, nested activity reads, stateless activity actions, and compound-Test child actions. These routes authorize the real teacher, then enforce learner visibility and dispatch only the plugin SDK's stateless preview contract; they do not reuse academic draft, attempt, or submission routes.
+
 Core endpoints:
 
 ```text

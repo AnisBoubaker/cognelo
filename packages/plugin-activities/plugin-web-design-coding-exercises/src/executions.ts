@@ -116,6 +116,76 @@ export async function submitWebDesignExercise(params: {
   });
 }
 
+export async function previewWebDesignExercise(params: {
+  activityId: string;
+  userId: string;
+  kind: "run" | "submit";
+  input: z.infer<typeof webDesignExerciseRunInputSchema>;
+}) {
+  const input = webDesignExerciseRunInputSchema.parse(params.input);
+  const testKind = params.kind === "run" ? "sample" : "hidden";
+  const tests = await prisma.pluginWebDesignExerciseTest.findMany({
+    where: { activityId: params.activityId, kind: testKind, isEnabled: true },
+    orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }]
+  });
+  if (!tests.length) {
+    throw new AppError(400, "WEB_DESIGN_NO_TESTS", testKind === "sample"
+      ? "No enabled sample tests are available."
+      : "No enabled hidden tests are available.");
+  }
+  const now = new Date();
+  const id = `student-preview-${crypto.randomUUID()}`;
+  try {
+    const result = await runWebDesignTestsInRunner({
+      files: input.files,
+      tests: tests.map((test) => ({ id: test.id, name: test.name, testCode: test.testCode, weight: test.weight }))
+    });
+    return {
+      id,
+      activityId: params.activityId,
+      userId: params.userId,
+      kind: params.kind,
+      status: result.status,
+      files: input.files,
+      resultSummary: { phase: "finished", testKind, durationMs: result.durationMs, studentPreview: true },
+      score: result.score,
+      maxScore: result.maxScore,
+      message: result.status === "completed" ? null : "One or more tests failed.",
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      testResults: result.tests.map((testResult) => ({
+        id: `student-preview-${testResult.id}`,
+        testId: tests.find((test) => test.id === testResult.id)?.id ?? null,
+        name: testResult.name,
+        status: testResult.status,
+        weight: testResult.weight,
+        score: testResult.score,
+        message: testResult.message ?? null,
+        durationMs: testResult.durationMs ?? null,
+        details: testResult.details,
+        createdAt: now.toISOString()
+      }))
+    } satisfies WebDesignExerciseSubmissionRecord;
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    return {
+      id,
+      activityId: params.activityId,
+      userId: params.userId,
+      kind: params.kind,
+      status: "failed",
+      files: input.files,
+      resultSummary: { phase: "failed-before-result", testKind, studentPreview: true },
+      score: null,
+      maxScore: null,
+      message: error instanceof Error ? error.message : "The web design runner failed.",
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      testResults: []
+    } satisfies WebDesignExerciseSubmissionRecord;
+  }
+}
+
 async function executeWebDesignExercise(params: {
   activityId: string;
   userId: string;

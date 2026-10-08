@@ -788,6 +788,7 @@ export const zhMessages = {
       participantCount: "{count} 名参与者",
       editGroup: "编辑分组",
       contentViewSelectorLabel: "课程内容视角",
+      studentView: "学生视图",
       courseView: "课程",
       groupView: "分组",
       groupViewSelect: "选择分组视角",
@@ -1465,6 +1466,17 @@ export const zhMessages = {
       hiddenInGroup: "已在该分组中隐藏。",
       hiddenByFolder: "由于父文件夹被隐藏，因此该资料也被隐藏。",
       courseMaterialVisibilityError: "无法更新继承资料的可见性。"
+    },
+    studentView: {
+      bannerTitle: "学生视图 — {group}",
+      bannerText: "在此完成的内容仅为临时内容，不会保存到任何学生记录中。",
+      reset: "重置预览",
+      loadError: "无法加载学生视图。",
+      groupUnavailableTitle: "学生目前无法访问此小组",
+      groupUnavailableText: "此小组尚未发布或不在开放时间内，因此学生目前无法打开。",
+      safeExamBrowserNotice: "学生使用此活动时需要 Safe Exam Browser。由于预览内容不会被记录，学生视图仍可使用。",
+      uploadActivityUnavailable: "可在此查看此上传型活动，但学生视图不支持其提交流程，因为该流程需要持久的处理工作区。",
+      unsupportedActivity: "此活动类型尚未提供学生视图。"
     },
     parsons: parsonsMessages.zh
   } satisfies MessageTree;

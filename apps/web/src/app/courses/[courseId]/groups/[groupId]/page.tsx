@@ -1339,6 +1339,12 @@ export default function CourseGroupPage() {
                     {t("groupPage.backToCourse")}
                   </Link>
                 </div>
+              ) : canManageRoster ? (
+                <div className="hero-actions">
+                  <Link className="button secondary" href={`/courses/${courseId}/groups/${groupId}/student-view`} rel="noopener" target="_blank">
+                    {t("courseDetail.studentView")}
+                  </Link>
+                </div>
               ) : null}
             </section>
 

@@ -9,6 +9,7 @@ const testMocks = vi.hoisted(() => ({
 }));
 const executionMocks = vi.hoisted(() => ({
   webDesignExerciseRunInputSchema: { parse: vi.fn((value) => value) },
+  previewWebDesignExercise: vi.fn(),
   runWebDesignExercise: vi.fn(),
   submitWebDesignExercise: vi.fn()
 }));
@@ -107,6 +108,14 @@ describe("web design coding exercises server plugin lifecycle hooks", () => {
       state: { files, submissionId: "submit-1" },
       gradingResult: expect.objectContaining({ rawScore: 2, rawMaxScore: 3 })
     }));
+  });
+
+  it("routes Student view through the stateless web-design evaluator", async () => {
+    executionMocks.previewWebDesignExercise.mockResolvedValue({ id: "preview-1" });
+    const context = { user: testUser(), courseId: "course-1", groupId: "group-1", activity: testActivity("web-design-coding-exercise") };
+    await expect(webDesignCodingExercisesServerPlugin.studentPreview?.actions.run({ ...context, payload: { files: [] } })).resolves.toEqual({ submission: { id: "preview-1" } });
+    expect(executionMocks.runWebDesignExercise).not.toHaveBeenCalled();
+    expect(executionMocks.submitWebDesignExercise).not.toHaveBeenCalled();
   });
 });
 

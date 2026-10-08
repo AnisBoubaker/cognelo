@@ -21,6 +21,7 @@ import {
 } from "@/lib/api";
 import { activityCreationConfig } from "@/lib/activity-creation-defaults";
 import type { Locale } from "@/lib/i18n";
+import { createStudentPreviewStateHost } from "@/lib/student-preview-state-host";
 import { getTestCountdownTone, shouldAutoSubmitTestAttempt } from "@/lib/test-countdown";
 
 type Props = {
@@ -43,6 +44,7 @@ type Props = {
   renderStudentItem?: (context: TestStudentItemRendererContext) => ReactNode;
   onSave?: unknown;
   t?: (key: string, vars?: Record<string, string | number>) => string;
+  studentPreview?: { sessionId: string };
 };
 
 export type TestStudentItemRendererContext = {
@@ -432,6 +434,7 @@ function TestStudentRuntime({
   onNewAttemptAvailabilityChange,
   onPreviousSubmissionsAvailabilityChange,
   renderStudentItem,
+  studentPreview,
   t = (key) => key
 }: Props & { groupId: string }) {
   const courseId = activityRouteCourseId ?? "";
@@ -461,7 +464,9 @@ function TestStudentRuntime({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.testRuntime(courseId, groupId, activity.id, studentViewMode, sessionId)
+    (studentPreview
+      ? api.studentPreviewTestRuntime(courseId, groupId, activity.id)
+      : api.testRuntime(courseId, groupId, activity.id, studentViewMode, sessionId))
       .then((result) => {
         if (!cancelled) applyRuntime(result.runtime);
       })
@@ -472,7 +477,7 @@ function TestStudentRuntime({
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [activity.id, applyRuntime, courseId, groupId, notifications, sessionId, studentViewMode]);
+  }, [activity.id, applyRuntime, courseId, groupId, notifications, sessionId, studentPreview, studentViewMode]);
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -483,6 +488,25 @@ function TestStudentRuntime({
   const selectedRuntimeItem = runtime?.test.items[selectedIndex] ?? null;
   const executionHost = useMemo<ActivityExecutionStateHost<Record<string, unknown>> | null>(() => {
     if (!runtime?.attempt || !selectedRuntimeItem) return null;
+    if (studentPreview) {
+      const stateHost = createStudentPreviewStateHost<Record<string, unknown>>({
+        courseId,
+        groupId,
+        activityId: `${activity.id}:test-item:${selectedRuntimeItem.id}`,
+        sessionId: studentPreview.sessionId
+      });
+      return {
+        ...stateHost,
+        executeAction: <TResult,>(action: string, payload: unknown) => api.executeStudentPreviewTestItemAction<TResult>(
+          courseId,
+          groupId,
+          activity.id,
+          selectedRuntimeItem.id,
+          action,
+          payload
+        )
+      };
+    }
     const parentAttemptId = runtime.attempt.id;
     const testItemId = selectedRuntimeItem.id;
     return {
@@ -526,12 +550,26 @@ function TestStudentRuntime({
         );
       }
     };
-  }, [activity.id, courseId, groupId, runtime?.attempt?.id, selectedRuntimeItem?.id, selectedRuntimeItem?.itemAttempt?.id, sessionId]);
+  }, [activity.id, courseId, groupId, runtime?.attempt?.id, selectedRuntimeItem?.id, selectedRuntimeItem?.itemAttempt?.id, sessionId, studentPreview]);
 
   async function startTest() {
     setBusy(true);
     setLongRunningStudentAction("start");
     try {
+      if (studentPreview && runtime) {
+        const startedAt = new Date().toISOString();
+        const expiresAt = runtime.timing.timeLimitMinutes
+          ? new Date(Date.now() + runtime.timing.timeLimitMinutes * 60_000).toISOString()
+          : null;
+        applyRuntime({
+          ...runtime,
+          attempt: { id: `student-preview-${studentPreview.sessionId}`, attemptNumber: 1, lifecycle: "started", startedAt, submittedAt: null, gradedAt: null },
+          timing: { ...runtime.timing, expiresAt, remainingSeconds: runtime.timing.timeLimitMinutes ? runtime.timing.timeLimitMinutes * 60 : null, isExpired: false }
+        });
+        setShowStartConfirmation(false);
+        notifications.success(t("courseDetail.testStarted"));
+        return;
+      }
       const result = await api.startTestAttempt(courseId, groupId, activity.id, sessionId);
       applyRuntime(result.runtime);
       setShowStartConfirmation(false);
@@ -553,6 +591,30 @@ function TestStudentRuntime({
     setBusy(true);
     setLongRunningStudentAction("submit");
     try {
+      if (studentPreview) {
+        await Promise.all(runtime.test.items.map(async (item) => {
+          const stateHost = createStudentPreviewStateHost<Record<string, unknown>>({
+            courseId,
+            groupId,
+            activityId: `${activity.id}:test-item:${item.id}`,
+            sessionId: studentPreview.sessionId
+          });
+          const state = await stateHost.load();
+          if (state) {
+            await api.executeStudentPreviewTestItemAction(courseId, groupId, activity.id, item.id, "submit", state);
+          }
+        }));
+        const submittedAt = new Date().toISOString();
+        applyRuntime({
+          ...runtime,
+          attempt: { ...runtime.attempt, lifecycle: "submitted", submittedAt },
+          timing: { ...runtime.timing, expiresAt: null, remainingSeconds: null, isExpired: false }
+        });
+        setShowSubmitConfirmation(false);
+        notifications.success(t("courseDetail.testSubmitted"));
+        onSubmitted?.();
+        return;
+      }
       const result = await api.submitTestAttempt(courseId, groupId, activity.id, runtime.attempt.id, sessionId);
       applyRuntime(result.runtime);
       setShowSubmitConfirmation(false);

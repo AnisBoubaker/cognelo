@@ -164,6 +164,8 @@ The root Prisma seed publishes `C exercise: Median of three integers` as `seed-b
 
 ## Judge0 Integration
 
+Student view calls the same Judge0 execution primitives but bypasses `PluginCodingExerciseExecution` and all core-attempt/feedback snapshot creation. The result is serialized in the ordinary learner execution shape with `resultSummary.studentPreview=true`; callers must dispatch it only through the SDK stateless preview contract.
+
 The browser should never call Judge0 directly.
 
 The intended flow is:

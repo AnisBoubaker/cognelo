@@ -12,7 +12,9 @@ const executionMocks = vi.hoisted(() => ({
   codingExerciseSubmitInputSchema: { parse: vi.fn((value) => value) },
   getCodingExercisePrivateConfig: vi.fn(),
   runCodingExercise: vi.fn(),
-  submitCodingExercise: vi.fn()
+  runCodingExercisePreview: vi.fn(),
+  submitCodingExercise: vi.fn(),
+  submitCodingExercisePreview: vi.fn()
 }));
 const aiFeedbackMocks = vi.hoisted(() => ({
   createCodingExerciseTeacherFeedbackDraft: vi.fn(),
@@ -149,6 +151,16 @@ describe("coding exercises server plugin lifecycle hooks", () => {
       activityId: "activity-1",
       executionId: "submit-1"
     });
+  });
+
+  it("uses only stateless preview execution handlers in Student view", async () => {
+    executionMocks.runCodingExercisePreview.mockResolvedValue({ id: "preview-run" });
+    executionMocks.submitCodingExercisePreview.mockResolvedValue({ id: "preview-submit" });
+    const context = { user: testUser(), courseId: "course-1", groupId: "group-1", activity: testActivity("coding-exercise") };
+    await expect(codingExercisesServerPlugin.studentPreview?.actions.run({ ...context, payload: { sourceCode: "print(1)" } })).resolves.toEqual({ execution: { id: "preview-run" } });
+    await expect(codingExercisesServerPlugin.studentPreview?.actions.submit({ ...context, payload: { sourceCode: "print(1)" } })).resolves.toMatchObject({ execution: { id: "preview-submit" } });
+    expect(executionMocks.runCodingExercise).not.toHaveBeenCalled();
+    expect(executionMocks.submitCodingExercise).not.toHaveBeenCalled();
   });
 
   it("returns a grading result when a teacher changes an AI-graded rubric", async () => {

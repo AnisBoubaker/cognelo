@@ -740,6 +740,7 @@ export const arMessages = {
       participantCount: "{count} مشاركًا",
       editGroup: "تعديل المجموعة",
       contentViewSelectorLabel: "منظور محتوى المقرر",
+      studentView: "عرض الطالب",
       courseView: "المقرر",
       groupView: "المجموعة",
       groupViewSelect: "اختر منظور مجموعة",
@@ -1328,6 +1329,17 @@ export const arMessages = {
       assignedActivitiesTitle: "الأنشطة المسندة",
       materialsEyebrow: "مواد المجموعة",
       materialsTitle: "مواد خاصة بالمجموعة"
+    },
+    studentView: {
+      bannerTitle: "عرض الطالب — {group}",
+      bannerText: "العمل المنجز هنا مؤقت ولا يُحفظ في أي سجل للطالب.",
+      reset: "إعادة تعيين المعاينة",
+      loadError: "تعذّر تحميل عرض الطالب.",
+      groupUnavailableTitle: "هذه المجموعة غير متاحة للطلاب",
+      groupUnavailableText: "لا يستطيع الطلاب فتح هذه المجموعة الآن لأنها غير منشورة أو خارج فترة الإتاحة.",
+      safeExamBrowserNotice: "يتطلب هذا النشاط Safe Exam Browser للطلاب. يبقى عرض الطالب متاحًا لأن عمل المعاينة لا يُسجل مطلقًا.",
+      uploadActivityUnavailable: "يمكن معاينة هذا النشاط القائم على رفع الملفات هنا، لكن سير الإرسال غير متاح في عرض الطالب لأنه يحتاج إلى مساحة معالجة دائمة.",
+      unsupportedActivity: "لا يوفر نوع النشاط هذا عارضًا لعرض الطالب حتى الآن."
     },
     parsons: parsonsMessages.ar
   } satisfies MessageTree;

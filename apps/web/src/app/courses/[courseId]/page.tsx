@@ -1415,6 +1415,16 @@ export default function CourseDetailPage() {
                       </select>
                     </span>
                   </div>
+                  {contentGroup ? (
+                    <Link
+                      className="button secondary"
+                      href={`/courses/${courseId}/groups/${contentGroup.id}/student-view`}
+                      rel="noopener"
+                      target="_blank"
+                    >
+                      {t("courseDetail.studentView")}
+                    </Link>
+                  ) : null}
                 </div>
               )}
               tabs={[

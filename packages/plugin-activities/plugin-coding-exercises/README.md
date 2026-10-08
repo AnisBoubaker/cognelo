@@ -10,6 +10,8 @@ Student template protection omits whitespace-only hidden boundaries, keeps the c
 
 The learner test runner contains and wraps execution output even when a program emits a very long line without spaces, so output cannot widen the responsive editor/test layout or push the runner off-screen.
 
+Teacher Student view reuses the learner editor and real Judge0 validation through stateless preview handlers. Preview source stays in browser session storage and no execution, attempt, grade, or analytics row is written.
+
 New exercises inherit the owning Subject's optional default programming language when they are created in a course, activity bank, course Test, or reusable bank Test. The choices come from the programming languages exposed by the configured Judge0 instance. A Subject can declare multiple languages; both that value and a missing default leave the exercise at `--- Choose ---`. Saving, generation, validation, execution, and submission remain unavailable until the exercise has one language. Existing and copied exercises keep their saved language.
 
 AI test generation warns before replacing an existing suite, then asks for visible and hidden counts (3 and 8 by default, at most 15 each), produces **Contains lines** comparisons with concise descriptive names capped at 50 characters and non-empty expected output, and validates the complete suite against the reviewed reference solution before inserting it into the authoring form. Invalid assertion-only harnesses are returned to the generation correction loop before Judge0 instead of surfacing an output-matcher error to the teacher.
