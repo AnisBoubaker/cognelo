@@ -434,7 +434,9 @@ export const codingHomeworkGradebookAttemptsRoute: PluginRouteDefinition = {
       }
       await assertCanGradeGroup(context.user, courseId, context.groupId);
 
-      const participantId = new URL(request.url).searchParams.get("participantId");
+      const searchParams = new URL(request.url).searchParams;
+      const participantId = searchParams.get("participantId");
+      const attemptId = searchParams.get("attemptId");
       if (!participantId) {
         throw new AppError(400, "PARTICIPANT_REQUIRED", "A participant is required.");
       }
@@ -465,6 +467,7 @@ export const codingHomeworkGradebookAttemptsRoute: PluginRouteDefinition = {
         activityId: context.activity.id,
         groupId: context.groupId,
         includeAttempts,
+        submissionId: attemptId || undefined,
         userId: participant.userId
       })).filter((submission) => !isCodingHomeworkSubmissionDeleted(submission.metadata));
 
@@ -503,6 +506,7 @@ async function listCodingHomeworkGradebookSubmissions(input: {
   activityId: string;
   groupId: string;
   includeAttempts: boolean;
+  submissionId?: string;
   userId: string;
 }) {
   return prisma.pluginCodingHomeworkSubmission.findMany({
@@ -511,6 +515,7 @@ async function listCodingHomeworkGradebookSubmissions(input: {
       groupId: input.groupId,
       kind: "final",
       userId: input.userId,
+      ...(input.submissionId ? { id: input.submissionId } : {}),
       ...(input.includeAttempts
         ? {}
         : {

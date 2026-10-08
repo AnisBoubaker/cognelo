@@ -25,10 +25,12 @@ export type McqManualGradingPanelProps = {
   row: McqManualGradingRow;
   activityConfig?: Record<string, unknown>;
   attempts: McqManualGradingAttempt[];
+  attemptCount: number;
   selectedAttempt: McqManualGradingAttempt | null;
   selectedIndex: number;
   loading: boolean;
   error: string;
+  readOnly?: boolean;
   isSavingOverride: boolean;
   isSavingRegrade: boolean;
   isSavingDelete: boolean;
@@ -44,11 +46,12 @@ export type McqManualGradingPanelProps = {
 export function McqManualGradingPanel({
   row,
   activityConfig,
-  attempts,
   selectedAttempt,
   selectedIndex,
+  attemptCount,
   loading,
   error,
+  readOnly = false,
   isSavingOverride,
   isSavingRegrade,
   isSavingDelete,
@@ -120,10 +123,10 @@ export function McqManualGradingPanel({
             <button className="button secondary" disabled={selectedIndex === 0} type="button" onClick={() => onSelectAttemptIndex(selectedIndex - 1)}>
               {t("courseDetail.previousSubmission")}
             </button>
-            <span className="muted">{t("courseDetail.submissionPosition", { current: selectedIndex + 1, total: attempts.length })}</span>
+            <span className="muted">{t("courseDetail.submissionPosition", { current: selectedIndex + 1, total: attemptCount })}</span>
             <button
               className="button secondary"
-              disabled={selectedIndex >= attempts.length - 1}
+              disabled={selectedIndex >= attemptCount - 1}
               type="button"
               onClick={() => onSelectAttemptIndex(selectedIndex + 1)}
             >
@@ -215,6 +218,7 @@ export function McqManualGradingPanel({
                       max={answer.maxScore}
                       step="any"
                       type="number"
+                      readOnly={readOnly}
                       value={questionScores[answer.questionId] ?? ""}
                       onChange={(event) =>
                         setQuestionScores((current) => ({
@@ -233,7 +237,7 @@ export function McqManualGradingPanel({
 
       {!loading && !selectedAttempt ? <p className="muted">{t("courseDetail.noAnswers")}</p> : null}
 
-      <form className="form inline-panel" onSubmit={submitOverride}>
+      {!readOnly ? <form className="form inline-panel" onSubmit={submitOverride}>
         <div className="section-heading">
           <div>
             <p className="eyebrow">{t("courseDetail.overrideGrade")}</p>
@@ -258,7 +262,7 @@ export function McqManualGradingPanel({
             {isSavingOverride ? t("common.saving") : t("common.save")}
           </button>
         </div>
-      </form>
+      </form> : <p className="inline-panel muted">{t("courseDetail.attemptReviewReadOnly")}</p>}
     </section>
   );
 }

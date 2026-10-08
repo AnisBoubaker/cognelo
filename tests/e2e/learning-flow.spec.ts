@@ -1,4 +1,5 @@
-import { confirmSharedDialog, expect, test } from "./fixtures/auth";
+import type { Request } from "@playwright/test";
+import { confirmSharedDialog, credentialsFor, expect, test } from "./fixtures/auth";
 import { provisionLearningFlow, removeLearningFlow, type LearningFlowData } from "./fixtures/learning-flow";
 
 test.describe("student submission and teacher grading", () => {
@@ -23,6 +24,9 @@ test.describe("student submission and teacher grading", () => {
     await studentPage.getByRole("link", { name: new RegExp(data.courseTitle) }).click();
     await expect(studentPage.getByRole("heading", { name: `${data.courseTitle}: ${data.groupTitle}` })).toBeVisible();
     await studentPage.getByRole("link", { name: data.activityTitle, exact: true }).click();
+    await expect(studentPage).toHaveURL(new RegExp(
+      `/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${data.activityId}$`
+    ));
     await expect(studentPage.getByRole("heading", { name: data.activityTitle })).toBeVisible();
     await studentPage.getByLabel("Four", { exact: true }).check();
     await studentPage.getByRole("button", { name: "Submit", exact: true }).click();
@@ -30,6 +34,34 @@ test.describe("student submission and teacher grading", () => {
     await submitDialog.getByRole("button", { name: "Submit answers" }).click();
     await expect(studentPage).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));
     await expect(studentPage.getByText("Submitted", { exact: true })).toBeVisible();
+
+    await studentPage.getByRole("link", { name: data.activityTitle, exact: true }).click();
+    await studentPage.getByLabel("Four", { exact: true }).check();
+    await studentPage.getByRole("button", { name: "Submit", exact: true }).click();
+    const secondSubmitDialog = studentPage.getByRole("dialog", { name: "Submit answers?" });
+    await secondSubmitDialog.getByRole("button", { name: "Submit answers" }).click();
+    await expect(studentPage).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));
+
+    await teacherPage.goto(`/courses/${data.courseId}/gradebook/activities/${data.activityId}`);
+    const reviewRequests: string[] = [];
+    const trackAttemptReview = (request: Request) => {
+      const url = new URL(request.url());
+      if (request.method() === "GET" && /\/gradebook\/attempts\/[^/]+\/ai-feedback$/.test(url.pathname)) {
+        reviewRequests.push(url.pathname);
+      }
+    };
+    teacherPage.on("request", trackAttemptReview);
+    const studentRow = teacherPage.locator(".table-row-gradebook-detail").filter({ hasText: credentialsFor("student").email });
+    await studentRow.getByRole("button", { name: "Review and grade" }).click();
+    const reviewDialog = teacherPage.getByRole("dialog");
+    await expect(reviewDialog.getByText("1 of 2", { exact: true })).toBeVisible();
+    expect(reviewRequests).toHaveLength(1);
+    await reviewDialog.getByRole("button", { name: "Next" }).click();
+    await expect(reviewDialog.getByText("2 of 2", { exact: true })).toBeVisible();
+    await expect.poll(() => reviewRequests.length).toBe(2);
+    expect(new Set(reviewRequests).size).toBe(2);
+    teacherPage.off("request", trackAttemptReview);
+    await reviewDialog.getByRole("button", { name: "Close" }).click();
 
     await teacherPage.goto(`/courses/${data.courseId}?tab=gradebook`);
     await expect(teacherPage.getByRole("heading", { name: "Course gradebook" })).toBeVisible();

@@ -6,7 +6,7 @@ import type { CourseGradebookRow, CourseTestAttemptReview } from "@/lib/api";
 
 export function TestManualGradingPanel({
   row,
-  attempts,
+  attemptCount,
   selectedAttempt,
   selectedIndex,
   loading,
@@ -23,6 +23,7 @@ export function TestManualGradingPanel({
 }: {
   row: CourseGradebookRow;
   attempts: CourseTestAttemptReview[];
+  attemptCount: number;
   selectedAttempt: CourseTestAttemptReview | null;
   selectedIndex: number;
   loading: boolean;
@@ -86,13 +87,13 @@ export function TestManualGradingPanel({
       </div>
 
       {loading ? <p className="muted">{t("common.loading")}</p> : null}
-      {!loading && attempts.length > 1 ? (
+      {!loading && attemptCount > 1 ? (
         <div className="row">
           <button className="button secondary" disabled={selectedIndex === 0} type="button" onClick={() => onSelectAttemptIndex(selectedIndex - 1)}>
             {t("courseDetail.previousSubmission")}
           </button>
-          <span className="muted">{t("courseDetail.submissionPosition", { current: selectedIndex + 1, total: attempts.length })}</span>
-          <button className="button secondary" disabled={selectedIndex >= attempts.length - 1} type="button" onClick={() => onSelectAttemptIndex(selectedIndex + 1)}>
+          <span className="muted">{t("courseDetail.submissionPosition", { current: selectedIndex + 1, total: attemptCount })}</span>
+          <button className="button secondary" disabled={selectedIndex >= attemptCount - 1} type="button" onClick={() => onSelectAttemptIndex(selectedIndex + 1)}>
             {t("courseDetail.nextSubmission")}
           </button>
         </div>

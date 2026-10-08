@@ -14,5 +14,6 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - The definition declares `studentView: { mode: "interactive", execution: "plugin" }`. This is a third browser-scoped path: answer checks are deterministic and stateless, with no draft, attempt, grade, feedback artifact, or analytics persistence.
 - Attempt limits are enforced by both status UI and the submission route. Released final grades close further attempts.
 - Every standalone answer check/submission creates a core attempt with the assignment mode. Student summative history and limits select only summative attempts; teacher history can inspect both modes.
+- The teacher gradebook-attempt route accepts an exact attempt ID constrained by course, group, activity, and participant so the shared report can load newest-first and fetch older payloads lazily. Historical and formative attempts are read-only in that dialog.
 - Gradebook attempt review and grading consume core course capabilities: explicit course teachers/admins work course-wide, while section teachers/TAs are restricted to their assigned groups. Authoring and grade release remain course-management operations.
 - Teacher feedback and learner copy use mechanism-neutral wording.

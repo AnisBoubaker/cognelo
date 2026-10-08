@@ -21,16 +21,25 @@ import { useI18n } from "@/lib/i18n";
 
 type ReviewAttempt = ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview;
 
+type ReviewAttemptReference = {
+  coreAttemptId: string;
+  pluginAttemptRef: string | null;
+};
+
 type ManualReviewState = {
   activityConfig?: Record<string, unknown>;
   includeAttempts: boolean;
   attempts: ReviewAttempt[];
+  attemptReferences: ReviewAttemptReference[];
+  attemptCount: number;
   selectedIndex: number;
   loading: boolean;
   error: string;
 };
 
 type FeedbackReviewState = {
+  attemptReferences: ReviewAttemptReference[];
+  selectedAttemptIndex: number;
   review: TeacherAiFeedbackReview | null;
   draft: Record<string, unknown> | null;
   gradeDraft: string;
@@ -61,6 +70,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
   const [feedbackReview, setFeedbackReview] = useState<FeedbackReviewState | null>(null);
   const [savingAction, setSavingAction] = useState<"delete" | "override" | "regrade" | null>(null);
   const loadReviewRef = useRef<() => void>(() => undefined);
+  const loadedReviewIdentityRef = useRef<string | null>(null);
   loadReviewRef.current = () => {
     if (feedbackRenderer) {
       void loadFeedbackReview();
@@ -70,11 +80,19 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
   };
 
   useEffect(() => {
+    const identity = `${courseId}:${row.gradebookItemId}:${row.participantId}`;
+    if (loadedReviewIdentityRef.current === identity) return;
+    loadedReviewIdentityRef.current = identity;
     loadReviewRef.current();
   }, [courseId, row.gradebookItemId, row.participantId]);
 
   async function loadFeedbackReview() {
-    const attempt = selectedFeedbackAttempt(row);
+    return loadFeedbackReviewAttempt(0);
+  }
+
+  async function loadFeedbackReviewAttempt(selectedAttemptIndex: number) {
+    const attemptReferences = reviewAttemptReferences(row);
+    const attempt = attemptReferences[selectedAttemptIndex];
     const preserveTeacherGrade = row.gradeSource === "manual" || row.gradeSource === "override";
     const gradeFollowsCalculated = !preserveTeacherGrade && !row.latePenaltyApplied;
     if (!attempt) {
@@ -82,6 +100,8 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
       return;
     }
     setFeedbackReview({
+      attemptReferences,
+      selectedAttemptIndex,
       review: null,
       draft: null,
       gradeDraft: row.score === null ? "" : formatGradeNumber(row.score),
@@ -94,11 +114,13 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
       error: ""
     });
     try {
-      const result = await api.activityAttemptAiFeedbackReview(courseId, attempt.id);
+      const result = await api.activityAttemptAiFeedbackReview(courseId, attempt.coreAttemptId);
       const calculatedGrade = gradeFollowsCalculated
         ? calculatedNormalizedGrade(row, result.review.activityTypeKey, result.review.feedback)
         : null;
       setFeedbackReview({
+        attemptReferences,
+        selectedAttemptIndex,
         review: result.review,
         draft: result.review.feedback,
         gradeDraft: row.score === null
@@ -119,54 +141,110 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
     }
   }
 
+  async function selectFeedbackAttemptIndex(selectedAttemptIndex: number) {
+    if (!feedbackReview || selectedAttemptIndex < 0 || selectedAttemptIndex >= feedbackReview.attemptReferences.length) return;
+    if (hasUnsavedFeedbackReview(feedbackReview) && !await dialogs.confirm({
+      message: t("courseDetail.feedbackReviewDiscardConfirm"),
+      confirmVariant: "danger"
+    })) return;
+    await loadFeedbackReviewAttempt(selectedAttemptIndex);
+  }
+
   async function loadManualReview(includeAttempts: boolean) {
     setManualReview((current) => ({
       activityConfig: current?.activityConfig,
       includeAttempts,
-      attempts: current?.attempts ?? [],
-      selectedIndex: current?.selectedIndex ?? 0,
+      attempts: [],
+      attemptReferences: reviewAttemptReferences(row),
+      attemptCount: reviewAttemptReferences(row).length,
+      selectedIndex: 0,
       loading: true,
       error: ""
     }));
     try {
-      if (row.activityTypeKey === "test") {
-        const parentAttempts = row.attempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
-        const reviews = await Promise.all(parentAttempts.map((attempt) => api.testAttemptReview(courseId, attempt.id)));
-        setManualReview({
-          includeAttempts,
-          attempts: sortAttemptsByDisplayedTimestamp(reviews.map((result) => result.review)),
-          selectedIndex: 0,
-          loading: false,
-          error: ""
-        });
-        return;
-      }
-      const [attemptsResult, activityResult] = await Promise.all([
-        row.activityTypeKey === "mcq"
-          ? mcqClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, { participantId: row.participantId })
-          : row.activityTypeKey === "coding-homework-grader"
-            ? codingHomeworkClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
-                participantId: row.participantId,
-                includeAttempts
-              })
-            : parsonsClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
-                participantId: row.participantId,
-                includeAttempts
-              }),
-        api.groupActivity(courseId, row.groupId, row.activityId)
-      ]);
-      const attempts = sortAttemptsByDisplayedTimestamp(attemptsResult.attempts as ReviewAttempt[]);
-      setManualReview((current) => ({
-        activityConfig: activityResult.activity.config ?? {},
+      const attemptReferences = reviewAttemptReferences(row);
+      const activityPromise = row.activityTypeKey === "test"
+        ? Promise.resolve(undefined)
+        : api.groupActivity(courseId, row.groupId, row.activityId);
+      const attemptsPromise = includeAttempts && row.activityTypeKey !== "test"
+        ? loadPluginReviewAttempts()
+        : attemptReferences[0]
+          ? loadReferencedReviewAttempt(attemptReferences[0])
+          : Promise.resolve([] as ReviewAttempt[]);
+      const [attempts, activityResult] = await Promise.all([attemptsPromise, activityPromise]);
+      const sortedAttempts = sortAttemptsByDisplayedTimestamp(attempts);
+      setManualReview({
+        activityConfig: activityResult?.activity.config ?? {},
         includeAttempts,
-        attempts,
-        selectedIndex: Math.min(current?.selectedIndex ?? 0, Math.max(0, attempts.length - 1)),
+        attempts: sortedAttempts,
+        attemptReferences,
+        attemptCount: includeAttempts ? sortedAttempts.length : attemptReferences.length,
+        selectedIndex: 0,
         loading: false,
         error: ""
-      }));
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : t("courseDetail.answerLoadError");
       setManualReview((current) => current ? { ...current, loading: false, error: message } : current);
+      notifications.error(message);
+    }
+  }
+
+  async function loadPluginReviewAttempts(attemptId?: string) {
+    if (row.activityTypeKey === "mcq") {
+      const result = await mcqClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
+        participantId: row.participantId,
+        attemptId
+      });
+      return result.attempts as ReviewAttempt[];
+    }
+    if (row.activityTypeKey === "coding-homework-grader") {
+      const result = await codingHomeworkClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
+        participantId: row.participantId,
+        attemptId,
+        includeAttempts: manualReview?.includeAttempts ?? false
+      });
+      return result.attempts as ReviewAttempt[];
+    }
+    const result = await parsonsClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
+      participantId: row.participantId,
+      attemptId,
+      includeAttempts: manualReview?.includeAttempts ?? false
+    });
+    return result.attempts as ReviewAttempt[];
+  }
+
+  async function loadReferencedReviewAttempt(reference: ReviewAttemptReference) {
+    if (row.activityTypeKey === "test") {
+      return [(await api.testAttemptReview(courseId, reference.coreAttemptId)).review] as ReviewAttempt[];
+    }
+    return reference.pluginAttemptRef ? loadPluginReviewAttempts(reference.pluginAttemptRef) : [];
+  }
+
+  async function selectManualAttemptIndex(selectedIndex: number) {
+    const current = manualReview;
+    if (!current || selectedIndex < 0 || selectedIndex >= current.attemptCount) return;
+    if (selectedIndex < current.attempts.length) {
+      setManualReview({ ...current, selectedIndex });
+      return;
+    }
+    const reference = current.attemptReferences[selectedIndex];
+    if (!reference) return;
+    setManualReview({ ...current, loading: true, error: "" });
+    try {
+      const attempts = await loadReferencedReviewAttempt(reference);
+      const attempt = attempts[0];
+      if (!attempt) throw new Error(t("courseDetail.answerLoadError"));
+      setManualReview((latest) => latest ? {
+        ...latest,
+        attempts: [...latest.attempts, attempt],
+        selectedIndex,
+        loading: false,
+        error: ""
+      } : latest);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("courseDetail.answerLoadError");
+      setManualReview((latest) => latest ? { ...latest, loading: false, error: message } : latest);
       notifications.error(message);
     }
   }
@@ -246,15 +324,17 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
   }
 
   async function regradeAttempt() {
-    const attempt = selectedFeedbackAttempt(row);
-    if (!attempt) {
+    const reference = feedbackReview
+      ? feedbackReview.attemptReferences[feedbackReview.selectedAttemptIndex]
+      : manualReview?.attemptReferences[manualReview.selectedIndex];
+    if (!reference) {
       notifications.error(t("courseDetail.regradeUnavailable"));
       return;
     }
     if (!await dialogs.confirm({ message: t("courseDetail.regradeConfirm", { name: row.participantName }) })) return;
     setSavingAction("regrade");
     try {
-      const result = await api.regradeActivityAttempt(courseId, attempt.id, { reason: t("courseDetail.regradeReason") });
+      const result = await api.regradeActivityAttempt(courseId, reference.coreAttemptId, { reason: t("courseDetail.regradeReason") });
       await onSaved?.();
       if (!result.result) notifications.success(t("courseDetail.regradeAwaitingRubric"));
     } catch (err) {
@@ -293,6 +373,8 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
       setManualReview((current) => current ? {
         ...current,
         attempts: current.attempts.filter((attempt) => attempt.id !== selectedAttempt.id),
+        attemptReferences: current.attemptReferences.filter((reference) => reference.coreAttemptId !== coreAttempt.id),
+        attemptCount: Math.max(0, current.attemptCount - 1),
         selectedIndex: Math.max(0, current.selectedIndex - 1)
       } : current);
       await onSaved?.();
@@ -345,6 +427,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
             gradeFollowsCalculated: false,
             preserveTeacherGrade: true
           } : current)}
+          onSelectAttemptIndex={(selectedAttemptIndex) => void selectFeedbackAttemptIndex(selectedAttemptIndex)}
           onSave={saveFeedbackReview}
           t={t}
         />
@@ -354,18 +437,19 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
         activityConfig: manualReview.activityConfig,
         locale,
         attempts: manualReview.attempts,
+        attemptCount: manualReview.attemptCount,
         selectedAttempt,
         selectedIndex: manualReview.selectedIndex,
         includeAttempts: manualReview.includeAttempts,
         loading: manualReview.loading,
         error: manualReview.error,
-        readOnly: false,
+        readOnly: row.assessmentMode === "formative" || manualReview.selectedIndex > 0,
         isSavingOverride: savingAction === "override",
         isSavingRegrade: savingAction === "regrade",
         isSavingDelete: savingAction === "delete",
         onClose,
         onIncludeAttemptsChange: loadManualReview,
-        onSelectAttemptIndex: (selectedIndex) => setManualReview((current) => current ? { ...current, selectedIndex } : current),
+        onSelectAttemptIndex: (selectedIndex) => void selectManualAttemptIndex(selectedIndex),
         onOverrideGrade: overrideGrade,
         onRegradeAttempt: regradeAttempt,
         onDeleteSubmission: () => deleteSelectedSubmission(selectedAttempt),
@@ -400,17 +484,19 @@ function LoadingReviewDialog({ onClose, t }: {
   );
 }
 
-function AiFeedbackReviewPanel({ row, state, onClose, onFeedbackChange, onGradeChange, onSave, t }: {
+function AiFeedbackReviewPanel({ row, state, onClose, onFeedbackChange, onGradeChange, onSelectAttemptIndex, onSave, t }: {
   row: CourseGradebookRow;
   state: FeedbackReviewState;
   onClose: () => void;
   onFeedbackChange: (feedback: Record<string, unknown>) => void;
   onGradeChange: (grade: string) => void;
+  onSelectAttemptIndex: (index: number) => void;
   onSave: () => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const renderer = state.review ? getAiFeedbackReviewRenderer(state.review.activityTypeKey) : null;
   const teacherRevision = state.review && typeof state.review.feedback.teacherRevision === "number" ? state.review.feedback.teacherRevision : 0;
+  const readOnly = row.assessmentMode === "formative" || state.selectedAttemptIndex > 0;
   return (
     <section className="dialog-panel answer-overlay test-review-overlay stack" role="dialog" aria-modal="true">
       <div className="section-heading">
@@ -421,15 +507,39 @@ function AiFeedbackReviewPanel({ row, state, onClose, onFeedbackChange, onGradeC
         </div>
         <button className="button secondary" type="button" onClick={onClose}>{t("common.close")}</button>
       </div>
+      {state.attemptReferences.length > 1 ? (
+        <div className="row">
+          <button
+            className="button secondary"
+            disabled={state.loading || state.selectedAttemptIndex === 0}
+            type="button"
+            onClick={() => onSelectAttemptIndex(state.selectedAttemptIndex - 1)}
+          >
+            {t("courseDetail.previousSubmission")}
+          </button>
+          <span className="muted">{t("courseDetail.submissionPosition", {
+            current: state.selectedAttemptIndex + 1,
+            total: state.attemptReferences.length
+          })}</span>
+          <button
+            className="button secondary"
+            disabled={state.loading || state.selectedAttemptIndex >= state.attemptReferences.length - 1}
+            type="button"
+            onClick={() => onSelectAttemptIndex(state.selectedAttemptIndex + 1)}
+          >
+            {t("courseDetail.nextSubmission")}
+          </button>
+        </div>
+      ) : null}
       {state.loading ? <p className="muted">{t("courseDetail.loadingStudentAnswers")}</p> : null}
       {state.error ? <p className="error-text">{state.error}</p> : null}
       {state.review?.gradesReleased ? <p className="inline-panel muted">{t("courseDetail.feedbackReviewReleasedNote")}</p> : null}
       {teacherRevision > 0 ? <p className="muted">{t("courseDetail.feedbackReviewRevision", { number: teacherRevision })}</p> : null}
       {!state.loading && state.review && state.draft && renderer
-        ? renderer({ feedback: state.draft, submission: state.review.submission, onFeedbackChange, t })
+        ? renderer({ feedback: state.draft, submission: state.review.submission, onFeedbackChange, readOnly, t })
         : null}
       {!state.loading && state.review && !renderer ? <p className="error-text">{t("courseDetail.feedbackReviewUnavailable")}</p> : null}
-      {!state.loading && state.review && state.draft && renderer ? (
+      {!state.loading && state.review && state.draft && renderer && !readOnly ? (
         <div className="stack">
           <div className="inline-panel form">
             <div className="field" style={{ maxWidth: 260 }}>
@@ -456,6 +566,7 @@ function AiFeedbackReviewPanel({ row, state, onClose, onFeedbackChange, onGradeC
           </div>
         </div>
       ) : null}
+      {!state.loading && state.review && readOnly ? <p className="inline-panel muted">{t("courseDetail.attemptReviewReadOnly")}</p> : null}
     </section>
   );
 }
@@ -468,11 +579,15 @@ function hasUnsavedFeedbackReview(state: FeedbackReviewState) {
   );
 }
 
-function selectedFeedbackAttempt(row: CourseGradebookRow) {
-  const summativeAttempts = row.attempts.filter((candidate) => candidate.assessmentMode === "summative");
-  return summativeAttempts.find((candidate) => candidate.attemptNumber === row.selectedAttemptNumber)
-    ?? [...summativeAttempts].reverse().find((candidate) => candidate.lifecycle === "graded" || candidate.lifecycle === "submitted")
-    ?? null;
+function reviewAttemptReferences(row: CourseGradebookRow): ReviewAttemptReference[] {
+  return row.attempts
+    .filter((attempt) => (
+      attempt.assessmentMode === row.assessmentMode
+      && (attempt.lifecycle === "submitted" || attempt.lifecycle === "graded")
+      && (row.activityTypeKey === "test" || Boolean(attempt.pluginAttemptRef))
+    ))
+    .sort((left, right) => right.attemptNumber - left.attemptNumber)
+    .map((attempt) => ({ coreAttemptId: attempt.id, pluginAttemptRef: attempt.pluginAttemptRef }));
 }
 
 function calculatedNormalizedGrade(row: CourseGradebookRow, activityTypeKey: string, feedback: Record<string, unknown>) {

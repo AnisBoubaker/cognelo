@@ -7,10 +7,11 @@ export type McqAiFeedbackReviewProps = {
   feedback: Record<string, unknown>;
   submission: Record<string, unknown>;
   onFeedbackChange: (feedback: Record<string, unknown>) => void;
+  readOnly?: boolean;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
-export function McqAiFeedbackReview({ feedback, submission, onFeedbackChange, t }: McqAiFeedbackReviewProps) {
+export function McqAiFeedbackReview({ feedback, submission, onFeedbackChange, readOnly = false, t }: McqAiFeedbackReviewProps) {
   const parsed = parseMcqSource(stringValue(submission.source), stringValue(submission.defaultCodeLanguage) || "none");
   const answers = recordValue(submission.answers);
   const questionFeedback = recordArray(feedback.questionFeedback);
@@ -38,7 +39,7 @@ export function McqAiFeedbackReview({ feedback, submission, onFeedbackChange, t 
       </section>
       <label className="field">
         <span>{t("courseDetail.feedbackReviewSummary")}</span>
-        <textarea maxLength={3000} rows={5} value={stringValue(feedback.summary)} onChange={(event) => onFeedbackChange({ ...feedback, summary: event.target.value })} />
+        <textarea maxLength={3000} readOnly={readOnly} rows={5} value={stringValue(feedback.summary)} onChange={(event) => onFeedbackChange({ ...feedback, summary: event.target.value })} />
       </label>
       {parsed.questions.map((question, questionIndex) => {
         const matched = feedbackByQuestionId.get(question.id);
@@ -48,6 +49,7 @@ export function McqAiFeedbackReview({ feedback, submission, onFeedbackChange, t 
             <span>{t("courseDetail.feedbackReviewQuestion", { number: questionIndex + 1 })}: {question.title}</span>
             <textarea
               maxLength={2000}
+              readOnly={readOnly}
               rows={4}
               value={stringValue(matched.entry.explanation)}
               onChange={(event) => onFeedbackChange({

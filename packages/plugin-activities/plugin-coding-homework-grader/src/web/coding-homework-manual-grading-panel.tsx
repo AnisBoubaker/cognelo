@@ -16,11 +16,13 @@ type CodingHomeworkManualGradingRow = {
 export type CodingHomeworkManualGradingPanelProps = {
   row: CodingHomeworkManualGradingRow;
   attempts: CodingHomeworkGradebookAttemptRecord[];
+  attemptCount: number;
   selectedAttempt: CodingHomeworkGradebookAttemptRecord | null;
   selectedIndex: number;
   includeAttempts: boolean;
   loading: boolean;
   error: string;
+  readOnly?: boolean;
   isSavingOverride: boolean;
   isSavingRegrade: boolean;
   isSavingDelete: boolean;
@@ -35,12 +37,13 @@ export type CodingHomeworkManualGradingPanelProps = {
 
 export function CodingHomeworkManualGradingPanel({
   row,
-  attempts,
+  attemptCount,
   selectedAttempt,
   selectedIndex,
   includeAttempts,
   loading,
   error,
+  readOnly = false,
   isSavingOverride,
   isSavingRegrade,
   isSavingDelete,
@@ -109,10 +112,10 @@ export function CodingHomeworkManualGradingPanel({
             <button className="button secondary" disabled={selectedIndex === 0} type="button" onClick={() => onSelectAttemptIndex(selectedIndex - 1)}>
               {t("courseDetail.previousSubmission")}
             </button>
-            <span className="muted">{t("courseDetail.submissionPosition", { current: selectedIndex + 1, total: attempts.length })}</span>
+            <span className="muted">{t("courseDetail.submissionPosition", { current: selectedIndex + 1, total: attemptCount })}</span>
             <button
               className="button secondary"
-              disabled={selectedIndex >= attempts.length - 1}
+              disabled={selectedIndex >= attemptCount - 1}
               type="button"
               onClick={() => onSelectAttemptIndex(selectedIndex + 1)}
             >
@@ -171,7 +174,7 @@ export function CodingHomeworkManualGradingPanel({
 
       {!loading && !selectedAttempt ? <p className="muted">{t("courseDetail.noAnswers")}</p> : null}
 
-      <form className="form inline-panel" onSubmit={submitOverride}>
+      {!readOnly ? <form className="form inline-panel" onSubmit={submitOverride}>
         <div className="section-heading">
           <div>
             <p className="eyebrow">{t("courseDetail.overrideGrade")}</p>
@@ -210,7 +213,7 @@ export function CodingHomeworkManualGradingPanel({
             {isSavingOverride ? t("common.saving") : t("common.save")}
           </button>
         </div>
-      </form>
+      </form> : <p className="inline-panel muted">{t("courseDetail.attemptReviewReadOnly")}</p>}
     </section>
   );
 }

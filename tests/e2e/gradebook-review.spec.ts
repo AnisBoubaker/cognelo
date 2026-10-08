@@ -5,7 +5,9 @@ test.describe("consistent gradebook review actions", () => {
     await page.goto("/courses/seed-course-programming-101/gradebook/activities/seed-activity-c-median-feedback");
 
     await expect(page.getByRole("heading", { name: "C exercise: Median of three integers" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Class overview" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Edit activity" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Class overview" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Student results" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("button", { name: "Rerun automatic grading for all" })).toBeVisible();
     await expect(page.getByRole("button", { name: "AI-assess all submissions" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Review and grade all" })).toBeVisible();
@@ -14,8 +16,8 @@ test.describe("consistent gradebook review actions", () => {
     await expect(page.getByRole("button", { name: "Grade All Manually" })).toHaveCount(0);
     await expect(page.getByText("Unavailable", { exact: true })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Class overview", exact: true }).click();
-    const classOverview = page.getByRole("dialog");
+    await page.getByRole("tab", { name: "Class overview", exact: true }).click();
+    const classOverview = page.getByRole("tabpanel");
     await expect(classOverview.getByRole("heading", { name: "Rubric results" })).toBeVisible();
     await expect(classOverview.getByText("Algorithm correctness", { exact: true })).toBeVisible();
     await expect(classOverview.getByText("The program computes the median for every ordering, including repeated and negative values.", { exact: true })).toBeVisible();
@@ -25,7 +27,7 @@ test.describe("consistent gradebook review actions", () => {
     for (let index = 0; index < 3; index += 1) {
       await expect(rubricCriteria.nth(index).getByText(/^(Average: .*% · \d+ graded|No graded rubric results)$/)).toBeVisible();
     }
-    await classOverview.getByRole("button", { name: "Close", exact: true }).click();
+    await page.getByRole("tab", { name: "Student results", exact: true }).click();
 
     await page.getByRole("button", { name: "Assess with AI", exact: true }).first().click();
     const aiConfirmation = page.getByRole("dialog", { name: "Please confirm" });
@@ -59,5 +61,25 @@ test.describe("consistent gradebook review actions", () => {
     await firstCriterion.fill(nextCriterionScore);
     await expect.poll(() => totalGrade.inputValue()).not.toBe(totalBefore);
     await expect.poll(async () => Number(await finalGrade.inputValue())).toBe(Number(await totalGrade.inputValue()));
+  });
+
+  test("course content opens the activity report workspace and keeps editing available", async ({ teacherPage: page }) => {
+    await page.goto("/courses/seed-course-programming-101?tab=content");
+
+    const activityLink = page.getByRole("link", { name: "C exercise: Median of three integers", exact: true }).first();
+    await expect(activityLink).toHaveAttribute(
+      "href",
+      "/courses/seed-course-programming-101/gradebook/activities/seed-activity-c-median-feedback?origin=content&report=overview"
+    );
+    await activityLink.click();
+
+    await expect(page).toHaveURL(/\/gradebook\/activities\/seed-activity-c-median-feedback\?origin=content&report=overview$/);
+    await expect(page.getByRole("tab", { name: "Class overview" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: "Student results" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Edit activity" })).toHaveAttribute(
+      "href",
+      "/courses/seed-course-programming-101/activities/seed-activity-c-median-feedback"
+    );
+    await expect(page.getByRole("link", { name: "Back to course content" })).toBeVisible();
   });
 });

@@ -261,6 +261,7 @@ export const parsonsGradebookAttemptsRoute: PluginRouteDefinition = {
 
       const searchParams = new URL(request.url).searchParams;
       const participantId = searchParams.get("participantId");
+      const attemptId = searchParams.get("attemptId");
       if (!participantId) {
         throw new AppError(400, "PARTICIPANT_REQUIRED", "A participant is required.");
       }
@@ -294,7 +295,8 @@ export const parsonsGradebookAttemptsRoute: PluginRouteDefinition = {
         activityId: context.activity.id,
         userId: participant.userId,
         config: parseParsonsConfig(context.activity.config),
-        includeAttempts: searchParams.get("includeAttempts") === "true"
+        includeAttempts: searchParams.get("includeAttempts") === "true",
+        attemptId: attemptId || undefined
       });
       const submittedStatesByPluginAttempt = await listSubmittedStatesByPluginAttempt({
         courseId: context.courseId,

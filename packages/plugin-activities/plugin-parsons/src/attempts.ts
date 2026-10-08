@@ -218,11 +218,13 @@ export async function listParsonsGradebookAttempts(params: {
   userId: string;
   config: ParsonsConfig;
   includeAttempts?: boolean;
+  attemptId?: string;
 }) {
   const attempts = await prisma.pluginParsonsAttempt.findMany({
     where: {
       activityId: params.activityId,
       userId: params.userId,
+      ...(params.attemptId ? { id: params.attemptId } : {}),
       ...(params.includeAttempts ? {} : { status: "completed" })
     },
     orderBy: [{ lastInteractionAt: "desc" }, { startedAt: "desc" }],

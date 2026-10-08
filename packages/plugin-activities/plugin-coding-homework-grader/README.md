@@ -19,6 +19,8 @@ Teacher-entered released grades and feedback are challengeable through the core 
 
 Finalized challenge answers create a core attempt tagged with the assignment mode. Formative attempts remain available to the teacher's read-only inspector; only summative attempts may receive a grade.
 
+Teacher review can resolve one exact linked final submission. The shared report dialog loads the newest current-mode submission first and requests older submissions only when the teacher navigates; historical submissions are read-only.
+
 The activity definition explicitly declares read-only Student view support. The upload-based activity remains available for inspection, but its ZIP submission workflow stays disabled because the existing pipeline requires durable attachments and background jobs; preview must not borrow academic records and delete them afterward.
 
 ## Read By Topic

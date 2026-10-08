@@ -235,7 +235,9 @@ export const mcqGradebookAttemptsRoute: PluginRouteDefinition = {
         throw new AppError(400, "GROUP_CONTEXT_REQUIRED", "Gradebook attempts require a group activity context.");
       }
       await assertCanGradeGroup(context.user, context.courseId, context.groupId);
-      const participantId = new URL(request.url).searchParams.get("participantId");
+      const searchParams = new URL(request.url).searchParams;
+      const participantId = searchParams.get("participantId");
+      const attemptId = searchParams.get("attemptId");
       if (!participantId) {
         throw new AppError(400, "PARTICIPANT_REQUIRED", "A participant is required.");
       }
@@ -253,7 +255,8 @@ export const mcqGradebookAttemptsRoute: PluginRouteDefinition = {
           activityId: context.activity.id,
           participantId,
           pluginKey: "mcq",
-          lifecycle: { in: ["submitted", "graded"] }
+          lifecycle: { in: ["submitted", "graded"] },
+          ...(attemptId ? { id: attemptId } : {})
         },
         orderBy: [{ attemptNumber: "desc" }]
       });

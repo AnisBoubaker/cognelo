@@ -32,11 +32,13 @@ type ParsonsManualGradingRow = {
 export type ParsonsManualGradingPanelProps = {
   row: ParsonsManualGradingRow;
   attempts: ParsonsGradebookAttemptLike[];
+  attemptCount: number;
   selectedAttempt: ParsonsGradebookAttemptLike | null;
   selectedIndex: number;
   includeAttempts: boolean;
   loading: boolean;
   error: string;
+  readOnly?: boolean;
   isSavingOverride: boolean;
   isSavingRegrade: boolean;
   isSavingDelete: boolean;
@@ -51,12 +53,13 @@ export type ParsonsManualGradingPanelProps = {
 
 export function ParsonsManualGradingPanel({
   row,
-  attempts,
+  attemptCount,
   selectedAttempt,
   selectedIndex,
   includeAttempts,
   loading,
   error,
+  readOnly = false,
   isSavingOverride,
   isSavingRegrade,
   isSavingDelete,
@@ -129,12 +132,12 @@ export function ParsonsManualGradingPanel({
             <span className="muted">
               {t("courseDetail.submissionPosition", {
                 current: selectedIndex + 1,
-                total: attempts.length
+                total: attemptCount
               })}
             </span>
             <button
               className="button secondary"
-              disabled={selectedIndex >= attempts.length - 1}
+              disabled={selectedIndex >= attemptCount - 1}
               type="button"
               onClick={() => onSelectAttemptIndex(selectedIndex + 1)}
             >
@@ -159,7 +162,7 @@ export function ParsonsManualGradingPanel({
 
       {!loading && !selectedAttempt ? <p className="muted">{t("courseDetail.noAnswers")}</p> : null}
 
-      <form className="form inline-panel" onSubmit={submitOverride}>
+      {!readOnly ? <form className="form inline-panel" onSubmit={submitOverride}>
         <div className="section-heading">
           <div>
             <p className="eyebrow">{t("courseDetail.overrideGrade")}</p>
@@ -197,7 +200,7 @@ export function ParsonsManualGradingPanel({
             {isSavingOverride ? t("common.saving") : t("common.save")}
           </button>
         </div>
-      </form>
+      </form> : <p className="inline-panel muted">{t("courseDetail.attemptReviewReadOnly")}</p>}
 
       {!loading && selectedAttempt && includeAttempts && selectedAttempt.events.length ? (
         <div className="stack">

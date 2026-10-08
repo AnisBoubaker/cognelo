@@ -547,12 +547,13 @@ export function createCodingHomeworkGraderClient(request: Requester) {
       courseId: string,
       groupId: string,
       activityId: string,
-      input: { includeAttempts?: boolean; participantId: string }
+      input: { attemptId?: string; includeAttempts?: boolean; participantId: string }
     ) => {
       const params = new URLSearchParams({ participantId: input.participantId });
       if (input.includeAttempts) {
         params.set("includeAttempts", "true");
       }
+      if (input.attemptId) params.set("attemptId", input.attemptId);
       return request<{
         participant: {
           id: string;

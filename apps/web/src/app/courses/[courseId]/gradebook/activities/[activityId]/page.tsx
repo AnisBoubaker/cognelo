@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ProgressDialog, useDialogs, useNotifications } from "@cognelo/activity-ui";
 import { createMcqClient } from "@cognelo/plugin-mcq";
 import { createParsonsClient } from "@cognelo/plugin-parsons";
@@ -39,6 +39,8 @@ export default function GradebookActivityResultsPage() {
   const { courseId, activityId } = params;
   const router = useRouter();
   const groupId = searchParams.get("groupId") || undefined;
+  const origin = searchParams.get("origin") === "content" ? "content" : "gradebook";
+  const requestedReportTab = searchParams.get("report") === "overview" ? "overview" : searchParams.get("report") === "students" ? "students" : null;
   const { t } = useI18n();
   const dialogs = useDialogs();
   const notifications = useNotifications();
@@ -65,6 +67,9 @@ export default function GradebookActivityResultsPage() {
   } | null>(null);
   const [reviewAndGradeRow, setReviewAndGradeRow] = useState<CourseGradebookRow | null>(null);
   const [showGradeExport, setShowGradeExport] = useState(false);
+  const [reportTab, setReportTab] = useState<"overview" | "students">(
+    requestedReportTab ?? (origin === "content" ? "overview" : "students")
+  );
   const [reviewAll, setReviewAll] = useState<{
     loading: boolean;
     error: string;
@@ -77,6 +82,7 @@ export default function GradebookActivityResultsPage() {
     rubricCriteria?: CodingRubricCriterion[];
     mcqContext?: Parameters<typeof renderTestReviewAllItem>[0];
   } | null>(null);
+  const openReviewAllRef = useRef<() => void>(() => undefined);
   const [feedbackReview, setFeedbackReview] = useState<{
     rows: CourseGradebookRow[];
     selectedIndex: number;
@@ -105,6 +111,10 @@ export default function GradebookActivityResultsPage() {
     refresh().catch((err) => notifications.error(err instanceof Error ? err.message : t("courseDetail.loadError")));
   }, [activityId, courseId, groupId, notifications, t]);
 
+  useEffect(() => {
+    setReportTab(requestedReportTab ?? (origin === "content" ? "overview" : "students"));
+  }, [origin, requestedReportTab]);
+
   const rows = gradebook?.rows ?? [];
   const activityTitle = rows[0]?.activityTitle ?? gradebook?.items[0]?.activityTitle ?? t("common.loading");
   const activityTypeKey = rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? "";
@@ -112,8 +122,10 @@ export default function GradebookActivityResultsPage() {
   const isSummativeActivity = (rows[0]?.assessmentMode ?? gradebook?.items[0]?.assessmentMode) === "summative";
   const canManageCourse = Boolean(course?.permissions?.canManageCourse);
   const groupTitle = groupId ? gradebook?.items.find((item) => item.groupId === groupId)?.groupTitle : null;
-  const backHref = groupId ? `/courses/${courseId}?tab=gradebook&groupId=${encodeURIComponent(groupId)}` : `/courses/${courseId}?tab=gradebook`;
-  const backLabel = t("courseDetail.backToCourseGradebook");
+  const backHref = origin === "content"
+    ? `/courses/${courseId}?tab=content`
+    : groupId ? `/courses/${courseId}?tab=gradebook&groupId=${encodeURIComponent(groupId)}` : `/courses/${courseId}?tab=gradebook`;
+  const backLabel = origin === "content" ? t("courseDetail.backToCourseContent") : t("courseDetail.backToCourseGradebook");
   const hasRowsWithSubmittedAttempts = rows.some((row) => hasSubmittedAttempt(row));
   const isTest = rows[0]?.activityTypeKey === "test" || gradebook?.items[0]?.activityTypeKey === "test";
 
@@ -220,6 +232,16 @@ export default function GradebookActivityResultsPage() {
       setReviewAll({ loading: false, error: message, submissions: [] });
     }
   }
+
+  openReviewAllRef.current = () => {
+    void openReviewAll();
+  };
+
+  useEffect(() => {
+    if (reportTab === "overview" && gradebook && reviewAll === null) {
+      openReviewAllRef.current();
+    }
+  }, [gradebook, reportTab, reviewAll]);
 
   function applyUpdatedGrade(row: CourseGradebookRow, grade: GradebookMutationGrade, attempt?: GradebookMutationAttempt) {
     setGradebook((current) => {
@@ -671,10 +693,6 @@ export default function GradebookActivityResultsPage() {
   }, [rows]);
 
   async function openReviewAndGrade(row: CourseGradebookRow) {
-    if (row.assessmentMode === "formative") {
-      router.push(manualGradingHref(courseId, activityId, groupId, row.participantId));
-      return;
-    }
     if (supportsAiFeedbackReview(row.activityTypeKey) || getManualGradingRenderer(row.activityTypeKey)) {
       setReviewAndGradeRow(row);
       return;
@@ -702,6 +720,11 @@ export default function GradebookActivityResultsPage() {
             </p>
           </div>
           <div className="hero-actions">
+            {canManageCourse ? (
+              <Link className="button primary" href={`/courses/${courseId}/activities/${activityId}`}>
+                {t("courseDetail.editActivityTitle")}
+              </Link>
+            ) : null}
             <button className="button secondary" disabled={!course || !gradebook} type="button" onClick={() => setShowGradeExport(true)}>
               {t("courseDetail.exportGrades")}
             </button>
@@ -712,15 +735,65 @@ export default function GradebookActivityResultsPage() {
         </section>
 
         <section className="section stack">
+          <div className="tab-strip" role="tablist" aria-label={t("courseDetail.activityReportsTabsLabel")}>
+            <button
+              aria-selected={reportTab === "overview"}
+              className={`tab-button ${reportTab === "overview" ? "is-active" : ""}`}
+              role="tab"
+              type="button"
+              onClick={() => setReportTab("overview")}
+            >
+              {t("courseDetail.reviewAll")}
+            </button>
+            <button
+              aria-selected={reportTab === "students"}
+              className={`tab-button ${reportTab === "students" ? "is-active" : ""}`}
+              role="tab"
+              type="button"
+              onClick={() => setReportTab("students")}
+            >
+              {t("courseDetail.studentResultsTitle")}
+            </button>
+          </div>
+
+          {reportTab === "overview" ? (
+            <div role="tabpanel">
+              {!reviewAll ? <p className="muted">{t("courseDetail.loadingStudentAnswers")}</p> : isTest ? (
+                <TestReviewAllPanel
+                  activityTitle={activityTitle}
+                  participantCount={rows.length}
+                  submissions={reviewAll.submissions}
+                  loading={reviewAll.loading}
+                  error={reviewAll.error}
+                  embedded
+                  renderItem={renderTestReviewAllItem}
+                  t={t}
+                />
+              ) : (
+                <ActivityReviewAllPanel
+                  activityTypeKey={reviewAll.activityTypeKey ?? rows[0]?.activityTypeKey ?? ""}
+                  activityTitle={activityTitle}
+                  config={reviewAll.config ?? {}}
+                  responses={reviewAll.responses ?? []}
+                  solution={reviewAll.solution}
+                  tests={reviewAll.tests}
+                  rubricCriteria={reviewAll.rubricCriteria}
+                  mcqReport={reviewAll.mcqContext ? renderTestReviewAllItem(reviewAll.mcqContext) : null}
+                  loading={reviewAll.loading}
+                  error={reviewAll.error}
+                  embedded
+                  t={t}
+                />
+              )}
+            </div>
+          ) : (
+          <div className="stack" role="tabpanel">
           <div className="section-heading">
             <div>
               <p className="eyebrow">{t("courseDetail.detailedResults")}</p>
               <h2>{t("courseDetail.studentResultsTitle")}</h2>
             </div>
             <div className="row wrap">
-              <button className="button secondary" type="button" onClick={() => void openReviewAll()}>
-                {t("courseDetail.reviewAll")}
-              </button>
               {isSummativeActivity && activityActions.canRerunAutomaticGrading ? (
                 <button className="button secondary" disabled={!hasRowsWithSubmittedAttempts || savingGradeKey === "__all:regrade"} type="button" onClick={() => void regradeAllRows()}>
                   {savingGradeKey === "__all:regrade" ? t("common.saving") : t("courseDetail.regradeAll")}
@@ -773,6 +846,8 @@ export default function GradebookActivityResultsPage() {
             </div>
           ) : (
             <p className="muted">{t("courseDetail.noGradebookRows")}</p>
+          )}
+          </div>
           )}
         </section>
 
@@ -897,39 +972,6 @@ export default function GradebookActivityResultsPage() {
             onClose={() => setReviewAndGradeRow(null)}
             onSaved={refresh}
           />
-        ) : null}
-        {reviewAll ? (
-          <div
-            className="dialog-backdrop"
-            role="presentation"
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget) setReviewAll(null);
-            }}
-          >
-            {isTest ? <TestReviewAllPanel
-              activityTitle={activityTitle}
-              participantCount={rows.length}
-              submissions={reviewAll.submissions}
-              loading={reviewAll.loading}
-              error={reviewAll.error}
-              onClose={() => setReviewAll(null)}
-              renderItem={renderTestReviewAllItem}
-              t={t}
-            /> : <ActivityReviewAllPanel
-              activityTypeKey={reviewAll.activityTypeKey ?? rows[0]?.activityTypeKey ?? ""}
-              activityTitle={activityTitle}
-              config={reviewAll.config ?? {}}
-              responses={reviewAll.responses ?? []}
-              solution={reviewAll.solution}
-              tests={reviewAll.tests}
-              rubricCriteria={reviewAll.rubricCriteria}
-              mcqReport={reviewAll.mcqContext ? renderTestReviewAllItem(reviewAll.mcqContext) : null}
-              loading={reviewAll.loading}
-              error={reviewAll.error}
-              onClose={() => setReviewAll(null)}
-              t={t}
-            />}
-          </div>
         ) : null}
         {feedbackReview ? (
           <div
