@@ -108,6 +108,7 @@ export default function GradebookActivityResultsPage() {
   const activityTypeKey = rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? "";
   const activityActions = getGradebookActivityActions(activityTypeKey);
   const isSummativeActivity = (rows[0]?.assessmentMode ?? gradebook?.items[0]?.assessmentMode) === "summative";
+  const canManageCourse = Boolean(course?.permissions?.canManageCourse);
   const groupTitle = groupId ? gradebook?.items.find((item) => item.groupId === groupId)?.groupTitle : null;
   const backHref = groupId ? `/courses/${courseId}?tab=gradebook&groupId=${encodeURIComponent(groupId)}` : `/courses/${courseId}?tab=gradebook`;
   const backLabel = t("courseDetail.backToCourseGradebook");
@@ -322,7 +323,7 @@ export default function GradebookActivityResultsPage() {
       ready: false,
       submitting: false,
       instructions: "",
-      updateInstructions: true,
+      updateInstructions: canManageCourse,
       templates: [],
       selectedTemplateAttemptIds: [],
       error: ""
@@ -349,7 +350,7 @@ export default function GradebookActivityResultsPage() {
         ready: true,
         submitting: false,
         instructions: setup.instructions,
-        updateInstructions: true,
+        updateInstructions: canManageCourse,
         templates: setup.templates,
         selectedTemplateAttemptIds: [],
         error: ""
@@ -539,7 +540,14 @@ export default function GradebookActivityResultsPage() {
     setFeedbackReview((current) => current ? { ...current, saving: true, error: "" } : current);
     try {
       const feedbackResult = feedbackChanged
-        ? await api.reviseActivityAttemptAiFeedback(courseId, feedbackReview.review.attemptId, feedbackReview.draft)
+        ? await api.reviseActivityAttemptAiFeedback(
+            courseId,
+            feedbackReview.review.attemptId,
+            feedbackReview.draft,
+            typeof feedbackReview.review.feedback.feedbackHash === "string"
+              ? feedbackReview.review.feedback.feedbackHash
+              : null
+          )
         : null;
       if (feedbackResult) {
         setFeedbackReview((current) => current ? {
@@ -559,7 +567,8 @@ export default function GradebookActivityResultsPage() {
         ? await api.overrideGradebookGrade(courseId, row.gradebookItemId, row.participantId, {
             score: parsedGrade,
             maxScore: row.maxScore,
-            reason: t("courseDetail.reviewAndGradeReason")
+            reason: t("courseDetail.reviewAndGradeReason"),
+            expectedGradeUpdatedAt: feedbackResult?.grade?.updatedAt ?? feedbackResult?.gradeUpdatedAt ?? row.gradeUpdatedAt
           })
         : null;
       const finalGrade = overrideResult?.grade.normalizedScore ?? feedbackResult?.grade?.normalizedScore ?? feedbackReview.initialGrade;
@@ -835,7 +844,7 @@ export default function GradebookActivityResultsPage() {
                       onChange={(event) => setAiGradingBatchDialog((current) => current ? { ...current, instructions: event.target.value, error: "" } : current)}
                     />
                   </div>
-                  <label className="checkbox-row">
+                  {canManageCourse ? <label className="checkbox-row">
                     <input
                       checked={aiGradingBatchDialog.updateInstructions}
                       disabled={aiGradingBatchDialog.submitting}
@@ -843,7 +852,7 @@ export default function GradebookActivityResultsPage() {
                       onChange={(event) => setAiGradingBatchDialog((current) => current ? { ...current, updateInstructions: event.target.checked } : current)}
                     />
                     <span>{t("courseDetail.aiBatchUpdateInstructions")}</span>
-                  </label>
+                  </label> : null}
                   {aiGradingBatchDialog.error ? <p className="error-text" role="alert">{aiGradingBatchDialog.error}</p> : null}
                   <div className="dialog-actions">
                     <button className="button secondary" disabled={aiGradingBatchDialog.submitting} type="button" onClick={() => setAiGradingBatchDialog(null)}>

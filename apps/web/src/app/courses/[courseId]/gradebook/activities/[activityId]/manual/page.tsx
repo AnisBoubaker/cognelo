@@ -287,7 +287,8 @@ export default function ManualActivityGradingPage() {
           score,
           maxScore: row.maxScore,
           reason: draft.feedback.trim() || null,
-          feedbackText: draft.feedback.trim() || null
+          feedbackText: draft.feedback.trim() || null,
+          expectedGradeUpdatedAt: row.gradeUpdatedAt
         });
         setSaveProgress({ completed: index + 1, total: rowsToSave.length });
       }

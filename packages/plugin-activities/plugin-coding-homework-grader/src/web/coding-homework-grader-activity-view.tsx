@@ -1116,7 +1116,7 @@ function SubmissionPanel({
   submissionResult: CodingHomeworkSubmissionResult | null;
   submitting: boolean;
 }) {
-  const currentSubmissionStatus = submissionResult?.submission.status ?? latestSubmission?.submission.status ?? null;
+  const currentSubmissionStatus = latestSubmission?.submission.status ?? submissionResult?.submission.status ?? null;
   const status = submissionResult && !submissionResult.summary.isValid
       ? copy.submissionInvalid
       : currentSubmissionStatus === "ready_for_grading"

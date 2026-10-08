@@ -1,8 +1,7 @@
 import { createHash } from "node:crypto";
 import { prisma, type Prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
-import { assertCanManageCourse } from "./authorization";
-import { assertCanViewCourse } from "./authorization";
+import { assertCanGradeGroup, assertCanManageCourse, assertCanViewCourse, assertCanViewCourseGradebook } from "./authorization";
 import { AppError, notFound } from "./errors";
 
 type JsonInput = Prisma.InputJsonValue;
@@ -72,7 +71,7 @@ export function hashAiFeedbackValue(value: unknown) {
 }
 
 export async function getTeacherAttemptAiFeedbackReview(user: CurrentUser, courseId: string, attemptId: string) {
-  await assertCanManageCourse(user, courseId);
+  await assertCanViewCourseGradebook(user, courseId);
   const attempt = await prisma.activityAttempt.findFirst({
     where: { id: attemptId, courseId },
     include: {
@@ -81,6 +80,7 @@ export async function getTeacherAttemptAiFeedbackReview(user: CurrentUser, cours
     }
   });
   if (!attempt) throw notFound("Activity attempt");
+  await assertCanGradeGroup(user, courseId, attempt.groupId);
   if (attempt.lifecycle !== "submitted" && attempt.lifecycle !== "graded") {
     throw new AppError(409, "FEEDBACK_SUBMISSION_REQUIRED", "Feedback is available only after the learner submits the activity.");
   }
@@ -103,6 +103,7 @@ export async function getTeacherAttemptAiFeedbackReview(user: CurrentUser, cours
   return {
     attemptId: attempt.id,
     gradeId: selectedGrade?.id ?? null,
+    gradeUpdatedAt: selectedGrade?.updatedAt.toISOString() ?? null,
     gradesReleased: attempt.gradebookItem.gradesReleased,
     participant: {
       id: attempt.participant.id,
@@ -117,14 +118,16 @@ export async function reviseTeacherAttemptAiFeedback(
   user: CurrentUser,
   courseId: string,
   attemptId: string,
-  revisedFeedback: Record<string, unknown>
+  revisedFeedback: Record<string, unknown>,
+  expectedFeedbackHash?: string | null
 ) {
-  await assertCanManageCourse(user, courseId);
+  await assertCanViewCourseGradebook(user, courseId);
   const attempt = await prisma.activityAttempt.findFirst({
     where: { id: attemptId, courseId },
     include: { gradebookItem: { select: { id: true, gradesReleased: true } } }
   });
   if (!attempt) throw notFound("Activity attempt");
+  await assertCanGradeGroup(user, courseId, attempt.groupId);
   if (attempt.lifecycle !== "submitted" && attempt.lifecycle !== "graded") {
     throw new AppError(409, "FEEDBACK_SUBMISSION_REQUIRED", "Feedback is available only after the learner submits the activity.");
   }
@@ -146,6 +149,14 @@ export async function reviseTeacherAttemptAiFeedback(
       ? attemptFeedback
       : {};
   const hasCurrentFeedback = isStoredTeacherFeedback(currentFeedback);
+  const currentFeedbackHash = hasCurrentFeedback
+    ? typeof currentFeedback.feedbackHash === "string"
+      ? currentFeedback.feedbackHash
+      : hashAiFeedbackValue(currentFeedback)
+    : null;
+  if (expectedFeedbackHash !== undefined && currentFeedbackHash !== expectedFeedbackHash) {
+    throw feedbackEditConflict();
+  }
   const feedbackRef = hasCurrentFeedback
     ? String(currentFeedback.feedbackRef)
     : `teacher-feedback:${attempt.id}`;
@@ -237,9 +248,9 @@ export async function reviseTeacherAttemptAiFeedback(
       }
     : { attemptId: attempt.id, lifecycle: attempt.lifecycle };
 
-  await prisma.$transaction(async (tx) => {
-    await tx.activityAttempt.update({
-      where: { id: attempt.id },
+  const mutation = await prisma.$transaction(async (tx) => {
+    const attemptUpdate = await tx.activityAttempt.updateMany({
+      where: { id: attempt.id, updatedAt: attempt.updatedAt },
       data: {
         metadata: {
           ...asRecord(attempt.metadata),
@@ -247,9 +258,11 @@ export async function reviseTeacherAttemptAiFeedback(
         } as JsonInput
       }
     });
+    if (attemptUpdate.count !== 1) throw feedbackEditConflict();
+    let gradeUpdatedAt: string | null = null;
     if (selectedGrade) {
-      await tx.grade.update({
-        where: { id: selectedGrade.id },
+      const gradeUpdate = await tx.grade.updateMany({
+        where: { id: selectedGrade.id, updatedAt: selectedGrade.updatedAt },
         data: {
           normalizedResult: nextNormalizedResult as JsonInput,
           metadata: {
@@ -262,6 +275,9 @@ export async function reviseTeacherAttemptAiFeedback(
           } as JsonInput
         }
       });
+      if (gradeUpdate.count !== 1) throw feedbackEditConflict();
+      const updatedGrade = await tx.grade.findUnique({ where: { id: selectedGrade.id }, select: { updatedAt: true } });
+      gradeUpdatedAt = updatedGrade?.updatedAt.toISOString() ?? null;
     }
     await tx.gradeEvent.create({
       data: {
@@ -320,9 +336,18 @@ export async function reviseTeacherAttemptAiFeedback(
         createdAt: now
       }
     });
+    return { gradeUpdatedAt };
   });
 
-  return { feedback: nextFeedback, teacherRevision, feedbackHash };
+  return { feedback: nextFeedback, teacherRevision, feedbackHash, gradeUpdatedAt: mutation.gradeUpdatedAt };
+}
+
+function feedbackEditConflict() {
+  return new AppError(
+    409,
+    "FEEDBACK_EDIT_CONFLICT",
+    "This feedback changed after the review dialog was opened. Reload the latest feedback before saving again."
+  );
 }
 
 function stableJson(value: unknown): string {

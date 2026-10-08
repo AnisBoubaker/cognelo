@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
 const mockPrisma = vi.hoisted(() => ({
-  activityAttempt: { findFirst: vi.fn(), update: vi.fn() },
-  grade: { findUnique: vi.fn(), update: vi.fn() },
+  activityAttempt: { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+  grade: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   gradeChallenge: { findFirst: vi.fn() },
   gradeEvent: { create: vi.fn() },
   aiFeedbackResearchEvent: { create: vi.fn() },
@@ -12,8 +12,10 @@ const mockPrisma = vi.hoisted(() => ({
 
 vi.mock("@cognelo/db", () => ({ prisma: mockPrisma }));
 vi.mock("./authorization", () => ({
+  assertCanGradeGroup: vi.fn(),
   assertCanManageCourse: vi.fn(),
-  assertCanViewCourse: vi.fn()
+  assertCanViewCourse: vi.fn(),
+  assertCanViewCourseGradebook: vi.fn()
 }));
 
 const { getTeacherAttemptAiFeedbackReview, reviseTeacherAttemptAiFeedback } = await import("./ai-feedback");
@@ -54,6 +56,7 @@ describe("teacher AI feedback review", () => {
       userId: "student-1",
       pluginKey: "coding-exercise",
       lifecycle: "submitted",
+      updatedAt: new Date("2026-08-01T12:00:00.000Z"),
       metadata: {},
       gradebookItem: { id: "item-1", gradesReleased: false },
       participant: { id: "participant-1", firstName: "Student", lastName: "One", email: "student@example.test" }
@@ -67,12 +70,15 @@ describe("teacher AI feedback review", () => {
       normalizedMaxScore: 100,
       isPass: true,
       source: "auto",
+      updatedAt: new Date("2026-08-01T12:00:00.000Z"),
       normalizedResult: { studentFeedback: currentFeedback },
       metadata: {}
     });
     mockPrisma.gradeChallenge.findFirst.mockResolvedValue(null);
     mockPrisma.activityAttempt.update.mockResolvedValue({ id: "attempt-1" });
+    mockPrisma.activityAttempt.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.grade.update.mockResolvedValue({ id: "grade-1" });
+    mockPrisma.grade.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.gradeEvent.create.mockResolvedValue({ id: "event-1" });
     mockPrisma.aiFeedbackResearchEvent.create.mockResolvedValue({ id: "research-1" });
   });
@@ -96,6 +102,7 @@ describe("teacher AI feedback review", () => {
       normalizedMaxScore: 100,
       isPass: true,
       source: "override",
+      updatedAt: new Date("2026-08-01T12:00:00.000Z"),
       normalizedResult: {
         studentFeedback: {
           kind: "ai_assessment_feedback",
@@ -152,8 +159,8 @@ describe("teacher AI feedback review", () => {
         authoredByTeacher: true
       }
     });
-    expect(mockPrisma.activityAttempt.update).toHaveBeenCalledWith({
-      where: { id: "attempt-1" },
+    expect(mockPrisma.activityAttempt.updateMany).toHaveBeenCalledWith({
+      where: { id: "attempt-1", updatedAt: new Date("2026-08-01T12:00:00.000Z") },
       data: {
         metadata: expect.objectContaining({
           teacherFeedback: expect.objectContaining({
@@ -163,7 +170,7 @@ describe("teacher AI feedback review", () => {
         })
       }
     });
-    expect(mockPrisma.grade.update).not.toHaveBeenCalled();
+    expect(mockPrisma.grade.updateMany).not.toHaveBeenCalled();
     expect(mockPrisma.gradeEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         gradeId: null,
@@ -184,7 +191,7 @@ describe("teacher AI feedback review", () => {
 
     expect(result).toMatchObject({ feedback: { summary: "Reviewed summary", teacherRevision: 1, reviewedByTeacher: true } });
     expect(result.feedback.feedbackHash).not.toBe("client-cannot-control-this");
-    expect(mockPrisma.grade.update).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mockPrisma.grade.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         normalizedResult: expect.objectContaining({
           studentFeedback: expect.objectContaining({ summary: "Reviewed summary", feedbackRef: "evaluation-1" })
@@ -207,7 +214,7 @@ describe("teacher AI feedback review", () => {
     })).resolves.toMatchObject({
       feedback: { summary: "Reviewed after the challenge", teacherRevision: 1 }
     });
-    expect(mockPrisma.grade.update).toHaveBeenCalled();
+    expect(mockPrisma.grade.updateMany).toHaveBeenCalled();
     expect(mockPrisma.gradeEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         previousValue: expect.objectContaining({

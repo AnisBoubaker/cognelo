@@ -9,6 +9,9 @@ export type CourseStatus = z.infer<typeof CourseStatusSchema>;
 export const CourseMembershipRoleSchema = z.enum(["owner", "teacher", "ta", "student"]);
 export type CourseMembershipRole = z.infer<typeof CourseMembershipRoleSchema>;
 
+export const CourseMembershipSourceSchema = z.enum(["explicit", "section_derived"]);
+export type CourseMembershipSource = z.infer<typeof CourseMembershipSourceSchema>;
+
 export const MaterialKindSchema = z.enum([
   "folder",
   "text",

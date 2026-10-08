@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma, type Prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
-import { assertCanManageCourse } from "./authorization";
+import { assertCanGradeGroup, assertCanViewCourseGradebook } from "./authorization";
 import { recordAiFeedbackResearchEvent } from "./ai-feedback";
 import { sendSystemEmailToEligibleRecipient } from "./email-delivery";
 import { AppError, forbidden, notFound } from "./errors";
@@ -124,10 +124,11 @@ export async function createGradeChallenge(user: CurrentUser, courseId: string, 
 }
 
 export async function listCourseGradeChallenges(user: CurrentUser, courseId: string, status?: string | null) {
-  await assertCanManageCourse(user, courseId);
+  const capabilities = await assertCanViewCourseGradebook(user, courseId);
   const challenges = await prisma.gradeChallenge.findMany({
     where: {
       courseId,
+      ...(capabilities.gradingGroupIds !== null ? { groupId: { in: capabilities.gradingGroupIds } } : {}),
       ...(status && ["open", "upheld", "adjusted"].includes(status) ? { status } : {})
     },
     orderBy: [{ status: "asc" }, { createdAt: "asc" }]
@@ -192,12 +193,13 @@ export async function resolveGradeChallenge(
   encryptionKey?: string,
   dependencies: ChallengeResolutionDependencies = {}
 ) {
-  await assertCanManageCourse(user, courseId);
+  await assertCanViewCourseGradebook(user, courseId);
   const data = resolveChallengeSchema.parse(input);
   const challenge = await prisma.gradeChallenge.findFirst({ where: { id: challengeId, courseId } });
   if (!challenge) {
     throw notFound("Grade challenge");
   }
+  await assertCanGradeGroup(user, courseId, challenge.groupId);
   if (challenge.status !== "open") {
     throw new AppError(409, "GRADE_CHALLENGE_ALREADY_RESOLVED", "This grade challenge has already been resolved.");
   }

@@ -1,6 +1,7 @@
 import { prisma } from "@cognelo/db";
 import {
   createAuthenticatedApi,
+  createAuthenticatedApiWithCredentials,
   expect,
   loginWithCredentialsThroughUi,
   test,
@@ -148,6 +149,29 @@ test.describe.serial("global and course role boundaries", () => {
     await expect(page.getByText("Physical blobs", { exact: true })).toBeVisible();
   });
 
+  test("an administrator cannot remove their own final administrator capability", async () => {
+    const api = await createAuthenticatedApi("admin");
+    try {
+      const { user } = await responseJson<{
+        user: { id: string; email: string; firstName: string; lastName: string };
+      }>(await api.get("/api/users/me"));
+      const response = await api.patch(`/api/users/${user.id}`, {
+        data: {
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          roles: ["teacher"]
+        }
+      });
+      expect(response.status()).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "CANNOT_REMOVE_OWN_ADMIN_ROLE" }
+      });
+    } finally {
+      await api.dispose();
+    }
+  });
+
   test("a pure course manager can create curriculum and courses without administrator access", async ({ browser }) => {
     if (!data) throw new Error("The activity suite was not provisioned.");
     const email = `e2e-course-manager-${data.token}@example.invalid`;
@@ -168,6 +192,11 @@ test.describe.serial("global and course role boundaries", () => {
       );
       userId = user.id;
       await responseJson(await adminApi.put(`/api/users/${userId}/email-verification`));
+      await responseJson(
+        await adminApi.post(`/api/courses/${data.courseId}/memberships`, {
+          data: { userId, role: "owner" }
+        })
+      );
 
       const context = await browser.newContext({ baseURL: WEB_BASE_URL, locale: "en-CA" });
       try {
@@ -178,10 +207,22 @@ test.describe.serial("global and course role boundaries", () => {
         await expect(page.getByRole("button", { name: "Add", exact: true })).toBeVisible();
         await page.goto("/courses");
         await expect(page.getByRole("link", { name: "Create course" })).toBeVisible();
+        await page.goto(`/courses/${data.courseId}`);
+        await expect(page.getByRole("tab", { name: "Content", exact: true })).toBeVisible();
+        await expect(page.getByRole("tab", { name: "Participants", exact: true })).toBeVisible();
+        await expect(page.getByRole("tab", { name: "Settings", exact: true })).toBeVisible();
+        await expect(page.getByRole("tab", { name: "Gradebook", exact: true })).toHaveCount(0);
         await page.goto("/settings/users");
         await expect(page.getByText("User management is available to administrators.")).toBeVisible();
       } finally {
         await context.close();
+      }
+
+      const managerApi = await createAuthenticatedApiWithCredentials({ email, password });
+      try {
+        expect((await managerApi.get(`/api/courses/${data.courseId}/gradebook`)).status()).toBe(403);
+      } finally {
+        await managerApi.dispose();
       }
     } finally {
       await adminApi.dispose();
@@ -199,36 +240,27 @@ test.describe.serial("global and course role boundaries", () => {
     await expect(page.getByRole("menuitem", { name: "New activity" })).toBeVisible();
   });
 
-  test("a group TA can use the same management workspace within assigned scope", async ({ studentPage: page }) => {
+  test("a group TA can grade only within the assigned section without course-management access", async ({ studentPage: page }) => {
     if (!data) throw new Error("The activity suite was not provisioned.");
     await setSeedStudentParticipantRole(data, "ta");
     await page.goto(`/courses/${data.courseId}/groups/${data.groupId}`);
-    await expect(page).toHaveURL(
-      `${WEB_BASE_URL}/courses/${data.courseId}?tab=content&view=group&groupId=${data.groupId}`
-    );
+    await expect(page).toHaveURL(`${WEB_BASE_URL}/courses/${data.courseId}/groups/${data.groupId}`);
     await expect(page.getByRole("tab", { name: "Content", exact: true })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Gradebook", exact: true })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Participants", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Content tree actions" }).click();
-    await expect(page.getByRole("menuitem", { name: "New activity" })).toHaveCount(0);
-    await page.getByRole("link", { name: "Course", exact: true }).click();
-    await expect(page).toHaveURL(`${WEB_BASE_URL}/courses/${data.courseId}?tab=content`);
-    await page.getByRole("button", { name: "Content tree actions" }).click();
-    await expect(page.getByRole("menuitem", { name: "New activity" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Challenges", exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Settings", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Add participant" })).toHaveCount(0);
   });
 
-  test("a group teacher can manage authoring and participant paths", async ({ studentPage: page }) => {
+  test("a group teacher can manage the assigned roster without course authoring access", async ({ studentPage: page }) => {
     if (!data) throw new Error("The activity suite was not provisioned.");
     await setSeedStudentParticipantRole(data, "teacher");
     await page.goto(`/courses/${data.courseId}/groups/${data.groupId}`);
-    await expect(page).toHaveURL(
-      `${WEB_BASE_URL}/courses/${data.courseId}?tab=content&view=group&groupId=${data.groupId}`
-    );
+    await expect(page).toHaveURL(`${WEB_BASE_URL}/courses/${data.courseId}/groups/${data.groupId}`);
     await page.getByRole("tab", { name: "Participants", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Participants", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Add participant" })).toBeVisible();
-    await page.getByRole("tab", { name: "Settings", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "General settings" })).toBeVisible();
-    await expect(page.getByText("You do not have permission to perform this action.")).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: "Settings", exact: true })).toHaveCount(0);
   });
 });

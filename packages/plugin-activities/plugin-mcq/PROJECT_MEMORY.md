@@ -13,4 +13,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Standalone and compound-Test draft paths are distinct and must not be mixed.
 - Attempt limits are enforced by both status UI and the submission route. Released final grades close further attempts.
 - Every standalone answer check/submission creates a core attempt with the assignment mode. Student summative history and limits select only summative attempts; teacher history can inspect both modes.
+- Gradebook attempt review and grading consume core course capabilities: explicit course teachers/admins work course-wide, while section teachers/TAs are restricted to their assigned groups. Authoring and grade release remain course-management operations.
 - Teacher feedback and learner copy use mechanism-neutral wording.

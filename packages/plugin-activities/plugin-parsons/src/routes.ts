@@ -2,6 +2,7 @@ import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import type { Prisma } from "@prisma/client";
 import {
   AppError,
+  assertCanGradeGroup,
   assertCanManageActivityBank,
   assertCanManageCourse,
   getActivityAttemptAvailability,
@@ -256,7 +257,7 @@ export const parsonsGradebookAttemptsRoute: PluginRouteDefinition = {
       if (!context.courseId || !context.groupId) {
         throw new AppError(400, "GROUP_CONTEXT_REQUIRED", "Gradebook attempts require a group activity context.");
       }
-      await assertCanManageCourse(context.user, context.courseId);
+      await assertCanGradeGroup(context.user, context.courseId, context.groupId);
 
       const searchParams = new URL(request.url).searchParams;
       const participantId = searchParams.get("participantId");

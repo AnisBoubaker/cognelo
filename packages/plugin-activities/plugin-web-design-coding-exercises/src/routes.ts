@@ -1,7 +1,8 @@
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import {
   AppError,
-  assertCanManageCourse,
+  assertCanManageCourseOrViewGradebook,
+  assertCanViewCourseGradebook,
   clearActivityResponseDraft,
   recordActivityAttemptGradingResult,
   startActivityAttempt,
@@ -37,7 +38,7 @@ export const webDesignExerciseTestsRoute: PluginRouteDefinition = {
       if (!context.courseId) {
         throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "This plugin route requires a course or activity bank context.");
       }
-      await assertCanManageCourse(context.user, context.courseId);
+      await assertCanManageCourseOrViewGradebook(context.user, context.courseId);
       return listWebDesignExerciseTests({
         activityId: context.activity.id
       });
@@ -186,9 +187,16 @@ export const webDesignExerciseReviewAllRoute: PluginRouteDefinition = {
   methods: {
     GET: async ({ context }) => {
       if (!context.courseId) throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "This plugin route requires a course context.");
-      await assertCanManageCourse(context.user, context.courseId);
+      const capabilities = await assertCanViewCourseGradebook(context.user, context.courseId);
       const participants = await prisma.courseGroupParticipant.findMany({
-        where: { group: { courseId: context.courseId }, role: "student", userId: { not: null } },
+        where: {
+          group: {
+            courseId: context.courseId,
+            ...(capabilities.gradingGroupIds !== null ? { id: { in: capabilities.gradingGroupIds } } : {})
+          },
+          role: "student",
+          userId: { not: null }
+        },
         select: { id: true, userId: true }
       });
       const submissions = await listWebDesignExerciseReviewSubmissionAttempts({ activityId: context.activity.id, userIds: participants.flatMap((participant) => participant.userId ? [participant.userId] : []) });

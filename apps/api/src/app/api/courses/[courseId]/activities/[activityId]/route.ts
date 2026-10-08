@@ -1,6 +1,15 @@
 import { NextRequest } from "next/server";
 import { runCourseActivityDeletedHooks } from "@cognelo/activity-sdk/server";
-import { deleteActivity, deleteTest, getActivity, getActivityForDeletion, getTestForDeletion, updateActivity } from "@cognelo/core";
+import {
+  canManageCourse,
+  deleteActivity,
+  deleteTest,
+  getActivity,
+  getActivityForDeletion,
+  getActivityForGradebook,
+  getTestForDeletion,
+  updateActivity
+} from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; activityId: string }> };
@@ -15,7 +24,11 @@ export async function GET(_request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, activityId } = await params;
-    return json({ activity: await getActivity(user, courseId, activityId) });
+    return json({
+      activity: await (await canManageCourse(user, courseId)
+        ? getActivity(user, courseId, activityId)
+        : getActivityForGradebook(user, courseId, activityId))
+    });
   });
 }
 

@@ -23,6 +23,7 @@ import { ActivityTypeIcon, AppIcon, FolderContentIcon as SharedFolderContentIcon
 import { useAuth } from "@/components/auth-provider";
 import { CourseSettingsPanel, type CourseSettingsSection } from "@/components/course-settings-panel";
 import { CourseParticipantsPanel } from "@/components/course-participants-panel";
+import { CourseStaffPanel } from "@/components/course-staff-panel";
 import { CourseGradeChallengesPanel } from "@/components/course-grade-challenges-panel";
 import { GradebookExportDialog, type GradebookExportTarget } from "@/components/gradebook-export-dialog";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
@@ -152,8 +153,7 @@ export default function CourseDetailPage() {
       setCourse(courseResult.course);
       setActivityTypes(typeResult.activityTypes);
       setActivityDefinitions(typeResult.registeredDefinitions);
-      const role = courseResult.course.memberships?.find((membership) => membership.userId === user?.id)?.role;
-      const userCanManage = Boolean(user?.roles.includes("admin") || role === "owner" || role === "teacher" || role === "ta");
+      const userCanManage = Boolean(courseResult.course.permissions?.canManageCourse);
       if (!userCanManage) {
         setGradebook(null);
         setContentItems([]);
@@ -197,7 +197,7 @@ export default function CourseDetailPage() {
       ).then((subjectsResult) => {
         if (isCurrentRequest()) setSubjects(subjectsResult.subjects);
       });
-      const gradebookRequest = activeCourseTab === "gradebook"
+      const gradebookRequest = activeCourseTab === "gradebook" && courseResult.course.permissions?.canViewGradebook
         ? api.courseGradebookSummary(courseId, {
             groupId: gradebookGroupId || undefined,
             activityId: gradebookActivityId || undefined,
@@ -328,12 +328,7 @@ export default function CourseDetailPage() {
     });
   }
 
-  const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
-  const canManage =
-    user?.roles.includes("admin") ||
-    membershipRole === "owner" ||
-    membershipRole === "teacher" ||
-    membershipRole === "ta";
+  const canManage = Boolean(course?.permissions?.canManageCourse);
   const sortedCourseGroups = useMemo(
     () => [...(course?.groups ?? [])].sort((left, right) => compareGroupTitles(left.title, right.title, locale)),
     [course?.groups, locale]
@@ -1813,15 +1808,23 @@ export default function CourseDetailPage() {
                   id: "participants",
                   label: t("courseDetail.participantsTab"),
                   render: () => (
-                    <CourseParticipantsPanel
-                      courseId={courseId}
-                      currentUserId={user?.id}
-                      groups={sortedCourseGroups}
-                      onChanged={refresh}
-                    />
+                    <div className="stack">
+                      <CourseStaffPanel
+                        courseId={courseId}
+                        currentUserId={user?.id}
+                        memberships={course.memberships ?? []}
+                        onChanged={refresh}
+                      />
+                      <CourseParticipantsPanel
+                        courseId={courseId}
+                        currentUserId={user?.id}
+                        groups={sortedCourseGroups}
+                        onChanged={refresh}
+                      />
+                    </div>
                   )
                 },
-                {
+                ...(course.permissions?.canViewGradebook ? [{
                   href: `/courses/${courseId}?tab=gradebook`,
                   id: "gradebook",
                   label: t("courseDetail.gradebookTab"),
@@ -2057,7 +2060,7 @@ export default function CourseDetailPage() {
                   id: "challenges",
                   label: t("courseDetail.challengesTab"),
                   render: () => <CourseGradeChallengesPanel courseId={courseId} />
-                },
+                }] : []),
                 {
                   href: `/courses/${courseId}?tab=settings&section=${activeCourseSettingsSection}`,
                   id: "settings",
@@ -2069,7 +2072,7 @@ export default function CourseDetailPage() {
                       course={course}
                       subjects={subjects}
                       onCourseUpdated={(updatedCourse) => {
-                        setCourse(updatedCourse);
+                        setCourse({ ...updatedCourse, permissions: course.permissions });
                         if (updatedCourse.subjectId) {
                           api.activityBanks(updatedCourse.subjectId)
                             .then((result) => setActivityBanks(result.activityBanks))

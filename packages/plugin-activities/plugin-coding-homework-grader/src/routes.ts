@@ -2,7 +2,7 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import type { PluginRouteDefinition, PluginRouteContext } from "@cognelo/activity-sdk/server";
-import { AppError, assertCanManageActivityBank, assertCanManageCourse, getBackgroundJob } from "@cognelo/core";
+import { AppError, assertCanGradeGroup, assertCanManageActivityBank, assertCanManageCourse, getBackgroundJob } from "@cognelo/core";
 import { prisma as corePrisma } from "@cognelo/db";
 import { analyzeCodingHomeworkSubmission } from "./analysis";
 import { saveCodingHomeworkChallengeAnswers } from "./challenge-answers";
@@ -108,7 +108,7 @@ async function resolveTeacherSubmissionScope(context: PluginRouteContext) {
   if (!context.groupId) {
     throw new AppError(400, "GROUP_CONTEXT_REQUIRED", "Submission processing requires an assigned group activity context.");
   }
-  await assertCanManageCourse(context.user, courseId);
+  await assertCanGradeGroup(context.user, courseId, context.groupId);
   return {
     user: context.user,
     courseId,
@@ -432,7 +432,7 @@ export const codingHomeworkGradebookAttemptsRoute: PluginRouteDefinition = {
       if (!context.groupId) {
         throw new AppError(400, "GROUP_CONTEXT_REQUIRED", "Gradebook attempts require a group activity context.");
       }
-      await assertCanManageCourse(context.user, courseId);
+      await assertCanGradeGroup(context.user, courseId, context.groupId);
 
       const participantId = new URL(request.url).searchParams.get("participantId");
       if (!participantId) {

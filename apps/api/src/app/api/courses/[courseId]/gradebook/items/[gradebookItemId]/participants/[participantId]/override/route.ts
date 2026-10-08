@@ -10,7 +10,8 @@ const overrideInputSchema = z.object({
   maxScore: z.number().positive().optional(),
   isPass: z.boolean().nullable().optional(),
   reason: z.string().max(1000).nullable().optional(),
-  feedbackText: z.string().max(4000).nullable().optional()
+  feedbackText: z.string().max(4000).nullable().optional(),
+  expectedGradeUpdatedAt: z.string().datetime().nullable()
 });
 
 export function OPTIONS() {
@@ -30,7 +31,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         maxScore: input.maxScore,
         isPass: input.isPass,
         reason: input.reason,
-        feedbackText: input.feedbackText
+        feedbackText: input.feedbackText,
+        expectedGradeUpdatedAt: input.expectedGradeUpdatedAt
       })
     });
   });

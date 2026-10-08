@@ -16,7 +16,14 @@ import {
 import { Prisma, prisma } from "@cognelo/db";
 import type { ActivityAssignmentOverrideField, CurrentUser } from "@cognelo/contracts";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
-import { assertCanManageCourse, assertCanViewCourse, canManageCourse, isAdmin } from "./authorization";
+import {
+  assertCanManageCourse,
+  assertCanManageGroupRoster,
+  assertCanViewCourse,
+  canGradeGroup,
+  canManageCourse,
+  isAdmin
+} from "./authorization";
 import { listContentItems } from "./course-content";
 import { AppError, notFound } from "./errors";
 
@@ -102,7 +109,10 @@ export async function listCourseGroups(user: CurrentUser, courseId: string) {
 }
 
 export async function getCourseGroup(user: CurrentUser, courseId: string, groupId: string) {
-  const isManager = await canManageCourse(user, courseId);
+  const [isManager, canTeach] = await Promise.all([
+    canManageCourse(user, courseId),
+    canGradeGroup(user, courseId, groupId)
+  ]);
   await assertCanViewGroup(user, courseId, groupId);
   const group = await prisma.courseGroup.findFirst({
     where: {
@@ -114,7 +124,7 @@ export async function getCourseGroup(user: CurrentUser, courseId: string, groupI
   if (!group) {
     throw notFound("Course group");
   }
-  const visibleAssignmentIds = isManager
+  const visibleAssignmentIds = isManager || canTeach
     ? null
     : new Set(
         (await listContentItems(user, courseId, { groupId, visibleOnly: true }))
@@ -126,7 +136,7 @@ export async function getCourseGroup(user: CurrentUser, courseId: string, groupI
     : group.activities;
   return {
     ...group,
-    activities: isManager
+    activities: isManager || canTeach
       ? visibleActivities
       : visibleActivities.map((assignment) => assignmentRequiresSafeExamBrowser(assignment.metadata)
         ? {
@@ -142,7 +152,7 @@ export async function getCourseGroup(user: CurrentUser, courseId: string, groupI
             }
           }
         : assignment),
-    participants: isManager ? group.participants : group.participants.filter((participant) => participant.userId === user.id),
+    participants: isManager || canTeach ? group.participants : group.participants.filter((participant) => participant.userId === user.id),
     hiddenCourseMaterialIds: group.hiddenCourseMaterials.map((entry) => entry.courseMaterialId)
   };
 }
@@ -571,6 +581,7 @@ export async function deleteCourseGroup(user: CurrentUser, courseId: string, gro
         });
       }
       await tx.courseGroup.delete({ where: { id: groupId } });
+      await cleanupDerivedStaffMemberships(tx, courseId, participants);
       return { ok: true as const, movedParticipantCount: participantsToCreate.length, skippedDuplicateCount: participants.length - participantsToCreate.length };
     }
 
@@ -587,6 +598,7 @@ export async function deleteCourseGroup(user: CurrentUser, courseId: string, gro
         await tx.courseMembership.deleteMany({ where: { courseId, userId, role: "student" } });
       }
     }
+    await cleanupDerivedStaffMemberships(tx, courseId, participants);
     return { ok: true as const, deletedParticipantCount: participants.length };
   });
 }
@@ -807,7 +819,7 @@ export async function getGroupAssignedActivityAccess(
 }
 
 export async function addGroupParticipant(user: CurrentUser, courseId: string, groupId: string, input: unknown) {
-  await assertCanManageCourse(user, courseId);
+  await assertCanManageGroupRoster(user, courseId, groupId);
   await assertGroupBelongsToCourse(courseId, groupId);
   const data = CourseGroupParticipantInputSchema.parse(input);
   const normalizedEmail = data.email.toLowerCase();
@@ -894,6 +906,22 @@ export async function addGroupParticipant(user: CurrentUser, courseId: string, g
         await ensureMembershipsForGroupParticipant(existingUser.id, courseId, data.role, tx);
       }
 
+      await tx.courseAuditEvent.create({
+        data: {
+          courseId,
+          actorUserId: user.id,
+          eventType: "section_participant_added",
+          targetType: "course_group_participant",
+          targetId: createdParticipant.id,
+          nextValue: {
+            groupId,
+            userId: createdParticipant.userId,
+            email: createdParticipant.email,
+            role: createdParticipant.role
+          }
+        }
+      });
+
       return createdParticipant;
     });
 
@@ -927,8 +955,17 @@ function assignedPasswordAccountConflict() {
   );
 }
 
-export async function lookupGroupParticipantCandidate(user: CurrentUser, courseId: string, email: string) {
-  await assertCanManageCourse(user, courseId);
+export async function lookupGroupParticipantCandidate(
+  user: CurrentUser,
+  courseId: string,
+  email: string,
+  groupId?: string | null
+) {
+  if (groupId) {
+    await assertCanManageGroupRoster(user, courseId, groupId);
+  } else {
+    await assertCanManageCourse(user, courseId);
+  }
   const normalizedEmail = email.toLowerCase().trim();
   if (!normalizedEmail) {
     return null;
@@ -953,7 +990,7 @@ export async function lookupGroupParticipantCandidate(user: CurrentUser, courseI
 }
 
 export async function removeGroupParticipant(user: CurrentUser, courseId: string, groupId: string, participantId: string) {
-  await assertCanManageCourse(user, courseId);
+  await assertCanManageGroupRoster(user, courseId, groupId);
   await assertGroupBelongsToCourse(courseId, groupId);
   const participant = await prisma.courseGroupParticipant.findFirst({
     where: { id: participantId, groupId }
@@ -965,6 +1002,21 @@ export async function removeGroupParticipant(user: CurrentUser, courseId: string
     throw new AppError(400, "GROUP_PARTICIPANT_SELF_REMOVE_FORBIDDEN", "You cannot remove yourself from this group.");
   }
   await prisma.$transaction(async (tx) => {
+    await tx.courseAuditEvent.create({
+      data: {
+        courseId,
+        actorUserId: user.id,
+        eventType: "section_participant_removed",
+        targetType: "course_group_participant",
+        targetId: participant.id,
+        previousValue: {
+          groupId,
+          userId: participant.userId,
+          email: participant.email,
+          role: participant.role
+        }
+      }
+    });
     await tx.courseGroupParticipant.delete({ where: { id: participantId } });
     if (participant.role === "student" && participant.userId) {
       const otherStudentGroups = await tx.courseGroupParticipant.findMany({
@@ -982,6 +1034,26 @@ export async function removeGroupParticipant(user: CurrentUser, courseId: string
             courseId,
             userId: participant.userId,
             role: "student"
+          }
+        });
+      }
+    } else if (participant.userId) {
+      const otherStaffGroups = await tx.courseGroupParticipant.findMany({
+        where: {
+          userId: participant.userId,
+          role: participant.role,
+          group: { courseId }
+        },
+        select: { id: true },
+        take: 1
+      });
+      if (!otherStaffGroups.length) {
+        await tx.courseMembership.deleteMany({
+          where: {
+            courseId,
+            userId: participant.userId,
+            role: participant.role,
+            source: "section_derived"
           }
         });
       }
@@ -1238,6 +1310,10 @@ async function assertCanViewGroup(user: CurrentUser, courseId: string, groupId: 
 
   if (!participant) {
     throw new AppError(403, "FORBIDDEN", "You do not have access to this group.");
+  }
+
+  if (participant.role === "teacher" || participant.role === "ta") {
+    return group;
   }
 
   const now = new Date();
@@ -1729,9 +1805,46 @@ async function ensureMembershipsForGroupParticipant(
     create: {
       courseId,
       userId,
-      role
+      role,
+      source: "section_derived"
     }
   });
+}
+
+async function cleanupDerivedStaffMemberships(
+  tx: Prisma.TransactionClient,
+  courseId: string,
+  participants: Array<{ userId: string | null; role: CourseGroupParticipantRole }>
+) {
+  const staffAssignments = new Map<string, { userId: string; role: "teacher" | "ta" }>();
+  for (const participant of participants) {
+    if (participant.userId && (participant.role === "teacher" || participant.role === "ta")) {
+      staffAssignments.set(`${participant.userId}:${participant.role}`, {
+        userId: participant.userId,
+        role: participant.role
+      });
+    }
+  }
+  for (const assignment of staffAssignments.values()) {
+    const remaining = await tx.courseGroupParticipant.findFirst({
+      where: {
+        userId: assignment.userId,
+        role: assignment.role,
+        group: { courseId }
+      },
+      select: { id: true }
+    });
+    if (!remaining) {
+      await tx.courseMembership.deleteMany({
+        where: {
+          courseId,
+          userId: assignment.userId,
+          role: assignment.role,
+          source: "section_derived"
+        }
+      });
+    }
+  }
 }
 
 function highestParticipantRole(

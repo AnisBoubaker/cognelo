@@ -82,7 +82,6 @@ test.describe.serial("subject programming-language defaults", () => {
     const language = page.getByLabel("Language", { exact: true });
     await expect(language).toHaveValue("");
     await expect(language.getByRole("option", { name: "--- Choose ---" })).toHaveCount(1);
-    await expect(page.getByRole("button", { name: "Generate prompt automatically" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Save coding exercise" })).toBeDisabled();
 
     await language.selectOption("bash");

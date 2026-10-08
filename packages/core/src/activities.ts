@@ -2,7 +2,7 @@ import { getActivityDefinition, getActivityPluginForActivityType, isCoreActivity
 import { ActivityInputSchema, ActivityUpdateSchema, CourseActivityBankSyncSchema, CourseActivityDuplicateSchema } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
-import { assertCanManageCourse } from "./authorization";
+import { assertCanManageCourse, assertCanViewCourseGradebook } from "./authorization";
 import { assertCanManageActivityBank } from "./subjects";
 import { AppError, notFound } from "./errors";
 import { assertActivityTypeAvailable, ensureCoreActivityTypes, getEnabledActivityPluginKeys } from "./plugins";
@@ -35,6 +35,18 @@ export async function listRegisteredActivityDefinitions() {
 
 export async function getActivity(user: CurrentUser, courseId: string, activityId: string) {
   await assertCanManageCourse(user, courseId);
+  const activity = await prisma.activity.findFirst({
+    where: { id: activityId, courseId },
+    include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
+  });
+  if (!activity) {
+    throw notFound("Activity");
+  }
+  return activity;
+}
+
+export async function getActivityForGradebook(user: CurrentUser, courseId: string, activityId: string) {
+  await assertCanViewCourseGradebook(user, courseId);
   const activity = await prisma.activity.findFirst({
     where: { id: activityId, courseId },
     include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }

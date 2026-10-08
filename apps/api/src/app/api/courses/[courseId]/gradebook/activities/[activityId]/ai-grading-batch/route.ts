@@ -4,7 +4,13 @@ import {
   resolvePluginAiGradingBatchHandler,
   type PluginAiFeedbackTeacherReviewContext
 } from "@cognelo/activity-sdk/server";
-import { AppError, getActivityAttemptRegradeContext, getActivityAttemptRegradeContexts, getTeacherAttemptAiFeedbackReview } from "@cognelo/core";
+import {
+  AppError,
+  assertCanManageCourse,
+  getActivityAttemptRegradeContext,
+  getActivityAttemptRegradeContexts,
+  getTeacherAttemptAiFeedbackReview
+} from "@cognelo/core";
 import { z } from "zod";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
@@ -62,6 +68,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, activityId } = await params;
+    await assertCanManageCourse(user, courseId);
     const body = updateSchema.parse(await readJson(request));
     const context = await getActivityAttemptRegradeContext(user, courseId, body.attemptId);
     assertActivityMatches(context.activityId, activityId);

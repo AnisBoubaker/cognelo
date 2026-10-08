@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   assertCanManageActivityBank: vi.fn(),
+  assertCanGradeGroup: vi.fn(),
   assertCanManageCourse: vi.fn(),
   clearActivityResponseDraft: vi.fn(),
   generateQuestionAuthoringText: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("@cognelo/core", async () => {
   return {
     ...actual,
     assertCanManageActivityBank: mocks.assertCanManageActivityBank,
+    assertCanGradeGroup: mocks.assertCanGradeGroup,
     assertCanManageCourse: mocks.assertCanManageCourse,
     clearActivityResponseDraft: mocks.clearActivityResponseDraft,
     generateQuestionAuthoringText: mocks.generateQuestionAuthoringText,
@@ -514,5 +516,6 @@ describe("MCQ generation route", () => {
         }
       ]
     });
+    expect(mocks.assertCanGradeGroup).toHaveBeenCalledWith(context.user, "course-1", "group-1");
   });
 });

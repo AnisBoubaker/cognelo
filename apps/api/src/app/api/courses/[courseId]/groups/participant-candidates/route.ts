@@ -13,6 +13,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { courseId } = await params;
     const email = request.nextUrl.searchParams.get("email") ?? "";
-    return json({ candidate: await lookupGroupParticipantCandidate(user, courseId, email) });
+    const groupId = request.nextUrl.searchParams.get("groupId");
+    return json({ candidate: await lookupGroupParticipantCandidate(user, courseId, email, groupId) });
   });
 }

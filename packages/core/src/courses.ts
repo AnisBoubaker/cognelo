@@ -1,7 +1,14 @@
 import { CourseInputSchema, CourseSettingsInputSchema, CourseUpdateSchema, EnrollmentInputSchema } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
-import { assertCanCreateCourse, assertCanManageCourse, assertCanViewCourse, isAdmin, isCourseManager, isTeacher } from "./authorization";
+import {
+  assertCanCreateCourse,
+  assertCanManageCourse,
+  assertCanManageCourseStaff,
+  assertCanViewCourse,
+  getCourseCapabilities,
+  isAdmin
+} from "./authorization";
 import { AppError, notFound } from "./errors";
 
 const courseInclude = {
@@ -52,6 +59,10 @@ function buildVisibleStudentGroupWhere(userId: string) {
 function buildCourseIncludeForStudent(userId: string) {
   return {
     ...courseInclude,
+    memberships: {
+      where: { userId },
+      include: { user: { select: { id: true, email: true, name: true } } }
+    },
     activities: {
       where: { testItem: null },
       select: {
@@ -73,42 +84,84 @@ function buildCourseIncludeForStudent(userId: string) {
   };
 }
 
+function buildCourseIncludeForSectionStaff(userId: string) {
+  return {
+    ...buildCourseIncludeForStudent(userId),
+    groups: {
+      where: { participants: { some: { userId, role: { in: ["teacher" as const, "ta" as const] } } } },
+      orderBy: [{ updatedAt: "desc" as const }, { createdAt: "desc" as const }]
+    }
+  };
+}
+
 export async function listCourses(user: CurrentUser) {
   if (isAdmin(user)) {
     return prisma.course.findMany({ include: courseInclude, orderBy: { updatedAt: "desc" } });
   }
 
-  if (isTeacher(user) || isCourseManager(user)) {
-    return prisma.course.findMany({
-      where: {
-        OR: [{ createdById: user.id }, { memberships: { some: { userId: user.id } } }]
-      },
-      include: courseInclude,
-      orderBy: { updatedAt: "desc" }
-    });
-  }
-
-  const courses = await prisma.course.findMany({
+  const fullCourses = await prisma.course.findMany({
     where: {
+      memberships: {
+        some: {
+          userId: user.id,
+          source: "explicit",
+          role: { in: ["owner", "teacher"] }
+        }
+      }
+    },
+    include: courseInclude,
+    orderBy: { updatedAt: "desc" }
+  });
+  const fullCourseIds = fullCourses.map((course) => course.id);
+  const sectionCourses = await prisma.course.findMany({
+    where: {
+      ...(fullCourseIds.length ? { id: { notIn: fullCourseIds } } : {}),
+      groups: {
+        some: {
+          participants: {
+            some: { userId: user.id, role: { in: ["teacher", "ta"] } }
+          }
+        }
+      }
+    },
+    include: buildCourseIncludeForSectionStaff(user.id),
+    orderBy: { updatedAt: "desc" }
+  });
+  const staffCourseIds = [...fullCourseIds, ...sectionCourses.map((course) => course.id)];
+  const learnerCourses = await prisma.course.findMany({
+    where: {
+      ...(staffCourseIds.length ? { id: { notIn: staffCourseIds } } : {}),
       memberships: { some: { userId: user.id, role: "student" } },
       groups: { some: buildVisibleStudentGroupWhere(user.id) }
     },
     include: buildCourseIncludeForStudent(user.id),
     orderBy: { updatedAt: "desc" }
   });
-  return courses.map(stripStudentCourseActivityContent);
+  return [
+    ...fullCourses,
+    ...sectionCourses.map(stripStudentCourseActivityContent),
+    ...learnerCourses.map(stripStudentCourseActivityContent)
+  ].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
 }
 
 export async function getCourse(user: CurrentUser, courseId: string) {
   await assertCanViewCourse(user, courseId);
+  const capabilities = await getCourseCapabilities(user, courseId);
   const course = await prisma.course.findUnique({
     where: { id: courseId },
-    include: isAdmin(user) || isTeacher(user) || isCourseManager(user) ? courseInclude : buildCourseIncludeForStudent(user.id)
+    include: capabilities.canManageCourse
+      ? courseInclude
+      : capabilities.canViewGradebook
+        ? buildCourseIncludeForSectionStaff(user.id)
+        : buildCourseIncludeForStudent(user.id)
   });
   if (!course) {
     throw notFound("Course");
   }
-  return isAdmin(user) || isTeacher(user) || isCourseManager(user) ? course : stripStudentCourseActivityContent(course);
+  return {
+    ...(capabilities.canManageCourse ? course : stripStudentCourseActivityContent(course)),
+    permissions: capabilities
+  };
 }
 
 function stripStudentCourseActivityContent<T extends { activities: Array<{ description: string }> }>(course: T) {
@@ -144,12 +197,15 @@ export async function updateCourse(user: CurrentUser, courseId: string, input: u
   const data = CourseUpdateSchema.parse(input);
   const { studentContentLayout, ...courseData } = data;
   let metadata: Prisma.InputJsonValue | undefined;
+  const course = await prisma.course.findUnique({
+    where: { id: courseId },
+    select: { title: true, description: true, status: true, metadata: true }
+  });
+  if (!course) {
+    throw notFound("Course");
+  }
 
   if (studentContentLayout !== undefined) {
-    const course = await prisma.course.findUnique({ where: { id: courseId }, select: { metadata: true } });
-    if (!course) {
-      throw notFound("Course");
-    }
     metadata = {
       ...asMetadataRecord(course.metadata),
       studentContentLayout
@@ -161,10 +217,34 @@ export async function updateCourse(user: CurrentUser, courseId: string, input: u
     ...(metadata ? { metadata } : {})
   };
 
-  return prisma.course.update({
-    where: { id: courseId },
-    data: updateData,
-    include: courseInclude
+  return prisma.$transaction(async (tx) => {
+    const updatedCourse = await tx.course.update({
+      where: { id: courseId },
+      data: updateData,
+      include: courseInclude
+    });
+    await tx.courseAuditEvent.create({
+      data: {
+        courseId,
+        actorUserId: user.id,
+        eventType: "course_updated",
+        targetType: "course",
+        targetId: courseId,
+        previousValue: {
+          title: course.title,
+          description: course.description,
+          status: course.status,
+          studentContentLayout: asMetadataRecord(course.metadata).studentContentLayout ?? null
+        },
+        nextValue: {
+          title: updatedCourse.title,
+          description: updatedCourse.description,
+          status: updatedCourse.status,
+          studentContentLayout: asMetadataRecord(updatedCourse.metadata).studentContentLayout ?? null
+        }
+      }
+    });
+    return updatedCourse;
   });
 }
 
@@ -193,15 +273,29 @@ export async function updateCourseSettings(user: CurrentUser, courseId: string, 
     assessmentFeedbackAiAgentConnectionId: data.assessmentFeedbackAiAgentConnectionId ?? null
   };
 
-  return prisma.course.update({
-    where: { id: courseId },
-    data: {
-      metadata: {
-        ...metadata,
-        aiSettings: nextAiSettings
+  return prisma.$transaction(async (tx) => {
+    const updatedCourse = await tx.course.update({
+      where: { id: courseId },
+      data: {
+        metadata: {
+          ...metadata,
+          aiSettings: nextAiSettings
+        }
+      },
+      include: courseInclude
+    });
+    await tx.courseAuditEvent.create({
+      data: {
+        courseId,
+        actorUserId: user.id,
+        eventType: "course_ai_settings_updated",
+        targetType: "course",
+        targetId: courseId,
+        previousValue: aiSettings as Prisma.InputJsonValue,
+        nextValue: nextAiSettings as Prisma.InputJsonValue
       }
-    },
-    include: courseInclude
+    });
+    return updatedCourse;
   });
 }
 
@@ -210,7 +304,7 @@ export async function archiveCourse(user: CurrentUser, courseId: string) {
 }
 
 export async function addCourseMembership(user: CurrentUser, courseId: string, input: unknown) {
-  await assertCanManageCourse(user, courseId);
+  await assertCanManageCourseStaff(user, courseId);
   const data = EnrollmentInputSchema.parse(input);
   if (data.role === "student") {
     if (!data.groupId) {
@@ -275,14 +369,128 @@ export async function addCourseMembership(user: CurrentUser, courseId: string, i
     });
   }
 
-  return prisma.courseMembership.create({
-    data: {
-      courseId,
-      userId: data.userId,
-      role: data.role
-    },
-    include: { user: { select: { id: true, email: true, name: true } } }
+  if (data.role === "ta") {
+    throw new AppError(400, "COURSE_TA_NOT_SUPPORTED", "Teaching assistants must be assigned to specific course sections.");
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id: data.userId },
+    select: {
+      id: true,
+      roles: { select: { role: { select: { key: true } } } }
+    }
   });
+  if (!target) {
+    throw notFound("User");
+  }
+  const targetRoles = new Set(target.roles.map((entry) => entry.role.key));
+  if (data.role === "teacher" && !targetRoles.has("teacher") && !targetRoles.has("admin")) {
+    throw new AppError(400, "COURSE_TEACHER_ROLE_REQUIRED", "A course teacher must have the global teacher role.");
+  }
+  if (
+    data.role === "owner" &&
+    !targetRoles.has("teacher") &&
+    !targetRoles.has("course_manager") &&
+    !targetRoles.has("admin")
+  ) {
+    throw new AppError(400, "COURSE_OWNER_ROLE_REQUIRED", "A course owner must be a teacher, course designer, or administrator.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const previousMembership = await tx.courseMembership.findUnique({
+      where: { courseId_userId_role: { courseId, userId: data.userId, role: data.role } }
+    });
+    const membership = await tx.courseMembership.upsert({
+      where: {
+        courseId_userId_role: {
+          courseId,
+          userId: data.userId,
+          role: data.role
+        }
+      },
+      update: { source: "explicit" },
+      create: {
+        courseId,
+        userId: data.userId,
+        role: data.role,
+        source: "explicit"
+      },
+      include: { user: { select: { id: true, email: true, name: true } } }
+    });
+    if (!previousMembership || previousMembership.source !== "explicit") {
+      await tx.courseAuditEvent.create({
+        data: {
+          courseId,
+          actorUserId: user.id,
+          eventType: "course_membership_added",
+          targetType: "course_membership",
+          targetId: membership.id,
+          previousValue: previousMembership ? {
+            userId: previousMembership.userId,
+            role: previousMembership.role,
+            source: previousMembership.source
+          } : undefined,
+          nextValue: { userId: membership.userId, role: membership.role, source: membership.source }
+        }
+      });
+    }
+    return membership;
+  });
+}
+
+export async function removeCourseMembership(user: CurrentUser, courseId: string, membershipId: string) {
+  await assertCanManageCourseStaff(user, courseId);
+  try {
+    await prisma.$transaction(async (tx) => {
+      const membership = await tx.courseMembership.findFirst({
+        where: { id: membershipId, courseId },
+        select: { id: true, userId: true, role: true, source: true }
+      });
+      if (!membership) {
+        throw notFound("Course membership");
+      }
+      if (membership.source === "section_derived") {
+        throw new AppError(
+          409,
+          "SECTION_MEMBERSHIP_REMOVE_REQUIRED",
+          "Remove this staff member from their course sections instead."
+        );
+      }
+      if (membership.role === "owner") {
+        const ownerCount = await tx.courseMembership.count({
+          where: { courseId, role: "owner", source: "explicit" }
+        });
+        if (ownerCount <= 1) {
+          throw new AppError(409, "LAST_COURSE_OWNER_REQUIRED", "Assign another course owner before removing the final owner.");
+        }
+      }
+      await tx.courseAuditEvent.create({
+        data: {
+          courseId,
+          actorUserId: user.id,
+          eventType: "course_membership_removed",
+          targetType: "course_membership",
+          targetId: membership.id,
+          previousValue: {
+            userId: membership.userId,
+            role: membership.role,
+            source: membership.source
+          }
+        }
+      });
+      await tx.courseMembership.delete({ where: { id: membership.id } });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+      throw new AppError(
+        409,
+        "COURSE_MEMBERSHIP_CONFLICT",
+        "Course staff changed while this membership was being removed. Reload the staff list and try again."
+      );
+    }
+    throw error;
+  }
+  return { ok: true as const };
 }
 
 function firstNameFromName(name: string | null) {
