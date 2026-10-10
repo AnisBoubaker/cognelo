@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getServerEnv } from "@cognelo/config";
 import { createGradeChallenge, listAttemptGradeChallenges } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
@@ -20,6 +21,14 @@ export async function POST(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, attemptId } = await params;
-    return json({ challenge: await createGradeChallenge(user, courseId, attemptId, await readJson(request)) }, { status: 201 });
+    return json({
+      challenge: await createGradeChallenge(
+        user,
+        courseId,
+        attemptId,
+        await readJson(request),
+        getServerEnv().EMAIL_CREDENTIALS_ENCRYPTION_KEY
+      )
+    }, { status: 201 });
   });
 }
