@@ -23,7 +23,18 @@ type ChallengeResolutionDependencies = {
   deliver?: typeof sendSystemEmailToEligibleRecipient;
 };
 
-export async function createGradeChallenge(user: CurrentUser, courseId: string, attemptId: string, input: unknown) {
+type ChallengeCreationDependencies = {
+  deliver?: typeof sendSystemEmailToEligibleRecipient;
+};
+
+export async function createGradeChallenge(
+  user: CurrentUser,
+  courseId: string,
+  attemptId: string,
+  input: unknown,
+  encryptionKey?: string,
+  dependencies: ChallengeCreationDependencies = {}
+) {
   const data = createChallengeSchema.parse(input);
   const attempt = await prisma.activityAttempt.findFirst({
     where: { id: attemptId, courseId },
@@ -101,6 +112,15 @@ export async function createGradeChallenge(user: CurrentUser, courseId: string, 
     throw error;
   });
 
+  const teacherNotification = await notifyTeachersAboutGradeChallenge({
+    challengeId: challenge.id,
+    courseId,
+    groupId: attempt.groupId,
+    activityId: challengedActivityId,
+    studentUserId: user.id,
+    studentName: participantDisplayName(attempt.participant)
+  }, encryptionKey, dependencies);
+
   await recordAiFeedbackResearchEvent({
     eventType: "challenge_opened",
     courseId,
@@ -122,10 +142,103 @@ export async function createGradeChallenge(user: CurrentUser, courseId: string, 
     metadata: {
       challengeId: challenge.id,
       rootActivityId: attempt.activityId,
+      teacherNotificationRecipientCount: teacherNotification.recipientCount,
+      teacherNotificationSentCount: teacherNotification.sentCount,
+      teacherNotificationFailureCount: teacherNotification.failureCount,
       ...(feedback.testItemId ? { testItemId: feedback.testItemId } : {})
     }
   });
   return challenge;
+}
+
+async function notifyTeachersAboutGradeChallenge(
+  context: {
+    challengeId: string;
+    courseId: string;
+    groupId: string;
+    activityId: string;
+    studentUserId: string;
+    studentName: string;
+  },
+  encryptionKey: string | undefined,
+  dependencies: ChallengeCreationDependencies
+) {
+  try {
+    const [course, group, activity, recipients] = await Promise.all([
+      prisma.course.findUnique({ where: { id: context.courseId }, select: { title: true } }),
+      prisma.courseGroup.findUnique({ where: { id: context.groupId }, select: { title: true } }),
+      prisma.activity.findUnique({ where: { id: context.activityId }, select: { title: true } }),
+      prisma.user.findMany({
+        where: {
+          id: { not: context.studentUserId },
+          isActive: true,
+          OR: [
+            {
+              courses: {
+                some: { courseId: context.courseId, source: "explicit", role: "teacher" }
+              }
+            },
+            {
+              AND: [
+                {
+                  courses: {
+                    some: { courseId: context.courseId, source: "explicit", role: "owner" }
+                  }
+                },
+                {
+                  roles: {
+                    some: { role: { key: { in: ["teacher", "admin"] } } }
+                  }
+                }
+              ]
+            },
+            {
+              groupParticipants: {
+                some: { groupId: context.groupId, role: "teacher" }
+              }
+            }
+          ]
+        },
+        select: { email: true }
+      })
+    ]);
+
+    const courseTitle = course?.title ?? "course";
+    const groupTitle = group?.title ?? "section";
+    const activityTitle = activity?.title ?? "activity";
+    const deliver = dependencies.deliver ?? sendSystemEmailToEligibleRecipient;
+    const deliveries = await Promise.allSettled(recipients.map((recipient) => deliver({
+      recipientEmail: recipient.email,
+      subject: `New grade challenge in ${courseTitle}`,
+      text: `${context.studentName} submitted a grade challenge for ${activityTitle} in ${groupTitle}.\n\nSign in to Cognelo and open the course Challenges tab to review and respond.`,
+      html: `<p><strong>${escapeHtml(context.studentName)}</strong> submitted a grade challenge for <strong>${escapeHtml(activityTitle)}</strong> in ${escapeHtml(groupTitle)}.</p><p>Sign in to Cognelo and open the course <strong>Challenges</strong> tab to review and respond.</p>`
+    }, encryptionKey)));
+    const failureCount = deliveries.filter((delivery) => delivery.status === "rejected").length;
+    if (failureCount > 0) {
+      console.error("Grade challenge teacher email delivery failed", {
+        challengeId: context.challengeId,
+        recipientCount: recipients.length,
+        failureCount
+      });
+    }
+    return {
+      recipientCount: recipients.length,
+      sentCount: recipients.length - failureCount,
+      failureCount
+    };
+  } catch (error) {
+    console.error("Grade challenge teacher notification could not be prepared", {
+      challengeId: context.challengeId,
+      error
+    });
+    return { recipientCount: 0, sentCount: 0, failureCount: 1 };
+  }
+}
+
+function participantDisplayName(participant: { firstName?: string | null; lastName?: string | null; email?: string | null }) {
+  return [participant.firstName, participant.lastName].filter(Boolean).join(" ").trim()
+    || participant.email
+    || "A student";
 }
 
 export async function listCourseGradeChallenges(user: CurrentUser, courseId: string, status?: string | null) {

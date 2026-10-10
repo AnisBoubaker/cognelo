@@ -94,6 +94,7 @@ A section TA may inspect attempts, prepare or save grades and feedback, and work
 4. TAs may send final challenge responses for learners in assigned sections.
 5. Concurrent grade and feedback edits use optimistic version rejection with an explicit HTTP 409 conflict; the teacher reloads before saving.
 6. Student question-authoring AI uses deterministic creator, owner, then teacher priority, considers only explicit course memberships, skips unusable preferred connections, and fails safely when no usable fallback remains.
+7. New grade challenges notify every active course-wide grading teacher and active teacher assigned to the challenged section. TAs remain authorized to respond within their section but are not email-notification recipients; unrelated administrators and other-section teachers are excluded.
 
 ## Required E2E Design Rules
 

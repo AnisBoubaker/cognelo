@@ -8,9 +8,10 @@ const mockPrisma = vi.hoisted(() => ({
   gradeChallenge: { create: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
   courseGroupParticipant: { findMany: vi.fn(), findFirst: vi.fn() },
   activity: { findMany: vi.fn(), findUnique: vi.fn() },
-  courseGroup: { findMany: vi.fn() },
+  courseGroup: { findMany: vi.fn(), findUnique: vi.fn() },
   gradebookItem: { findMany: vi.fn() },
-  course: { findUnique: vi.fn() }
+  course: { findUnique: vi.fn() },
+  user: { findMany: vi.fn() }
 }));
 const recordResearch = vi.hoisted(() => vi.fn());
 
@@ -120,6 +121,10 @@ describe("grade challenges", () => {
     mockPrisma.activity.findMany.mockResolvedValue([]);
     mockPrisma.courseGroup.findMany.mockResolvedValue([]);
     mockPrisma.gradebookItem.findMany.mockResolvedValue([]);
+    mockPrisma.course.findUnique.mockResolvedValue(null);
+    mockPrisma.courseGroup.findUnique.mockResolvedValue(null);
+    mockPrisma.activity.findUnique.mockResolvedValue(null);
+    mockPrisma.user.findMany.mockResolvedValue([]);
   });
 
   it("targets the exact challengeable Compound Test child feedback version", async () => {
@@ -148,6 +153,108 @@ describe("grade challenges", () => {
       feedbackRef: "feedback-2",
       feedbackVersion: 3
     }));
+  });
+
+  it("emails every active teacher authorized for the course or challenged section", async () => {
+    const deliver = vi.fn().mockResolvedValue({ ok: true });
+    mockPrisma.course.findUnique.mockResolvedValue({ title: "Programming 101" });
+    mockPrisma.courseGroup.findUnique.mockResolvedValue({ title: "Section 1" });
+    mockPrisma.activity.findUnique.mockResolvedValue({ title: "Loops exercise" });
+    mockPrisma.user.findMany.mockResolvedValue([
+      { email: "course-teacher@example.test" },
+      { email: "section-teacher@example.test" }
+    ]);
+    mockPrisma.activityAttempt.findFirst.mockResolvedValue({
+      ...attempt,
+      participant: {
+        userId: "student-1",
+        firstName: "Student",
+        lastName: "One",
+        email: "student@example.test"
+      }
+    });
+
+    await expect(createGradeChallenge(student, "course-1", "attempt-1", {
+      feedbackRef: "feedback-2",
+      feedbackVersion: 3,
+      explanation: "The rubric interpretation does not match my submitted implementation."
+    }, "11".repeat(32), { deliver })).resolves.toMatchObject({ id: "challenge-1" });
+
+    expect(mockPrisma.user.findMany).toHaveBeenCalledWith({
+      where: {
+        id: { not: "student-1" },
+        isActive: true,
+        OR: [
+          {
+            courses: {
+              some: { courseId: "course-1", source: "explicit", role: "teacher" }
+            }
+          },
+          {
+            AND: [
+              {
+                courses: {
+                  some: { courseId: "course-1", source: "explicit", role: "owner" }
+                }
+              },
+              {
+                roles: {
+                  some: { role: { key: { in: ["teacher", "admin"] } } }
+                }
+              }
+            ]
+          },
+          {
+            groupParticipants: {
+              some: { groupId: "group-1", role: "teacher" }
+            }
+          }
+        ]
+      },
+      select: { email: true }
+    });
+    expect(deliver).toHaveBeenCalledTimes(2);
+    expect(deliver).toHaveBeenCalledWith(expect.objectContaining({
+      recipientEmail: "course-teacher@example.test",
+      subject: "New grade challenge in Programming 101",
+      text: expect.stringContaining("Student One submitted a grade challenge for Loops exercise in Section 1.")
+    }), "11".repeat(32));
+    expect(deliver).toHaveBeenCalledWith(expect.objectContaining({
+      recipientEmail: "section-teacher@example.test"
+    }), "11".repeat(32));
+    expect(recordResearch).toHaveBeenCalledWith(expect.objectContaining({
+      metadata: expect.objectContaining({
+        teacherNotificationRecipientCount: 2,
+        teacherNotificationSentCount: 2,
+        teacherNotificationFailureCount: 0
+      })
+    }));
+  });
+
+  it("keeps a submitted challenge when teacher email delivery fails", async () => {
+    const deliver = vi.fn().mockRejectedValue(new Error("SMTP unavailable"));
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockPrisma.user.findMany.mockResolvedValue([{ email: "teacher@example.test" }]);
+
+    await expect(createGradeChallenge(student, "course-1", "attempt-1", {
+      feedbackRef: "feedback-2",
+      feedbackVersion: 3,
+      explanation: "The rubric interpretation does not match my submitted implementation."
+    }, "11".repeat(32), { deliver })).resolves.toMatchObject({ id: "challenge-1" });
+
+    expect(errorLog).toHaveBeenCalledWith("Grade challenge teacher email delivery failed", {
+      challengeId: "challenge-1",
+      recipientCount: 1,
+      failureCount: 1
+    });
+    expect(recordResearch).toHaveBeenCalledWith(expect.objectContaining({
+      metadata: expect.objectContaining({
+        teacherNotificationRecipientCount: 1,
+        teacherNotificationSentCount: 0,
+        teacherNotificationFailureCount: 1
+      })
+    }));
+    errorLog.mockRestore();
   });
 
   it("does not expose a withdrawn grade as a current challenge target", async () => {

@@ -221,6 +221,8 @@ Rules:
 - Separately identified generated or teacher-authored feedback can also be challenged when it is part of the released result; feedback-only model explanations that did not affect grading are not a separate challenge target, although the released deterministic grade remains challengeable.
 - A student can create one challenge for each immutable released grade or feedback version while the effective assignment setting permits new challenges.
 - The explanation is required and becomes read-only after submission.
+- Once the challenge record is saved, Cognelo automatically emails every active course-wide teacher authorized to grade plus every active teacher assigned to the challenged section. Teaching assistants, inactive accounts, unrelated administrators, and the challenging learner are excluded. The message identifies the student, course activity, and section but leaves the explanation inside the authenticated challenge queue.
+- Teacher notification uses guarded system email. Delivery counts are recorded with the `challenge_opened` research event, while lookup or transport failure is logged and does not roll back the challenge or make the learner retry it.
 - A challenge does not reopen the activity attempt or permit another submission.
 - Authorized course owners, teachers, and TAs can review challenges within their grading scope.
 - Resolving a challenge requires a teacher response.
@@ -366,7 +368,7 @@ The development seed includes a reproducible two-section Programming Exercise ba
 
 ### Phase 3 — Grade Challenges
 
-Status: complete for the agreed core workflow. Challenges are disabled by default for summative course activities and follow the General assignment policy plus per-group overrides. When enabled, students can challenge a released final grade or a separately identified generated/teacher-authored feedback version with a required explanation; disabling the setting preserves existing challenges. Course managers have an expandable Challenges queue that opens the existing plugin review dialog for grading and sends a separate required response with optional email notification. Grade changes remain in the ordinary audited gradebook path, and response submission derives the challenge outcome from the released and current grade/feedback snapshots.
+Status: complete for the agreed core workflow. Challenges are disabled by default for summative course activities and follow the General assignment policy plus per-group overrides. When enabled, students can challenge a released final grade or a separately identified generated/teacher-authored feedback version with a required explanation; disabling the setting preserves existing challenges. Submission automatically emails the active course-wide grading teachers and active teachers assigned to the challenged section without making mail delivery part of academic-record success. Course managers have an expandable Challenges queue that opens the existing plugin review dialog for grading and sends a separate required response with optional student email notification. Grade changes remain in the ordinary audited gradebook path, and response submission derives the challenge outcome from the released and current grade/feedback snapshots.
 
 - Add the core challenge schema and migration.
 - Add student create/read APIs and activity review panel.
