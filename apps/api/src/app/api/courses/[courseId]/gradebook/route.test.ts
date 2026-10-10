@@ -4,13 +4,25 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   getCourseGradebook: vi.fn(),
   getCourseGradebookCsv: vi.fn(),
+  listCourseActivityInProgressAttempts: vi.fn(),
   requireUser: vi.fn(),
   resolveCompletions: vi.fn()
 }));
 
 vi.mock("@cognelo/core", () => ({
   getCourseGradebook: mocks.getCourseGradebook,
-  getCourseGradebookCsv: mocks.getCourseGradebookCsv
+  getCourseGradebookCsv: mocks.getCourseGradebookCsv,
+  listCourseActivityInProgressAttempts: mocks.listCourseActivityInProgressAttempts,
+  AppError: class AppError extends Error {
+    status: number;
+    code: string;
+
+    constructor(status: number, code: string, message: string) {
+      super(message);
+      this.status = status;
+      this.code = code;
+    }
+  }
 }));
 vi.mock("@/lib/gradebook-completion", () => ({
   resolveCourseGradebookCompletions: mocks.resolveCompletions
@@ -30,6 +42,9 @@ describe("course gradebook route", () => {
     vi.clearAllMocks();
     mocks.requireUser.mockResolvedValue({ id: "teacher-1", roles: ["teacher"] });
     mocks.getCourseGradebook.mockResolvedValue({ source: "gradebook" });
+    mocks.listCourseActivityInProgressAttempts.mockResolvedValue([
+      { participantId: "participant-1", groupId: "group-1", attemptNumber: 2, startedAt: "2026-10-09T18:30:00.000Z" }
+    ]);
     mocks.resolveCompletions.mockResolvedValue({
       filters: { groupId: null, activityId: null, status: "all" },
       groups: [{ id: "group-1", title: "Section A" }],
@@ -71,5 +86,25 @@ describe("course gradebook route", () => {
     });
     expect(JSON.stringify(body)).not.toContain("private-participant");
     expect(JSON.stringify(body)).not.toContain("private-attempt");
+  });
+
+  it("returns a lightweight in-progress attempt feed without loading the full gradebook", async () => {
+    const response = await GET(new NextRequest(
+      "http://test.local/api/courses/course-1/gradebook?view=in-progress-attempts&activityId=activity-1&groupId=group-1"
+    ), params);
+
+    await expect(response.json()).resolves.toEqual({
+      attempts: [
+        { participantId: "participant-1", groupId: "group-1", attemptNumber: 2, startedAt: "2026-10-09T18:30:00.000Z" }
+      ]
+    });
+    expect(mocks.listCourseActivityInProgressAttempts).toHaveBeenCalledWith(
+      { id: "teacher-1", roles: ["teacher"] },
+      "course-1",
+      "activity-1",
+      "group-1"
+    );
+    expect(mocks.getCourseGradebook).not.toHaveBeenCalled();
+    expect(mocks.resolveCompletions).not.toHaveBeenCalled();
   });
 });

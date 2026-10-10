@@ -953,6 +953,8 @@ export const arMessages = {
       attemptHistoryItem: "#{number} {status}",
       attemptHistory: "المحاولات",
       attemptNumber: "المحاولة {number}",
+      attemptInProgress: "المحاولة {number} قيد التنفيذ",
+      attemptStartedAt: "بدأت في {date}",
       formativeAttemptReadOnly: "هذه المحاولة التكوينية متاحة للمراجعة ولا تدخل في الدرجة الختامية.",
       studentResultsTitle: "نتائج الطلاب",
       answerUnavailable: "غير متاح",

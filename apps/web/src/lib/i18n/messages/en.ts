@@ -879,6 +879,8 @@ export const enMessages = {
       attemptHistoryItem: "#{number} {status}",
       attemptHistory: "Attempts",
       attemptNumber: "Attempt {number}",
+      attemptInProgress: "Attempt {number} in progress",
+      attemptStartedAt: "Started {date}",
       formativeAttemptReadOnly: "This formative attempt is available for review and does not contribute to the summative grade.",
       attemptReviewReadOnly: "This attempt is available for review only.",
       noGradebookRows: "No gradebook rows match these filters.",

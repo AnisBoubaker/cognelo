@@ -77,6 +77,7 @@ const {
   getActivityAttemptAvailability,
   getCourseGradebook,
   getStudentReleasedGrades,
+  listCourseActivityInProgressAttempts,
   deleteActivitySubmission,
   overrideGradebookGrade,
   recordActivityAttemptGradingResult,
@@ -1039,6 +1040,59 @@ describe("gradebook attempt services", () => {
         }
       ]
     });
+  });
+
+  it("lists the latest current-mode in-progress attempt within the grader's group scope", async () => {
+    authMocks.assertCanViewCourseGradebook.mockResolvedValueOnce({ gradingGroupIds: ["group-1"] });
+    mockPrisma.activityAttempt.findMany.mockResolvedValue([
+      {
+        id: "attempt-new",
+        participantId: "participant-1",
+        groupId: "group-1",
+        attemptNumber: 3,
+        assessmentMode: "summative",
+        startedAt: new Date("2026-10-09T18:30:00.000Z"),
+        groupActivity: { metadata: { assessmentMode: "summative" } }
+      },
+      {
+        id: "attempt-old",
+        participantId: "participant-1",
+        groupId: "group-1",
+        attemptNumber: 2,
+        assessmentMode: "summative",
+        startedAt: new Date("2026-10-09T18:00:00.000Z"),
+        groupActivity: { metadata: { assessmentMode: "summative" } }
+      },
+      {
+        id: "attempt-formative",
+        participantId: "participant-2",
+        groupId: "group-1",
+        attemptNumber: 1,
+        assessmentMode: "formative",
+        startedAt: new Date("2026-10-09T18:15:00.000Z"),
+        groupActivity: { metadata: { assessmentMode: "summative" } }
+      }
+    ]);
+
+    await expect(listCourseActivityInProgressAttempts(
+      teacherUser,
+      "course-1",
+      "activity-1"
+    )).resolves.toEqual([{
+      participantId: "participant-1",
+      groupId: "group-1",
+      attemptNumber: 3,
+      startedAt: "2026-10-09T18:30:00.000Z"
+    }]);
+
+    expect(mockPrisma.activityAttempt.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        courseId: "course-1",
+        activityId: "activity-1",
+        lifecycle: "started",
+        groupId: { in: ["group-1"] }
+      })
+    }));
   });
 
   it("backfills missing gradebook items from existing group activity assignments before listing", async () => {

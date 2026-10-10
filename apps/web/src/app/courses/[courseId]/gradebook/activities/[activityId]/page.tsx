@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ProgressDialog, useDialogs, useNotifications } from "@cognelo/activity-ui";
 import { createMcqClient } from "@cognelo/plugin-mcq";
 import { createParsonsClient } from "@cognelo/plugin-parsons";
@@ -16,6 +16,7 @@ import {
   api,
   apiRequest,
   Course,
+  CourseActivityInProgressAttempt,
   CourseGradebook,
   CourseGradebookRow,
   GradebookMutationAttempt,
@@ -30,7 +31,7 @@ import {
 } from "@/lib/activity-renderers";
 import { getGradebookActivityActions } from "@/lib/gradebook-actions";
 import { excludeAiGradingTemplateTargets } from "@/lib/ai-grading-batch";
-import { useI18n } from "@/lib/i18n";
+import { type Locale, useI18n } from "@/lib/i18n";
 import { latestCompletedTestAttempt, type TestReviewAllSubmission } from "@/lib/test-review-all";
 
 export default function GradebookActivityResultsPage() {
@@ -41,13 +42,14 @@ export default function GradebookActivityResultsPage() {
   const groupId = searchParams.get("groupId") || undefined;
   const origin = searchParams.get("origin") === "content" ? "content" : "gradebook";
   const requestedReportTab = searchParams.get("report") === "overview" ? "overview" : searchParams.get("report") === "students" ? "students" : null;
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const dialogs = useDialogs();
   const notifications = useNotifications();
   const mcqClient = useMemo(() => createMcqClient(apiRequest), []);
   const parsonsClient = useMemo(() => createParsonsClient(apiRequest), []);
   const [course, setCourse] = useState<Course | null>(null);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
+  const [inProgressAttempts, setInProgressAttempts] = useState<CourseActivityInProgressAttempt[]>([]);
   const [savingGradeKey, setSavingGradeKey] = useState<string | null>(null);
   const [progressOperation, setProgressOperation] = useState<{
     title: string;
@@ -98,24 +100,50 @@ export default function GradebookActivityResultsPage() {
     error: string;
   } | null>(null);
 
-  async function refresh() {
-    const [courseResult, gradebookResult] = await Promise.all([
+  const refresh = useCallback(async () => {
+    const [courseResult, gradebookResult, inProgressResult] = await Promise.all([
       api.course(courseId),
-      api.courseGradebook(courseId, { activityId, groupId })
+      api.courseGradebook(courseId, { activityId, groupId }),
+      api.courseActivityInProgressAttempts(courseId, activityId, groupId).catch(() => ({ attempts: [] }))
     ]);
     setCourse(courseResult.course);
     setGradebook(gradebookResult.gradebook);
-  }
+    setInProgressAttempts(inProgressResult.attempts);
+  }, [activityId, courseId, groupId]);
 
   useEffect(() => {
+    setInProgressAttempts([]);
     refresh().catch((err) => notifications.error(err instanceof Error ? err.message : t("courseDetail.loadError")));
-  }, [activityId, courseId, groupId, notifications, t]);
+  }, [notifications, refresh, t]);
 
   useEffect(() => {
     setReportTab(requestedReportTab ?? (origin === "content" ? "overview" : "students"));
   }, [origin, requestedReportTab]);
 
-  const rows = gradebook?.rows ?? [];
+  useEffect(() => {
+    if (reportTab !== "students") return;
+    let cancelled = false;
+    const refreshInProgressAttempts = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const result = await api.courseActivityInProgressAttempts(courseId, activityId, groupId);
+        if (!cancelled) setInProgressAttempts(result.attempts);
+      } catch {
+        // Keep the last successful live status; the full page load owns visible error reporting.
+      }
+    };
+    void refreshInProgressAttempts();
+    const intervalId = window.setInterval(() => void refreshInProgressAttempts(), 10_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [activityId, courseId, groupId, reportTab]);
+
+  const rows = useMemo(() => gradebook?.rows ?? [], [gradebook]);
+  const inProgressAttemptByParticipant = useMemo(() => new Map(
+    inProgressAttempts.map((attempt) => [`${attempt.groupId}:${attempt.participantId}`, attempt])
+  ), [inProgressAttempts]);
   const activityTitle = rows[0]?.activityTitle ?? gradebook?.items[0]?.activityTitle ?? t("common.loading");
   const activityTypeKey = rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? "";
   const activityActions = getGradebookActivityActions(activityTypeKey);
@@ -836,6 +864,8 @@ export default function GradebookActivityResultsPage() {
                 <GradebookStudentRow
                   key={`${row.gradebookItemId}-${row.participantId}`}
                   row={row}
+                  inProgressAttempt={inProgressAttemptByParticipant.get(`${row.groupId}:${row.participantId}`) ?? null}
+                  locale={locale}
                   savingGradeKey={savingGradeKey}
                   onReviewAndGrade={openReviewAndGrade}
                   onRegrade={regradeRow}
@@ -1122,6 +1152,8 @@ function hasUnsavedFeedbackReview(state: AiFeedbackReviewState) {
 
 function GradebookStudentRow({
   row,
+  inProgressAttempt,
+  locale,
   savingGradeKey,
   onReviewAndGrade,
   onRegrade,
@@ -1129,6 +1161,8 @@ function GradebookStudentRow({
   t
 }: {
   row: CourseGradebookRow;
+  inProgressAttempt: CourseActivityInProgressAttempt | null;
+  locale: Locale;
   savingGradeKey: string | null;
   onReviewAndGrade: (row: CourseGradebookRow) => Promise<void>;
   onRegrade: (row: CourseGradebookRow) => Promise<void>;
@@ -1157,6 +1191,19 @@ function GradebookStudentRow({
             <span aria-hidden="true">◐</span>
             {t("courseDetail.partialGrade")}
           </span>
+        ) : null}
+        {inProgressAttempt ? (
+          <div className="gradebook-attempt-in-progress">
+            <span className="gradebook-attempt-in-progress-badge">
+              <span aria-hidden="true">●</span>
+              {t("courseDetail.attemptInProgress", { number: inProgressAttempt.attemptNumber })}
+            </span>
+            <span className="table-meta-note muted">
+              {t("courseDetail.attemptStartedAt", {
+                date: formatAttemptStartedAt(inProgressAttempt.startedAt, locale)
+              })}
+            </span>
+          </div>
         ) : null}
       </div>
       <span className="table-meta muted">{row.submittedAttemptCount}</span>
@@ -1194,6 +1241,12 @@ function GradebookStudentRow({
       </div>
     </div>
   );
+}
+
+function formatAttemptStartedAt(value: string, locale: Locale) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
 function normalizeCodingTestResults(value: unknown): Array<{ testId: string; name: string; passed: boolean }> {

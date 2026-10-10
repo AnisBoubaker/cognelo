@@ -2838,6 +2838,28 @@ a.card:hover,
   color: #92400e;
 }
 
+.gradebook-attempt-in-progress {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.gradebook-attempt-in-progress-badge {
+  align-items: center;
+  background: color-mix(in srgb, var(--brand-teal), white 87%);
+  border: 1px solid color-mix(in srgb, var(--brand-teal), white 52%);
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--brand-teal), #052f38 42%);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 5px;
+  line-height: 1;
+  padding: 5px 8px;
+  width: fit-content;
+}
+
 .grade-release-blocked-note {
   color: #92400e;
   font-size: 12px;
