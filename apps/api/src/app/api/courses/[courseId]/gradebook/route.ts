@@ -1,5 +1,11 @@
 import { NextRequest } from "next/server";
-import { getCourseGradebook, getCourseGradebookCsv, type CourseGradebookStatusFilter } from "@cognelo/core";
+import {
+  AppError,
+  getCourseGradebook,
+  getCourseGradebookCsv,
+  listCourseActivityInProgressAttempts,
+  type CourseGradebookStatusFilter
+} from "@cognelo/core";
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 import { resolveCourseGradebookCompletions } from "@/lib/gradebook-completion";
 import { summarizeCourseGradebook } from "@/lib/gradebook-summary";
@@ -22,6 +28,15 @@ export async function GET(request: NextRequest, { params }: Params) {
       activityId: searchParams.get("activityId") || null,
       status: parseStatus(searchParams.get("status"))
     };
+
+    if (searchParams.get("view") === "in-progress-attempts") {
+      if (!filters.activityId) {
+        throw new AppError(400, "ACTIVITY_REQUIRED", "An activity is required to list in-progress attempts.");
+      }
+      return json({
+        attempts: await listCourseActivityInProgressAttempts(user, courseId, filters.activityId, filters.groupId)
+      });
+    }
 
     if (searchParams.get("format") === "csv") {
       const csv = await getCourseGradebookCsv(user, courseId, filters);

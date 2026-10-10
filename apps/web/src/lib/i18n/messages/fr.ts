@@ -872,6 +872,8 @@ export const frMessages = {
       attemptHistoryItem: "#{number} {status}",
       attemptHistory: "Tentatives",
       attemptNumber: "Tentative {number}",
+      attemptInProgress: "Tentative {number} en cours",
+      attemptStartedAt: "Commencée le {date}",
       formativeAttemptReadOnly: "Cette tentative formative peut être consultée et ne contribue pas à la note sommative.",
       attemptReviewReadOnly: "Cette tentative est disponible en lecture seule.",
       noGradebookRows: "Aucune ligne ne correspond a ces filtres.",

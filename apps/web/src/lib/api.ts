@@ -1168,6 +1168,13 @@ export type CourseGradebookRow = {
   deletedSubmissions: DeletedSubmissionAudit[];
 };
 
+export type CourseActivityInProgressAttempt = {
+  participantId: string;
+  groupId: string;
+  attemptNumber: number;
+  startedAt: string;
+};
+
 export type GradebookMutationGrade = {
   id: string;
   updatedAt: string;
@@ -1702,6 +1709,13 @@ export const api = {
       params.set("status", filters.status);
     }
     return request<{ gradebook: CourseGradebookSummary }>(`/courses/${courseId}/gradebook?${params.toString()}`);
+  },
+  courseActivityInProgressAttempts: (courseId: string, activityId: string, groupId?: string) => {
+    const params = new URLSearchParams({ view: "in-progress-attempts", activityId });
+    if (groupId) {
+      params.set("groupId", groupId);
+    }
+    return request<{ attempts: CourseActivityInProgressAttempt[] }>(`/courses/${courseId}/gradebook?${params.toString()}`);
   },
   courseGradebookCsvUrl: (courseId: string, filters?: { groupId?: string; activityId?: string; status?: GradebookStatus }) => {
     const params = new URLSearchParams({ format: "csv" });

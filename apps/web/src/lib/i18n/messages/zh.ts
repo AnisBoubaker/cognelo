@@ -871,6 +871,8 @@ export const zhMessages = {
       attemptHistoryItem: "#{number} {status}",
       attemptHistory: "尝试记录",
       attemptNumber: "尝试 {number}",
+      attemptInProgress: "尝试 {number} 进行中",
+      attemptStartedAt: "开始于 {date}",
       formativeAttemptReadOnly: "此形成性尝试仅供查看，不计入总结性成绩。",
       attemptReviewReadOnly: "此尝试仅供查看。",
       noGradebookRows: "没有符合筛选条件的成绩行。",

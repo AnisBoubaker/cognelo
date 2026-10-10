@@ -1,4 +1,6 @@
+import { prisma } from "@cognelo/db";
 import { expect, test } from "./fixtures/auth";
+import { provisionLearningFlow, removeLearningFlow } from "./fixtures/learning-flow";
 
 test.describe("consistent gradebook review actions", () => {
   test("programming exercises combine rubric feedback and the final grade in one review", async ({ teacherPage: page }) => {
@@ -81,5 +83,59 @@ test.describe("consistent gradebook review actions", () => {
       "/courses/seed-course-programming-101/activities/seed-activity-c-median-feedback"
     );
     await expect(page.getByRole("link", { name: "Back to course content" })).toBeVisible();
+  });
+
+  test("shows a newly started student attempt and its start time without reloading the report", async ({ teacherPage: page }) => {
+    test.setTimeout(45_000);
+    const data = await provisionLearningFlow();
+    try {
+      let initialFeedResponseCount = 0;
+      page.on("response", (response) => {
+        if (
+          response.request().method() === "GET"
+          && response.url().includes("view=in-progress-attempts")
+          && response.url().includes(`activityId=${data.activityId}`)
+        ) {
+          initialFeedResponseCount += 1;
+        }
+      });
+      await page.goto(`/courses/${data.courseId}/gradebook/activities/${data.activityId}?groupId=${data.groupId}`);
+      await expect.poll(() => initialFeedResponseCount).toBeGreaterThanOrEqual(2);
+      const participant = await prisma.courseGroupParticipant.findFirstOrThrow({
+        where: { groupId: data.groupId, role: "student" }
+      });
+      const assignment = await prisma.courseGroupActivity.findUniqueOrThrow({
+        where: { groupId_activityId: { groupId: data.groupId, activityId: data.activityId } }
+      });
+      const gradebookItem = await prisma.gradebookItem.findUniqueOrThrow({
+        where: { groupActivityId: assignment.id }
+      });
+      const studentRow = page.locator(".table-row-gradebook-detail").filter({ hasText: participant.email });
+      const inProgressBadge = studentRow.locator(".gradebook-attempt-in-progress-badge");
+      await expect(inProgressBadge).toHaveCount(0);
+
+      await prisma.activityAttempt.create({
+        data: {
+          courseId: data.courseId,
+          groupId: data.groupId,
+          groupActivityId: assignment.id,
+          activityId: data.activityId,
+          gradebookItemId: gradebookItem.id,
+          participantId: participant.id,
+          userId: participant.userId,
+          attemptNumber: 1,
+          lifecycle: "started",
+          pluginKey: "mcq",
+          pluginVersion: "e2e",
+          assessmentMode: "summative"
+        }
+      });
+
+      await expect(inProgressBadge).toContainText("Attempt 1 in progress", { timeout: 20_000 });
+      await expect(studentRow.getByText(/^Started .+/)).toBeVisible();
+    } finally {
+      await page.goto("/courses");
+      await removeLearningFlow(data);
+    }
   });
 });

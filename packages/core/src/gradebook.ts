@@ -963,6 +963,67 @@ export type CourseGradebookFilters = {
   status?: CourseGradebookStatusFilter | null;
 };
 
+export type CourseActivityInProgressAttempt = {
+  participantId: string;
+  groupId: string;
+  attemptNumber: number;
+  startedAt: string;
+};
+
+export async function listCourseActivityInProgressAttempts(
+  user: CurrentUser,
+  courseId: string,
+  activityId: string,
+  groupId?: string | null
+): Promise<CourseActivityInProgressAttempt[]> {
+  const capabilities = await assertCanViewCourseGradebook(user, courseId);
+  if (groupId && capabilities.gradingGroupIds !== null && !capabilities.gradingGroupIds.includes(groupId)) {
+    throw forbidden();
+  }
+
+  const attempts = await prisma.activityAttempt.findMany({
+    where: {
+      courseId,
+      activityId,
+      lifecycle: "started",
+      ...(groupId
+        ? { groupId }
+        : capabilities.gradingGroupIds !== null
+          ? { groupId: { in: capabilities.gradingGroupIds } }
+          : {})
+    },
+    select: {
+      id: true,
+      participantId: true,
+      groupId: true,
+      attemptNumber: true,
+      assessmentMode: true,
+      startedAt: true,
+      groupActivity: { select: { metadata: true } }
+    },
+    orderBy: [{ startedAt: "desc" }, { id: "desc" }]
+  });
+
+  const seenParticipants = new Set<string>();
+  return attempts.flatMap((attempt) => {
+    const attemptAssessmentMode = attempt.assessmentMode === "formative" ? "formative" : "summative";
+    if (attemptAssessmentMode !== assignmentAssessmentMode(attempt.groupActivity.metadata)) {
+      return [];
+    }
+    const participantKey = `${attempt.groupId}:${attempt.participantId}`;
+    if (seenParticipants.has(participantKey)) {
+      return [];
+    }
+    seenParticipants.add(participantKey);
+    return [{
+      participantId: attempt.participantId,
+      groupId: attempt.groupId,
+      attemptNumber: attempt.attemptNumber,
+      startedAt: attempt.startedAt.toISOString()
+    }];
+  });
+}
+
 export type SetGradebookItemReleaseInput = {
   released: boolean;
   now?: Date;
