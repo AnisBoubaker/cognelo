@@ -90,7 +90,7 @@ const fallbackConfig = {
 const copyByLocale = {
   en: {
     authoringTitle: "Multiple choice questions authoring",
-    authoringHelp: "Write the activity as text. Use ## headings for questions and task-list syntax like - [x] and - [ ] for the choices. A choice can contain a code block.",
+    authoringHelp: "Write the activity as Markdown. Use ## headings for questions and task-list syntax like - [x] and - [ ] for the choices. Questions and choices can include images, GFM tables, math, and code blocks.",
     title: "Title",
     description: "Student prompt",
     defaultCodeLanguage: "Default code language",
@@ -149,7 +149,7 @@ const copyByLocale = {
   },
   fr: {
     authoringTitle: "Edition des questions a choix multiples",
-    authoringHelp: "Redigez l'activite sous forme de texte. Utilisez des titres ## pour les questions et la syntaxe de liste de taches comme - [x] et - [ ] pour les choix. Un choix peut contenir un bloc de code.",
+    authoringHelp: "Redigez l'activite en Markdown. Utilisez des titres ## pour les questions et la syntaxe de liste de taches comme - [x] et - [ ] pour les choix. Les questions et les choix peuvent contenir des images, des tableaux GFM, des formules et des blocs de code.",
     title: "Titre",
     description: "Consigne pour les etudiants",
     defaultCodeLanguage: "Langage de code par defaut",
@@ -208,7 +208,7 @@ const copyByLocale = {
   },
   zh: {
     authoringTitle: "选择题编辑",
-    authoringHelp: "使用文本来编写活动。用 ## 标题表示题目，用 - [x] 和 - [ ] 这样的任务列表语法表示选项。",
+    authoringHelp: "使用 Markdown 编写活动。用 ## 标题表示题目，用 - [x] 和 - [ ] 这样的任务列表语法表示选项。题目和选项可以包含图片、GFM 表格、数学公式和代码块。",
     title: "标题",
     description: "学生提示",
     defaultCodeLanguage: "默认代码语言",

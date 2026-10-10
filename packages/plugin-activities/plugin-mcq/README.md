@@ -15,6 +15,7 @@ Gradebook attempt review and grading use core grade scope, so explicit course te
 
 - `##` starts a question; `- [x]` and `- [ ]` mark correct and incorrect choices.
 - `#` and `---` create titled and untitled content sections between questions.
+- Question prompts and choices render Markdown images, including web URLs, and portable GFM tables in addition to text, math, lists, and fenced code.
 - Authored content is generic activity config, so core owns bank copying, synchronization, and version comparison.
 - Reusable bank Tests copy MCQ children into Test-owned bank activities and later into independent course children without plugin-private authoring rows.
 - Standalone answers autosave through `ActivityResponseDraft`; compound Test answers use `TestItemAttempt`.
