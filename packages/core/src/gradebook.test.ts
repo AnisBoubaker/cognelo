@@ -1588,7 +1588,8 @@ describe("gradebook attempt services", () => {
         },
         groupActivity: {
           availableFrom: null,
-          availableUntil: null
+          availableUntil: null,
+          metadata: { assessmentMode: "summative", gradeChallengesEnabled: true }
         },
         grades: [
           {
@@ -1692,6 +1693,7 @@ describe("gradebook attempt services", () => {
             feedbackRef: expect.stringMatching(/^grade:grade-1:/),
             feedbackVersion: 1
           },
+          gradeChallengesEnabled: true,
           selectedAttemptNumber: 2,
           attemptCount: 2,
           submittedAttemptCount: 2,
@@ -1743,7 +1745,8 @@ describe("gradebook attempt services", () => {
         },
         groupActivity: {
           availableFrom: null,
-          availableUntil: null
+          availableUntil: null,
+          metadata: { assessmentMode: "summative" }
         },
         grades: [
           {

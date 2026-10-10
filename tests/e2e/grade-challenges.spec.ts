@@ -7,7 +7,7 @@ test.describe("student grade challenges", () => {
   let data: LearningFlowData | undefined;
 
   test.beforeAll(async () => {
-    data = await provisionLearningFlow();
+    data = await provisionLearningFlow({ gradeChallengesEnabled: true });
     if (!data) return;
     const api = await createAuthenticatedApi("student");
     try {

@@ -44,6 +44,7 @@ const attempt = {
   pluginKey: "core-test-runtime",
   participant: { userId: "student-1" },
   gradebookItem: { gradesReleased: true },
+  groupActivity: { metadata: { assessmentMode: "summative", gradeChallengesEnabled: true } },
   activity: { activityType: { key: "test" } }
 };
 
@@ -157,6 +158,20 @@ describe("grade challenges", () => {
       feedbackVersion: 3,
       explanation: "This feedback belonged to the withdrawn summative grade."
     })).rejects.toMatchObject({ code: "GRADE_NOT_AVAILABLE", status: 409 });
+
+    expect(mockPrisma.gradeChallenge.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a new challenge when the effective activity setting is disabled", async () => {
+    mockPrisma.activityAttempt.findFirst.mockResolvedValue({
+      ...attempt,
+      groupActivity: { metadata: { assessmentMode: "summative" } }
+    });
+
+    await expect(createGradeChallenge(student, "course-1", "attempt-1", {
+      ...gradeChallengeTargetForGrade(grade),
+      explanation: "I would like the released final grade to be reviewed."
+    })).rejects.toMatchObject({ code: "GRADE_CHALLENGES_DISABLED", status: 409 });
 
     expect(mockPrisma.gradeChallenge.create).not.toHaveBeenCalled();
   });

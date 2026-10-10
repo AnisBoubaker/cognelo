@@ -419,16 +419,22 @@ describe("shared contract schemas", () => {
       metadata: {},
       position: 0
     });
+    expect(CourseAllGroupsActivityAssignmentInputSchema.parse({})).toMatchObject({
+      assessmentMode: "formative",
+      gradeChallengesEnabled: false
+    });
     expect(CourseAllGroupsActivityAssignmentInputSchema.parse({
       assessmentMode: "summative",
+      gradeChallengesEnabled: true,
       groupAssignments: [
-        { groupId: "group-1", assigned: true, overrideFields: ["pointsPossible"] },
+        { groupId: "group-1", assigned: true, overrideFields: ["pointsPossible", "gradeChallenges"], gradeChallengesEnabled: false },
         { groupId: "group-2", assigned: false }
       ]
     })).toMatchObject({
       assessmentMode: "summative",
+      gradeChallengesEnabled: true,
       groupAssignments: [
-        { groupId: "group-1", assigned: true, overrideFields: ["pointsPossible"] },
+        { groupId: "group-1", assigned: true, overrideFields: ["pointsPossible", "gradeChallenges"], gradeChallengesEnabled: false },
         { groupId: "group-2", assigned: false, overrideFields: [] }
       ]
     });

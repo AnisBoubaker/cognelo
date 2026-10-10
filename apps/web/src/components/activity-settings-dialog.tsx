@@ -28,6 +28,7 @@ type AssignmentValueDraft = GradebookDraft & {
   availableUntil: string;
   isVisible: boolean;
   requireSafeExamBrowser: boolean;
+  gradeChallengesEnabled: boolean;
 };
 type GroupAssignmentDraft = AssignmentValueDraft & {
   groupId: string;
@@ -51,6 +52,7 @@ type ActivitySettingsDialogProps = {
 
 const summativeOverrideFields = new Set<ActivityAssignmentOverrideField>([
   "requireSafeExamBrowser",
+  "gradeChallenges",
   "pointsPossible",
   "grading",
   "attempts",
@@ -124,10 +126,11 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
       return {
         ...current,
         assessmentMode: mode,
-        general: { ...current.general, requireSafeExamBrowser: false },
+        general: { ...current.general, requireSafeExamBrowser: false, gradeChallengesEnabled: false },
         groups: current.groups.map((group) => ({
           ...group,
           requireSafeExamBrowser: false,
+          gradeChallengesEnabled: false,
           overrideFields: group.overrideFields.filter((field) => !summativeOverrideFields.has(field))
         }))
       };
@@ -173,6 +176,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
         assessmentMode: draft.assessmentMode,
         confirmSummativeToFormative: convertsSummativeToFormative,
         requireSafeExamBrowser: draft.assessmentMode === "summative" && draft.general.requireSafeExamBrowser,
+        gradeChallengesEnabled: draft.assessmentMode === "summative" && draft.general.gradeChallengesEnabled,
         gradebookSettings: buildGradebookSettings(draft.general),
         contentPlacement: {
           parentId: draft.contentParentId || null,
@@ -189,6 +193,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
           availableFrom: toIsoOrNull(group.availableFrom),
           availableUntil: toIsoOrNull(group.availableUntil),
           requireSafeExamBrowser: draft.assessmentMode === "summative" && group.requireSafeExamBrowser,
+          gradeChallengesEnabled: draft.assessmentMode === "summative" && group.gradeChallengesEnabled,
           gradebookSettings: buildGradebookSettings(group),
           contentPlacement: {
             parentId: draft.contentParentId || null,
@@ -466,6 +471,19 @@ function SummativeFields({
           <small className="muted">{t("groupPage.requireSafeExamBrowserHelp")}</small>
         </span>
       </label>
+      <label className="checkbox-row" htmlFor={`${idPrefix}-grade-challenges`}>
+        <input
+          checked={value.gradeChallengesEnabled}
+          disabled={disabled}
+          id={`${idPrefix}-grade-challenges`}
+          type="checkbox"
+          onChange={(event) => onChange({ gradeChallengesEnabled: event.target.checked })}
+        />
+        <span>
+          {t("groupPage.gradeChallengesEnabled")}
+          <small className="muted">{t("groupPage.gradeChallengesEnabledHelp")}</small>
+        </span>
+      </label>
       <div className="settings-grid">
         <GradebookFields disabled={disabled} idPrefix={idPrefix} value={value} onChange={onChange} />
       </div>
@@ -487,6 +505,7 @@ function GroupSummativeOverrides({
   const { t } = useI18n();
   const fields: Array<{ field: ActivityAssignmentOverrideField; label: string }> = [
     { field: "requireSafeExamBrowser", label: t("groupPage.requireSafeExamBrowser") },
+    { field: "gradeChallenges", label: t("groupPage.gradeChallengesEnabled") },
     { field: "pointsPossible", label: t("groupPage.pointsPossible") },
     { field: "grading", label: t("groupPage.gradingMode") },
     { field: "attempts", label: t("groupPage.attemptLimitMode") },
@@ -503,16 +522,18 @@ function GroupSummativeOverrides({
           label={label}
           onToggle={(checked) => onToggle(field, checked)}
         >
-          {field === "requireSafeExamBrowser" ? (
-            <label className="checkbox-row" htmlFor={`activity-group-seb-value-${group.groupId}`}>
+          {field === "requireSafeExamBrowser" || field === "gradeChallenges" ? (
+            <label className="checkbox-row" htmlFor={`activity-group-${field}-value-${group.groupId}`}>
               <input
-                checked={group.requireSafeExamBrowser}
+                checked={field === "requireSafeExamBrowser" ? group.requireSafeExamBrowser : group.gradeChallengesEnabled}
                 disabled={disabled}
-                id={`activity-group-seb-value-${group.groupId}`}
+                id={`activity-group-${field}-value-${group.groupId}`}
                 type="checkbox"
-                onChange={(event) => onChange({ requireSafeExamBrowser: event.target.checked })}
+                onChange={(event) => onChange(field === "requireSafeExamBrowser"
+                  ? { requireSafeExamBrowser: event.target.checked }
+                  : { gradeChallengesEnabled: event.target.checked })}
               />
-              <span>{t("groupPage.requireSafeExamBrowser")}</span>
+              <span>{field === "requireSafeExamBrowser" ? t("groupPage.requireSafeExamBrowser") : t("groupPage.gradeChallengesEnabled")}</span>
             </label>
           ) : (
             <div className="settings-grid activity-group-gradebook-fields">
@@ -724,6 +745,7 @@ function assignmentValueDraft(value: {
   availableFrom: string | null;
   availableUntil: string | null;
   requireSafeExamBrowser: boolean;
+  gradeChallengesEnabled: boolean;
   gradebookSettings: ActivityAssignmentGradebookSettings;
   contentPlacement: { parentId: string | null; isVisible: boolean };
 }): AssignmentValueDraft {
@@ -732,6 +754,7 @@ function assignmentValueDraft(value: {
     availableUntil: toDateTimeLocalValue(value.availableUntil),
     isVisible: value.contentPlacement.isVisible,
     requireSafeExamBrowser: value.requireSafeExamBrowser,
+    gradeChallengesEnabled: value.gradeChallengesEnabled,
     pointsPossible: String(value.gradebookSettings.pointsPossible),
     gradingMode: value.gradebookSettings.gradingMode,
     passThresholdPoints: String(value.gradebookSettings.passThresholdPoints ?? value.gradebookSettings.pointsPossible / 2),
@@ -749,6 +772,7 @@ function copyGeneralField(general: AssignmentValueDraft, field: ActivityAssignme
     case "availableUntil": return { availableUntil: general.availableUntil };
     case "visibility": return { isVisible: general.isVisible };
     case "requireSafeExamBrowser": return { requireSafeExamBrowser: general.requireSafeExamBrowser };
+    case "gradeChallenges": return { gradeChallengesEnabled: general.gradeChallengesEnabled };
     case "pointsPossible": return { pointsPossible: general.pointsPossible };
     case "grading": return {
       gradingMode: general.gradingMode,
@@ -779,6 +803,9 @@ function inheritedGeneralUpdate(
   }
   if (!group.overrideFields.includes("requireSafeExamBrowser") && update.requireSafeExamBrowser !== undefined) {
     inherited.requireSafeExamBrowser = update.requireSafeExamBrowser;
+  }
+  if (!group.overrideFields.includes("gradeChallenges") && update.gradeChallengesEnabled !== undefined) {
+    inherited.gradeChallengesEnabled = update.gradeChallengesEnabled;
   }
   if (!group.overrideFields.includes("pointsPossible") && update.pointsPossible !== undefined) {
     inherited.pointsPossible = update.pointsPossible;

@@ -705,7 +705,7 @@ async function assignActivity(
           maxAttempts: 1,
           pointsPossible: 10
         },
-        metadata: { assessmentMode: "summative" },
+        metadata: { assessmentMode: "summative", gradeChallengesEnabled: true },
         position: 0
       }
     })

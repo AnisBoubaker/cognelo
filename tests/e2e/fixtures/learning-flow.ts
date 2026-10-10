@@ -18,7 +18,7 @@ async function responseJson<T>(response: APIResponse): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function provisionLearningFlow(): Promise<LearningFlowData> {
+export async function provisionLearningFlow(options: { gradeChallengesEnabled?: boolean } = {}): Promise<LearningFlowData> {
   const api = await createAuthenticatedApi("teacher");
   const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const courseTitle = `E2E critical learning flow ${token}`;
@@ -89,7 +89,10 @@ export async function provisionLearningFlow(): Promise<LearningFlowData> {
           availableFrom: null,
           availableUntil: null,
           config: {},
-          metadata: { assessmentMode: "summative" },
+          metadata: {
+            assessmentMode: "summative",
+            ...(options.gradeChallengesEnabled ? { gradeChallengesEnabled: true } : {})
+          },
           gradebookSettings: {
             pointsPossible: 10,
             attemptLimitMode: "max_attempts",

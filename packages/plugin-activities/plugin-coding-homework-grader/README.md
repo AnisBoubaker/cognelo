@@ -15,7 +15,7 @@ author assignment -> snapshot prior content -> validate ZIP -> analyze functions
 
 Long-running analysis and question generation use the shared background-job service. Final submission requests are idempotent and teachers can reprocess unfinished or failed work. Student submission/preflight and visible background processing, plus teacher uploads, extraction, snapshots, preflight, and saves, use the platform shared blocking progress dialog.
 
-Teacher-entered released grades and feedback are challengeable through the core course workflow, which reuses the plugin's existing **Review and grade** panel.
+When the effective summative assignment setting enables challenges, teacher-entered released grades and feedback are challengeable through the core course workflow, which reuses the plugin's existing **Review and grade** panel.
 
 Finalized challenge answers create a core attempt tagged with the assignment mode. Formative attempts remain available to the teacher's read-only inspector; only summative attempts may receive a grade.
 

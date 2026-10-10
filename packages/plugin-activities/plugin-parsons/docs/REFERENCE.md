@@ -110,7 +110,7 @@ The gradebook attempts route is teacher-only. It returns a participant's complet
 
 Parsons registers a server `gradeAttempt` handler for the platform gradebook regrade API. Teacher-triggered regrades resolve the stored plugin attempt reference, evaluate the submitted attempt state against the current course-local activity config, and let the core gradebook service record the updated grade plus a `regraded` audit event.
 
-Summative submissions do not show correctness feedback during the activity. When the gradebook item is released, Parsons provides sanitized deterministic student feedback through the core normalized grade result: the same order/indentation messages used by formative checks plus an order/indentation grading breakdown. This does not expose raw plugin payloads, attempt history, or grading timestamps to students. The released deterministic or teacher-overridden grade is challengeable through core, which reopens the existing Parsons **Review and grade** surface for any change.
+Summative submissions do not show correctness feedback during the activity. When the gradebook item is released, Parsons provides sanitized deterministic student feedback through the core normalized grade result: the same order/indentation messages used by formative checks plus an order/indentation grading breakdown. This does not expose raw plugin payloads, attempt history, or grading timestamps to students. When the effective summative assignment setting enables challenges, the released deterministic or teacher-overridden grade is challengeable through core, which reopens the existing Parsons **Review and grade** surface for any change.
 
 ## UX Notes
 

@@ -853,6 +853,7 @@ export type CourseActivityAssignmentSettings = {
     availableUntil: string | null;
     assessmentMode: "formative" | "summative";
     requireSafeExamBrowser: boolean;
+    gradeChallengesEnabled: boolean;
     gradebookSettings: ActivityAssignmentGradebookSettings;
     contentPlacement: {
       parentId: string | null;
@@ -870,6 +871,7 @@ export type CourseActivityAssignmentSettings = {
     availableFrom: string | null;
     availableUntil: string | null;
     requireSafeExamBrowser: boolean;
+    gradeChallengesEnabled: boolean;
     gradebookSettings: ActivityAssignmentGradebookSettings;
     contentPlacement: {
       parentId: string | null;
@@ -1210,6 +1212,7 @@ export type StudentReleasedGradeRow = {
   selectedAttemptId: string | null;
   challengeAttemptId: string | null;
   gradeChallengeTarget: { feedbackRef: string; feedbackVersion: number } | null;
+  gradeChallengesEnabled: boolean;
   selectedAttemptNumber: number | null;
   attemptCount: number;
   submittedAttemptCount: number;
