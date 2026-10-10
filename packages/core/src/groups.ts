@@ -27,6 +27,7 @@ import {
 } from "./authorization";
 import { listContentItems } from "./course-content";
 import { AppError, notFound } from "./errors";
+import { assignmentAllowsGradeChallenges } from "./activity-assignment-policy";
 
 type StudentAccessDb = Pick<typeof prisma, "role" | "userRole" | "courseMembership">;
 type GradebookItemDb = Pick<typeof prisma, "gradebookItem">;
@@ -40,6 +41,7 @@ type CourseWideAssignmentMetadata = {
   enablePerGroupSettings?: boolean;
   assessmentMode?: "formative" | "summative";
   requireSafeExamBrowser?: boolean;
+  gradeChallengesEnabled?: boolean;
   gradebookSettings?: GradebookItemSettingsInput;
   contentPlacement?: CourseWideContentPlacement;
   assignedGroupIds?: string[];
@@ -54,6 +56,7 @@ const SUMMATIVE_OVERRIDE_FIELDS = new Set<ActivityAssignmentOverrideField>([
   "availableUntil",
   "visibility",
   "requireSafeExamBrowser",
+  "gradeChallenges",
   "pointsPossible",
   "grading",
   "attempts",
@@ -231,6 +234,7 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
     availableUntil: rule?.availableUntil ?? null,
     assessmentMode,
     requireSafeExamBrowser: assessmentMode === "summative" && rule?.requireSafeExamBrowser === true,
+    gradeChallengesEnabled: assessmentMode === "summative" && rule?.gradeChallengesEnabled === true,
     gradebookSettings: generalGradebookSettings,
     contentPlacement: generalContentPlacement
   };
@@ -276,6 +280,12 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
           assessmentMode === "summative"
             ? assignmentRequiresSafeExamBrowser(assignment?.metadata) || (!overrideFields.includes("requireSafeExamBrowser") && general.requireSafeExamBrowser)
             : false,
+        gradeChallengesEnabled:
+          assessmentMode === "summative"
+            ? overrideFields.includes("gradeChallenges")
+              ? assignmentAllowsGradeChallenges(assignment?.metadata)
+              : general.gradeChallengesEnabled
+            : false,
         gradebookSettings: assignmentGradebookSettings,
         contentPlacement: assignmentContentPlacement
       };
@@ -290,6 +300,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   const activity = await assertActivityBelongsToCourse(courseId, activityId);
   assertTestAssignmentIsSummative(activity, data.assessmentMode);
   assertSafeExamBrowserIsSummative(data.assessmentMode, data.requireSafeExamBrowser);
+  assertGradeChallengesAreSummative(data.assessmentMode, data.gradeChallengesEnabled);
   await assertTestReadyForCompositeExecution(courseId, activity);
   const gradebookSettings = normalizeGradebookItemSettings(data.gradebookSettings);
 
@@ -326,6 +337,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
       availableFrom: data.availableFrom,
       availableUntil: data.availableUntil,
       requireSafeExamBrowser: data.requireSafeExamBrowser,
+      gradeChallengesEnabled: data.gradeChallengesEnabled,
       gradebookSettings,
       contentPlacement: data.contentPlacement
     }));
@@ -349,6 +361,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
             futureGroupsAssigned: false,
             assessmentMode: data.assessmentMode,
             ...(data.requireSafeExamBrowser ? { requireSafeExamBrowser: true } : {}),
+            ...(data.gradeChallengesEnabled ? { gradeChallengesEnabled: true } : {}),
             ...(data.assessmentMode === "summative" ? { gradebookSettings } : {}),
             ...(generalContentPlacement ? { contentPlacement: generalContentPlacement } : {}),
             assignedGroupIds
@@ -387,6 +400,11 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
           overrideFields.includes("requireSafeExamBrowser")
             ? requested.requireSafeExamBrowser === true
             : data.requireSafeExamBrowser
+        );
+        const gradeChallengesEnabled = data.assessmentMode === "summative" && (
+          overrideFields.includes("gradeChallenges")
+            ? requested.gradeChallengesEnabled === true
+            : data.gradeChallengesEnabled
         );
         const requestedGradebookSettings = normalizeGradebookItemSettings(requested.gradebookSettings);
         const effectiveGradebookSettings = data.assessmentMode === "summative"
@@ -430,7 +448,8 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
           existingAssignment?.metadata,
           overrideFields,
           data.assessmentMode,
-          requireSafeExamBrowser
+          requireSafeExamBrowser,
+          gradeChallengesEnabled
         );
         if (existingAssignment) {
           await applyAssignmentAssessmentModeTransition(tx, {
@@ -1094,6 +1113,7 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
   const activity = await assertActivityBelongsToCourse(courseId, data.activityId);
   assertTestAssignmentIsSummative(activity, data.metadata.assessmentMode);
   assertSafeExamBrowserIsSummative(data.metadata.assessmentMode, data.metadata.requireSafeExamBrowser);
+  assertGradeChallengesAreSummative(data.metadata.assessmentMode, data.metadata.gradeChallengesEnabled);
   await assertTestReadyForCompositeExecution(courseId, activity);
   validateAvailability(data.availableFrom, data.availableUntil);
 
@@ -1169,6 +1189,7 @@ export async function updateGroupActivityAssignment(
   );
   const effectiveMetadata = data.metadata !== undefined ? data.metadata : asMetadataRecord(assignment.metadata);
   assertSafeExamBrowserIsSummative(effectiveMetadata.assessmentMode, effectiveMetadata.requireSafeExamBrowser);
+  assertGradeChallengesAreSummative(effectiveMetadata.assessmentMode, effectiveMetadata.gradeChallengesEnabled);
   if (isCourseWideGroupAssignment(assignment.metadata) && !isAllowedCourseWideGroupAssignmentUpdate(data, assignment.metadata)) {
     throw new AppError(400, "COURSE_WIDE_GROUP_ACTIVITY_LOCKED", "This activity is assigned to all groups from the course.");
   }
@@ -1377,6 +1398,12 @@ function assertSafeExamBrowserIsSummative(assessmentMode: unknown, requireSafeEx
   }
 }
 
+function assertGradeChallengesAreSummative(assessmentMode: unknown, gradeChallengesEnabled: unknown) {
+  if (gradeChallengesEnabled === true && assessmentMode !== "summative") {
+    throw new AppError(400, "GRADE_CHALLENGES_SUMMATIVE_ONLY", "Grade challenges can only be enabled for summative activities.");
+  }
+}
+
 async function assertTestReadyForCompositeExecution(
   courseId: string,
   activity: { id: string; activityType?: { key: string } | null }
@@ -1530,6 +1557,7 @@ function inferLegacyOverrideFields(input: {
     availableFrom: string | null;
     availableUntil: string | null;
     requireSafeExamBrowser: boolean;
+    gradeChallengesEnabled: boolean;
     gradebookSettings: GradebookItemSettingsInput;
     contentPlacement: {
       parentId?: string | null;
@@ -1543,6 +1571,9 @@ function inferLegacyOverrideFields(input: {
   if ((input.assignmentContentPlacement.isVisible ?? true) !== (input.general.contentPlacement.isVisible ?? true)) fields.push("visibility");
   if (assignmentRequiresSafeExamBrowser(input.assignment.metadata) !== input.general.requireSafeExamBrowser) {
     fields.push("requireSafeExamBrowser");
+  }
+  if (assignmentAllowsGradeChallenges(input.assignment.metadata) !== input.general.gradeChallengesEnabled) {
+    fields.push("gradeChallenges");
   }
   const groupGradebook = input.assignmentGradebookSettings;
   const generalGradebook = input.general.gradebookSettings;
@@ -1597,7 +1628,8 @@ function buildCourseActivitySettingsMetadata(
   currentValue: Prisma.JsonValue | undefined,
   overrideFields: ActivityAssignmentOverrideField[],
   assessmentMode: "formative" | "summative",
-  requireSafeExamBrowser: boolean
+  requireSafeExamBrowser: boolean,
+  gradeChallengesEnabled: boolean
 ): Prisma.InputJsonValue {
   const current = asMetadataRecord(currentValue);
   const {
@@ -1606,6 +1638,7 @@ function buildCourseActivitySettingsMetadata(
     overrideFields: _overrideFields,
     assessmentMode: _assessmentMode,
     requireSafeExamBrowser: _requireSafeExamBrowser,
+    gradeChallengesEnabled: _gradeChallengesEnabled,
     ...preserved
   } = current;
   return {
@@ -1613,7 +1646,8 @@ function buildCourseActivitySettingsMetadata(
     assignmentScope: COURSE_ACTIVITY_SETTINGS_SCOPE,
     overrideFields,
     assessmentMode,
-    ...(requireSafeExamBrowser ? { requireSafeExamBrowser: true } : {})
+    ...(requireSafeExamBrowser ? { requireSafeExamBrowser: true } : {}),
+    ...(gradeChallengesEnabled ? { gradeChallengesEnabled: true } : {})
   };
 }
 

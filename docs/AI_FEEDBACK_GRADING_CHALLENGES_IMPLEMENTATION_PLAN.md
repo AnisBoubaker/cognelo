@@ -23,7 +23,7 @@ Teacher/admin product copy may use **AI feedback** for the generation feature an
 - Keep summative AI feedback hidden from the student until the gradebook item is released.
 - Let plugins decide whether AI feedback affects grading and how it combines with deterministic grading.
 - Preserve deterministic grading where it is authoritative, especially MCQ answer-key grading.
-- Let a student challenge any released final grade and any separately identified challengeable feedback, including teacher-authored feedback.
+- Let a student challenge any released final grade and any separately identified challengeable feedback, including teacher-authored feedback, when the effective summative activity/group setting enables challenges.
 - Give teachers one course-wide challenge queue with a response and audited grade-adjustment workflow.
 - Let teachers author learner feedback directly, whether or not AI feedback is enabled or generated.
 - Retain reproducible, privacy-aware data for educational research, model evaluation, audit, and later student-model evidence work.
@@ -177,7 +177,7 @@ The plugin must validate that component weights total 100%. It stores the determ
 
 ### MCQ Example
 
-MCQ answer-key grading remains deterministic and authoritative. AI feedback may explain errors or suggest study areas, but it does not change the MCQ score and is not an independent challenge target. The released deterministic grade and any teacher-authored released feedback remain challengeable. Summative MCQ feedback is still teacher-triggered and release-gated; formative MCQ feedback is generated on submission.
+MCQ answer-key grading remains deterministic and authoritative. AI feedback may explain errors or suggest study areas, but it does not change the MCQ score and is not an independent challenge target. The released deterministic grade and any teacher-authored released feedback remain challengeable when the effective assignment enables challenges. Summative MCQ feedback is still teacher-triggered and release-gated; formative MCQ feedback is generated on submission.
 
 ### Regrading
 
@@ -215,9 +215,11 @@ Provisional fields:
 
 Rules:
 
-- Every released final grade tied to a submitted attempt can be challenged, regardless of whether it was automatic, AI-assisted, or teacher-entered.
+- Grade challenges are disabled by default on each summative course activity, follow the General assignment policy, and can be overridden per group.
+- When the learner's effective assignment enables challenges, every released final grade tied to a submitted attempt can be challenged, regardless of whether it was automatic, AI-assisted, or teacher-entered.
+- Disabling challenges prevents new records but preserves existing challenges for learner visibility and staff resolution.
 - Separately identified generated or teacher-authored feedback can also be challenged when it is part of the released result; feedback-only model explanations that did not affect grading are not a separate challenge target, although the released deterministic grade remains challengeable.
-- A student can create one challenge for each immutable released grade or feedback version.
+- A student can create one challenge for each immutable released grade or feedback version while the effective assignment setting permits new challenges.
 - The explanation is required and becomes read-only after submission.
 - A challenge does not reopen the activity attempt or permit another submission.
 - Authorized course owners, teachers, and TAs can review challenges within their grading scope.
@@ -364,7 +366,7 @@ The development seed includes a reproducible two-section Programming Exercise ba
 
 ### Phase 3 — Grade Challenges
 
-Status: complete for the agreed core workflow. Students can challenge a released final grade or a separately identified generated/teacher-authored feedback version with a required explanation; course managers have an expandable Challenges queue that opens the existing plugin review dialog for grading and sends a separate required response with optional email notification. Grade changes remain in the ordinary audited gradebook path, and response submission derives the challenge outcome from the released and current grade/feedback snapshots.
+Status: complete for the agreed core workflow. Challenges are disabled by default for summative course activities and follow the General assignment policy plus per-group overrides. When enabled, students can challenge a released final grade or a separately identified generated/teacher-authored feedback version with a required explanation; disabling the setting preserves existing challenges. Course managers have an expandable Challenges queue that opens the existing plugin review dialog for grading and sends a separate required response with optional email notification. Grade changes remain in the ordinary audited gradebook path, and response submission derives the challenge outcome from the released and current grade/feedback snapshots.
 
 - Add the core challenge schema and migration.
 - Add student create/read APIs and activity review panel.
@@ -416,7 +418,7 @@ Status: partial. The manager research endpoint is implemented with stable identi
 - Invalid/failed AI output cannot create a partial or silent grade.
 - Retry and regrade preserve earlier evaluation versions and research events.
 - Programming Exercise test-only regrading never invokes AI or creates another student attempt; later AI generation never reruns tests and uses the latest successful saved test result plus current rubric.
-- Students can challenge only their own released final grade or challengeable released feedback.
+- Students can challenge only their own released final grade or challengeable released feedback when their effective summative assignment setting permits new challenges.
 - Teacher resolution requires a response and records any grade change through the audited override path.
 - Course challenge listing and resolution authorization are enforced server-side.
 - Research records cover successful, failed, retried, released, viewed, challenged, and adjusted evaluations.

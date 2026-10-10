@@ -15,6 +15,7 @@ type AssignmentSettings = {
     availableUntil: string | null;
     assessmentMode: "formative" | "summative";
     requireSafeExamBrowser: boolean;
+    gradeChallengesEnabled: boolean;
     gradebookSettings: GradebookSettings;
     contentPlacement: { isVisible: boolean };
   };
@@ -26,6 +27,7 @@ type AssignmentSettings = {
     availableFrom: string | null;
     availableUntil: string | null;
     requireSafeExamBrowser: boolean;
+    gradeChallengesEnabled: boolean;
     gradebookSettings: GradebookSettings;
     contentPlacement: { isVisible: boolean };
   }>;
@@ -93,6 +95,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
         availableUntil: "2028-01-10T17:00:00.000Z",
         assessmentMode: "summative",
         requireSafeExamBrowser: true,
+        gradeChallengesEnabled: true,
         gradebookSettings: gradebookSettings(),
         groupAssignments: [
           assignedGroup(data.groupId),
@@ -337,6 +340,11 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
     await expect(overrideValueCheckbox(safeExamBrowser)).toBeChecked();
     await overrideValueCheckbox(safeExamBrowser).uncheck();
 
+    const gradeChallenges = overrideCard(settings, "Allow grade challenges");
+    await enableOverride(gradeChallenges);
+    await expect(overrideValueCheckbox(gradeChallenges)).toBeChecked();
+    await overrideValueCheckbox(gradeChallenges).uncheck();
+
     const points = overrideCard(settings, "Points possible");
     await enableOverride(points);
     await expect(points.getByRole("spinbutton")).toHaveValue("100");
@@ -374,6 +382,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
         "availableUntil",
         "visibility",
         "requireSafeExamBrowser",
+        "gradeChallenges",
         "pointsPossible",
         "grading",
         "attempts",
@@ -382,6 +391,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
       expect(group).toMatchObject({
         assigned: true,
         requireSafeExamBrowser: false,
+        gradeChallengesEnabled: false,
         contentPlacement: { isVisible: false },
         gradebookSettings: {
           pointsPossible: 40,
@@ -400,6 +410,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
         assigned: true,
         overrideFields: [],
         requireSafeExamBrowser: true,
+        gradeChallengesEnabled: true,
         contentPlacement: { isVisible: true },
         gradebookSettings: {
           pointsPossible: 100,
@@ -420,6 +431,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
       "Available until",
       "Visible to students",
       "Require Safe Exam Browser",
+      "Allow grade challenges",
       "Points possible",
       "Grading",
       "Attempts",
@@ -441,7 +453,11 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
     const verificationApi = await createAuthenticatedApi("teacher");
     try {
       const saved = await loadAssignmentSettings(verificationApi, data.courseId, matrixActivityId);
-      expect(saved.general).toMatchObject({ assessmentMode: "formative", requireSafeExamBrowser: false });
+      expect(saved.general).toMatchObject({
+        assessmentMode: "formative",
+        requireSafeExamBrowser: false,
+        gradeChallengesEnabled: false
+      });
       expect(saved.groups.find((group) => group.groupId === data?.groupId)?.overrideFields).toEqual([
         "availableFrom",
         "availableUntil",
@@ -590,6 +606,7 @@ async function saveAssignmentSettings(
         availableUntil: null,
         assessmentMode: "formative",
         requireSafeExamBrowser: false,
+        gradeChallengesEnabled: false,
         contentPlacement: contentPlacement(title, true),
         ...input
       }
@@ -612,6 +629,7 @@ function assignedGroup(groupId: string, input: Record<string, unknown> = {}) {
     availableFrom: null,
     availableUntil: null,
     requireSafeExamBrowser: false,
+    gradeChallengesEnabled: false,
     gradebookSettings: gradebookSettings(),
     contentPlacement: { parentId: null, isVisible: true, metadata: {} },
     ...input

@@ -1348,6 +1348,8 @@ export const enMessages = {
       summativeToFormativeConfirm: "Change this activity to formative? Every existing summative attempt will become formative, active grades will be withdrawn, and released grades will be hidden. Attempts and grade history will remain available for review.",
       requireSafeExamBrowser: "Require Safe Exam Browser",
       requireSafeExamBrowserHelp: "Students must launch and work on this activity in Safe Exam Browser.",
+      gradeChallengesEnabled: "Allow grade challenges",
+      gradeChallengesEnabledHelp: "Students can challenge released grades and eligible feedback for this activity.",
       safeExamBrowserRequiredBadge: "Safe Exam Browser required",
       safeExamBrowserEyebrow: "Secure assessment",
       safeExamBrowserTitle: "Open this activity in Safe Exam Browser?",

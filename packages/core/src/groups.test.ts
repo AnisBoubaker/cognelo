@@ -309,6 +309,62 @@ describe("group services", () => {
     });
   });
 
+  it("loads grade challenge policy from General with a per-group override", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      courseId: "course-1",
+      title: "Final quiz",
+      metadata: {
+        allGroupsAssignment: {
+          assessmentMode: "summative",
+          gradeChallengesEnabled: true
+        }
+      },
+      activityType: { key: "mcq" }
+    });
+    mockPrisma.courseGroup.findMany.mockResolvedValue([
+      {
+        id: "group-1",
+        title: "Group 1",
+        activities: [{
+          id: "assignment-1",
+          availableFrom: null,
+          availableUntil: null,
+          metadata: { assessmentMode: "summative", overrideFields: ["gradeChallenges"] },
+          gradebookItem: null,
+          contentItems: []
+        }]
+      },
+      {
+        id: "group-2",
+        title: "Group 2",
+        activities: [{
+          id: "assignment-2",
+          availableFrom: null,
+          availableUntil: null,
+          metadata: { assessmentMode: "summative", overrideFields: [], gradeChallengesEnabled: true },
+          gradebookItem: null,
+          contentItems: []
+        }]
+      }
+    ]);
+    mockPrisma.courseContentItem.findFirst.mockResolvedValue({
+      id: "content-1",
+      parentId: null,
+      titleSnapshot: "Final quiz",
+      isVisible: true,
+      metadata: {}
+    });
+
+    await expect(getCourseActivityAssignmentSettings(teacherUser, "course-1", "activity-1")).resolves.toMatchObject({
+      general: { assessmentMode: "summative", gradeChallengesEnabled: true },
+      groups: [
+        { groupId: "group-1", gradeChallengesEnabled: false, overrideFields: ["gradeChallenges"] },
+        { groupId: "group-2", gradeChallengesEnabled: true, overrideFields: [] }
+      ]
+    });
+  });
+
   it("creates groups as drafts with the creator as a teacher participant", async () => {
     tx.courseGroup.create.mockResolvedValue({ id: "group-1" });
     tx.activity.findMany.mockResolvedValue([]);
@@ -532,6 +588,7 @@ describe("group services", () => {
 
     await assignActivityToAllCourseGroups(teacherUser, "course-1", "activity-1", {
       assessmentMode: "summative",
+      gradeChallengesEnabled: true,
       availableFrom: "2026-05-18T13:00:00.000Z",
       gradebookSettings: { pointsPossible: 100, gradeStrategy: "latest" },
       contentPlacement: { parentId: null, isVisible: true },
@@ -539,8 +596,9 @@ describe("group services", () => {
         {
           groupId: "group-1",
           assigned: true,
-          overrideFields: ["availableFrom", "pointsPossible"],
+          overrideFields: ["availableFrom", "pointsPossible", "gradeChallenges"],
           availableFrom: "2026-05-19T13:00:00.000Z",
+          gradeChallengesEnabled: false,
           gradebookSettings: { pointsPossible: 25 },
           contentPlacement: { parentId: null, isVisible: true }
         },
@@ -556,7 +614,7 @@ describe("group services", () => {
         metadata: {
           note: "keep",
           assignmentScope: "course_activity_settings",
-          overrideFields: ["availableFrom", "pointsPossible"],
+          overrideFields: ["availableFrom", "pointsPossible", "gradeChallenges"],
           assessmentMode: "summative"
         }
       })
@@ -590,8 +648,9 @@ describe("group services", () => {
       groupAssignments: [{
         groupId: "group-1",
         assigned: true,
-        overrideFields: ["pointsPossible", "grading", "attempts", "gradeStrategy", "requireSafeExamBrowser"],
+        overrideFields: ["pointsPossible", "grading", "attempts", "gradeStrategy", "requireSafeExamBrowser", "gradeChallenges"],
         requireSafeExamBrowser: true,
+        gradeChallengesEnabled: true,
         gradebookSettings: {
           pointsPossible: 25,
           gradingMode: "pass_fail",
@@ -616,7 +675,8 @@ describe("group services", () => {
         metadata: {
           allGroupsAssignment: expect.not.objectContaining({
             gradebookSettings: expect.anything(),
-            requireSafeExamBrowser: expect.anything()
+            requireSafeExamBrowser: expect.anything(),
+            gradeChallengesEnabled: expect.anything()
           })
         }
       }
@@ -653,6 +713,23 @@ describe("group services", () => {
         requireSafeExamBrowser: true
       })
     ).rejects.toMatchObject({ status: 400, code: "SAFE_EXAM_BROWSER_SUMMATIVE_ONLY" });
+
+    expect(tx.courseGroupActivity.upsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects enabling grade challenges for a formative course-wide assignment", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      courseId: "course-1",
+      activityType: { key: "mcq" }
+    });
+
+    await expect(
+      assignActivityToAllCourseGroups(teacherUser, "course-1", "activity-1", {
+        assessmentMode: "formative",
+        gradeChallengesEnabled: true
+      })
+    ).rejects.toMatchObject({ status: 400, code: "GRADE_CHALLENGES_SUMMATIVE_ONLY" });
 
     expect(tx.courseGroupActivity.upsert).not.toHaveBeenCalled();
   });

@@ -1318,6 +1318,8 @@ export const frMessages = {
       summativeToFormativeConfirm: "Passer cette activité en mode formatif ? Toutes les tentatives sommatives existantes deviendront formatives, les notes actives seront retirées et les notes publiées seront masquées. Les tentatives et l’historique des notes resteront accessibles pour consultation.",
       requireSafeExamBrowser: "Exiger Safe Exam Browser",
       requireSafeExamBrowserHelp: "Les étudiants doivent ouvrir et réaliser cette activité dans Safe Exam Browser.",
+      gradeChallengesEnabled: "Autoriser les contestations de note",
+      gradeChallengesEnabledHelp: "Les étudiants peuvent contester les notes publiées et les rétroactions admissibles pour cette activité.",
       safeExamBrowserRequiredBadge: "Safe Exam Browser requis",
       safeExamBrowserEyebrow: "Évaluation sécurisée",
       safeExamBrowserTitle: "Ouvrir cette activité dans Safe Exam Browser?",

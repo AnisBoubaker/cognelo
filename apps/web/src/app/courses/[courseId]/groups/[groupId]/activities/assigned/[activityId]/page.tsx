@@ -327,10 +327,11 @@ export default function GroupActivityPage() {
               ) : (
                 <StudentFeedback feedback={releasedGrade.feedback} maxScore={releasedGrade.maxScore} t={t} />
               )}
-              {gradeChallengeReferences.length ? (
+              {gradeChallengeReferences.length && (releasedGrade.gradeChallengesEnabled || gradeChallenges.length) ? (
                 <GradeChallengePanel
                   references={gradeChallengeReferences}
                   challenges={gradeChallenges}
+                  allowNewChallenge={releasedGrade.gradeChallengesEnabled}
                   explanation={challengeExplanation}
                   isSubmitting={isSubmittingChallenge}
                   selectedReferenceKey={selectedChallengeReferenceKey}
@@ -613,6 +614,7 @@ function StudentFeedback({
 function GradeChallengePanel({
   references,
   challenges,
+  allowNewChallenge,
   explanation,
   isSubmitting,
   selectedReferenceKey,
@@ -623,6 +625,7 @@ function GradeChallengePanel({
 }: {
   references: GradeChallengeReference[];
   challenges: GradeChallenge[];
+  allowNewChallenge: boolean;
   explanation: string;
   isSubmitting: boolean;
   selectedReferenceKey: string;
@@ -631,9 +634,11 @@ function GradeChallengePanel({
   onSubmit: () => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
-  const availableReferences = references.filter((reference) => !challenges.some(
-    (challenge) => challenge.feedbackRef === reference.feedbackRef && challenge.feedbackVersion === reference.feedbackVersion
-  ));
+  const availableReferences = allowNewChallenge
+    ? references.filter((reference) => !challenges.some(
+        (challenge) => challenge.feedbackRef === reference.feedbackRef && challenge.feedbackVersion === reference.feedbackVersion
+      ))
+    : [];
   const effectiveSelectedKey = availableReferences.some((reference) => feedbackReferenceKey(reference) === selectedReferenceKey)
     ? selectedReferenceKey
     : feedbackReferenceKey(availableReferences[0]);

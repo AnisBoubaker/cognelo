@@ -20,7 +20,7 @@ Gradebook attempt review and grading use core grade scope, so explicit course te
 - The definition declares interactive, plugin-executed Student view support. Standalone preview state and checks remain browser-scoped; stateless server actions provide the same deterministic, non-persistent evaluation when Parsons is embedded in a preview Test.
 - Formative checks and summative submissions create mode-tagged core attempts linked to the richer plugin attempt. Only summative attempts are graded, suppress correctness until release, and support teacher regrades; formative checks remain read-only teacher evidence.
 - Teacher review can resolve one exact linked Parsons attempt. The shared report dialog loads the newest current-mode submission first, then fetches older attempts only when navigated to; historical attempts are read-only.
-- The released deterministic or teacher-overridden grade is challengeable through the core workflow and returns to the existing Parsons **Review and grade** surface.
+- When the effective summative assignment setting enables challenges, the released deterministic or teacher-overridden grade is challengeable through the core workflow and returns to the existing Parsons **Review and grade** surface.
 - Activity-bank variations preserve the selected concepts, skills, and misconceptions, language, grouping/precedence structure, line count, and difficulty while generating a meaningfully different prompt and reference solution. The copied activity is independent, including inside reusable Test variations.
 - AI prompt/solution generation uses the platform shared blocking, indeterminate progress dialog; reusable Test variation progress remains owned by the activity-bank background job.
 

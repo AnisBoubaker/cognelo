@@ -1269,6 +1269,8 @@ export const arMessages = {
       summativeToFormativeConfirm: "هل تريد تحويل هذا النشاط إلى تكويني؟ ستصبح كل المحاولات الختامية الحالية تكوينية، وستُسحب الدرجات النشطة وتُخفى الدرجات المنشورة. ستبقى المحاولات وسجل الدرجات متاحين للمراجعة.",
       requireSafeExamBrowser: "اشتراط Safe Exam Browser",
       requireSafeExamBrowserHelp: "يجب على الطلاب فتح هذا النشاط والعمل عليه داخل Safe Exam Browser.",
+      gradeChallengesEnabled: "السماح بالاعتراض على الدرجات",
+      gradeChallengesEnabledHelp: "يمكن للطلاب الاعتراض على الدرجات المنشورة والتغذية الراجعة المؤهلة لهذا النشاط.",
       safeExamBrowserRequiredBadge: "يتطلب Safe Exam Browser",
       safeExamBrowserEyebrow: "تقييم آمن",
       safeExamBrowserTitle: "فتح هذا النشاط في Safe Exam Browser؟",

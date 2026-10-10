@@ -6,6 +6,7 @@ import { recordAiFeedbackResearchEvent } from "./ai-feedback";
 import { sendSystemEmailToEligibleRecipient } from "./email-delivery";
 import { AppError, forbidden, notFound } from "./errors";
 import { gradeChallengeTargetForGrade } from "./grade-challenge-targets";
+import { assignmentAllowsGradeChallenges } from "./activity-assignment-policy";
 
 const createChallengeSchema = z.object({
   feedbackRef: z.string().min(1).max(200),
@@ -29,6 +30,7 @@ export async function createGradeChallenge(user: CurrentUser, courseId: string, 
     include: {
       participant: true,
       gradebookItem: true,
+      groupActivity: { select: { metadata: true } },
       activity: { include: { activityType: true } }
     }
   });
@@ -40,6 +42,9 @@ export async function createGradeChallenge(user: CurrentUser, courseId: string, 
   }
   if (!attempt.gradebookItem.gradesReleased) {
     throw new AppError(409, "GRADE_NOT_RELEASED", "Feedback can only be challenged after the grade is released.");
+  }
+  if (!assignmentAllowsGradeChallenges(attempt.groupActivity.metadata)) {
+    throw new AppError(409, "GRADE_CHALLENGES_DISABLED", "Grade challenges are not enabled for this activity.");
   }
   const grade = await prisma.grade.findUnique({
     where: {

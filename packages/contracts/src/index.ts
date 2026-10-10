@@ -767,6 +767,7 @@ export const ActivityAssignmentOverrideFieldSchema = z.enum([
   "availableUntil",
   "visibility",
   "requireSafeExamBrowser",
+  "gradeChallenges",
   "pointsPossible",
   "grading",
   "attempts",
@@ -777,13 +778,14 @@ export type ActivityAssignmentOverrideField = z.infer<typeof ActivityAssignmentO
 export const CourseActivityGroupAssignmentSettingsSchema = z.object({
   groupId: RecordIdSchema,
   assigned: z.boolean(),
-  overrideFields: z.array(ActivityAssignmentOverrideFieldSchema).max(8).refine(
+  overrideFields: z.array(ActivityAssignmentOverrideFieldSchema).max(9).refine(
     (fields) => new Set(fields).size === fields.length,
     { message: "Override fields must be unique." }
   ).optional().default([]),
   availableFrom: z.string().datetime().nullable().optional(),
   availableUntil: z.string().datetime().nullable().optional(),
   requireSafeExamBrowser: z.boolean().optional(),
+  gradeChallengesEnabled: z.boolean().optional(),
   gradebookSettings: GradebookItemSettingsInputSchema.optional(),
   contentPlacement: CourseContentPlacementInputSchema.optional()
 });
@@ -796,6 +798,7 @@ export const CourseAllGroupsActivityAssignmentInputSchema = z.object({
   assessmentMode: AssignedActivityAssessmentModeSchema.optional().default("formative"),
   confirmSummativeToFormative: z.boolean().optional(),
   requireSafeExamBrowser: z.boolean().optional().default(false),
+  gradeChallengesEnabled: z.boolean().optional().default(false),
   gradebookSettings: GradebookItemSettingsInputSchema.optional(),
   contentPlacement: CourseContentPlacementInputSchema.optional(),
   groupAssignments: z.array(CourseActivityGroupAssignmentSettingsSchema).max(500).refine(

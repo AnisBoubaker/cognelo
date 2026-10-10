@@ -9,7 +9,7 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - The definition declares `studentView: { mode: "read_only" }` until an expiring non-academic upload workspace exists; never emulate preview by creating and deleting normal preflight/submission records.
 - Final-submission processing is idempotent, background-job based, append-audited, and replace-on-reprocess for derived functions/questions.
 - The teacher gradebook-attempt route accepts an exact final-submission ID constrained by activity, group, participant-linked user, and the matching core attempt. The host uses it for newest-first lazy history; older and formative submissions are inspection-only.
-- Released teacher-entered grades/feedback are challengeable through core; review must return to the plugin's existing manual-grading surface and audited override path.
+- Released teacher-entered grades/feedback are challengeable through core only when the effective summative assignment setting permits it; review must return to the plugin's existing manual-grading surface and audited override path.
 - Teacher submission review and grading consume core course capabilities: explicit course teachers/admins work course-wide, while section teachers/TAs are restricted to their assigned groups. Assignment authoring, snapshots, and grade release remain course-management operations.
 - Student-triggered challenge generation resolves only explicit course staff question-authoring preferences in creator, owner, then teacher order; disabled, missing, unauthorized, or keyless non-local connections are skipped before the request fails safely.
 - Student challenge payloads are sanitized; generation prompts, raw output, reference matches, provider keys, and provenance remain private.

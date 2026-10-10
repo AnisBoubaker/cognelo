@@ -1317,6 +1317,8 @@ export const zhMessages = {
       summativeToFormativeConfirm: "将此活动改为形成性活动？所有现有的总结性尝试都将变为形成性尝试，当前成绩将被撤回，已发布的成绩将被隐藏。尝试记录和成绩历史仍可供查看。",
       requireSafeExamBrowser: "要求使用 Safe Exam Browser",
       requireSafeExamBrowserHelp: "学生必须在 Safe Exam Browser 中打开并完成此活动。",
+      gradeChallengesEnabled: "允许成绩质疑",
+      gradeChallengesEnabledHelp: "学生可以质疑此活动已发布的成绩和符合条件的反馈。",
       safeExamBrowserRequiredBadge: "需要 Safe Exam Browser",
       safeExamBrowserEyebrow: "安全评估",
       safeExamBrowserTitle: "在 Safe Exam Browser 中打开此活动？",

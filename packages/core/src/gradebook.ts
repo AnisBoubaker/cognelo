@@ -10,6 +10,7 @@ import {
 } from "./authorization";
 import { AppError, forbidden, notFound } from "./errors";
 import { gradeChallengeTargetForGrade } from "./grade-challenge-targets";
+import { assignmentAllowsGradeChallenges } from "./activity-assignment-policy";
 
 type JsonInput = Prisma.InputJsonValue;
 export type ActivityAttemptAssessmentMode = "formative" | "summative";
@@ -1471,7 +1472,8 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
       groupActivity: {
         select: {
           availableFrom: true,
-          availableUntil: true
+          availableUntil: true,
+          metadata: true
         }
       },
       grades: {
@@ -1541,6 +1543,7 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
         gradeChallengeTarget: gradeChallengeTarget
           ? { feedbackRef: gradeChallengeTarget.feedbackRef, feedbackVersion: gradeChallengeTarget.feedbackVersion }
           : null,
+        gradeChallengesEnabled: assignmentAllowsGradeChallenges(item.groupActivity.metadata),
         selectedAttemptNumber: item.gradesReleased ? effectiveGrade?.selectedAttempt?.attemptNumber ?? null : latestGrade?.attemptNumber ?? null,
         attemptCount: activeAttempts.length,
         submittedAttemptCount: submittedAttempts.length,

@@ -10,7 +10,7 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Bank variation preserves exact concept, skill, and misconception selections and the original question count/settings, but generates a distinct student introduction and MCQ source. The normal parser, exact-count validation, and model answer-key audit remain mandatory before the target draft is saved.
 - Deterministic answer-key grading is authoritative. Feedback generation and teacher edits must never return a grading result.
 - **Assess with AI** is feedback-only for MCQ. The shared **Review and grade** host may still apply an explicit audited teacher override to the final grade; that override is separate from MCQ feedback generation or revision.
-- Model explanations are not an independent challenge target because they do not affect scoring. The released deterministic/overridden grade and teacher-authored released feedback are challengeable through core.
+- Model explanations are not an independent challenge target because they do not affect scoring. The released deterministic/overridden grade and teacher-authored released feedback are challengeable through core only when the effective summative assignment setting permits it.
 - Standalone and compound-Test draft paths are distinct and must not be mixed.
 - The definition declares `studentView: { mode: "interactive", execution: "plugin" }`. This is a third browser-scoped path: answer checks are deterministic and stateless, with no draft, attempt, grade, feedback artifact, or analytics persistence.
 - Attempt limits are enforced by both status UI and the submission route. Released final grades close further attempts.
