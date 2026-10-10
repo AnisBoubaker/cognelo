@@ -210,6 +210,39 @@ print("hello")
     expect(parsed.questions[0].choices[0]).toMatchObject({ isCorrect: true });
   });
 
+  it("preserves GFM tables and Markdown images in question prompts and choices", () => {
+    const parsed = parseMcqSource(
+      `## Interpret the diagram
+
+![A coordinate-system diagram](https://example.test/diagram.png)
+
+| Point | X | Y |
+|:------|---:|---:|
+| A     | 1 | 2 |
+| B     | 3 | 4 |
+
+- [x] ![Choice A](https://example.test/choice-a.png)
+- [ ] Choice B`,
+      "none"
+    );
+
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.questions[0].promptBlocks).toEqual([
+      {
+        type: "paragraph",
+        text: "![A coordinate-system diagram](https://example.test/diagram.png)"
+      },
+      {
+        type: "table",
+        markdown: "| Point | X | Y |\n|:------|---:|---:|\n| A     | 1 | 2 |\n| B     | 3 | 4 |"
+      }
+    ]);
+    expect(parsed.questions[0].choices[0].blocks[0]).toEqual({
+      type: "paragraph",
+      text: "![Choice A](https://example.test/choice-a.png)"
+    });
+  });
+
   it("parses dollar and standard LaTeX math delimiters", () => {
     expect(renderInlineMarkdown("Derive \\(f(x)=x^2\\) or $g(x)=x^3$."))
       .toEqual(expect.arrayContaining([

@@ -3,6 +3,7 @@
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
 - Preserve the single text-first source; do not replace it with a click-heavy form builder.
+- Question prompts and choices use the shared sanitized Markdown renderer for inline content and GFM tables, including responsive images from Cognelo or web URLs; structural `##` and task-list markers remain owned by the MCQ parser.
 - Question and section boundaries are grammar-significant. Plain trailing text remains part of the preceding choice unless `#` or `---` starts a section.
 - Stable choice IDs survive optional display randomization and remain the grading identity.
 - All authored data is generic config; core can therefore deep-copy MCQ children across reusable bank Tests without a private-data hook. Plugin-owned `PluginMcqAiEvaluation` rows are immutable operational artifacts only.

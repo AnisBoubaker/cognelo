@@ -29,6 +29,8 @@ The main MCQ source is written as text.
 - inline mathematics supports both `$...$` and standard LaTeX `\\(...\\)` delimiters; display mathematics supports `$$...$$` and `\\[...\\]`, rendered with KaTeX
 - a literal dollar sign is escaped as `\$`; wrapping it in inline code as `` `$` `` is also supported when code styling is desired
 - choices can contain fenced code blocks, including code-only alternatives where the marker line is followed by the code block
+- question prompts and choices can contain Markdown images such as `![Alternative text](https://example.org/image.png)`; images remain responsive to the available width and are sanitized by the shared renderer
+- question prompts and choices can contain portable GFM tables written with a header row, delimiter row, and data rows
 - the activity option `randomizeChoices` can show choices in randomized order while keeping grading tied to stable choice IDs
 
 ## Current State

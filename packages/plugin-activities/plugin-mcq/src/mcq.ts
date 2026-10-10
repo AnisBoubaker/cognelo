@@ -4,6 +4,7 @@ export type McqBlock =
   | { type: "paragraph"; text: string }
   | { type: "heading"; level: number; text: string }
   | { type: "list"; ordered: boolean; items: string[] }
+  | { type: "table"; markdown: string }
   | { type: "math"; expression: string; display: boolean }
   | { type: "code"; language: string; code: string };
 
@@ -454,6 +455,17 @@ function parseMarkdownBlocks(lines: string[], defaultCodeLanguage: string): McqB
       continue;
     }
 
+    if (isGfmTableStart(lines, index)) {
+      const tableLines = [line, lines[index + 1]];
+      index += 2;
+      while (index < lines.length && isGfmTableRow(lines[index])) {
+        tableLines.push(lines[index]);
+        index += 1;
+      }
+      blocks.push({ type: "table", markdown: tableLines.join("\n") });
+      continue;
+    }
+
     const unorderedMatch = line.match(/^\s*[-*]\s+(.*)$/);
     if (unorderedMatch) {
       const items: string[] = [];
@@ -491,6 +503,9 @@ function parseMarkdownBlocks(lines: string[], defaultCodeLanguage: string): McqB
       if (!nextTrimmed) {
         break;
       }
+      if (paragraphLines.length > 0 && isGfmTableStart(lines, index)) {
+        break;
+      }
       if (/^```/.test(nextTrimmed) || /^\$\$/.test(nextTrimmed) || /^(#{1,6})\s+/.test(next) || /^\s*[-*]\s+/.test(next) || /^\s*\d+\.\s+/.test(next)) {
         break;
       }
@@ -501,6 +516,27 @@ function parseMarkdownBlocks(lines: string[], defaultCodeLanguage: string): McqB
   }
 
   return blocks;
+}
+
+function isGfmTableStart(lines: string[], index: number) {
+  return index + 1 < lines.length
+    && isGfmTableRow(lines[index])
+    && isGfmTableDelimiter(lines[index + 1]);
+}
+
+function isGfmTableRow(line: string) {
+  const trimmed = line.trim();
+  return trimmed.length > 0 && trimmed.includes("|");
+}
+
+function isGfmTableDelimiter(line: string) {
+  const cells = line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
 }
 
 export function renderInlineMarkdown(text: string): InlineToken[] {
