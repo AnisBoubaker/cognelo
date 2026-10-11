@@ -474,6 +474,7 @@ First plugin integration target:
   - needs grading
 - Completed: add CSV export.
 - Completed: add a shared per-activity export dialog to the content context menu, gradebook activity/group rows, and detailed-results page. The dedicated endpoint emits exactly email, first name, last name, and normalized final grade in CSV or XLSX; plugin-declared partial grades and ungraded/missing rows are excluded.
+- Completed: add attempt-scoped live activity broadcasts from the detailed report. The teacher dialog reports recently active recipients plus delivery/read counts; the learner receives a blinking unread envelope and chat-style history beside the timer. Timed activities and Tests bind the thread to their started core attempt, untimed activities use the next logical attempt without creating a core attempt on view, and a later attempt cannot receive earlier messages. Course-wide teachers/admins can broadcast to all assigned groups, section teachers remain section-scoped, and TAs are excluded. Sender/read persistence is bidirectional-ready even though this phase exposes only staff-to-learner writes.
 
 ### Phase 6A: Formative/Summative Assignment Mode - Completed
 

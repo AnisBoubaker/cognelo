@@ -53,6 +53,11 @@ export type UiLocale = z.infer<typeof UiLocaleSchema>;
 export const RecordIdSchema = z.string().trim().min(1).max(191);
 export type RecordId = z.infer<typeof RecordIdSchema>;
 
+export const ActivityBroadcastMessageInputSchema = z.object({
+  body: z.string().trim().min(1).max(2000)
+}).strict();
+export type ActivityBroadcastMessageInput = z.infer<typeof ActivityBroadcastMessageInputSchema>;
+
 export const LoginInputSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8)

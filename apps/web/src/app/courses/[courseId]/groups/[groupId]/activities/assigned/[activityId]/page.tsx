@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { CodingExerciseStudentGradeReport } from "@cognelo/plugin-coding-exercises";
 import { AppShell } from "@/components/app-shell";
+import { ActivityLiveControlPortal } from "@/components/activity-live-controls";
+import { ActivityMessenger } from "@/components/activity-messenger";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { useAuth } from "@/components/auth-provider";
 import { api, ApiError, Activity, ActivityDefinition, Course, CourseGroup, DeletedSubmissionAudit, GradeChallenge, SafeExamBrowserAccess, SafeExamBrowserLaunch, StudentGradeFeedback, StudentReleasedGradeRow, TimedActivityRuntime } from "@/lib/api";
@@ -495,15 +497,30 @@ export default function GroupActivityPage() {
         ) : null}
 
         {timedRuntime?.attempt && timedRemainingSeconds !== null ? (
-          <div
-            aria-label={t("courseDetail.testTimeRemaining", { time: formatRemainingTime(timedRemainingSeconds) })}
-            aria-live="off"
-            className={`test-countdown test-countdown--${getTestCountdownTone(timedRemainingSeconds, timedRuntime.timeLimitMinutes)}`}
-            role="timer"
-          >
-            {t("courseDetail.testTimeRemaining", { time: formatRemainingTime(timedRemainingSeconds) })}
-          </div>
+          <ActivityLiveControlPortal>
+            <div
+              aria-label={t("courseDetail.testTimeRemaining", { time: formatRemainingTime(timedRemainingSeconds) })}
+              aria-live="off"
+              className={`test-countdown test-countdown--${getTestCountdownTone(timedRemainingSeconds, timedRuntime.timeLimitMinutes)}`}
+              role="timer"
+            >
+              {t("courseDetail.testTimeRemaining", { time: formatRemainingTime(timedRemainingSeconds) })}
+            </div>
+          </ActivityLiveControlPortal>
         ) : null}
+
+        <ActivityMessenger
+          activityId={activityId}
+          courseId={courseId}
+          enabled={Boolean(
+            isLearner &&
+            activity &&
+            !isActivityUnavailable &&
+            selectedTab === "attempt" &&
+            (!safeExamBrowserAccess?.requiresSafeExamBrowser || safeExamBrowserAccess.accessGranted)
+          )}
+          groupId={groupId}
+        />
 
         {!isActivityUnavailable && (!isLearner || activity?.activityType.key === "test" || timingStatus === "ready") && (!timedRuntime?.timeLimitMinutes || timedRuntime.attempt || selectedTab === "previous") && (
           (selectedTab === "attempt" && (

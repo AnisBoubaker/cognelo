@@ -189,6 +189,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <button className="secondary" type="button" onClick={() => void refresh()}>{t("common.retry")}</button>
         </div>
       ) : null}
+      <div className="activity-live-controls" id="activity-live-controls" />
       {children}
     </div>
   );

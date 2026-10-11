@@ -15,7 +15,7 @@ vi.mock("@cognelo/db", () => ({
   prisma: mockPrisma
 }));
 
-const { assertCanCreateCourse, assertCanManageCourse, assertCanPreviewGroupAsStudent, assertCanViewCourse, canManageCourse, getCourseCapabilities } = await import("./authorization");
+const { assertCanCreateCourse, assertCanManageCourse, assertCanPreviewGroupAsStudent, assertCanViewCourse, canManageCourse, getActivityMessagingGroupScope, getCourseCapabilities } = await import("./authorization");
 
 const user = (roles: CurrentUser["roles"], id = "user-1"): CurrentUser => ({
   id,
@@ -115,6 +115,35 @@ describe("authorization helpers", () => {
     mockPrisma.courseMembership.findMany.mockResolvedValueOnce([]);
     mockPrisma.courseGroupParticipant.findFirst.mockResolvedValueOnce(null);
     await expect(assertCanPreviewGroupAsStudent(user(["teacher"]), "course-1", "group-1")).rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
+  });
+
+  it("allows course teachers to message course-wide and restricts section teachers while excluding TAs", async () => {
+    mockPrisma.courseMembership.findMany.mockResolvedValueOnce([{ role: "teacher", source: "explicit" }]);
+    await expect(getActivityMessagingGroupScope(user(["teacher"]), "course-1")).resolves.toBeNull();
+
+    mockPrisma.courseMembership.findMany.mockResolvedValueOnce([]);
+    mockPrisma.courseGroupParticipant.findMany.mockResolvedValueOnce([
+      { groupId: "group-1", role: "teacher" },
+      { groupId: "group-2", role: "ta" }
+    ]);
+    await expect(getActivityMessagingGroupScope(user(["teacher"]), "course-1")).resolves.toEqual(["group-1"]);
+
+    mockPrisma.courseMembership.findMany.mockResolvedValueOnce([]);
+    mockPrisma.courseGroupParticipant.findMany.mockResolvedValueOnce([
+      { groupId: "group-1", role: "teacher" }
+    ]);
+    await expect(getActivityMessagingGroupScope(
+      user(["teacher"]),
+      "course-1",
+      "group-2"
+    )).rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
+
+    mockPrisma.courseMembership.findMany.mockResolvedValueOnce([]);
+    mockPrisma.courseGroupParticipant.findMany.mockResolvedValueOnce([{ groupId: "group-2", role: "ta" }]);
+    await expect(getActivityMessagingGroupScope(user(["teacher"]), "course-1")).rejects.toMatchObject({
+      status: 403,
+      code: "FORBIDDEN"
+    });
   });
 
   it("reports learner visibility without granting gradebook capabilities", async () => {

@@ -845,6 +845,36 @@ export type TimedActivityRuntime = {
   };
 };
 
+export type ActivityConversationMessage = {
+  id: string;
+  senderKind: "staff" | "student" | "system";
+  senderName: string;
+  body: string;
+  createdAt: string;
+};
+
+export type LearnerActivityConversation = {
+  id: string;
+  attemptId: string | null;
+  attemptNumber: number;
+  unreadCount: number;
+  messages: ActivityConversationMessage[];
+};
+
+export type ActivityBroadcast = {
+  id: string;
+  senderName: string;
+  body: string;
+  createdAt: string;
+  recipientCount: number;
+  readCount: number;
+};
+
+export type ActivityMessagingOverview = {
+  activeRecipientCount: number;
+  broadcasts: ActivityBroadcast[];
+};
+
 export type CourseGroupActivityAssignment = {
   id: string;
   activityId: string;
@@ -1751,6 +1781,23 @@ export const api = {
     }
     return request<{ attempts: CourseActivityInProgressAttempt[] }>(`/courses/${courseId}/gradebook?${params.toString()}`);
   },
+  activityMessagingOverview: (courseId: string, activityId: string, groupId?: string) => {
+    const params = new URLSearchParams();
+    if (groupId) params.set("groupId", groupId);
+    const query = params.size ? `?${params.toString()}` : "";
+    return request<{ messaging: ActivityMessagingOverview }>(
+      `/courses/${courseId}/gradebook/activities/${activityId}/messages${query}`
+    );
+  },
+  sendActivityBroadcast: (courseId: string, activityId: string, body: string, groupId?: string) => {
+    const params = new URLSearchParams();
+    if (groupId) params.set("groupId", groupId);
+    const query = params.size ? `?${params.toString()}` : "";
+    return request<{ broadcast: ActivityBroadcast }>(
+      `/courses/${courseId}/gradebook/activities/${activityId}/messages${query}`,
+      { method: "POST", body: JSON.stringify({ body }) }
+    );
+  },
   courseGradebookCsvUrl: (courseId: string, filters?: { groupId?: string; activityId?: string; status?: GradebookStatus }) => {
     const params = new URLSearchParams({ format: "csv" });
     if (filters?.groupId) {
@@ -2006,6 +2053,19 @@ export const api = {
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/timing`,
       { method: "POST" }
     ),
+  learnerActivityConversation: (courseId: string, groupId: string, activityId: string) =>
+    request<{ conversation: LearnerActivityConversation | null }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/messages`
+    ),
+  markLearnerActivityConversationRead: (
+    courseId: string,
+    groupId: string,
+    activityId: string,
+    conversationId: string
+  ) => request<{ readAt: string }>(
+    `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/messages`,
+    { method: "PATCH", body: JSON.stringify({ conversationId }) }
+  ),
   finalizeTimedActivityAttempt: (courseId: string, groupId: string, activityId: string) =>
     request<{ runtime: TimedActivityRuntime }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/timing/finalize`,

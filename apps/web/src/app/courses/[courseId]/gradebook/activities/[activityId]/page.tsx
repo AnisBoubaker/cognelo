@@ -7,6 +7,8 @@ import { ProgressDialog, useDialogs, useNotifications } from "@cognelo/activity-
 import { createMcqClient } from "@cognelo/plugin-mcq";
 import { createParsonsClient } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
+import { ActivityBroadcastDialog } from "@/components/activity-broadcast-dialog";
+import { AppIcon } from "@/components/app-icon";
 import { TestReviewAllPanel } from "@/components/test-review-all-panel";
 import { ActivityReviewAllPanel, toActivityReviewResponse, type ActivityReviewResponse } from "@/components/activity-review-all-panel";
 import { codingRubricResultsFromFeedback, type CodingRubricCriterion } from "@/lib/activity-review-all";
@@ -69,6 +71,7 @@ export default function GradebookActivityResultsPage() {
   } | null>(null);
   const [reviewAndGradeRow, setReviewAndGradeRow] = useState<CourseGradebookRow | null>(null);
   const [showGradeExport, setShowGradeExport] = useState(false);
+  const [showActivityMessenger, setShowActivityMessenger] = useState(false);
   const [reportTab, setReportTab] = useState<"overview" | "students">(
     requestedReportTab ?? (origin === "content" ? "overview" : "students")
   );
@@ -149,6 +152,12 @@ export default function GradebookActivityResultsPage() {
   const activityActions = getGradebookActivityActions(activityTypeKey);
   const isSummativeActivity = (rows[0]?.assessmentMode ?? gradebook?.items[0]?.assessmentMode) === "summative";
   const canManageCourse = Boolean(course?.permissions?.canManageCourse);
+  const canMessageStudents = Boolean(
+    course?.permissions?.canReleaseGrades ||
+    course?.permissions?.sectionRoles.some((assignment) => (
+      assignment.role === "teacher" && (!groupId || assignment.groupId === groupId)
+    ))
+  );
   const groupTitle = groupId ? gradebook?.items.find((item) => item.groupId === groupId)?.groupTitle : null;
   const backHref = origin === "content"
     ? `/courses/${courseId}?tab=content`
@@ -748,6 +757,12 @@ export default function GradebookActivityResultsPage() {
             </p>
           </div>
           <div className="hero-actions">
+            {canMessageStudents ? (
+              <button className="button secondary" type="button" onClick={() => setShowActivityMessenger(true)}>
+                <AppIcon name="messages" />
+                {t("activityMessenger.messageStudents")}
+              </button>
+            ) : null}
             {canManageCourse ? (
               <Link className="button primary" href={`/courses/${courseId}/activities/${activityId}`}>
                 {t("courseDetail.editActivityTitle")}
@@ -1048,6 +1063,14 @@ export default function GradebookActivityResultsPage() {
               t={t}
             />
           </div>
+        ) : null}
+        {showActivityMessenger ? (
+          <ActivityBroadcastDialog
+            activityId={activityId}
+            courseId={courseId}
+            groupId={groupId}
+            onClose={() => setShowActivityMessenger(false)}
+          />
         ) : null}
       </main>
     </AppShell>
