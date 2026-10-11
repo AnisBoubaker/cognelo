@@ -9,6 +9,7 @@ import {
   api,
   apiRequest,
   type CourseGradebookRow,
+  type CodingExerciseReviewAttempt,
   type CourseTestAttemptReview,
   type TeacherAiFeedbackReview
 } from "@/lib/api";
@@ -19,7 +20,7 @@ import {
 } from "@/lib/activity-renderers";
 import { useI18n } from "@/lib/i18n";
 
-type ReviewAttempt = ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview;
+type ReviewAttempt = ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview | CodingExerciseReviewAttempt;
 
 type ReviewAttemptReference = {
   coreAttemptId: string;
@@ -66,13 +67,14 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
   const parsonsClient = useMemo(() => createParsonsClient(apiRequest), []);
   const feedbackRenderer = getAiFeedbackReviewRenderer(row.activityTypeKey);
   const manualRenderer = getManualGradingRenderer(row.activityTypeKey);
+  const useFeedbackReview = Boolean(feedbackRenderer && row.assessmentMode !== "formative");
   const [manualReview, setManualReview] = useState<ManualReviewState | null>(null);
   const [feedbackReview, setFeedbackReview] = useState<FeedbackReviewState | null>(null);
   const [savingAction, setSavingAction] = useState<"delete" | "override" | "regrade" | null>(null);
   const loadReviewRef = useRef<() => void>(() => undefined);
   const loadedReviewIdentityRef = useRef<string | null>(null);
   loadReviewRef.current = () => {
-    if (feedbackRenderer) {
+    if (useFeedbackReview) {
       void loadFeedbackReview();
     } else if (manualRenderer) {
       void loadManualReview(false);
@@ -191,6 +193,13 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
   }
 
   async function loadPluginReviewAttempts(attemptId?: string) {
+    if (row.activityTypeKey === "coding-exercise") {
+      const result = await api.codingExerciseReviewAll(courseId, row.activityId, {
+        participantId: row.participantId,
+        attemptId
+      });
+      return (result.submissions[0]?.attempts ?? []) as ReviewAttempt[];
+    }
     if (row.activityTypeKey === "mcq") {
       const result = await mcqClient.groupGradebookAttempts(courseId, row.groupId, row.activityId, {
         participantId: row.participantId,
@@ -408,7 +417,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
     <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) void close();
     }}>
-      {feedbackRenderer ? feedbackReview ? (
+      {useFeedbackReview ? feedbackReview ? (
           <AiFeedbackReviewPanel
           row={row}
           state={feedbackReview}
@@ -604,6 +613,10 @@ function sortAttemptsByDisplayedTimestamp<T extends ReviewAttempt>(attempts: T[]
 }
 
 function attemptDisplayTime(attempt: ReviewAttempt) {
-  const value = "completedAt" in attempt ? attempt.completedAt ?? attempt.lastInteractionAt : attempt.submittedAt ?? attempt.gradedAt;
+  const value = "completedAt" in attempt
+    ? attempt.completedAt ?? attempt.lastInteractionAt
+    : "submittedAt" in attempt
+      ? attempt.submittedAt ?? attempt.gradedAt
+      : attempt.createdAt;
   return value ? new Date(value).getTime() : 0;
 }

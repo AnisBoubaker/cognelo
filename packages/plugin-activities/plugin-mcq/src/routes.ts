@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import {
   AppError,
+  assignmentUsesAutomaticAiFeedback,
   clearActivityResponseDraft,
   activityGenerationKnowledgeSchema,
   assertCanManageActivityBank,
@@ -91,8 +92,12 @@ export const mcqSubmissionRoute: PluginRouteDefinition = {
         participantId: participant.id,
         assessmentMode: context.activity.assignment?.metadata?.assessmentMode === "summative" ? "summative" : "formative"
       });
+      const showAiFeedback = assignmentUsesAutomaticAiFeedback(context.activity.assignment?.metadata);
+      const feedbackByAttemptId = showAiFeedback
+        ? await listLatestMcqAiFeedbackByAttemptId(context.activity.id, submissions.map((submission) => submission.id), true)
+        : new Map<string, Record<string, unknown>>();
       const attempts = submissions.map((submission) => ({
-        submission,
+        submission: { ...submission, aiFeedback: feedbackByAttemptId.get(submission.id) ?? null },
         grade: toMcqSubmissionGrade(buildMcqGradingResultFromConfig(context.activity.config, submission.answers))
       }));
       return {
@@ -207,7 +212,7 @@ export const mcqFormativeFeedbackRoute: PluginRouteDefinition = {
         pluginAttemptRef: coreAttempt.id,
         metadata
       });
-      const evaluation = context.activity.config?.aiFeedbackEnabled === true
+      const evaluation = assignmentUsesAutomaticAiFeedback(context.activity.assignment?.metadata) && context.activity.config?.aiFeedbackEnabled === true
         ? await evaluateMcqWithAi({
             user: context.user,
             courseId: context.courseId,
@@ -262,13 +267,48 @@ export const mcqGradebookAttemptsRoute: PluginRouteDefinition = {
         },
         orderBy: [{ attemptNumber: "desc" }]
       });
+      const feedbackByAttemptId = await listLatestMcqAiFeedbackByAttemptId(
+        context.activity.id,
+        attempts.map((attempt) => attempt.id),
+        false
+      );
       return {
         participant,
-        attempts: attempts.map((attempt) => toMcqSubmissionRecord(attempt.metadata, attempt))
+        attempts: attempts.map((attempt) => ({
+          ...toMcqSubmissionRecord(attempt.metadata, attempt),
+          aiFeedback: feedbackByAttemptId.get(attempt.id) ?? null
+        }))
       };
     }
   }
 };
+
+async function listLatestMcqAiFeedbackByAttemptId(activityId: string, attemptIds: string[], formativeOnly: boolean) {
+  const byAttemptId = new Map<string, Record<string, unknown>>();
+  if (!attemptIds.length) return byAttemptId;
+  const evaluations = await prisma.pluginMcqAiEvaluation.findMany({
+    where: {
+      activityId,
+      coreAttemptId: { in: attemptIds },
+      status: "completed",
+      ...(formativeOnly ? { assessmentMode: "formative", triggerKind: "formative_submission" } : {})
+    },
+    orderBy: [{ version: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+    select: { coreAttemptId: true, sanitizedFeedback: true }
+  });
+  for (const evaluation of evaluations) {
+    if (
+      evaluation.coreAttemptId &&
+      !byAttemptId.has(evaluation.coreAttemptId) &&
+      evaluation.sanitizedFeedback &&
+      typeof evaluation.sanitizedFeedback === "object" &&
+      !Array.isArray(evaluation.sanitizedFeedback)
+    ) {
+      byAttemptId.set(evaluation.coreAttemptId, evaluation.sanitizedFeedback as Record<string, unknown>);
+    }
+  }
+  return byAttemptId;
+}
 
 async function findStudentParticipant(groupId: string, userId: string) {
   return prisma.courseGroupParticipant.findFirst({

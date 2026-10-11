@@ -23,6 +23,7 @@ export type McqSubmission = {
   gradedAt: string | null;
   assessmentMode?: "formative" | "summative";
   answers: Record<string, string[]>;
+  aiFeedback?: Record<string, unknown> | null;
 };
 
 export type McqSubmissionGrade = {

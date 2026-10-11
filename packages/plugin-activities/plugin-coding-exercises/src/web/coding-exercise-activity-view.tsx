@@ -88,6 +88,7 @@ type CodingExecution = {
 type CodingAttemptHistory = {
   submission: CodingExecution;
   runs: CodingExecution[];
+  aiFeedback?: { feedback?: CodingExerciseAiFeedback } | null;
 };
 
 type CodingAttemptAvailability = {
@@ -1170,7 +1171,7 @@ export function CodingExerciseActivityView({
       setEditorCode(alignCodingExerciseStarterCodeToTemplate(config.starterCode, config.studentTemplateSource));
       setRunExecution(null);
       setPreviousAttempts((current) => [
-        { submission: result.execution, runs: [...recentRuns].reverse() },
+        { submission: result.execution, runs: [...recentRuns].reverse(), aiFeedback: result.aiFeedback ?? null },
         ...current
       ]);
       setRecentRuns([]);
@@ -2408,6 +2409,9 @@ function CodingAttemptHistoryList({
                 title={formatCodingExercisesMessage(locale, "submissionResult")}
                 locale={locale}
               />
+              {attempt.aiFeedback?.feedback ? (
+                <CodingAttemptFeedback feedback={attempt.aiFeedback.feedback} locale={locale} />
+              ) : null}
               <div className="stack stack-tight">
                 <strong>{formatCodingExercisesMessage(locale, "attemptRuns")}</strong>
                 {attempt.runs.length ? (
@@ -2428,6 +2432,37 @@ function CodingAttemptHistoryList({
           </details>
         );
       })}
+    </section>
+  );
+}
+
+function CodingAttemptFeedback({ feedback, locale }: {
+  feedback: CodingExerciseAiFeedback;
+  locale: CodingExercisesLocale;
+}) {
+  const t = (key: Parameters<typeof formatCodingExercisesMessage>[1]) => formatCodingExercisesMessage(locale, key);
+  return (
+    <section className="inline-panel stack stack-tight">
+      <h3>{t("aiFeedbackResult")}</h3>
+      {feedback.summary ? <p>{feedback.summary}</p> : null}
+      {feedback.strengths?.length ? (
+        <div>
+          <strong>{t("aiFeedbackStrengths")}</strong>
+          <ul>{feedback.strengths.map((item, index) => <li key={index}>{item}</li>)}</ul>
+        </div>
+      ) : null}
+      {feedback.improvements?.length ? (
+        <div>
+          <strong>{t("aiFeedbackImprovements")}</strong>
+          <ul>{feedback.improvements.map((item, index) => <li key={index}>{item}</li>)}</ul>
+        </div>
+      ) : null}
+      {feedback.criteria?.map((criterion, index) => (
+        <div className="stack stack-tight" key={criterion.id ?? index}>
+          {criterion.title ? <strong>{criterion.title}</strong> : null}
+          {criterion.feedback ? <p className="muted">{criterion.feedback}</p> : null}
+        </div>
+      ))}
     </section>
   );
 }

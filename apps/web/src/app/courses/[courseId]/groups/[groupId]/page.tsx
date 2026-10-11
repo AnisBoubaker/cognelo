@@ -1,6 +1,8 @@
 "use client";
 
+import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { MarkdownRenderer, useDialogs } from "@cognelo/activity-ui";
+import type { AssignedActivityAssessmentMode } from "@cognelo/contracts";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import { CodingExerciseStudentGradeReport } from "@cognelo/plugin-coding-exercises";
 import Link from "next/link";
@@ -79,7 +81,7 @@ export default function CourseGroupPage() {
   const [assignIsVisible, setAssignIsVisible] = useState(true);
   const [assignAvailableFrom, setAssignAvailableFrom] = useState("");
   const [assignAvailableUntil, setAssignAvailableUntil] = useState("");
-  const [assignAssessmentMode, setAssignAssessmentMode] = useState<"formative" | "summative">("formative");
+  const [assignAssessmentMode, setAssignAssessmentMode] = useState<AssignedActivityAssessmentMode>("formative");
   const [assignRequireSafeExamBrowser, setAssignRequireSafeExamBrowser] = useState(false);
   const [assignPointsPossible, setAssignPointsPossible] = useState("100");
   const [assignGradingMode, setAssignGradingMode] = useState<"points" | "pass_fail">("points");
@@ -240,6 +242,9 @@ export default function CourseGroupPage() {
   );
   const selectedAssignableActivity = assignableActivities.find((activity) => activity.id === assignActivityId);
   const assignActivityIsTest = selectedAssignableActivity?.activityType.key === "test";
+  const assignActivitySupportsAiFeedback = getActivityDefinition(
+    selectedAssignableActivity?.activityType.key ?? ""
+  )?.grading?.supportsAiFeedback === true;
   const effectiveAssignAssessmentMode = assignActivityIsTest ? "summative" : assignAssessmentMode;
   const gradebookActivities = buildGroupGradebookActivitySummaries(gradebook?.items ?? [], gradebook?.rows ?? []);
   const gradebookOverview = buildGroupGradebookOverview(gradebookActivities);
@@ -1203,13 +1208,14 @@ export default function CourseGroupPage() {
                                 id="assignAssessmentMode"
                                 value={effectiveAssignAssessmentMode}
                                 onChange={(event) => {
-                                  const mode = event.target.value as "formative" | "summative";
+                                  const mode = event.target.value as AssignedActivityAssessmentMode;
                                   setAssignAssessmentMode(mode);
-                                  if (mode === "formative") setAssignRequireSafeExamBrowser(false);
+                                  if (mode !== "summative") setAssignRequireSafeExamBrowser(false);
                                 }}
                                 disabled={!canManage || assignActivityIsTest}
                               >
                                 <option value="formative">{t("groupPage.assessmentModeFormative")}</option>
+                                {assignActivitySupportsAiFeedback ? <option value="formative_ai">{t("groupPage.assessmentModeFormativeAi")}</option> : null}
                                 <option value="summative">{t("groupPage.assessmentModeSummative")}</option>
                               </select>
                             </div>

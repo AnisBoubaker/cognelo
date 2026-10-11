@@ -8,6 +8,7 @@ export type CodingExerciseAiFeedbackReviewProps = {
   submission: Record<string, unknown>;
   onFeedbackChange: (feedback: Record<string, unknown>) => void;
   readOnly?: boolean;
+  hideFeedbackWhenEmpty?: boolean;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
@@ -19,7 +20,7 @@ export type CodingExerciseGradingBreakdown = {
   totalGrade: number | null;
 };
 
-export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbackChange, readOnly = false, t }: CodingExerciseAiFeedbackReviewProps) {
+export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbackChange, readOnly = false, hideFeedbackWhenEmpty = false, t }: CodingExerciseAiFeedbackReviewProps) {
   const [clearConfirmationOpen, setClearConfirmationOpen] = useState(false);
   const sourceCode = typeof submission.sourceCode === "string" ? submission.sourceCode : "";
   const language = typeof submission.language === "string" ? submission.language : "text";
@@ -31,6 +32,7 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
   const criteria = recordArray(feedback.criteria);
   const gradingBreakdown = getCodingExerciseGradingBreakdown(feedback);
   const hasFeedbackContent = hasCodingExerciseFeedbackContent(feedback);
+  const showFeedback = !hideFeedbackWhenEmpty || !readOnly || hasFeedbackContent || criteria.length > 0;
 
   return (
     <div className="stack">
@@ -73,7 +75,7 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
           </section>
         ) : null}
       </section>
-      {!readOnly ? <div className="row wrap" style={{ justifyContent: "flex-end" }}>
+      {showFeedback && !readOnly ? <div className="row wrap" style={{ justifyContent: "flex-end" }}>
         <button
           className="button danger"
           disabled={!hasFeedbackContent}
@@ -83,7 +85,7 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
           {t("courseDetail.feedbackReviewClearContent")}
         </button>
       </div> : null}
-      <label className="field">
+      {showFeedback ? <><label className="field">
         <span>{t("courseDetail.feedbackReviewSummary")}</span>
         <textarea maxLength={3000} readOnly={readOnly} rows={5} value={stringValue(feedback.summary)} onChange={(event) => onFeedbackChange({ ...feedback, summary: event.target.value })} />
       </label>
@@ -157,7 +159,7 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
             </label>
           </div>
         </section>
-      ) : null}
+      ) : null}</> : null}
       <ConfirmationDialog
         open={clearConfirmationOpen}
         title={t("courseDetail.feedbackReviewClearContentConfirmTitle")}

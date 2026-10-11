@@ -14,7 +14,7 @@ import {
   CourseGroupUpdateSchema
 } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
-import type { ActivityAssignmentOverrideField, CurrentUser } from "@cognelo/contracts";
+import type { ActivityAssignmentOverrideField, AssignedActivityAssessmentMode, CurrentUser } from "@cognelo/contracts";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import {
   assertCanManageCourse,
@@ -27,7 +27,7 @@ import {
 } from "./authorization";
 import { listContentItems } from "./course-content";
 import { AppError, notFound } from "./errors";
-import { assignmentAllowsGradeChallenges, assignmentTimeLimitMinutes } from "./activity-assignment-policy";
+import { assignmentAllowsGradeChallenges, assignmentAssessmentPolicyMode, assignmentTimeLimitMinutes } from "./activity-assignment-policy";
 
 type StudentAccessDb = Pick<typeof prisma, "role" | "userRole" | "courseMembership">;
 type GradebookItemDb = Pick<typeof prisma, "gradebookItem">;
@@ -40,7 +40,7 @@ type CourseWideAssignmentMetadata = {
   availableUntil?: string | null;
   timeLimitMinutes?: number | null;
   enablePerGroupSettings?: boolean;
-  assessmentMode?: "formative" | "summative";
+  assessmentMode?: AssignedActivityAssessmentMode;
   requireSafeExamBrowser?: boolean;
   gradeChallengesEnabled?: boolean;
   gradebookSettings?: GradebookItemSettingsInput;
@@ -306,6 +306,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   validateAvailability(data.availableFrom, data.availableUntil);
   const activity = await assertActivityBelongsToCourse(courseId, activityId);
   assertTestAssignmentIsSummative(activity, data.assessmentMode);
+  assertActivitySupportsAssessmentMode(activity, data.assessmentMode);
   assertSafeExamBrowserIsSummative(data.assessmentMode, data.requireSafeExamBrowser);
   assertGradeChallengesAreSummative(data.assessmentMode, data.gradeChallengesEnabled);
   await assertTestReadyForCompositeExecution(courseId, activity);
@@ -1125,6 +1126,7 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
   const data = CourseGroupActivityInputSchema.parse(input);
   const activity = await assertActivityBelongsToCourse(courseId, data.activityId);
   assertTestAssignmentIsSummative(activity, data.metadata.assessmentMode);
+  assertActivitySupportsAssessmentMode(activity, data.metadata.assessmentMode);
   assertSafeExamBrowserIsSummative(data.metadata.assessmentMode, data.metadata.requireSafeExamBrowser);
   assertGradeChallengesAreSummative(data.metadata.assessmentMode, data.metadata.gradeChallengesEnabled);
   await assertTestReadyForCompositeExecution(courseId, activity);
@@ -1211,6 +1213,7 @@ export async function updateGroupActivityAssignment(
     data.metadata !== undefined ? data.metadata.assessmentMode : asMetadataRecord(assignment.metadata).assessmentMode
   );
   const effectiveMetadata = data.metadata !== undefined ? data.metadata : asMetadataRecord(assignment.metadata);
+  assertActivitySupportsAssessmentMode(assignment.activity, effectiveMetadata.assessmentMode);
   assertSafeExamBrowserIsSummative(effectiveMetadata.assessmentMode, effectiveMetadata.requireSafeExamBrowser);
   assertGradeChallengesAreSummative(effectiveMetadata.assessmentMode, effectiveMetadata.gradeChallengesEnabled);
   if (isCourseWideGroupAssignment(assignment.metadata) && !isAllowedCourseWideGroupAssignmentUpdate(data, assignment.metadata)) {
@@ -1408,6 +1411,22 @@ function assertTestAssignmentIsSummative(
 ) {
   if (activity?.activityType?.key === "test" && assessmentMode !== "summative") {
     throw new AppError(400, "TEST_SUMMATIVE_ONLY", "A Test must be assigned as a summative activity.");
+  }
+}
+
+function assertActivitySupportsAssessmentMode(
+  activity: { activityType?: { key: string } | null } | null | undefined,
+  assessmentMode: unknown
+) {
+  if (
+    assessmentMode === "formative_ai" &&
+    getActivityDefinition(activity?.activityType?.key ?? "")?.grading?.supportsAiFeedback !== true
+  ) {
+    throw new AppError(
+      400,
+      "FORMATIVE_AI_FEEDBACK_UNSUPPORTED",
+      "This activity type does not support automatic formative AI feedback."
+    );
   }
 }
 
@@ -1652,7 +1671,7 @@ function buildGradebookItemSettingsData(settings: GradebookItemSettingsInput) {
 function buildCourseActivitySettingsMetadata(
   currentValue: Prisma.JsonValue | undefined,
   overrideFields: ActivityAssignmentOverrideField[],
-  assessmentMode: "formative" | "summative",
+  assessmentMode: AssignedActivityAssessmentMode,
   requireSafeExamBrowser: boolean,
   gradeChallengesEnabled: boolean,
   timeLimitMinutes: number | null
@@ -1683,11 +1702,7 @@ function normalizeTimeLimitMinutes(value: unknown): number | null {
   return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 1440 ? value : null;
 }
 
-function readAssessmentMode(value: unknown): "formative" | "summative" {
-  return value && typeof value === "object" && !Array.isArray(value) && (value as Record<string, unknown>).assessmentMode === "summative"
-    ? "summative"
-    : "formative";
-}
+const readAssessmentMode = assignmentAssessmentPolicyMode;
 
 async function applyAssignmentAssessmentModeTransition(
   tx: Prisma.TransactionClient,
@@ -1695,12 +1710,12 @@ async function applyAssignmentAssessmentModeTransition(
     assignmentId: string;
     actorUserId: string;
     confirmed: boolean;
-    previousMode: "formative" | "summative";
-    nextMode: "formative" | "summative";
+    previousMode: AssignedActivityAssessmentMode;
+    nextMode: AssignedActivityAssessmentMode;
   }
 ) {
   if (input.previousMode === input.nextMode) return;
-  if (input.previousMode === "summative" && input.nextMode === "formative" && !input.confirmed) {
+  if (input.previousMode === "summative" && input.nextMode !== "summative" && !input.confirmed) {
     throw new AppError(
       409,
       "ASSESSMENT_MODE_CONVERSION_CONFIRMATION_REQUIRED",
@@ -1718,7 +1733,7 @@ async function applyAssignmentAssessmentModeTransition(
   if (!item) return;
 
   const now = new Date();
-  const convertingToFormative = input.previousMode === "summative" && input.nextMode === "formative";
+  const convertingToFormative = input.previousMode === "summative" && input.nextMode !== "summative";
   const convertedAttempts = convertingToFormative
     ? item.attempts.filter((attempt) => attempt.assessmentMode === "summative")
     : [];

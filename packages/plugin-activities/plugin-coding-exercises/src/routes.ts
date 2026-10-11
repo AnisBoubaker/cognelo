@@ -1,6 +1,7 @@
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import {
   AppError,
+  assignmentUsesAutomaticAiFeedback,
   assertCanViewCourseGradebook,
   assertCanManageCourseOrViewGradebook,
   assertCanManageActivityBank,
@@ -70,11 +71,15 @@ export const codingExerciseReviewAllRoute: PluginRouteDefinition = {
   path: "coding-exercises/review-all",
   activityTypeKeys: ["coding-exercise"],
   methods: {
-    GET: async ({ context }) => {
+    GET: async ({ context, request }) => {
       const courseId = requireCourseId(context.courseId);
       const capabilities = await assertCanViewCourseGradebook(context.user, courseId);
+      const searchParams = new URL(request.url).searchParams;
+      const participantId = searchParams.get("participantId");
+      const executionId = searchParams.get("attemptId");
       const participants = await prisma.courseGroupParticipant.findMany({
         where: {
+          ...(participantId ? { id: participantId } : {}),
           group: {
             courseId,
             ...(capabilities.gradingGroupIds !== null ? { id: { in: capabilities.gradingGroupIds } } : {})
@@ -84,7 +89,12 @@ export const codingExerciseReviewAllRoute: PluginRouteDefinition = {
         },
         select: { id: true, userId: true }
       });
-      const executions = await listCodingExerciseReviewExecutionAttempts({ activityId: context.activity.id, userIds: participants.flatMap((participant) => participant.userId ? [participant.userId] : []) });
+      const allExecutions = await listCodingExerciseReviewExecutionAttempts({
+        activityId: context.activity.id,
+        userIds: participants.flatMap((participant) => participant.userId ? [participant.userId] : []),
+        executionId
+      });
+      const executions = executionId ? allExecutions.filter((execution) => execution.id === executionId) : allExecutions;
       const evaluations = executions.length ? await codingExercisePrisma.pluginCodingExerciseAiEvaluation.findMany({
         where: {
           activityId: context.activity.id,
@@ -92,12 +102,18 @@ export const codingExerciseReviewAllRoute: PluginRouteDefinition = {
           status: "completed"
         },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        select: { executionId: true, criterionScores: true }
+        select: { executionId: true, criterionScores: true, id: true, version: true, feedbackHash: true, sanitizedFeedback: true }
       }) : [];
       const rubricByExecutionId = new Map<string, Array<{ criterionId: string; scorePercent: number }>>();
       for (const evaluation of evaluations) {
         if (!rubricByExecutionId.has(evaluation.executionId)) {
           rubricByExecutionId.set(evaluation.executionId, reviewRubricScores(evaluation.criterionScores));
+        }
+      }
+      const feedbackByExecutionId = new Map<string, ReturnType<typeof toAttemptAiFeedback>>();
+      for (const evaluation of evaluations) {
+        if (!feedbackByExecutionId.has(evaluation.executionId)) {
+          feedbackByExecutionId.set(evaluation.executionId, toAttemptAiFeedback(evaluation));
         }
       }
       const byUserId = new Map<string, typeof executions>();
@@ -110,7 +126,10 @@ export const codingExerciseReviewAllRoute: PluginRouteDefinition = {
           return attempts.length ? [{
             participantId: participant.id,
             execution: attempts[0],
-            attempts,
+            attempts: attempts.map((execution) => ({
+              ...execution,
+              aiFeedback: feedbackByExecutionId.get(execution.id) ?? null
+            })),
             rubricEvaluations: attempts.flatMap((execution) => {
               const criteria = rubricByExecutionId.get(execution.id);
               return criteria?.length ? [{ executionId: execution.id, criteria }] : [];
@@ -301,13 +320,20 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
             } as Prisma.InputJsonValue
           });
         }
-      } else if (assessmentMode === "formative" && context.courseId && context.groupId && aiFeedbackSetup.effective) {
+      } else if (
+        assessmentMode === "formative" &&
+        context.courseId &&
+        context.groupId &&
+        assignmentUsesAutomaticAiFeedback(context.activity.assignment?.metadata) &&
+        aiFeedbackSetup.effective
+      ) {
         try {
           aiFeedback = await evaluateCodingExerciseAttemptWithAi({
             user: context.user,
             courseId: context.courseId,
             groupId: context.groupId,
             activityId: context.activity.id,
+            coreAttemptId: submittedCoreAttemptId,
             executionId: execution.id,
             activity: context.activity,
             assessmentMode: "formative",
@@ -360,8 +386,19 @@ export const codingExerciseHistoryRoute: PluginRouteDefinition = {
         activityId: context.activity.id,
         userId: context.user.id
       });
+      const showAiFeedback = assignmentUsesAutomaticAiFeedback(context.activity.assignment?.metadata);
+      const feedbackByExecutionId = showAiFeedback
+        ? await listLatestFormativeAiFeedbackByExecutionId(
+            context.activity.id,
+            history.attempts.map((attempt) => attempt.submission.id)
+          )
+        : new Map<string, ReturnType<typeof toAttemptAiFeedback>>();
       return {
-        ...history,
+        currentRuns: history.currentRuns,
+        attempts: history.attempts.map((attempt) => ({
+          ...attempt,
+          aiFeedback: feedbackByExecutionId.get(attempt.submission.id) ?? null
+        })),
         availability: await getCodingExerciseAttemptAvailability({
           context,
           submissionCount: history.attempts.length
@@ -370,6 +407,44 @@ export const codingExerciseHistoryRoute: PluginRouteDefinition = {
     }
   }
 };
+
+async function listLatestFormativeAiFeedbackByExecutionId(activityId: string, executionIds: string[]) {
+  const byExecutionId = new Map<string, ReturnType<typeof toAttemptAiFeedback>>();
+  if (!executionIds.length) return byExecutionId;
+  const evaluations = await codingExercisePrisma.pluginCodingExerciseAiEvaluation.findMany({
+    where: {
+      activityId,
+      executionId: { in: executionIds },
+      assessmentMode: "formative",
+      triggerKind: "formative_submission",
+      status: "completed"
+    },
+    orderBy: [{ version: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+    select: { executionId: true, id: true, version: true, feedbackHash: true, sanitizedFeedback: true }
+  });
+  for (const evaluation of evaluations) {
+    if (!byExecutionId.has(evaluation.executionId)) {
+      byExecutionId.set(evaluation.executionId, toAttemptAiFeedback(evaluation));
+    }
+  }
+  return byExecutionId;
+}
+
+function toAttemptAiFeedback(evaluation: {
+  id: string;
+  version: number;
+  feedbackHash: string | null;
+  sanitizedFeedback: unknown;
+}) {
+  return {
+    feedbackRef: evaluation.id,
+    feedbackVersion: evaluation.version,
+    feedbackHash: evaluation.feedbackHash ?? "",
+    feedback: evaluation.sanitizedFeedback && typeof evaluation.sanitizedFeedback === "object" && !Array.isArray(evaluation.sanitizedFeedback)
+      ? evaluation.sanitizedFeedback as Record<string, unknown>
+      : {}
+  };
+}
 
 function isSummativeGroupActivity(context: {
   courseId?: string;

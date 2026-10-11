@@ -1,4 +1,5 @@
 export * from "./activities";
+export * from "./activity-assignment-policy";
 export * from "./activity-response-drafts";
 export * from "./activity-timing";
 export * from "./activity-knowledge-generation";

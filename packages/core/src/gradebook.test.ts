@@ -72,6 +72,7 @@ vi.mock("@cognelo/db", () => ({
 vi.mock("./authorization", () => authMocks);
 
 const {
+  assignmentAssessmentMode,
   getActivityAttemptRegradeContext,
   getActivityAttemptRegradeContexts,
   getActivityAttemptAvailability,
@@ -85,6 +86,15 @@ const {
   startActivityAttempt,
   submitActivityAttempt
 } = await import("./gradebook");
+
+describe("assignment assessment mode", () => {
+  it("maps formative AI policy to formative attempts while preserving the legacy summative default", () => {
+    expect(assignmentAssessmentMode({ assessmentMode: "formative_ai" })).toBe("formative");
+    expect(assignmentAssessmentMode({ assessmentMode: "formative" })).toBe("formative");
+    expect(assignmentAssessmentMode({ assessmentMode: "summative" })).toBe("summative");
+    expect(assignmentAssessmentMode(undefined)).toBe("summative");
+  });
+});
 
 const studentUser: CurrentUser = {
   id: "student-1",

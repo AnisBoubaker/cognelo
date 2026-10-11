@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   assertCanGradeGroup: vi.fn(),
   assertCanManageCourse: vi.fn(),
   clearActivityResponseDraft: vi.fn(),
+  evaluateMcqWithAi: vi.fn(),
   generateQuestionAuthoringText: vi.fn(),
   getActivityAttemptAvailability: vi.fn(),
   recordActivityAttemptGradingResult: vi.fn(),
@@ -14,7 +15,8 @@ const mocks = vi.hoisted(() => ({
     activityAttempt: { findFirst: vi.fn(), findMany: vi.fn() },
     activityBank: { findUnique: vi.fn() },
     course: { findUnique: vi.fn() },
-    courseGroupParticipant: { findFirst: vi.fn() }
+    courseGroupParticipant: { findFirst: vi.fn() },
+    pluginMcqAiEvaluation: { findMany: vi.fn() }
   }
 }));
 
@@ -36,6 +38,10 @@ vi.mock("@cognelo/core", async () => {
 
 vi.mock("@cognelo/db", () => ({
   prisma: mocks.prisma
+}));
+
+vi.mock("./ai-feedback", () => ({
+  evaluateMcqWithAi: mocks.evaluateMcqWithAi
 }));
 
 const { mcqFormativeFeedbackRoute, mcqGenerateRoute, mcqGradebookAttemptsRoute, mcqSubmissionRoute } = await import("./routes");
@@ -68,6 +74,13 @@ describe("MCQ generation route", () => {
     });
     mocks.prisma.activityAttempt.findFirst.mockResolvedValue(null);
     mocks.prisma.activityAttempt.findMany.mockResolvedValue([]);
+    mocks.prisma.pluginMcqAiEvaluation.findMany.mockResolvedValue([]);
+    mocks.evaluateMcqWithAi.mockResolvedValue({
+      feedbackRef: "feedback-1",
+      feedbackVersion: 1,
+      feedbackHash: "hash-1",
+      feedback: { summary: "Good work", questionFeedback: [] }
+    });
     mocks.getActivityAttemptAvailability.mockResolvedValue({ canStart: true, reason: null });
     mocks.startActivityAttempt.mockResolvedValue({ id: "core-attempt-1" });
     mocks.submitActivityAttempt.mockResolvedValue({
@@ -384,7 +397,7 @@ describe("MCQ generation route", () => {
           groupId: "group-1",
           activity: {
             ...context.activity,
-            config: { source: "## Question\n\n- [x] Correct\n- [ ] Wrong", aiFeedbackEnabled: false },
+            config: { source: "## Question\n\n- [x] Correct\n- [ ] Wrong", aiFeedbackEnabled: true, aiFeedbackInstructions: "Explain." },
             assignment: { id: "assignment-1", metadata: { assessmentMode: "formative" } }
           }
         },
@@ -404,6 +417,32 @@ describe("MCQ generation route", () => {
       expect.objectContaining({ attemptId: "core-attempt-1" })
     );
     expect(mocks.recordActivityAttemptGradingResult).not.toHaveBeenCalled();
+    expect(mocks.evaluateMcqWithAi).not.toHaveBeenCalled();
+  });
+
+  it("generates formative AI feedback only when the assignment opts in", async () => {
+    await expect(
+      mcqFormativeFeedbackRoute.methods.POST?.({
+        request: new Request("http://test.local"),
+        context: {
+          ...context,
+          user: { ...context.user, id: "student-1", roles: ["student" as const] },
+          groupId: "group-1",
+          activity: {
+            ...context.activity,
+            config: { source: "## Question\n\n- [x] Correct\n- [ ] Wrong", aiFeedbackEnabled: true, aiFeedbackInstructions: "Explain." },
+            assignment: { id: "assignment-1", metadata: { assessmentMode: "formative_ai" } }
+          }
+        },
+        readJson: async () => ({ answers: { "question-1": ["question-1-choice-1"] } })
+      })
+    ).resolves.toMatchObject({ evaluation: { feedback: { summary: "Good work" } } });
+
+    expect(mocks.evaluateMcqWithAi).toHaveBeenCalledWith(expect.objectContaining({
+      coreAttemptId: "core-attempt-1",
+      assessmentMode: "formative",
+      triggerKind: "formative_submission"
+    }));
   });
 
   it("rejects a summative submission when the configured attempt limit is exhausted", async () => {
@@ -490,6 +529,39 @@ describe("MCQ generation route", () => {
     }));
   });
 
+  it("returns attempt-specific AI feedback in formative AI history", async () => {
+    mocks.prisma.activityAttempt.findMany.mockResolvedValueOnce([{
+      id: "core-attempt-1",
+      attemptNumber: 1,
+      lifecycle: "submitted",
+      submittedAt: new Date("2026-05-22T12:00:00.000Z"),
+      gradedAt: null,
+      assessmentMode: "formative",
+      metadata: { submittedAnswers: { "question-1": ["question-1-choice-1"] } }
+    }]);
+    mocks.prisma.pluginMcqAiEvaluation.findMany.mockResolvedValueOnce([{
+      coreAttemptId: "core-attempt-1",
+      sanitizedFeedback: { summary: "Attempt-specific feedback", questionFeedback: [] }
+    }]);
+
+    await expect(mcqSubmissionRoute.methods.GET?.({
+      request: new Request("http://test.local"),
+      context: {
+        ...context,
+        user: { ...context.user, id: "student-1", roles: ["student" as const] },
+        groupId: "group-1",
+        activity: {
+          ...context.activity,
+          config: { source: "## Question\n\n- [x] Correct\n- [ ] Wrong" },
+          assignment: { id: "assignment-1", metadata: { assessmentMode: "formative_ai" } }
+        }
+      },
+      readJson: async () => ({})
+    })).resolves.toMatchObject({
+      attempts: [{ submission: { id: "core-attempt-1", aiFeedback: { summary: "Attempt-specific feedback" } } }]
+    });
+  });
+
   it("lists MCQ gradebook attempts for teachers", async () => {
     mocks.prisma.activityAttempt.findMany.mockResolvedValueOnce([
       {
@@ -501,6 +573,10 @@ describe("MCQ generation route", () => {
         metadata: { submittedAnswers: { "question-1": ["question-1-choice-1"] } }
       }
     ]);
+    mocks.prisma.pluginMcqAiEvaluation.findMany.mockResolvedValueOnce([{
+      coreAttemptId: "core-attempt-1",
+      sanitizedFeedback: { summary: "Teacher-visible feedback", questionFeedback: [] }
+    }]);
 
     await expect(
       mcqGradebookAttemptsRoute.methods.GET?.({
@@ -512,7 +588,8 @@ describe("MCQ generation route", () => {
       attempts: [
         {
           id: "core-attempt-1",
-          answers: { "question-1": ["question-1-choice-1"] }
+          answers: { "question-1": ["question-1-choice-1"] },
+          aiFeedback: { summary: "Teacher-visible feedback" }
         }
       ]
     });
