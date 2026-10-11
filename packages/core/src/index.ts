@@ -3,6 +3,7 @@ export * from "./activity-assignment-policy";
 export * from "./activity-response-drafts";
 export * from "./activity-timing";
 export * from "./activity-knowledge-generation";
+export * from "./activity-messaging";
 export * from "./activity-version-diff";
 export * from "./ai-agents";
 export * from "./ai-feedback";

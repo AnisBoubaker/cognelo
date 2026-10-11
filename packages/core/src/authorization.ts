@@ -145,6 +145,36 @@ export async function assertCanViewCourseGradebook(user: CurrentUser, courseId: 
   return capabilities;
 }
 
+/**
+ * Resolves the groups in which a teacher may communicate with learners.
+ * Course-wide grading teachers and administrators may message every group;
+ * section teachers are restricted to the sections they teach. Teaching
+ * assistants are intentionally excluded from this teacher communication
+ * capability.
+ */
+export async function getActivityMessagingGroupScope(
+  user: CurrentUser,
+  courseId: string,
+  requestedGroupId?: string | null
+): Promise<string[] | null> {
+  const capabilities = await getCourseCapabilities(user, courseId);
+  if (capabilities.canReleaseGrades) {
+    return requestedGroupId ? [requestedGroupId] : null;
+  }
+
+  const teacherGroupIds = [...new Set(
+    capabilities.sectionRoles
+      .filter((assignment) => assignment.role === "teacher")
+      .map((assignment) => assignment.groupId)
+  )];
+  if (requestedGroupId) {
+    if (teacherGroupIds.includes(requestedGroupId)) return [requestedGroupId];
+    throw forbidden();
+  }
+  if (teacherGroupIds.length) return teacherGroupIds;
+  throw forbidden();
+}
+
 export async function assertCanManageCourseOrViewGradebook(user: CurrentUser, courseId: string) {
   if (await canManageCourse(user, courseId)) {
     return;

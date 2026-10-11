@@ -99,6 +99,12 @@ enum ActivityAttemptLifecycle {
   deleted
 }
 
+enum ActivityConversationSenderKind {
+  staff
+  student
+  system
+}
+
 enum GradeSource {
   auto
   manual
@@ -149,42 +155,45 @@ enum SmtpSecurityMode {
 }
 
 model User {
-  id                                 String                       @id @default(cuid())
-  email                              String                       @unique
+  id                                 String                        @id @default(cuid())
+  email                              String                        @unique
   name                               String?
   firstName                          String?
   lastName                           String?
-  metadata                           Json                         @default("{}")
+  metadata                           Json                          @default("{}")
   passwordHash                       String
-  mustChangePassword                 Boolean                      @default(false)
-  authVersion                        Int                          @default(0)
-  isActive                           Boolean                      @default(true)
+  mustChangePassword                 Boolean                       @default(false)
+  authVersion                        Int                           @default(0)
+  isActive                           Boolean                       @default(true)
   emailVerifiedAt                    DateTime?
-  createdAt                          DateTime                     @default(now())
-  updatedAt                          DateTime                     @updatedAt
+  createdAt                          DateTime                      @default(now())
+  updatedAt                          DateTime                      @updatedAt
   roles                              UserRole[]
   courses                            CourseMembership[]
-  createdCourses                     Course[]                     @relation("CourseCreator")
-  createdSubjects                    Subject[]                    @relation("SubjectCreator")
-  createdSubjectMaterials            SubjectMaterial[]            @relation("SubjectMaterialCreator")
-  ownedActivityBanks                 ActivityBank[]               @relation("ActivityBankOwner")
-  materials                          CourseMaterial[]             @relation("MaterialCreator")
-  activities                         Activity[]                   @relation("ActivityCreator")
-  createdBankActivities              BankActivity[]               @relation("BankActivityCreator")
-  createdActivityVersions            ActivityVersion[]            @relation("ActivityVersionCreator")
-  createdGroups                      CourseGroup[]                @relation("CourseGroupCreator")
+  createdCourses                     Course[]                      @relation("CourseCreator")
+  createdSubjects                    Subject[]                     @relation("SubjectCreator")
+  createdSubjectMaterials            SubjectMaterial[]             @relation("SubjectMaterialCreator")
+  ownedActivityBanks                 ActivityBank[]                @relation("ActivityBankOwner")
+  materials                          CourseMaterial[]              @relation("MaterialCreator")
+  activities                         Activity[]                    @relation("ActivityCreator")
+  createdBankActivities              BankActivity[]                @relation("BankActivityCreator")
+  createdActivityVersions            ActivityVersion[]             @relation("ActivityVersionCreator")
+  createdGroups                      CourseGroup[]                 @relation("CourseGroupCreator")
   groupParticipants                  CourseGroupParticipant[]
-  groupMaterials                     CourseGroupMaterial[]        @relation("GroupMaterialCreator")
+  groupMaterials                     CourseGroupMaterial[]         @relation("GroupMaterialCreator")
   aiAgentConnections                 AiAgentConnection[]
-  activityAttempts                   ActivityAttempt[]            @relation("ActivityAttemptUser")
-  grades                             Grade[]                      @relation("GradeUser")
-  gradedGrades                       Grade[]                      @relation("GradeGrader")
-  gradeEvents                        GradeEvent[]                 @relation("GradeEventActor")
-  courseAuditEvents                  CourseAuditEvent[]           @relation("CourseAuditEventActor")
-  updatedEmailDeliveryConfigurations EmailDeliveryConfiguration[] @relation("EmailDeliveryConfigurationUpdater")
-  updatedExecutionRunners            ExecutionRunner[]            @relation("ExecutionRunnerUpdater")
+  activityAttempts                   ActivityAttempt[]             @relation("ActivityAttemptUser")
+  grades                             Grade[]                       @relation("GradeUser")
+  gradedGrades                       Grade[]                       @relation("GradeGrader")
+  gradeEvents                        GradeEvent[]                  @relation("GradeEventActor")
+  courseAuditEvents                  CourseAuditEvent[]            @relation("CourseAuditEventActor")
+  updatedEmailDeliveryConfigurations EmailDeliveryConfiguration[]  @relation("EmailDeliveryConfigurationUpdater")
+  updatedExecutionRunners            ExecutionRunner[]             @relation("ExecutionRunnerUpdater")
   emailVerificationChallenge         EmailVerificationChallenge?
-  mediaAssets                        MediaAsset[]                 @relation("MediaAssetCreator")
+  mediaAssets                        MediaAsset[]                  @relation("MediaAssetCreator")
+  activityMessageBroadcasts          ActivityMessageBroadcast[]    @relation("ActivityMessageBroadcastSender")
+  activityConversationMessages       ActivityConversationMessage[] @relation("ActivityConversationMessageSender")
+  activityConversationReads          ActivityConversationRead[]
 
   @@index([email])
 }
@@ -308,27 +317,29 @@ model UserRole {
 }
 
 model Course {
-  id               String                  @id @default(cuid())
-  subjectId        String
-  title            String
-  description      String                  @default("")
-  status           CourseStatus            @default(draft)
-  metadata         Json                    @default("{}")
-  createdById      String
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  subject          Subject                 @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  createdBy        User                    @relation("CourseCreator", fields: [createdById], references: [id])
-  memberships      CourseMembership[]
-  materials        CourseMaterial[]
-  activities       Activity[]
-  groups           CourseGroup[]
-  gradebookItems   GradebookItem[]
-  activityAttempts ActivityAttempt[]
-  contentItems     CourseContentItem[]
-  contentResources CourseContentResource[]
-  tests            Test[]
-  auditEvents      CourseAuditEvent[]
+  id                        String                     @id @default(cuid())
+  subjectId                 String
+  title                     String
+  description               String                     @default("")
+  status                    CourseStatus               @default(draft)
+  metadata                  Json                       @default("{}")
+  createdById               String
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  subject                   Subject                    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdBy                 User                       @relation("CourseCreator", fields: [createdById], references: [id])
+  memberships               CourseMembership[]
+  materials                 CourseMaterial[]
+  activities                Activity[]
+  groups                    CourseGroup[]
+  gradebookItems            GradebookItem[]
+  activityAttempts          ActivityAttempt[]
+  contentItems              CourseContentItem[]
+  contentResources          CourseContentResource[]
+  tests                     Test[]
+  auditEvents               CourseAuditEvent[]
+  activityMessageBroadcasts ActivityMessageBroadcast[]
+  activityConversations     ActivityConversation[]
 
   @@index([subjectId])
   @@index([status])
@@ -575,6 +586,7 @@ model CourseGroup {
   contentItems               CourseContentItem[]
   contentResources           CourseContentResource[]
   contentVisibilityOverrides CourseGroupContentVisibilityOverride[]
+  activityConversations      ActivityConversation[]
 
   @@index([courseId, updatedAt])
   @@index([status, availableFrom, availableUntil])
@@ -598,6 +610,7 @@ model CourseGroupParticipant {
   activityResponseDrafts ActivityResponseDraft[]
   grades                 Grade[]
   gradeEvents            GradeEvent[]
+  activityConversations  ActivityConversation[]
 
   @@unique([groupId, email])
   @@index([groupId, createdAt])
@@ -629,22 +642,23 @@ model CourseGroupMaterial {
 }
 
 model CourseGroupActivity {
-  id               String                  @id @default(cuid())
-  groupId          String
-  activityId       String
-  availableFrom    DateTime?
-  availableUntil   DateTime?
-  config           Json                    @default("{}")
-  metadata         Json                    @default("{}")
-  position         Int                     @default(0)
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  group            CourseGroup             @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  activity         Activity                @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  gradebookItem    GradebookItem?
-  activityAttempts ActivityAttempt[]
-  responseDrafts   ActivityResponseDraft[]
-  contentItems     CourseContentItem[]
+  id                    String                  @id @default(cuid())
+  groupId               String
+  activityId            String
+  availableFrom         DateTime?
+  availableUntil        DateTime?
+  config                Json                    @default("{}")
+  metadata              Json                    @default("{}")
+  position              Int                     @default(0)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  group                 CourseGroup             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  activity              Activity                @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  gradebookItem         GradebookItem?
+  activityAttempts      ActivityAttempt[]
+  responseDrafts        ActivityResponseDraft[]
+  contentItems          CourseContentItem[]
+  activityConversations ActivityConversation[]
 
   @@unique([groupId, activityId])
   @@index([groupId, position])
@@ -824,34 +838,36 @@ model ActivityVersion {
 }
 
 model Activity {
-  id                   String                     @id @default(cuid())
-  courseId             String
-  bankActivityId       String?
-  activityVersionId    String?
-  activityTypeId       String
-  title                String
-  description          String                     @default("")
-  lifecycle            ActivityLifecycle          @default(draft)
-  config               Json                       @default("{}")
-  metadata             Json                       @default("{}")
-  position             Int                        @default(0)
-  createdById          String
-  createdAt            DateTime                   @default(now())
-  updatedAt            DateTime                   @updatedAt
-  course               Course                     @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  bankActivity         BankActivity?              @relation(fields: [bankActivityId], references: [id], onDelete: SetNull)
-  activityVersion      ActivityVersion?           @relation(fields: [activityVersionId], references: [id], onDelete: SetNull)
-  activityType         ActivityType               @relation(fields: [activityTypeId], references: [id])
-  createdBy            User                       @relation("ActivityCreator", fields: [createdById], references: [id])
-  groupAssignments     CourseGroupActivity[]
-  gradebookItems       GradebookItem[]
-  activityAttempts     ActivityAttempt[]
-  testItemAttempts     TestItemAttempt[]
-  contentItems         CourseContentItem[]
-  testDefinition       Test?                      @relation("TestShellActivity")
-  testItem             TestItem?                  @relation("TestItemActivity")
-  knowledgeConcepts    ActivityKnowledgeConcept[]
-  mediaAssetReferences MediaAssetReference[]
+  id                        String                     @id @default(cuid())
+  courseId                  String
+  bankActivityId            String?
+  activityVersionId         String?
+  activityTypeId            String
+  title                     String
+  description               String                     @default("")
+  lifecycle                 ActivityLifecycle          @default(draft)
+  config                    Json                       @default("{}")
+  metadata                  Json                       @default("{}")
+  position                  Int                        @default(0)
+  createdById               String
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  course                    Course                     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  bankActivity              BankActivity?              @relation(fields: [bankActivityId], references: [id], onDelete: SetNull)
+  activityVersion           ActivityVersion?           @relation(fields: [activityVersionId], references: [id], onDelete: SetNull)
+  activityType              ActivityType               @relation(fields: [activityTypeId], references: [id])
+  createdBy                 User                       @relation("ActivityCreator", fields: [createdById], references: [id])
+  groupAssignments          CourseGroupActivity[]
+  gradebookItems            GradebookItem[]
+  activityAttempts          ActivityAttempt[]
+  testItemAttempts          TestItemAttempt[]
+  contentItems              CourseContentItem[]
+  testDefinition            Test?                      @relation("TestShellActivity")
+  testItem                  TestItem?                  @relation("TestItemActivity")
+  knowledgeConcepts         ActivityKnowledgeConcept[]
+  mediaAssetReferences      MediaAssetReference[]
+  activityMessageBroadcasts ActivityMessageBroadcast[]
+  activityConversations     ActivityConversation[]
 
   @@index([courseId, position])
   @@index([bankActivityId])
@@ -1255,6 +1271,7 @@ model ActivityAttempt {
   gradeEvents               GradeEvent[]
   testItemAttempts          TestItemAttempt[]
   testSubmissionClaim       TestSubmissionClaim?
+  activityConversation      ActivityConversation?
 
   @@unique([gradebookItemId, participantId, attemptNumber])
   @@index([courseId, groupId, activityId])
@@ -1267,6 +1284,83 @@ model ActivityAttempt {
   @@index([groupActivityId, assessmentMode])
   @@index([activityVersionId])
   @@index([testRevisionId])
+}
+
+model ActivityMessageBroadcast {
+  id             String                        @id @default(cuid())
+  courseId       String
+  activityId     String
+  senderUserId   String?
+  senderName     String
+  body           String
+  targetGroupIds Json                          @default("[]")
+  createdAt      DateTime                      @default(now())
+  course         Course                        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  activity       Activity                      @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  sender         User?                         @relation("ActivityMessageBroadcastSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+  messages       ActivityConversationMessage[]
+
+  @@index([courseId, activityId, createdAt])
+  @@index([senderUserId])
+}
+
+model ActivityConversation {
+  id              String                        @id @default(cuid())
+  courseId        String
+  groupId         String
+  groupActivityId String
+  activityId      String
+  participantId   String
+  attemptId       String?                       @unique
+  attemptNumber   Int
+  lastSeenAt      DateTime                      @default(now())
+  closedAt        DateTime?
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+  course          Course                        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  group           CourseGroup                   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupActivity   CourseGroupActivity           @relation(fields: [groupActivityId], references: [id], onDelete: Cascade)
+  activity        Activity                      @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  participant     CourseGroupParticipant        @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  attempt         ActivityAttempt?              @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  messages        ActivityConversationMessage[]
+  reads           ActivityConversationRead[]
+
+  @@unique([groupActivityId, participantId, attemptNumber])
+  @@index([courseId, activityId, groupId, lastSeenAt])
+  @@index([participantId, updatedAt])
+  @@index([closedAt, lastSeenAt])
+}
+
+model ActivityConversationMessage {
+  id             String                         @id @default(cuid())
+  conversationId String
+  broadcastId    String?
+  senderUserId   String?
+  senderKind     ActivityConversationSenderKind
+  senderName     String
+  body           String
+  createdAt      DateTime                       @default(now())
+  conversation   ActivityConversation           @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  broadcast      ActivityMessageBroadcast?      @relation(fields: [broadcastId], references: [id], onDelete: SetNull)
+  sender         User?                          @relation("ActivityConversationMessageSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@index([broadcastId])
+  @@index([senderUserId])
+}
+
+model ActivityConversationRead {
+  conversationId String
+  userId         String
+  lastReadAt     DateTime
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  conversation   ActivityConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([userId, updatedAt])
 }
 
 model TestSubmissionClaim {

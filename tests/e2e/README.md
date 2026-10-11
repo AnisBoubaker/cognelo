@@ -25,6 +25,7 @@ The Playwright suite covers the platform's critical browser journeys with real A
 - shared accessible confirmation dialogs for grade release, AI assessment, participant removal, and other guarded actions instead of native browser popups;
 - activity-settings dialog layout and placeholders, Cancel behavior, formative/summative field filtering, generic General timing plus changed/disabled group overrides, Assign-to-all preservation, unassignment cleanup, inheritance and every group override category, save/reopen persistence, assigned/unassigned access, group visibility, upcoming and expired availability, Safe Exam Browser gating, and effective per-group gradebook policy;
 - explicit timed starts and automatic zero-time submission for standalone activities, plus one-time Test-authoring default copy, independent later Test edits, and the compound Test countdown/finalization path;
+- attempt-scoped live activity broadcasts, including recent-recipient detection, unread/read state, the combined timer-and-envelope control, and isolation of messages when the learner starts a later attempt;
 - bank activity publication from the editor and list, version comparison, duplication, movement between banks, and AI-assisted variation progress for both individual activities and compound Tests, including midpoint failure cleanup and retry;
 - administrator-managed Judge0, web-design, and SageMath execution-runner endpoints, including per-endpoint capability checks; and
 - group settings updates and restoration;

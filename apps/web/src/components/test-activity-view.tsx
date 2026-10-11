@@ -23,6 +23,7 @@ import { activityCreationConfig } from "@/lib/activity-creation-defaults";
 import type { Locale } from "@/lib/i18n";
 import { createStudentPreviewStateHost } from "@/lib/student-preview-state-host";
 import { getTestCountdownTone, shouldAutoSubmitTestAttempt } from "@/lib/test-countdown";
+import { ActivityLiveControlPortal } from "@/components/activity-live-controls";
 
 type Props = {
   activity: Activity;
@@ -719,14 +720,16 @@ function TestStudentRuntime({
   return (
     <div className="stack">
       {attemptStarted && remainingSeconds !== null && countdownTone ? (
-        <div
-          aria-label={t("courseDetail.testTimeRemaining", { time: formatRemainingTime(remainingSeconds) })}
-          aria-live="off"
-          className={`test-countdown test-countdown--${countdownTone}`}
-          role="timer"
-        >
-          {t("courseDetail.testTimeRemaining", { time: formatRemainingTime(remainingSeconds) })}
-        </div>
+        <ActivityLiveControlPortal>
+          <div
+            aria-label={t("courseDetail.testTimeRemaining", { time: formatRemainingTime(remainingSeconds) })}
+            aria-live="off"
+            className={`test-countdown test-countdown--${countdownTone}`}
+            role="timer"
+          >
+            {t("courseDetail.testTimeRemaining", { time: formatRemainingTime(remainingSeconds) })}
+          </div>
+        </ActivityLiveControlPortal>
       ) : null}
       <section className="section stack">
         <div>

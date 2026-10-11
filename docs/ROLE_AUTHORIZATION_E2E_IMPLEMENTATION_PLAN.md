@@ -95,6 +95,7 @@ A section TA may inspect attempts, prepare or save grades and feedback, and work
 5. Concurrent grade and feedback edits use optimistic version rejection with an explicit HTTP 409 conflict; the teacher reloads before saving.
 6. Student question-authoring AI uses deterministic creator, owner, then teacher priority, considers only explicit course memberships, skips unusable preferred connections, and fails safely when no usable fallback remains.
 7. New grade challenges notify every active course-wide grading teacher and active teacher assigned to the challenged section. TAs remain authorized to respond within their section but are not email-notification recipients; unrelated administrators and other-section teachers are excluded.
+8. Live activity broadcasts are a teacher intervention rather than grading assistance: administrators and explicit course-wide grading teachers may send to all recently active attempts, section teachers may send only to their assigned sections, and TAs may not broadcast.
 
 ## Required E2E Design Rules
 
@@ -180,6 +181,7 @@ Do not reuse one browser context for distinct people. Multi-user scenarios need 
 - **TCH-13 — Grade export:** CSV and XLSX contain correct identities and only complete final grades.
 - **TCH-14 — No global administration:** deny global users, runners, plugins, email, and maintenance.
 - **TCH-15 — Course-creation boundary:** if creation remains designer-only, deny teacher course creation in both UI and API.
+- **TCH-16 — Attempt-scoped broadcast:** send to a recently active learner, verify unread/read counts and the shared timer/message control, complete the attempt, then prove the next attempt starts with no prior messages.
 
 ### Section teacher and teaching assistant
 
@@ -196,6 +198,7 @@ Do not reuse one browser context for distinct people. Multi-user scenarios need 
 - **SEC-11 — Section-teacher release policy:** verify that a section teacher cannot release or hide grades while an explicit course teacher can.
 - **SEC-12 — Partial removal:** removing one of several section assignments retains access to the remaining sections only.
 - **SEC-13 — Final removal:** removing the final section assignment immediately removes section-derived access.
+- **SEC-14 — Live-message scope:** a section teacher can broadcast to a recent attempt in the assigned section but cannot target another section; a section TA has neither the action nor API permission.
 
 ### Multiple course teachers
 

@@ -35,6 +35,7 @@ import {
   IconGripVertical,
   IconLink,
   IconListCheck,
+  IconMail,
   IconMusic,
   IconPhoto,
   IconPlus,
@@ -57,7 +58,7 @@ import React, { type ComponentType } from "react";
 export type AppIconName =
   | "activityAdd" | "add" | "alert" | "assign" | "check" | "chevronDown" | "close"
   | "compare" | "course" | "download" | "duplicate" | "down" | "drag" | "edit" | "folder"
-  | "folderAdd" | "folderOpen" | "hidden" | "more" | "move" | "open" | "remove"
+  | "folderAdd" | "folderOpen" | "hidden" | "messages" | "more" | "move" | "open" | "remove"
   | "participants" | "save" | "sync" | "up" | "upload" | "visible";
 
 const appIcons = {
@@ -79,6 +80,7 @@ const appIcons = {
   folderAdd: IconFolderPlus,
   folderOpen: IconFolderOpen,
   hidden: IconEyeOff,
+  messages: IconMail,
   more: IconDots,
   move: IconArrowRight,
   open: IconExternalLink,
