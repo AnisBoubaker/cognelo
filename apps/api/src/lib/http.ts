@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { getServerEnv } from "@cognelo/config";
 import { AppError, refreshAuthSession, verifyAuthToken } from "@cognelo/core";
+import "@cognelo/plugin-registry/server";
 export { AUTH_COOKIE, validateCsrfOrigin } from "./csrf";
 import { AUTH_COOKIE } from "./csrf";
 

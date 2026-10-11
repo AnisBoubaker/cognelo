@@ -8,6 +8,7 @@ vi.mock("next/headers", () => ({
 vi.mock("@cognelo/config", () => ({
   getServerEnv: () => ({ CORS_ORIGIN: "http://localhost:3000", JWT_SECRET: "test-secret" })
 }));
+vi.mock("@cognelo/plugin-registry/server", () => ({}));
 vi.mock("@cognelo/core", () => ({
   AppError: class AppError extends Error {
     constructor(public status: number, public code: string, message: string) {

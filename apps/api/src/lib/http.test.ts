@@ -10,8 +10,42 @@ vi.mock("@cognelo/config", () => ({
 
 const { AppError } = await import("@cognelo/core");
 const { AUTH_COOKIE, handleRoute, json, options, readJson, validateCsrfOrigin } = await import("./http");
+const { listActivityDefinitions } = await import("@cognelo/activity-sdk");
+const { listServerActivityPlugins } = await import("@cognelo/activity-sdk/server");
+const { listContentTypeDefinitions } = await import("@cognelo/content-type-sdk");
+const { listServerContentTypePlugins } = await import("@cognelo/content-type-sdk/server");
 
 describe("API HTTP helpers", () => {
+  it("loads the installed plugin composition in the route-handler module graph", () => {
+    expect(listActivityDefinitions().map((definition) => definition.key).sort()).toEqual([
+      "coding-exercise",
+      "coding-homework-grader",
+      "mcq",
+      "parsons-problem",
+      "placeholder",
+      "test",
+      "web-design-coding-exercise"
+    ]);
+    expect(listServerActivityPlugins().map((plugin) => plugin.key).sort()).toEqual([
+      "coding-exercises",
+      "coding-homework-grader",
+      "mcq",
+      "parsons",
+      "placeholder",
+      "web-design-coding-exercises"
+    ]);
+    expect(listContentTypeDefinitions().map((definition) => definition.key).sort()).toEqual([
+      "file",
+      "github-repo",
+      "text"
+    ]);
+    expect(listServerContentTypePlugins().map((plugin) => plugin.key).sort()).toEqual([
+      "file-content",
+      "github-repo-content",
+      "text-content"
+    ]);
+  });
+
   it("rejects unsafe authenticated requests from missing or foreign origins", () => {
     const request = (method: string, origin?: string, authenticated = true) => ({
       method,
