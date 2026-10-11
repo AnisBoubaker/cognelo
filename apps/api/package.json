@@ -11,11 +11,13 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@cognelo/activity-sdk": "0.1.0",
     "@cognelo/config": "0.1.0",
+    "@cognelo/content-type-sdk": "0.1.0",
     "@cognelo/contracts": "0.1.0",
     "@cognelo/core": "0.1.0",
     "@cognelo/db": "0.1.0",
-    "@cognelo/plugin-coding-exercises": "0.1.0",
+    "@cognelo/plugin-registry": "0.1.0",
     "fflate": "^0.8.3",
     "next": "16.3.3",
     "react": "^19.2.5",

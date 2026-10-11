@@ -121,9 +121,9 @@ Keep a short transition checklist:
 - Update TypeScript path aliases in `tsconfig.base.json`, `apps/web/tsconfig.json`, and `apps/api/tsconfig.json`.
 - Update `apps/api/next.config.mjs`.
 - Update `vitest.config.mts`.
-- Update `packages/activity-sdk/src/index.ts`.
-- Update `packages/activity-sdk/src/server.ts`.
-- Update `packages/activity-sdk/package.json`.
+- Update the installed manifest/server arrays in `packages/plugin-registry`.
+- Keep `packages/activity-sdk` limited to generic contracts and registry operations.
+- Update `packages/plugin-registry/package.json`.
 - Update package-lock after package rename.
 - Update plugin authoring handbook references.
 - Update plugin README and plugin memory.

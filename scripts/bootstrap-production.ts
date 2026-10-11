@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@cognelo/db";
+import "@cognelo/plugin-registry";
 import { ensureActivityPluginInstallations, ensureContentTypePluginInstallations, ensureCoreActivityTypes } from "@cognelo/core";
 
 const roleDefinitions = [

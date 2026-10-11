@@ -7,10 +7,11 @@ import bcrypt from "bcryptjs";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { listActivityDefinitions, listActivityPlugins, listCoreActivityDefinitions } from "@cognelo/activity-sdk";
 import { listContentTypePlugins } from "@cognelo/content-type-sdk";
-import { prisma as codingExercisesPrisma } from "../../plugin-activities/plugin-coding-exercises/src/db-client";
-import { prisma as codingHomeworkGraderPrisma } from "../../plugin-activities/plugin-coding-homework-grader/src/db-client";
-import { prisma as webDesignCodingExercisesPrisma } from "../../plugin-activities/plugin-web-design-coding-exercises/src/db-client";
-import { mergeSeedCourseAiSettings } from "../src/seed-ai-settings";
+import "@cognelo/plugin-registry";
+import { prisma as codingExercisesPrisma } from "../packages/plugin-activities/plugin-coding-exercises/src/db-client";
+import { prisma as codingHomeworkGraderPrisma } from "../packages/plugin-activities/plugin-coding-homework-grader/src/db-client";
+import { prisma as webDesignCodingExercisesPrisma } from "../packages/plugin-activities/plugin-web-design-coding-exercises/src/db-client";
+import { mergeSeedCourseAiSettings } from "../packages/db/src/seed-ai-settings";
 
 const prisma = new PrismaClient();
 const execFileAsync = promisify(execFile);

@@ -17,6 +17,7 @@ import {
   submitActivityAttempt
 } from "@cognelo/core";
 import { prisma, type Prisma } from "@cognelo/db";
+import { prisma as mcqPrisma } from "./db-client";
 import { MCQ_AI_MAX_QUESTION_COUNT } from "./constants";
 import { buildMcqGradingResultFromConfig } from "./grading";
 import { parseMcqSource, type McqAnswerState, type McqParseError } from "./mcq";
@@ -286,7 +287,7 @@ export const mcqGradebookAttemptsRoute: PluginRouteDefinition = {
 async function listLatestMcqAiFeedbackByAttemptId(activityId: string, attemptIds: string[], formativeOnly: boolean) {
   const byAttemptId = new Map<string, Record<string, unknown>>();
   if (!attemptIds.length) return byAttemptId;
-  const evaluations = await prisma.pluginMcqAiEvaluation.findMany({
+  const evaluations = await mcqPrisma.pluginMcqAiEvaluation.findMany({
     where: {
       activityId,
       coreAttemptId: { in: attemptIds },

@@ -23,13 +23,14 @@ apps/
   api/                 Next.js backend API
   web/                 Next.js frontend
 packages/
-  activity-sdk/        Plugin registries and shared plugin contracts
+  activity-sdk/        Plugin-independent activity registry/contracts
   activity-ui/         Shared plugin-facing UI such as code editor/renderer/markdown/notifications
-  content-type-sdk/    Content type plugin registry and server contracts
+  content-type-sdk/    Plugin-independent content registry/contracts
+  plugin-registry/     Installed-plugin composition root
   config/              Environment validation
   contracts/           Shared DTO schemas and types
   core/                Services and authorization
-  db/                  Prisma schema, migration, seed, client
+  db/                  Core Prisma schema, migrations, client
   plugin-activities/
     plugin-*/          Activity plugin packages, each with its own README and PROJECT_MEMORY
   plugin-content-types/
@@ -42,6 +43,8 @@ docs/
   STUDENT_MODEL_IMPLEMENTATION_PLAN.md
                        Planned stable skills, learning evidence, mastery projection, and product rollout
 ```
+
+The development/demo seed composition lives in `scripts/db-seed.ts`, outside the core database package, because it installs plugin manifests and writes plugin-owned fixtures.
 
 ## Core Modules
 

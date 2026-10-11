@@ -1,5 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
+import { registerActivityPlugin } from "@cognelo/activity-sdk";
+
+registerActivityPlugin({
+  key: "group-service-test-capabilities",
+  packageName: "@cognelo/test-group-service-capabilities",
+  name: "Group service test capabilities",
+  db: { namespace: "test_group_service_capabilities", tables: [] },
+  activities: [{
+    key: "mcq",
+    name: "Test-capable activity",
+    description: "Generic test fixture for assignment capability checks.",
+    studentView: { mode: "interactive", execution: "plugin" },
+    grading: { supportsCompositeExecution: true, supportsAiFeedback: true }
+  }]
+});
 
 const bcryptMocks = vi.hoisted(() => ({ compare: vi.fn(), hash: vi.fn() }));
 

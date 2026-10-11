@@ -7,6 +7,7 @@
   "dependencies": {
     "@cognelo/activity-sdk": "0.1.0",
     "@cognelo/contracts": "0.1.0",
+    "@cognelo/content-type-sdk": "0.1.0",
     "@cognelo/db": "0.1.0",
     "bcryptjs": "^2.4.3",
     "jose": "^5.3.0",

@@ -2,6 +2,7 @@ import type { ComponentProps, ComponentType, ElementType, ReactNode } from "reac
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getActivityDefinition, listActivityDefinitions, validateStudentViewClientContracts, type TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
+import "@cognelo/plugin-registry/activity";
 import { CodeRenderer } from "@cognelo/activity-ui";
 import {
   CodingExerciseActivityView,

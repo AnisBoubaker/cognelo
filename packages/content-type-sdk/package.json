@@ -10,10 +10,7 @@
     "./vector": "./src/vector.ts"
   },
   "dependencies": {
-    "@cognelo/contracts": "0.1.0",
-    "@cognelo/plugin-file-content": "0.1.0",
-    "@cognelo/plugin-github-repo": "0.1.0",
-    "@cognelo/plugin-text-content": "0.1.0"
+    "@cognelo/contracts": "0.1.0"
   },
   "devDependencies": {
     "typescript": "^5.4.5"

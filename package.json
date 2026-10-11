@@ -16,10 +16,11 @@
     "dev:runner": "docker compose up -d web-design-runner",
     "dev:web": "set -a && . ./.env && set +a && npm run dev --workspace @cognelo/web",
     "dev:stop": "node ./scripts/stop-dev.mjs",
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run architecture:check && npm run build --workspaces --if-present",
+    "architecture:check": "node ./scripts/check-plugin-boundaries.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "vitest run",
+    "test": "npm run architecture:check && vitest run",
     "test:e2e": "set -a && . ./.env && set +a && playwright test",
     "test:e2e:headed": "set -a && . ./.env && set +a && playwright test --headed",
     "test:e2e:install": "playwright install chromium",
@@ -34,6 +35,7 @@
     "production:bootstrap": "set -a && . ./.env && set +a && npx tsx scripts/bootstrap-production.ts"
   },
   "dependencies": {
+    "@cognelo/plugin-registry": "0.1.0",
     "monaco-editor": "0.52.2"
   },
   "devDependencies": {

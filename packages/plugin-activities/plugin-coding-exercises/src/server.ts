@@ -34,11 +34,15 @@ import { regradeCodingExerciseAttempt } from "./regrading";
 import { getCodingExerciseStudentGradeReport } from "./student-grade-report";
 import { getCodingExerciseGradeCompletions } from "./grade-completion";
 import { createCodingExerciseBankActivityVariation } from "./variation";
+import { listCodingExerciseProgrammingLanguages } from "./judge0";
 
 export { listCodingExerciseProgrammingLanguages } from "./judge0";
 
 export const codingExercisesServerPlugin: ServerActivityPlugin = {
   key: "coding-exercises",
+  hostCapabilities: {
+    "programming-languages": listCodingExerciseProgrammingLanguages
+  },
   routes: [
     codingExerciseRunRoute,
     codingExerciseReviewAllRoute,

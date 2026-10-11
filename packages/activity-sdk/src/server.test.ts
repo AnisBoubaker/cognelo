@@ -12,7 +12,10 @@ import {
   resolvePluginAiFeedbackHandler,
   resolvePluginAiGradingBatchHandler,
   resolvePluginRoute,
+  resolveCoursePluginRouteAuthorization,
+  resolvePluginHostCapability,
   resolveStudentPreviewExecutionHandler,
+  registerServerActivityPlugin,
   validateStudentPreviewServerContracts,
   runBankActivityDeletedHooks,
   runBankActivityDeletedHooksForPlugins,
@@ -22,7 +25,7 @@ import {
   type ServerActivityRecord,
   type ServerActivityPlugin
 } from "./server";
-import { listActivityDefinitions } from "./index";
+import { listActivityDefinitions, registerActivityPlugin } from "./index";
 
 const user = {
   id: "user-1",
@@ -46,6 +49,71 @@ const activity: ServerActivityRecord = {
     description: ""
   }
 };
+
+const activityTypeKey = "sdk-test-interactive";
+const routeHandler = vi.fn(async () => ({}));
+const gradingHandler = vi.fn(async () => ({ rawScore: 1, rawMaxScore: 1 }));
+const previewHandler = vi.fn(async () => ({}));
+
+registerActivityPlugin({
+  key: "sdk-test-plugin",
+  packageName: "@example/sdk-test-plugin",
+  name: "SDK test plugin",
+  db: { namespace: "sdk_test", tables: [] },
+  activities: [{
+    key: activityTypeKey,
+    name: "SDK test activity",
+    description: "Test-only activity.",
+    studentView: { mode: "interactive", execution: "plugin" }
+  }]
+});
+
+const testServerPlugin: ServerActivityPlugin = {
+  key: "sdk-test-plugin",
+  hostCapabilities: {
+    "sdk-test-capability": async () => ["supported"]
+  },
+  routes: [{
+    path: "sdk-test/run",
+    activityTypeKeys: [activityTypeKey],
+    courseAuthorization: { GET: "view_gradebook" },
+    methods: { GET: routeHandler, POST: routeHandler }
+  }],
+  grading: { gradeAttempt: gradingHandler },
+  studentGradeReport: { activityTypeKeys: [activityTypeKey], getReport: async () => ({}) },
+  gradeCompletion: { activityTypeKeys: [activityTypeKey], getCompletions: async () => ({}) },
+  aiFeedback: {
+    evaluateAttempt: async () => ({
+      feedbackRef: "feedback-1",
+      feedbackVersion: 1,
+      feedbackHash: "hash",
+      feedback: {}
+    }),
+    batchGrading: {
+      getInstructions: () => "",
+      updateInstructions: () => undefined,
+      isTemplateComplete: () => true
+    }
+  },
+  compositeExecution: {
+    activityTypeKeys: [activityTypeKey],
+    submit: async () => ({ state: {}, gradingResult: { rawScore: 1, rawMaxScore: 1 } }),
+    actions: { run: async () => ({}) }
+  },
+  studentPreview: {
+    activityTypeKeys: [activityTypeKey],
+    actions: { run: previewHandler }
+  },
+  bankVariation: {
+    activityTypeKeys: [activityTypeKey],
+    createVariation: async () => undefined
+  },
+  hooks: {
+    onBankActivityDeleted: async () => undefined
+  }
+};
+
+registerServerActivityPlugin(testServerPlugin);
 
 describe("server activity SDK", () => {
   it("keeps every registered activity's Student view server contract consistent", () => {
@@ -83,8 +151,30 @@ describe("server activity SDK", () => {
   });
 
   it("resolves plugin routes by normalized path and activity type", () => {
-    expect(resolvePluginRoute("coding-exercise", ["coding-exercises", "run"])?.path).toBe("coding-exercises/run");
-    expect(resolvePluginRoute("mcq", ["coding-exercises", "run"])).toBeNull();
+    expect(resolvePluginRoute(activityTypeKey, ["sdk-test", "run"])?.path).toBe("sdk-test/run");
+    expect(resolvePluginRoute("unknown", ["sdk-test", "run"])).toBeNull();
+  });
+
+  it("rejects undispatchable routes and unsafe gradebook authorization declarations", () => {
+    expect(() => registerServerActivityPlugin({
+      key: "missing-types",
+      routes: [{ path: "missing/types", methods: { GET: vi.fn() } }]
+    })).toThrow("must declare activity type keys");
+    expect(() => registerServerActivityPlugin({
+      key: "unsafe-gradebook-write",
+      routes: [{
+        path: "unsafe/write",
+        activityTypeKeys: ["placeholder"],
+        courseAuthorization: { POST: "view_gradebook" },
+        methods: { POST: vi.fn() }
+      }]
+    })).toThrow("limited to GET routes");
+  });
+
+  it("lets plugins declare gradebook-read authorization without host route knowledge", () => {
+    expect(resolveCoursePluginRouteAuthorization(["sdk-test", "run"], "GET")).toBe("view_gradebook");
+    expect(resolveCoursePluginRouteAuthorization(["sdk-test", "run"], "POST")).toBe("manage_course");
+    expect(resolveCoursePluginRouteAuthorization(["missing"], "GET")).toBeUndefined();
   });
 
   it("lists registered plugin routes for API dispatch introspection", () => {
@@ -93,39 +183,40 @@ describe("server activity SDK", () => {
     expect(routes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          pluginKey: "coding-exercises",
-          path: "coding-exercises/run"
+          pluginKey: "sdk-test-plugin",
+          path: "sdk-test/run"
         })
       ])
     );
   });
 
   it("resolves plugin grading handlers by activity type", () => {
-    expect(resolvePluginGradingHandler("parsons-problem")).toBeTypeOf("function");
-    expect(resolvePluginGradingHandler("mcq")).toBeTypeOf("function");
+    expect(resolvePluginGradingHandler(activityTypeKey)).toBeTypeOf("function");
     expect(resolvePluginGradingHandler("placeholder")).toBeNull();
   });
 
+  it("resolves host capabilities without importing their plugin into the host", () => {
+    expect(resolvePluginHostCapability("sdk-test-capability")).toBeTypeOf("function");
+    expect(resolvePluginHostCapability("missing-capability")).toBeNull();
+  });
+
   it("resolves release-gated student grade reports by activity type", () => {
-    expect(resolvePluginStudentGradeReportHandler("coding-exercise")).toBeTypeOf("function");
-    expect(resolvePluginStudentGradeReportHandler("mcq")).toBeNull();
+    expect(resolvePluginStudentGradeReportHandler(activityTypeKey)).toBeTypeOf("function");
     expect(resolvePluginStudentGradeReportHandler("placeholder")).toBeNull();
   });
 
   it("resolves plugin-owned grade completion handlers by activity type", () => {
-    expect(resolvePluginGradeCompletionHandler("coding-exercise")).toBeTypeOf("function");
-    expect(resolvePluginGradeCompletionHandler("mcq")).toBeNull();
+    expect(resolvePluginGradeCompletionHandler(activityTypeKey)).toBeTypeOf("function");
     expect(resolvePluginGradeCompletionHandler("placeholder")).toBeNull();
   });
 
   it("resolves plugin-owned AI feedback handlers only for supported activity types", () => {
-    expect(resolvePluginAiFeedbackHandler("coding-exercise")).toBeTypeOf("function");
-    expect(resolvePluginAiFeedbackHandler("mcq")).toBeTypeOf("function");
+    expect(resolvePluginAiFeedbackHandler(activityTypeKey)).toBeTypeOf("function");
     expect(resolvePluginAiFeedbackHandler("placeholder")).toBeNull();
   });
 
   it("resolves guided batch grading only for AI-grading plugins that implement it", () => {
-    expect(resolvePluginAiGradingBatchHandler("coding-exercise")).toMatchObject({
+    expect(resolvePluginAiGradingBatchHandler(activityTypeKey)).toMatchObject({
       getInstructions: expect.any(Function),
       updateInstructions: expect.any(Function),
       isTemplateComplete: expect.any(Function)
@@ -135,18 +226,15 @@ describe("server activity SDK", () => {
   });
 
   it("resolves composite execution handlers by activity type without coupling the Test runtime to a plugin", () => {
-    expect(resolveCompositeExecutionSubmissionHandler("mcq")).toBeTypeOf("function");
-    expect(resolveCompositeExecutionSubmissionHandler("coding-exercise")).toBeTypeOf("function");
-    expect(resolveCompositeExecutionSubmissionHandler("web-design-coding-exercise")).toBeTypeOf("function");
-    expect(resolveCompositeExecutionActionHandler("coding-exercise", "run")).toBeTypeOf("function");
-    expect(resolveCompositeExecutionActionHandler("coding-exercise", "submit")).toBeNull();
+    expect(resolveCompositeExecutionSubmissionHandler(activityTypeKey)).toBeTypeOf("function");
+    expect(resolveCompositeExecutionActionHandler(activityTypeKey, "run")).toBeTypeOf("function");
+    expect(resolveCompositeExecutionActionHandler(activityTypeKey, "submit")).toBeNull();
     expect(resolveCompositeExecutionSubmissionHandler("placeholder")).toBeNull();
   });
 
   it("resolves only explicitly stateless Student view handlers", () => {
-    expect(resolveStudentPreviewExecutionHandler("coding-exercise", "run")).toBeTypeOf("function");
-    expect(resolveStudentPreviewExecutionHandler("coding-exercise", "submit")).toBeTypeOf("function");
-    expect(resolveStudentPreviewExecutionHandler("mcq", "feedback")).toBeTypeOf("function");
+    expect(resolveStudentPreviewExecutionHandler(activityTypeKey, "run")).toBeTypeOf("function");
+    expect(resolveStudentPreviewExecutionHandler(activityTypeKey, "submit")).toBeNull();
     expect(resolveStudentPreviewExecutionHandler("placeholder", "submit")).toBeNull();
   });
 
@@ -171,10 +259,7 @@ describe("server activity SDK", () => {
   });
 
   it("resolves bank variation handlers for every Test-capable activity plugin", () => {
-    expect(resolveBankActivityVariationHandler("mcq")).toBeTypeOf("function");
-    expect(resolveBankActivityVariationHandler("parsons-problem")).toBeTypeOf("function");
-    expect(resolveBankActivityVariationHandler("coding-exercise")).toBeTypeOf("function");
-    expect(resolveBankActivityVariationHandler("web-design-coding-exercise")).toBeTypeOf("function");
+    expect(resolveBankActivityVariationHandler(activityTypeKey)).toBeTypeOf("function");
     expect(resolveBankActivityVariationHandler("placeholder")).toBeNull();
   });
 
@@ -184,7 +269,7 @@ describe("server activity SDK", () => {
         user,
         activityBankId: "bank-1",
         bankActivityId: "bank-activity-1",
-        activityTypeKey: "placeholder"
+        activityTypeKey
       })
     ).resolves.toBeUndefined();
   });

@@ -20,9 +20,10 @@ Cognelo has:
 
 - `apps/web`: frontend app
 - `apps/api`: backend API app
-- `packages/activity-sdk`: plugin registration and plugin contracts
+- `packages/activity-sdk`: plugin-independent registry operations and contracts
 - `packages/activity-ui`: shared code editor/renderer/markdown/notifications
-- `packages/content-type-sdk`: content type plugin registration and contracts
+- `packages/content-type-sdk`: plugin-independent content registry operations and contracts
+- `packages/plugin-registry`: installed-plugin composition root
 - `packages/core`: shared business logic
 - `packages/contracts`: shared schemas/types
 - `packages/db`: Prisma schema, migrations, seed
@@ -41,13 +42,13 @@ If a plugin adds AI-assisted generation that writes into authoring/configuration
 
 1. Create `packages/plugin-activities/plugin-your-plugin`
 2. Export an `ActivityPlugin`
-3. Register it in `packages/activity-sdk/src/index.ts`
+3. Register its manifest in `packages/plugin-registry/src/activity.ts`
 4. Declare `studentView` as `interactive`, `read_only`, or `unsupported`
 5. If needed, export a `ServerActivityPlugin`
-6. Register it in `packages/activity-sdk/src/server.ts`
+6. Register it in `packages/plugin-registry/src/activity-server.ts`
 7. If needed, export a React renderer
 8. Register it in `apps/web/src/lib/activity-renderers.tsx`; interactive Student view support also requires the dedicated preview registry
-9. If needed, add plugin tables in `packages/db/prisma/schema.prisma`
+9. If needed, add a plugin-local Prisma schema/client plus idempotent migrations in the plugin package; never add plugin-owned models to the core schema
 10. If the plugin exposes any authoring or settings form, register unsaved-change behavior with `useUnsavedChangesGuard`
 11. If the plugin stores private bank-owned data, add a server hook to copy it into course-owned plugin tables when a bank version is assigned to a course. This is mandatory; core does not know how to copy plugin-owned rows.
 12. If needed, add browser API helpers in `apps/web/src/lib/api.ts`
@@ -56,9 +57,9 @@ If a plugin adds AI-assisted generation that writes into authoring/configuration
 
 1. Create `packages/plugin-content-types/plugin-your-content-type`
 2. Export a `ContentTypePlugin`
-3. Register it in `packages/content-type-sdk/src/index.ts`
+3. Register it in `packages/plugin-registry/src/content.ts`
 4. Export a `ServerContentTypePlugin`
-5. Register it in `packages/content-type-sdk/src/server.ts`
+5. Register it in `packages/plugin-registry/src/content-server.ts`
 6. Add settings/viewer components if needed
 7. Register settings/viewer renderers in `apps/web/src/lib/content-type-renderers.tsx`
 8. If needed, add plugin routes for upload/download/viewer behavior
@@ -73,14 +74,14 @@ Content type plugins do not create `Activity`, `BankActivity`, attempts, or grad
 
 File:
 
-- [packages/activity-sdk/src/index.ts](../../packages/activity-sdk/src/index.ts)
+- [packages/plugin-registry/src/activity.ts](../../packages/plugin-registry/src/activity.ts)
 
 What you add:
 
 ```ts
 import { yourPlugin } from "@cognelo/plugin-your-plugin";
 
-const plugins: ActivityPlugin[] = [
+export const installedActivityPlugins = [
   placeholderPlugin,
   codingHomeworkGraderPlugin,
   parsonsPlugin,
@@ -92,14 +93,14 @@ const plugins: ActivityPlugin[] = [
 
 File:
 
-- [packages/activity-sdk/src/server.ts](../../packages/activity-sdk/src/server.ts)
+- [packages/plugin-registry/src/activity-server.ts](../../packages/plugin-registry/src/activity-server.ts)
 
 What you add:
 
 ```ts
 import { yourServerPlugin } from "@cognelo/plugin-your-plugin/server";
 
-const serverPlugins: readonly ServerActivityPlugin[] = [
+export const installedServerActivityPlugins = [
   placeholderServerPlugin,
   codingHomeworkGraderServerPlugin,
   parsonsServerPlugin,
@@ -130,14 +131,14 @@ Interactive Student view types must also be registered in `studentPreviewRendere
 
 File:
 
-- [packages/content-type-sdk/src/index.ts](../../packages/content-type-sdk/src/index.ts)
+- [packages/plugin-registry/src/content.ts](../../packages/plugin-registry/src/content.ts)
 
 What you add:
 
 ```ts
 import { yourContentPlugin } from "@cognelo/plugin-your-content-type";
 
-const plugins: ContentTypePlugin[] = [
+export const installedContentTypePlugins = [
   githubRepoContentPlugin,
   fileContentPlugin,
   textContentPlugin,
@@ -149,14 +150,14 @@ const plugins: ContentTypePlugin[] = [
 
 File:
 
-- [packages/content-type-sdk/src/server.ts](../../packages/content-type-sdk/src/server.ts)
+- [packages/plugin-registry/src/content-server.ts](../../packages/plugin-registry/src/content-server.ts)
 
 What you add:
 
 ```ts
 import { yourContentServerPlugin } from "@cognelo/plugin-your-content-type/server";
 
-const serverPlugins: readonly ServerContentTypePlugin[] = [
+export const installedServerContentTypePlugins = [
   githubRepoContentServerPlugin,
   fileContentServerPlugin,
   textContentServerPlugin,
@@ -433,6 +434,8 @@ export const tracingQuizSubmissionRoute: PluginRouteDefinition = {
   }
 };
 ```
+
+Course plugin routes default to course-management authorization. A read-only teacher route that is intentionally available to course-wide or section-scoped graders declares it on the route, for example `courseAuthorization: { GET: "view_gradebook" }`. The generic dispatcher consumes that declaration; never add a plugin path check to the host API route.
 
 ## Content Type Route Handler Example
 

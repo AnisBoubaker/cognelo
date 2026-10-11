@@ -39,59 +39,11 @@
       "@cognelo/content-type-sdk/vector": [
         "../../packages/content-type-sdk/src/vector.ts"
       ],
-      "@cognelo/plugin-file-content": [
-        "../../packages/plugin-content-types/plugin-file/src/index.ts"
+      "@cognelo/plugin-registry": [
+        "../../packages/plugin-registry/src/index.ts"
       ],
-      "@cognelo/plugin-file-content/server": [
-        "../../packages/plugin-content-types/plugin-file/src/server.ts"
-      ],
-      "@cognelo/plugin-github-repo": [
-        "../../packages/plugin-content-types/plugin-github-repo/src/index.ts"
-      ],
-      "@cognelo/plugin-github-repo/server": [
-        "../../packages/plugin-content-types/plugin-github-repo/src/server.ts"
-      ],
-      "@cognelo/plugin-text-content": [
-        "../../packages/plugin-content-types/plugin-text/src/index.ts"
-      ],
-      "@cognelo/plugin-text-content/server": [
-        "../../packages/plugin-content-types/plugin-text/src/server.ts"
-      ],
-      "@cognelo/plugin-coding-homework-grader": [
-        "../../packages/plugin-activities/plugin-coding-homework-grader/src/index.ts"
-      ],
-      "@cognelo/plugin-coding-homework-grader/server": [
-        "../../packages/plugin-activities/plugin-coding-homework-grader/src/server.ts"
-      ],
-      "@cognelo/plugin-coding-exercises": [
-        "../../packages/plugin-activities/plugin-coding-exercises/src/index.ts"
-      ],
-      "@cognelo/plugin-coding-exercises/server": [
-        "../../packages/plugin-activities/plugin-coding-exercises/src/server.ts"
-      ],
-      "@cognelo/plugin-parsons": [
-        "../../packages/plugin-activities/plugin-parsons/src/index.ts"
-      ],
-      "@cognelo/plugin-parsons/server": [
-        "../../packages/plugin-activities/plugin-parsons/src/server.ts"
-      ],
-      "@cognelo/plugin-placeholder": [
-        "../../packages/plugin-activities/plugin-placeholder/src/index.ts"
-      ],
-      "@cognelo/plugin-placeholder/server": [
-        "../../packages/plugin-activities/plugin-placeholder/src/server.ts"
-      ],
-      "@cognelo/plugin-mcq": [
-        "../../packages/plugin-activities/plugin-mcq/src/index.ts"
-      ],
-      "@cognelo/plugin-mcq/server": [
-        "../../packages/plugin-activities/plugin-mcq/src/server.ts"
-      ],
-      "@cognelo/plugin-web-design-coding-exercises": [
-        "../../packages/plugin-activities/plugin-web-design-coding-exercises/src/index.ts"
-      ],
-      "@cognelo/plugin-web-design-coding-exercises/server": [
-        "../../packages/plugin-activities/plugin-web-design-coding-exercises/src/server.ts"
+      "@cognelo/plugin-registry/server": [
+        "../../packages/plugin-registry/src/server.ts"
       ],
       "@cognelo/config": [
         "../../packages/config/src/index.ts"

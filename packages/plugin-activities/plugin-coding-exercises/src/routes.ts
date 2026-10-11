@@ -70,6 +70,7 @@ function normalizeTeachingLanguage(value: string): SubjectContext["teachingLangu
 export const codingExerciseReviewAllRoute: PluginRouteDefinition = {
   path: "coding-exercises/review-all",
   activityTypeKeys: ["coding-exercise"],
+  courseAuthorization: { GET: "view_gradebook" },
   methods: {
     GET: async ({ context, request }) => {
       const courseId = requireCourseId(context.courseId);
@@ -494,6 +495,7 @@ function numberValue(value: unknown) {
 export const codingExerciseHiddenTestsRoute: PluginRouteDefinition = {
   path: "coding-exercises/hidden-tests",
   activityTypeKeys: ["coding-exercise"],
+  courseAuthorization: { GET: "view_gradebook" },
   methods: {
     GET: async ({ context }) => {
       if (context.activityBankId) {

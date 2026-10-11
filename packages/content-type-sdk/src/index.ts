@@ -1,7 +1,3 @@
-import { fileContentPlugin } from "@cognelo/plugin-file-content";
-import { githubRepoContentPlugin } from "@cognelo/plugin-github-repo";
-import { textContentPlugin } from "@cognelo/plugin-text-content";
-
 export type ContentPluginLocale = "en" | "fr" | "zh" | "ar";
 
 export type LocalizedText = {
@@ -61,7 +57,7 @@ export type ContentTypeMessages = {
   defaultTitle: string;
 };
 
-const plugins: readonly ContentTypePlugin[] = [githubRepoContentPlugin, fileContentPlugin, textContentPlugin];
+const pluginsByKey = new Map<string, ContentTypePlugin>();
 
 export function createContentTypeRegistry(registryPlugins: readonly ContentTypePlugin[]) {
   const pluginKeys = new Set<string>();
@@ -110,30 +106,42 @@ export function createContentTypeRegistry(registryPlugins: readonly ContentTypeP
   };
 }
 
-const registry = createContentTypeRegistry(plugins);
+function currentRegistry() {
+  return createContentTypeRegistry([...pluginsByKey.values()]);
+}
+
+export function registerContentTypePlugin(plugin: ContentTypePlugin) {
+  const replacementPlugins = [...pluginsByKey.values()].filter((candidate) => candidate.key !== plugin.key);
+  createContentTypeRegistry([...replacementPlugins, plugin]);
+  pluginsByKey.set(plugin.key, plugin);
+}
+
+export function registerContentTypePlugins(plugins: readonly ContentTypePlugin[]) {
+  for (const plugin of plugins) registerContentTypePlugin(plugin);
+}
 
 export function getContentTypeDefinition(key: string) {
-  return registry.getContentTypeDefinition(key);
+  return currentRegistry().getContentTypeDefinition(key);
 }
 
 export function getContentTypePlugin(key: string) {
-  return registry.getContentTypePlugin(key);
+  return currentRegistry().getContentTypePlugin(key);
 }
 
 export function getContentTypePluginForType(contentTypeKey: string) {
-  return registry.getContentTypePluginForType(contentTypeKey);
+  return currentRegistry().getContentTypePluginForType(contentTypeKey);
 }
 
 export function listContentTypeDefinitions() {
-  return registry.listContentTypeDefinitions();
+  return currentRegistry().listContentTypeDefinitions();
 }
 
 export function listContentTypePlugins() {
-  return registry.listContentTypePlugins();
+  return currentRegistry().listContentTypePlugins();
 }
 
 export function listContentTypePluginManifests() {
-  return registry.listContentTypePluginManifests();
+  return currentRegistry().listContentTypePluginManifests();
 }
 
 export function resolveLocalizedText(text: LocalizedText, locale: ContentPluginLocale) {

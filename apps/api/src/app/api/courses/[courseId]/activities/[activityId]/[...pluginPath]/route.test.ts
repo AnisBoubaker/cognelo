@@ -5,8 +5,11 @@ const routeHandler = vi.hoisted(() => vi.fn());
 const mocks = vi.hoisted(() => ({
   assertActivityTypePluginEnabled: vi.fn(),
   assertCanManageCourse: vi.fn(),
+  assertCanViewCourseGradebook: vi.fn(),
   getActivity: vi.fn(),
+  getActivityForGradebook: vi.fn(),
   requireUser: vi.fn(),
+  resolveCoursePluginRouteAuthorization: vi.fn(),
   resolvePluginRoute: vi.fn()
 }));
 
@@ -23,10 +26,13 @@ vi.mock("@cognelo/core", () => ({
   },
   assertActivityTypePluginEnabled: mocks.assertActivityTypePluginEnabled,
   assertCanManageCourse: mocks.assertCanManageCourse,
-  getActivity: mocks.getActivity
+  assertCanViewCourseGradebook: mocks.assertCanViewCourseGradebook,
+  getActivity: mocks.getActivity,
+  getActivityForGradebook: mocks.getActivityForGradebook
 }));
 
 vi.mock("@cognelo/activity-sdk/server", () => ({
+  resolveCoursePluginRouteAuthorization: mocks.resolveCoursePluginRouteAuthorization,
   resolvePluginRoute: mocks.resolvePluginRoute
 }));
 
@@ -43,7 +49,8 @@ describe("course activity plugin dispatch route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.requireUser.mockResolvedValue({ id: "user-1", roles: ["teacher"] });
-    mocks.getActivity.mockResolvedValue({
+    mocks.resolveCoursePluginRouteAuthorization.mockReturnValue("manage_course");
+    const activity = {
       id: "activity-1",
       bankActivityId: "bank-activity-1",
       activityVersionId: "version-1",
@@ -53,7 +60,9 @@ describe("course activity plugin dispatch route", () => {
       config: { prompt: "Solve it" },
       metadata: {},
       activityType: { key: "coding-exercise", name: "Coding exercise", description: "" }
-    });
+    };
+    mocks.getActivity.mockResolvedValue(activity);
+    mocks.getActivityForGradebook.mockResolvedValue(activity);
     routeHandler.mockResolvedValue({ ok: true });
     mocks.resolvePluginRoute.mockReturnValue({ methods: { POST: routeHandler } });
   });
@@ -91,6 +100,20 @@ describe("course activity plugin dispatch route", () => {
         params: Promise.resolve({ courseId: "course-1", activityId: "activity-1", pluginPath: ["run"] })
       })
     ).rejects.toMatchObject({ status: 405, code: "METHOD_NOT_ALLOWED" });
+  });
+
+  it("uses a plugin's declared gradebook authorization for read-only review routes", async () => {
+    mocks.resolveCoursePluginRouteAuthorization.mockReturnValue("view_gradebook");
+    mocks.resolvePluginRoute.mockReturnValue({ methods: { GET: routeHandler } });
+
+    await GET(new Request("http://test.local", { method: "GET" }) as never, {
+      params: Promise.resolve({ courseId: "course-1", activityId: "activity-1", pluginPath: ["review-all"] })
+    });
+
+    expect(mocks.assertCanViewCourseGradebook).toHaveBeenCalledWith({ id: "user-1", roles: ["teacher"] }, "course-1");
+    expect(mocks.getActivityForGradebook).toHaveBeenCalledWith({ id: "user-1", roles: ["teacher"] }, "course-1", "activity-1");
+    expect(mocks.assertCanManageCourse).not.toHaveBeenCalled();
+    expect(mocks.getActivity).not.toHaveBeenCalled();
   });
 
   it("fails before plugin resolution when the user cannot manage the course", async () => {
