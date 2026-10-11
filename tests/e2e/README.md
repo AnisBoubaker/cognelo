@@ -6,6 +6,7 @@ The Playwright suite covers the platform's critical browser journeys with real A
 - global administrator, course manager, teacher, and student boundaries; explicit multi-teacher course staffing; section-scoped teacher/TA grading, roster, release, and identifier-tampering boundaries; immediate partial/final revocation; final-owner protection; and preservation of academic history;
 - personal settings, profile and password changes, email verification, forced password replacement, and fresh-session sign-in, plus administrator user creation, confirmation, filtering, and password reset;
 - administrator AI-model CRUD and preference selection, retained email-secret handling and test-email progress, activity/content plugin lifecycle controls, and media-cleanup progress and results;
+- installed plugin composition across real API route bundles and the course browser, including activity metadata/icons and coding-renderer mounting;
 - teacher creation of subjects, activity banks, courses, groups, linked users, and pending participants, plus existing-account matching, CSV validation/import progress and totals, participant removal, and moving a learner between groups without breaking access;
 - complete knowledge-graph concept, prerequisite, skill, and misconception editing and persistence, including stable activity targeting and mocked AI generation/iteration progress;
 - course settings lifecycle for metadata, publication/archive restoration, and content-layout persistence;
