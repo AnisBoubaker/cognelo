@@ -14,7 +14,7 @@ type AssignmentSettings = {
     availableFrom: string | null;
     availableUntil: string | null;
     timeLimitMinutes: number | null;
-    assessmentMode: "formative" | "summative";
+    assessmentMode: "formative" | "formative_ai" | "summative";
     requireSafeExamBrowser: boolean;
     gradeChallengesEnabled: boolean;
     gradebookSettings: GradebookSettings;
@@ -218,6 +218,11 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
     for (const tab of ["General", "Group assignment", "AI settings", "Exceptions"]) {
       await expect(settings.getByRole("tab", { name: tab, exact: true })).toBeVisible();
     }
+    await expect(settings.getByLabel("Assessment mode").locator("option")).toHaveText([
+      "Formative activity",
+      "Formative with automatic AI feedback",
+      "Summative activity"
+    ]);
     await expect(settings.getByRole("button", { name: "Cancel", exact: true }).last()).toBeVisible();
     await expect(settings.getByRole("button", { name: "Save settings", exact: true })).toBeVisible();
     await expect(settings.getByLabel("Assessment mode")).toHaveValue("formative");

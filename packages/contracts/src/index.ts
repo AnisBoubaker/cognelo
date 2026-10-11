@@ -759,7 +759,7 @@ export const CourseGroupActivityInputSchema = z.object({
 });
 export type CourseGroupActivityInput = z.infer<typeof CourseGroupActivityInputSchema>;
 
-export const AssignedActivityAssessmentModeSchema = z.enum(["formative", "summative"]);
+export const AssignedActivityAssessmentModeSchema = z.enum(["formative", "formative_ai", "summative"]);
 export type AssignedActivityAssessmentMode = z.infer<typeof AssignedActivityAssessmentModeSchema>;
 
 export const ActivityAssignmentOverrideFieldSchema = z.enum([

@@ -214,7 +214,7 @@ export async function copyAndAssignBankActivity(
   input: {
     activityTypeKey: Exclude<ActivityTypeKey, "test">;
     bankActivityId: string;
-    assessmentMode?: "formative" | "summative";
+    assessmentMode?: "formative" | "formative_ai" | "summative";
     gradebookSettings?: JsonRecord;
     title: string;
   }

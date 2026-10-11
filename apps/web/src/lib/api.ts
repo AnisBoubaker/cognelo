@@ -872,7 +872,7 @@ export type CourseActivityAssignmentSettings = {
     availableFrom: string | null;
     availableUntil: string | null;
     timeLimitMinutes: number | null;
-    assessmentMode: "formative" | "summative";
+    assessmentMode: "formative" | "formative_ai" | "summative";
     requireSafeExamBrowser: boolean;
     gradeChallengesEnabled: boolean;
     gradebookSettings: ActivityAssignmentGradebookSettings;
@@ -981,6 +981,18 @@ export type CodingExerciseExecution = {
 export type CodingExerciseAttemptHistory = {
   submission: CodingExerciseExecution;
   runs: CodingExerciseExecution[];
+  aiFeedback: CodingExerciseAttemptAiFeedback | null;
+};
+
+export type CodingExerciseAttemptAiFeedback = {
+  feedbackRef: string;
+  feedbackVersion: number;
+  feedbackHash: string;
+  feedback: Record<string, unknown>;
+};
+
+export type CodingExerciseReviewAttempt = CodingExerciseExecution & {
+  aiFeedback: CodingExerciseAttemptAiFeedback | null;
 };
 
 export type CodingExerciseAttemptAvailability = {
@@ -2016,18 +2028,21 @@ export const api = {
     request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
       `/courses/${courseId}/activities/${activityId}/coding-exercises/hidden-tests`
     ),
-  codingExerciseReviewAll: (courseId: string, activityId: string) =>
-    request<{ submissions: Array<{
+  codingExerciseReviewAll: (courseId: string, activityId: string, input?: { participantId?: string; attemptId?: string }) => {
+    const params = new URLSearchParams();
+    if (input?.participantId) params.set("participantId", input.participantId);
+    if (input?.attemptId) params.set("attemptId", input.attemptId);
+    const query = params.size ? `?${params.toString()}` : "";
+    return request<{ submissions: Array<{
       participantId: string;
       execution: CodingExerciseExecution;
-      attempts: CodingExerciseExecution[];
+      attempts: CodingExerciseReviewAttempt[];
       rubricEvaluations: Array<{
         executionId: string;
         criteria: Array<{ criterionId: string; scorePercent: number }>;
       }>;
-    }> }>(
-      `/courses/${courseId}/activities/${activityId}/coding-exercises/review-all`
-    ),
+    }> }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/review-all${query}`);
+  },
   saveCodingExerciseHiddenTests: (
     courseId: string,
     activityId: string,

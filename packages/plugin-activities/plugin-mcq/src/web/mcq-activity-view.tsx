@@ -31,18 +31,18 @@ type McqActivityViewProps = {
   locale?: "en" | "fr" | "zh" | "ar";
   submissionClient?: {
     getStatus?: (activityId: string) => Promise<{
-      submission: { answers: StudentAnswerState; lifecycle?: string } | null;
+      submission: { answers: StudentAnswerState; lifecycle?: string; aiFeedback?: Record<string, unknown> | null } | null;
       draft?: { answers: StudentAnswerState } | null;
       grade?: { rawScore: number; rawMaxScore: number; normalizedScore?: number; normalizedMaxScore?: number } | null;
       attempts?: Array<{
-        submission: { id: string; attemptNumber: number; submittedAt: string | null; answers: StudentAnswerState; lifecycle?: string };
+        submission: { id: string; attemptNumber: number; submittedAt: string | null; answers: StudentAnswerState; lifecycle?: string; aiFeedback?: Record<string, unknown> | null };
         grade: { rawScore: number; rawMaxScore: number; normalizedScore?: number; normalizedMaxScore?: number };
       }>;
       availability: { attemptsRemaining: number | null; canStart: boolean; reason: string | null; gradesReleased?: boolean };
     }>;
     save?: (activityId: string, answers: StudentAnswerState) => Promise<void>;
     submit?: (activityId: string, answers: StudentAnswerState) => Promise<{ submission: { answers: StudentAnswerState } }>;
-    feedback?: (activityId: string, answers: StudentAnswerState) => Promise<Record<string, unknown>>;
+    feedback?: (activityId: string, answers: StudentAnswerState) => Promise<Record<string, unknown> | null>;
   };
   onSubmitted?: () => void;
   studentViewMode?: "attempt" | "previous";
@@ -145,7 +145,7 @@ const copyByLocale = {
     aiFeedbackSection: "AI assessment feedback",
     aiFeedbackEnabled: "Enable AI feedback",
     aiFeedbackInstructions: "Feedback instructions",
-    aiFeedbackHelp: "Formative feedback is generated after Check answers. Summative feedback is started by a teacher and does not change deterministic MCQ grading.",
+    aiFeedbackHelp: "Formative feedback is generated after Check answers only when the course activity is set to Formative with automatic AI feedback. Summative feedback is started by a teacher and does not change deterministic MCQ grading.",
     aiFeedbackResult: "Feedback",
     aiFeedbackError: "Answers were checked, but feedback could not be generated."
   },
@@ -204,7 +204,7 @@ const copyByLocale = {
     aiFeedbackSection: "Rétroaction d’évaluation par IA",
     aiFeedbackEnabled: "Activer la rétroaction IA",
     aiFeedbackInstructions: "Consignes de rétroaction",
-    aiFeedbackHelp: "La rétroaction formative est générée après la vérification. La rétroaction sommative est lancée par un enseignant et ne modifie pas la notation déterministe.",
+    aiFeedbackHelp: "La rétroaction formative est générée après la vérification seulement si l’activité du cours est réglée à Formative avec rétroaction automatique par IA. La rétroaction sommative est lancée par un enseignant et ne modifie pas la notation déterministe.",
     aiFeedbackResult: "Rétroaction",
     aiFeedbackError: "Les réponses ont été vérifiées, mais la rétroaction n’a pas pu être générée."
   },
@@ -263,7 +263,7 @@ const copyByLocale = {
     aiFeedbackSection: "AI 评估反馈",
     aiFeedbackEnabled: "启用 AI 反馈",
     aiFeedbackInstructions: "反馈说明",
-    aiFeedbackHelp: "形成性反馈在检查答案后生成。总结性反馈由教师启动，且不会改变确定性选择题评分。",
+    aiFeedbackHelp: "仅当课程活动设为带自动 AI 反馈的形成性活动时，检查答案后才会生成形成性反馈。总结性反馈由教师启动，且不会改变确定性选择题评分。",
     aiFeedbackResult: "反馈",
     aiFeedbackError: "答案已检查，但无法生成反馈。"
   }
@@ -317,6 +317,7 @@ export function McqActivityView({
     submittedAt: string | null;
     answers: StudentAnswerState;
     grade: { rawScore: number; rawMaxScore: number; normalizedScore?: number; normalizedMaxScore?: number } | null;
+    aiFeedback: Record<string, unknown> | null;
   }>>([]);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
   const [loadingSubmissionStatus, setLoadingSubmissionStatus] = useState(false);
@@ -416,13 +417,15 @@ export function McqActivityView({
           attemptNumber: attempt.submission.attemptNumber,
           submittedAt: attempt.submission.submittedAt,
           answers: attempt.submission.answers,
-          grade: attempt.grade
+          grade: attempt.grade,
+          aiFeedback: attempt.submission.aiFeedback ?? null
         })) ?? (isCompletedSubmission && status.submission ? [{
           id: "latest",
           attemptNumber: 1,
           submittedAt: null,
           answers: status.submission.answers,
-          grade: status.grade ?? null
+          grade: status.grade ?? null,
+          aiFeedback: status.submission.aiFeedback ?? null
         }] : []);
         setSubmissionReviews(reviews);
         setSelectedSubmissionId((current) => reviews.some((review) => review.id === current) ? current : reviews[0]?.id ?? null);
@@ -617,7 +620,7 @@ export function McqActivityView({
       try {
         if (submissionClient?.feedback) {
           const feedback = await submissionClient.feedback(activity.id, studentAnswers);
-          if (aiFeedbackEnabled) setAiFeedback(feedback);
+          if (aiFeedbackEnabled && feedback) setAiFeedback(feedback);
         }
       } catch {
         if (aiFeedbackEnabled) notifications.error(copy.aiFeedbackError);
@@ -939,6 +942,9 @@ export function McqActivityView({
             releasedMaxScore={releasedMaxScore ?? selectedSubmissionReview.grade?.normalizedMaxScore}
             randomizeChoices={false}
           />
+          {selectedSubmissionReview.aiFeedback ? (
+            <McqAttemptAiFeedback feedback={selectedSubmissionReview.aiFeedback} title={copy.aiFeedbackResult} />
+          ) : null}
         </section>
       ) : null}
       {studentViewMode === "attempt" ? (
@@ -1011,6 +1017,21 @@ export function McqActivityView({
         title={isSummativeStudentSession ? copy.saving : copy.generating}
         progressLabel={isSummativeStudentSession ? copy.saving : copy.generating}
       />
+    </section>
+  );
+}
+
+function McqAttemptAiFeedback({ feedback, title }: { feedback: Record<string, unknown>; title: string }) {
+  const questionFeedback = Array.isArray(feedback.questionFeedback) ? feedback.questionFeedback : [];
+  return (
+    <section className="inline-panel stack">
+      <h3>{title}</h3>
+      {typeof feedback.summary === "string" ? <p>{feedback.summary}</p> : null}
+      {questionFeedback.map((entry, index) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+        const explanation = (entry as Record<string, unknown>).explanation;
+        return typeof explanation === "string" ? <p className="muted" key={index}>{explanation}</p> : null;
+      })}
     </section>
   );
 }

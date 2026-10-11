@@ -20,11 +20,12 @@ Gradebook attempt review and grading use core grade scope, so explicit course te
 - Reusable bank Tests copy MCQ children into Test-owned bank activities and later into independent course children without plugin-private authoring rows.
 - Standalone answers autosave through `ActivityResponseDraft`; compound Test answers use `TestItemAttempt`.
 - Course assignment settings may time a standalone MCQ in either assessment mode. Core owns the explicit start, immutable deadline, and countdown; at zero the renderer invokes the ordinary check/submission path so deterministic grading and draft cleanup remain unchanged.
-- Formative **Check answers** and summative submissions both create mode-tagged core attempts. Only summative attempts use limits, gradebook selection, grading, and release visibility; teachers can inspect formative attempts read-only.
+- Formative **Check answers** and summative submissions both create mode-tagged core attempts. Only summative attempts use limits, gradebook selection, grading, and release visibility; teachers can inspect formative attempts and their exact generated feedback read-only.
 - Teacher review resolves an exact core MCQ attempt. The report dialog loads only the newest current-mode submission initially and requests older submissions as the teacher navigates; historical and formative attempts remain read-only.
+- Ordinary **Formative** never invokes or exposes model feedback. **Formative with automatic AI feedback** may generate feedback for the exact attempt when the plugin/course AI prerequisites are satisfied, persists it with that attempt, and shows it in the learner's **Previous submissions** history.
 - Optional model feedback can explain results but never changes deterministic MCQ grades and is not independently challengeable. The released deterministic grade and teacher-authored released feedback remain challengeable through the core workflow when the effective summative assignment setting permits it.
 - Activity-bank variations preserve the selected concepts, skills, and misconceptions, question count, code-language setting, and difficulty while generating a new student introduction, questions, choices, and independently audited answer key. Reusable Test variation applies the same operation to each MCQ child.
 - The definition declares interactive, plugin-executed Student view support; the learner questionnaire uses browser-scoped answers and deterministic, non-persistent checking.
-- AI question generation and formative model feedback use the shared blocking, indeterminate progress dialog; variation progress is supplied by the activity-bank background job.
+- AI question generation and automatic formative model feedback use the shared blocking, indeterminate progress dialog; variation progress is supplied by the activity-bank background job.
 
 When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an invariant changed, and the relevant detailed section.

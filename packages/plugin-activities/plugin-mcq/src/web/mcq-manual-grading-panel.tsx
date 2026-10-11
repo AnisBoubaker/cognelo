@@ -19,6 +19,7 @@ export type McqManualGradingAttempt = {
   submittedAt: string | null;
   gradedAt: string | null;
   answers: Record<string, string[]>;
+  aiFeedback?: Record<string, unknown> | null;
 };
 
 export type McqManualGradingPanelProps = {
@@ -232,6 +233,19 @@ export function McqManualGradingPanel({
               </article>
             ))}
           </div>
+          {selectedAttempt.aiFeedback ? (
+            <section className="inline-panel stack stack-tight">
+              <h3>{t("courseDetail.generatedFeedbackTitle")}</h3>
+              {typeof selectedAttempt.aiFeedback.summary === "string" ? <p>{selectedAttempt.aiFeedback.summary}</p> : null}
+              {Array.isArray(selectedAttempt.aiFeedback.questionFeedback)
+                ? selectedAttempt.aiFeedback.questionFeedback.map((entry, index) => {
+                    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+                    const explanation = (entry as Record<string, unknown>).explanation;
+                    return typeof explanation === "string" ? <p className="muted" key={index}>{explanation}</p> : null;
+                  })
+                : null}
+            </section>
+          ) : null}
         </div>
       ) : null}
 

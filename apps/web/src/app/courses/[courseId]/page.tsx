@@ -2326,7 +2326,11 @@ function getAllGroupsAssignmentRule(activity: NonNullable<Course["activities"]>[
     availableFrom: typeof record.availableFrom === "string" ? record.availableFrom : null,
     availableUntil: typeof record.availableUntil === "string" ? record.availableUntil : null,
     enablePerGroupSettings: record.enablePerGroupSettings !== false,
-    assessmentMode: record.assessmentMode === "summative" ? "summative" as const : "formative" as const,
+    assessmentMode: record.assessmentMode === "summative"
+      ? "summative" as const
+      : record.assessmentMode === "formative_ai"
+        ? "formative_ai" as const
+        : "formative" as const,
     requireSafeExamBrowser: record.requireSafeExamBrowser === true,
     contentPlacement: parseContentPlacement(record.contentPlacement),
     gradebookSettings:

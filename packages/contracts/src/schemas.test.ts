@@ -424,6 +424,9 @@ describe("shared contract schemas", () => {
       gradeChallengesEnabled: false,
       timeLimitMinutes: null
     });
+    expect(CourseAllGroupsActivityAssignmentInputSchema.parse({ assessmentMode: "formative_ai" })).toMatchObject({
+      assessmentMode: "formative_ai"
+    });
     expect(CourseAllGroupsActivityAssignmentInputSchema.parse({
       assessmentMode: "summative",
       gradeChallengesEnabled: true,

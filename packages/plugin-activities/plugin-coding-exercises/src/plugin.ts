@@ -30,6 +30,9 @@ export const codingExercisesPlugin: ActivityPlugin = {
       aiFeedback: {
         rendererKey: "coding-exercise-ai-feedback-review"
       },
+      manualGrading: {
+        rendererKey: "coding-exercise-manual-grading"
+      },
       authoring: {
         gradingTab: true,
         supportsVariations: true

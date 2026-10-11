@@ -60,13 +60,15 @@ It is intentionally a planning artifact. Implementation should proceed iterative
 
 ### Submission And Grading
 
-- Group activity assignments have an assessment mode:
+- Group activity assignments have an assessment policy:
   - formative activity
+  - formative activity with automatic AI feedback, for activity types that declare AI-feedback support
   - summative activity
-- Every inspectable formative check and summative submission creates a core attempt whose `assessmentMode` captures the assignment mode at that moment; plugins may additionally retain richer state and event history.
+- Core attempts retain the stable two-value `assessmentMode` (`formative` or `summative`). Both formative assignment policies create formative attempts; the richer assignment policy determines whether submission-triggered AI feedback is permitted.
+- Every inspectable formative check and summative submission creates a core attempt whose `assessmentMode` captures its formative/summative classification at that moment; plugins may additionally retain richer state and event history.
 - Only summative attempts consume summative attempt limits, enter grade selection, or receive gradebook grades. Formative attempts remain visible to teachers through the read-only attempt inspector.
-- Formative-to-summative changes preserve all old formative attempts and make only future attempts summative. Summative reports select only summative attempt references.
-- Summative-to-formative changes require explicit UI and API confirmation because they convert existing summative attempts to formative, deactivate current grades, hide released grades, and append per-student audit events. Grade snapshots and history are retained rather than deleted.
+- Either formative policy changing to summative preserves all old formative attempts and makes only future attempts summative. Summative reports select only summative attempt references.
+- Summative changing to either formative policy requires explicit UI and API confirmation because it converts existing summative attempts to formative, deactivates current grades, hides released grades, and appends per-student audit events. Grade snapshots and history are retained rather than deleted. Switching between the two formative policies does not rewrite attempt history.
 - Every submission creates an attempt.
 - A successful final submission clears its standalone response draft on a best-effort basis; draft cleanup failure must not turn an already-recorded submission into a client-visible submission failure.
 - An attempt should not remain submitted without grading.
@@ -477,7 +479,7 @@ First plugin integration target:
 
 - Completed: add General assignment-level `assessmentMode` metadata for direct group assignments and course activity settings.
 - Completed: default new assignments to formative activity behavior.
-- Completed: expose formative/summative selection as a non-overridable General activity setting.
+- Completed: expose Formative, Formative with automatic AI feedback, and Summative as a non-overridable General activity policy; show the automatic-feedback choice only for capable plugins.
 - Completed: expose core gradebook policy settings in summative assignment forms: points possible, points/pass-fail grading mode, pass threshold, attempt limit mode, max attempts, grade strategy, and drop-lowest for weighted averages.
 - Completed: persist inherited or explicitly overridden settings into each assigned current group's `GradebookItem`; newly created groups remain unassigned.
 - Completed: pass group assignment metadata into plugin route and renderer context.
@@ -487,6 +489,7 @@ First plugin integration target:
 - Completed: suppress correct/incorrect validation messages in summative Parsons mode.
 - Completed: tag every inspectable plugin attempt with its creation-time assessment mode, expose formative and summative attempt histories to teachers, and exclude formative attempts from summative limits, grading, release, and reports.
 - Completed: preserve formative attempts when switching to summative; require explicit UI/API confirmation when switching summative to formative, then convert attempts, withdraw active grades, hide released grades, and audit every affected learner.
+- Completed: keep the core attempt enum at formative/summative while storing `formative_ai` in assignment metadata, so ordinary formative never invokes or exposes model feedback and automatic formative feedback remains attached to the exact attempt.
 
 ### Phase 7: Student Grade Visibility - Completed
 
@@ -524,7 +527,7 @@ First plugin integration target:
 
 The implemented cross-plugin design and remaining hardening work are tracked in `docs/AI_FEEDBACK_GRADING_CHALLENGES_IMPLEMENTATION_PLAN.md`.
 
-- Formative AI feedback starts immediately when the learner submits the formative activity.
+- Formative AI feedback starts immediately only when the effective assignment policy is **Formative with automatic AI feedback**. Ordinary Formative never invokes or exposes it.
 - Summative AI feedback/grading never starts automatically on submission or through the background-job worker. An authorized teacher explicitly starts it from the gradebook/review workflow.
 - Plugins own feedback configuration, rubric/model prompting, structured result validation, sanitized feedback, and deterministic/AI score composition.
 - Feedback-capable plugins own a teacher review renderer plus answer-loading/revision validation handlers. The detailed activity gradebook supports one-student review and whole-class previous/next navigation, and teachers may revise narrative feedback without mutating the original evaluation or score components.

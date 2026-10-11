@@ -1861,7 +1861,8 @@ async function assertAttemptCanStart(
 }
 
 export function assignmentAssessmentMode(value: unknown): ActivityAttemptAssessmentMode {
-  return asJsonObject(value)?.assessmentMode === "formative" ? "formative" : "summative";
+  const mode = asJsonObject(value)?.assessmentMode;
+  return mode === "formative" || mode === "formative_ai" ? "formative" : "summative";
 }
 
 async function assertCanUseAttempt(

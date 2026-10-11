@@ -6,7 +6,9 @@ const mocks = vi.hoisted(() => ({
   assertCanManageCourseOrViewGradebook: vi.fn(),
   assertCanViewCourseGradebook: vi.fn(),
   clearActivityResponseDraft: vi.fn(),
+  evaluateCodingExerciseAttemptWithAi: vi.fn(),
   getActivityAttemptAvailability: vi.fn(),
+  getCourseAssessmentFeedbackPolicy: vi.fn(),
   recordActivityAttemptGradingResult: vi.fn(),
   startActivityAttempt: vi.fn(),
   submitActivityAttempt: vi.fn(),
@@ -39,6 +41,7 @@ vi.mock("@cognelo/core", async () => {
     assertCanManageCourseOrViewGradebook: mocks.assertCanManageCourseOrViewGradebook,
     assertCanViewCourseGradebook: mocks.assertCanViewCourseGradebook,
     clearActivityResponseDraft: mocks.clearActivityResponseDraft,
+    getCourseAssessmentFeedbackPolicy: mocks.getCourseAssessmentFeedbackPolicy,
     getActivityAttemptAvailability: mocks.getActivityAttemptAvailability,
     recordActivityAttemptGradingResult: mocks.recordActivityAttemptGradingResult,
     startActivityAttempt: mocks.startActivityAttempt,
@@ -79,6 +82,10 @@ vi.mock("./generation", async () => {
   };
 });
 
+vi.mock("./ai-feedback", () => ({
+  evaluateCodingExerciseAttemptWithAi: mocks.evaluateCodingExerciseAttemptWithAi
+}));
+
 const {
   codingExerciseGeneratePromptRoute,
   codingExerciseGenerateRubricRoute,
@@ -110,6 +117,13 @@ describe("coding exercise plugin routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.clearActivityResponseDraft.mockResolvedValue({ ok: true });
+    mocks.getCourseAssessmentFeedbackPolicy.mockResolvedValue({ enabled: true });
+    mocks.evaluateCodingExerciseAttemptWithAi.mockResolvedValue({
+      feedbackRef: "feedback-1",
+      feedbackVersion: 1,
+      feedbackHash: "hash-1",
+      feedback: { summary: "Good work" }
+    });
     mocks.listRecentCodingExerciseExecutions.mockResolvedValue([{ id: "run-1", kind: "run" }, { id: "submit-1", kind: "submit" }]);
     mocks.listCodingExerciseAttemptHistory.mockResolvedValue({
       currentRuns: [{ id: "run-current", kind: "run" }],
@@ -174,8 +188,8 @@ describe("coding exercise plugin routes", () => {
         participantId: "participant-1",
         execution: { id: "execution-2", userId: "student-1" },
         attempts: [
-          { id: "execution-2", userId: "student-1" },
-          { id: "execution-1", userId: "student-1" }
+          { id: "execution-2", userId: "student-1", aiFeedback: expect.any(Object) },
+          { id: "execution-1", userId: "student-1", aiFeedback: null }
         ],
         rubricEvaluations: [{
           executionId: "execution-2",
@@ -229,7 +243,7 @@ describe("coding exercise plugin routes", () => {
       codingExerciseHistoryRoute.methods.GET?.({ request: new Request("http://test.local"), context, readJson: async () => ({}) })
     ).resolves.toEqual({
       currentRuns: [{ id: "run-current", kind: "run" }],
-      attempts: [{ submission: { id: "submit-1", kind: "submit" }, runs: [{ id: "run-1", kind: "run" }] }],
+      attempts: [{ submission: { id: "submit-1", kind: "submit" }, runs: [{ id: "run-1", kind: "run" }], aiFeedback: null }],
       availability: {
         attemptLimitMode: "unlimited",
         gradesReleased: false,
@@ -239,6 +253,78 @@ describe("coding exercise plugin routes", () => {
         canStart: true,
         reason: null
       }
+    });
+  });
+
+  it("runs automatic AI feedback only for the explicit formative AI policy", async () => {
+    mocks.prisma.pluginCodingExerciseReferenceSolution.findUnique.mockResolvedValue({
+      privateConfig: {
+        aiFeedback: {
+          enabled: true,
+          gradingEnabled: false,
+          instructions: "Explain the result.",
+          testWeightPercent: 100,
+          aiWeightPercent: 0,
+          criteria: [{ id: "correctness", title: "Correctness", description: "Assess correctness.", weightPercent: 100 }]
+        }
+      }
+    });
+
+    const submit = (assessmentMode: "formative" | "formative_ai") => codingExerciseSubmitRoute.methods.POST?.({
+      request: new Request("http://test.local"),
+      context: {
+        ...context,
+        groupId: "group-1",
+        activity: {
+          ...context.activity,
+          assignment: { id: "assignment-1", metadata: { assessmentMode } }
+        }
+      },
+      readJson: async () => ({ sourceCode: "print(1)" })
+    });
+
+    await expect(submit("formative")).resolves.toMatchObject({ aiFeedback: null });
+    expect(mocks.evaluateCodingExerciseAttemptWithAi).not.toHaveBeenCalled();
+
+    await expect(submit("formative_ai")).resolves.toMatchObject({
+      aiFeedback: { feedbackRef: "feedback-1", feedback: { summary: "Good work" } }
+    });
+    expect(mocks.evaluateCodingExerciseAttemptWithAi).toHaveBeenCalledWith(expect.objectContaining({
+      coreAttemptId: "attempt-1",
+      executionId: "submit-1",
+      assessmentMode: "formative",
+      triggerKind: "formative_submission"
+    }));
+  });
+
+  it("returns the feedback recorded for each formative AI attempt", async () => {
+    mocks.prisma.pluginCodingExerciseAiEvaluation.findMany.mockResolvedValueOnce([{
+      id: "feedback-1",
+      executionId: "submit-1",
+      version: 1,
+      feedbackHash: "hash-1",
+      sanitizedFeedback: { summary: "Attempt-specific feedback" }
+    }]);
+
+    await expect(codingExerciseHistoryRoute.methods.GET?.({
+      request: new Request("http://test.local"),
+      context: {
+        ...context,
+        groupId: "group-1",
+        activity: {
+          ...context.activity,
+          assignment: { id: "assignment-1", metadata: { assessmentMode: "formative_ai" } }
+        }
+      },
+      readJson: async () => ({})
+    })).resolves.toMatchObject({
+      attempts: [{
+        submission: { id: "submit-1" },
+        aiFeedback: {
+          feedbackRef: "feedback-1",
+          feedback: { summary: "Attempt-specific feedback" }
+        }
+      }]
     });
   });
 

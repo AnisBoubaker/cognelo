@@ -427,10 +427,15 @@ export async function listCodingExerciseReviewExecutions(params: { activityId: s
   });
 }
 
-export async function listCodingExerciseReviewExecutionAttempts(params: { activityId: string; userIds: string[] }) {
+export async function listCodingExerciseReviewExecutionAttempts(params: { activityId: string; userIds: string[]; executionId?: string | null }) {
   if (!params.userIds.length) return [];
   const executions = await codingExerciseExecutionClient.pluginCodingExerciseExecution.findMany({
-    where: { activityId: params.activityId, userId: { in: params.userIds }, kind: "submit" },
+    where: {
+      activityId: params.activityId,
+      userId: { in: params.userIds },
+      kind: "submit",
+      ...(params.executionId ? { id: params.executionId } : {})
+    },
     orderBy: [{ createdAt: "desc" }]
   });
   return executions.flatMap((execution) => {

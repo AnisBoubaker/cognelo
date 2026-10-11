@@ -1,6 +1,7 @@
 "use client";
 
-import type { ActivityAssignmentOverrideField } from "@cognelo/contracts";
+import { getActivityDefinition } from "@cognelo/activity-sdk";
+import type { ActivityAssignmentOverrideField, AssignedActivityAssessmentMode } from "@cognelo/contracts";
 import { useDialogs } from "@cognelo/activity-ui";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
@@ -39,7 +40,7 @@ type GroupAssignmentDraft = AssignmentValueDraft & {
   overrideFields: ActivityAssignmentOverrideField[];
 };
 type ActivitySettingsDraft = {
-  assessmentMode: "formative" | "summative";
+  assessmentMode: AssignedActivityAssessmentMode;
   contentParentId: string;
   general: AssignmentValueDraft;
   groups: GroupAssignmentDraft[];
@@ -70,8 +71,9 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [savedAssessmentMode, setSavedAssessmentMode] = useState<"formative" | "summative" | null>(null);
+  const [savedAssessmentMode, setSavedAssessmentMode] = useState<AssignedActivityAssessmentMode | null>(null);
   const isTest = activity.activityType.key === "test";
+  const supportsAiFeedback = getActivityDefinition(activity.activityType.key)?.grading?.supportsAiFeedback === true;
 
   useEffect(() => {
     let cancelled = false;
@@ -121,7 +123,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
     } : current);
   }
 
-  function changeAssessmentMode(mode: "formative" | "summative") {
+  function changeAssessmentMode(mode: AssignedActivityAssessmentMode) {
     setDraft((current) => {
       if (!current) return current;
       if (mode === "summative") return { ...current, assessmentMode: mode };
@@ -160,7 +162,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
   async function saveSettings(event: FormEvent) {
     event.preventDefault();
     if (!draft) return;
-    const convertsSummativeToFormative = savedAssessmentMode === "summative" && draft.assessmentMode === "formative";
+    const convertsSummativeToFormative = savedAssessmentMode === "summative" && draft.assessmentMode !== "summative";
     if (convertsSummativeToFormative && !await dialogs.confirm({
       message: t("groupPage.summativeToFormativeConfirm"),
       confirmVariant: "danger"
@@ -263,9 +265,10 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                         disabled={saving || isTest}
                         id={`activity-settings-mode-${activity.id}`}
                         value={draft.assessmentMode}
-                        onChange={(event) => changeAssessmentMode(event.target.value as "formative" | "summative")}
+                        onChange={(event) => changeAssessmentMode(event.target.value as AssignedActivityAssessmentMode)}
                       >
                         <option value="formative">{t("groupPage.assessmentModeFormative")}</option>
+                        {supportsAiFeedback ? <option value="formative_ai">{t("groupPage.assessmentModeFormativeAi")}</option> : null}
                         <option value="summative">{t("groupPage.assessmentModeSummative")}</option>
                       </select>
                     </div>

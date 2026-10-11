@@ -6,6 +6,7 @@ import { CodeRenderer } from "@cognelo/activity-ui";
 import {
   CodingExerciseActivityView,
   CodingExerciseAiFeedbackReview,
+  CodingExerciseManualGradingPanel,
   getCodingExerciseGradingBreakdown
 } from "@cognelo/plugin-coding-exercises";
 import {
@@ -52,6 +53,7 @@ import {
   apiAbsoluteUrl,
   apiRequest,
   type CodingExerciseExecution,
+  type CodingExerciseReviewAttempt,
   type CodingExerciseHiddenTest,
   type CourseGradebookRow,
   type CourseTestAttemptReview,
@@ -110,9 +112,9 @@ type ManualGradingRendererContext = {
   row: CourseGradebookRow;
   activityConfig?: Record<string, unknown>;
   locale: Locale;
-  attempts: Array<ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview>;
+  attempts: Array<ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview | CodingExerciseReviewAttempt>;
   attemptCount: number;
-  selectedAttempt: ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview | null;
+  selectedAttempt: ParsonsGradebookAttemptRecord | McqSubmission | CodingHomeworkGradebookAttemptRecord | CourseTestAttemptReview | CodingExerciseReviewAttempt | null;
   selectedIndex: number;
   includeAttempts: boolean;
   loading: boolean;
@@ -648,7 +650,7 @@ function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView
       },
       feedback: async (activityId: string, answers: Record<string, string[]>) => {
         const result = await api.groupMcqFormativeFeedback(courseId, groupId, activityId, answers);
-        return result.evaluation?.feedback ?? {};
+        return result.evaluation?.feedback ?? null;
       }
     };
   }, [courseId, groupId, mcqClient, responseDraftHost, studentPreview]);
@@ -1390,6 +1392,13 @@ export const bankActivityRenderers: Record<string, (context: BankActivityRendere
 };
 
 export const manualGradingRenderers: Record<string, (context: ManualGradingRendererContext) => ReactNode> = {
+  "coding-exercise-manual-grading": (context) => (
+    <CodingExerciseManualGradingPanel
+      {...context}
+      attempts={context.attempts as CodingExerciseReviewAttempt[]}
+      selectedAttempt={context.selectedAttempt as CodingExerciseReviewAttempt | null}
+    />
+  ),
   "test-manual-grading": (context) => (
     <TestManualGradingPanel
       {...context}

@@ -1655,7 +1655,7 @@ describe("group services", () => {
     expect(mockPrisma.courseGroupActivity.update).not.toHaveBeenCalled();
   });
 
-  it("requires explicit confirmation before converting summative attempts and grades to formative", async () => {
+  it("requires explicit confirmation before converting summative attempts and grades to formative AI", async () => {
     mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
     mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({
       id: "assignment-1",
@@ -1666,7 +1666,7 @@ describe("group services", () => {
 
     await expect(
       updateGroupActivityAssignment(teacherUser, "course-1", "group-1", "assignment-1", {
-        metadata: { assessmentMode: "formative" }
+        metadata: { assessmentMode: "formative_ai" }
       })
     ).rejects.toMatchObject({ status: 409, code: "ASSESSMENT_MODE_CONVERSION_CONFIRMATION_REQUIRED" });
 

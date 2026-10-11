@@ -18,7 +18,7 @@ Teacher/admin product copy may use **AI feedback** for the generation feature an
 - Let an activity plugin opt into AI feedback and, separately, AI grading.
 - Use an AI model selected and enabled for the course; students never supply the grading model or credentials.
 - Require complete plugin-specific feedback configuration whenever AI feedback is enabled on an activity.
-- Generate formative feedback immediately after the learner submits the formative activity.
+- Generate formative feedback immediately after submission only when the effective course assignment is explicitly **Formative with automatic AI feedback**.
 - Require an explicit teacher action to start summative AI feedback/grading.
 - Keep summative AI feedback hidden from the student until the gradebook item is released.
 - Let plugins decide whether AI feedback affects grading and how it combines with deterministic grading.
@@ -38,6 +38,7 @@ course AI feedback switch is enabled
 + activity plugin declares AI feedback support
 + course activity enables AI feedback
 + the plugin validates the complete activity feedback configuration
++ for submission-triggered formative feedback, assignment policy is formative with automatic AI feedback
 = effective AI feedback
 ```
 
@@ -59,7 +60,7 @@ The setting reuses existing personal/global `AiAgentConnection` records and serv
 The current course UI:
 
 - require an accessible enabled model before the master switch can be enabled;
-- explains that formative feedback runs on submission while summative evaluation waits for a teacher.
+- explains that automatic formative feedback runs on submission only for the explicit assignment policy, while summative evaluation waits for a teacher.
 
 An activity-count summary and proactive per-activity ineffective-configuration warnings remain UI follow-up work; server-side evaluation still fails closed when any effective-enablement layer is missing.
 
@@ -69,10 +70,11 @@ The model is always resolved server-side. Provider keys, raw credentials, privat
 
 ### Formative Activities
 
-- The learner's explicit formative submission starts AI feedback immediately.
+- Ordinary **Formative** never invokes model feedback and does not expose model feedback generated under a previous policy.
+- **Formative with automatic AI feedback** (`formative_ai`) starts AI feedback on the learner's explicit submission when all other effective-enablement conditions pass.
 - The plugin submission route directly invokes the feedback evaluation workflow; it is not waiting for a teacher action or a scheduled scan.
 - The student UI may show a generating state while the model call runs and presents the feedback as soon as it completes.
-- Formative feedback remains plugin-owned analytics/research data and does not create a core gradebook grade.
+- Formative feedback is linked to the exact core attempt and plugin submission, remains plugin-owned analytics/research data, and does not create a core gradebook grade. Learner attempt history displays the feedback with that attempt.
 - Retrying a failed formative evaluation must be explicit and idempotent.
 
 ### Summative Activities
@@ -177,7 +179,7 @@ The plugin must validate that component weights total 100%. It stores the determ
 
 ### MCQ Example
 
-MCQ answer-key grading remains deterministic and authoritative. AI feedback may explain errors or suggest study areas, but it does not change the MCQ score and is not an independent challenge target. The released deterministic grade and any teacher-authored released feedback remain challengeable when the effective assignment enables challenges. Summative MCQ feedback is still teacher-triggered and release-gated; formative MCQ feedback is generated on submission.
+MCQ answer-key grading remains deterministic and authoritative. AI feedback may explain errors or suggest study areas, but it does not change the MCQ score and is not an independent challenge target. The released deterministic grade and any teacher-authored released feedback remain challengeable when the effective assignment enables challenges. Summative MCQ feedback is still teacher-triggered and release-gated; formative MCQ feedback is generated on submission only for the explicit `formative_ai` assignment policy and is stored with that exact attempt.
 
 ### Regrading
 
@@ -354,13 +356,13 @@ Status: complete. Course settings, SDK contracts, secure model resolution, norma
 
 ### Phase 2 — Programming Exercise Pilot
 
-Status: complete. Programming Exercises support a private unnamed general grading rubric that remains available to teachers without automatic feedback, immediate formative evaluation when automation is enabled, teacher-triggered summative evaluation, configurable deterministic/rubric weighting, strict two-attempt structured-output validation, immutable private evaluation artifacts, submission-time private rubric snapshots, and teacher review of submitted code, latest successful hidden-test outcomes, and editable summary/strength/improvement/criterion scores and narrative. Whole-activity grading batches preload current instructions and may use up to three complete graded attempts as identity-free consistency examples; selected examples are not reassessed, and edited instructions can be run-only or persisted once to the course activity. A confirmed draft action clears all learner-facing narrative while preserving scores and grade components, allowing selected learners to receive manually written experimental feedback through the same audited save path. Course and bank editors expose a dedicated host Grading tab after Concepts with nested Rubric and Test cases side tabs. Rubrics may be generated only from a title, student prompt, and reference solution; both rubric and assessment-feedback generation resolve the Subject teaching language server-side.
+Status: complete. Programming Exercises support a private unnamed general grading rubric that remains available to teachers without automatic feedback, explicit `formative_ai` submission-triggered evaluation, teacher-triggered summative evaluation, configurable deterministic/rubric weighting, strict two-attempt structured-output validation, immutable private evaluation artifacts, submission-time private rubric snapshots, and teacher review of submitted code, latest successful hidden-test outcomes, and editable summary/strength/improvement/criterion scores and narrative. Ordinary formative never invokes or exposes model feedback. Generated formative feedback is linked to the exact attempt and appears in learner history and the teacher's read-only attempt inspector. Whole-activity grading batches preload current instructions and may use up to three complete graded attempts as identity-free consistency examples; selected examples are not reassessed, and edited instructions can be run-only or persisted once to the course activity. A confirmed draft action clears all learner-facing narrative while preserving scores and grade components, allowing selected learners to receive newly written manual experimental feedback through the same audited save path. Course and bank editors expose a dedicated host Grading tab after Concepts with nested Rubric and Test cases side tabs. Rubrics may be generated only from a title, student prompt, and reference solution; both rubric and assessment-feedback generation resolve the Subject teaching language server-side.
 Teacher correction workflows additionally append test-only reruns against current hidden tests and regenerate summative feedback against the current rubric and latest saved tests. Neither action invokes the other; the original submission snapshot and earlier evaluation artifacts remain immutable.
 
 The development seed includes a reproducible two-section Programming Exercise batch at the submitted-but-not-evaluated boundary. This permits teacher single/batch generation, review, editing, release, learner review, challenge, and research-event testing without requiring Judge0 to execute dozens of fixture submissions during seeding. A clean course receives the fallback seed model, while reseeding preserves a teacher-selected assessment-feedback model and explicit feedback switch.
 
 - Add plugin-owned bank/course feedback configuration, rubrics, and copy/sync hooks.
-- Add formative submission-triggered feedback.
+- Add explicit `formative_ai` submission-triggered feedback, exact-attempt persistence, learner history, and teacher inspection.
 - Add teacher-triggered standalone summative evaluation.
 - Add configurable deterministic-test/AI-rubric weighting.
 - Snapshot all grading inputs and record detailed research artifacts.
@@ -377,11 +379,11 @@ Status: complete for the agreed core workflow. Challenges are disabled by defaul
 
 ### Phase 4 — MCQ Feedback
 
-Status: complete. MCQ supports required explanation instructions, immediate formative explanations, teacher-triggered/release-gated summative explanations, immutable evaluation artifacts, normalized research events, and teacher review of selected answers plus editable overall/per-question explanations. Its deterministic answer-key score remains authoritative and its AI feedback is not challengeable.
+Status: complete. MCQ supports required explanation instructions, explicit `formative_ai` submission-triggered explanations attached to the exact attempt, ordinary formative without model feedback, teacher-triggered/release-gated summative explanations, immutable evaluation artifacts, normalized research events, learner attempt-history display, and teacher inspection of selected answers plus exact-attempt feedback. Its deterministic answer-key score remains authoritative and its AI feedback is not challengeable.
 
 - Add activity-level AI feedback configuration.
 - Keep deterministic MCQ grading unchanged.
-- Add formative submission-triggered explanations.
+- Add explicit `formative_ai` submission-triggered explanations, exact-attempt persistence, learner history, and teacher inspection.
 - Add teacher-triggered summative explanations hidden until release.
 - Record evaluation/research data without marking MCQ as AI-graded.
 

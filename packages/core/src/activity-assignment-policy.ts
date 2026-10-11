@@ -1,3 +1,18 @@
+export type AssignmentAssessmentPolicyMode = "formative" | "formative_ai" | "summative";
+
+export function assignmentAssessmentPolicyMode(value: unknown): AssignmentAssessmentPolicyMode {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return "formative";
+  }
+  const mode = (value as Record<string, unknown>).assessmentMode;
+  if (mode === "summative" || mode === "formative_ai") return mode;
+  return "formative";
+}
+
+export function assignmentUsesAutomaticAiFeedback(value: unknown) {
+  return assignmentAssessmentPolicyMode(value) === "formative_ai";
+}
+
 export function assignmentAllowsGradeChallenges(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false;
