@@ -85,7 +85,7 @@ export function ActivityMessenger({
           }}
         >
           <AppIcon name="messages" size={22} />
-          <span>{t("activityMessenger.label")}</span>
+          <span className="activity-messenger-label">{t("activityMessenger.label")}</span>
           {conversation.unreadCount ? <span aria-hidden="true" className="activity-messenger-unread-dot" /> : null}
         </button>
       </ActivityLiveControlPortal>

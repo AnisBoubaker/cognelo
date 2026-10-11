@@ -724,6 +724,29 @@ select:focus {
   background: #1d73c4;
 }
 
+.activity-live-controls:has(.test-countdown) {
+  background: #2e8de1;
+}
+
+.activity-live-controls:has(.test-countdown) .activity-messenger-trigger {
+  border-radius: 999px;
+  justify-content: center;
+  margin-left: -20px;
+  min-width: 78px;
+  padding: 9px 15px 9px 35px;
+}
+
+.activity-live-controls:has(.test-countdown) .activity-messenger-label {
+  display: none;
+}
+
+.activity-live-controls:has(.test-countdown) .test-countdown {
+  border-radius: 999px;
+  padding-right: 20px;
+  position: relative;
+  z-index: 1;
+}
+
 .activity-messenger-unread-dot {
   background: #ef3131;
   border: 2px solid #fff;

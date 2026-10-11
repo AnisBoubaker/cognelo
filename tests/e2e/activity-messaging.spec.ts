@@ -35,9 +35,38 @@ test.describe("attempt-scoped activity messaging", () => {
     await expect(studentPage.getByRole("heading", { name: data.activityTitle })).toBeVisible();
     await studentPage.getByRole("button", { name: "Start timed attempt" }).click();
     const liveControls = studentPage.locator("#activity-live-controls");
-    await expect(liveControls.getByRole("timer")).toBeVisible();
+    const timer = liveControls.getByRole("timer");
+    const messenger = liveControls.getByRole("button", { name: "Open activity messages" });
+    await expect(timer).toBeVisible();
     await expect(studentPage.getByRole("button", { name: "Open activity messages" })).toBeVisible();
-    await expect(liveControls.getByRole("button", { name: "Open activity messages" })).toBeVisible();
+    await expect(messenger).toBeVisible();
+    await expect(liveControls.locator(".activity-messenger-label")).toBeHidden();
+    const [timerBox, messengerBox, liveControlStyles] = await Promise.all([
+      timer.boundingBox(),
+      messenger.boundingBox(),
+      liveControls.evaluate((container) => {
+        const timerElement = container.querySelector<HTMLElement>(".test-countdown");
+        const messengerElement = container.querySelector<HTMLElement>(".activity-messenger-trigger");
+        if (!timerElement || !messengerElement) return null;
+        const timerStyle = getComputedStyle(timerElement);
+        const messengerStyle = getComputedStyle(messengerElement);
+        return {
+          containerBackground: getComputedStyle(container).backgroundColor,
+          timerRadius: timerStyle.borderTopRightRadius,
+          timerZIndex: timerStyle.zIndex,
+          messengerRadius: messengerStyle.borderTopLeftRadius
+        };
+      })
+    ]);
+    expect(timerBox).not.toBeNull();
+    expect(messengerBox).not.toBeNull();
+    expect((timerBox?.x ?? 0) + (timerBox?.width ?? 0)).toBeGreaterThan(messengerBox?.x ?? Number.MAX_SAFE_INTEGER);
+    expect(liveControlStyles).toEqual({
+      containerBackground: "rgb(46, 141, 225)",
+      timerRadius: "999px",
+      timerZIndex: "1",
+      messengerRadius: "999px"
+    });
 
     await teacherPage.goto(
       `/courses/${data.courseId}/gradebook/activities/${data.activityId}?groupId=${data.groupId}`
