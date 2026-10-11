@@ -27,6 +27,7 @@ vi.mock("./groups", () => groups);
 
 import {
   gradeTestItemManually,
+  getTestRuntime,
   getTestItemExecutionContext,
   getTestAttemptReview,
   saveTestItemAttemptState,
@@ -127,7 +128,8 @@ describe("compound Test execution", () => {
     vi.clearAllMocks();
     groups.getGroupAssignedActivity.mockResolvedValue({
       id: "assignment-1",
-      activityType: { key: "test" }
+      activityType: { key: "test" },
+      assignment: { id: "assignment-1", metadata: { timeLimitMinutes: 25 } }
     });
     db.courseGroupParticipant.findFirst.mockResolvedValue({ id: "participant-1" });
     db.test.findFirst.mockResolvedValue(testRecord);
@@ -175,12 +177,33 @@ describe("compound Test execution", () => {
       metadata: expect.objectContaining({
         runtimeHandlerKey: "core:test",
         manifest: expect.objectContaining({
+          settings: expect.objectContaining({ timeLimitMinutes: 25 }),
           items: [expect.objectContaining({ testItemId: "item-1", activityTypeKey: "mcq" })]
         })
       })
     }));
     expect(runtime.test.items).toHaveLength(1);
     expect(runtime.attempt?.id).toBe("parent-attempt-1");
+  });
+
+  it("keeps the started Test attempt time snapshot when course settings later change", async () => {
+    groups.getGroupAssignedActivity.mockResolvedValue({
+      id: "assignment-1",
+      activityType: { key: "test" },
+      assignment: { id: "assignment-1", metadata: { timeLimitMinutes: 5 } }
+    });
+    db.activityAttempt.findMany.mockResolvedValue([parentAttempt({
+      metadata: {
+        manifest: {
+          settings: { timeLimitMinutes: 20, navigationMode: "free", randomizeItems: false, allowResume: true },
+          items: [{ testItemId: "item-1", activityId: "mcq-1", activityTypeKey: "mcq", pointsPossible: 10, isRequired: true }]
+        }
+      },
+      testItemAttempts: []
+    })]);
+
+    await expect(getTestRuntime(student, "course-1", "group-1", "test-activity-1"))
+      .resolves.toMatchObject({ test: { settings: { timeLimitMinutes: 20 } } });
   });
 
   it("saves plugin-neutral item state and stores a weighted grading result", async () => {

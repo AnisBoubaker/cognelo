@@ -212,6 +212,7 @@ export const codingExerciseRunRoute: PluginRouteDefinition = {
 export const codingExerciseSubmitRoute: PluginRouteDefinition = {
   path: "coding-exercises/submit",
   activityTypeKeys: ["coding-exercise"],
+  allowExpiredTimedAttemptMethods: ["POST"],
   methods: {
     GET: async ({ context }) => {
       const executions = await listRecentCodingExerciseExecutions({

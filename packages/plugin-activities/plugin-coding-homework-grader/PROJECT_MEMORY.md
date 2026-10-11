@@ -6,6 +6,7 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Consume prior content only through generic content-type extraction and vector-search dispatchers. Never branch on concrete content types here.
 - The parser registry is language-neutral; C is the first conservative adapter. Add languages through adapters, not pipeline branches.
 - ZIP preflight creates temporary plugin records only. A mode-tagged core attempt is created after every challenge answer is finalized, not at upload time; formative attempts remain review-only and summative attempts are gradeable.
+- When course assignment timing is enabled, core creates that attempt at the explicit timed start and the plugin's final challenge-answer route reuses it. `TimedActivityAutoSubmit` finalizes only a complete ready question set; otherwise core records the timeout as an ungraded attempt without inventing a plugin submission result.
 - The definition declares `studentView: { mode: "read_only" }` until an expiring non-academic upload workspace exists; never emulate preview by creating and deleting normal preflight/submission records.
 - Final-submission processing is idempotent, background-job based, append-audited, and replace-on-reprocess for derived functions/questions.
 - The teacher gradebook-attempt route accepts an exact final-submission ID constrained by activity, group, participant-linked user, and the matching core attempt. The host uses it for newest-first lazy history; older and formative submissions are inspection-only.

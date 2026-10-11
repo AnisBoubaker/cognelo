@@ -242,7 +242,7 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
         </div>
         <div className="form-grid-two">
           <div className="field">
-            <label htmlFor="test-time-limit">Time limit in minutes (optional)</label>
+            <label htmlFor="test-time-limit">Default course time limit in minutes (optional)</label>
             <input
               id="test-time-limit"
               min={1}
@@ -251,6 +251,7 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
               disabled={!canManage || busy}
               onChange={(event) => setTest({ ...test, settings: { ...settings, timeLimitMinutes: event.target.value ? Number(event.target.value) : null } })}
             />
+            <small className="muted">Used when this Test is duplicated or added from the bank. Change the current course limit in Activity settings.</small>
           </div>
           <div className="field">
             <label htmlFor="test-navigation">Navigation</label>

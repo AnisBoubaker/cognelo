@@ -74,6 +74,7 @@ export const mcqGenerateRoute: PluginRouteDefinition = {
 export const mcqSubmissionRoute: PluginRouteDefinition = {
   path: "mcq/submission",
   activityTypeKeys: ["mcq"],
+  allowExpiredTimedAttemptMethods: ["POST"],
   methods: {
     GET: async ({ context }) => {
       if (!context.courseId || !context.groupId) {
@@ -178,6 +179,7 @@ export const mcqSubmissionRoute: PluginRouteDefinition = {
 export const mcqFormativeFeedbackRoute: PluginRouteDefinition = {
   path: "mcq/feedback",
   activityTypeKeys: ["mcq"],
+  allowExpiredTimedAttemptMethods: ["POST"],
   methods: {
     POST: async ({ context, readJson }) => {
       if (!context.courseId || !context.groupId) {

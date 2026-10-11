@@ -161,8 +161,9 @@ export function BankTestActivityView({ activity, bank, locale, onActivityUpdated
         </div>
         <div className="form-grid-two">
           <div className="field">
-            <label htmlFor="bank-test-time-limit">Time limit in minutes (optional)</label>
+            <label htmlFor="bank-test-time-limit">Default course time limit in minutes (optional)</label>
             <input id="bank-test-time-limit" min={1} type="number" value={settings.timeLimitMinutes ?? ""} disabled={busy} onChange={(event) => setTest({ ...test, settings: { ...settings, timeLimitMinutes: event.target.value ? Number(event.target.value) : null } })} />
+            <small className="muted">Copied when this Test is added to a course. Existing course settings stay independent.</small>
           </div>
           <div className="field">
             <label htmlFor="bank-test-navigation">Navigation</label>

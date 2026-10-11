@@ -141,6 +141,23 @@ export async function startActivityAttempt(user: CurrentUser, input: StartActivi
   if (input.assessmentMode && input.assessmentMode !== assessmentMode) {
     throw new AppError(409, "ATTEMPT_MODE_MISMATCH", "The attempt mode no longer matches the activity assignment mode.");
   }
+  const activeTimedAttempt = await findActiveTimedAttempt(context.groupActivity.id, context.participant.id);
+  if (activeTimedAttempt) {
+    return prisma.activityAttempt.update({
+      where: { id: activeTimedAttempt.id },
+      data: {
+        pluginKey: input.pluginKey,
+        pluginVersion: input.pluginVersion,
+        pluginAttemptRef: input.pluginAttemptRef ?? activeTimedAttempt.pluginAttemptRef,
+        activityConfigFingerprint: input.activityConfigFingerprint ?? activeTimedAttempt.activityConfigFingerprint,
+        testRevisionId: input.testRevisionId ?? activeTimedAttempt.testRevisionId,
+        metadata: {
+          ...(asJsonObject(activeTimedAttempt.metadata) ?? {}),
+          ...(asJsonObject(input.metadata) ?? {})
+        } as JsonInput
+      }
+    });
+  }
   await assertAttemptCanStart(context, now, assessmentMode);
 
   return prisma.$transaction(async (tx) => {
@@ -214,6 +231,10 @@ export async function getActivityAttemptAvailability(user: CurrentUser, input: A
   });
   const assessmentMode = assignmentAssessmentMode(context.groupActivity.metadata);
   const details = await activityAttemptAvailabilityDetails(context, assessmentMode);
+  const activeTimedAttempt = await findActiveTimedAttempt(context.groupActivity.id, context.participant.id);
+  if (activeTimedAttempt) {
+    return { ...details, canStart: true as const, reason: null, activeAttemptId: activeTimedAttempt.id };
+  }
 
   try {
     await assertAttemptCanStart(context, input.now ?? new Date(), assessmentMode);
@@ -227,6 +248,22 @@ export async function getActivityAttemptAvailability(user: CurrentUser, input: A
     }
     throw error;
   }
+}
+
+export function activityAttemptTimeLimitMinutes(value: unknown): number | null {
+  const metadata = asJsonObject(value);
+  const timeLimitMinutes = metadata?.timeLimitSnapshotMinutes;
+  return typeof timeLimitMinutes === "number" && Number.isInteger(timeLimitMinutes) && timeLimitMinutes > 0 && timeLimitMinutes <= 1440
+    ? timeLimitMinutes
+    : null;
+}
+
+async function findActiveTimedAttempt(groupActivityId: string, participantId: string) {
+  const attempts = await prisma.activityAttempt.findMany({
+    where: { groupActivityId, participantId, lifecycle: "started" },
+    orderBy: [{ attemptNumber: "desc" }]
+  });
+  return attempts.find((attempt) => activityAttemptTimeLimitMinutes(attempt.metadata) !== null) ?? null;
 }
 
 async function activityAttemptAvailabilityDetails(
@@ -307,7 +344,12 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
       isLate: lateness.isLate,
       lateBySeconds: lateness.lateBySeconds,
       pluginAttemptRef: input.pluginAttemptRef ?? attempt.pluginAttemptRef,
-      metadata: input.metadata === undefined ? undefined : (input.metadata as JsonInput)
+      metadata: input.metadata === undefined
+        ? undefined
+        : {
+            ...(asJsonObject(attempt.metadata) ?? {}),
+            ...(asJsonObject(input.metadata) ?? {})
+          } as JsonInput
     }
   });
 }

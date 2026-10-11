@@ -10,6 +10,7 @@ import {
   startActivityAttempt,
   submitActivityAttempt
 } from "./gradebook";
+import { assignmentTimeLimitMinutes } from "./activity-assignment-policy";
 import { getGroupAssignedActivity } from "./groups";
 import { extractMediaAssetIds, reconcileMediaAssetReferences } from "./media-assets";
 
@@ -79,13 +80,14 @@ export async function startOrResumeTestAttempt(
   });
   if (!existing) {
     const revision = await ensureCurrentTestRevision(context);
-    const revisionItems = orderManifestItems(revision.items, asRecord(revision.settings).randomizeItems === true);
+    const attemptSettings = withAssignmentTimeLimit(revision.settings, context.assignedActivity.assignment.metadata);
+    const revisionItems = orderManifestItems(revision.items, asRecord(attemptSettings).randomizeItems === true);
     const manifest = {
       testId: context.test.id,
       sessionId: sessionId ?? null,
       testRevisionId: revision.id,
       revisionNumber: revision.revisionNumber,
-      settings: revision.settings,
+      settings: attemptSettings,
       items: revisionItems.map((item) => ({
         testItemId: item.sourceTestItemId,
         activityId: item.sourceActivityId,
@@ -677,7 +679,9 @@ function buildTestRuntime(
       } : null
     }];
   });
-  const runtimeSettings = attempt ? asRecord(asRecord(attempt.metadata).manifest).settings ?? context.test.settings : context.test.settings;
+  const runtimeSettings = attempt
+    ? asRecord(asRecord(attempt.metadata).manifest).settings ?? withAssignmentTimeLimit(context.test.settings, context.assignedActivity.assignment.metadata)
+    : withAssignmentTimeLimit(context.test.settings, context.assignedActivity.assignment.metadata);
   const manifest = attempt ? asRecord(asRecord(attempt.metadata).manifest) : {};
   const resumeAllowed = asRecord(runtimeSettings).allowResume !== false;
   const attemptSessionId = typeof manifest.sessionId === "string" ? manifest.sessionId : null;
@@ -823,6 +827,13 @@ function buildTestTiming(settingsValue: unknown, attempt: { lifecycle?: unknown;
     expiresAt: expiresAt?.toISOString() ?? null,
     remainingSeconds,
     isExpired: attempt?.lifecycle === "started" && remainingSeconds === 0
+  };
+}
+
+function withAssignmentTimeLimit(settingsValue: unknown, assignmentMetadata: unknown) {
+  return {
+    ...asRecord(settingsValue),
+    timeLimitMinutes: assignmentTimeLimitMinutes(assignmentMetadata)
   };
 }
 

@@ -70,6 +70,11 @@ export type ActivityExecutionHost<TState, TSubmissionResult> = ActivityExecution
   submit: (state: TState) => Promise<TSubmissionResult>;
 };
 
+export type TimedActivityAutoSubmit = {
+  requestId: number;
+  onSettled: (submitted: boolean) => void;
+};
+
 export type ActivityManualGradingContract = {
   routePath?: string;
   rendererKey?: string;

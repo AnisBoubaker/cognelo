@@ -365,6 +365,57 @@ describe("group services", () => {
     });
   });
 
+  it("loads a General time limit and lets a group explicitly disable it", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      courseId: "course-1",
+      title: "Timed practice",
+      metadata: { allGroupsAssignment: { assessmentMode: "formative", timeLimitMinutes: 40 } },
+      activityType: { key: "mcq" }
+    });
+    mockPrisma.courseGroup.findMany.mockResolvedValue([
+      {
+        id: "group-1",
+        title: "Group 1",
+        activities: [{
+          id: "assignment-1",
+          availableFrom: null,
+          availableUntil: null,
+          metadata: { assessmentMode: "formative", overrideFields: ["timeLimit"], timeLimitMinutes: null },
+          gradebookItem: null,
+          contentItems: []
+        }]
+      },
+      {
+        id: "group-2",
+        title: "Group 2",
+        activities: [{
+          id: "assignment-2",
+          availableFrom: null,
+          availableUntil: null,
+          metadata: { assessmentMode: "formative", overrideFields: [], timeLimitMinutes: 40 },
+          gradebookItem: null,
+          contentItems: []
+        }]
+      }
+    ]);
+    mockPrisma.courseContentItem.findFirst.mockResolvedValue({
+      id: "content-1",
+      parentId: null,
+      titleSnapshot: "Timed practice",
+      isVisible: true,
+      metadata: {}
+    });
+
+    await expect(getCourseActivityAssignmentSettings(teacherUser, "course-1", "activity-1")).resolves.toMatchObject({
+      general: { assessmentMode: "formative", timeLimitMinutes: 40 },
+      groups: [
+        { groupId: "group-1", timeLimitMinutes: null, overrideFields: ["timeLimit"] },
+        { groupId: "group-2", timeLimitMinutes: 40, overrideFields: [] }
+      ]
+    });
+  });
+
   it("creates groups as drafts with the creator as a teacher participant", async () => {
     tx.courseGroup.create.mockResolvedValue({ id: "group-1" });
     tx.activity.findMany.mockResolvedValue([]);
@@ -495,6 +546,7 @@ describe("group services", () => {
               enablePerGroupSettings: true,
               futureGroupsAssigned: false,
               assessmentMode: "formative",
+              timeLimitMinutes: null,
               assignedGroupIds: ["group-1", "group-2"]
             }
           })
@@ -510,7 +562,7 @@ describe("group services", () => {
           activityId: "activity-1",
           availableFrom: new Date("2026-05-18T13:00:00.000Z"),
           availableUntil: new Date("2026-05-25T13:00:00.000Z"),
-          metadata: { assignmentScope: "course_activity_settings", overrideFields: [], assessmentMode: "formative" }
+          metadata: { assignmentScope: "course_activity_settings", overrideFields: [], assessmentMode: "formative", timeLimitMinutes: null }
         })
       })
     );
@@ -520,7 +572,7 @@ describe("group services", () => {
         update: expect.objectContaining({
           availableFrom: new Date("2026-05-18T13:00:00.000Z"),
           availableUntil: new Date("2026-05-25T13:00:00.000Z"),
-          metadata: { assignmentScope: "course_activity_settings", overrideFields: [], assessmentMode: "formative" }
+          metadata: { assignmentScope: "course_activity_settings", overrideFields: [], assessmentMode: "formative", timeLimitMinutes: null }
         })
       })
     );
@@ -615,7 +667,8 @@ describe("group services", () => {
           note: "keep",
           assignmentScope: "course_activity_settings",
           overrideFields: ["availableFrom", "pointsPossible", "gradeChallenges"],
-          assessmentMode: "summative"
+          assessmentMode: "summative",
+          timeLimitMinutes: null
         }
       })
     }));
@@ -627,6 +680,50 @@ describe("group services", () => {
         metadata: expect.objectContaining({
           allGroupsAssignment: expect.objectContaining({ assignedGroupIds: ["group-1"], enabled: false })
         })
+      })
+    }));
+  });
+
+  it("persists formative time limits with changed and disabled group overrides", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({
+      id: "activity-1",
+      courseId: "course-1",
+      title: "Timed practice",
+      metadata: {},
+      activityType: { key: "mcq" }
+    });
+    tx.courseGroup.findMany.mockResolvedValue([
+      { id: "group-1", activities: [] },
+      { id: "group-2", activities: [] }
+    ]);
+    tx.activity.findFirst.mockResolvedValue({ id: "activity-1" });
+
+    await assignActivityToAllCourseGroups(teacherUser, "course-1", "activity-1", {
+      assessmentMode: "formative",
+      timeLimitMinutes: 30,
+      groupAssignments: [
+        { groupId: "group-1", assigned: true, overrideFields: ["timeLimit"], timeLimitMinutes: 15 },
+        { groupId: "group-2", assigned: true, overrideFields: ["timeLimit"], timeLimitMinutes: null }
+      ]
+    });
+
+    expect(tx.activity.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: {
+        metadata: {
+          allGroupsAssignment: expect.objectContaining({ timeLimitMinutes: 30 })
+        }
+      }
+    }));
+    expect(tx.courseGroupActivity.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { groupId_activityId: { groupId: "group-1", activityId: "activity-1" } },
+      create: expect.objectContaining({
+        metadata: expect.objectContaining({ overrideFields: ["timeLimit"], timeLimitMinutes: 15 })
+      })
+    }));
+    expect(tx.courseGroupActivity.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { groupId_activityId: { groupId: "group-2", activityId: "activity-1" } },
+      create: expect.objectContaining({
+        metadata: expect.objectContaining({ overrideFields: ["timeLimit"], timeLimitMinutes: null })
       })
     }));
   });
@@ -666,7 +763,8 @@ describe("group services", () => {
         metadata: {
           assignmentScope: "course_activity_settings",
           overrideFields: [],
-          assessmentMode: "formative"
+          assessmentMode: "formative",
+          timeLimitMinutes: null
         }
       })
     }));
@@ -777,7 +875,7 @@ describe("group services", () => {
         update: {
           availableFrom: new Date("2026-05-18T13:00:00.000Z"),
           availableUntil: new Date("2026-05-25T13:00:00.000Z"),
-          metadata: { assignmentScope: "course_activity_settings", overrideFields: [], assessmentMode: "formative" }
+          metadata: { assignmentScope: "course_activity_settings", overrideFields: [], assessmentMode: "formative", timeLimitMinutes: null }
         }
       })
     );
@@ -1393,6 +1491,7 @@ describe("group services", () => {
       id: "test-activity-1",
       courseId: "course-1",
       title: "Midterm",
+      metadata: { allGroupsAssignment: { timeLimitMinutes: 60 } },
       activityType: { key: "test" }
     });
     mockPrisma.courseGroupActivity.findFirst.mockResolvedValue(null);
@@ -1409,7 +1508,7 @@ describe("group services", () => {
       data: expect.objectContaining({
         activityId: "test-activity-1",
         groupId: "group-1",
-        metadata: { assessmentMode: "summative" }
+        metadata: { assessmentMode: "summative", timeLimitMinutes: 60 }
       })
     }));
     expect(tx.gradebookItem.upsert).toHaveBeenCalledTimes(1);

@@ -825,6 +825,26 @@ export type ActivityResponseDraft = {
   updatedAt: string;
 };
 
+export type TimedActivityRuntime = {
+  timeLimitMinutes: number | null;
+  attempt: {
+    id: string;
+    attemptNumber: number;
+    lifecycle: "started";
+    startedAt: string;
+  } | null;
+  timing: {
+    expiresAt: string | null;
+    remainingSeconds: number | null;
+    isExpired: boolean;
+  };
+  availability: {
+    canStart: boolean;
+    reason: string | null;
+    attemptsRemaining: number | null;
+  };
+};
+
 export type CourseGroupActivityAssignment = {
   id: string;
   activityId: string;
@@ -851,6 +871,7 @@ export type CourseActivityAssignmentSettings = {
   general: {
     availableFrom: string | null;
     availableUntil: string | null;
+    timeLimitMinutes: number | null;
     assessmentMode: "formative" | "summative";
     requireSafeExamBrowser: boolean;
     gradeChallengesEnabled: boolean;
@@ -870,6 +891,7 @@ export type CourseActivityAssignmentSettings = {
     overrideFields: ActivityAssignmentOverrideField[];
     availableFrom: string | null;
     availableUntil: string | null;
+    timeLimitMinutes: number | null;
     requireSafeExamBrowser: boolean;
     gradeChallengesEnabled: boolean;
     gradebookSettings: ActivityAssignmentGradebookSettings;
@@ -1962,6 +1984,20 @@ export const api = {
     request<{ ok: true }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/draft`,
       { method: "DELETE" }
+    ),
+  timedActivityRuntime: (courseId: string, groupId: string, activityId: string) =>
+    request<{ runtime: TimedActivityRuntime }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/timing`
+    ),
+  startTimedActivityAttempt: (courseId: string, groupId: string, activityId: string) =>
+    request<{ runtime: TimedActivityRuntime }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/timing`,
+      { method: "POST" }
+    ),
+  finalizeTimedActivityAttempt: (courseId: string, groupId: string, activityId: string) =>
+    request<{ runtime: TimedActivityRuntime }>(
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/timing/finalize`,
+      { method: "POST" }
     ),
   assignActivityToAllCourseGroups: (courseId: string, activityId: string, input: CourseAllGroupsActivityAssignmentInput) =>
     request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}/assign-all-groups`, {

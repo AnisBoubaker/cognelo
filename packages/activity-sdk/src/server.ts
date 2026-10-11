@@ -50,6 +50,7 @@ export type PluginRouteHandler = (input: {
 export type PluginRouteDefinition = {
   path: string;
   activityTypeKeys?: readonly string[];
+  allowExpiredTimedAttemptMethods?: readonly ("POST" | "PATCH" | "PUT" | "DELETE")[];
   methods: Partial<Record<"GET" | "POST" | "PATCH" | "PUT" | "DELETE", PluginRouteHandler>>;
 };
 

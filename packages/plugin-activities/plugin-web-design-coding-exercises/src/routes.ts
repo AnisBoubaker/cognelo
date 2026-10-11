@@ -115,6 +115,7 @@ export const webDesignExerciseRunRoute: PluginRouteDefinition = {
 export const webDesignExerciseSubmitRoute: PluginRouteDefinition = {
   path: "web-design-coding-exercises/submit",
   activityTypeKeys: ["web-design-coding-exercise"],
+  allowExpiredTimedAttemptMethods: ["POST"],
   methods: {
     GET: async ({ context }) => {
       const submissions = await listRecentWebDesignExerciseSubmissions({

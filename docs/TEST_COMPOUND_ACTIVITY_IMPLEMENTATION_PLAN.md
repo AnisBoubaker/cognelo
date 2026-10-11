@@ -233,6 +233,9 @@ Assignment behavior:
 
 - assessment mode is always `summative`;
 - availability and due dates belong to the Test assignment;
+- the Test authoring time limit is a reusable default only: creating, duplicating, or importing the course Test copies it once into the course activity's General assignment settings;
+- the copied course limit can then be disabled or changed independently and can have per-group replace/disable overrides; later Test-authoring edits do not update it;
+- a new parent attempt snapshots the effective group assignment limit in its manifest, while an active parent retains that snapshot if course settings later change;
 - attempt limits and grade strategy belong to the Test gradebook item;
 - **Assign to all** materializes one Test assignment per current group, while later groups remain unassigned;
 - per-group settings use explicit overrides of the General Test policy;
@@ -408,7 +411,7 @@ This section records an unresolved product discussion for a later session. None 
 
 ### Current behavior and limitation
 
-- After the first Test attempt starts, the supported service routes reject changes to Test settings, contained activity public configuration, and guarded plugin-private authoring such as Programming Exercise templates, reference solutions, rubrics, and hidden tests.
+- After the first Test attempt starts, the supported service routes reject changes to Test authoring settings, contained activity public configuration, and guarded plugin-private authoring such as Programming Exercise templates, reference solutions, rubrics, and hidden tests. The independent course activity timing policy remains editable for future attempts, but an active parent keeps its manifest snapshot.
 - A Test attempt records its settings, ordered item manifest, immutable `TestRevision`, and child-configuration fingerprints when it starts.
 - The active student runtime does not poll for authored-content changes or compare the recorded child fingerprint with the live child before every action. Display and composite execution currently read the live child `Activity`; Programming Exercise submission reads the live plugin-private template and hidden-test rows. Safety therefore depends on every mutation path honoring the post-attempt authoring lock.
 - The browser counts down from the server-provided deadline and initiates submission at zero after pending saves finish. There is no server-scheduled submission exactly at the deadline. Reloading an expired active attempt causes the browser to observe zero and initiate submission, while the server rejects further child writes after expiry.

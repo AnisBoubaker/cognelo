@@ -7,6 +7,7 @@ import { assertCanManageCourse, assertCanViewCourse } from "./authorization";
 import { AppError, notFound } from "./errors";
 import { ensureCoreActivityTypes } from "./plugins";
 import { reconcileMediaAssetReferences } from "./media-assets";
+import { withCourseActivityTimeLimitDefault } from "./activity-assignment-policy";
 
 const testInclude = {
   activity: { include: { activityType: true, bankActivity: true, activityVersion: true } },
@@ -36,7 +37,10 @@ export async function createTest(user: CurrentUser, courseId: string, input: unk
         description: data.description,
         lifecycle: data.lifecycle,
         config: {},
-        metadata: { coreActivity: "test" },
+        metadata: withCourseActivityTimeLimitDefault(
+          { coreActivity: "test" },
+          data.settings.timeLimitMinutes
+        ) as Prisma.InputJsonValue,
         position: data.position,
         createdById: user.id
       }
@@ -101,7 +105,10 @@ export async function duplicateTest(user: CurrentUser, courseId: string, activit
         description: source.activity.description,
         lifecycle: "draft",
         config: source.activity.config as Prisma.InputJsonValue,
-        metadata: source.activity.metadata as Prisma.InputJsonValue,
+        metadata: withCourseActivityTimeLimitDefault(
+          withoutAssignmentPolicy(source.activity.metadata),
+          asRecord(source.settings).timeLimitMinutes as number | null | undefined
+        ) as Prisma.InputJsonValue,
         position: source.activity.position + 1,
         createdById: user.id
       }
@@ -166,6 +173,12 @@ export async function duplicateTest(user: CurrentUser, courseId: string, activit
       activityCopies
     };
   });
+}
+
+function withoutAssignmentPolicy(value: unknown) {
+  const metadata = asRecord(value);
+  const { allGroupsAssignment: _assignment, ...preserved } = metadata;
+  return preserved;
 }
 
 export async function updateTest(user: CurrentUser, courseId: string, activityId: string, input: unknown) {

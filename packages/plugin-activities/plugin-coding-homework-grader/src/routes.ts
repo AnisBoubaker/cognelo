@@ -265,6 +265,7 @@ export const codingHomeworkStudentAssignmentRoute: PluginRouteDefinition = {
 export const codingHomeworkSubmissionRoute: PluginRouteDefinition = {
   path: "coding-homework-grader/submission",
   activityTypeKeys: ["coding-homework-grader"],
+  allowExpiredTimedAttemptMethods: ["POST"],
   methods: {
     GET: async ({ context }) => {
       return getLatestCodingHomeworkSubmission(resolveStudentSubmissionScope(context));
@@ -405,6 +406,7 @@ export const codingHomeworkChallengeGenerationRoute: PluginRouteDefinition = {
 export const codingHomeworkChallengeAnswersRoute: PluginRouteDefinition = {
   path: "coding-homework-grader/challenge-answers",
   activityTypeKeys: ["coding-homework-grader"],
+  allowExpiredTimedAttemptMethods: ["POST"],
   methods: {
     PUT: async ({ context, readJson }) => {
       return saveCodingHomeworkChallengeAnswers(resolveStudentSubmissionScope(context), await readJson(), { finalize: false });

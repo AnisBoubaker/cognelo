@@ -27,7 +27,7 @@ import {
 } from "./authorization";
 import { listContentItems } from "./course-content";
 import { AppError, notFound } from "./errors";
-import { assignmentAllowsGradeChallenges } from "./activity-assignment-policy";
+import { assignmentAllowsGradeChallenges, assignmentTimeLimitMinutes } from "./activity-assignment-policy";
 
 type StudentAccessDb = Pick<typeof prisma, "role" | "userRole" | "courseMembership">;
 type GradebookItemDb = Pick<typeof prisma, "gradebookItem">;
@@ -38,6 +38,7 @@ type CourseWideAssignmentMetadata = {
   enabled?: boolean;
   availableFrom?: string | null;
   availableUntil?: string | null;
+  timeLimitMinutes?: number | null;
   enablePerGroupSettings?: boolean;
   assessmentMode?: "formative" | "summative";
   requireSafeExamBrowser?: boolean;
@@ -54,6 +55,7 @@ const COURSE_ACTIVITY_SETTINGS_SCOPE = "course_activity_settings";
 const SUMMATIVE_OVERRIDE_FIELDS = new Set<ActivityAssignmentOverrideField>([
   "availableFrom",
   "availableUntil",
+  "timeLimit",
   "visibility",
   "requireSafeExamBrowser",
   "gradeChallenges",
@@ -65,6 +67,7 @@ const SUMMATIVE_OVERRIDE_FIELDS = new Set<ActivityAssignmentOverrideField>([
 const FORMATIVE_OVERRIDE_FIELDS = new Set<ActivityAssignmentOverrideField>([
   "availableFrom",
   "availableUntil",
+  "timeLimit",
   "visibility"
 ]);
 
@@ -232,6 +235,7 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
   const general = {
     availableFrom: rule?.availableFrom ?? null,
     availableUntil: rule?.availableUntil ?? null,
+    timeLimitMinutes: normalizeTimeLimitMinutes(rule?.timeLimitMinutes),
     assessmentMode,
     requireSafeExamBrowser: assessmentMode === "summative" && rule?.requireSafeExamBrowser === true,
     gradeChallengesEnabled: assessmentMode === "summative" && rule?.gradeChallengesEnabled === true,
@@ -276,6 +280,9 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
         overrideFields,
         availableFrom: assignment?.availableFrom?.toISOString() ?? general.availableFrom,
         availableUntil: assignment?.availableUntil?.toISOString() ?? general.availableUntil,
+        timeLimitMinutes: overrideFields.includes("timeLimit")
+          ? assignmentTimeLimitMinutes(assignment?.metadata)
+          : general.timeLimitMinutes,
         requireSafeExamBrowser:
           assessmentMode === "summative"
             ? assignmentRequiresSafeExamBrowser(assignment?.metadata) || (!overrideFields.includes("requireSafeExamBrowser") && general.requireSafeExamBrowser)
@@ -336,6 +343,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
       overrideFields: [],
       availableFrom: data.availableFrom,
       availableUntil: data.availableUntil,
+      timeLimitMinutes: data.timeLimitMinutes,
       requireSafeExamBrowser: data.requireSafeExamBrowser,
       gradeChallengesEnabled: data.gradeChallengesEnabled,
       gradebookSettings,
@@ -357,6 +365,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
             enabled: assignedGroupIds.length > 0 && assignedGroupIds.length === groups.length,
             availableFrom: data.availableFrom ?? null,
             availableUntil: data.availableUntil ?? null,
+            timeLimitMinutes: data.timeLimitMinutes,
             enablePerGroupSettings: true,
             futureGroupsAssigned: false,
             assessmentMode: data.assessmentMode,
@@ -395,6 +404,9 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
         const overrideFields = requested.overrideFields.filter((field) => allowedFields.has(field));
         const groupAvailableFrom = overrideFields.includes("availableFrom") ? requested.availableFrom : data.availableFrom;
         const groupAvailableUntil = overrideFields.includes("availableUntil") ? requested.availableUntil : data.availableUntil;
+        const groupTimeLimitMinutes = overrideFields.includes("timeLimit")
+          ? normalizeTimeLimitMinutes(requested.timeLimitMinutes)
+          : data.timeLimitMinutes;
         validateAvailability(groupAvailableFrom, groupAvailableUntil);
         const requireSafeExamBrowser = data.assessmentMode === "summative" && (
           overrideFields.includes("requireSafeExamBrowser")
@@ -449,7 +461,8 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
           overrideFields,
           data.assessmentMode,
           requireSafeExamBrowser,
-          gradeChallengesEnabled
+          gradeChallengesEnabled,
+          groupTimeLimitMinutes
         );
         if (existingAssignment) {
           await applyAssignmentAssessmentModeTransition(tx, {
@@ -1124,6 +1137,16 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
     throw new AppError(400, "GROUP_ACTIVITY_EXISTS", "This activity is already assigned to the group.");
   }
 
+  const assignmentMetadata = asMetadataRecord(data.metadata as Prisma.JsonValue);
+  const courseAssignmentRule = getCourseWideAssignmentMetadata(activity.metadata);
+  if (
+    !Object.prototype.hasOwnProperty.call(assignmentMetadata, "timeLimitMinutes") &&
+    courseAssignmentRule &&
+    Object.prototype.hasOwnProperty.call(courseAssignmentRule, "timeLimitMinutes")
+  ) {
+    assignmentMetadata.timeLimitMinutes = normalizeTimeLimitMinutes(courseAssignmentRule.timeLimitMinutes);
+  }
+
   return prisma.$transaction(async (tx) => {
     const assignment = await tx.courseGroupActivity.create({
       data: {
@@ -1132,7 +1155,7 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
         availableFrom: parseDateInput(data.availableFrom),
         availableUntil: parseDateInput(data.availableUntil),
         config: data.config as Prisma.InputJsonValue,
-        metadata: data.metadata as Prisma.InputJsonValue,
+        metadata: assignmentMetadata as Prisma.InputJsonValue,
         position: data.position
       },
       include: {
@@ -1558,6 +1581,7 @@ function inferLegacyOverrideFields(input: {
     availableUntil: string | null;
     requireSafeExamBrowser: boolean;
     gradeChallengesEnabled: boolean;
+    timeLimitMinutes: number | null;
     gradebookSettings: GradebookItemSettingsInput;
     contentPlacement: {
       parentId?: string | null;
@@ -1568,6 +1592,7 @@ function inferLegacyOverrideFields(input: {
   const fields: ActivityAssignmentOverrideField[] = [];
   if ((input.assignment.availableFrom?.toISOString() ?? null) !== input.general.availableFrom) fields.push("availableFrom");
   if ((input.assignment.availableUntil?.toISOString() ?? null) !== input.general.availableUntil) fields.push("availableUntil");
+  if (assignmentTimeLimitMinutes(input.assignment.metadata) !== input.general.timeLimitMinutes) fields.push("timeLimit");
   if ((input.assignmentContentPlacement.isVisible ?? true) !== (input.general.contentPlacement.isVisible ?? true)) fields.push("visibility");
   if (assignmentRequiresSafeExamBrowser(input.assignment.metadata) !== input.general.requireSafeExamBrowser) {
     fields.push("requireSafeExamBrowser");
@@ -1629,7 +1654,8 @@ function buildCourseActivitySettingsMetadata(
   overrideFields: ActivityAssignmentOverrideField[],
   assessmentMode: "formative" | "summative",
   requireSafeExamBrowser: boolean,
-  gradeChallengesEnabled: boolean
+  gradeChallengesEnabled: boolean,
+  timeLimitMinutes: number | null
 ): Prisma.InputJsonValue {
   const current = asMetadataRecord(currentValue);
   const {
@@ -1639,6 +1665,7 @@ function buildCourseActivitySettingsMetadata(
     assessmentMode: _assessmentMode,
     requireSafeExamBrowser: _requireSafeExamBrowser,
     gradeChallengesEnabled: _gradeChallengesEnabled,
+    timeLimitMinutes: _timeLimitMinutes,
     ...preserved
   } = current;
   return {
@@ -1646,9 +1673,14 @@ function buildCourseActivitySettingsMetadata(
     assignmentScope: COURSE_ACTIVITY_SETTINGS_SCOPE,
     overrideFields,
     assessmentMode,
+    timeLimitMinutes,
     ...(requireSafeExamBrowser ? { requireSafeExamBrowser: true } : {}),
     ...(gradeChallengesEnabled ? { gradeChallengesEnabled: true } : {})
   };
+}
+
+function normalizeTimeLimitMinutes(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 1440 ? value : null;
 }
 
 function readAssessmentMode(value: unknown): "formative" | "summative" {

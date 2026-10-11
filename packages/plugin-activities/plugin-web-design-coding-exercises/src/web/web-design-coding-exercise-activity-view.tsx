@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
+import type { ActivityExecutionStateHost, TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import { EditActionBar, MarkdownRenderer, MonacoCodeEditor, ProgressDialog, getEditActionBarCopy, useDialogs, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   buildWebDesignPreviewDocument,
@@ -127,6 +127,8 @@ type WebDesignCodingExerciseActivityViewProps = {
   executionStateHost?: ActivityExecutionStateHost<Record<string, unknown>>;
   deferSubmission?: boolean;
   readOnly?: boolean;
+  onSubmitted?: () => void;
+  timedAutoSubmit?: TimedActivityAutoSubmit;
 };
 
 type ApiErrorLike = Error & {
@@ -410,7 +412,9 @@ export function WebDesignCodingExerciseActivityView({
   webDesignClient,
   executionStateHost,
   deferSubmission = false,
-  readOnly = false
+  readOnly = false,
+  onSubmitted,
+  timedAutoSubmit
 }: WebDesignCodingExerciseActivityViewProps) {
   const copyLocale = locale === "fr" || locale === "zh" ? locale : "en";
   const copy = copyByLocale[copyLocale] ?? copyByLocale.en;
@@ -443,6 +447,7 @@ export function WebDesignCodingExerciseActivityView({
   const [executingKind, setExecutingKind] = useState<"run" | "submit" | null>(null);
   const [latestSubmission, setLatestSubmission] = useState<WebDesignExerciseSubmissionRecord | null>(null);
   const [executionError, setExecutionError] = useState("");
+  const lastTimedAutoSubmitRequestRef = useRef(0);
   const [expectedResultImageDataUrl, setExpectedResultImageDataUrl] = useState<string | null>(null);
   const [authoringTests, setAuthoringTests] = useState<WebDesignExerciseTestRecord[]>([]);
   const [authoringTestsLoaded, setAuthoringTestsLoaded] = useState(false);
@@ -939,15 +944,15 @@ export function WebDesignCodingExerciseActivityView({
     });
   }
 
-  async function executeStudentTests(kind: "run" | "submit") {
+  async function executeStudentTests(kind: "run" | "submit"): Promise<boolean> {
     if (!course?.id) {
       setExecutionError(copy.noCourse);
-      return;
+      return false;
     }
 
     if (!webDesignClient) {
       setExecutionError(copy.noRunner);
-      return;
+      return false;
     }
 
     setExecutingKind(kind);
@@ -961,12 +966,24 @@ export function WebDesignCodingExerciseActivityView({
         await executionStateHost?.clear?.().catch(() => undefined);
       }
       setLatestSubmission(result.submission);
+      if (kind === "submit") onSubmitted?.();
+      return true;
     } catch (err) {
       setExecutionError(err instanceof Error ? err.message : copy.noRunner);
+      return false;
     } finally {
       setExecutingKind(null);
     }
   }
+
+  useEffect(() => {
+    const requestId = timedAutoSubmit?.requestId ?? 0;
+    if (!requestId || requestId === lastTimedAutoSubmitRequestRef.current || canManage || readOnly) return;
+    lastTimedAutoSubmitRequestRef.current = requestId;
+    void executeStudentTests("submit")
+      .then((didSubmit) => timedAutoSubmit?.onSettled(didSubmit))
+      .catch(() => timedAutoSubmit?.onSettled(false));
+  }, [canManage, readOnly, timedAutoSubmit]);
 
   if (canManage) {
     const authoringTabs = [

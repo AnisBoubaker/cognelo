@@ -26,6 +26,8 @@ type GradebookDraft = {
 type AssignmentValueDraft = GradebookDraft & {
   availableFrom: string;
   availableUntil: string;
+  timeLimitEnabled: boolean;
+  timeLimitMinutes: string;
   isVisible: boolean;
   requireSafeExamBrowser: boolean;
   gradeChallengesEnabled: boolean;
@@ -172,6 +174,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
       await api.assignActivityToAllCourseGroups(courseId, activity.id, {
         availableFrom: toIsoOrNull(draft.general.availableFrom),
         availableUntil: toIsoOrNull(draft.general.availableUntil),
+        timeLimitMinutes: buildTimeLimitMinutes(draft.general),
         enablePerGroupSettings: true,
         assessmentMode: draft.assessmentMode,
         confirmSummativeToFormative: convertsSummativeToFormative,
@@ -192,6 +195,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
             : [],
           availableFrom: toIsoOrNull(group.availableFrom),
           availableUntil: toIsoOrNull(group.availableUntil),
+          timeLimitMinutes: buildTimeLimitMinutes(group),
           requireSafeExamBrowser: draft.assessmentMode === "summative" && group.requireSafeExamBrowser,
           gradeChallengesEnabled: draft.assessmentMode === "summative" && group.gradeChallengesEnabled,
           gradebookSettings: buildGradebookSettings(group),
@@ -284,6 +288,12 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                       />
                     </div>
                   </div>
+                  <TimeLimitField
+                    disabled={saving}
+                    idPrefix={`activity-settings-general-${activity.id}`}
+                    value={draft.general}
+                    onChange={updateGeneral}
+                  />
                   <label className="checkbox-row" htmlFor={`activity-settings-visible-${activity.id}`}>
                     <input
                       checked={draft.general.isVisible}
@@ -386,6 +396,20 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                             />
                           </OverrideField>
                           <OverrideField
+                            checked={selectedGroup.overrideFields.includes("timeLimit")}
+                            disabled={saving}
+                            id={`activity-group-time-limit-${selectedGroup.groupId}`}
+                            label={t("groupPage.timeLimit")}
+                            onToggle={(checked) => toggleGroupOverride(selectedGroup.groupId, "timeLimit", checked)}
+                          >
+                            <TimeLimitField
+                              disabled={saving}
+                              idPrefix={`activity-group-time-limit-value-${selectedGroup.groupId}`}
+                              value={selectedGroup}
+                              onChange={(update) => updateGroup(selectedGroup.groupId, update)}
+                            />
+                          </OverrideField>
+                          <OverrideField
                             checked={selectedGroup.overrideFields.includes("visibility")}
                             disabled={saving}
                             id={`activity-group-visible-${selectedGroup.groupId}`}
@@ -441,6 +465,52 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
             </button>
           </div>
     </form>
+  );
+}
+
+function TimeLimitField({
+  disabled,
+  idPrefix,
+  value,
+  onChange
+}: {
+  disabled: boolean;
+  idPrefix: string;
+  value: Pick<AssignmentValueDraft, "timeLimitEnabled" | "timeLimitMinutes">;
+  onChange: (update: Partial<AssignmentValueDraft>) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="stack stack-tight">
+      <label className="checkbox-row" htmlFor={`${idPrefix}-enabled`}>
+        <input
+          checked={value.timeLimitEnabled}
+          disabled={disabled}
+          id={`${idPrefix}-enabled`}
+          type="checkbox"
+          onChange={(event) => onChange({ timeLimitEnabled: event.target.checked })}
+        />
+        <span>
+          {t("groupPage.timeLimitEnabled")}
+          <small className="muted">{t("groupPage.timeLimitHelp")}</small>
+        </span>
+      </label>
+      {value.timeLimitEnabled ? (
+        <div className="field">
+          <label htmlFor={`${idPrefix}-minutes`}>{t("groupPage.timeLimitMinutes")}</label>
+          <input
+            disabled={disabled}
+            id={`${idPrefix}-minutes`}
+            max="1440"
+            min="1"
+            step="1"
+            type="number"
+            value={value.timeLimitMinutes}
+            onChange={(event) => onChange({ timeLimitMinutes: event.target.value })}
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -744,6 +814,7 @@ function buildDraft(settings: CourseActivityAssignmentSettings, isTest: boolean)
 function assignmentValueDraft(value: {
   availableFrom: string | null;
   availableUntil: string | null;
+  timeLimitMinutes: number | null;
   requireSafeExamBrowser: boolean;
   gradeChallengesEnabled: boolean;
   gradebookSettings: ActivityAssignmentGradebookSettings;
@@ -752,6 +823,8 @@ function assignmentValueDraft(value: {
   return {
     availableFrom: toDateTimeLocalValue(value.availableFrom),
     availableUntil: toDateTimeLocalValue(value.availableUntil),
+    timeLimitEnabled: value.timeLimitMinutes !== null,
+    timeLimitMinutes: String(value.timeLimitMinutes ?? 60),
     isVisible: value.contentPlacement.isVisible,
     requireSafeExamBrowser: value.requireSafeExamBrowser,
     gradeChallengesEnabled: value.gradeChallengesEnabled,
@@ -770,6 +843,10 @@ function copyGeneralField(general: AssignmentValueDraft, field: ActivityAssignme
   switch (field) {
     case "availableFrom": return { availableFrom: general.availableFrom };
     case "availableUntil": return { availableUntil: general.availableUntil };
+    case "timeLimit": return {
+      timeLimitEnabled: general.timeLimitEnabled,
+      timeLimitMinutes: general.timeLimitMinutes
+    };
     case "visibility": return { isVisible: general.isVisible };
     case "requireSafeExamBrowser": return { requireSafeExamBrowser: general.requireSafeExamBrowser };
     case "gradeChallenges": return { gradeChallengesEnabled: general.gradeChallengesEnabled };
@@ -797,6 +874,10 @@ function inheritedGeneralUpdate(
   }
   if (!group.overrideFields.includes("availableUntil") && update.availableUntil !== undefined) {
     inherited.availableUntil = update.availableUntil;
+  }
+  if (!group.overrideFields.includes("timeLimit")) {
+    if (update.timeLimitEnabled !== undefined) inherited.timeLimitEnabled = update.timeLimitEnabled;
+    if (update.timeLimitMinutes !== undefined) inherited.timeLimitMinutes = update.timeLimitMinutes;
   }
   if (!group.overrideFields.includes("visibility") && update.isVisible !== undefined) {
     inherited.isVisible = update.isVisible;
@@ -838,6 +919,11 @@ function buildGradebookSettings(value: GradebookDraft): ActivityAssignmentGradeb
     gradeStrategy: value.gradeStrategy,
     dropLowestAttempt: value.gradeStrategy === "weighted_average" && value.dropLowestAttempt
   };
+}
+
+function buildTimeLimitMinutes(value: Pick<AssignmentValueDraft, "timeLimitEnabled" | "timeLimitMinutes">) {
+  if (!value.timeLimitEnabled) return null;
+  return Math.min(1440, Math.max(1, Math.floor(positiveNumber(value.timeLimitMinutes, 60))));
 }
 
 function positiveNumber(value: string, fallback: number) {

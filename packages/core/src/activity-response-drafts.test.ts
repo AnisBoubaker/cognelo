@@ -10,9 +10,11 @@ const db = vi.hoisted(() => ({
   courseGroupParticipant: { findFirst: vi.fn() }
 }));
 const groups = vi.hoisted(() => ({ getGroupAssignedActivity: vi.fn() }));
+const timing = vi.hoisted(() => ({ assertTimedActivityWriteAllowed: vi.fn() }));
 
 vi.mock("@cognelo/db", () => ({ prisma: db, Prisma: {} }));
 vi.mock("./groups", () => groups);
+vi.mock("./activity-timing", () => timing);
 
 import {
   clearActivityResponseDraft,
@@ -74,6 +76,12 @@ describe("activity response drafts", () => {
       }),
       update: { state }
     }));
+    expect(timing.assertTimedActivityWriteAllowed).toHaveBeenCalledWith(
+      student,
+      "course-1",
+      "group-1",
+      "activity-1"
+    );
   });
 
   it("clears only the current student's draft for this assignment", async () => {

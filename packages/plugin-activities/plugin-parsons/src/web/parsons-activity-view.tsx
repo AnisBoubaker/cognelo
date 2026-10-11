@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import { CodeEditor, CodeRenderer, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, ProgressDialog, codeLanguageOptions, getEditActionBarCopy, normalizeCodeLanguage, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   createParsonsGroup,
@@ -93,6 +94,7 @@ type ParsonsActivityViewProps = {
   onSubmitted?: () => void;
   onNewAttemptAvailabilityChange?: (canStartNewAttempt: boolean) => void;
   onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
+  timedAutoSubmit?: TimedActivityAutoSubmit;
   t: (key: string, vars?: Record<string, string | number>) => string;
   locale?: "en" | "fr" | "zh" | "ar";
   aiGenerationClient?: {
@@ -136,6 +138,7 @@ export function ParsonsActivityView({
   onSubmitted,
   onNewAttemptAvailabilityChange,
   onPreviousSubmissionsAvailabilityChange,
+  timedAutoSubmit,
   t,
   locale = "en",
   aiGenerationClient
@@ -143,6 +146,7 @@ export function ParsonsActivityView({
   const actionCopy = getEditActionBarCopy(locale);
   const notifications = useNotifications();
   const knowledgeGeneration = useActivityKnowledgeGeneration();
+  const lastTimedAutoSubmitRequestRef = useRef(0);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -565,9 +569,9 @@ export function ParsonsActivityView({
     });
   }
 
-  async function submitSolution() {
+  async function submitSolution(): Promise<boolean> {
     if (isReadOnlyStudentAttempt || submitting) {
-      return;
+      return false;
     }
     setSubmitting(true);
     const result = evaluateParsonsSolution(blocksRef.current, parseParsonsConfig(activity.config));
@@ -599,11 +603,22 @@ export function ParsonsActivityView({
       if (submittedAttempt) {
         setShowSubmitConfirmDialog(false);
         onSubmitted?.();
+        return true;
       }
+      return false;
     } finally {
       setSubmitting(false);
     }
   }
+
+  useEffect(() => {
+    const requestId = timedAutoSubmit?.requestId ?? 0;
+    if (!requestId || requestId === lastTimedAutoSubmitRequestRef.current || canManage || studentViewMode !== "attempt") return;
+    lastTimedAutoSubmitRequestRef.current = requestId;
+    void submitSolution()
+      .then((didSubmit) => timedAutoSubmit?.onSettled(didSubmit))
+      .catch(() => timedAutoSubmit?.onSettled(false));
+  }, [canManage, studentViewMode, timedAutoSubmit]);
 
   function toggleSelectedLine(lineIndex: number) {
     setSelectedLines((current) =>

@@ -12,6 +12,7 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - **Assess with AI** is feedback-only for MCQ. The shared **Review and grade** host may still apply an explicit audited teacher override to the final grade; that override is separate from MCQ feedback generation or revision.
 - Model explanations are not an independent challenge target because they do not affect scoring. The released deterministic/overridden grade and teacher-authored released feedback are challengeable through core only when the effective summative assignment setting permits it.
 - Standalone and compound-Test draft paths are distinct and must not be mixed.
+- Standalone timing is core assignment policy. Do not add an MCQ time setting: after the host's explicit start, MCQ must answer `TimedActivityAutoSubmit` by using its ordinary formative check or summative submission so the same core attempt is finalized.
 - The definition declares `studentView: { mode: "interactive", execution: "plugin" }`. This is a third browser-scoped path: answer checks are deterministic and stateless, with no draft, attempt, grade, feedback artifact, or analytics persistence.
 - Attempt limits are enforced by both status UI and the submission route. Released final grades close further attempts.
 - Every standalone answer check/submission creates a core attempt with the assignment mode. Student summative history and limits select only summative attempts; teacher history can inspect both modes.

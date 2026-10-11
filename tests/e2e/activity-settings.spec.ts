@@ -13,6 +13,7 @@ type AssignmentSettings = {
   general: {
     availableFrom: string | null;
     availableUntil: string | null;
+    timeLimitMinutes: number | null;
     assessmentMode: "formative" | "summative";
     requireSafeExamBrowser: boolean;
     gradeChallengesEnabled: boolean;
@@ -26,6 +27,7 @@ type AssignmentSettings = {
     overrideFields: string[];
     availableFrom: string | null;
     availableUntil: string | null;
+    timeLimitMinutes: number | null;
     requireSafeExamBrowser: boolean;
     gradeChallengesEnabled: boolean;
     gradebookSettings: GradebookSettings;
@@ -93,6 +95,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
       await saveAssignmentSettings(teacherApi, data, matrixActivityId, matrixTitle, {
         availableFrom: "2026-01-10T17:00:00.000Z",
         availableUntil: "2028-01-10T17:00:00.000Z",
+        timeLimitMinutes: 45,
         assessmentMode: "summative",
         requireSafeExamBrowser: true,
         gradeChallengesEnabled: true,
@@ -103,7 +106,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
         ]
       });
 
-      for (const key of ["visible", "assignAll", "unassigned", "hidden", "future", "expired", "seb", "policy"] as const) {
+      for (const key of ["visible", "assignAll", "unassigned", "hidden", "future", "expired", "seb", "policy", "timed"] as const) {
         const title = `E2E settings ${key} ${data.token}`;
         activityTitles[key] = title;
         activityIds[key] = await createCourseActivity(data, {
@@ -189,6 +192,10 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
           unassignedGroup(secondaryGroupId)
         ]
       });
+      await saveAssignmentSettings(teacherApi, data, activityIds.timed, activityTitles.timed, {
+        timeLimitMinutes: 30,
+        groupAssignments: [assignedGroup(data.groupId), unassignedGroup(secondaryGroupId)]
+      });
     } finally {
       await teacherApi.dispose();
     }
@@ -214,6 +221,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
     await expect(settings.getByRole("button", { name: "Cancel", exact: true }).last()).toBeVisible();
     await expect(settings.getByRole("button", { name: "Save settings", exact: true })).toBeVisible();
     await expect(settings.getByLabel("Assessment mode")).toHaveValue("formative");
+    await expect(settings.getByLabel("Limit the time for each attempt")).not.toBeChecked();
     await expect(settings.locator(".activity-summative-settings")).toHaveCount(0);
     await expect(settings.getByLabel("Folder")).toHaveCount(0);
 
@@ -221,7 +229,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
     await expect(settings.getByRole("tab", { name: data.groupTitle, exact: true })).toBeVisible();
     await expect(settings.getByRole("tab", { name: secondaryGroupTitle, exact: true })).toBeVisible();
     await settings.getByRole("tab", { name: data.groupTitle, exact: true }).click();
-    await expect(settings.locator(".activity-override-field")).toHaveCount(3);
+    await expect(settings.locator(".activity-override-field")).toHaveCount(4);
     await expect(overrideCard(settings, "Assessment mode")).toHaveCount(0);
     await expect(overrideCard(settings, "Require Safe Exam Browser")).toHaveCount(0);
     await expect(overrideCard(settings, "Points possible")).toHaveCount(0);
@@ -330,6 +338,12 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
     await expect(availableUntil.locator("input[type='date']")).toHaveValue("2028-01-10");
     await availableUntil.locator("input[type='date']").fill("2027-11-12");
 
+    const timeLimit = overrideCard(settings, "Time limit");
+    await enableOverride(timeLimit);
+    await expect(timeLimit.getByLabel("Limit the time for each attempt")).toBeChecked();
+    await expect(timeLimit.getByLabel("Time limit (minutes)")).toHaveValue("45");
+    await timeLimit.getByLabel("Time limit (minutes)").fill("20");
+
     const visibility = overrideCard(settings, "Visible to students");
     await enableOverride(visibility);
     await expect(overrideValueCheckbox(visibility)).toBeChecked();
@@ -380,6 +394,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
       expect(new Set(group?.overrideFields)).toEqual(new Set([
         "availableFrom",
         "availableUntil",
+        "timeLimit",
         "visibility",
         "requireSafeExamBrowser",
         "gradeChallenges",
@@ -390,6 +405,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
       ]));
       expect(group).toMatchObject({
         assigned: true,
+        timeLimitMinutes: 20,
         requireSafeExamBrowser: false,
         gradeChallengesEnabled: false,
         contentPlacement: { isVisible: false },
@@ -409,6 +425,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
       expect(inherited).toMatchObject({
         assigned: true,
         overrideFields: [],
+        timeLimitMinutes: 45,
         requireSafeExamBrowser: true,
         gradeChallengesEnabled: true,
         contentPlacement: { isVisible: true },
@@ -429,6 +446,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
     for (const label of [
       "Available from",
       "Available until",
+      "Time limit",
       "Visible to students",
       "Require Safe Exam Browser",
       "Allow grade challenges",
@@ -440,12 +458,13 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
       await expect(overrideToggle(overrideCard(reopened, label))).toBeChecked();
     }
     await expect(overrideCard(reopened, "Points possible").getByRole("spinbutton")).toHaveValue("40");
+    await expect(overrideCard(reopened, "Time limit").getByLabel("Time limit (minutes)")).toHaveValue("20");
     await expect(overrideCard(reopened, "Visible to students").locator(".activity-override-control input[type='checkbox']")).not.toBeChecked();
 
     await reopened.getByRole("tab", { name: "General", exact: true }).click();
     await reopened.getByLabel("Assessment mode").selectOption("formative");
     await reopened.getByRole("tab", { name: "Group assignment", exact: true }).click();
-    await expect(reopened.locator(".activity-override-field")).toHaveCount(3);
+    await expect(reopened.locator(".activity-override-field")).toHaveCount(4);
     await reopened.getByRole("button", { name: "Save settings", exact: true }).click();
     await confirmSharedDialog(page);
     await expect(reopened).toBeHidden();
@@ -461,11 +480,46 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
       expect(saved.groups.find((group) => group.groupId === data?.groupId)?.overrideFields).toEqual([
         "availableFrom",
         "availableUntil",
+        "timeLimit",
         "visibility"
       ]);
     } finally {
       await verificationApi.dispose();
     }
+  });
+
+  test("a timed non-Test activity starts explicitly and automatically submits at zero", async ({ studentPage: page }) => {
+    test.setTimeout(90_000);
+    if (!data) throw new Error("The activity suite was not provisioned.");
+    await page.clock.install({ time: new Date() });
+    await page.goto(`/courses/${data.courseId}/groups/${data.groupId}`);
+    await page.getByRole("link", { name: activityTitles.timed, exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Start your attempt when you are ready" })).toBeVisible();
+    await expect(page.getByText("You will have 30 minutes. The timer continues if you close or reload this page.", { exact: true })).toBeVisible();
+
+    await page.route(`**/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${activityIds.timed}/timing`, async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      const response = await route.fetch();
+      const body = await response.json() as { runtime: { timing: { expiresAt: string | null; remainingSeconds: number | null } } };
+      body.runtime.timing.expiresAt = new Date(Date.now() + 3_000).toISOString();
+      body.runtime.timing.remainingSeconds = 3;
+      await route.fulfill({ response, json: body });
+    });
+    await page.getByRole("button", { name: "Start timed attempt" }).click();
+    await expect(page.getByRole("timer")).toBeVisible();
+    await page.getByLabel("Yes", { exact: true }).check();
+    await page.clock.fastForward(4_000);
+
+    await expect(page).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));
+    const attempt = await prisma.activityAttempt.findFirstOrThrow({
+      where: { courseId: data.courseId, groupId: data.groupId, activityId: activityIds.timed },
+      orderBy: { attemptNumber: "desc" }
+    });
+    expect(attempt.lifecycle).toBe("submitted");
+    expect(attempt.metadata).toMatchObject({ timedAttempt: true, timeLimitSnapshotMinutes: 30 });
   });
 
   test("students inherit access, cannot see hidden or unassigned activities, and see availability states", async ({ studentPage: page }) => {

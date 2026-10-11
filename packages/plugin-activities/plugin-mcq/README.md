@@ -19,6 +19,7 @@ Gradebook attempt review and grading use core grade scope, so explicit course te
 - Authored content is generic activity config, so core owns bank copying, synchronization, and version comparison.
 - Reusable bank Tests copy MCQ children into Test-owned bank activities and later into independent course children without plugin-private authoring rows.
 - Standalone answers autosave through `ActivityResponseDraft`; compound Test answers use `TestItemAttempt`.
+- Course assignment settings may time a standalone MCQ in either assessment mode. Core owns the explicit start, immutable deadline, and countdown; at zero the renderer invokes the ordinary check/submission path so deterministic grading and draft cleanup remain unchanged.
 - Formative **Check answers** and summative submissions both create mode-tagged core attempts. Only summative attempts use limits, gradebook selection, grading, and release visibility; teachers can inspect formative attempts read-only.
 - Teacher review resolves an exact core MCQ attempt. The report dialog loads only the newest current-mode submission initially and requests older submissions as the teacher navigates; historical and formative attempts remain read-only.
 - Optional model feedback can explain results but never changes deterministic MCQ grades and is not independently challengeable. The released deterministic grade and teacher-authored released feedback remain challengeable through the core workflow when the effective summative assignment setting permits it.

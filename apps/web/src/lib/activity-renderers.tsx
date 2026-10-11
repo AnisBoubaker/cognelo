@@ -1,7 +1,7 @@
 import type { ComponentProps, ComponentType, ElementType, ReactNode } from "react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { getActivityDefinition, listActivityDefinitions, validateStudentViewClientContracts } from "@cognelo/activity-sdk";
+import { getActivityDefinition, listActivityDefinitions, validateStudentViewClientContracts, type TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import { CodeRenderer } from "@cognelo/activity-ui";
 import {
   CodingExerciseActivityView,
@@ -71,6 +71,7 @@ type ActivityRendererProps<T extends ElementType> = ComponentProps<T> & {
   onNewAttemptAvailabilityChange?: (canStartNewAttempt: boolean) => void;
   onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
   studentPreview?: { sessionId: string };
+  timedAutoSubmit?: TimedActivityAutoSubmit;
 };
 
 type RenderableActivity = {
@@ -406,7 +407,7 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
     activityRouteCourseId,
     groupId,
     hasQuestionAuthoringAgent: _hasQuestionAuthoringAgent,
-    onSubmitted: _onSubmitted,
+    onSubmitted,
     showReleasedAnswers: _showReleasedAnswers,
     releasedMaxScore: _releasedMaxScore,
     studentViewMode: _studentViewMode,
@@ -485,6 +486,7 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
       authoringClient={authoringClient}
       preflightClient={preflightClient}
       submissionClient={submissionClient}
+      onSubmitted={onSubmitted}
     />
   );
 }
@@ -494,7 +496,7 @@ function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<ty
     activityRouteCourseId,
     groupId,
     hasQuestionAuthoringAgent: _hasQuestionAuthoringAgent,
-    onSubmitted: _onSubmitted,
+    onSubmitted,
     showReleasedAnswers: _showReleasedAnswers,
     releasedMaxScore: _releasedMaxScore,
     studentViewMode: _studentViewMode,
@@ -571,6 +573,7 @@ function WebDesignCodingExerciseActivityRenderer(props: ActivityRendererProps<ty
         }
       }}
       executionStateHost={executionStateHost}
+      onSubmitted={onSubmitted}
     />
   );
 }
