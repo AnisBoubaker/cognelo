@@ -64,13 +64,15 @@ apps/
   api/      Next.js backend API
   web/      Next.js frontend
 packages/
-  activity-sdk/   plugin registry and contracts
+  activity-sdk/   plugin-independent registry and contracts
   activity-ui/    shared code editor and renderer
   content-type-sdk/
-                  content type plugin registry and contracts
+                  plugin-independent content registry and contracts
+  plugin-registry/
+                  installed-plugin composition root
   core/           shared business logic
   contracts/      Zod schemas and shared types
-  db/             Prisma schema, migrations, seed
+  db/             core Prisma schema, migrations, and client
   plugin-activities/
                   activity plugin packages
   plugin-content-types/
@@ -89,8 +91,8 @@ If you just want the shortest possible summary:
 
 1. Copy a plugin under `packages/plugin-activities/`
 2. Rename its keys and package metadata
-3. Register it in `packages/activity-sdk/src/index.ts`
-4. If it has API subroutes, register it in `packages/activity-sdk/src/server.ts`
+3. Register its manifest in `packages/plugin-registry/src/activity.ts`
+4. If it has API subroutes or server capabilities, register it in `packages/plugin-registry/src/activity-server.ts`
 5. If it has a custom UI, register it in `apps/web/src/lib/activity-renderers.tsx`
 6. If it needs persistence, add a plugin-local Prisma schema, migrations, client wrapper, and database manifest
 7. Seed or sync its `ActivityPluginInstallation` manifest so admins can activate it and then enable or disable it from Settings
@@ -103,9 +105,9 @@ For a content type plugin:
 
 1. Create `packages/plugin-content-types/plugin-your-content-type`
 2. Export a `ContentTypePlugin`
-3. Register it in `packages/content-type-sdk/src/index.ts`
+3. Register it in `packages/plugin-registry/src/content.ts`
 4. Export a `ServerContentTypePlugin`
-5. Register it in `packages/content-type-sdk/src/server.ts`
+5. Register it in `packages/plugin-registry/src/content-server.ts`
 6. Register any settings/viewer renderer in `apps/web/src/lib/content-type-renderers.tsx`
 7. Implement `getEmbeddingSource` so future indexing can read a generic descriptor
 8. Add plugin-owned tables only when generic `CourseContentResource.metadata` is not enough

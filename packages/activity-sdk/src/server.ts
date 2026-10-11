@@ -1,10 +1,4 @@
 import type { CurrentUser } from "@cognelo/contracts";
-import { codingExercisesServerPlugin } from "@cognelo/plugin-coding-exercises/server";
-import { codingHomeworkGraderServerPlugin } from "@cognelo/plugin-coding-homework-grader/server";
-import { parsonsServerPlugin } from "@cognelo/plugin-parsons/server";
-import { placeholderServerPlugin } from "@cognelo/plugin-placeholder/server";
-import { mcqServerPlugin } from "@cognelo/plugin-mcq/server";
-import { webDesignCodingExercisesServerPlugin } from "@cognelo/plugin-web-design-coding-exercises/server";
 import type { ActivityDefinition } from "./index";
 
 export type ServerActivityRecord = {
@@ -47,11 +41,15 @@ export type PluginRouteHandler = (input: {
   readJson: () => Promise<unknown>;
 }) => Promise<unknown>;
 
+export type PluginRouteMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+export type CoursePluginRouteAuthorization = "manage_course" | "view_gradebook";
+
 export type PluginRouteDefinition = {
   path: string;
   activityTypeKeys?: readonly string[];
-  allowExpiredTimedAttemptMethods?: readonly ("POST" | "PATCH" | "PUT" | "DELETE")[];
-  methods: Partial<Record<"GET" | "POST" | "PATCH" | "PUT" | "DELETE", PluginRouteHandler>>;
+  courseAuthorization?: Partial<Record<PluginRouteMethod, CoursePluginRouteAuthorization>>;
+  allowExpiredTimedAttemptMethods?: readonly Exclude<PluginRouteMethod, "GET">[];
+  methods: Partial<Record<PluginRouteMethod, PluginRouteHandler>>;
 };
 
 export type CourseActivityCreatedFromBankVersionHook = (input: {
@@ -297,8 +295,11 @@ export type StudentPreviewExecutionHandler = (input: {
   payload: unknown;
 }) => Promise<unknown>;
 
+export type PluginHostCapabilityHandler<TResult = unknown> = () => Promise<TResult> | TResult;
+
 export type ServerActivityPlugin = {
   key: string;
+  hostCapabilities?: Readonly<Record<string, PluginHostCapabilityHandler>>;
   routes?: readonly PluginRouteDefinition[];
   grading?: {
     gradeAttempt?: PluginGradingHandler;
@@ -354,18 +355,31 @@ export function getAssignedGroupActivityAttemptSource(context: PluginRouteContex
   };
 }
 
-// Rebuild the list from live ESM bindings whenever it is used. Development hot
-// reload can replace one plugin module without re-evaluating this SDK module;
-// retaining a one-time array would then dispatch through the stale plugin object.
+const serverPluginsByKey = new Map<string, ServerActivityPlugin>();
+
+export function registerServerActivityPlugin(plugin: ServerActivityPlugin) {
+  for (const route of plugin.routes ?? []) {
+    if (!route.activityTypeKeys?.length) {
+      throw new Error(`Plugin route must declare activity type keys: ${plugin.key}/${normalizePath(route.path)}`);
+    }
+    for (const [method, authorization] of Object.entries(route.courseAuthorization ?? {})) {
+      if (!route.methods[method as PluginRouteMethod]) {
+        throw new Error(`Plugin route authorization has no matching handler: ${plugin.key}/${normalizePath(route.path)} (${method})`);
+      }
+      if (authorization === "view_gradebook" && method !== "GET") {
+        throw new Error(`Gradebook-read plugin authorization is limited to GET routes: ${plugin.key}/${normalizePath(route.path)} (${method})`);
+      }
+    }
+  }
+  serverPluginsByKey.set(plugin.key, plugin);
+}
+
+export function registerServerActivityPlugins(plugins: readonly ServerActivityPlugin[]) {
+  for (const plugin of plugins) registerServerActivityPlugin(plugin);
+}
+
 function currentServerPlugins(): readonly ServerActivityPlugin[] {
-  return [
-    placeholderServerPlugin,
-    codingHomeworkGraderServerPlugin,
-    parsonsServerPlugin,
-    mcqServerPlugin,
-    codingExercisesServerPlugin,
-    webDesignCodingExercisesServerPlugin
-  ];
+  return [...serverPluginsByKey.values()];
 }
 
 export function validateStudentPreviewServerContracts(
@@ -433,6 +447,18 @@ export function resolvePluginRoute(activityTypeKey: string, path: readonly strin
   }
 
   return null;
+}
+
+export function resolveCoursePluginRouteAuthorization(path: readonly string[], method: PluginRouteMethod) {
+  const normalizedPath = normalizePath(path);
+  const matchingRoutes = currentServerPlugins().flatMap((plugin) =>
+    (plugin.routes ?? []).filter((route) => normalizePath(route.path) === normalizedPath && Boolean(route.methods[method]))
+  );
+  const declared = new Set(matchingRoutes.map((route) => route.courseAuthorization?.[method] ?? "manage_course"));
+  if (declared.size > 1) {
+    throw new Error(`Plugin routes disagree on course authorization for ${method} ${normalizedPath}.`);
+  }
+  return declared.values().next().value as CoursePluginRouteAuthorization | undefined;
 }
 
 export function listPluginRoutes() {
@@ -507,6 +533,17 @@ export function resolveBankActivityVariationHandler(activityTypeKey: string) {
   return currentServerPlugins().find((plugin) =>
     plugin.bankVariation?.activityTypeKeys.includes(activityTypeKey)
   )?.bankVariation?.createVariation ?? null;
+}
+
+export function resolvePluginHostCapability<TResult = unknown>(capabilityKey: string) {
+  const handlers = currentServerPlugins().flatMap((plugin) => {
+    const handler = plugin.hostCapabilities?.[capabilityKey];
+    return handler ? [{ pluginKey: plugin.key, handler }] : [];
+  });
+  if (handlers.length > 1) {
+    throw new Error(`Plugin host capability has multiple providers: ${capabilityKey} (${handlers.map(({ pluginKey }) => pluginKey).join(", ")})`);
+  }
+  return (handlers[0]?.handler ?? null) as PluginHostCapabilityHandler<TResult> | null;
 }
 
 export async function runCourseActivityCreatedFromBankVersionHooks(input: {

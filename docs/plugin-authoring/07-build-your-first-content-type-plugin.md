@@ -152,11 +152,11 @@ The settings form should edit fields that your server `update` handler understan
 
 Register the shared definition in:
 
-- [packages/content-type-sdk/src/index.ts](../../packages/content-type-sdk/src/index.ts)
+- [packages/plugin-registry/src/content.ts](../../packages/plugin-registry/src/content.ts)
 
 Register the server plugin in:
 
-- [packages/content-type-sdk/src/server.ts](../../packages/content-type-sdk/src/server.ts)
+- [packages/plugin-registry/src/content-server.ts](../../packages/plugin-registry/src/content-server.ts)
 
 Register the settings renderer in:
 

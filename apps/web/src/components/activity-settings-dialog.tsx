@@ -1,6 +1,7 @@
 "use client";
 
 import { getActivityDefinition } from "@cognelo/activity-sdk";
+import "@cognelo/plugin-registry/activity";
 import type { ActivityAssignmentOverrideField, AssignedActivityAssessmentMode } from "@cognelo/contracts";
 import { useDialogs } from "@cognelo/activity-ui";
 import { FormEvent, useEffect, useMemo, useState } from "react";

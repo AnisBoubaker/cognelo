@@ -28,6 +28,7 @@ import { prisma, type Prisma } from "@cognelo/db";
 export const webDesignExerciseTestsRoute: PluginRouteDefinition = {
   path: "web-design-coding-exercises/tests",
   activityTypeKeys: ["web-design-coding-exercise"],
+  courseAuthorization: { GET: "view_gradebook" },
   methods: {
     GET: async ({ context }) => {
       if (context.activityBankId) {
@@ -185,6 +186,7 @@ export const webDesignExerciseSubmitRoute: PluginRouteDefinition = {
 export const webDesignExerciseReviewAllRoute: PluginRouteDefinition = {
   path: "web-design-coding-exercises/review-all",
   activityTypeKeys: ["web-design-coding-exercise"],
+  courseAuthorization: { GET: "view_gradebook" },
   methods: {
     GET: async ({ context }) => {
       if (!context.courseId) throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "This plugin route requires a course context.");

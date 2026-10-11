@@ -1,0 +1,34 @@
+{
+  "name": "@cognelo/plugin-registry",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./activity": "./src/activity.ts",
+    "./activity-server": "./src/activity-server.ts",
+    "./content": "./src/content.ts",
+    "./content-server": "./src/content-server.ts",
+    "./server": "./src/server.ts"
+  },
+  "dependencies": {
+    "@cognelo/activity-sdk": "0.1.0",
+    "@cognelo/content-type-sdk": "0.1.0",
+    "@cognelo/plugin-coding-exercises": "0.1.0",
+    "@cognelo/plugin-coding-homework-grader": "0.1.0",
+    "@cognelo/plugin-file-content": "0.1.0",
+    "@cognelo/plugin-github-repo": "0.1.0",
+    "@cognelo/plugin-mcq": "0.1.0",
+    "@cognelo/plugin-parsons": "0.1.0",
+    "@cognelo/plugin-placeholder": "0.1.0",
+    "@cognelo/plugin-text-content": "0.1.0",
+    "@cognelo/plugin-web-design-coding-exercises": "0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

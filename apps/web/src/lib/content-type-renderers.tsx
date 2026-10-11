@@ -1,5 +1,6 @@
 import React, { type ReactNode } from "react";
 import type { ContentPluginLocale, ContentTypeDefinition } from "@cognelo/content-type-sdk";
+import "@cognelo/plugin-registry/content";
 import { FileContentSettingsForm } from "@cognelo/plugin-file-content";
 import { GithubRepoSettingsForm } from "@cognelo/plugin-github-repo";
 import { TextContentSettingsForm } from "@cognelo/plugin-text-content";

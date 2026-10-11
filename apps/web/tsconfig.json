@@ -36,6 +36,15 @@
       "@cognelo/content-type-sdk/vector": [
         "../../packages/content-type-sdk/src/vector.ts"
       ],
+      "@cognelo/plugin-registry": [
+        "../../packages/plugin-registry/src/index.ts"
+      ],
+      "@cognelo/plugin-registry/activity": [
+        "../../packages/plugin-registry/src/activity.ts"
+      ],
+      "@cognelo/plugin-registry/content": [
+        "../../packages/plugin-registry/src/content.ts"
+      ],
       "@cognelo/plugin-file-content": [
         "../../packages/plugin-content-types/plugin-file/src/index.ts"
       ],

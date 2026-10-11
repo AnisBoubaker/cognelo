@@ -10,144 +10,137 @@ import {
   getActivityProviderForActivityType,
   isCoreActivityType,
   listActivityCategories,
-  listCoreActivityDefinitions,
   listActivityDefinitions,
   listActivityPlugins,
+  listCoreActivityDefinitions,
   listPluginDatabaseModules,
-  validateStudentViewClientContracts
+  registerActivityPlugin,
+  validateStudentViewClientContracts,
+  type ActivityPlugin
 } from "./index";
 
-describe("activity SDK registry", () => {
-  it("registers the expected activity plugins and activity definitions", () => {
-    const pluginKeys = listActivityPlugins().map((plugin) => plugin.key);
-    expect(pluginKeys).toEqual(
-      expect.arrayContaining(["coding-exercises", "mcq", "parsons", "placeholder", "web-design-coding-exercises"])
-    );
+const fakePlugin: ActivityPlugin = {
+  key: "fake-activity-plugin",
+  packageName: "@example/fake-activity-plugin",
+  name: "Fake activity plugin",
+  db: {
+    namespace: "fake_activity",
+    tables: ["FakeActivity"],
+    notes: ["Test-only manifest"]
+  },
+  activities: [{
+    key: "fake-interactive-activity",
+    name: "Fake interactive activity",
+    description: "A test-only interactive activity.",
+    defaultCategoryIds: ["generic", "all"],
+    icon: "checklist",
+    studentView: { mode: "interactive", execution: "plugin" },
+    grading: {
+      supportsAttempts: true,
+      supportsAutoGrading: true,
+      supportsManualGrading: true,
+      supportsRegrading: true,
+      supportsAnalyticsPayloads: true,
+      supportsCompositeExecution: true
+    },
+    manualGrading: { rendererKey: "fake-manual-grading" },
+    i18n: {
+      fr: {
+        name: "Activité fictive",
+        description: "Une activité interactive réservée aux tests."
+      }
+    }
+  }]
+};
 
-    const definitionKeys = listActivityDefinitions().map((definition) => definition.key);
-    expect(definitionKeys).toEqual(expect.arrayContaining(["coding-exercise", "mcq", "parsons-problem", "placeholder", "test"]));
+registerActivityPlugin(fakePlugin);
+
+describe("activity SDK registry", () => {
+  it("registers injected plugins alongside core activity definitions", () => {
+    expect(listActivityPlugins().map((plugin) => plugin.key)).toContain("fake-activity-plugin");
+    expect(listActivityDefinitions().map((definition) => definition.key)).toEqual(
+      expect.arrayContaining(["fake-interactive-activity", "test"])
+    );
   });
 
   it("resolves plugins by plugin key and activity type key", () => {
-    expect(getActivityPlugin("coding-exercises")?.packageName).toBe("@cognelo/plugin-coding-exercises");
-    expect(getActivityPluginForActivityType("coding-exercise")?.key).toBe("coding-exercises");
-    expect(getActivityDefinition("coding-exercise")?.icon).toBe("code");
-    expect(getActivityDefinition("web-design-coding-exercise")?.icon).toBe("browser-code");
-    expect(getActivityDefinition("coding-homework-grader")?.icon).toBe("file-code");
+    expect(getActivityPlugin("fake-activity-plugin")?.packageName).toBe("@example/fake-activity-plugin");
+    expect(getActivityPluginForActivityType("fake-interactive-activity")?.key).toBe("fake-activity-plugin");
+    expect(getActivityDefinition("fake-interactive-activity")?.icon).toBe("checklist");
     expect(getActivityDefinition("test")?.icon).toBe("clipboard-check");
-    expect(getActivityDefinition("parsons-problem")?.icon).toBe("tornado");
   });
 
   it("distinguishes core activity definitions from plugin-backed definitions", () => {
     expect(listCoreActivityDefinitions().map((definition) => definition.key)).toEqual(["test"]);
     expect(getActivityProviderForActivityType("test")).toEqual({ kind: "core", key: "test" });
-    expect(getActivityProviderForActivityType("mcq")).toEqual({ kind: "plugin", key: "mcq" });
+    expect(getActivityProviderForActivityType("fake-interactive-activity")).toEqual({ kind: "plugin", key: "fake-activity-plugin" });
     expect(isCoreActivityType("test")).toBe(true);
-    expect(getActivityDefinition("test")).toMatchObject({
-      creationScopes: ["course", "bank"],
-      isEnabledByDefault: true
-    });
+    expect(getActivityDefinition("test")).toMatchObject({ creationScopes: ["course", "bank"], isEnabledByDefault: true });
   });
 
   it("returns localized activity messages with stable fallbacks", () => {
-    const definition = getActivityDefinition("coding-exercise");
-    const messages = getActivityMessages(definition, "fr");
-    expect(messages?.name).toBeTruthy();
-    expect(messages?.description).toBeTruthy();
-
-    const fallback = getActivityMessages({ key: "x", name: "Fallback", description: "Default", studentView: { mode: "unsupported" } }, "zh");
-    expect(fallback).toEqual({ name: "Fallback", description: "Default", defaultTitle: "Fallback" });
+    expect(getActivityMessages(getActivityDefinition("fake-interactive-activity"), "fr")).toEqual({
+      name: "Activité fictive",
+      description: "Une activité interactive réservée aux tests.",
+      defaultTitle: "Fake interactive activity"
+    });
+    expect(getActivityMessages({
+      key: "fallback",
+      name: "Fallback",
+      description: "Default",
+      studentView: { mode: "unsupported" }
+    }, "zh")).toEqual({ name: "Fallback", description: "Default", defaultTitle: "Fallback" });
   });
 
   it("requires explicit, fail-closed Student view renderer registrations", () => {
     const definitions = listActivityDefinitions();
-    expect(getActivityDefinition("mcq")?.studentView).toEqual({ mode: "interactive", execution: "plugin" });
-    expect(getActivityDefinition("test")?.studentView).toEqual({ mode: "interactive", execution: "core" });
-    expect(getActivityDefinition("coding-homework-grader")?.studentView).toEqual({ mode: "read_only" });
-    expect(getActivityDefinition("placeholder")?.studentView).toEqual({ mode: "unsupported" });
+    expect(() => validateStudentViewClientContracts({
+      definitions,
+      interactiveActivityTypeKeys: ["test"],
+      testItemActivityTypeKeys: []
+    })).toThrow("Interactive activity type is missing a Student view renderer: fake-interactive-activity");
 
     expect(() => validateStudentViewClientContracts({
       definitions,
-      interactiveActivityTypeKeys: ["test", "coding-exercise", "parsons-problem", "web-design-coding-exercise"],
-      testItemActivityTypeKeys: ["coding-exercise", "mcq", "parsons-problem", "web-design-coding-exercise"]
-    })).toThrow("Interactive activity type is missing a Student view renderer: mcq");
+      interactiveActivityTypeKeys: ["test", "fake-interactive-activity"],
+      testItemActivityTypeKeys: []
+    })).toThrow("Test-capable activity type is missing a Student view Test-item renderer: fake-interactive-activity");
 
     expect(() => validateStudentViewClientContracts({
       definitions,
-      interactiveActivityTypeKeys: ["test", "coding-exercise", "mcq", "parsons-problem", "placeholder", "web-design-coding-exercise"],
-      testItemActivityTypeKeys: ["coding-exercise", "mcq", "parsons-problem", "web-design-coding-exercise"]
-    })).toThrow("Non-interactive activity type has a Student view renderer: placeholder");
+      interactiveActivityTypeKeys: ["test", "fake-interactive-activity"],
+      testItemActivityTypeKeys: ["fake-interactive-activity"]
+    })).not.toThrow();
   });
 
-  it("marks all-category activities and explicit category assignments", () => {
-    expect(getActivityDefinition("mcq")?.defaultCategoryIds).toEqual(["generic", "all"]);
-    expect(getActivityDefinition("coding-exercise")?.defaultCategoryIds).toContain("programming");
-    expect(getActivityDefinition("placeholder")?.defaultCategoryIds).toContain("miscellaneous");
+  it("supports all-category activities and explicit category assignments", () => {
+    const definition = getActivityDefinition("fake-interactive-activity");
+    expect(definition?.defaultCategoryIds).toEqual(["generic", "all"]);
+    expect(activityDefinitionCreatesCategory(definition, "generic")).toBe(true);
+    expect(activityDefinitionCreatesCategory(definition, "programming")).toBe(false);
+    expect(activityDefinitionBelongsToCategory(definition, "programming")).toBe(true);
   });
 
   it("centralizes category definitions and falls unknown categories back to generic", () => {
     expect(listActivityCategories().map((category) => category.id)).toEqual(["generic", "programming", "miscellaneous"]);
-    expect(listActivityCategories().map((category) => category.labelKey)).toEqual([
-      "activityCategories.generic",
-      "activityCategories.programming",
-      "activityCategories.miscellaneous"
-    ]);
     expect(getActivityHomeCategoryIds({ defaultCategoryIds: ["unknown-category"] })).toEqual(["generic"]);
-    expect(activityDefinitionCreatesCategory(getActivityDefinition("mcq"), "generic")).toBe(true);
-    expect(activityDefinitionCreatesCategory(getActivityDefinition("mcq"), "programming")).toBe(false);
-    expect(activityDefinitionBelongsToCategory(getActivityDefinition("mcq"), "programming")).toBe(true);
   });
 
-  it("exposes grading capability metadata on gradable activity definitions", () => {
-    expect(getActivityDefinition("parsons-problem")?.grading).toEqual(
-      expect.objectContaining({
-        supportsAttempts: true,
-        supportsAutoGrading: true,
-        supportsManualGrading: true,
-        supportsRegrading: true,
-        supportsAnalyticsPayloads: true,
-        supportsCompositeExecution: true
-      })
-    );
-    expect(getActivityDefinition("parsons-problem")?.manualGrading).toEqual(
-      expect.objectContaining({
-        rendererKey: "parsons-manual-grading"
-      })
-    );
-    expect(getActivityDefinition("mcq")?.grading).toEqual(
-      expect.objectContaining({
-        supportsAttempts: true,
-        supportsAutoGrading: true,
-        supportsManualGrading: true,
-        supportsRegrading: true
-      })
-    );
-    expect(getActivityDefinition("mcq")?.manualGrading).toEqual(
-      expect.objectContaining({
-        rendererKey: "mcq-manual-grading"
-      })
-    );
-    expect(getActivityDefinition("coding-exercise")?.grading?.supportsCompositeExecution).toBe(true);
-    expect(getActivityDefinition("coding-exercise")?.grading).toMatchObject({ supportsManualGrading: true, supportsRegrading: true });
-    expect(getActivityDefinition("coding-exercise")?.authoring?.gradingTab).toBe(true);
-    expect(getActivityDefinition("web-design-coding-exercise")?.grading?.supportsCompositeExecution).toBe(true);
-    expect(getActivityDefinition("web-design-coding-exercise")?.grading).toMatchObject({ supportsManualGrading: true });
-    expect(getActivityDefinition("web-design-coding-exercise")?.grading?.supportsRegrading).not.toBe(true);
-    expect(getActivityDefinition("coding-homework-grader")?.grading?.supportsCompositeExecution).not.toBe(true);
-    expect(getActivityDefinition("coding-homework-grader")?.grading?.supportsRegrading).not.toBe(true);
+  it("exposes generic grading metadata without knowing concrete plugins", () => {
+    expect(getActivityDefinition("fake-interactive-activity")?.grading).toMatchObject({
+      supportsAttempts: true,
+      supportsManualGrading: true,
+      supportsCompositeExecution: true
+    });
+    expect(getActivityDefinition("fake-interactive-activity")?.manualGrading).toEqual({ rendererKey: "fake-manual-grading" });
     expect(getActivityDefinition("test")?.grading).toMatchObject({ supportsManualGrading: true, supportsRegrading: true });
   });
 
-  it("exposes plugin database manifests for lifecycle management", () => {
-    const modules = listPluginDatabaseModules();
-    expect(modules.map((module) => module.pluginKey)).toContain("placeholder");
-    expect(
-      modules.every(
-        (module) =>
-          module.namespace &&
-          Array.isArray(module.tables) &&
-          (module.tables.length === 0 || Array.isArray(module.migrations) || Array.isArray(module.notes))
-      )
-    ).toBe(true);
+  it("exposes injected plugin database manifests for lifecycle management", () => {
+    expect(listPluginDatabaseModules()).toContainEqual(expect.objectContaining({
+      pluginKey: "fake-activity-plugin",
+      namespace: "fake_activity",
+      tables: ["FakeActivity"]
+    }));
   });
 });

@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model PluginMcqAiEvaluation {
+  id                String   @id @default(cuid())
+  activityId        String
+  coreAttemptId     String?
+  courseId          String
+  groupId           String
+  participantId     String?
+  userId            String
+  createdByUserId   String
+  assessmentMode    String
+  triggerKind       String
+  status            String
+  version           Int
+  promptVersion     String
+  schemaVersion     String
+  provider          String
+  model             String
+  connectionId      String
+  requestPayload    Json
+  rawResponse       String?
+  parsedResponse    Json?
+  sanitizedFeedback Json?
+  submissionHash    String
+  feedbackHash      String?
+  latencyMs         Int?
+  error             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([activityId, coreAttemptId, version])
+  @@index([activityId, createdAt])
+  @@index([coreAttemptId, createdAt])
+  @@index([courseId, createdAt])
+  @@index([participantId, createdAt])
+}

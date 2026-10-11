@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { resolvePluginRoute } from "@cognelo/activity-sdk/server";
+import { resolveCoursePluginRouteAuthorization, resolvePluginRoute, type PluginRouteMethod } from "@cognelo/activity-sdk/server";
 import {
   AppError,
   assertActivityTypePluginEnabled,
@@ -21,12 +21,8 @@ export function OPTIONS() {
 async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params["params"]>) {
   const user = await requireUser();
   const { courseId, activityId, pluginPath } = params;
-  const gradebookRead = request.method === "GET" && new Set([
-    "coding-exercises/review-all",
-    "coding-exercises/hidden-tests",
-    "web-design-coding-exercises/tests",
-    "web-design-coding-exercises/review-all"
-  ]).has(pluginPath.join("/"));
+  const method = request.method as PluginRouteMethod;
+  const gradebookRead = resolveCoursePluginRouteAuthorization(pluginPath, method) === "view_gradebook";
   if (gradebookRead) {
     await assertCanViewCourseGradebook(user, courseId);
   } else {

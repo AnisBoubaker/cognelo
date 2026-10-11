@@ -17,6 +17,7 @@ Gradebook attempt review and grading use core grade scope, so explicit course te
 - `#` and `---` create titled and untitled content sections between questions.
 - Question prompts and choices render Markdown images, including web URLs, and portable GFM tables in addition to text, math, lists, and fenced code.
 - Authored content is generic activity config, so core owns bank copying, synchronization, and version comparison.
+- Immutable AI evaluation artifacts use the plugin-local MCQ Prisma schema/client; the core Prisma client does not model this table.
 - Reusable bank Tests copy MCQ children into Test-owned bank activities and later into independent course children without plugin-private authoring rows.
 - Standalone answers autosave through `ActivityResponseDraft`; compound Test answers use `TestItemAttempt`.
 - Course assignment settings may time a standalone MCQ in either assessment mode. Core owns the explicit start, immutable deadline, and countdown; at zero the renderer invokes the ordinary check/submission path so deterministic grading and draft cleanup remain unchanged.

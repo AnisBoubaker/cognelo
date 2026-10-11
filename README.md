@@ -29,13 +29,15 @@ packages/
   activity-sdk/         Activity plugin contracts and registries
   activity-ui/          Shared activity UI
   content-type-sdk/     Content-type plugin contracts and registries
+  plugin-registry/      Installed-plugin composition root
   contracts/            Shared Zod schemas and DTOs
   core/                 Shared services and authorization
-  db/                   Core Prisma schema, migrations, seed, and client
+  db/                   Core Prisma schema, migrations, and client
   plugin-activities/    Activity plugins
   plugin-content-types/ Content-type plugins
 docs/                    Architecture, operations, plans, and references
 tests/e2e/               Integrated Playwright user flows
+scripts/db-seed.ts       Development/demo seed composition
 ```
 
 ## Local Development
@@ -67,6 +69,7 @@ Some plugins need additional services:
 
 ```bash
 npm run lint
+npm run architecture:check
 npm run typecheck
 npm test
 npm run test:e2e

@@ -15,7 +15,9 @@ const mocks = vi.hoisted(() => ({
     activityAttempt: { findFirst: vi.fn(), findMany: vi.fn() },
     activityBank: { findUnique: vi.fn() },
     course: { findUnique: vi.fn() },
-    courseGroupParticipant: { findFirst: vi.fn() },
+    courseGroupParticipant: { findFirst: vi.fn() }
+  },
+  mcqPrisma: {
     pluginMcqAiEvaluation: { findMany: vi.fn() }
   }
 }));
@@ -38,6 +40,10 @@ vi.mock("@cognelo/core", async () => {
 
 vi.mock("@cognelo/db", () => ({
   prisma: mocks.prisma
+}));
+
+vi.mock("./db-client", () => ({
+  prisma: mocks.mcqPrisma
 }));
 
 vi.mock("./ai-feedback", () => ({
@@ -74,7 +80,7 @@ describe("MCQ generation route", () => {
     });
     mocks.prisma.activityAttempt.findFirst.mockResolvedValue(null);
     mocks.prisma.activityAttempt.findMany.mockResolvedValue([]);
-    mocks.prisma.pluginMcqAiEvaluation.findMany.mockResolvedValue([]);
+    mocks.mcqPrisma.pluginMcqAiEvaluation.findMany.mockResolvedValue([]);
     mocks.evaluateMcqWithAi.mockResolvedValue({
       feedbackRef: "feedback-1",
       feedbackVersion: 1,
@@ -539,7 +545,7 @@ describe("MCQ generation route", () => {
       assessmentMode: "formative",
       metadata: { submittedAnswers: { "question-1": ["question-1-choice-1"] } }
     }]);
-    mocks.prisma.pluginMcqAiEvaluation.findMany.mockResolvedValueOnce([{
+    mocks.mcqPrisma.pluginMcqAiEvaluation.findMany.mockResolvedValueOnce([{
       coreAttemptId: "core-attempt-1",
       sanitizedFeedback: { summary: "Attempt-specific feedback", questionFeedback: [] }
     }]);
@@ -573,7 +579,7 @@ describe("MCQ generation route", () => {
         metadata: { submittedAnswers: { "question-1": ["question-1-choice-1"] } }
       }
     ]);
-    mocks.prisma.pluginMcqAiEvaluation.findMany.mockResolvedValueOnce([{
+    mocks.mcqPrisma.pluginMcqAiEvaluation.findMany.mockResolvedValueOnce([{
       coreAttemptId: "core-attempt-1",
       sanitizedFeedback: { summary: "Teacher-visible feedback", questionFeedback: [] }
     }]);

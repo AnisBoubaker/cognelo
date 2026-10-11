@@ -1,10 +1,4 @@
 import { z } from "zod";
-import { codingExercisesPlugin } from "@cognelo/plugin-coding-exercises";
-import { codingHomeworkGraderPlugin } from "@cognelo/plugin-coding-homework-grader";
-import { parsonsPlugin } from "@cognelo/plugin-parsons";
-import { placeholderPlugin } from "@cognelo/plugin-placeholder";
-import { mcqPlugin } from "@cognelo/plugin-mcq";
-import { webDesignCodingExercisesPlugin } from "@cognelo/plugin-web-design-coding-exercises";
 export * from "./categories";
 import type { ActivityCategoryAssignment } from "./categories";
 
@@ -145,14 +139,7 @@ export type ActivityPlugin = {
   activities: ActivityDefinition[];
 };
 
-const plugins: ActivityPlugin[] = [
-  placeholderPlugin,
-  codingHomeworkGraderPlugin,
-  parsonsPlugin,
-  mcqPlugin,
-  codingExercisesPlugin,
-  webDesignCodingExercisesPlugin
-];
+const pluginsByKey = new Map<string, ActivityPlugin>();
 
 const coreDefinitions: ActivityDefinition[] = [
   {
@@ -209,12 +196,6 @@ const definitions = new Map<string, RegisteredActivityDefinition>();
 for (const definition of coreDefinitions) {
   registerActivityDefinition(definition, { kind: "core", key: definition.key });
 }
-for (const plugin of plugins) {
-  for (const definition of plugin.activities) {
-    registerActivityDefinition(definition, { kind: "plugin", key: plugin.key });
-  }
-}
-
 function registerActivityDefinition(definition: ActivityDefinition, provider: ActivityProvider) {
   if (definitions.has(definition.key)) {
     throw new Error(`Activity type already registered: ${definition.key}`);
@@ -226,6 +207,41 @@ function registerActivityDefinition(definition: ActivityDefinition, provider: Ac
     throw new Error(`Test-capable activity types must provide interactive Student view support: ${definition.key}`);
   }
   definitions.set(definition.key, { ...definition, provider });
+}
+
+export function registerActivityPlugin(plugin: ActivityPlugin) {
+  const replacementDefinitions = new Map(definitions);
+  const previousPlugin = pluginsByKey.get(plugin.key);
+
+  for (const definition of previousPlugin?.activities ?? []) {
+    if (replacementDefinitions.get(definition.key)?.provider.key === plugin.key) {
+      replacementDefinitions.delete(definition.key);
+    }
+  }
+
+  for (const definition of plugin.activities) {
+    if (!definition.studentView) {
+      throw new Error(`Activity type must declare Student view support: ${definition.key}`);
+    }
+    if (definition.grading?.supportsCompositeExecution && definition.studentView.mode !== "interactive") {
+      throw new Error(`Test-capable activity types must provide interactive Student view support: ${definition.key}`);
+    }
+    if (replacementDefinitions.has(definition.key)) {
+      throw new Error(`Activity type already registered: ${definition.key}`);
+    }
+    replacementDefinitions.set(definition.key, {
+      ...definition,
+      provider: { kind: "plugin", key: plugin.key }
+    });
+  }
+
+  pluginsByKey.set(plugin.key, plugin);
+  definitions.clear();
+  for (const [key, definition] of replacementDefinitions) definitions.set(key, definition);
+}
+
+export function registerActivityPlugins(plugins: readonly ActivityPlugin[]) {
+  for (const plugin of plugins) registerActivityPlugin(plugin);
 }
 
 export function validateStudentViewClientContracts(input: {
@@ -284,19 +300,19 @@ export function isCoreActivityType(activityTypeKey: string) {
 }
 
 export function listActivityPlugins() {
-  return [...plugins];
+  return [...pluginsByKey.values()];
 }
 
 export function getActivityPlugin(key: string) {
-  return plugins.find((plugin) => plugin.key === key);
+  return pluginsByKey.get(key);
 }
 
 export function getActivityPluginForActivityType(activityTypeKey: string) {
-  return plugins.find((plugin) => plugin.activities.some((definition) => definition.key === activityTypeKey));
+  return listActivityPlugins().find((plugin) => plugin.activities.some((definition) => definition.key === activityTypeKey));
 }
 
 export function listPluginDatabaseModules() {
-  return plugins.map((plugin) => ({
+  return listActivityPlugins().map((plugin) => ({
     pluginKey: plugin.key,
     pluginName: plugin.name,
     ...plugin.db

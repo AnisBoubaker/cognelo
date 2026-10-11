@@ -1,4 +1,5 @@
 import { listActivityPlugins } from "@cognelo/activity-sdk";
+import "@cognelo/plugin-registry/activity";
 import { prisma } from "@cognelo/db";
 
 async function main() {

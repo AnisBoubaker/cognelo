@@ -6,11 +6,7 @@ const nextConfig = {
     "@cognelo/core",
     "@cognelo/db",
     "@cognelo/activity-sdk",
-    "@cognelo/plugin-coding-exercises",
-    "@cognelo/plugin-coding-homework-grader",
-    "@cognelo/plugin-parsons",
-    "@cognelo/plugin-placeholder",
-    "@cognelo/plugin-mcq"
+    "@cognelo/plugin-registry"
   ]
 };
 

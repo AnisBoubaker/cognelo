@@ -1,6 +1,3 @@
-import { fileContentServerPlugin } from "@cognelo/plugin-file-content/server";
-import { githubRepoContentServerPlugin } from "@cognelo/plugin-github-repo/server";
-import { textContentServerPlugin } from "@cognelo/plugin-text-content/server";
 import type { CurrentUser } from "@cognelo/contracts";
 import type { ContentEmbeddingSourceKind } from "./index";
 import type { ContentVectorIndexResult, ContentVectorSearchResult } from "./vector";
@@ -173,7 +170,7 @@ export type ServerContentTypePlugin = {
   };
 };
 
-const serverPlugins: readonly ServerContentTypePlugin[] = [githubRepoContentServerPlugin, fileContentServerPlugin, textContentServerPlugin];
+const serverPluginsByKey = new Map<string, ServerContentTypePlugin>();
 
 function normalizePath(path: string | readonly string[]) {
   const segments: readonly string[] = typeof path === "string" ? path.split("/") : path;
@@ -227,20 +224,32 @@ export function createServerContentTypeRegistry(registryPlugins: readonly Server
   };
 }
 
-const registry = createServerContentTypeRegistry(serverPlugins);
+function currentRegistry() {
+  return createServerContentTypeRegistry([...serverPluginsByKey.values()]);
+}
+
+export function registerServerContentTypePlugin(plugin: ServerContentTypePlugin) {
+  const replacementPlugins = [...serverPluginsByKey.values()].filter((candidate) => candidate.key !== plugin.key);
+  createServerContentTypeRegistry([...replacementPlugins, plugin]);
+  serverPluginsByKey.set(plugin.key, plugin);
+}
+
+export function registerServerContentTypePlugins(plugins: readonly ServerContentTypePlugin[]) {
+  for (const plugin of plugins) registerServerContentTypePlugin(plugin);
+}
 
 export function getServerContentTypePlugin(key: string) {
-  return registry.getServerContentTypePlugin(key);
+  return currentRegistry().getServerContentTypePlugin(key);
 }
 
 export function listServerContentTypePlugins() {
-  return registry.listServerContentTypePlugins();
+  return currentRegistry().listServerContentTypePlugins();
 }
 
 export function listContentTypePluginRoutes() {
-  return registry.listContentTypePluginRoutes();
+  return currentRegistry().listContentTypePluginRoutes();
 }
 
 export function resolveContentTypePluginRoute(pluginKey: string, contentTypeKey: string, path: readonly string[]) {
-  return registry.resolveContentTypePluginRoute(pluginKey, contentTypeKey, path);
+  return currentRegistry().resolveContentTypePluginRoute(pluginKey, contentTypeKey, path);
 }

@@ -1,4 +1,5 @@
 import { getActivityDefinition } from "@cognelo/activity-sdk";
+import "@cognelo/plugin-registry/activity";
 
 export type GradebookActivityActions = {
   canReviewAndGrade: boolean;

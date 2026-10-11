@@ -5,8 +5,8 @@ const mocks = vi.hoisted(() => ({
   requireUser: vi.fn()
 }));
 
-vi.mock("@cognelo/plugin-coding-exercises/server", () => ({
-  listCodingExerciseProgrammingLanguages: mocks.listCodingExerciseProgrammingLanguages
+vi.mock("@cognelo/activity-sdk/server", () => ({
+  resolvePluginHostCapability: () => mocks.listCodingExerciseProgrammingLanguages
 }));
 vi.mock("@/lib/http", () => ({
   handleRoute: async (handler: () => Promise<Response>) => handler(),

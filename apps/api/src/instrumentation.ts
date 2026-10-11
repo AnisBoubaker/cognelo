@@ -1,5 +1,6 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    await import("@cognelo/plugin-registry/server");
     // Development recompiles plugin modules independently, so cross-registry validation can
     // briefly observe a partial hot-reload graph. Production starts from one complete graph;
     // the same invariant is also exercised directly by the activity SDK test suite.

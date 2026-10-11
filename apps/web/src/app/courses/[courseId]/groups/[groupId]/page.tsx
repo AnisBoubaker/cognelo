@@ -1,6 +1,7 @@
 "use client";
 
 import { getActivityDefinition } from "@cognelo/activity-sdk";
+import "@cognelo/plugin-registry/activity";
 import { MarkdownRenderer, useDialogs } from "@cognelo/activity-ui";
 import type { AssignedActivityAssessmentMode } from "@cognelo/contracts";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";

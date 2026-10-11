@@ -5,6 +5,7 @@ import {
   listContentTypeDefinitions,
   listContentTypePluginManifests,
   listContentTypePlugins,
+  registerContentTypePlugin,
   type ContentTypePlugin
 } from "./index";
 
@@ -32,25 +33,17 @@ const fakePlugin: ContentTypePlugin = {
   ]
 };
 
+registerContentTypePlugin(fakePlugin);
+
 describe("content type SDK registry", () => {
-  it("registers concrete content type plugins", () => {
-    expect(listContentTypePlugins().map((plugin) => plugin.key)).toEqual(
-      expect.arrayContaining(["github-repo-content", "file-content", "text-content"])
-    );
-    expect(listContentTypeDefinitions().map((definition) => definition.key)).toEqual(expect.arrayContaining(["github-repo", "file", "text"]));
+  it("registers injected content type plugins", () => {
+    expect(listContentTypePlugins().map((plugin) => plugin.key)).toContain("fake-content");
+    expect(listContentTypeDefinitions().map((definition) => definition.key)).toContain("fake-document");
     expect(listContentTypePluginManifests()).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          pluginKey: "github-repo-content",
-          contentTypeKeys: ["github-repo"]
-        }),
-        expect.objectContaining({
-          pluginKey: "file-content",
-          contentTypeKeys: ["file"]
-        }),
-        expect.objectContaining({
-          pluginKey: "text-content",
-          contentTypeKeys: ["text"]
+          pluginKey: "fake-content",
+          contentTypeKeys: ["fake-document"]
         })
       ])
     );

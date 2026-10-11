@@ -155,11 +155,11 @@ That means the platform can already:
 
 The explicit `unsupported` declaration makes the teacher's Student view fail closed for now. When you later implement a non-recording preview adapter, change it to `{ mode: "interactive", execution: "plugin" }`, register the activity in `studentPreviewRenderers`, and add stateless `ServerActivityPlugin.studentPreview` actions. Use `read_only` only when the authored activity may be inspected but its response workflow cannot safely run without durable state.
 
-## Step 3: Register The Plugin In The SDK
+## Step 3: Register The Plugin In The Composition Root
 
 Open:
 
-- [packages/activity-sdk/src/index.ts](../../packages/activity-sdk/src/index.ts)
+- [packages/plugin-registry/src/activity.ts](../../packages/plugin-registry/src/activity.ts)
 
 Add an import:
 
@@ -167,10 +167,10 @@ Add an import:
 import { tracingQuizPlugin } from "@cognelo/plugin-tracing-quiz";
 ```
 
-Then add it to the `plugins` array:
+Then add it to the `installedActivityPlugins` array:
 
 ```ts
-const plugins: ActivityPlugin[] = [placeholderPlugin, codingHomeworkGraderPlugin, parsonsPlugin, tracingQuizPlugin];
+export const installedActivityPlugins = [placeholderPlugin, codingHomeworkGraderPlugin, parsonsPlugin, tracingQuizPlugin] as const;
 ```
 
 Why this matters:
@@ -426,7 +426,7 @@ export const tracingQuizServerPlugin: ServerActivityPlugin = {
 
 Open:
 
-- [packages/activity-sdk/src/server.ts](../../packages/activity-sdk/src/server.ts)
+- [packages/plugin-registry/src/activity-server.ts](../../packages/plugin-registry/src/activity-server.ts)
 
 Add:
 
@@ -434,7 +434,7 @@ Add:
 import { tracingQuizServerPlugin } from "@cognelo/plugin-tracing-quiz/server";
 ```
 
-and register it in the `serverPlugins` array.
+and register it in the `installedServerActivityPlugins` array.
 
 Now the generic API dispatchers can route requests to your plugin. Cognelo has dispatchers for course activity authoring, section/group assigned activity work, and activity-bank authoring. Keep plugin behavior in plugin route definitions rather than creating plugin-specific route files under `apps/api`.
 
@@ -519,14 +519,11 @@ model PluginTracingQuizSubmission {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   @@index([activityId, userId, createdAt])
 }
 ```
 
-That would let you keep a full history of learner submissions.
+That would let you keep a full history of learner submissions. The plugin schema stores core IDs as scalar references rather than declaring Prisma relations to core models; ownership checks and lifecycle hooks cross that boundary through core services.
 
 ## Step 15: Verify Everything
 
@@ -563,7 +560,7 @@ By the end of this tutorial, you have seen:
 
 - how plugin packages are created
 - how activity definitions work
-- how the SDK registry activates a plugin
+- how the outer composition root installs a plugin into the neutral SDK registry
 - how a renderer is connected to the activity page
 - how custom plugin routes are dispatched
 - how the web app calls those routes

@@ -121,14 +121,14 @@ Once the plugin exists, it is not active until you register it.
 
 Add it to:
 
-- [packages/activity-sdk/src/index.ts](../../packages/activity-sdk/src/index.ts)
+- [packages/plugin-registry/src/activity.ts](../../packages/plugin-registry/src/activity.ts)
 
 Pattern:
 
 ```ts
 import { myActivityPlugin } from "@cognelo/plugin-my-activity";
 
-const plugins: ActivityPlugin[] = [
+export const installedActivityPlugins = [
   placeholderPlugin,
   codingHomeworkGraderPlugin,
   parsonsPlugin,
@@ -137,6 +137,8 @@ const plugins: ActivityPlugin[] = [
 ```
 
 This is the moment your plugin becomes visible to the platform.
+
+Do not import it from `activity-sdk`, `core`, or `db`. Those packages provide contracts and services inward to plugins; the outer composition root is the only shared package that imports the installed implementations.
 
 ## What Registration Unlocks
 

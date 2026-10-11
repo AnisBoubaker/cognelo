@@ -10,7 +10,7 @@ When creating a new activity plugin, a safe order is:
 
 1. create the package
 2. define the plugin object
-3. register it in `packages/activity-sdk/src/index.ts`
+3. register it in `packages/plugin-registry/src/activity.ts`
 4. add a simple renderer
 5. register the renderer
 6. verify the activity type appears
@@ -25,9 +25,9 @@ When creating a new content type plugin, a safe order is:
 
 1. create the package under `packages/plugin-content-types`
 2. define the `ContentTypePlugin`
-3. register it in `packages/content-type-sdk/src/index.ts`
+3. register it in `packages/plugin-registry/src/content.ts`
 4. define the `ServerContentTypePlugin`
-5. register it in `packages/content-type-sdk/src/server.ts`
+5. register it in `packages/plugin-registry/src/content-server.ts`
 6. add settings/viewer renderers if needed
 7. register renderers in `apps/web/src/lib/content-type-renderers.tsx`
 8. add plugin routes if needed
@@ -41,6 +41,7 @@ When creating a new content type plugin, a safe order is:
 Always useful:
 
 ```bash
+npm run architecture:check
 npm run typecheck
 ```
 
@@ -100,6 +101,10 @@ Read these when you get stuck:
 - [packages/activity-sdk/src/server.ts](../../packages/activity-sdk/src/server.ts)
 - [packages/content-type-sdk/src/index.ts](../../packages/content-type-sdk/src/index.ts)
 - [packages/content-type-sdk/src/server.ts](../../packages/content-type-sdk/src/server.ts)
+- [packages/plugin-registry/src/activity.ts](../../packages/plugin-registry/src/activity.ts)
+- [packages/plugin-registry/src/activity-server.ts](../../packages/plugin-registry/src/activity-server.ts)
+- [packages/plugin-registry/src/content.ts](../../packages/plugin-registry/src/content.ts)
+- [packages/plugin-registry/src/content-server.ts](../../packages/plugin-registry/src/content-server.ts)
 - [packages/core/src/activities.ts](../../packages/core/src/activities.ts)
 - [packages/core/src/course-content.ts](../../packages/core/src/course-content.ts)
 - [packages/core/src/subjects.ts](../../packages/core/src/subjects.ts)

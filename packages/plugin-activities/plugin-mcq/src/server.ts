@@ -1,5 +1,6 @@
 import { AppError } from "@cognelo/core";
 import { prisma } from "@cognelo/db";
+import { prisma as mcqPrisma } from "./db-client";
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import { buildMcqGradingResultFromConfig } from "./grading";
 import { z } from "zod";
@@ -100,7 +101,7 @@ export const mcqServerPlugin: ServerActivityPlugin = {
   },
   hooks: {
     onCourseActivityDeleted: async ({ activityId, activityTypeKey }) => {
-      if (activityTypeKey === "mcq") await prisma.pluginMcqAiEvaluation.deleteMany({ where: { activityId } });
+      if (activityTypeKey === "mcq") await mcqPrisma.pluginMcqAiEvaluation.deleteMany({ where: { activityId } });
     }
   }
 } as const;

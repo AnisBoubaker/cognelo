@@ -57,9 +57,11 @@ The plugin package is not a standalone app. Instead, it gets imported by the mai
 
 The main registration points are:
 
-- `packages/activity-sdk/src/index.ts`
-- `packages/activity-sdk/src/server.ts`
+- `packages/plugin-registry/src/activity.ts`
+- `packages/plugin-registry/src/activity-server.ts`
 - `apps/web/src/lib/activity-renderers.tsx`
+
+The activity SDK defines the contracts and registry operations but deliberately imports no concrete plugin. Keeping installation in the outer composition root prevents core-to-plugin dependency cycles.
 
 ## The Most Important Idea: Shared Vs Plugin-Specific
 

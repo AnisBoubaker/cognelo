@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { prisma, type Prisma } from "@cognelo/db";
+import { prisma as corePrisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 import type { PluginAiFeedbackResult, ServerActivityRecord } from "@cognelo/activity-sdk/server";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@cognelo/core";
 import { buildMcqGradingResultFromConfig } from "./grading";
 import { parseMcqSource, type McqAnswerState } from "./mcq";
+import { prisma as mcqPrisma, type Prisma } from "./db-client";
 
 const promptVersion = "mcq-feedback-v1";
 const schemaVersion = "mcq-feedback-schema-v1";
@@ -75,11 +76,11 @@ export async function evaluateMcqWithAi(input: {
   const [connection, context] = await Promise.all([
     getCourseAssessmentFeedbackAiAgentConnection(input.user, input.courseId),
     input.coreAttemptId
-      ? prisma.activityAttempt.findFirst({
+      ? corePrisma.activityAttempt.findFirst({
           where: { id: input.coreAttemptId, courseId: input.courseId },
           select: { participantId: true, userId: true, gradebookItemId: true, groupActivityId: true }
         })
-      : prisma.courseGroupParticipant.findFirst({
+      : corePrisma.courseGroupParticipant.findFirst({
           where: { groupId: input.groupId, userId: input.user.id, role: "student" },
           select: { id: true, userId: true }
         }).then((participant) => participant ? ({ participantId: participant.id, userId: participant.userId, gradebookItemId: null, groupActivityId: null }) : null)
@@ -99,12 +100,12 @@ export async function evaluateMcqWithAi(input: {
     deterministicResult: deterministic.analyticsPayload
   };
   const submissionHash = hashAiFeedbackValue({ answers: input.answers, source: input.activity.config.source });
-  const previous = await prisma.pluginMcqAiEvaluation.findFirst({
+  const previous = await mcqPrisma.pluginMcqAiEvaluation.findFirst({
     where: { activityId: input.activityId, coreAttemptId: input.coreAttemptId ?? null },
     orderBy: { version: "desc" },
     select: { version: true }
   });
-  const evaluation = await prisma.pluginMcqAiEvaluation.create({
+  const evaluation = await mcqPrisma.pluginMcqAiEvaluation.create({
     data: {
       activityId: input.activityId,
       coreAttemptId: input.coreAttemptId ?? null,
@@ -140,7 +141,7 @@ export async function evaluateMcqWithAi(input: {
       gradingEnabled: false
     };
     const feedbackHash = hashAiFeedbackValue(feedback);
-    const completed = await prisma.pluginMcqAiEvaluation.update({
+    const completed = await mcqPrisma.pluginMcqAiEvaluation.update({
       where: { id: evaluation.id },
       data: {
         status: "completed",
@@ -155,7 +156,7 @@ export async function evaluateMcqWithAi(input: {
     return { feedbackRef: completed.id, feedbackVersion: completed.version, feedbackHash, feedback };
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI feedback generation failed.";
-    await prisma.pluginMcqAiEvaluation.update({ where: { id: evaluation.id }, data: { status: "failed", error: message.slice(0, 8000), latencyMs: Date.now() - startedAt } });
+    await mcqPrisma.pluginMcqAiEvaluation.update({ where: { id: evaluation.id }, data: { status: "failed", error: message.slice(0, 8000), latencyMs: Date.now() - startedAt } });
     await recordResearch("feedback_failed", "failed", input, context, evaluation, connection, submissionHash, undefined, { error: message.slice(0, 1000) });
     throw new AppError(502, "AI_FEEDBACK_GENERATION_FAILED", "AI feedback could not be generated. The deterministic MCQ grade is unchanged.");
   }

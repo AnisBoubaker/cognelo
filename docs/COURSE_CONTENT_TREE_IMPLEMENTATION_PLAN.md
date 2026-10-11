@@ -453,7 +453,7 @@ This preserves the documented student-first, section-first navigation model.
 - The API route tests live in:
   - `apps/api/src/app/api/courses/[courseId]/content/route.test.ts`
   - `apps/api/src/app/api/courses/[courseId]/groups/[groupId]/content/route.test.ts`
-- The seed content tree lives in `packages/db/prisma/seed.ts`.
+- The seed content tree lives in the outer composition script `scripts/db-seed.ts`.
 - Activity creation and assignment now accept optional `contentPlacement` in shared contracts.
 - Student accordion state for first-level folders is stored in browser `localStorage`, keyed per course/group, and pruned defensively after content loads.
 - Verification completed after Phase 1:

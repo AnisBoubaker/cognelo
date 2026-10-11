@@ -434,9 +434,8 @@ Open decision: decide whether text content should be Markdown-only initially or 
 - Phase 5 is implemented.
 - Activity plugins have been moved under `packages/plugin-activities`.
 - Course content tree is canonical for placement/order/visibility.
-- Concrete non-activity content types are still hardcoded as material kinds and a web-only material type registry.
-- `packages/content-type-sdk` now provides initial shared/server content type plugin contracts and empty registries.
-- `packages/plugin-content-types` exists as the future home for concrete content type plugin packages.
+- Concrete GitHub repo, File, and Text content types live under `packages/plugin-content-types`.
+- `packages/content-type-sdk` provides plugin-independent shared/server contracts and registries; `packages/plugin-registry` installs the concrete manifests and server handlers.
 - Core Prisma now has `CourseContentResource` and `ContentTypePluginInstallation`.
 - `CourseContentItemKind` now uses `content` instead of `material`; legacy `materialId` remains only as a compatibility bridge until later phases migrate callers and seed data fully.
 
@@ -507,7 +506,7 @@ Verification completed after Phase 2:
   - active plugin can serve existing content routes
   - student cannot access hidden content through plugin routes
   - unauthorized users are blocked before plugin dispatch
-  - core never imports concrete content type plugin packages outside registry wiring
+  - core never imports concrete content type plugin packages; only the outer composition root wires them
 
 Verification:
 

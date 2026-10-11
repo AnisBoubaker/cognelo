@@ -51,13 +51,13 @@ export const tracingQuizPlugin: ActivityPlugin = {
 };
 ```
 
-## Step 2: Register It In The SDK
+## Step 2: Register It In The Composition Root
 
 In:
 
-- [packages/activity-sdk/src/index.ts](../../packages/activity-sdk/src/index.ts)
+- [packages/plugin-registry/src/activity.ts](../../packages/plugin-registry/src/activity.ts)
 
-add your import and add the plugin to the `plugins` array.
+add your import and add the plugin to `installedActivityPlugins`. The SDK remains a plugin-independent contract and registry implementation; it must never import your plugin.
 
 This is what makes the activity type visible to the platform.
 
@@ -155,7 +155,7 @@ export const tracingQuizSubmitRoute: PluginRouteDefinition = {
 
 Then export a server plugin in `src/server.ts` and register it in:
 
-- [packages/activity-sdk/src/server.ts](../../packages/activity-sdk/src/server.ts)
+- [packages/plugin-registry/src/activity-server.ts](../../packages/plugin-registry/src/activity-server.ts)
 
 Do not add plugin-specific route files under `apps/api`. The API app owns generic dispatchers for course activities, assigned section/group activities, and activity-bank activities. Plugin-specific behavior belongs in the plugin route definitions.
 
