@@ -58,11 +58,23 @@ describe("Test authoring services", () => {
     tx.test.create.mockResolvedValue({ id: "test-1" });
     tx.test.findUniqueOrThrow.mockResolvedValue({ id: "test-1", activityId: "activity-test", items: [] });
 
-    await createTest(teacher, "course-1", { title: "Midterm", contentPlacement: { isVisible: true } });
+    await createTest(teacher, "course-1", {
+      title: "Midterm",
+      settings: { timeLimitMinutes: 75 },
+      contentPlacement: { isVisible: true }
+    });
 
     expect(plugins.ensureCoreActivityTypes).toHaveBeenCalled();
     expect(tx.activity.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ activityTypeId: "type-test", courseId: "course-1", title: "Midterm", createdById: "teacher-1" })
+      data: expect.objectContaining({
+        activityTypeId: "type-test",
+        courseId: "course-1",
+        title: "Midterm",
+        createdById: "teacher-1",
+        metadata: expect.objectContaining({
+          allGroupsAssignment: expect.objectContaining({ timeLimitMinutes: 75 })
+        })
+      })
     });
     expect(tx.test.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ courseId: "course-1", activityId: "activity-test", settings: expect.objectContaining({ navigationMode: "free" }) })
@@ -127,7 +139,7 @@ describe("Test authoring services", () => {
   it("duplicates the shell and every contained activity as an editable draft", async () => {
     db.test.findFirst.mockResolvedValue({
       id: "test-1",
-      settings: { allowResume: true },
+      settings: { allowResume: true, timeLimitMinutes: 90 },
       activity: {
         id: "test-activity-1",
         activityTypeId: "type-test",
@@ -175,7 +187,15 @@ describe("Test authoring services", () => {
 
     const result = await duplicateTest(teacher, "course-1", "test-activity-1", {});
 
-    expect(tx.activity.create).toHaveBeenNthCalledWith(1, { data: expect.objectContaining({ title: "Midterm (copy)", lifecycle: "draft" }) });
+    expect(tx.activity.create).toHaveBeenNthCalledWith(1, {
+      data: expect.objectContaining({
+        title: "Midterm (copy)",
+        lifecycle: "draft",
+        metadata: expect.objectContaining({
+          allGroupsAssignment: expect.objectContaining({ timeLimitMinutes: 90 })
+        })
+      })
+    });
     expect(tx.activity.create).toHaveBeenNthCalledWith(2, expect.objectContaining({ data: expect.objectContaining({ title: "Question", lifecycle: "draft" }) }));
     expect(tx.testItem.create).toHaveBeenCalledWith({ data: expect.objectContaining({ testId: "test-copy-row", activityId: "child-copy" }) });
     expect(result.activityCopies).toEqual([expect.objectContaining({ sourceActivityId: "child-1" })]);

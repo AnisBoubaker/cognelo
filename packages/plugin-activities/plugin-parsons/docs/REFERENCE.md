@@ -85,6 +85,8 @@ Key behavior:
 - the next fresh try starts a new attempt
 - teacher/admin previews stay ephemeral so instructor exploration does not pollute student-behavior data
 
+Course activity settings may add a time limit in either assessment mode. Core owns the explicit start and immutable deadline. Parsons move/state updates are rejected after expiry, while the route's final check/submission remains available for the host's automatic zero-time submission. The renderer answers `TimedActivityAutoSubmit` by invoking its normal submission function, which links the current plugin attempt to the already-started core timed attempt rather than creating another one.
+
 ## Routes
 
 Parsons owns its own plugin subroute definitions in `src/routes.ts`.

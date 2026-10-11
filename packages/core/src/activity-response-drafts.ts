@@ -3,6 +3,7 @@ import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import { AppError } from "./errors";
 import { getGroupAssignedActivity } from "./groups";
+import { assertTimedActivityWriteAllowed } from "./activity-timing";
 
 const MAX_ACTIVITY_RESPONSE_DRAFT_BYTES = 2 * 1024 * 1024;
 
@@ -35,6 +36,7 @@ export async function saveActivityResponseDraft(
 ) {
   const parsedState = activityResponseDraftStateSchema.parse(state);
   assertDraftSize(parsedState);
+  await assertTimedActivityWriteAllowed(user, courseId, groupId, activityId);
   const context = await resolveActivityResponseDraftContext(user, courseId, groupId, activityId);
   return prisma.activityResponseDraft.upsert({
     where: {

@@ -421,26 +421,28 @@ describe("shared contract schemas", () => {
     });
     expect(CourseAllGroupsActivityAssignmentInputSchema.parse({})).toMatchObject({
       assessmentMode: "formative",
-      gradeChallengesEnabled: false
+      gradeChallengesEnabled: false,
+      timeLimitMinutes: null
     });
     expect(CourseAllGroupsActivityAssignmentInputSchema.parse({
       assessmentMode: "summative",
       gradeChallengesEnabled: true,
       groupAssignments: [
-        { groupId: "group-1", assigned: true, overrideFields: ["pointsPossible", "gradeChallenges"], gradeChallengesEnabled: false },
+        { groupId: "group-1", assigned: true, overrideFields: ["pointsPossible", "gradeChallenges", "timeLimit"], timeLimitMinutes: null, gradeChallengesEnabled: false },
         { groupId: "group-2", assigned: false }
       ]
     })).toMatchObject({
       assessmentMode: "summative",
       gradeChallengesEnabled: true,
       groupAssignments: [
-        { groupId: "group-1", assigned: true, overrideFields: ["pointsPossible", "gradeChallenges"], gradeChallengesEnabled: false },
+        { groupId: "group-1", assigned: true, overrideFields: ["pointsPossible", "gradeChallenges", "timeLimit"], timeLimitMinutes: null, gradeChallengesEnabled: false },
         { groupId: "group-2", assigned: false, overrideFields: [] }
       ]
     });
     expect(() => CourseAllGroupsActivityAssignmentInputSchema.parse({
       groupAssignments: [{ groupId: "group-1", assigned: true, overrideFields: ["contentFolder"] }]
     })).toThrow();
+    expect(() => CourseAllGroupsActivityAssignmentInputSchema.parse({ timeLimitMinutes: 1441 })).toThrow();
     expect(EnrollmentInputSchema.parse({ userId: "user-1", role: "student" })).toEqual({ userId: "user-1", role: "student" });
   });
 });

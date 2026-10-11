@@ -2,7 +2,7 @@
 
 import { type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
+import type { ActivityExecutionStateHost, TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import { CodeEditor, CodeRenderer, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, ProgressDialog, RichTextEditor, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   alignCodingExerciseStarterCodeToTemplate,
@@ -278,6 +278,7 @@ type CodingExerciseActivityViewProps = {
   onNewAttemptAvailabilityChange?: (canStartNewAttempt: boolean) => void;
   onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
   onSubmitted?: () => void;
+  timedAutoSubmit?: TimedActivityAutoSubmit;
 };
 
 const personalizedTestId = "__personalized_test__";
@@ -300,7 +301,8 @@ export function CodingExerciseActivityView({
   studentViewMode = "attempt",
   onNewAttemptAvailabilityChange,
   onPreviousSubmissionsAvailabilityChange,
-  onSubmitted
+  onSubmitted,
+  timedAutoSubmit
 }: CodingExerciseActivityViewProps) {
   const pluginLocale = normalizeCodingExercisesLocale(locale);
   const actionCopy = getEditActionBarCopy(pluginLocale);
@@ -315,6 +317,7 @@ export function CodingExerciseActivityView({
     language: string;
   } | null>(null);
   const previousActivityIdRef = useRef(activity.id);
+  const lastTimedAutoSubmitRequestRef = useRef(0);
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);
   const [config, setConfig] = useState<CodingExerciseConfig>(() => getCodingExerciseActivityConfig(activity.config));
@@ -1152,9 +1155,9 @@ export function CodingExerciseActivityView({
     }
   }
 
-  async function submitCode() {
+  async function submitCode(): Promise<boolean> {
     if (!course?.id || !codingClient || !config.language || !editorCode.trim()) {
-      return;
+      return false;
     }
     setWorkingAction("submit");
     setError("");
@@ -1177,12 +1180,23 @@ export function CodingExerciseActivityView({
       if (result.availability.canStart) {
         onNewAttemptAvailabilityChange?.(!readOnly);
       }
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : t("submitError"));
+      return false;
     } finally {
       setWorkingAction(null);
     }
   }
+
+  useEffect(() => {
+    const requestId = timedAutoSubmit?.requestId ?? 0;
+    if (!requestId || requestId === lastTimedAutoSubmitRequestRef.current || canManage || readOnly || studentViewMode !== "attempt") return;
+    lastTimedAutoSubmitRequestRef.current = requestId;
+    void submitCode()
+      .then((didSubmit) => timedAutoSubmit?.onSettled(didSubmit))
+      .catch(() => timedAutoSubmit?.onSettled(false));
+  }, [canManage, readOnly, studentViewMode, timedAutoSubmit]);
 
   function updateStudentCode(sourceCode: string) {
     setEditorCode(sourceCode);

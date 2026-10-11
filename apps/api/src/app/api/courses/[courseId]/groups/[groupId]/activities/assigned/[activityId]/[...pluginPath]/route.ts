@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { resolvePluginRoute } from "@cognelo/activity-sdk/server";
-import { AppError, assertActivityTypePluginEnabled, getGroupAssignedActivity } from "@cognelo/core";
+import { AppError, assertActivityTypePluginEnabled, assertTimedActivityWriteAllowed, getGroupAssignedActivity } from "@cognelo/core";
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 import { requireSafeExamBrowserAccess } from "@/lib/safe-exam-browser";
 
@@ -27,6 +27,13 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
   const handler = route.methods[request.method as keyof typeof route.methods];
   if (!handler) {
     throw new AppError(405, "METHOD_NOT_ALLOWED", "This plugin route does not support that HTTP method.");
+  }
+
+  const unsafeMethod = request.method as "POST" | "PATCH" | "PUT" | "DELETE";
+  if (["POST", "PATCH", "PUT", "DELETE"].includes(unsafeMethod)) {
+    await assertTimedActivityWriteAllowed(user, courseId, groupId, activityId, {
+      allowExpiredAttempt: route.allowExpiredTimedAttemptMethods?.includes(unsafeMethod) === true
+    });
   }
 
   const payload = await handler({

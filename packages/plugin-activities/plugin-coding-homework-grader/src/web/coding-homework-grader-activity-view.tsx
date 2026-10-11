@@ -1,6 +1,7 @@
 "use client";
 
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import {
   EditActionBar,
   MarkdownRenderer,
@@ -83,6 +84,8 @@ type CodingHomeworkGraderActivityViewProps = {
   onSave?: SaveActivity;
   preflightClient?: PreflightClient;
   submissionClient?: SubmissionClient;
+  onSubmitted?: () => void;
+  timedAutoSubmit?: TimedActivityAutoSubmit;
 };
 
 type RequirementDraft = {
@@ -146,7 +149,9 @@ export function CodingHomeworkGraderActivityView({
   locale = "en",
   onSave,
   preflightClient,
-  submissionClient
+  submissionClient,
+  onSubmitted,
+  timedAutoSubmit
 }: CodingHomeworkGraderActivityViewProps) {
   const copy: CodingHomeworkCopy = codingHomeworkMessages[locale] ?? codingHomeworkMessages.en;
   const actionCopy = getEditActionBarCopy(locale);
@@ -181,6 +186,7 @@ export function CodingHomeworkGraderActivityView({
   const [loadingStudentAssignment, setLoadingStudentAssignment] = useState(Boolean(!canManage && submissionClient));
   const [submitting, setSubmitting] = useState(false);
   const savedSnapshotRef = useRef("");
+  const lastTimedAutoSubmitRequestRef = useRef(0);
 
   const applyAuthoring = useCallback(
     (record: CodingHomeworkAuthoringRecord, nextTitle: string, nextDescription: string) => {
@@ -641,9 +647,9 @@ export function CodingHomeworkGraderActivityView({
     }
   }
 
-  async function submitChallengeAnswers() {
+  async function submitChallengeAnswers(): Promise<boolean> {
     if (!submissionClient || !latestSubmission) {
-      return;
+      return false;
     }
 
     setSubmittingAnswers(true);
@@ -655,12 +661,33 @@ export function CodingHomeworkGraderActivityView({
       setLatestSubmission((current) => (current ? { ...current, questions: result.questions, submission: result.submission } : current));
       applyChallengeQuestions(result.questions);
       notifications.success(copy.answersSubmitted);
+      onSubmitted?.();
+      return true;
     } catch (error) {
       notifications.error(error instanceof Error ? error.message : copy.answersError);
+      return false;
     } finally {
       setSubmittingAnswers(false);
     }
   }
+
+  useEffect(() => {
+    const requestId = timedAutoSubmit?.requestId ?? 0;
+    if (!requestId || requestId === lastTimedAutoSubmitRequestRef.current || canManage) return;
+    lastTimedAutoSubmitRequestRef.current = requestId;
+    const alreadySubmitted = latestSubmission?.submission.status === "ready_for_grading" || latestSubmission?.submission.status === "graded";
+    if (alreadySubmitted) {
+      timedAutoSubmit?.onSettled(true);
+      return;
+    }
+    if (!challengeQuestions.length) {
+      timedAutoSubmit?.onSettled(false);
+      return;
+    }
+    void submitChallengeAnswers()
+      .then((didSubmit) => timedAutoSubmit?.onSettled(didSubmit))
+      .catch(() => timedAutoSubmit?.onSettled(false));
+  }, [canManage, challengeQuestions.length, latestSubmission?.submission.status, timedAutoSubmit]);
 
   if (!canManage) {
     const submissionStatus = latestSubmission?.submission.status ?? null;

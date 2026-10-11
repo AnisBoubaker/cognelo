@@ -44,6 +44,8 @@ Student view is inspection-only. A future interactive preview requires a separat
 
 The plugin now has the complete manual-grading workflow: teacher authoring, prior-documentation snapshot/extraction, plugin-owned assignment/provided files, the first C parser adapter, ZIP preflight validation, final ZIP submission storage, submitted-function candidate analysis, challenge question generation, student challenge answers, core attempts, and teacher gradebook review. It is registered as `coding-homework-grader`, uses the package `@cognelo/plugin-coding-homework-grader`, and owns its authoring, attachment, snapshot, submission, challenge-question, and review records.
 
+Course activity assignment settings may time the standalone workflow. Core creates and snapshots the ordinary attempt at the explicit start instead of waiting for challenge-answer finalization. Draft answer writes stop after expiry. When the countdown reaches zero, `TimedActivityAutoSubmit` uses the existing final challenge-answer route if a complete ready question set exists; that route reuses the timed core attempt. If upload processing or question generation is still incomplete, or required answers are missing, the renderer reports that it cannot finalize and core closes the attempt as timed out and ungraded without fabricating plugin grading evidence.
+
 The teacher authoring form is registered with `useUnsavedChangesGuard` from `@cognelo/activity-ui` so navigation uses the platform-wide unsaved-change dialog. Teacher uploads, documentation preview/snapshot/extraction, preflight, and save operations display the shared blocking, indeterminate progress dialog.
 
 ## Seed Fixture

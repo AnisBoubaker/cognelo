@@ -368,7 +368,11 @@ describe("reusable bank Test services", () => {
     expect(tx.activity.create).toHaveBeenNthCalledWith(1, { data: expect.objectContaining({
       bankActivityId: "test-shell-1",
       activityVersionId: "shell-version-2",
-      title: "Reusable midterm"
+      title: "Reusable midterm",
+      metadata: expect.objectContaining({
+        activityVersionNumber: 2,
+        allGroupsAssignment: expect.objectContaining({ timeLimitMinutes: 60 })
+      })
     }) });
     expect(tx.activity.create).toHaveBeenNthCalledWith(2, expect.objectContaining({ data: expect.objectContaining({
       bankActivityId: "owned-child-1",

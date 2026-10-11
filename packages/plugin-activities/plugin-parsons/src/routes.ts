@@ -5,6 +5,7 @@ import {
   assertCanGradeGroup,
   assertCanManageActivityBank,
   assertCanManageCourse,
+  assertTimedActivityWriteAllowed,
   getActivityAttemptAvailability,
   recordActivityAttemptGradingResult,
   startActivityAttempt,
@@ -74,6 +75,7 @@ async function resolveSubjectContext(activityBankId: string | undefined, courseI
 export const parsonsAttemptRoute: PluginRouteDefinition = {
   path: "parsons/attempt",
   activityTypeKeys: ["parsons-problem"],
+  allowExpiredTimedAttemptMethods: ["PATCH"],
   methods: {
     POST: async ({ context, readJson }) => {
       const input = parsonsAttemptEnsureInputSchema.parse(await readJson());
@@ -107,6 +109,11 @@ export const parsonsAttemptRoute: PluginRouteDefinition = {
     },
     PATCH: async ({ context, readJson }) => {
       const input = parsonsAttemptUpdateInputSchema.parse(await readJson());
+      const assessmentMode = context.activity.assignment?.metadata?.assessmentMode === "summative" ? "summative" : "formative";
+      const recordsCoreAttempt = input.submit || (assessmentMode === "formative" && input.event?.type === "check");
+      if (!recordsCoreAttempt && context.courseId && context.groupId) {
+        await assertTimedActivityWriteAllowed(context.user, context.courseId, context.groupId, context.activity.id);
+      }
       const attempt = await updateParsonsAttempt({
         activityId: context.activity.id,
         userId: context.user.id,
@@ -118,8 +125,6 @@ export const parsonsAttemptRoute: PluginRouteDefinition = {
         throw new AppError(409, "ATTEMPT_STATE_INVALID", "The Parsons attempt could not be updated.");
       }
 
-      const assessmentMode = context.activity.assignment?.metadata?.assessmentMode === "summative" ? "summative" : "formative";
-      const recordsCoreAttempt = input.submit || (assessmentMode === "formative" && input.event?.type === "check");
       if (recordsCoreAttempt && context.courseId && context.groupId) {
         if (assessmentMode === "summative" && !input.result) {
           throw new AppError(400, "PARSONS_SUBMISSION_RESULT_REQUIRED", "A Parsons submission requires a grading result.");

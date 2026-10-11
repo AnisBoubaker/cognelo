@@ -8,11 +8,12 @@ import { CodingExerciseStudentGradeReport } from "@cognelo/plugin-coding-exercis
 import { AppShell } from "@/components/app-shell";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { useAuth } from "@/components/auth-provider";
-import { api, ApiError, Activity, ActivityDefinition, Course, CourseGroup, DeletedSubmissionAudit, GradeChallenge, SafeExamBrowserAccess, SafeExamBrowserLaunch, StudentGradeFeedback, StudentReleasedGradeRow } from "@/lib/api";
+import { api, ApiError, Activity, ActivityDefinition, Course, CourseGroup, DeletedSubmissionAudit, GradeChallenge, SafeExamBrowserAccess, SafeExamBrowserLaunch, StudentGradeFeedback, StudentReleasedGradeRow, TimedActivityRuntime } from "@/lib/api";
 import { getGradeChallengeReferences, type GradeChallengeReference } from "@/lib/grade-challenges";
 import { useI18n } from "@/lib/i18n";
 import { activityRenderers } from "@/lib/activity-renderers";
 import { readSafeExamBrowserProof } from "@/lib/safe-exam-browser";
+import { getTestCountdownTone } from "@/lib/test-countdown";
 
 export default function GroupActivityPage() {
   const params = useParams<{ courseId: string; groupId: string; activityId: string }>();
@@ -42,9 +43,15 @@ export default function GroupActivityPage() {
   const [isPreparingSafeExamBrowser, setIsPreparingSafeExamBrowser] = useState(false);
   const [safeExamBrowserError, setSafeExamBrowserError] = useState("");
   const [error, setError] = useState("");
+  const [timedRuntime, setTimedRuntime] = useState<TimedActivityRuntime | null>(null);
+  const [timingStatus, setTimingStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [timedRemainingSeconds, setTimedRemainingSeconds] = useState<number | null>(null);
+  const [timedAutoSubmitRequestId, setTimedAutoSubmitRequestId] = useState(0);
+  const [startingTimedAttempt, setStartingTimedAttempt] = useState(false);
   const safeExamBrowserLaunchRequestRef = useRef(false);
   const safeExamBrowserLaunchDismissedRef = useRef(false);
   const aiFeedbackViewRecordedRef = useRef("");
+  const autoSubmittedTimedAttemptRef = useRef<string | null>(null);
   const safeExamBrowserLaunchToken = searchParams.get("sebLaunch");
 
   const membershipRole = course?.memberships?.find((membership) => membership.userId === user?.id)?.role;
@@ -53,6 +60,9 @@ export default function GroupActivityPage() {
     membershipRole === "owner" ||
     membershipRole === "teacher" ||
     membershipRole === "ta";
+  const isLearner = !canManage && Boolean(
+    group?.participants?.some((participant) => participant.userId === user?.id && participant.role === "student")
+  );
   const ActivityRenderer =
     activity && activityDefinitions.some((definition) => definition.key === activity.activityType.key)
       ? activityRenderers[activity.activityType.key as keyof typeof activityRenderers]
@@ -72,7 +82,56 @@ export default function GroupActivityPage() {
     setSafeExamBrowserError("");
     setSelectedChallengeReferenceKey("");
     setChallengeExplanation("");
+    setTimedRuntime(null);
+    setTimingStatus("idle");
+    setTimedRemainingSeconds(null);
+    setTimedAutoSubmitRequestId(0);
+    autoSubmittedTimedAttemptRef.current = null;
   }, [activityId, courseId, groupId]);
+
+  useEffect(() => {
+    if (!activity || !isLearner || activity.activityType.key === "test") {
+      setTimedRuntime(null);
+      setTimedRemainingSeconds(null);
+      setTimingStatus("idle");
+      return;
+    }
+    let cancelled = false;
+    setTimingStatus("loading");
+    api.timedActivityRuntime(courseId, groupId, activityId)
+      .then(({ runtime }) => {
+        if (cancelled) return;
+        setTimedRuntime(runtime);
+        setTimedRemainingSeconds(runtime.timing.remainingSeconds);
+        setTimingStatus("ready");
+      })
+      .catch((loadError) => {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : t("groupPage.timedActivityLoadError"));
+          setTimingStatus("error");
+        }
+      });
+    return () => { cancelled = true; };
+  }, [activity, activityId, courseId, groupId, isLearner, t]);
+
+  useEffect(() => {
+    const expiresAt = timedRuntime?.timing.expiresAt;
+    if (!expiresAt) {
+      setTimedRemainingSeconds(timedRuntime?.timing.remainingSeconds ?? null);
+      return;
+    }
+    const update = () => setTimedRemainingSeconds(Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000)));
+    update();
+    const interval = window.setInterval(update, 1000);
+    return () => window.clearInterval(interval);
+  }, [timedRuntime?.timing.expiresAt, timedRuntime?.timing.remainingSeconds]);
+
+  useEffect(() => {
+    const attemptId = timedRuntime?.attempt?.id;
+    if (!attemptId || timedRemainingSeconds !== 0 || autoSubmittedTimedAttemptRef.current === attemptId) return;
+    autoSubmittedTimedAttemptRef.current = attemptId;
+    setTimedAutoSubmitRequestId((current) => current + 1);
+  }, [timedRemainingSeconds, timedRuntime?.attempt?.id]);
 
   useEffect(() => {
     async function refresh() {
@@ -261,6 +320,33 @@ export default function GroupActivityPage() {
     return result.activity;
   }
 
+  async function startTimedAttempt() {
+    setStartingTimedAttempt(true);
+    setError("");
+    try {
+      const { runtime } = await api.startTimedActivityAttempt(courseId, groupId, activityId);
+      setTimedRuntime(runtime);
+      setTimedRemainingSeconds(runtime.timing.remainingSeconds);
+    } catch (startError) {
+      setError(startError instanceof Error ? startError.message : t("groupPage.timedActivityStartError"));
+    } finally {
+      setStartingTimedAttempt(false);
+    }
+  }
+
+  async function settleTimedAutoSubmit(submitted: boolean) {
+    if (submitted) {
+      router.push(`/courses/${courseId}/groups/${groupId}`);
+      return;
+    }
+    try {
+      await api.finalizeTimedActivityAttempt(courseId, groupId, activityId);
+      router.push(`/courses/${courseId}/groups/${groupId}`);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : t("groupPage.timedActivitySubmitError"));
+    }
+  }
+
   function localizedActivityName() {
     if (!activity) {
       return t("common.loading");
@@ -383,7 +469,43 @@ export default function GroupActivityPage() {
           </div>
         ) : null}
 
-        {!isActivityUnavailable && (
+        {!isActivityUnavailable && isLearner && activity?.activityType.key !== "test" && timingStatus !== "ready" ? (
+          <section className="section stack">
+            <p>{timingStatus === "error" ? t("groupPage.timedActivityLoadError") : t("common.loading")}</p>
+          </section>
+        ) : null}
+
+        {!isActivityUnavailable && timingStatus === "ready" && timedRuntime?.timeLimitMinutes && !timedRuntime.attempt && selectedTab === "attempt" ? (
+          <section className="section stack">
+            <div>
+              <p className="eyebrow">{t("groupPage.timedActivityEyebrow")}</p>
+              <h2>{t("groupPage.timedActivityTitle")}</h2>
+              <p className="muted">{t("groupPage.timedActivityStartMessage", { count: timedRuntime.timeLimitMinutes })}</p>
+            </div>
+            <button
+              className="button"
+              disabled={startingTimedAttempt || !timedRuntime.availability.canStart}
+              type="button"
+              onClick={() => void startTimedAttempt()}
+            >
+              {startingTimedAttempt ? t("groupPage.timedActivityStarting") : t("groupPage.timedActivityStart")}
+            </button>
+            {!timedRuntime.availability.canStart ? <p className="muted">{timedRuntime.availability.reason}</p> : null}
+          </section>
+        ) : null}
+
+        {timedRuntime?.attempt && timedRemainingSeconds !== null ? (
+          <div
+            aria-label={t("courseDetail.testTimeRemaining", { time: formatRemainingTime(timedRemainingSeconds) })}
+            aria-live="off"
+            className={`test-countdown test-countdown--${getTestCountdownTone(timedRemainingSeconds, timedRuntime.timeLimitMinutes)}`}
+            role="timer"
+          >
+            {t("courseDetail.testTimeRemaining", { time: formatRemainingTime(timedRemainingSeconds) })}
+          </div>
+        ) : null}
+
+        {!isActivityUnavailable && (!isLearner || activity?.activityType.key === "test" || timingStatus === "ready") && (!timedRuntime?.timeLimitMinutes || timedRuntime.attempt || selectedTab === "previous") && (
           (selectedTab === "attempt" && (
             canStartNewAttempt !== false || activity?.activityType.key === "test"
           )) || selectedTab === "previous"
@@ -403,6 +525,10 @@ export default function GroupActivityPage() {
               studentViewMode={selectedTab === "previous" ? "previous" : "attempt"}
               onNewAttemptAvailabilityChange={setCanStartNewAttempt}
               onPreviousSubmissionsAvailabilityChange={setHasPreviousSubmissions}
+              timedAutoSubmit={timedRuntime?.attempt && timedAutoSubmitRequestId ? {
+                requestId: timedAutoSubmitRequestId,
+                onSettled: (submitted) => void settleTimedAutoSubmit(submitted)
+              } : undefined}
               t={t}
               locale={locale}
             />
@@ -469,6 +595,15 @@ export default function GroupActivityPage() {
       </main>
     </AppShell>
   );
+}
+
+function formatRemainingTime(remainingSeconds: number) {
+  const hours = Math.floor(remainingSeconds / 3600);
+  const minutes = Math.floor((remainingSeconds % 3600) / 60);
+  const seconds = remainingSeconds % 60;
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+    : `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 function DeletedSubmissionList({

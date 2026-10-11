@@ -1,6 +1,7 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import { CodeEditor, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, ProgressDialog, RichTextEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   parseMcqSource,
@@ -51,6 +52,7 @@ type McqActivityViewProps = {
   releasedMaxScore?: number;
   deferSubmission?: boolean;
   autosaveDelayMs?: number;
+  timedAutoSubmit?: TimedActivityAutoSubmit;
   aiGenerationClient?: {
     generate: (input: {
       description: string;
@@ -281,6 +283,7 @@ export function McqActivityView({
   releasedMaxScore,
   deferSubmission = false,
   autosaveDelayMs = 500,
+  timedAutoSubmit,
   aiGenerationClient
 }: McqActivityViewProps) {
   const copyLocale = locale === "ar" ? "en" : locale;
@@ -322,6 +325,7 @@ export function McqActivityView({
   const [studentAnswers, setStudentAnswers] = useState<StudentAnswerState>({});
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const lastTimedAutoSubmitRequestRef = useRef(0);
   const isStudentSession = !canManage && Boolean(submissionClient);
   const isSummativeStudentSession = isStudentSession && activity.assignment?.metadata?.assessmentMode === "summative";
   const activityConfigKey = useMemo(() => JSON.stringify(activity.config ?? {}), [activity.config]);
@@ -605,7 +609,7 @@ export function McqActivityView({
     });
   }
 
-  async function requestSubmitMcqAnswers() {
+  async function requestSubmitMcqAnswers(): Promise<boolean> {
     if (!isSummativeStudentSession || !submissionClient?.submit) {
       setSubmitted(true);
       setAiFeedback(null);
@@ -620,25 +624,27 @@ export function McqActivityView({
       } finally {
         setSubmitting(false);
       }
-      return;
+      return true;
     }
     try {
       const status = await submissionClient.getStatus?.(activity.id);
       setSubmissionAvailability(status?.availability ?? null);
       if (status?.availability.canStart === false) {
         notifications.error(status.availability.reason ?? copy.submitError);
-        return;
+        return false;
       }
       setShowSubmitConfirmDialog(true);
+      return false;
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : copy.submitError);
+      return false;
     }
   }
 
-  async function submitMcqAnswers() {
+  async function submitMcqAnswers(): Promise<boolean> {
     if (!isSummativeStudentSession || !submissionClient?.submit) {
       setSubmitted(true);
-      return;
+      return true;
     }
     setSubmitting(true);
     try {
@@ -648,12 +654,23 @@ export function McqActivityView({
       setShowSubmitConfirmDialog(false);
       notifications.success(copy.submitted);
       onSubmitted?.();
+      return true;
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : copy.submitError);
+      return false;
     } finally {
       setSubmitting(false);
     }
   }
+
+  useEffect(() => {
+    const requestId = timedAutoSubmit?.requestId ?? 0;
+    if (!requestId || requestId === lastTimedAutoSubmitRequestRef.current || canManage || studentViewMode !== "attempt") return;
+    lastTimedAutoSubmitRequestRef.current = requestId;
+    void (isSummativeStudentSession ? submitMcqAnswers() : requestSubmitMcqAnswers())
+      .then((didSubmit) => timedAutoSubmit?.onSettled(didSubmit))
+      .catch(() => timedAutoSubmit?.onSettled(false));
+  }, [canManage, isSummativeStudentSession, studentViewMode, timedAutoSubmit]);
 
   if (canManage) {
     return (

@@ -41,6 +41,8 @@ The plugin stores authored content in generic bank/course activity config. Assig
 
 Unsubmitted standalone answers autosave through the core `ActivityResponseDraft` state host for both formative and summative MCQs. Reloading or a periodic account refresh restores that draft without replacing newer in-memory answers. Final summative submission clears the draft after the graded attempt is recorded. Embedded Test MCQs remain on the Test execution host and continue to autosave into `TestItemAttempt`; they never use the standalone draft route.
 
+An MCQ can be timed through the course activity's General/group assignment settings in either formative or summative mode. Core presents the explicit start gate, snapshots the effective limit on the ordinary attempt, blocks draft/submission bypasses before start, and renders the countdown. At zero, the host's `TimedActivityAutoSubmit` signal invokes the same formative check or summative submission function used by the visible action; deterministic grading, feedback behavior, attempt history, and draft cleanup therefore do not gain a parallel timed code path.
+
 Explicit course/bank synchronization also relies entirely on the platform's generic title, description, config, metadata, and concept copying. Core blocks bank-to-course retrieval after any attempt, while course-to-bank publication remains allowed because it creates a new bank version without replacing attempted course content.
 
 Bank version comparison is fully covered by the shared core diff because MCQ authoring lives in generic versioned config.

@@ -146,6 +146,8 @@ describe("gradebook attempt services", () => {
     mockPrisma.courseGroupActivity.findFirst.mockResolvedValue(groupActivity);
     mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue(participant);
     mockPrisma.activityAttempt.count.mockResolvedValue(0);
+    mockPrisma.activityAttempt.findMany.mockResolvedValue([]);
+    mockPrisma.activityAttempt.update.mockImplementation(async ({ data }) => ({ id: "attempt-1", ...data }));
     mockPrisma.courseContentItem.findMany.mockResolvedValue([]);
     mockPrisma.gradebookItem.findMany.mockResolvedValue([]);
     mockPrisma.gradebookItem.upsert.mockResolvedValue({ id: "gradebook-item-1" });
@@ -204,6 +206,41 @@ describe("gradebook attempt services", () => {
         activityVersionId: "version-1"
       })
     });
+  });
+
+  it("reuses the active timed attempt when the activity plugin creates its submission", async () => {
+    mockPrisma.activityAttempt.findMany.mockResolvedValue([{
+      id: "timed-attempt-1",
+      attemptNumber: 1,
+      pluginAttemptRef: null,
+      activityConfigFingerprint: null,
+      testRevisionId: null,
+      metadata: { timedAttempt: true, timeLimitSnapshotMinutes: 45 }
+    }]);
+
+    await expect(startActivityAttempt(studentUser, {
+      courseId: "course-1",
+      groupId: "group-1",
+      activityId: "activity-1",
+      pluginKey: "mcq",
+      pluginVersion: "0.1.0",
+      pluginAttemptRef: "mcq-submission-1",
+      metadata: { responseStored: true }
+    })).resolves.toMatchObject({ id: "attempt-1", pluginKey: "mcq" });
+
+    expect(mockPrisma.activityAttempt.update).toHaveBeenCalledWith({
+      where: { id: "timed-attempt-1" },
+      data: expect.objectContaining({
+        pluginKey: "mcq",
+        pluginAttemptRef: "mcq-submission-1",
+        metadata: {
+          timedAttempt: true,
+          timeLimitSnapshotMinutes: 45,
+          responseStored: true
+        }
+      })
+    });
+    expect(tx.activityAttempt.create).not.toHaveBeenCalled();
   });
 
   it("stores formative mode on core attempts without applying summative release or attempt limits", async () => {
@@ -342,6 +379,7 @@ describe("gradebook attempt services", () => {
       lifecycle: "started",
       startedAt: new Date("2026-05-18T14:00:00.000Z"),
       pluginAttemptRef: null,
+      metadata: { timedAttempt: true, timeLimitSnapshotMinutes: 45 },
       groupActivity: {
         availableUntil: new Date("2026-05-18T15:00:00.000Z")
       },
@@ -354,13 +392,19 @@ describe("gradebook attempt services", () => {
     await expect(
       submitActivityAttempt(studentUser, {
         attemptId: "attempt-1",
+        metadata: { submittedAnswers: { "question-1": ["choice-1"] } },
         now: new Date("2026-05-18T15:15:30.000Z")
       })
     ).resolves.toMatchObject({
       lifecycle: "submitted",
       durationSeconds: 4530,
       isLate: true,
-      lateBySeconds: 330
+      lateBySeconds: 330,
+      metadata: {
+        timedAttempt: true,
+        timeLimitSnapshotMinutes: 45,
+        submittedAnswers: { "question-1": ["choice-1"] }
+      }
     });
   });
 

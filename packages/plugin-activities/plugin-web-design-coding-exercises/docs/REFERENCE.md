@@ -12,6 +12,8 @@ Teachers can define a private HTML/CSS/JavaScript solution bundle and a separate
 
 Standalone student file bundles autosave through the core `ActivityResponseDraft` state host and resume after reload. Successful final submission clears that draft. Embedded Test web-design activities continue to autosave through the Test execution host and `TestItemAttempt` rather than the standalone draft route, and Test navigation remounts the workspace so file/editor state stays scoped to its item.
 
+The course assignment policy may time a standalone web-design exercise in either assessment mode. Core owns the explicit start, snapshotted deadline, and countdown. Draft and learner-run writes stop after expiry, while the ordinary hidden-test submission route is declared as the finalization boundary. The renderer answers `TimedActivityAutoSubmit` by invoking that existing Playwright submission, which attaches the plugin result to the already-started timed core attempt and preserves normal draft cleanup and grading.
+
 Teachers can include `{{ EXPECTED_RESULT }}` in the prompt to show students a visual target, or `{{ EXPECTED_RESULT_CROPPED }}` to trim large plain background regions around that target. Cognelo replaces either token with a screenshot generated from the private solution bundle; the student browser receives only the image artifact, never the solution source files.
 
 ## Package Contents

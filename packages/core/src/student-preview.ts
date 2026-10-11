@@ -4,6 +4,7 @@ import { assertCanPreviewGroupAsStudent } from "./authorization";
 import { listContentItems } from "./course-content";
 import { notFound } from "./errors";
 import { getGroupAssignedActivityForStudentPreview } from "./groups";
+import { assignmentTimeLimitMinutes } from "./activity-assignment-policy";
 
 export async function getStudentPreviewWorkspace(user: CurrentUser, courseId: string, groupId: string) {
   await assertCanPreviewGroupAsStudent(user, courseId, groupId);
@@ -59,10 +60,14 @@ export async function getStudentPreviewTestRuntime(user: CurrentUser, courseId: 
     }
   });
   if (!test) throw notFound("Test");
+  const settings = {
+    ...(test.settings && typeof test.settings === "object" && !Array.isArray(test.settings) ? test.settings as Record<string, unknown> : {}),
+    timeLimitMinutes: assignmentTimeLimitMinutes(assignedActivity.assignment.metadata)
+  };
   return {
-    test: { ...test, items: test.items.map((item) => ({ ...item, itemAttempt: null })) },
+    test: { ...test, settings, items: test.items.map((item) => ({ ...item, itemAttempt: null })) },
     attempt: null,
-    timing: { timeLimitMinutes: readTimeLimitMinutes(test.settings), expiresAt: null, remainingSeconds: null, isExpired: false },
+    timing: { timeLimitMinutes: readTimeLimitMinutes(settings), expiresAt: null, remainingSeconds: null, isExpired: false },
     resume: { allowed: true, blocked: false },
     availability: { canStart: true, reason: null, attemptsRemaining: null },
     hasPreviousSubmissions: false

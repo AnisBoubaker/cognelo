@@ -4,6 +4,7 @@ const routeHandler = vi.hoisted(() => vi.fn());
 
 const mocks = vi.hoisted(() => ({
   assertActivityTypePluginEnabled: vi.fn(),
+  assertTimedActivityWriteAllowed: vi.fn(),
   getGroupAssignedActivity: vi.fn(),
   requireUser: vi.fn(),
   resolvePluginRoute: vi.fn()
@@ -21,6 +22,7 @@ vi.mock("@cognelo/core", () => ({
     }
   },
   assertActivityTypePluginEnabled: mocks.assertActivityTypePluginEnabled,
+  assertTimedActivityWriteAllowed: mocks.assertTimedActivityWriteAllowed,
   getGroupAssignedActivity: mocks.getGroupAssignedActivity
 }));
 
@@ -67,6 +69,13 @@ describe("assigned group activity plugin dispatch route", () => {
     expect(mocks.getGroupAssignedActivity).toHaveBeenCalledWith({ id: "user-1", roles: ["teacher"] }, "course-1", "group-1", "activity-1");
     expect(mocks.assertActivityTypePluginEnabled).toHaveBeenCalledWith("coding-exercise");
     expect(mocks.resolvePluginRoute).toHaveBeenCalledWith("coding-exercise", ["run"]);
+    expect(mocks.assertTimedActivityWriteAllowed).toHaveBeenCalledWith(
+      { id: "user-1", roles: ["teacher"] },
+      "course-1",
+      "group-1",
+      "activity-1",
+      { allowExpiredAttempt: false }
+    );
     expect(routeHandler).toHaveBeenCalledWith(
       expect.objectContaining({
         context: expect.objectContaining({
@@ -77,6 +86,25 @@ describe("assigned group activity plugin dispatch route", () => {
         }),
         readJson: expect.any(Function)
       })
+    );
+  });
+
+  it("marks only declared final-submission methods as expiry-tolerant", async () => {
+    mocks.resolvePluginRoute.mockReturnValue({
+      allowExpiredTimedAttemptMethods: ["POST"],
+      methods: { POST: routeHandler }
+    });
+
+    await POST(new Request("http://test.local", { method: "POST", body: "{}" }) as never, {
+      params: Promise.resolve({ courseId: "course-1", groupId: "group-1", activityId: "activity-1", pluginPath: ["submit"] })
+    });
+
+    expect(mocks.assertTimedActivityWriteAllowed).toHaveBeenCalledWith(
+      { id: "user-1", roles: ["teacher"] },
+      "course-1",
+      "group-1",
+      "activity-1",
+      { allowExpiredAttempt: true }
     );
   });
 

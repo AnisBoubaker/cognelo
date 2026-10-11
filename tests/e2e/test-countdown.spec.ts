@@ -73,6 +73,30 @@ test.describe.serial("timed Test countdown", () => {
     await removeActivitySuite(data);
   });
 
+  test("copies the authored Test limit into course settings without linking later edits", async () => {
+    if (!data) throw new Error("The timed Test fixture was not provisioned.");
+    const api = await createAuthenticatedApi("teacher");
+    try {
+      const initial = await responseJson<{ settings: { general: { timeLimitMinutes: number | null } } }>(
+        await api.get(`/api/courses/${data.courseId}/activities/${testActivityId}/assign-all-groups`)
+      );
+      expect(initial.settings.general.timeLimitMinutes).toBe(30);
+
+      await responseJson(
+        await api.patch(`/api/courses/${data.courseId}/activities/${testActivityId}/test`, {
+          data: { settings: { timeLimitMinutes: 45 } }
+        })
+      );
+
+      const afterAuthoringEdit = await responseJson<{ settings: { general: { timeLimitMinutes: number | null } } }>(
+        await api.get(`/api/courses/${data.courseId}/activities/${testActivityId}/assign-all-groups`)
+      );
+      expect(afterAuthoringEdit.settings.general.timeLimitMinutes).toBe(30);
+    } finally {
+      await api.dispose();
+    }
+  });
+
   test("stays visible while scrolling, changes urgency, and submits at zero", async ({ studentPage }) => {
     test.setTimeout(60_000);
     if (!data) throw new Error("The timed Test fixture was not provisioned.");

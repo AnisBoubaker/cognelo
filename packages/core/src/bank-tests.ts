@@ -17,6 +17,7 @@ import { AppError, notFound } from "./errors";
 import { reconcileMediaAssetReferences } from "./media-assets";
 import { assertActivityTypeAvailable, ensureCoreActivityTypes } from "./plugins";
 import { assertCanManageActivityBank, assertCanViewActivityBank } from "./subjects";
+import { withCourseActivityTimeLimitDefault } from "./activity-assignment-policy";
 
 const bankActivityInclude = {
   activityType: true,
@@ -398,10 +399,10 @@ export async function createCourseTestFromBankVersion(user: CurrentUser, courseI
         description: shellVersion.description,
         lifecycle: data.lifecycle,
         config: shellVersion.config as Prisma.InputJsonValue,
-        metadata: {
+        metadata: withCourseActivityTimeLimitDefault({
           ...asRecord(shellVersion.metadata),
           activityVersionNumber: shellVersion.versionNumber
-        } as Prisma.InputJsonValue,
+        }, asRecord(source.settings).timeLimitMinutes as number | null | undefined) as Prisma.InputJsonValue,
         position: data.position,
         createdById: user.id
       }
