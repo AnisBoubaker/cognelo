@@ -613,6 +613,7 @@ model CourseGroupParticipant {
   gradeEvents            GradeEvent[]
   activityConversations  ActivityConversation[]
   teamMemberships        StudentTeamMember[]
+  assignmentExceptions   ActivityAssignmentException[]
 
   @@unique([groupId, email])
   @@index([groupId, createdAt])
@@ -653,6 +654,7 @@ model StudentTeam {
   capacity   Int             @default(4)
   grouping   StudentGrouping @relation(fields: [groupingId], references: [id], onDelete: Cascade)
   members    StudentTeamMember[]
+  assignmentExceptions ActivityAssignmentException[]
 
   @@unique([id, groupingId])
   @@unique([groupingId, title])
@@ -712,10 +714,28 @@ model CourseGroupActivity {
   responseDrafts        ActivityResponseDraft[]
   contentItems          CourseContentItem[]
   activityConversations ActivityConversation[]
+  assignmentExceptions  ActivityAssignmentException[]
 
   @@unique([groupId, activityId])
   @@index([groupId, position])
   @@index([activityId])
+}
+
+model ActivityAssignmentException {
+  id              String                 @id @default(cuid())
+  groupActivityId String
+  teamId          String?
+  participantId   String?
+  priority        Int                    @default(0)
+  settings        Json                   @default("{}")
+  groupActivity   CourseGroupActivity     @relation(fields: [groupActivityId], references: [id], onDelete: Cascade, map: "ActivityAssignmentException_assignment_fkey")
+  team            StudentTeam?            @relation(fields: [teamId], references: [id], onDelete: Cascade, map: "ActivityAssignmentException_team_fkey")
+  participant     CourseGroupParticipant? @relation(fields: [participantId], references: [id], onDelete: Cascade, map: "ActivityAssignmentException_participant_fkey")
+
+  @@unique([groupActivityId, teamId])
+  @@unique([groupActivityId, participantId])
+  @@index([teamId])
+  @@index([participantId])
 }
 
 model ActivityResponseDraft {

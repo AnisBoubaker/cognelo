@@ -90,6 +90,7 @@ const tx = vi.hoisted(() => ({
 }));
 
 const mockPrisma = vi.hoisted(() => ({
+  activityAssignmentException: { findMany: vi.fn() },
   $transaction: vi.fn(async (handler: (transaction: typeof tx) => unknown) => handler(tx)),
   activity: {
     findFirst: vi.fn(),
@@ -212,6 +213,7 @@ const studentUser: CurrentUser = {
 describe("group services", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.activityAssignmentException.findMany.mockResolvedValue([]);
     bcryptMocks.compare.mockResolvedValue(true);
     bcryptMocks.hash.mockResolvedValue("assigned-password-hash");
     mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof tx) => unknown) => handler(tx));

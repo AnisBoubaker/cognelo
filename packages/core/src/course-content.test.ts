@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
 const mockPrisma = vi.hoisted(() => ({
+  activityAssignmentException: { findMany: vi.fn() },
   $transaction: vi.fn(),
   activity: {
     deleteMany: vi.fn(),
@@ -112,6 +113,7 @@ const teacherUser: CurrentUser = {
 describe("course content services", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.activityAssignmentException.findMany.mockResolvedValue([]);
     mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof mockPrisma) => unknown) => handler(mockPrisma));
     mockPrisma.courseContentItem.count.mockResolvedValue(0);
     mockPrisma.courseContentItem.findMany.mockResolvedValue([]);

@@ -2,6 +2,25 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const zhMessages = {
+  activityExceptions: {
+    "title": "团队与学生例外设置",
+    "precedence": "设置依次继承自通用设置、班级设置和团队例外。学生个人例外对每个选定设置具有最高优先级。",
+    "inheritanceHelp": "仅选择需要覆盖的设置。未勾选的设置继续继承。保存活动设置后更改才会生效。",
+    "teamExceptions": "团队例外",
+    "studentExceptions": "学生例外",
+    "priorityHelp": "优先级最高的排在最前面。如果学生属于多个团队，首先覆盖某项设置的团队例外生效。也可使用隐藏的分组。",
+    "chooseTeam": "选择团队",
+    "chooseStudent": "选择学生",
+    "selectTarget": "请选择…",
+    "add": "添加例外",
+    "remove": "移除 {name} 的例外",
+    "higherPriority": "提高 {name} 的优先级",
+    "lowerPriority": "降低 {name} 的优先级",
+    "edit": "例外设置",
+    "empty": "添加团队或学生例外以自定义其活动设置。",
+    "assignSectionFirst": "请先在班级选项卡中将活动分配给此班级，再添加例外。",
+    "removedTarget": "团队或学生已移除"
+  },
     studentGroupings: {
       "manualMethod": "手动",
       "useManual": "使用手动分配",

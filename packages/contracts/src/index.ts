@@ -845,9 +845,7 @@ export const ActivityAssignmentOverrideFieldSchema = z.enum([
 ]);
 export type ActivityAssignmentOverrideField = z.infer<typeof ActivityAssignmentOverrideFieldSchema>;
 
-export const CourseActivityGroupAssignmentSettingsSchema = z.object({
-  groupId: RecordIdSchema,
-  assigned: z.boolean(),
+export const ActivityAssignmentOverrideValuesSchema = z.object({
   overrideFields: z.array(ActivityAssignmentOverrideFieldSchema).max(10).refine(
     (fields) => new Set(fields).size === fields.length,
     { message: "Override fields must be unique." }
@@ -859,6 +857,23 @@ export const CourseActivityGroupAssignmentSettingsSchema = z.object({
   gradeChallengesEnabled: z.boolean().optional(),
   gradebookSettings: GradebookItemSettingsInputSchema.optional(),
   contentPlacement: CourseContentPlacementInputSchema.optional()
+});
+export const ActivityAssignmentExceptionSchema = ActivityAssignmentOverrideValuesSchema.extend({
+  teamId: RecordIdSchema.nullable().optional(),
+  participantId: RecordIdSchema.nullable().optional()
+}).superRefine((value, context) => {
+  if (Boolean(value.teamId) === Boolean(value.participantId)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "Choose exactly one team or student for an exception." });
+  }
+});
+export type ActivityAssignmentExceptionInput = z.infer<typeof ActivityAssignmentExceptionSchema>;
+export const CourseActivityGroupAssignmentSettingsSchema = ActivityAssignmentOverrideValuesSchema.extend({
+  groupId: RecordIdSchema,
+  assigned: z.boolean(),
+  exceptions: z.array(ActivityAssignmentExceptionSchema).max(5000).refine(
+    (values) => new Set(values.map((value) => value.teamId ? `team:${value.teamId}` : `student:${value.participantId}`)).size === values.length,
+    { message: "Each team or student can have only one exception per activity." }
+  ).optional()
 });
 export type CourseActivityGroupAssignmentSettings = z.infer<typeof CourseActivityGroupAssignmentSettingsSchema>;
 

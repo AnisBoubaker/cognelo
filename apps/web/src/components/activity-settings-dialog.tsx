@@ -39,7 +39,11 @@ type GroupAssignmentDraft = AssignmentValueDraft & {
   title: string;
   assigned: boolean;
   overrideFields: ActivityAssignmentOverrideField[];
+  students: CourseActivityAssignmentSettings["groups"][number]["students"];
+  teams: CourseActivityAssignmentSettings["groups"][number]["teams"];
+  exceptions: ExceptionDraft[];
 };
+type ExceptionDraft = AssignmentValueDraft & { key: string; teamId: string | null; participantId: string | null; overrideFields: ActivityAssignmentOverrideField[] };
 type ActivitySettingsDraft = {
   assessmentMode: AssignedActivityAssessmentMode;
   contentParentId: string;
@@ -136,7 +140,8 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
           ...group,
           requireSafeExamBrowser: false,
           gradeChallengesEnabled: false,
-          overrideFields: group.overrideFields.filter((field) => !summativeOverrideFields.has(field))
+          overrideFields: group.overrideFields.filter((field) => !summativeOverrideFields.has(field)),
+          exceptions: group.exceptions.map((exception) => ({ ...exception, overrideFields: exception.overrideFields.filter((field) => !summativeOverrideFields.has(field)) }))
         }))
       };
     });
@@ -193,6 +198,14 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
         groupAssignments: draft.groups.map((group) => ({
           groupId: group.groupId,
           assigned: group.assigned,
+          exceptions: group.assigned ? group.exceptions.map((exception) => ({
+            teamId: exception.teamId, participantId: exception.participantId,
+            overrideFields: exception.overrideFields.filter((field) => allowedGroupFields ? allowedGroupFields(field) : true),
+            availableFrom: toIsoOrNull(exception.availableFrom), availableUntil: toIsoOrNull(exception.availableUntil),
+            timeLimitMinutes: buildTimeLimitMinutes(exception), requireSafeExamBrowser: exception.requireSafeExamBrowser,
+            gradeChallengesEnabled: exception.gradeChallengesEnabled, gradebookSettings: buildGradebookSettings(exception),
+            contentPlacement: { isVisible: exception.isVisible, metadata: {} }
+          })) : [],
           overrideFields: group.assigned
             ? group.overrideFields.filter((field) => allowedGroupFields ? allowedGroupFields(field) : true)
             : [],
@@ -371,74 +384,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                       {selectedGroup.assigned ? (
                         <div className="activity-group-overrides stack">
                           <p className="muted">{t("courseDetail.activitySettingsOverridesText")}</p>
-                          <OverrideField
-                            checked={selectedGroup.overrideFields.includes("availableFrom")}
-                            disabled={saving}
-                            id={`activity-group-from-${selectedGroup.groupId}`}
-                            label={t("groupPage.availableFrom")}
-                            onToggle={(checked) => toggleGroupOverride(selectedGroup.groupId, "availableFrom", checked)}
-                          >
-                            <DateTimeMinuteInput
-                              disabled={saving}
-                              id={`activity-group-from-value-${selectedGroup.groupId}`}
-                              value={selectedGroup.availableFrom}
-                              onChange={(availableFrom) => updateGroup(selectedGroup.groupId, { availableFrom })}
-                            />
-                          </OverrideField>
-                          <OverrideField
-                            checked={selectedGroup.overrideFields.includes("availableUntil")}
-                            disabled={saving}
-                            id={`activity-group-until-${selectedGroup.groupId}`}
-                            label={t("groupPage.availableUntil")}
-                            onToggle={(checked) => toggleGroupOverride(selectedGroup.groupId, "availableUntil", checked)}
-                          >
-                            <DateTimeMinuteInput
-                              disabled={saving}
-                              id={`activity-group-until-value-${selectedGroup.groupId}`}
-                              value={selectedGroup.availableUntil}
-                              onChange={(availableUntil) => updateGroup(selectedGroup.groupId, { availableUntil })}
-                            />
-                          </OverrideField>
-                          <OverrideField
-                            checked={selectedGroup.overrideFields.includes("timeLimit")}
-                            disabled={saving}
-                            id={`activity-group-time-limit-${selectedGroup.groupId}`}
-                            label={t("groupPage.timeLimit")}
-                            onToggle={(checked) => toggleGroupOverride(selectedGroup.groupId, "timeLimit", checked)}
-                          >
-                            <TimeLimitField
-                              disabled={saving}
-                              idPrefix={`activity-group-time-limit-value-${selectedGroup.groupId}`}
-                              value={selectedGroup}
-                              onChange={(update) => updateGroup(selectedGroup.groupId, update)}
-                            />
-                          </OverrideField>
-                          <OverrideField
-                            checked={selectedGroup.overrideFields.includes("visibility")}
-                            disabled={saving}
-                            id={`activity-group-visible-${selectedGroup.groupId}`}
-                            label={t("courseDetail.contentVisibleLabel")}
-                            onToggle={(checked) => toggleGroupOverride(selectedGroup.groupId, "visibility", checked)}
-                          >
-                            <label className="checkbox-row" htmlFor={`activity-group-visible-value-${selectedGroup.groupId}`}>
-                              <input
-                                checked={selectedGroup.isVisible}
-                                disabled={saving}
-                                id={`activity-group-visible-value-${selectedGroup.groupId}`}
-                                type="checkbox"
-                                onChange={(event) => updateGroup(selectedGroup.groupId, { isVisible: event.target.checked })}
-                              />
-                              <span>{t("courseDetail.contentVisibleLabel")}</span>
-                            </label>
-                          </OverrideField>
-                          {draft.assessmentMode === "summative" ? (
-                            <GroupSummativeOverrides
-                              disabled={saving}
-                              group={selectedGroup}
-                              onChange={(update) => updateGroup(selectedGroup.groupId, update)}
-                              onToggle={(field, checked) => toggleGroupOverride(selectedGroup.groupId, field, checked)}
-                            />
-                          ) : null}
+                          <AssignmentOverrideFields group={selectedGroup} summative={draft.assessmentMode === "summative"} disabled={saving} onChange={(update) => updateGroup(selectedGroup.groupId, update)} onToggle={(field, checked) => toggleGroupOverride(selectedGroup.groupId, field, checked)} />
                         </div>
                       ) : null}
                     </div>
@@ -446,7 +392,13 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                 </section>
               ) : null}
 
-              {!loading && draft && (activeTab === "ai" || activeTab === "exceptions") ? (
+              {!loading && draft && activeTab === "exceptions" ? <section aria-labelledby="activity-settings-tab-exceptions" className="activity-settings-panel stack" id="activity-settings-panel-exceptions" role="tabpanel">
+                <h3>{t("activityExceptions.title")}</h3>
+                <p className="muted">{t("activityExceptions.precedence")}</p>
+                <div className="field"><label htmlFor="exception-section">{t("studentGroupings.section")}</label><select id="exception-section" value={selectedGroup?.groupId ?? ""} disabled={saving} onChange={(event) => setSelectedGroupId(event.target.value)}>{draft.groups.map((group) => <option key={group.groupId} value={group.groupId}>{group.title}</option>)}</select></div>
+                {selectedGroup?.assigned ? <ExceptionsEditor key={selectedGroup.groupId} group={selectedGroup} general={draft.general} summative={draft.assessmentMode === "summative"} disabled={saving} onChange={(exceptions) => updateGroup(selectedGroup.groupId, { exceptions })} /> : <p className="muted">{t("activityExceptions.assignSectionFirst")}</p>}
+              </section> : null}
+              {!loading && draft && activeTab === "ai" ? (
                 <section
                   aria-labelledby={`activity-settings-tab-${activeTab}`}
                   className="activity-settings-panel activity-settings-placeholder"
@@ -470,6 +422,154 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
           </div>
     </form>
   );
+}
+
+function ExceptionsEditor({ group, general, summative, disabled, onChange }: {
+  group: GroupAssignmentDraft; general: AssignmentValueDraft; summative: boolean; disabled: boolean;
+  onChange: (exceptions: ExceptionDraft[]) => void;
+}) {
+  const { t } = useI18n();
+  const [selectedKey, setSelectedKey] = useState("");
+  const [teamId, setTeamId] = useState("");
+  const [participantId, setParticipantId] = useState("");
+  const selected = group.exceptions.find((exception) => exception.key === selectedKey) ?? group.exceptions[0];
+  const sectionValues = group.overrideFields.reduce((value, field) => ({ ...value, ...copyGeneralField(group, field) }), general);
+  const label = (exception: ExceptionDraft) => {
+    if (exception.teamId) {
+      const team = group.teams.find((team) => team.id === exception.teamId);
+      return team ? `${team.groupingTitle} · ${team.title}` : t("activityExceptions.removedTarget");
+    }
+    const student = group.students.find((student) => student.id === exception.participantId);
+    return student ? `${student.firstName} ${student.lastName} (${student.email})` : t("activityExceptions.removedTarget");
+  };
+  function add(kind: "team" | "student") {
+    const id = kind === "team" ? teamId : participantId;
+    if (!id) return;
+    const key = `${kind}-${id}`;
+    onChange([...group.exceptions, { ...sectionValues, key, teamId: kind === "team" ? id : null, participantId: kind === "student" ? id : null, overrideFields: [] }]);
+    setSelectedKey(key);
+    if (kind === "team") setTeamId(""); else setParticipantId("");
+  }
+  function edit(update: Partial<ExceptionDraft>) {
+    if (selected) onChange(group.exceptions.map((exception) => exception.key === selected.key ? { ...exception, ...update } : exception));
+  }
+  function move(exception: ExceptionDraft, direction: number) {
+    const teams = group.exceptions.filter((item) => item.teamId);
+    const destination = teams[teams.indexOf(exception) + direction];
+    if (!destination) return;
+    const next = [...group.exceptions];
+    const from = next.indexOf(exception), to = next.indexOf(destination);
+    [next[from], next[to]] = [next[to]!, next[from]!];
+    onChange(next);
+  }
+  return <div className="stack activity-exceptions">
+    <p className="muted">{t("activityExceptions.inheritanceHelp")}</p>
+    {(["team", "student"] as const).map((kind) => <section className="activity-exception-list stack" key={kind} aria-label={t(`activityExceptions.${kind}Exceptions`)}>
+      <h4>{t(`activityExceptions.${kind}Exceptions`)}</h4>
+      {kind === "team" ? <p className="muted">{t("activityExceptions.priorityHelp")}</p> : null}
+      <div className="activity-exception-add">
+        <div className="field"><label htmlFor={`exception-${kind}-target`}>{t(`activityExceptions.choose${kind === "team" ? "Team" : "Student"}`)}</label>
+          <select id={`exception-${kind}-target`} value={kind === "team" ? teamId : participantId} disabled={disabled} onChange={(event) => kind === "team" ? setTeamId(event.target.value) : setParticipantId(event.target.value)}>
+            <option value="">{t("activityExceptions.selectTarget")}</option>
+            {kind === "team" ? group.teams.filter((team) => !group.exceptions.some((exception) => exception.teamId === team.id)).map((team) => <option key={team.id} value={team.id}>{team.groupingTitle} · {team.title}</option>)
+              : group.students.filter((student) => !group.exceptions.some((exception) => exception.participantId === student.id)).map((student) => <option key={student.id} value={student.id}>{student.firstName} {student.lastName} ({student.email})</option>)}
+          </select>
+        </div>
+        <button type="button" className="secondary" disabled={disabled || !(kind === "team" ? teamId : participantId)} onClick={() => add(kind)}>{t("activityExceptions.add")}</button>
+      </div>
+      {group.exceptions.filter((exception) => kind === "team" ? exception.teamId : exception.participantId).map((exception, index, entries) => <div className="activity-exception-row" key={exception.key}>
+        <button type="button" className={`secondary activity-exception-select${selected?.key === exception.key ? " is-active" : ""}`} aria-pressed={selected?.key === exception.key} disabled={disabled} onClick={() => setSelectedKey(exception.key)}>{kind === "team" ? `${index + 1}. ` : ""}{label(exception)}</button>
+        <div className="activity-exception-row-actions">
+          {kind === "team" ? <><button type="button" className="secondary" aria-label={t("activityExceptions.higherPriority", { name: label(exception) })} disabled={disabled || index === 0} onClick={() => move(exception, -1)}>↑</button><button type="button" className="secondary" aria-label={t("activityExceptions.lowerPriority", { name: label(exception) })} disabled={disabled || index === entries.length - 1} onClick={() => move(exception, 1)}>↓</button></> : null}
+          <button type="button" className="secondary" aria-label={t("activityExceptions.remove", { name: label(exception) })} disabled={disabled} onClick={() => onChange(group.exceptions.filter((item) => item.key !== exception.key))}>{t("common.remove")}</button>
+        </div>
+      </div>)}
+    </section>)}
+    {selected ? <section className="activity-exception-editor stack" aria-label={t("activityExceptions.edit")}>
+      <h4>{label(selected)}</h4>
+      <AssignmentOverrideFields group={{ ...selected, groupId: selected.key }} summative={summative} disabled={disabled} onChange={edit} onToggle={(field, checked) => edit({
+        ...(checked ? copyGeneralField(sectionValues, field) : {}),
+        overrideFields: checked ? [...new Set([...selected.overrideFields, field])] : selected.overrideFields.filter((value) => value !== field)
+      })} />
+    </section> : <p className="muted">{t("activityExceptions.empty")}</p>}
+  </div>;
+}
+
+function AssignmentOverrideFields({ group, summative, disabled, onChange, onToggle }: {
+  group: AssignmentValueDraft & { groupId: string; overrideFields: ActivityAssignmentOverrideField[] };
+  summative: boolean; disabled: boolean;
+  onChange: (update: Partial<AssignmentValueDraft>) => void;
+  onToggle: (field: ActivityAssignmentOverrideField, checked: boolean) => void;
+}) {
+  const { t } = useI18n();
+  return <>                          <OverrideField
+                            checked={group.overrideFields.includes("availableFrom")}
+                            disabled={disabled}
+                            id={`activity-group-from-${group.groupId}`}
+                            label={t("groupPage.availableFrom")}
+                            onToggle={(checked) => onToggle("availableFrom", checked)}
+                          >
+                            <DateTimeMinuteInput
+                              disabled={disabled}
+                              id={`activity-group-from-value-${group.groupId}`}
+                              value={group.availableFrom}
+                              onChange={(availableFrom) => onChange({ availableFrom })}
+                            />
+                          </OverrideField>
+                          <OverrideField
+                            checked={group.overrideFields.includes("availableUntil")}
+                            disabled={disabled}
+                            id={`activity-group-until-${group.groupId}`}
+                            label={t("groupPage.availableUntil")}
+                            onToggle={(checked) => onToggle("availableUntil", checked)}
+                          >
+                            <DateTimeMinuteInput
+                              disabled={disabled}
+                              id={`activity-group-until-value-${group.groupId}`}
+                              value={group.availableUntil}
+                              onChange={(availableUntil) => onChange({ availableUntil })}
+                            />
+                          </OverrideField>
+                          <OverrideField
+                            checked={group.overrideFields.includes("timeLimit")}
+                            disabled={disabled}
+                            id={`activity-group-time-limit-${group.groupId}`}
+                            label={t("groupPage.timeLimit")}
+                            onToggle={(checked) => onToggle("timeLimit", checked)}
+                          >
+                            <TimeLimitField
+                              disabled={disabled}
+                              idPrefix={`activity-group-time-limit-value-${group.groupId}`}
+                              value={group}
+                              onChange={(update) => onChange(update)}
+                            />
+                          </OverrideField>
+                          <OverrideField
+                            checked={group.overrideFields.includes("visibility")}
+                            disabled={disabled}
+                            id={`activity-group-visible-${group.groupId}`}
+                            label={t("courseDetail.contentVisibleLabel")}
+                            onToggle={(checked) => onToggle("visibility", checked)}
+                          >
+                            <label className="checkbox-row" htmlFor={`activity-group-visible-value-${group.groupId}`}>
+                              <input
+                                checked={group.isVisible}
+                                disabled={disabled}
+                                id={`activity-group-visible-value-${group.groupId}`}
+                                type="checkbox"
+                                onChange={(event) => onChange({ isVisible: event.target.checked })}
+                              />
+                              <span>{t("courseDetail.contentVisibleLabel")}</span>
+                            </label>
+                          </OverrideField>
+                          {summative ? (
+                            <GroupSummativeOverrides
+                              disabled={disabled}
+                              group={group}
+                              onChange={(update) => onChange(update)}
+                              onToggle={(field, checked) => onToggle(field, checked)}
+                            />
+                          ) : null}</>;
 }
 
 function TimeLimitField({
@@ -572,8 +672,8 @@ function GroupSummativeOverrides({
   onToggle
 }: {
   disabled: boolean;
-  group: GroupAssignmentDraft;
-  onChange: (update: Partial<GroupAssignmentDraft>) => void;
+  group: AssignmentValueDraft & { groupId: string; overrideFields: ActivityAssignmentOverrideField[] };
+  onChange: (update: Partial<AssignmentValueDraft>) => void;
   onToggle: (field: ActivityAssignmentOverrideField, checked: boolean) => void;
 }) {
   const { t } = useI18n();
@@ -808,6 +908,24 @@ function buildDraft(settings: CourseActivityAssignmentSettings, isTest: boolean)
       groupId: group.groupId,
       title: group.title,
       assigned: group.assigned,
+      students: group.students,
+      teams: group.teams,
+      exceptions: group.exceptions.map((exception) => ({
+        ...assignmentValueDraft({
+          ...group,
+          ...exception,
+          availableFrom: exception.availableFrom ?? null,
+          availableUntil: exception.availableUntil ?? null,
+          timeLimitMinutes: exception.timeLimitMinutes ?? null,
+          requireSafeExamBrowser: exception.requireSafeExamBrowser ?? false,
+          gradeChallengesEnabled: exception.gradeChallengesEnabled ?? false,
+          gradebookSettings: { ...group.gradebookSettings, ...exception.gradebookSettings },
+          contentPlacement: { ...group.contentPlacement, ...exception.contentPlacement }
+        }),
+        key: exception.teamId ? `team-${exception.teamId}` : `student-${exception.participantId}`,
+        teamId: exception.teamId ?? null, participantId: exception.participantId ?? null,
+        overrideFields: exception.overrideFields
+      })),
       overrideFields: assessmentMode === "summative"
         ? group.overrideFields
         : group.overrideFields.filter((field) => !summativeOverrideFields.has(field))
@@ -843,7 +961,7 @@ function assignmentValueDraft(value: {
   };
 }
 
-function copyGeneralField(general: AssignmentValueDraft, field: ActivityAssignmentOverrideField): Partial<GroupAssignmentDraft> {
+function copyGeneralField(general: AssignmentValueDraft, field: ActivityAssignmentOverrideField): Partial<AssignmentValueDraft> {
   switch (field) {
     case "availableFrom": return { availableFrom: general.availableFrom };
     case "availableUntil": return { availableUntil: general.availableUntil };

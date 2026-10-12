@@ -2,6 +2,25 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const arMessages = {
+  activityExceptions: {
+    "title": "استثناءات الفرق والطلاب",
+    "precedence": "تُورث الإعدادات من العام، ثم الشعبة، ثم استثناءات الفرق. تتقدم استثناءات الطالب لكل إعداد محدد.",
+    "inheritanceHelp": "حدد فقط الإعدادات التي تريد تجاوزها. تبقى الإعدادات غير المحددة موروثة. تسري التغييرات عند حفظ إعدادات النشاط.",
+    "teamExceptions": "استثناءات الفرق",
+    "studentExceptions": "استثناءات الطلاب",
+    "priorityHelp": "الأولوية الأعلى أولاً. إذا انضم الطالب إلى عدة فرق، يسري أول استثناء يتجاوز الإعداد. يمكن أيضًا استخدام التجميعات المخفية.",
+    "chooseTeam": "اختر فريقًا",
+    "chooseStudent": "اختر طالبًا",
+    "selectTarget": "اختر…",
+    "add": "إضافة استثناء",
+    "remove": "إزالة استثناء {name}",
+    "higherPriority": "رفع أولوية {name}",
+    "lowerPriority": "خفض أولوية {name}",
+    "edit": "إعدادات الاستثناء",
+    "empty": "أضف استثناء لفريق أو طالب لتخصيص إعدادات النشاط.",
+    "assignSectionFirst": "عيّن النشاط لهذه الشعبة في علامة تبويب المجموعات قبل إضافة الاستثناءات.",
+    "removedTarget": "تمت إزالة الفريق أو الطالب"
+  },
     studentGroupings: {
       "manualMethod": "يدوي",
       "studentChangesAllowed": "يمكن للطلاب تغيير فرقهم خلال فترة الاختيار وحتى الموعد النهائي.",

@@ -6,6 +6,8 @@ Teacher review routes consume core grade capabilities: explicit course teachers/
 
 ## Read By Topic
 
+- [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)
+
 - [Public/private data and bank/course lifecycle](docs/REFERENCE.md#architecture-boundary)
 - [Teacher authoring](docs/REFERENCE.md#authoring-ux)
 - [Playwright validation and submission flow](docs/REFERENCE.md#playwright-grading)

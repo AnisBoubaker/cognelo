@@ -35,6 +35,8 @@ The main MCQ source is written as text.
 
 ## Current State
 
+Core applies [team and student assignment exceptions](../../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md) to access, timing, attempts, grading, and challenge policy. Plugin routes consume the resolved assignment and core grade services; active attempt deadlines retain their original snapshot.
+
 Teacher Student view uses the same parser and deterministic answer-key grader but keeps answers in browser session storage. Its SDK preview handlers return an ephemeral submission/result and never call the core attempt or plugin AI-evaluation persistence paths.
 
 The plugin stores authored content in generic bank/course activity config. Assigning from an activity bank therefore uses the platform's generic config copy. Every standalone formative **Check answers** action and summative submission is persisted as a mode-tagged core `ActivityAttempt`; only summative attempts are graded through the shared gradebook workflow or counted against summative limits. The assignment policies `formative` and `formative_ai` both create a core formative attempt so old consumers remain compatible. Teachers can inspect either mode, while a learner opening a summative activity sees only its summative submission history. The plugin also owns private immutable `PluginMcqAiEvaluation` rows for generated assessment feedback artifacts; those rows are operational evaluation data, not authored activity data.

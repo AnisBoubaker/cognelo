@@ -60,6 +60,8 @@ The activity config currently includes:
 
 ## Persistence
 
+Core applies [team and student assignment exceptions](../../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md) to access, timing, attempts, grading, and challenge policy. Plugin routes consume the resolved assignment and core grade services; active attempt deadlines retain their original snapshot.
+
 Parsons owns plugin-specific persistence for student attempts.
 
 Authored Parsons content remains in generic activity config, so explicit course/bank synchronization is core-owned and needs no private authoring hook. Any existing core attempt prevents bank-to-course retrieval, while course-to-bank publication remains allowed because it does not replace attempted course content.

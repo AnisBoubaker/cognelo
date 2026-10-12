@@ -3,6 +3,7 @@ import type { CurrentUser } from "@cognelo/contracts";
 import { gradeChallengeTargetForGrade } from "./grade-challenge-targets";
 
 const mockPrisma = vi.hoisted(() => ({
+  activityAssignmentException: { findMany: vi.fn() },
   activityAttempt: { findFirst: vi.fn() },
   grade: { findUnique: vi.fn() },
   gradeChallenge: { create: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
@@ -112,6 +113,7 @@ const openChallenge = {
 describe("grade challenges", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.activityAssignmentException.findMany.mockResolvedValue([]);
     mockPrisma.activityAttempt.findFirst.mockResolvedValue(attempt);
     mockPrisma.grade.findUnique.mockResolvedValue(grade);
     mockPrisma.gradeChallenge.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ id: "challenge-1", ...data }));

@@ -2,6 +2,25 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const frMessages = {
+  activityExceptions: {
+    "title": "Exceptions par équipe et par étudiant",
+    "precedence": "Les paramètres sont hérités des réglages généraux, puis de la section, puis des exceptions d’équipe. Les exceptions individuelles sont prioritaires pour chaque paramètre sélectionné.",
+    "inheritanceHelp": "Sélectionnez uniquement les paramètres à remplacer. Les paramètres non cochés restent hérités. Les changements prennent effet à l’enregistrement des paramètres de l’activité.",
+    "teamExceptions": "Exceptions d’équipe",
+    "studentExceptions": "Exceptions individuelles",
+    "priorityHelp": "La priorité la plus élevée est en premier. Si un étudiant appartient à plusieurs équipes, la première exception qui remplace un paramètre prévaut. Les regroupements masqués peuvent aussi être utilisés.",
+    "chooseTeam": "Choisir une équipe",
+    "chooseStudent": "Choisir un étudiant",
+    "selectTarget": "Sélectionner…",
+    "add": "Ajouter une exception",
+    "remove": "Retirer l’exception pour {name}",
+    "higherPriority": "Augmenter la priorité de {name}",
+    "lowerPriority": "Diminuer la priorité de {name}",
+    "edit": "Paramètres de l’exception",
+    "empty": "Ajoutez une exception d’équipe ou individuelle pour personnaliser les paramètres de l’activité.",
+    "assignSectionFirst": "Attribuez l’activité à cette section dans l’onglet Affectation aux groupes avant d’ajouter des exceptions.",
+    "removedTarget": "Équipe ou étudiant supprimé"
+  },
     studentGroupings: {
       "manualMethod": "Manuelle",
       "useManual": "Passer à l’attribution manuelle",

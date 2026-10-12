@@ -6,6 +6,8 @@ Gradebook attempt review and grading use core grade scope, so explicit course te
 
 ## Read By Topic
 
+- [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)
+
 - [Authoring config, persistence, and routes](docs/REFERENCE.md#persistence)
 - [Generation and grading behavior](docs/REFERENCE.md#routes)
 - [Learner and authoring UX](docs/REFERENCE.md#ux-notes)

@@ -2,6 +2,25 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const enMessages = {
+  activityExceptions: {
+    "title": "Team and student exceptions",
+    "precedence": "Settings are inherited from General, then the section, then team exceptions. Student exceptions take precedence for each selected setting.",
+    "inheritanceHelp": "Select only the settings to override. Unchecked settings stay inherited. Changes apply when you save activity settings.",
+    "teamExceptions": "Team exceptions",
+    "studentExceptions": "Student exceptions",
+    "priorityHelp": "Highest priority first. If a student belongs to several teams, the first team exception that overrides a setting wins. Hidden groupings can also be used.",
+    "chooseTeam": "Choose a team",
+    "chooseStudent": "Choose a student",
+    "selectTarget": "Select…",
+    "add": "Add exception",
+    "remove": "Remove exception for {name}",
+    "higherPriority": "Higher priority for {name}",
+    "lowerPriority": "Lower priority for {name}",
+    "edit": "Exception settings",
+    "empty": "Add a team or student exception to customize their activity settings.",
+    "assignSectionFirst": "Assign the activity to this section in the Group assignment tab before adding exceptions.",
+    "removedTarget": "Removed team or student"
+  },
     studentGroupings: {
       "manualMethod": "Manual",
       "useManual": "Use manual assignment",

@@ -132,6 +132,8 @@ Saving uses incremental reference validation. Each passing visible or enabled hi
 
 ## Assessment Feedback And Grading
 
+Core applies [team and student assignment exceptions](../../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md) to access, timing, attempts, grading, and challenge policy. Plugin routes consume the resolved assignment and core grade services; active attempt deadlines retain their original snapshot.
+
 Programming Exercises declare both AI-feedback and AI-feedback-grading capabilities, but their rubric is a general teacher grading tool rather than an AI-only artifact. The activity's private reference-solution row retains the backward-compatible `privateConfig.aiFeedback` storage shape: a rubric can be configured and weighted into the grade while automatic feedback is disabled. Enabling automatic feedback additionally requires evaluator instructions; enabling rubric grading requires deterministic-test and rubric weights that total 100. The private configuration is copied by the existing bank/course lifecycle hooks with the other reference data.
 
 Course and bank authoring add a host-level **Grading** tab immediately after **Concepts**. Inside it, a left-side **Rubric** section holds deterministic/rubric weighting, the unnamed general rubric, and optional automatic-feedback controls; a **Test cases** section holds test generation, visible sample tests, and hidden tests. The plugin keeps one mounted authoring state and portals that grading portion into the host tab, so switching either level of tabs cannot discard the combined public/private draft. Both Activity and Grading expose the same save/discard boundary.

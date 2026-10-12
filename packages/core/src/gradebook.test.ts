@@ -23,6 +23,7 @@ const tx = vi.hoisted(() => ({
 }));
 
 const mockPrisma = vi.hoisted(() => ({
+  activityAssignmentException: { findMany: vi.fn() },
   $transaction: vi.fn(async (handler: (transaction: typeof tx) => unknown) => handler(tx)),
   activityAttempt: {
     count: vi.fn(),
@@ -152,6 +153,7 @@ const testNow = new Date("2026-05-18T15:00:00.000Z");
 describe("gradebook attempt services", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.activityAssignmentException.findMany.mockResolvedValue([]);
     mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof tx) => unknown) => handler(tx));
     mockPrisma.courseGroupActivity.findFirst.mockResolvedValue(groupActivity);
     mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue(participant);
@@ -216,6 +218,20 @@ describe("gradebook attempt services", () => {
         activityVersionId: "version-1"
       })
     });
+  });
+
+  it("uses the student's due date and attempt allowance ahead of a matching team exception", async () => {
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({ ...groupActivity, availableUntil: new Date("2026-05-17T12:00:00.000Z"), gradebookItem: { ...groupActivity.gradebookItem, attemptLimitMode: "max_attempts", maxAttempts: 1 } });
+    const teamException = { groupActivityId: "assignment-1", teamId: "team", participantId: null, priority: 0, team: { members: [{ participantId: participant.id }] }, settings: { overrideFields: ["attempts", "availableUntil"], availableUntil: null, gradebookSettings: { attemptLimitMode: "max_attempts", maxAttempts: 2 } } };
+    mockPrisma.activityAssignmentException.findMany.mockResolvedValue([
+      teamException,
+      { groupActivityId: "assignment-1", teamId: null, participantId: participant.id, priority: 1, settings: { overrideFields: ["attempts"], gradebookSettings: { attemptLimitMode: "max_attempts", maxAttempts: 3 } } }
+    ]);
+    mockPrisma.activityAttempt.count.mockResolvedValue(2);
+    const input = { courseId: "course-1", groupId: "group-1", activityId: "activity-1", now: testNow };
+    await expect(getActivityAttemptAvailability(studentUser, input)).resolves.toMatchObject({ canStart: true, maxAttempts: 3, attemptsRemaining: 1 });
+    mockPrisma.activityAssignmentException.findMany.mockResolvedValue([teamException]);
+    await expect(getActivityAttemptAvailability(studentUser, input)).resolves.toMatchObject({ canStart: false, reason: "ATTEMPT_LIMIT_REACHED", maxAttempts: 2 });
   });
 
   it("reuses the active timed attempt when the activity plugin creates its submission", async () => {
@@ -1816,12 +1832,7 @@ describe("gradebook attempt services", () => {
       expect.objectContaining({
         where: {
           courseId: "course-1",
-          groupId: "group-1",
-          OR: [
-            { gradesReleased: true },
-            { attemptLimitMode: { not: "max_attempts" } },
-            { maxAttempts: { gt: 1 } }
-          ]
+          groupId: "group-1"
         }
       })
     );
