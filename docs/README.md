@@ -43,6 +43,7 @@ Open these only when changing or reviewing the named area:
 - [Course content tree](COURSE_CONTENT_TREE_IMPLEMENTATION_PLAN.md)
 - [Gradebook](GRADEBOOK_IMPLEMENTATION_PLAN.md)
 - [Role authorization and multi-teacher E2E plan](ROLE_AUTHORIZATION_E2E_IMPLEMENTATION_PLAN.md)
+- [Student groupings and teams](STUDENT_GROUPINGS.md)
 - [Student model](STUDENT_MODEL_IMPLEMENTATION_PLAN.md)
 - [Student view](STUDENT_VIEW_IMPLEMENTATION_PLAN.md)
 - [Compound Test activity](TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md)
@@ -59,6 +60,7 @@ Implementation plans contain design rationale and delivery state. They are not r
 
 ## Point-In-Time Records
 
+- [Grouping verification — 2026-10-12](E2E_RUN_2026-10-12.md)
 - [E2E run — 2026-09-07](E2E_RUN_2026-09-07.md)
 
 Point-in-time records preserve evidence; they are not current product reference unless explicitly linked from an active issue or task.

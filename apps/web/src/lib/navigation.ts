@@ -1,6 +1,6 @@
 import type { CurrentUser } from "@cognelo/contracts";
 
-export type CourseWorkspaceTab = "content" | "participants" | "gradebook" | "challenges" | "settings";
+export type CourseWorkspaceTab = "content" | "groupings" | "participants" | "gradebook" | "challenges" | "settings";
 
 export function getPrimaryLandingPath(user: Pick<CurrentUser, "roles">) {
   const canManageLearningContent = user.roles.some((role) =>
@@ -26,6 +26,7 @@ export function resolveCourseWorkspaceTab(requestedTab: string | null): CourseWo
     return "participants";
   }
   if (
+    requestedTab === "groupings" ||
     requestedTab === "participants" ||
     requestedTab === "gradebook" ||
     requestedTab === "challenges" ||

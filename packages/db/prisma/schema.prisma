@@ -580,6 +580,7 @@ model CourseGroup {
   materials                  CourseGroupMaterial[]
   activities                 CourseGroupActivity[]
   participants               CourseGroupParticipant[]
+  studentGroupings           StudentGrouping[]
   hiddenCourseMaterials      CourseGroupHiddenCourseMaterial[]
   gradebookItems             GradebookItem[]
   activityAttempts           ActivityAttempt[]
@@ -611,11 +612,50 @@ model CourseGroupParticipant {
   grades                 Grade[]
   gradeEvents            GradeEvent[]
   activityConversations  ActivityConversation[]
+  teamMemberships        StudentTeamMember[]
 
   @@unique([groupId, email])
   @@index([groupId, createdAt])
   @@index([email])
   @@index([userId])
+}
+
+model StudentGrouping {
+  id          String      @id @default(cuid())
+  groupId     String
+  title       String
+  description String      @default("")
+  revision    Int         @default(1)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  group       CourseGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  teams       StudentTeam[]
+
+  @@unique([groupId, title])
+}
+
+model StudentTeam {
+  id         String          @id @default(cuid())
+  groupingId String
+  title      String
+  grouping   StudentGrouping @relation(fields: [groupingId], references: [id], onDelete: Cascade)
+  members    StudentTeamMember[]
+
+  @@unique([id, groupingId])
+  @@unique([groupingId, title])
+}
+
+model StudentTeamMember {
+  groupingId    String
+  teamId        String
+  participantId String
+  createdAt     DateTime               @default(now())
+  team          StudentTeam            @relation(fields: [teamId, groupingId], references: [id, groupingId], onDelete: Cascade)
+  participant   CourseGroupParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@id([groupingId, participantId])
+  @@index([teamId, groupingId])
+  @@index([participantId])
 }
 
 model CourseGroupMaterial {

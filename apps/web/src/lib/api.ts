@@ -1,4 +1,8 @@
 import type {
+  StudentGroupingDto,
+  StudentGroupingInput,
+  StudentGroupingUpdate,
+  StudentGroupingStudent,
   ActivateAccountInput,
   AdminUserCreate,
   AdminUserPasswordReset,
@@ -47,7 +51,7 @@ import type {
 import type { ActivityVersionDiff } from "@cognelo/contracts";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 
-export type { MaterialKind, SubjectKnowledgeGraphDraft, SubjectProgrammingLanguage };
+export type { StudentGroupingDto, StudentGroupingStudent, MaterialKind, SubjectKnowledgeGraphDraft, SubjectProgrammingLanguage };
 
 export type AdminRole = { id: string; key: "admin" | "course_manager" | "teacher" | "student"; name: string; description: string | null };
 export type AdminUser = {
@@ -1961,6 +1965,20 @@ export const api = {
   archiveCourse: (courseId: string) => request<{ course: Course }>(`/courses/${courseId}`, { method: "DELETE" }),
   groups: (courseId: string) => request<{ groups: CourseGroup[] }>(`/courses/${courseId}/groups`),
   group: (courseId: string, groupId: string) => request<{ group: CourseGroup }>(`/courses/${courseId}/groups/${groupId}`),
+  studentGroupings: (courseId: string, groupId: string) =>
+    request<{ groupings: StudentGroupingDto[]; students: StudentGroupingStudent[] }>(`/courses/${courseId}/groups/${groupId}/groupings`),
+  createStudentGrouping: (courseId: string, groupId: string, input: StudentGroupingInput) =>
+    request<{ grouping: StudentGroupingDto }>(`/courses/${courseId}/groups/${groupId}/groupings`, {
+      method: "POST", body: JSON.stringify(input)
+    }),
+  updateStudentGrouping: (courseId: string, groupId: string, groupingId: string, input: StudentGroupingUpdate) =>
+    request<{ grouping: StudentGroupingDto }>(`/courses/${courseId}/groups/${groupId}/groupings/${groupingId}`, {
+      method: "PATCH", body: JSON.stringify(input)
+    }),
+  deleteStudentGrouping: (courseId: string, groupId: string, groupingId: string, revision: number) =>
+    request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}/groupings/${groupingId}`, {
+      method: "DELETE", body: JSON.stringify({ revision })
+    }),
   createGroup: (courseId: string, input: CourseGroupInput) =>
     request<{ group: CourseGroup }>(`/courses/${courseId}/groups`, {
       method: "POST",
