@@ -4,6 +4,7 @@ This file is intentionally short. It records only cross-cutting decisions that a
 
 ## Platform Invariants
 
+- Synthetic email recipients, including `cognelo.local`, are captured in the private local outbox at the shared delivery boundary, even when real SMTP/Graph is configured. Keep system-mail eligibility checks before capture; never fall back to a provider when capture fails. See [Email delivery](EMAIL_DELIVERY.md).
 - Keep `apps/api` and `apps/web` separate. Shared business rules belong in `packages/core`; shared schemas belong in `packages/contracts`.
 - Keep core persistence generic. Activity- or content-type-specific tables, migrations, routes, services, translations, and UI belong to the owning plugin.
 - Treat browser-visible activity config as public student data. Hidden tests, reference solutions, raw model output, private prompts, credentials, and grading internals stay server-side in authorized storage and routes.
