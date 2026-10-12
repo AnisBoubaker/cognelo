@@ -29,7 +29,7 @@ async function requireStudent(tx: Prisma.TransactionClient, user: CurrentUser, c
 export async function listMyStudentGroupings(user: CurrentUser, courseId: string, groupId: string): Promise<{ groupings: MyStudentGroupingDto[] }> {
   const student = await requireStudent(prisma, user, courseId, groupId);
   const groupings = await prisma.studentGrouping.findMany({
-    where: { groupId }, orderBy: [{ title: "asc" }, { id: "asc" }],
+    where: { groupId, visibleToStudents: true }, orderBy: [{ title: "asc" }, { id: "asc" }],
     include: { teams: { orderBy: [{ title: "asc" }, { id: "asc" }], include: { members: {
       where: { participant: { role: "student", groupId } },
       orderBy: [{ participant: { lastName: "asc" } }, { participant: { firstName: "asc" } }, { participantId: "asc" }],
@@ -61,7 +61,7 @@ export async function chooseStudentTeam(user: CurrentUser, courseId: string, gro
     return await prisma.$transaction(async (tx) => {
       const student = await requireStudent(tx, user, courseId, groupId);
       const grouping = await tx.studentGrouping.findFirst({
-        where: { id: groupingId, groupId }, include: { teams: { include: { members: { select: { participantId: true } } } } }
+        where: { id: groupingId, groupId, visibleToStudents: true }, include: { teams: { include: { members: { select: { participantId: true } } } } }
       });
       if (!grouping) throw notFound("Student grouping");
       const previousTeam = grouping.teams.find((team) => team.members.some((member) => member.participantId === student.id));

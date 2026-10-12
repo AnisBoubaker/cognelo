@@ -17,6 +17,7 @@ function toDto(grouping: StoredGrouping): StudentGroupingDto {
   return {
     id: grouping.id, groupId: grouping.groupId, title: grouping.title,
     description: grouping.description, revision: grouping.revision,
+    visibleToStudents: grouping.visibleToStudents, assignmentMethod: grouping.assignmentMethod,
     studentChoiceEnabled: grouping.studentChoiceEnabled, choiceOpensAt: grouping.choiceOpensAt?.toISOString() ?? null,
     choiceClosesAt: grouping.choiceClosesAt?.toISOString() ?? null, allowChoiceChanges: grouping.allowChoiceChanges,
     teams: grouping.teams.map((team) => ({ id: team.id, title: team.title, capacity: team.capacity, participantIds: team.members.map((member) => member.participantId) }))
@@ -26,6 +27,7 @@ function toDto(grouping: StoredGrouping): StudentGroupingDto {
 function groupingSettings(data: StudentGroupingInput) {
   return {
     title: data.title, description: data.description, studentChoiceEnabled: data.studentChoiceEnabled,
+    visibleToStudents: data.visibleToStudents, assignmentMethod: data.assignmentMethod,
     choiceOpensAt: data.choiceOpensAt ? new Date(data.choiceOpensAt) : null,
     choiceClosesAt: data.choiceClosesAt ? new Date(data.choiceClosesAt) : null,
     allowChoiceChanges: data.allowChoiceChanges
@@ -122,7 +124,7 @@ export async function updateStudentGrouping(user: CurrentUser, courseId: string,
     await validateTeams(tx, groupId, data.teams, previous);
     const updated = await tx.studentGrouping.updateMany({
       where: { id: groupingId, groupId, revision: data.revision },
-      data: { ...groupingSettings(data), revision: { increment: 1 } }
+      data: { ...groupingSettings({ ...data, visibleToStudents: data.visibleToStudents ?? previous.visibleToStudents }), revision: { increment: 1 } }
     });
     if (updated.count !== 1) throw conflict();
     await tx.studentTeamMember.deleteMany({ where: { groupingId } });

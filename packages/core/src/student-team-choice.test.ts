@@ -13,7 +13,7 @@ const user: CurrentUser = { id: "learner", email: "learner@example.test", roles:
 const now = new Date("2026-10-12T12:00:00.000Z");
 const policy = { studentChoiceEnabled: true, choiceOpensAt: new Date("2026-10-12T11:00:00.000Z"), choiceClosesAt: now, allowChoiceChanges: true };
 const grouping = () => ({
-  ...policy, choiceClosesAt: new Date("2026-10-12T13:00:00.000Z"), id: "grouping", groupId: "section", title: "Projects", description: "Private accommodation notes", revision: 7,
+  ...policy, visibleToStudents: true, choiceClosesAt: new Date("2026-10-12T13:00:00.000Z"), id: "grouping", groupId: "section", title: "Projects", description: "Private accommodation notes", revision: 7,
   teams: [
     { id: "a", title: "A", capacity: 2, members: [{ participantId: "student", participant: { firstName: "Sam", lastName: "Student", email: "private@example.test" } }] },
     { id: "b", title: "B", capacity: 1, members: [] }
@@ -111,7 +111,7 @@ describe("student team choice authorization and atomicity", () => {
   it("scopes grouping lookup to the student's section", async () => {
     mocks.studentGrouping.findFirst.mockResolvedValue(null);
     await expect(choose()).rejects.toMatchObject({ status: 404 });
-    expect(mocks.studentGrouping.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "grouping", groupId: "section" } }));
+    expect(mocks.studentGrouping.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "grouping", groupId: "section", visibleToStudents: true } }));
   });
   it("rejects client-supplied student identities", async () => {
     await expect(chooseStudentTeam(user, "course", "section", "grouping", { teamId: "b", participantId: "someone-else" })).rejects.toThrow();
@@ -126,4 +126,17 @@ describe("student team choice authorization and atomicity", () => {
     mocks.transaction.mockRejectedValue(new Prisma.PrismaClientKnownRequestError("Conflict", { code, clientVersion: "test" }));
     await expect(choose()).rejects.toMatchObject({ status: 409, code: "STUDENT_TEAM_CHOICE_CONFLICT" });
   });
+  it("filters hidden groupings from learner reads before projecting names or memberships", async () => {
+    mocks.studentGrouping.findMany.mockResolvedValue([]);
+    await expect(listMyStudentGroupings(user, "course", "section")).resolves.toEqual({ groupings: [] });
+    expect(mocks.studentGrouping.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { groupId: "section", visibleToStudents: true } }));
+  });
+  it("treats a hidden grouping as not found even when its ID and a team ID are known", async () => {
+    mocks.studentGrouping.findFirst.mockResolvedValue(null);
+    await expect(choose()).rejects.toMatchObject({ status: 404 });
+    expect(mocks.studentGrouping.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "grouping", groupId: "section", visibleToStudents: true } }));
+    expect(mocks.studentTeamMember.upsert).not.toHaveBeenCalled();
+    expect(mocks.courseAuditEvent.create).not.toHaveBeenCalled();
+  });
+
 });

@@ -3,6 +3,23 @@ import type { MessageTree } from "../types";
 
 export const frMessages = {
     studentGroupings: {
+      "manualMethod": "Manuelle",
+      "useManual": "Passer à l’attribution manuelle",
+      "studentVisibility": "Visibilité pour les étudiants",
+      "showToStudents": "Afficher le regroupement aux étudiants",
+      "visibleHelp": "Les étudiants voient ce regroupement dans Mes équipes.",
+      "hiddenHelp": "Les étudiants ne peuvent pas voir ce regroupement ni choisir une équipe. Les affectations existantes sont conservées.",
+      "hiddenChoiceHelp": "Le choix des étudiants est suspendu tant que ce regroupement est masqué.",
+      "visibleToStudents": "Visible pour les étudiants",
+      "hiddenFromStudents": "Masqué pour les étudiants",
+      "assignmentSummary": "Attribution : {method}",
+      "immediately": "Immédiatement",
+      "noDeadline": "Sans échéance",
+      "studentChangesAllowed": "Les étudiants peuvent changer d’équipe pendant la période de choix, jusqu’à l’échéance.",
+      "studentChangesLocked": "Les étudiants ne peuvent pas changer d’équipe après avoir confirmé leur choix.",
+      "manualMethodHelp": "Attribuez les étudiants à l’aide des sélecteurs d’équipe ci-dessous.",
+      "randomMethodHelp": "L’attribution aléatoire a été appliquée. Vous pouvez ajuster les équipes ci-dessous ou la relancer.",
+
       "automaticAssign": "Attribution automatique",
       "applyAssignment": "Appliquer au regroupement",
       "assignmentMethod": "Méthode d’attribution",
@@ -27,7 +44,7 @@ export const frMessages = {
       "automaticAssignmentHelp": "Définissez la méthode et les places. Appliquez, puis enregistrez le regroupement pour publier vos changements.",
       "myTeams": "Mes équipes",
       "myTeamsError": "Impossible de charger ou de confirmer vos équipes. Réessayez.",
-      "noMyTeams": "Votre section n’a pas encore de regroupements.",
+      "noMyTeams": "Aucun regroupement n’est actuellement disponible pour vous.",
       "choiceSaved": "Votre choix d’équipe est confirmé.",
       "teamFull": "Cette équipe est complète. Choisissez une autre équipe.",
       "choiceConflict": "Les places disponibles ont changé. Vérifiez les équipes et confirmez à nouveau.",

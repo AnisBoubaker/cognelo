@@ -30,7 +30,7 @@ export function StudentAssignmentDialog({ draft, studentIds, onApply, onClose }:
   function apply() {
     if (invalid) return;
     onApply({
-      ...draft, studentChoiceEnabled: mode === "student", allowChoiceChanges: mode === "student" && allowChanges,
+      ...draft, assignmentMethod: mode === "student" ? "student_choice" : "random", studentChoiceEnabled: mode === "student", allowChoiceChanges: mode === "student" && allowChanges,
       choiceOpensAt: mode === "student" && opensAt ? new Date(opensAt).toISOString() : null,
       choiceClosesAt: mode === "student" && closesAt ? new Date(closesAt).toISOString() : null,
       teams: mode === "random" ? randomlyAssignStudents(teams, studentIds, scope) : teams

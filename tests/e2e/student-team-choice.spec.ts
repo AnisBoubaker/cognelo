@@ -41,6 +41,7 @@ test.describe("automatic assignment and student team choices", { tag: "@regressi
       await page.goto(`/courses/${data.courseId}?tab=groupings`);
       await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
       await page.getByRole("article", { name: "Assignment options" }).getByRole("button", { name: "Edit", exact: true }).click();
+      await expect(page.getByRole("region", { name: "Assignment method", exact: true }).getByText("Manual", { exact: true })).toBeVisible();
       await page.getByRole("button", { name: "Automatic assign", exact: true }).click();
       const dialog = page.getByRole("dialog", { name: "Automatic assign", exact: true });
       await expect(dialog.getByRole("radio", { name: /Smart/ })).toBeDisabled();
@@ -58,6 +59,12 @@ test.describe("automatic assignment and student team choices", { tag: "@regressi
       let saved = (await responseJson<{ groupings: StudentGroupingDto[] }>(await api.get(staffPath(data)))).groupings[0]!;
       expect(saved.teams.find((team) => team.title === "Blue")!.participantIds).toEqual([assigned.id]);
       expect(saved.teams.flatMap((team) => team.participantIds)).toHaveLength(2);
+      expect(saved.assignmentMethod).toBe("random");
+      await expect(page.getByRole("region", { name: "Assignment method", exact: true }).getByText("Random", { exact: true })).toBeVisible();
+      await page.reload();
+      await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
+      await expect(page.getByRole("article", { name: "Assignment options" }).getByText("Assignment: Random", { exact: true })).toBeVisible();
+      await page.getByRole("article", { name: "Assignment options" }).getByRole("button", { name: "Edit", exact: true }).click();
       await page.getByRole("button", { name: "Automatic assign", exact: true }).click();
       await dialog.getByLabel("Let students choose", { exact: true }).check();
       await dialog.getByLabel("Slots per team", { exact: true }).fill("3");
@@ -82,6 +89,12 @@ test.describe("automatic assignment and student team choices", { tag: "@regressi
       saved = (await responseJson<{ groupings: StudentGroupingDto[] }>(await api.get(staffPath(data)))).groupings[0]!;
       expect(saved.id).toBe(grouping.id);
       expect(saved.studentChoiceEnabled).toBe(true);
+      expect(saved.assignmentMethod).toBe("student_choice");
+      const method = page.getByRole("region", { name: "Assignment method", exact: true });
+      await expect(method.getByText("Let students choose", { exact: true })).toBeVisible();
+      await expect(method).toContainText("Choose until:");
+      await expect(method).toContainText("2027");
+      await expect(method).toContainText("Students can change teams while selection is open, until the deadline.");
       expect(saved.allowChoiceChanges).toBe(true);
       expect(saved.choiceOpensAt).not.toBeNull(); expect(saved.choiceClosesAt).not.toBeNull();
       expect(saved.teams.map((team) => team.capacity)).toEqual([2, 3]);
@@ -197,4 +210,85 @@ test.describe("automatic assignment and student team choices", { tag: "@regressi
       expect((await student.post(choose, { data: { teamId } })).status()).toBe(403);
     } finally { await teacher.dispose(); await student.dispose(); await peer.dispose(); }
   });
+  test("hides a grouping from learner reads and choices, preserves memberships, and shows assignment and visibility settings", async ({ teacherPage: page, studentPage: learner, teamsData: data }) => {
+    const teacher = await createAuthenticatedApi("teacher");
+    const student = await createAuthenticatedApi("student");
+    const self = data.students.find((item) => item.email === credentialsFor("student").email)!;
+    try {
+      const { grouping } = await responseJson<{ grouping: StudentGroupingDto }>(await teacher.post(staffPath(data), { data: {
+        title: "Private arrangements", description: "Teacher-only description", visibleToStudents: false, assignmentMethod: "student_choice", allowChoiceChanges: true,
+        teams: [{ title: "Support team", participantIds: [self.id] }, { title: "Other team" }]
+      } }));
+      const choose = `${choicePath(data)}/${grouping.id}`;
+      const otherTeamId = grouping.teams.find((team) => team.title === "Other team")!.id;
+      expect((await responseJson<{ groupings: MyStudentGroupingDto[] }>(await student.get(choicePath(data)))).groupings).toEqual([]);
+      expect((await student.post(choose, { data: { teamId: otherTeamId } })).status()).toBe(404);
+      await learner.goto(`/courses/${data.courseId}/groups/${data.groupId}?tab=my-teams`);
+      await expect(learner.getByRole("heading", { name: "My teams", exact: true })).toBeVisible();
+      await expect(learner.getByRole("article", { name: "Private arrangements", exact: true })).toHaveCount(0);
+      await page.goto(`/courses/${data.courseId}?tab=groupings`);
+      await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
+      const card = page.getByRole("article", { name: "Private arrangements", exact: true });
+      await expect(card.getByText("Hidden from students", { exact: true })).toBeVisible();
+      await expect(card.getByText("Assignment: Let students choose", { exact: true })).toBeVisible();
+      await expect(card).toContainText("Student choice is paused while this grouping is hidden.");
+      await card.screenshot({ path: test.info().outputPath("grouping-policy-desktop.png") });
+      await card.getByRole("button", { name: "Edit", exact: true }).click();
+      const visible = page.getByLabel("Show grouping to students", { exact: true });
+      const method = page.getByRole("region", { name: "Assignment method", exact: true });
+      await expect(visible).not.toBeChecked();
+      await expect(method.getByText("Let students choose", { exact: true })).toBeVisible();
+      await expect(method).toContainText("Immediately");
+      await expect(method).toContainText("No deadline");
+      await page.locator(".student-grouping-settings").screenshot({ path: test.info().outputPath("grouping-settings-desktop.png") });
+      await visible.check();
+      // Visibility belongs to the same saved draft; applying or canceling cannot expose it early.
+      expect((await responseJson<{ groupings: MyStudentGroupingDto[] }>(await student.get(choicePath(data)))).groupings).toEqual([]);
+      await page.getByRole("button", { name: "Cancel", exact: true }).click();
+      await expect(visible).not.toBeChecked();
+      await visible.check();
+      await page.getByRole("button", { name: "Save grouping", exact: true }).click();
+      await expect(page.getByText("Everything is saved.", { exact: true })).toBeVisible();
+      await learner.reload();
+      await expect(learner.getByRole("article", { name: "Private arrangements", exact: true })).toBeVisible();
+      await responseJson(await student.post(choose, { data: { teamId: otherTeamId } }));
+      // Reload after the learner changes teams, so the teacher saves the latest revision.
+      await page.reload();
+      await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
+      await card.getByRole("button", { name: "Edit", exact: true }).click();
+      await visible.uncheck();
+      await page.getByRole("button", { name: "Save grouping", exact: true }).click();
+      await expect(page.getByText("Everything is saved.", { exact: true })).toBeVisible();
+      const hidden = (await responseJson<{ groupings: StudentGroupingDto[] }>(await teacher.get(staffPath(data)))).groupings[0]!;
+      expect(hidden).toMatchObject({ visibleToStudents: false, assignmentMethod: "student_choice", studentChoiceEnabled: true });
+      expect(hidden.teams.find((team) => team.id === otherTeamId)!.participantIds).toEqual([self.id]);
+      expect((await student.post(choose, { data: { teamId: otherTeamId } })).status()).toBe(404);
+      await learner.evaluate(() => window.dispatchEvent(new Event("focus")));
+      await expect(learner.getByRole("article", { name: "Private arrangements", exact: true })).toHaveCount(0);
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.locator(".student-grouping-settings").evaluate((element) => element.scrollIntoView({ block: "start" }));
+      await page.evaluate(() => window.scrollBy(0, -96));
+      await page.locator(".student-grouping-settings").screenshot({ path: test.info().outputPath("grouping-settings-mobile.png") });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBe(false);
+      // Switching the assignment policy is explicit and does not delete teams or members.
+      await page.getByRole("button", { name: "Use manual assignment", exact: true }).click();
+      await expect(method.getByText("Manual", { exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Cancel", exact: true }).click();
+      await expect(method.getByText("Let students choose", { exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Use manual assignment", exact: true }).click();
+      await visible.check();
+      await page.getByRole("button", { name: "Save grouping", exact: true }).click();
+      await expect(page.getByText("Everything is saved.", { exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Close", exact: true }).click();
+      await expect(card.getByText("Assignment: Manual", { exact: true })).toBeVisible();
+      await expect(card.getByText("Visible to students", { exact: true })).toBeVisible();
+      await page.reload();
+      await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
+      await expect(card.getByText("Assignment: Manual", { exact: true })).toBeVisible();
+      const mine = (await responseJson<{ groupings: MyStudentGroupingDto[] }>(await student.get(choicePath(data)))).groupings[0]!;
+      expect(mine.choiceState).toBe("disabled"); expect(mine.ownTeamId).toBe(otherTeamId);
+      expect((await student.post(choose, { data: { teamId: otherTeamId } })).status()).toBe(403);
+    } finally { await teacher.dispose(); await student.dispose(); }
+  });
+
 });

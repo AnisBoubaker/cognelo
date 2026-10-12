@@ -13,4 +13,15 @@ describe("team capacities and selection dates", () => {
       expect(schema.safeParse({ title: "Projects", revision: 1, choiceOpensAt: "2026-10-12T12:00:00.000Z", choiceClosesAt }).success).toBe(false);
     }
   });
+  it("preserves legacy choice input and defaults existing visibility to visible", () => {
+    expect(StudentGroupingInputSchema.parse({ title: "Projects" })).toMatchObject({ visibleToStudents: true, assignmentMethod: "manual", studentChoiceEnabled: false });
+    expect(StudentGroupingInputSchema.parse({ title: "Projects", studentChoiceEnabled: true })).toMatchObject({ assignmentMethod: "student_choice", studentChoiceEnabled: true });
+  });
+  it.each(["manual", "random", "student_choice"] as const)("uses %s as the authoritative method independently of visibility", (assignmentMethod) => {
+    expect(StudentGroupingInputSchema.parse({ title: "Projects", visibleToStudents: false, assignmentMethod, studentChoiceEnabled: true })).toMatchObject({ visibleToStudents: false, assignmentMethod, studentChoiceEnabled: assignmentMethod === "student_choice" });
+  });
+  it("rejects selecting the unavailable smart mode through the API", () => {
+    expect(StudentGroupingInputSchema.safeParse({ title: "Projects", assignmentMethod: "smart" }).success).toBe(false);
+  });
+
 });

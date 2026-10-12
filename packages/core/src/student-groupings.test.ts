@@ -20,7 +20,7 @@ vi.mock("./authorization", () => ({ assertCanManageGroupRoster: mocks.authorize 
 const { createStudentGrouping, listStudentGroupings, updateStudentGrouping, deleteStudentGrouping } = await import("./student-groupings");
 const user: CurrentUser = { id: "teacher", email: "teacher@example.test", name: null, firstName: null, lastName: null, roles: ["teacher"] };
 const stored = () => ({
-  id: "grouping", groupId: "section", title: "Project teams", description: "", revision: 1, studentChoiceEnabled: false, choiceOpensAt: null, choiceClosesAt: null, allowChoiceChanges: false,
+  id: "grouping", groupId: "section", title: "Project teams", description: "", revision: 1, visibleToStudents: true, assignmentMethod: "manual", studentChoiceEnabled: false, choiceOpensAt: null, choiceClosesAt: null, allowChoiceChanges: false,
   teams: [{ id: "team", title: "Team A", capacity: 4, members: [{ participantId: "student" }] }]
 });
 const input = { title: "Project teams", teams: [{ title: "Team A", capacity: 4, participantIds: ["student"] }] };
@@ -151,6 +151,21 @@ describe("section student groupings", () => {
     const policy = { studentChoiceEnabled: true, choiceOpensAt: "2026-10-01T12:00:00.000Z", choiceClosesAt: "2026-10-12T12:00:00.000Z", allowChoiceChanges: true };
     await createStudentGrouping(user, "course", "section", { ...input, ...policy });
     expect(mocks.studentGrouping.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ ...policy, choiceOpensAt: new Date(policy.choiceOpensAt), choiceClosesAt: new Date(policy.choiceClosesAt) }) }));
+  });
+
+  it("keeps a hidden grouping private when an older client omits visibility", async () => {
+    mocks.studentGrouping.findFirst.mockResolvedValue({ ...stored(), visibleToStudents: false });
+    await updateStudentGrouping(user, "course", "section", "grouping", update);
+    expect(mocks.studentGrouping.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ visibleToStudents: false }) }));
+  });
+
+  it("persists hidden random-assignment settings and records them in staff audit data", async () => {
+    const hidden = { ...stored(), visibleToStudents: false, assignmentMethod: "random", revision: 2 };
+    mocks.studentGrouping.findUniqueOrThrow.mockResolvedValue(hidden);
+    const result = await updateStudentGrouping(user, "course", "section", "grouping", { ...update, visibleToStudents: false, assignmentMethod: "random" });
+    expect(result).toMatchObject({ visibleToStudents: false, assignmentMethod: "random", studentChoiceEnabled: false });
+    expect(mocks.studentGrouping.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ visibleToStudents: false, assignmentMethod: "random", studentChoiceEnabled: false }) }));
+    expect(mocks.courseAuditEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ nextValue: expect.objectContaining({ visibleToStudents: false, assignmentMethod: "random" }) }) });
   });
 
 });
