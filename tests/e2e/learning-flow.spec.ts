@@ -52,7 +52,8 @@ test.describe("student submission and teacher grading", () => {
     };
     teacherPage.on("request", trackAttemptReview);
     const studentRow = teacherPage.locator(".table-row-gradebook-detail").filter({ hasText: credentialsFor("student").email });
-    await studentRow.getByRole("button", { name: "Review and grade" }).click();
+    await studentRow.getByRole("button", { name: /^Actions for / }).click();
+    await teacherPage.getByRole("menuitem", { name: "Review and grade", exact: true }).click();
     const reviewDialog = teacherPage.getByRole("dialog");
     await expect(reviewDialog.getByText("1 of 2", { exact: true })).toBeVisible();
     expect(reviewRequests).toHaveLength(1);

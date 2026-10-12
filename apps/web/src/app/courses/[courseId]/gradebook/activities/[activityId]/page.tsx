@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ProgressDialog, useDialogs, useNotifications } from "@cognelo/activity-ui";
+import { ContextMenu, ProgressDialog, useDialogs, useNotifications } from "@cognelo/activity-ui";
 import { createMcqClient } from "@cognelo/plugin-mcq";
 import { createParsonsClient } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
@@ -1193,6 +1193,16 @@ function GradebookStudentRow({
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const rowHasSubmittedAttempt = hasSubmittedAttempt(row);
+  const activityActions = getGradebookActivityActions(row.activityTypeKey);
+  const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLButtonElement | null>(null);
+  const actionMenuOpen = actionMenuAnchor !== null;
+  const canAssessWithAi = row.assessmentMode === "summative" && activityActions.canAssessWithAi;
+  const canRerunAutomaticGrading = row.assessmentMode === "summative" && activityActions.canRerunAutomaticGrading;
+  const hasActions = canAssessWithAi || canRerunAutomaticGrading || activityActions.canReviewAndGrade;
+
+  function closeActionMenu() {
+    setActionMenuAnchor(null);
+  }
 
   return (
     <div className="table-row table-row-gradebook-detail">
@@ -1231,35 +1241,72 @@ function GradebookStudentRow({
       </div>
       <span className="table-meta muted">{row.submittedAttemptCount}</span>
       <div className="table-actions">
-        {row.assessmentMode === "summative" && getGradebookActivityActions(row.activityTypeKey).canAssessWithAi ? (
-          <button
-            className="button secondary"
-            disabled={!rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:ai-feedback`}
-            type="button"
-            onClick={() => onGenerateAiFeedback(row)}
-          >
-            {t("courseDetail.generateAiFeedback")}
-          </button>
-        ) : null}
-        {row.assessmentMode === "summative" && getGradebookActivityActions(row.activityTypeKey).canRerunAutomaticGrading ? (
-          <button
-            className="button secondary"
-            disabled={!rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:regrade`}
-            type="button"
-            onClick={() => onRegrade(row)}
-          >
-            {t("courseDetail.regrade")}
-          </button>
-        ) : null}
-        {getGradebookActivityActions(row.activityTypeKey).canReviewAndGrade ? (
-          <button
-            className="button secondary"
-            disabled={(row.assessmentMode === "summative" && !rowHasSubmittedAttempt) || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:override`}
-            type="button"
-            onClick={() => onReviewAndGrade(row)}
-          >
-            {t(row.assessmentMode === "formative" ? "courseDetail.inspectAttempts" : "courseDetail.reviewAndGrade")}
-          </button>
+        {hasActions ? (
+          <>
+            <button
+              aria-expanded={actionMenuOpen}
+              aria-haspopup="menu"
+              aria-label={t("courseDetail.contentActions", { title: row.participantName })}
+              className="button secondary icon-button"
+              title={t("courseDetail.contentActionsTitle")}
+              type="button"
+              onClick={(event) => setActionMenuAnchor(actionMenuOpen ? null : event.currentTarget)}
+            >
+              <AppIcon name="more" />
+            </button>
+            <ContextMenu
+              anchor={actionMenuAnchor}
+              className="content-context-menu"
+              open={actionMenuOpen}
+              onClose={closeActionMenu}
+            >
+              {canAssessWithAi ? (
+                <button
+                  className="content-context-menu-item"
+                  disabled={!rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:ai-feedback`}
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    closeActionMenu();
+                    void onGenerateAiFeedback(row);
+                  }}
+                >
+                  <AppIcon name="check" />
+                  <span>{t("courseDetail.generateAiFeedback")}</span>
+                </button>
+              ) : null}
+              {canRerunAutomaticGrading ? (
+                <button
+                  className="content-context-menu-item"
+                  disabled={!rowHasSubmittedAttempt || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:regrade`}
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    closeActionMenu();
+                    void onRegrade(row);
+                  }}
+                >
+                  <AppIcon name="sync" />
+                  <span>{t("courseDetail.regrade")}</span>
+                </button>
+              ) : null}
+              {activityActions.canReviewAndGrade ? (
+                <button
+                  className="content-context-menu-item"
+                  disabled={(row.assessmentMode === "summative" && !rowHasSubmittedAttempt) || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:override`}
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    closeActionMenu();
+                    void onReviewAndGrade(row);
+                  }}
+                >
+                  <AppIcon name="edit" />
+                  <span>{t(row.assessmentMode === "formative" ? "courseDetail.inspectAttempts" : "courseDetail.reviewAndGrade")}</span>
+                </button>
+              ) : null}
+            </ContextMenu>
+          </>
         ) : null}
       </div>
     </div>

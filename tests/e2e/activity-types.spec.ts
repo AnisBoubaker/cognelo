@@ -747,7 +747,8 @@ test.describe.serial("authoring and completing every activity type", () => {
     const mcqRow = teacherPage
       .getByText(studentEmail, { exact: true })
       .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' table-row-gradebook-detail ')][1]");
-    await mcqRow.getByRole("button", { name: "Rerun automatic grading" }).click();
+    await mcqRow.getByRole("button", { name: /^Actions for / }).click();
+    await teacherPage.getByRole("menuitem", { name: "Rerun automatic grading", exact: true }).click();
     const regradeConfirmation = teacherPage.getByRole("dialog").filter({ hasText: "Rerun automatic grading" });
     const regraded = teacherPage.waitForResponse((response) =>
       response.request().method() === "POST" && response.url().endsWith("/regrade")
@@ -757,7 +758,8 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(teacherPage.getByRole("dialog", { name: "Rerunning automatic grading" })).toBeHidden();
     await expect(mcqRow.getByText("10 / 10", { exact: true })).toBeVisible();
 
-    await mcqRow.getByRole("button", { name: "Review and grade" }).click();
+    await mcqRow.getByRole("button", { name: /^Actions for / }).click();
+    await teacherPage.getByRole("menuitem", { name: "Review and grade", exact: true }).click();
     const mcqReview = teacherPage.getByRole("dialog").filter({ has: teacherPage.getByRole("heading", { name: "Student answer" }) });
     await expect(mcqReview.getByText("42", { exact: true })).toBeVisible();
     await mcqReview.getByRole("spinbutton").fill("8");
@@ -771,7 +773,8 @@ test.describe.serial("authoring and completing every activity type", () => {
     const parsonsRow = teacherPage
       .getByText(studentEmail, { exact: true })
       .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' table-row-gradebook-detail ')][1]");
-    await parsonsRow.getByRole("button", { name: "Review and grade" }).click();
+    await parsonsRow.getByRole("button", { name: /^Actions for / }).click();
+    await teacherPage.getByRole("menuitem", { name: "Review and grade", exact: true }).click();
     const parsonsReview = teacherPage.getByRole("dialog").filter({ has: teacherPage.getByRole("heading", { name: "Student answer" }) });
     await expect(parsonsReview).toContainText("print('E2E Parsons')");
     await parsonsReview.getByLabel("Enter a score out of 10.").fill("7");
@@ -788,7 +791,8 @@ test.describe.serial("authoring and completing every activity type", () => {
     const testRow = teacherPage
       .getByText(studentEmail, { exact: true })
       .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' table-row-gradebook-detail ')][1]");
-    await testRow.getByRole("button", { name: "Review and grade" }).click();
+    await testRow.getByRole("button", { name: /^Actions for / }).click();
+    await teacherPage.getByRole("menuitem", { name: "Review and grade", exact: true }).click();
     const testReview = teacherPage.getByRole("dialog").filter({ has: teacherPage.getByRole("heading", { name: "Grade Test manually" }) });
     await expect(testReview.getByRole("heading", { name: mcqTitle })).toBeVisible();
     await expect(testReview.getByRole("heading", { name: parsonsTitle })).toBeVisible();
@@ -799,7 +803,8 @@ test.describe.serial("authoring and completing every activity type", () => {
     await mcqItem.getByRole("button", { name: "Save", exact: true }).click();
     await expect(testReview).toBeHidden();
 
-    await testRow.getByRole("button", { name: "Review and grade" }).click();
+    await testRow.getByRole("button", { name: /^Actions for / }).click();
+    await teacherPage.getByRole("menuitem", { name: "Review and grade", exact: true }).click();
     const reopenedTestReview = teacherPage.getByRole("dialog").filter({ has: teacherPage.getByRole("heading", { name: "Grade Test manually" }) });
     await expect(reopenedTestReview.getByRole("heading", { name: mcqTitle }).locator("xpath=ancestor::article[1]")).toContainText("0.6 / 1");
     await reopenedTestReview.getByRole("button", { name: "Close" }).click();

@@ -67,7 +67,10 @@ test.describe("formative and summative attempt conversion", () => {
     expect(convertedItem.gradesReleased).toBe(false);
 
     await page.goto(`/courses/${data.courseId}/gradebook/activities/${data.activityId}`);
-    await expect(page.getByRole("button", { name: "Inspect attempts", exact: true })).toBeVisible();
+    const formativeStudentRow = page.locator(".table-row-gradebook-detail").filter({ hasText: "student@cognelo.local" });
+    await formativeStudentRow.getByRole("button", { name: /^Actions for / }).click();
+    await expect(page.getByRole("menuitem", { name: "Inspect attempts", exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
     await expect(page.getByRole("button", { name: "Release", exact: true })).toHaveCount(0);
 
     const formativeSettings = await openActivitySettings(page, data);
@@ -106,7 +109,8 @@ test.describe("formative and summative attempt conversion", () => {
     await page.goto(`/courses/${data.courseId}/gradebook/activities/${data.activityId}`);
     const studentRow = page.locator(".table-row-gradebook-detail").filter({ hasText: "student@cognelo.local" });
     await expect(studentRow).toContainText("1");
-    await expect(studentRow.getByRole("button", { name: "Review and grade", exact: true })).toBeVisible();
+    await studentRow.getByRole("button", { name: /^Actions for / }).click();
+    await expect(page.getByRole("menuitem", { name: "Review and grade", exact: true })).toBeVisible();
   });
 });
 
