@@ -4,9 +4,10 @@ import {
   test as base,
   type APIRequestContext,
   type Browser,
-  type Page,
-  type StorageState
+  type Page
 } from "@playwright/test";
+
+type StorageState = Awaited<ReturnType<APIRequestContext["storageState"]>>;
 
 export type AuthRole = "admin" | "teacher" | "student";
 

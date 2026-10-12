@@ -3,6 +3,7 @@
 The Playwright suite covers the platform's critical browser journeys with real API and database integration:
 
 - anonymous access control, sign-in, first-time activation UI, and sign-out;
+- unsaved authoring across Activity/Concepts tabs and navigation prompts, discard persistence, failed Save-and-leave recovery, and preservation of editable work through a network session-check failure;
 - global administrator, course manager, teacher, and student boundaries; explicit multi-teacher course staffing; section-scoped teacher/TA grading, roster, release, and identifier-tampering boundaries; immediate partial/final revocation; final-owner protection; and preservation of academic history;
 - personal settings, profile and password changes, email verification, forced password replacement, and fresh-session sign-in, plus administrator user creation, confirmation, filtering, and password reset;
 - administrator AI-model CRUD and preference selection, retained email-secret handling and test-email progress, activity/content plugin lifecycle controls, and media-cleanup progress and results;
@@ -27,6 +28,8 @@ The Playwright suite covers the platform's critical browser journeys with real A
 - explicit timed starts and automatic zero-time submission for standalone activities, plus one-time Test-authoring default copy, independent later Test edits, and the compound Test countdown/finalization path;
 - attempt-scoped live activity broadcasts, including recent-recipient detection, unread/read state, the combined timer-and-envelope control, and isolation of messages when the learner starts a later attempt;
 - bank activity publication from the editor and list, version comparison, duplication, movement between banks, and AI-assisted variation progress for both individual activities and compound Tests, including midpoint failure cleanup and retry;
+- explicit bank-to-course synchronization confirmation/cancellation, preservation of assignment and placement, immutable earlier versions, post-submission retrieval rejection, and course-to-bank publication without changing attempts or grades;
+- on-demand gradebook summary loading and continued content-menu interaction while the gradebook request is pending;
 - administrator-managed Judge0, web-design, and SageMath execution-runner endpoints, including per-endpoint capability checks; and
 - group settings updates and restoration;
 - English/French locale persistence across navigation and reload; and
@@ -54,11 +57,29 @@ The runner starts the API and web development servers when they are not already 
 
 The broad activity suite exercises real plugin integrations. Coding exercise runs require Judge0, web-design runs require the Playwright runner, and Coding Homework challenge generation requires a configured question-authoring model plus the API background worker. Start those services and configure the model connection before running the complete suite.
 
+## Focused regression checks
+
+Run the independent authoring-recovery, bank-synchronization, and course-loading scenarios with:
+
+```bash
+npm run test:e2e -- --grep @regression
+```
+
+These six tests require the normal migrated/seeded database, API, and web app, but no AI provider, Judge0, or web-design runner. Each test provisions its own disposable bank/course/MCQ scenario through public APIs and runs lifecycle-aware cleanup, so failures do not skip later scenarios in a serial chain. The fixture creates both shared course placement and group assignment, which are distinct content scopes.
+
+Only deliberate save/session failures and gradebook latency are intercepted. Recovery, synchronization, submission, and persistence assertions use the real services. The loading test releases its pending response in `finally`; it uses request/UI state instead of fixed sleeps. The `@regression` tag selects this focused set, not every regression assertion in the wider suite.
+
+The broader suite still runs only the configured Chromium project. Useful next additions include the remaining synchronization branches (restore-original and both-copies-changed), compound-Test resume/navigation boundaries, and Firefox/WebKit coverage if those browsers become supported test targets.
+
+Playwright transpiles the specs without type-checking them, and the root `npm run typecheck` currently omits `tests/e2e`. A dedicated E2E TypeScript gate is another useful follow-up; existing specs need type corrections before that gate can pass across the entire suite.
+
 ## Handling product failures
 
 An E2E run is observational unless the task explicitly asks for product fixes. When a browser test exposes an application defect, preserve the evidence, document expected and observed behavior, and open or link a GitHub issue; do not change product code as part of the run. A stable known defect may use Playwright's expected-failure annotation only when it includes the issue URL, so the intended behavior remains executable and an unexpected recovery is reported. Test-code mistakes and fixture defects may still be corrected to let the requested product paths execute.
 
 The maximum-attempt integrity check waits for each submission to finish, verifies the exhausted activity exposes only submission history, and confirms a direct extra submission request is rejected. The released-grade visibility check asserts that the selected released grade appears to the learner without exposing raw grading payloads.
+
+The Coding Homework completion check waits for successful final answer submission, then verifies navigation back to the learner's course group and the activity's **Submitted** status. The assigned-activity host navigates away on success, so completion text inside the previous activity renderer is not a stable assertion.
 
 ## Authorization scenario catalog
 
