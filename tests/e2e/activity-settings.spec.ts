@@ -520,6 +520,10 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
     await page.getByRole("button", { name: "Start timed attempt" }).click();
     await expect(page.getByRole("timer")).toBeVisible();
     await page.getByLabel("Yes", { exact: true }).check();
+    await prisma.activityAttempt.updateMany({
+      where: { activityId: activityIds.timed, lifecycle: "started" },
+      data: { startedAt: new Date(Date.now() - 31 * 60_000) }
+    });
     await page.clock.fastForward(4_000);
 
     await expect(page).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));

@@ -2,6 +2,8 @@
 
 Local verification of [team and student activity exceptions](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md), using the migrated development database and the configured Google Chrome executable. No production environment was changed.
 
+The timing assertions in this historical run predate [live assignment settings](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md#live-updates-and-teacher-notices), which now update unsubmitted deadlines.
+
 ## Results
 
 - Core migration `202610120004_activity_assignment_exceptions` applied successfully through `npm run db:migrate:all`; Prisma schema validation passed.

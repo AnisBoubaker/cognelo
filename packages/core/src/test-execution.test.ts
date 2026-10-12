@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
 const db = vi.hoisted(() => ({
@@ -124,7 +124,10 @@ function parentAttempt(overrides: Record<string, unknown> = {}) {
 }
 
 describe("compound Test execution", () => {
+  afterEach(() => vi.useRealTimers());
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-07T10:00:00.000Z"));
     vi.clearAllMocks();
     groups.getGroupAssignedActivity.mockResolvedValue({
       id: "assignment-1",
@@ -186,7 +189,7 @@ describe("compound Test execution", () => {
     expect(runtime.attempt?.id).toBe("parent-attempt-1");
   });
 
-  it("keeps the started Test attempt time snapshot when course settings later change", async () => {
+  it("updates a started Test time limit while preserving its authored settings", async () => {
     groups.getGroupAssignedActivity.mockResolvedValue({
       id: "assignment-1",
       activityType: { key: "test" },
@@ -203,7 +206,7 @@ describe("compound Test execution", () => {
     })]);
 
     await expect(getTestRuntime(student, "course-1", "group-1", "test-activity-1"))
-      .resolves.toMatchObject({ test: { settings: { timeLimitMinutes: 20 } } });
+      .resolves.toMatchObject({ test: { settings: { timeLimitMinutes: 5, navigationMode: "free" } } });
   });
 
   it("saves plugin-neutral item state and stores a weighted grading result", async () => {
@@ -305,7 +308,10 @@ describe("compound Test execution", () => {
     }));
   });
 
-  it("rejects autosaves after the manifest time limit while allowing final submission grading", async () => {
+  it("rejects autosaves after the live time limit while allowing final submission grading", async () => {
+    groups.getGroupAssignedActivity.mockResolvedValue({
+      activityType: { key: "test" }, assignment: { id: "assignment-1", metadata: { timeLimitMinutes: 1 } }
+    });
     const expiredAttempt = parentAttempt({
       startedAt: new Date(Date.now() - 120_000),
       metadata: {
@@ -335,6 +341,25 @@ describe("compound Test execution", () => {
       "item-1",
       { allowExpiredParent: true }
     )).resolves.toMatchObject({ parentAttempt: { id: "parent-attempt-1" } });
+  });
+
+  it("allows child writes again after extending an expired initial limit", async () => {
+    db.activityAttempt.findFirst.mockResolvedValue(parentAttempt({
+      startedAt: new Date(Date.now() - 120_000),
+      metadata: { manifest: { settings: { timeLimitMinutes: 1 }, items: [{ testItemId: "item-1", activityId: "mcq-1" }] } }
+    }));
+    await expect(getTestItemExecutionContext(student, "course-1", "group-1", "test-activity-1", "parent-attempt-1", "item-1"))
+      .resolves.toMatchObject({ parentAttempt: { lifecycle: "started" } });
+  });
+
+  it("keeps submitted parent timing fixed after the effective assignment changes", async () => {
+    db.activityAttempt.findMany.mockResolvedValue([parentAttempt({
+      lifecycle: "submitted",
+      metadata: { submittedTimeLimitMinutes: 10, manifest: { settings: { timeLimitMinutes: 5 }, items: [{ testItemId: "item-1", activityId: "mcq-1" }] } },
+      testItemAttempts: []
+    })]);
+    await expect(getTestRuntime(student, "course-1", "group-1", "test-activity-1", "previous"))
+      .resolves.toMatchObject({ timing: { timeLimitMinutes: 10, isExpired: false } });
   });
 
   it("blocks child access from a new browser session when resume is disabled", async () => {

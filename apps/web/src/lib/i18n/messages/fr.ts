@@ -880,6 +880,11 @@ export const frMessages = {
       loadError: "Impossible de charger le cours."
     },
     courseDetail: {
+      liveSettingsTitle: "Des étudiants répondent à cette activité",
+      liveSettingsWarning: "Des étudiants répondent actuellement à cette activité. Ces paramètres seront appliqués aux travaux non remis dans les 30 secondes. Annulez pour conserver les paramètres actuels.",
+      liveSettingsMessage: "Message aux étudiants (facultatif)",
+      liveSettingsApply: "Appliquer les paramètres",
+
       duplicateActivity: "Dupliquer",
       duplicateActivityEyebrow: "Contenu du cours",
       duplicateActivityTitle: "Dupliquer l'activité",

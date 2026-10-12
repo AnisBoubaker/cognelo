@@ -28,6 +28,7 @@ import {
 } from "./authorization";
 import { listContentItems } from "./course-content";
 import { AppError, notFound } from "./errors";
+import { confirmLiveActivitySettings } from "./activity-settings-live";
 import { assignmentAllowsGradeChallenges, assignmentAssessmentPolicyMode, assignmentTimeLimitMinutes } from "./activity-assignment-policy";
 import { applyAssignmentExceptions, assignmentExceptionsForUser, exceptionsForParticipant, loadAssignmentExceptions, resolveAssignmentExceptions, saveAssignmentExceptions } from "./activity-assignment-exceptions";
 
@@ -323,6 +324,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   const gradebookSettings = normalizeGradebookItemSettings(data.gradebookSettings);
 
   return prisma.$transaction(async (tx) => {
+    await confirmLiveActivitySettings(tx, user, courseId, activityId, data);
     const [groups, coursePlacement] = await Promise.all([
       tx.courseGroup.findMany({
         where: { courseId },
@@ -1255,6 +1257,9 @@ export async function updateGroupActivityAssignment(
   }
 
   return prisma.$transaction(async (tx) => {
+    if (data.availableFrom !== undefined || data.availableUntil !== undefined || data.metadata !== undefined) {
+      await confirmLiveActivitySettings(tx, user, courseId, assignment.activityId, data, [groupId]);
+    }
     const previousMode = readAssessmentMode(assignment.metadata);
     const nextMode = readAssessmentMode(effectiveMetadata);
     await applyAssignmentAssessmentModeTransition(tx, {

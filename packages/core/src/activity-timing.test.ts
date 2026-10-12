@@ -77,7 +77,7 @@ describe("generic timed activity runtime", () => {
     });
   });
 
-  it("starts a core attempt with an immutable time snapshot", async () => {
+  it("starts a core attempt and records its initial time limit", async () => {
     db.activityAttempt.findMany
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([activeAttempt]);
@@ -92,7 +92,7 @@ describe("generic timed activity runtime", () => {
     }));
   });
 
-  it("keeps the active attempt snapshot when the assignment limit is disabled", async () => {
+  it("removes the running deadline when the assignment limit is disabled", async () => {
     groups.getGroupAssignedActivity.mockResolvedValue({
       activityType: { key: "mcq", providerKind: "plugin", providerKey: "mcq" },
       assignment: { id: "assignment-1", metadata: { timeLimitMinutes: null } }
@@ -100,12 +100,16 @@ describe("generic timed activity runtime", () => {
     db.activityAttempt.findMany.mockResolvedValue([activeAttempt]);
 
     await expect(getTimedActivityRuntime(student, "course-1", "group-1", "activity-1")).resolves.toMatchObject({
-      timeLimitMinutes: 30,
-      timing: { expiresAt: "2026-10-11T14:30:00.000Z", remainingSeconds: 1200, isExpired: false }
+      timeLimitMinutes: null,
+      timing: { expiresAt: null, remainingSeconds: null, isExpired: false }
     });
   });
 
-  it("rejects learner writes after the snapshotted deadline", async () => {
+  it("rejects learner writes after the live deadline", async () => {
+    groups.getGroupAssignedActivity.mockResolvedValue({
+      activityType: { key: "mcq", providerKind: "plugin", providerKey: "mcq" },
+      assignment: { id: "assignment-1", metadata: { timeLimitMinutes: 5 } }
+    });
     db.activityAttempt.findMany.mockResolvedValue([{
       ...activeAttempt,
       startedAt: new Date("2026-10-11T14:00:00.000Z"),
@@ -139,6 +143,10 @@ describe("generic timed activity runtime", () => {
   });
 
   it("preserves the saved draft when core finalizes an expired attempt", async () => {
+    groups.getGroupAssignedActivity.mockResolvedValue({
+      activityType: { key: "mcq", providerKind: "plugin", providerKey: "mcq" },
+      assignment: { id: "assignment-1", metadata: { timeLimitMinutes: 5 } }
+    });
     db.activityAttempt.findMany
       .mockResolvedValueOnce([{
         ...activeAttempt,
@@ -160,4 +168,15 @@ describe("generic timed activity runtime", () => {
       }
     });
   });
+  it("extends an expired initial limit from the original start and rejects stale timeout finalization", async () => {
+    db.activityAttempt.findMany.mockResolvedValue([{ ...activeAttempt, metadata: { timedAttempt: true, timeLimitSnapshotMinutes: 5 } }]);
+    await expect(getTimedActivityRuntime(student, "course-1", "group-1", "activity-1")).resolves.toMatchObject({
+      timeLimitMinutes: 30, timing: { expiresAt: "2026-10-11T14:30:00.000Z", isExpired: false }
+    });
+    await expect(assertTimedActivityWriteAllowed(student, "course-1", "group-1", "activity-1")).resolves.toBeUndefined();
+    await expect(finalizeExpiredTimedActivityAttempt(student, "course-1", "group-1", "activity-1"))
+      .rejects.toMatchObject({ code: "ACTIVITY_TIME_LIMIT_ACTIVE" });
+    expect(gradebook.submitActivityAttempt).not.toHaveBeenCalled();
+  });
+
 });

@@ -35,6 +35,8 @@ export default function GroupActivityPage() {
   const [isSubmittingChallenge, setIsSubmittingChallenge] = useState(false);
   const [deletedSubmissions, setDeletedSubmissions] = useState<DeletedSubmissionAudit[]>([]);
   const [canStartNewAttempt, setCanStartNewAttempt] = useState<boolean | null>(null);
+  const [unlockedAttemptRevision, setUnlockedAttemptRevision] = useState(0);
+  const canStartNewAttemptRef = useRef<boolean | null>(null);
   const [hasPreviousSubmissions, setHasPreviousSubmissions] = useState<boolean | null>(null);
   const [selectedTab, setSelectedTab] = useState<"attempt" | "previous" | "deleted">("attempt");
   const [isActivityUnavailable, setIsActivityUnavailable] = useState(false);
@@ -65,10 +67,15 @@ export default function GroupActivityPage() {
   const isLearner = !canManage && Boolean(
     group?.participants?.some((participant) => participant.userId === user?.id && participant.role === "student")
   );
+  const hasStandaloneActivity = Boolean(activity?.id && activity.activityType.key !== "test");
   const ActivityRenderer =
     activity && activityDefinitions.some((definition) => definition.key === activity.activityType.key)
       ? activityRenderers[activity.activityType.key as keyof typeof activityRenderers]
       : null;
+
+  useEffect(() => {
+    canStartNewAttemptRef.current = canStartNewAttempt;
+  }, [canStartNewAttempt]);
 
   useEffect(() => {
     setCanStartNewAttempt(null);
@@ -92,7 +99,7 @@ export default function GroupActivityPage() {
   }, [activityId, courseId, groupId]);
 
   useEffect(() => {
-    if (!activity || !isLearner || activity.activityType.key === "test") {
+    if (!hasStandaloneActivity || !isLearner) {
       setTimedRuntime(null);
       setTimedRemainingSeconds(null);
       setTimingStatus("idle");
@@ -114,7 +121,57 @@ export default function GroupActivityPage() {
         }
       });
     return () => { cancelled = true; };
-  }, [activity, activityId, courseId, groupId, isLearner, t]);
+  }, [hasStandaloneActivity, activityId, courseId, groupId, isLearner, t]);
+
+  // Refresh policy without replacing the response editor or its in-memory draft.
+  useEffect(() => {
+    if (!isLearner) return;
+    let cancelled = false;
+    let refreshing = false;
+    async function refreshPolicy() {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const { access } = await api.groupActivitySafeExamBrowserAccess(courseId, groupId, activityId);
+        if (cancelled) return;
+        setSafeExamBrowserAccess(access);
+        if (access.requiresSafeExamBrowser && !access.accessGranted) {
+          setIsSafeExamBrowserGateOpen(true);
+          return;
+        }
+        setIsSafeExamBrowserGateOpen(false);
+        const { activity: latest } = await api.groupActivity(courseId, groupId, activityId);
+        if (cancelled) return;
+        setIsActivityUnavailable(false);
+        setActivity((current) => !current ? latest : JSON.stringify(current.assignment) === JSON.stringify(latest.assignment)
+          ? current : { ...current, assignment: latest.assignment });
+        if (latest.activityType.key !== "test") {
+          const { runtime } = await api.timedActivityRuntime(courseId, groupId, activityId);
+          if (cancelled) return;
+          setTimedRuntime(runtime);
+          setTimingStatus("ready");
+          const canStart = Boolean(runtime.attempt) || runtime.availability.canStart;
+          // Exhausted plugin renderers cache their read-only status. Refresh them
+          // only when another attempt is unlocked, never while an editor is active.
+          if (canStartNewAttemptRef.current === false && canStart) {
+            setUnlockedAttemptRevision((current) => current + 1);
+          }
+          setCanStartNewAttempt(canStart);
+          if (!runtime.timing.isExpired) autoSubmittedTimedAttemptRef.current = null;
+        }
+      } catch (reason) {
+        if (!cancelled && reason instanceof ApiError && ["GROUP_ACTIVITY_NOT_AVAILABLE", "GROUP_ACTIVITY_HIDDEN"].includes(reason.code ?? "")) {
+          setIsActivityUnavailable(true);
+          setError("");
+        }
+      } finally {
+        refreshing = false;
+      }
+    }
+    const interval = window.setInterval(() => void refreshPolicy(), 20_000);
+    window.addEventListener("focus", refreshPolicy);
+    return () => { cancelled = true; window.clearInterval(interval); window.removeEventListener("focus", refreshPolicy); };
+  }, [activityId, courseId, groupId, isLearner]);
 
   useEffect(() => {
     const expiresAt = timedRuntime?.timing.expiresAt;
@@ -132,8 +189,16 @@ export default function GroupActivityPage() {
     const attemptId = timedRuntime?.attempt?.id;
     if (!attemptId || timedRemainingSeconds !== 0 || autoSubmittedTimedAttemptRef.current === attemptId) return;
     autoSubmittedTimedAttemptRef.current = attemptId;
-    setTimedAutoSubmitRequestId((current) => current + 1);
-  }, [timedRemainingSeconds, timedRuntime?.attempt?.id]);
+    // A teacher may have extended time since the last touchbase.
+    void api.timedActivityRuntime(courseId, groupId, activityId).then(({ runtime }) => {
+      setTimedRuntime(runtime);
+      if (runtime.attempt?.id === attemptId && runtime.timing.isExpired) {
+        setTimedAutoSubmitRequestId((current) => current + 1);
+      } else {
+        autoSubmittedTimedAttemptRef.current = null;
+      }
+    }).catch(() => { autoSubmittedTimedAttemptRef.current = null; });
+  }, [timedRemainingSeconds, timedRuntime?.attempt?.id, activityId, courseId, groupId]);
 
   useEffect(() => {
     async function refresh() {
@@ -194,7 +259,7 @@ export default function GroupActivityPage() {
         setActivity(activityResult.activity);
         setIsActivityUnavailable(false);
       } catch (err) {
-        if (!userCanManage && err instanceof ApiError && err.code === "GROUP_ACTIVITY_NOT_AVAILABLE") {
+        if (!userCanManage && err instanceof ApiError && ["GROUP_ACTIVITY_NOT_AVAILABLE", "GROUP_ACTIVITY_HIDDEN"].includes(err.code ?? "")) {
           setActivity(null);
           setReleasedGrade(null);
           setDeletedSubmissions([]);
@@ -513,22 +578,20 @@ export default function GroupActivityPage() {
           activityId={activityId}
           courseId={courseId}
           enabled={Boolean(
-            isLearner &&
-            activity &&
-            !isActivityUnavailable &&
-            selectedTab === "attempt" &&
-            (!safeExamBrowserAccess?.requiresSafeExamBrowser || safeExamBrowserAccess.accessGranted)
+            isLearner && selectedTab === "attempt"
           )}
           groupId={groupId}
         />
 
-        {!isActivityUnavailable && (!isLearner || activity?.activityType.key === "test" || timingStatus === "ready") && (!timedRuntime?.timeLimitMinutes || timedRuntime.attempt || selectedTab === "previous") && (
+        <div hidden={isActivityUnavailable || Boolean(safeExamBrowserAccess?.requiresSafeExamBrowser && !safeExamBrowserAccess.accessGranted)}>
+        {(!isLearner || activity?.activityType.key === "test" || timingStatus === "ready") && (!timedRuntime?.timeLimitMinutes || timedRuntime.attempt || selectedTab === "previous") && (
           (selectedTab === "attempt" && (
             canStartNewAttempt !== false || activity?.activityType.key === "test"
           )) || selectedTab === "previous"
         ) ? (
           activity && ActivityRenderer ? (
             <ActivityRenderer
+              key={`${activity.id}:${unlockedAttemptRevision}`}
               activity={activity}
               activityRouteCourseId={courseId}
               canManage={Boolean(canManage)}
@@ -568,6 +631,8 @@ export default function GroupActivityPage() {
             <DeletedSubmissionList deletedSubmissions={deletedSubmissions} t={t} />
           </section>
         ) : null}
+
+        </div>
 
         {isSafeExamBrowserGateOpen ? (
           <div className="dialog-backdrop" role="presentation">

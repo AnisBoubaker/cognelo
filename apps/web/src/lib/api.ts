@@ -2442,10 +2442,10 @@ export const api = {
     `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/test/items/${testItemId}/actions/${encodeURIComponent(action)}`,
     { method: "POST", body: JSON.stringify({ parentAttemptId, sessionId, payload }) }
   ),
-  submitTestAttempt: (courseId: string, groupId: string, activityId: string, parentAttemptId: string, sessionId: string) =>
+  submitTestAttempt: (courseId: string, groupId: string, activityId: string, parentAttemptId: string, sessionId: string, onlyIfExpired = false) =>
     request<{ runtime: CourseTestRuntime }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/test/submit`,
-      { method: "POST", body: JSON.stringify({ parentAttemptId, sessionId }) }
+      { method: "POST", body: JSON.stringify({ parentAttemptId, sessionId, onlyIfExpired }) }
     ),
   courseContent: (courseId: string, options?: { includeGroupItems?: boolean; visibleOnly?: boolean }) => {
     const params = new URLSearchParams();

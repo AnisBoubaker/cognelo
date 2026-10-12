@@ -27,6 +27,7 @@ vi.mock("./groups", () => groups);
 
 import {
   getLearnerActivityConversation,
+  getStoredLearnerActivityConversation,
   sendActivityBroadcast
 } from "./activity-messaging";
 
@@ -71,6 +72,16 @@ describe("activity attempt messaging", () => {
     db.activity.findFirst.mockResolvedValue({ id: "activity-1" });
     db.courseGroupActivity.findFirst.mockResolvedValue({ id: "assignment-1" });
     authorization.getActivityMessagingGroupScope.mockResolvedValue(null);
+  });
+
+  it("reads stored notices using the student's enrollment without renewing presence", async () => {
+    db.activityConversation.findFirst.mockResolvedValue({ id: "conversation-1", attemptId: "attempt-1", attemptNumber: 1 });
+    await expect(getStoredLearnerActivityConversation(student, "course-1", "group-1", "activity-1"))
+      .resolves.toMatchObject({ conversation: { id: "conversation-1" } });
+    expect(db.activityConversation.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { courseId: "course-1", groupId: "group-1", activityId: "activity-1", participant: { userId: student.id, role: "student" } }
+    }));
+    expect(db.activityConversation.upsert).not.toHaveBeenCalled();
   });
 
   it("creates a fresh logical conversation after a completed untimed attempt", async () => {

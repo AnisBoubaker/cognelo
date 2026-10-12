@@ -21,6 +21,7 @@ import { StudentGroupingsPanel } from "@/components/student-groupings-panel";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import {
   api,
+  ApiError,
   ActivityDefinition,
   ActivityType,
   Course,
@@ -875,10 +876,28 @@ export default function CourseGroupPage() {
     setSavingAssignmentId(assignmentId);
     setAssignmentError("");
     try {
-      await api.updateGroupActivityAssignment(courseId, groupId, assignmentId, {
+      const input = {
         availableFrom: toIsoOrNull(availableFrom),
         availableUntil: toIsoOrNull(availableUntil)
-      });
+      };
+      try {
+        await api.updateGroupActivityAssignment(courseId, groupId, assignmentId, input);
+      } catch (saveError) {
+        if (!(saveError instanceof ApiError) || saveError.code !== "ACTIVITY_SETTINGS_ACTIVE_STUDENTS") throw saveError;
+        const confirmation = {
+          title: t("courseDetail.liveSettingsTitle"),
+          message: t("courseDetail.liveSettingsWarning"),
+          confirmLabel: t("courseDetail.liveSettingsApply")
+        };
+        const canNotify = (saveError.details as { canNotifyStudents?: boolean } | undefined)?.canNotifyStudents === true;
+        const message = canNotify
+          ? await dialogs.prompt({ ...confirmation, inputLabel: t("courseDetail.liveSettingsMessage"), maxLength: 4000 })
+          : await dialogs.confirm(confirmation) ? "" : null;
+        if (message === null) return;
+        await api.updateGroupActivityAssignment(courseId, groupId, assignmentId, {
+          ...input, confirmActiveStudents: true, studentMessage: message
+        });
+      }
       await refresh();
     } catch (err) {
       setAssignmentError(err instanceof Error ? err.message : t("groupPage.assignmentUpdateError"));

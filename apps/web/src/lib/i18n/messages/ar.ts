@@ -831,6 +831,11 @@ export const arMessages = {
       pluginsAdminOnly: "إعدادات الإضافات متاحة للمديرين."
     },
     courseDetail: {
+      liveSettingsTitle: "الطلاب يجيبون الآن",
+      liveSettingsWarning: "يجيب الطلاب حاليًا عن هذا النشاط. ستُطبق هذه الإعدادات على العمل غير المُسلَّم خلال 30 ثانية. يمكنك الإلغاء للإبقاء على الإعدادات الحالية.",
+      liveSettingsMessage: "رسالة إلى الطلاب (اختياري)",
+      liveSettingsApply: "تطبيق الإعدادات",
+
       duplicateActivity: "تكرار",
       duplicateActivityEyebrow: "محتوى المقرر",
       duplicateActivityTitle: "تكرار النشاط",

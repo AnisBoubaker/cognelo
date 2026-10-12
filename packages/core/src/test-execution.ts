@@ -134,7 +134,7 @@ export async function getTestItemExecutionContext(
     parentAttemptId,
     options.allowCompletedParent === true
   );
-  if (!options.allowExpiredParent) assertTestAttemptWithinTime(parentAttempt);
+  if (!options.allowExpiredParent) assertTestAttemptWithinTime(parentAttempt, context.assignedActivity.assignment.metadata);
   if (!options.allowResumePolicyBypass) assertTestAttemptResumePolicy(parentAttempt, options.sessionId);
   const item = context.test.items.find((candidate) => candidate.id === testItemId);
   if (!item || !manifestItemIds(parentAttempt.metadata).has(item.id)) {
@@ -180,7 +180,7 @@ export async function saveTestItemAttemptState(
     }
     throw notFound("Test item attempt");
   }
-  assertTestAttemptWithinTime(context.parentAttempt);
+  assertTestAttemptWithinTime(context.parentAttempt, context.assignedActivity.assignment.metadata);
   assertTestAttemptResumePolicy(context.parentAttempt, options.sessionId);
   return prisma.testItemAttempt.upsert({
     where: { parentAttemptId_testItemId: { parentAttemptId, testItemId } },
@@ -679,9 +679,13 @@ function buildTestRuntime(
       } : null
     }];
   });
-  const runtimeSettings = attempt
-    ? asRecord(asRecord(attempt.metadata).manifest).settings ?? withAssignmentTimeLimit(context.test.settings, context.assignedActivity.assignment.metadata)
-    : withAssignmentTimeLimit(context.test.settings, context.assignedActivity.assignment.metadata);
+  const savedSettings = attempt ? asRecord(asRecord(attempt.metadata).manifest).settings ?? context.test.settings : context.test.settings;
+  const submittedMetadata = asRecord(attempt?.metadata);
+  const runtimeSettings = !attempt || attempt.lifecycle === "started"
+    ? withAssignmentTimeLimit(savedSettings, context.assignedActivity.assignment.metadata)
+    : Object.prototype.hasOwnProperty.call(submittedMetadata, "submittedTimeLimitMinutes")
+      ? { ...asRecord(savedSettings), timeLimitMinutes: submittedMetadata.submittedTimeLimitMinutes }
+      : savedSettings;
   const manifest = attempt ? asRecord(asRecord(attempt.metadata).manifest) : {};
   const resumeAllowed = asRecord(runtimeSettings).allowResume !== false;
   const attemptSessionId = typeof manifest.sessionId === "string" ? manifest.sessionId : null;
@@ -837,9 +841,9 @@ function withAssignmentTimeLimit(settingsValue: unknown, assignmentMetadata: unk
   };
 }
 
-function assertTestAttemptWithinTime(attempt: { metadata: unknown; startedAt: Date }) {
-  const settings = asRecord(asRecord(asRecord(attempt.metadata).manifest).settings);
-  const timeLimitMinutes = typeof settings.timeLimitMinutes === "number" && settings.timeLimitMinutes > 0 ? settings.timeLimitMinutes : null;
+function assertTestAttemptWithinTime(attempt: { metadata: unknown; startedAt: Date; lifecycle?: string }, assignmentMetadata: unknown) {
+  if (attempt.lifecycle && attempt.lifecycle !== "started") return;
+  const timeLimitMinutes = assignmentTimeLimitMinutes(assignmentMetadata);
   if (!timeLimitMinutes) return;
   const expiresAt = attempt.startedAt.getTime() + timeLimitMinutes * 60_000;
   if (Date.now() >= expiresAt) {

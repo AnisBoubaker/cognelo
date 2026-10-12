@@ -482,6 +482,31 @@ function TestStudentRuntime({
   }, [activity.id, applyRuntime, courseId, groupId, notifications, sessionId, studentPreview, studentViewMode]);
 
   useEffect(() => {
+    if (studentPreview) return;
+    let cancelled = false;
+    let refreshing = false;
+    async function refreshPolicy() {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const { runtime: next } = await api.testRuntime(courseId, groupId, activity.id, studentViewMode, sessionId);
+        if (cancelled) return;
+        // Keep item objects stable: polling must never replace unsaved child responses.
+        setRuntime((current) => current && current.attempt?.id === next.attempt?.id ? {
+          ...current, test: { ...current.test, settings: next.test.settings },
+          timing: next.timing, availability: next.availability, resume: next.resume
+        } : current);
+        onNewAttemptAvailabilityChange?.(next.attempt?.lifecycle === "started" || next.availability.canStart);
+        if (!next.timing.isExpired) autoSubmittedAttemptRef.current = null;
+      } catch { /* Access changes are handled by the assigned activity host. */ }
+      finally { refreshing = false; }
+    }
+    const interval = window.setInterval(() => void refreshPolicy(), 20_000);
+    window.addEventListener("focus", refreshPolicy);
+    return () => { cancelled = true; window.clearInterval(interval); window.removeEventListener("focus", refreshPolicy); };
+  }, [activity.id, courseId, groupId, sessionId, studentPreview, studentViewMode, onNewAttemptAvailabilityChange]);
+
+  useEffect(() => {
     setSelectedIndex(0);
     setFurthestVisitedIndex(0);
     setPendingSaveCount(0);
@@ -584,7 +609,7 @@ function TestStudentRuntime({
     }
   }
 
-  async function finishTest() {
+  async function finishTest(onlyIfExpired = false) {
     if (!runtime?.attempt) return;
     if (pendingSaveCount > 0) {
       notifications.error(t("courseDetail.testWaitForSave"));
@@ -617,8 +642,12 @@ function TestStudentRuntime({
         onSubmitted?.();
         return;
       }
-      const result = await api.submitTestAttempt(courseId, groupId, activity.id, runtime.attempt.id, sessionId);
+      const result = await api.submitTestAttempt(courseId, groupId, activity.id, runtime.attempt.id, sessionId, onlyIfExpired);
       applyRuntime(result.runtime);
+      if (result.runtime.attempt?.lifecycle === "started") {
+        autoSubmittedAttemptRef.current = null;
+        return;
+      }
       setShowSubmitConfirmation(false);
       notifications.success(t("courseDetail.testSubmitted"));
       onSubmitted?.();
@@ -656,7 +685,7 @@ function TestStudentRuntime({
       notifications.info(t(runtime.resume.blocked
         ? "courseDetail.testResumeDisabledSubmitting"
         : "courseDetail.testTimeExpiredSubmitting"));
-      void finishTest();
+      void finishTest(!runtime.resume.blocked);
     }
   }, [busy, pendingSaveCount, remainingSeconds, runtime?.attempt?.id, runtime?.attempt?.lifecycle, runtime?.resume.blocked, t]);
 

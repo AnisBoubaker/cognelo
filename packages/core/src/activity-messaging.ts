@@ -75,7 +75,7 @@ export async function getLearnerActivityConversation(
     const availability = await getActivityAttemptAvailability(user, { courseId, groupId, activityId, now });
     if (!availability.canStart) {
       await closeLearnerConversations(activity.assignment.id, participant.id, now);
-      return { conversation: null };
+      return getStoredLearnerActivityConversation(user, courseId, groupId, activityId);
     }
   }
 
@@ -115,6 +115,21 @@ export async function getLearnerActivityConversation(
     select: { id: true, attemptId: true, attemptNumber: true }
   });
 
+  return readConversation(user, conversation);
+}
+
+// Notices remain readable if a live policy change closes access to the activity.
+// This path never opens a conversation or renews answering presence.
+export async function getStoredLearnerActivityConversation(user: CurrentUser, courseId: string, groupId: string, activityId: string) {
+  const conversation = await prisma.activityConversation.findFirst({
+    where: { courseId, groupId, activityId, participant: { userId: user.id, role: "student" } },
+    orderBy: [{ attemptNumber: "desc" }],
+    select: { id: true, attemptId: true, attemptNumber: true }
+  });
+  return conversation ? readConversation(user, conversation) : { conversation: null };
+}
+
+async function readConversation(user: CurrentUser, conversation: { id: string; attemptId: string | null; attemptNumber: number }) {
   const [messagesDescending, readState] = await Promise.all([
     prisma.activityConversationMessage.findMany({
       where: { conversationId: conversation.id },
@@ -305,13 +320,14 @@ async function assertActivityMessagingAccess(
   return groupScope;
 }
 
-async function listActiveConversations(
+export async function listActiveConversations(
   courseId: string,
   activityId: string,
   groupScope: string[] | null,
-  now: Date
+  now: Date,
+  db: Pick<Prisma.TransactionClient, "activityConversation" | "activityAttempt"> = prisma
 ) {
-  const conversations = await prisma.activityConversation.findMany({
+  const conversations = await db.activityConversation.findMany({
     where: {
       courseId,
       activityId,
@@ -333,7 +349,7 @@ async function listActiveConversations(
   });
   if (!conversations.length) return [];
 
-  const recordedAttempts = await prisma.activityAttempt.findMany({
+  const recordedAttempts = await db.activityAttempt.findMany({
     where: {
       groupActivityId: { in: [...new Set(conversations.map((conversation) => conversation.groupActivityId))] },
       participantId: { in: [...new Set(conversations.map((conversation) => conversation.participantId))] },

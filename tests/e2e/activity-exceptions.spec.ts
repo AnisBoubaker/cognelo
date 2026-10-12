@@ -48,7 +48,98 @@ async function setTimeLimit(editor: Locator, minutes: string) {
 }
 
 test.describe("team and student activity exceptions", { tag: "@regression" }, () => {
-  test("edits and prioritizes team exceptions, applies student precedence, cancels drafts, and preserves a started deadline", async ({ teacherPage: page, teacherApi, studentApi, bankCourse: data, exceptionData: ex }) => {
+  test("applies live section and student timing with a cancellable warning and optional message", async ({ teacherPage, studentPage, teacherApi, studentApi, bankCourse: data, exceptionData: ex }) => {
+    test.setTimeout(90_000);
+    const value = await settings(teacherApi, ex.settingsPath);
+    value.general.assessmentMode = "summative";
+    value.general.timeLimitMinutes = 30;
+    await save(teacherApi, ex.settingsPath, value);
+    await studentPage.goto(ex.assignedPath.replace("/api", ""));
+    await studentPage.getByRole("button", { name: "Start timed attempt" }).click();
+    await studentPage.getByLabel("Four", { exact: true }).check();
+    await expect(studentPage.getByRole("button", { name: "Open activity messages" })).toBeVisible();
+    const before = await responseJson<{ runtime: { attempt: { id: string }; timing: { expiresAt: string } } }>(await studentApi.get(`${ex.assignedPath}/timing`));
+    const dialog = await openSettings(teacherPage, data.courseId, data.title);
+    await dialog.getByLabel("Time limit (minutes)", { exact: true }).fill("60");
+    await dialog.getByRole("button", { name: "Save settings", exact: true }).click();
+    const warning = teacherPage.getByRole("dialog", { name: "Students are answering", exact: true });
+    await expect(warning).toBeVisible();
+    await warning.getByRole("button", { name: "Cancel", exact: true }).click();
+    expect((await settings(teacherApi, ex.settingsPath)).general.timeLimitMinutes).toBe(30);
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Save settings", exact: true }).click();
+    await warning.getByLabel("Message to students (optional)").fill("You now have one hour in total.");
+    await warning.getByRole("button", { name: "Apply settings", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(studentPage.getByRole("timer")).toContainText(/59:/, { timeout: 30_000 });
+    await expect(studentPage.getByLabel("Four", { exact: true })).toBeChecked();
+    await studentPage.getByRole("button", { name: /Open activity messages/ }).click();
+    const messages = studentPage.getByRole("dialog", { name: "Activity messages", exact: true });
+    await expect(messages.getByText("You now have one hour in total.")).toBeVisible();
+    await messages.getByRole("button", { name: "Close", exact: true }).click();
+    const updated = await settings(teacherApi, ex.settingsPath);
+    updated.groups[0]!.exceptions.push({ ...updated.general, teamId: null, participantId: ex.student.id, overrideFields: ["timeLimit"], timeLimitMinutes: 75 });
+    await responseJson(await teacherApi.post(ex.settingsPath, { data: { ...updated.general, groupAssignments: updated.groups, confirmActiveStudents: true } }));
+    await studentPage.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(studentPage.getByRole("timer")).toContainText(/1:14:/);
+    const after = await responseJson<typeof before>(await studentApi.get(`${ex.assignedPath}/timing`));
+    expect(after.runtime.attempt.id).toBe(before.runtime.attempt.id);
+    expect(new Date(after.runtime.timing.expiresAt).getTime() - new Date(before.runtime.timing.expiresAt).getTime()).toBe(45 * 60_000);
+    await expect(studentPage.getByLabel("Four", { exact: true })).toBeChecked();
+    updated.groups[0]!.exceptions[0]!.timeLimitMinutes = null;
+    await responseJson(await teacherApi.post(ex.settingsPath, { data: { ...updated.general, groupAssignments: updated.groups, confirmActiveStudents: true } }));
+    await studentPage.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(studentPage.getByRole("timer")).toHaveCount(0);
+    await expect(studentPage.getByLabel("Four", { exact: true })).toBeChecked();
+    updated.groups[0]!.exceptions[0]!.overrideFields.push("visibility");
+    updated.groups[0]!.exceptions[0]!.contentPlacement = { isVisible: false, metadata: {} };
+    await responseJson(await teacherApi.post(ex.settingsPath, { data: { ...updated.general, groupAssignments: updated.groups, confirmActiveStudents: true, studentMessage: "The activity is paused briefly." } }));
+    await studentPage.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(studentPage.getByLabel("Four", { exact: true })).toBeHidden();
+    await expect(studentPage.getByRole("button", { name: /Open activity messages/ })).toBeVisible();
+    await studentPage.getByRole("button", { name: /Open activity messages/ }).click();
+    await expect(studentPage.getByRole("dialog", { name: "Activity messages", exact: true }).getByText("The activity is paused briefly.")).toBeVisible({ timeout: 10_000 });
+    await studentPage.getByRole("dialog", { name: "Activity messages", exact: true }).getByRole("button", { name: "Close", exact: true }).click();
+    updated.groups[0]!.exceptions[0]!.contentPlacement.isVisible = true;
+    updated.groups[0]!.exceptions[0]!.timeLimitMinutes = 75;
+    await responseJson(await teacherApi.post(ex.settingsPath, { data: { ...updated.general, groupAssignments: updated.groups, confirmActiveStudents: true } }));
+    await studentPage.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(studentPage.getByLabel("Four", { exact: true })).toBeChecked();
+    await studentPage.getByRole("button", { name: "Submit", exact: true }).click();
+    await studentPage.getByRole("dialog", { name: "Submit answers?" }).getByRole("button", { name: "Submit answers", exact: true }).click();
+    await expect(studentPage).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));
+    const submitted = await prisma.activityAttempt.findUniqueOrThrow({ where: { id: before.runtime.attempt.id } });
+    expect(submitted.metadata).toMatchObject({ timeLimitSnapshotMinutes: 30, submittedTimeLimitMinutes: 75 });
+    updated.general.timeLimitMinutes = 90;
+    updated.groups[0]!.exceptions = [];
+    await save(teacherApi, ex.settingsPath, updated);
+    expect((await prisma.activityAttempt.findUniqueOrThrow({ where: { id: submitted.id } })).metadata).toEqual(submitted.metadata);
+  });
+
+  test("refreshes extra student attempts on an already-open blocked page", async ({ studentPage, teacherApi, bankCourse: data, exceptionData: ex }) => {
+    test.setTimeout(60_000);
+    const value = await settings(teacherApi, ex.settingsPath);
+    value.general.assessmentMode = "summative";
+    value.general.gradebookSettings.attemptLimitMode = "max_attempts";
+    value.general.gradebookSettings.maxAttempts = 1;
+    await save(teacherApi, ex.settingsPath, value);
+    await studentPage.goto(ex.assignedPath.replace("/api", ""));
+    await studentPage.getByLabel("Four", { exact: true }).check();
+    await studentPage.getByRole("button", { name: "Submit", exact: true }).click();
+    await studentPage.getByRole("dialog", { name: "Submit answers?" }).getByRole("button", { name: "Submit answers", exact: true }).click();
+    await expect(studentPage).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));
+    await studentPage.goto(ex.assignedPath.replace("/api", ""));
+    await expect(studentPage.getByRole("tab", { name: "Previous submissions", exact: true })).toBeVisible();
+    await expect(studentPage.getByRole("tab", { name: "New attempt", exact: true })).toHaveCount(0);
+    const updated = await settings(teacherApi, ex.settingsPath);
+    updated.groups[0]!.exceptions.push({ ...updated.general, teamId: null, participantId: ex.student.id, overrideFields: ["attempts"], gradebookSettings: { ...updated.general.gradebookSettings, maxAttempts: 2 } });
+    await save(teacherApi, ex.settingsPath, updated);
+    await expect(studentPage.getByRole("tab", { name: "New attempt", exact: true })).toBeVisible({ timeout: 30_000 });
+    await studentPage.getByRole("tab", { name: "New attempt", exact: true }).click();
+    await expect(studentPage.getByRole("button", { name: "Submit", exact: true })).toBeEnabled();
+  });
+
+  test("edits and prioritizes team exceptions, applies student precedence, cancels drafts, and updates a started deadline", async ({ teacherPage: page, teacherApi, studentApi, bankCourse: data, exceptionData: ex }) => {
     const initial = await settings(teacherApi, ex.settingsPath);
     initial.general.assessmentMode = "summative";
     initial.general.timeLimitMinutes = 10;
@@ -96,8 +187,8 @@ test.describe("team and student activity exceptions", { tag: "@regression" }, ()
     const assigned = await responseJson<{ activity: { assignment: { metadata: { timeLimitMinutes: number } } } }>(await studentApi.get(ex.assignedPath));
     expect(assigned.activity.assignment.metadata.timeLimitMinutes).toBe(30);
     const resumed = await responseJson<typeof runtime>(await studentApi.get(`${ex.assignedPath}/timing`));
-    expect(resumed.runtime.timeLimitMinutes).toBe(40);
-    expect(resumed.runtime.timing.expiresAt).toBe(runtime.runtime.timing.expiresAt);
+    expect(resumed.runtime.timeLimitMinutes).toBe(30);
+    expect(new Date(resumed.runtime.timing.expiresAt).getTime()).toBe(new Date(runtime.runtime.timing.expiresAt).getTime() - 10 * 60_000);
   });
 
   test("enforces all exception policies in learner access, attempts, grading, and challenges without exposing private targets", async ({ teacherApi, studentApi, bankCourse: data, exceptionData: ex }) => {

@@ -879,6 +879,11 @@ export const zhMessages = {
       loadError: "无法加载课程。"
     },
     courseDetail: {
+      liveSettingsTitle: "学生正在作答",
+      liveSettingsWarning: "学生目前正在完成此活动。设置将在30秒内应用于尚未提交的作业。取消可保留当前设置。",
+      liveSettingsMessage: "给学生的消息（可选）",
+      liveSettingsApply: "应用设置",
+
       duplicateActivity: "复制",
       duplicateActivityEyebrow: "课程内容",
       duplicateActivityTitle: "复制活动",

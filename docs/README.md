@@ -45,7 +45,7 @@ Open these only when changing or reviewing the named area:
 - [Gradebook](GRADEBOOK_IMPLEMENTATION_PLAN.md)
 - [Role authorization and multi-teacher E2E plan](ROLE_AUTHORIZATION_E2E_IMPLEMENTATION_PLAN.md)
 - [Student groupings and teams](STUDENT_GROUPINGS.md)
-- [Activity assignment exceptions](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)
+- [Activity assignment exceptions and live settings](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)
 - [Student model](STUDENT_MODEL_IMPLEMENTATION_PLAN.md)
 - [Student view](STUDENT_VIEW_IMPLEMENTATION_PLAN.md)
 - [Compound Test activity](TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md)
@@ -62,6 +62,7 @@ Implementation plans contain design rationale and delivery state. They are not r
 
 ## Point-In-Time Records
 
+- [Live activity settings verification — 2026-10-12](LIVE_ACTIVITY_SETTINGS_VERIFICATION_2026-10-12.md)
 - [Automatic assignment and team-choice verification — 2026-10-12](TEAM_CHOICE_VERIFICATION_2026-10-12.md)
 - [Activity exception verification — 2026-10-12](ACTIVITY_EXCEPTIONS_VERIFICATION_2026-10-12.md)
 - [Grouping verification — 2026-10-12](E2E_RUN_2026-10-12.md)
