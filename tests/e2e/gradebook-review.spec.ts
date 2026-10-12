@@ -31,7 +31,12 @@ test.describe("consistent gradebook review actions", () => {
     }
     await page.getByRole("tab", { name: "Student results", exact: true }).click();
 
-    await page.getByRole("button", { name: "Assess with AI", exact: true }).first().click();
+    const firstStudentRow = page.locator(".table-row-gradebook-detail:not(.table-head)").first();
+    await expect(firstStudentRow.getByRole("button", { name: "Assess with AI", exact: true })).toHaveCount(0);
+    await firstStudentRow.getByRole("button", { name: /^Actions for / }).click();
+    await expect(page.getByRole("menuitem", { name: "Rerun automatic grading", exact: true })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Review and grade", exact: true })).toBeVisible();
+    await page.getByRole("menuitem", { name: "Assess with AI", exact: true }).click();
     const aiConfirmation = page.getByRole("dialog", { name: "Please confirm" });
     const aiConfirmationMessage = await aiConfirmation.locator(".muted").innerText();
     expect(aiConfirmationMessage).toContain("evaluate the rubric, generate feedback, and update");
@@ -39,7 +44,8 @@ test.describe("consistent gradebook review actions", () => {
     await aiConfirmation.getByRole("button", { name: "Cancel", exact: true }).click();
 
     const autoGradedStudentRow = page.locator(".table-row-gradebook-detail").filter({ hasText: "programming.a01@cognelo.local" });
-    await autoGradedStudentRow.getByRole("button", { name: "Review and grade", exact: true }).click();
+    await autoGradedStudentRow.getByRole("button", { name: /^Actions for / }).click();
+    await page.getByRole("menuitem", { name: "Review and grade", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: "Review and grade" })).toBeVisible();
     await expect(dialog.getByText("Summary", { exact: true })).toBeVisible();
