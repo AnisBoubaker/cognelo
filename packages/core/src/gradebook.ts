@@ -10,7 +10,7 @@ import {
 } from "./authorization";
 import { AppError, forbidden, notFound } from "./errors";
 import { gradeChallengeTargetForGrade } from "./grade-challenge-targets";
-import { assignmentAllowsGradeChallenges } from "./activity-assignment-policy";
+import { assignmentAllowsGradeChallenges, assignmentTimeLimitMinutes } from "./activity-assignment-policy";
 import { applyAssignmentExceptions, applyGradebookExceptions, exceptionsForParticipant, loadAssignmentExceptions } from "./activity-assignment-exceptions";
 
 type JsonInput = Prisma.InputJsonValue;
@@ -325,6 +325,12 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
   }
   await assertCanUseAttempt(user, attempt.courseId, attempt.participant);
 
+  // Retrying a completed submission must not apply a subsequently edited policy.
+  if (attempt.lifecycle === "submitted") {
+    const { gradebookItem: _item, groupActivity: _assignment, participant: _participant, ...submittedAttempt } = attempt;
+    return submittedAttempt;
+  }
+
   const exceptions = await loadAssignmentExceptions([attempt.groupActivityId]);
   const effectiveAssignment = applyAssignmentExceptions(attempt.groupActivity, exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId));
 
@@ -348,12 +354,12 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
       isLate: lateness.isLate,
       lateBySeconds: lateness.lateBySeconds,
       pluginAttemptRef: input.pluginAttemptRef ?? attempt.pluginAttemptRef,
-      metadata: input.metadata === undefined
-        ? undefined
-        : {
-            ...(asJsonObject(attempt.metadata) ?? {}),
-            ...(asJsonObject(input.metadata) ?? {})
-          } as JsonInput
+      metadata: {
+        ...(asJsonObject(attempt.metadata) ?? {}),
+        ...(asJsonObject(input.metadata) ?? {}),
+        // Preserve the original attempt/manifest; record final timing separately.
+        submittedTimeLimitMinutes: assignmentTimeLimitMinutes(effectiveAssignment.metadata)
+      } as JsonInput
     }
   });
 }

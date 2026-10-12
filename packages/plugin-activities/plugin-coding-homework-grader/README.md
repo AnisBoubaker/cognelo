@@ -19,7 +19,7 @@ When the effective summative assignment setting enables challenges, teacher-ente
 
 Finalized challenge answers create a core attempt tagged with the assignment mode. Formative attempts remain available to the teacher's read-only inspector; only summative attempts may receive a grade.
 
-Course assignment settings may time this workflow. Core owns the explicit start and deadline. At zero the renderer finalizes complete challenge answers through the ordinary route; if the upload/analysis/questions are not ready or answers remain incomplete, core closes the timed attempt ungraded instead of fabricating plugin results.
+Course assignment settings may time this workflow. Core owns the explicit start and live deadline until submission. At zero the renderer finalizes complete challenge answers through the ordinary route; if the upload/analysis/questions are not ready or answers remain incomplete, core closes the timed attempt ungraded instead of fabricating plugin results.
 
 Teacher review can resolve one exact linked final submission. The shared report dialog loads the newest current-mode submission first and requests older submissions only when the teacher navigates; historical submissions are read-only.
 

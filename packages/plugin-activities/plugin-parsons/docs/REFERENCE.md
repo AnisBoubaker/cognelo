@@ -60,7 +60,7 @@ The activity config currently includes:
 
 ## Persistence
 
-Core applies [team and student assignment exceptions](../../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md) to access, timing, attempts, grading, and challenge policy. Plugin routes consume the resolved assignment and core grade services; active attempt deadlines retain their original snapshot.
+Core applies [team and student assignment exceptions](../../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md) to access, timing, attempts, grading, and challenge policy. Plugin routes consume the resolved assignment and core grade services; unsubmitted attempt deadlines resolve the latest effective limit from the original start, and the host refreshes policy every 20 seconds. Submitted timing stays fixed.
 
 Parsons owns plugin-specific persistence for student attempts.
 
@@ -87,7 +87,7 @@ Key behavior:
 - the next fresh try starts a new attempt
 - teacher/admin previews stay ephemeral so instructor exploration does not pollute student-behavior data
 
-Course activity settings may add a time limit in either assessment mode. Core owns the explicit start and immutable deadline. Parsons move/state updates are rejected after expiry, while the route's final check/submission remains available for the host's automatic zero-time submission. The renderer answers `TimedActivityAutoSubmit` by invoking its normal submission function, which links the current plugin attempt to the already-started core timed attempt rather than creating another one.
+Course activity settings may add a time limit in either assessment mode. Core owns the explicit start and live deadline. Parsons move/state updates are rejected after expiry, while the route's final check/submission remains available for the host's automatic zero-time submission. The renderer answers `TimedActivityAutoSubmit` by invoking its normal submission function, which links the current plugin attempt to the already-started core timed attempt rather than creating another one.
 
 ## Routes
 

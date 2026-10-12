@@ -3,12 +3,15 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   getConversation: vi.fn(),
+  getStoredConversation: vi.fn(),
   markRead: vi.fn(),
   requireUser: vi.fn(),
   requireSafeExamBrowserAccess: vi.fn()
 }));
 
 vi.mock("@cognelo/core", () => ({
+  AppError: class extends Error { constructor(public status: number, public code: string, message: string) { super(message); } },
+  getStoredLearnerActivityConversation: mocks.getStoredConversation,
   getLearnerActivityConversation: mocks.getConversation,
   markLearnerActivityConversationRead: mocks.markRead
 }));
@@ -47,6 +50,15 @@ describe("learner activity messaging route", () => {
       "group-1",
       "activity-1"
     );
+  });
+
+  it.each(["GROUP_ACTIVITY_NOT_AVAILABLE", "GROUP_ACTIVITY_HIDDEN", "SAFE_EXAM_BROWSER_REQUIRED"])("keeps an existing notice readable after %s", async (code) => {
+    const { AppError } = await import("@cognelo/core");
+    mocks.requireSafeExamBrowserAccess.mockRejectedValueOnce(new AppError(403, code, "Unavailable"));
+    mocks.getStoredConversation.mockResolvedValue({ conversation: { id: "existing", messages: [{ body: "Please pause while I adjust the activity." }] } });
+    const response = await GET(new NextRequest("http://test.local/messages"), params);
+    await expect(response.json()).resolves.toMatchObject({ conversation: { id: "existing" } });
+    expect(mocks.getConversation).not.toHaveBeenCalled();
   });
 
   it("marks only the requested learner conversation as read", async () => {

@@ -235,7 +235,7 @@ Assignment behavior:
 - availability and due dates belong to the Test assignment;
 - the Test authoring time limit is a reusable default only: creating, duplicating, or importing the course Test copies it once into the course activity's General assignment settings;
 - the copied course limit can then be disabled or changed independently and can have per-group replace/disable overrides; later Test-authoring edits do not update it;
-- a new parent attempt snapshots the effective group assignment limit in its manifest, while an active parent retains that snapshot if course settings later change;
+- a new parent attempt records its initial effective assignment limit; active parents resolve live limits and submission records final timing separately while preserving the original manifest;
 - attempt limits and grade strategy belong to the Test gradebook item;
 - **Assign to all** materializes one Test assignment per current group, while later groups remain unassigned;
 - per-group settings use explicit overrides of the General Test policy;
@@ -405,25 +405,20 @@ Edit safety rules:
 
 Reusable bank Test publications are also immutable composition snapshots. Draft edits update the mutable `BankTest` graph and return the shell to Draft. Publishing reuses the latest version when the complete generic graph is unchanged; otherwise it publishes changed children, creates a new shell `ActivityVersion`, and records the ordered `BankTestVersionItem` snapshot. Plugin-private authoring data retains the platform's existing limitation: it is copied independently but is current bank state rather than version-snapshotted private state.
 
-## Deferred design: interventions during an active Test
+## Live assignment settings and deferred content interventions
 
-This section records an unresolved product discussion for a later session. None of the possible behavior below is accepted yet, and it must not be implemented without revisiting the product decisions with the user.
+Live assignment settings are implemented: unsubmitted parents resolve the latest effective time limit, including section/team/student exceptions, from their original start. Learner pages refresh within 20 seconds. Settings saves warn about answering students and offer cancel or an optional in-app notice. Submitted timing remains fixed. See [live assignment policy](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md#live-updates-and-teacher-notices). Content and grading-test corrections remain deferred and require a separate product decision.
 
 ### Current behavior and limitation
 
-- After the first Test attempt starts, the supported service routes reject changes to Test authoring settings, contained activity public configuration, and guarded plugin-private authoring such as Programming Exercise templates, reference solutions, rubrics, and hidden tests. The independent course activity timing policy, including [team/student exceptions](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md), remains editable for future attempts, but an active parent keeps its manifest snapshot.
+- After the first Test attempt starts, the supported service routes reject changes to Test authoring settings, contained activity public configuration, and guarded plugin-private authoring such as Programming Exercise templates, reference solutions, rubrics, and hidden tests. The independent course activity timing policy, including [team/student exceptions](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md), applies live until parent submission; authored navigation and composition retain their manifest snapshot.
 - A Test attempt records its settings, ordered item manifest, immutable `TestRevision`, and child-configuration fingerprints when it starts.
 - The active student runtime does not poll for authored-content changes or compare the recorded child fingerprint with the live child before every action. Display and composite execution currently read the live child `Activity`; Programming Exercise submission reads the live plugin-private template and hidden-test rows. Safety therefore depends on every mutation path honoring the post-attempt authoring lock.
 - The browser counts down from the server-provided deadline and initiates submission at zero after pending saves finish. There is no server-scheduled submission exactly at the deadline. Reloading an expired active attempt causes the browser to observe zero and initiate submission, while the server rejects further child writes after expiry.
-- Consequently, teachers cannot currently extend an active attempt, correct a public prompt/sample test, or repair a grading test through a supported workflow. Duplicating the Test affects future use only; external communication and later manual grade compensation are the available workarounds.
+- Teachers can extend or shorten active time through assignment settings, section overrides, or exceptions. Correcting public prompts/sample tests or grading tests remains locked after attempts; duplication still affects future use only.
 
-### Questions to revisit before implementation
+### Questions remaining for content interventions
 
-- Should an active Test permit time changes, and if so should the teacher add minutes, set a replacement deadline, or choose either operation?
-- What scopes are required: every active attempt, one group, selected learners, future attempts that have not started, or combinations of these?
-- Should reducing active time ever be permitted, or should early termination be a separate explicit operation?
-- What happens when an extension races with browser-initiated automatic submission, or when the previous deadline has passed but final submission has not completed?
-- How and how quickly should open student pages learn about an intervention: polling, server push, action responses, or another mechanism?
 - Which public corrections may be applied to an active attempt: typographical prompt fixes, visible sample-test inputs/outputs, starter code, or broader activity configuration?
 - How should students be informed about a correction, and must the system preserve when each learner first saw the original and corrected versions?
 - Should a correction apply to all active attempts uniformly, or can its scope differ by group or learner without compromising fairness?
@@ -431,7 +426,7 @@ This section records an unresolved product discussion for a later session. None 
 - Which changes require confirmation, a teacher-entered reason, append-only audit history, student notification, and later reporting?
 - Must active display and execution be rebuilt to use the immutable `TestRevision` plus versioned plugin-private snapshots before any intervention workflow is safe, or is a different consistency boundary preferred?
 
-Possible mechanisms discussed included append-only attempt amendments, per-attempt effective deadlines, audited scopes, student-visible correction notices, and server-authoritative handling of stale automatic submissions. These are ideas for the later design discussion, not agreed requirements.
+Versioned content amendments and audited grading corrections remain ideas for a later discussion. Assignment timing and stale automatic-expiry handling follow the implemented policy above.
 
 ## API and Service Boundaries
 

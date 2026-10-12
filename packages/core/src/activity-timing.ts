@@ -19,10 +19,9 @@ export async function getTimedActivityRuntime(
 ) {
   const context = await resolveTimedActivityContext(user, courseId, groupId, activityId);
   const activeAttempt = await findActiveAttempt(context.assignmentId, context.participantId);
-  const snapshotLimit = activeAttempt ? activityAttemptTimeLimitMinutes(activeAttempt.metadata) : null;
-  const timeLimitMinutes = snapshotLimit ?? assignmentTimeLimitMinutes(context.assignmentMetadata);
-  const expiresAt = activeAttempt && snapshotLimit
-    ? new Date(activeAttempt.startedAt.getTime() + snapshotLimit * 60_000)
+  const timeLimitMinutes = assignmentTimeLimitMinutes(context.assignmentMetadata);
+  const expiresAt = activeAttempt && timeLimitMinutes
+    ? new Date(activeAttempt.startedAt.getTime() + timeLimitMinutes * 60_000)
     : null;
   return {
     timeLimitMinutes,
@@ -86,7 +85,7 @@ export async function finalizeExpiredTimedActivityAttempt(
   if (!activeAttempt) {
     return getTimedActivityRuntime(user, courseId, groupId, activityId);
   }
-  const timeLimitMinutes = activityAttemptTimeLimitMinutes(activeAttempt.metadata);
+  const timeLimitMinutes = assignmentTimeLimitMinutes(context.assignmentMetadata);
   if (!timeLimitMinutes || Date.now() < activeAttempt.startedAt.getTime() + timeLimitMinutes * 60_000) {
     throw new AppError(409, "ACTIVITY_TIME_LIMIT_ACTIVE", "The timed attempt has not expired.");
   }
@@ -126,7 +125,7 @@ export async function assertTimedActivityWriteAllowed(
     }
     return;
   }
-  const timeLimitMinutes = activityAttemptTimeLimitMinutes(activeAttempt.metadata);
+  const timeLimitMinutes = assignmentTimeLimitMinutes(context.assignmentMetadata);
   if (
     !options.allowExpiredAttempt &&
     timeLimitMinutes &&

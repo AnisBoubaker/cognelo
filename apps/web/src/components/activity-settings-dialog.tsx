@@ -8,6 +8,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import {
   api,
+  ApiError,
   type Activity,
   type ActivityAssignmentGradebookSettings,
   type CourseActivityAssignmentSettings
@@ -179,7 +180,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
       const allowedGroupFields = draft.assessmentMode === "summative"
         ? undefined
         : (field: ActivityAssignmentOverrideField) => !summativeOverrideFields.has(field);
-      await api.assignActivityToAllCourseGroups(courseId, activity.id, {
+      const input = {
         availableFrom: toIsoOrNull(draft.general.availableFrom),
         availableUntil: toIsoOrNull(draft.general.availableUntil),
         timeLimitMinutes: buildTimeLimitMinutes(draft.general),
@@ -222,7 +223,25 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
             metadata: {}
           }
         }))
-      });
+      };
+      try {
+        await api.assignActivityToAllCourseGroups(courseId, activity.id, input);
+      } catch (saveError) {
+        if (!(saveError instanceof ApiError) || saveError.code !== "ACTIVITY_SETTINGS_ACTIVE_STUDENTS") throw saveError;
+        const confirmation = {
+          title: t("courseDetail.liveSettingsTitle"),
+          message: t("courseDetail.liveSettingsWarning"),
+          confirmLabel: t("courseDetail.liveSettingsApply")
+        };
+        const canNotify = (saveError.details as { canNotifyStudents?: boolean } | undefined)?.canNotifyStudents === true;
+        const message = canNotify
+          ? await dialogs.prompt({ ...confirmation, inputLabel: t("courseDetail.liveSettingsMessage"), maxLength: 4000 })
+          : await dialogs.confirm(confirmation) ? "" : null;
+        if (message === null) return;
+        await api.assignActivityToAllCourseGroups(courseId, activity.id, {
+          ...input, confirmActiveStudents: true, studentMessage: message
+        });
+      }
       await onSaved();
       onClose();
     } catch (saveError) {

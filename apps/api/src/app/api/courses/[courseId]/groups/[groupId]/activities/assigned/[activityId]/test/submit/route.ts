@@ -17,7 +17,7 @@ import { requireSafeExamBrowserAccess } from "@/lib/safe-exam-browser";
 
 type Params = { params: Promise<{ courseId: string; groupId: string; activityId: string }> };
 
-const inputSchema = z.object({ parentAttemptId: z.string().min(1), sessionId: z.string().min(1).max(200) });
+const inputSchema = z.object({ parentAttemptId: z.string().min(1), sessionId: z.string().min(1).max(200), onlyIfExpired: z.boolean().optional() });
 
 export function OPTIONS() {
   return options();
@@ -37,6 +37,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
       throw new AppError(404, "TEST_ATTEMPT_NOT_FOUND", "The active Test attempt was not found.");
     }
+
+    if (input.onlyIfExpired && !runtime.timing.isExpired) return json({ runtime });
 
     if (!(await claimTestAttemptSubmission(input.parentAttemptId))) {
       throw new AppError(409, "TEST_SUBMISSION_IN_PROGRESS", "This Test submission is already being processed.");

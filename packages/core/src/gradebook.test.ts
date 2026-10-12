@@ -429,9 +429,25 @@ describe("gradebook attempt services", () => {
       metadata: {
         timedAttempt: true,
         timeLimitSnapshotMinutes: 45,
+        submittedTimeLimitMinutes: null,
         submittedAnswers: { "question-1": ["choice-1"] }
       }
     });
+  });
+
+  it("preserves submitted timing and lateness when a submission is retried after policy changes", async () => {
+    const submitted = {
+      id: "attempt-1", courseId: "course-1", participant, participantId: "participant-1",
+      lifecycle: "submitted", submittedAt: new Date("2026-05-18T15:00:00.000Z"),
+      isLate: false, metadata: { submittedTimeLimitMinutes: 30 },
+      groupActivity: { metadata: { timeLimitMinutes: 60 }, availableUntil: new Date("2026-05-18T14:00:00.000Z") },
+      gradebookItem: { lateGracePeriodMinutes: 0 }
+    };
+    mockPrisma.activityAttempt.findUnique.mockResolvedValue(submitted);
+    const result = await submitActivityAttempt(studentUser, { attemptId: "attempt-1" });
+    expect(result).toMatchObject({ lifecycle: "submitted", submittedAt: submitted.submittedAt, isLate: false, metadata: submitted.metadata });
+    expect(result).not.toHaveProperty("gradebookItem");
+    expect(mockPrisma.activityAttempt.update).not.toHaveBeenCalled();
   });
 
   it("rejects submitting an already-started attempt when grades have been released", async () => {

@@ -22,15 +22,25 @@ Every section override is also available on an exception:
 
 The last six categories are summative-only. Switching to formative removes their override selections from both section and exception settings. Assessment mode remains General-only, and folder placement remains controlled by the content tree. Grade release, late grace, activity configuration, and Test child authoring are not exception fields because they are not section overrides in this dialog.
 
-Targets are section-local: exactly one team or student enrollment per exception, at most one exception per target per assignment. Team membership is resolved at use time, including memberships in hidden groupings. Moving into/out of a team changes future policy resolution without copying settings onto students. Pending student enrollments may receive exceptions; teachers and TAs cannot be student targets.
+Targets are section-local: exactly one team or student enrollment per exception, at most one exception per target per assignment. Team membership is resolved at use time, including memberships in hidden groupings. Moving into/out of a team changes live policy resolution without copying settings onto students. Pending student enrollments may receive exceptions; teachers and TAs cannot be student targets.
 
 ## Enforcement and academic history
 
 Core resolves policy for learner content visibility, assigned-activity detail and plugin access, availability/SEB checks, attempt limits, due-date lateness, grading normalization/selection, manual-grade defaults, regrading, student grade reports, and challenge creation. Manager Student view uses the section policy rather than impersonating an arbitrary student. Learner responses expose their effective values, never the exception list or its private team/student targets.
 
-An attempt snapshots its time limit when it starts. Later team, student, or section edits do not extend or shorten that active deadline, including a compound Test's parent snapshot. Other access controls still apply on each request. Exception edits do not rewrite historical grades or grading events automatically; subsequent grading/regrading uses the current effective policy. Explicit teacher-entered grade overrides retain their supplied score/maximum. Existing challenge records survive disabling new challenges.
+Unsubmitted attempts resolve their effective settings live, including a compound Test parent. A deadline is the original start plus the latest effective total minutes: increasing the limit extends it, reducing it may expire it immediately, and disabling it removes the countdown. The initial limit/manifest remains unchanged and submission records `submittedTimeLimitMinutes` separately; later settings edits do not alter submitted attempt timing. Other access controls apply on each request. Exception edits do not rewrite historical grades or grading events automatically; subsequent grading/regrading uses the current effective policy. Explicit teacher-entered grade overrides retain their supplied score/maximum. Existing challenge records survive disabling new challenges.
 
 Settings saves validate the final availability window for every currently affected participant; an empty team's window is validated against the section policy. An invalid window or target rejects the complete transaction, including General edits. Subsequent membership changes do not rewrite or prevalidate activity rules; normal access checks continue enforcing the resulting dates.
+
+## Live updates and teacher notices
+
+Assigned learner pages refresh policy every 20 seconds and on focus, including pages blocked by an attempt limit. Added attempts become available without reloading. The host refreshes access, visibility, SEB, and standalone attempt availability/timing; the Test runtime refreshes its timing and availability while retaining child item objects so unsaved answers are not replaced. Ordinary writes always resolve current server policy. A newly timed standalone activity still requires its explicit start if there is no started core attempt.
+
+At zero the standalone host rechecks the server deadline before requesting the ordinary plugin submission. Core timeout finalization rejects a deadline that was extended or disabled. Automatic compound Test submission sends `onlyIfExpired`; the route checks live timing before claiming submission or running child graders and returns the still-active runtime if time remains. An already accepted final submission continues through its existing finalization path. There is no scheduled server submission at the exact deadline.
+
+When a settings save finds answering students (the activity messenger's 45-second presence window, excluding completed/deleted attempts), it returns `ACTIVITY_SETTINGS_ACTIVE_STUDENTS` with the active count before changing data. The teacher can cancel, apply without a notice, or enter an optional message for all currently answering students in the save's activity/section scope. Notices retain existing teacher messaging permissions; the warning returns `canNotifyStudents`, and a course designer without that scope gets confirmation without a message field. Confirmation uses `confirmActiveStudents`; `studentMessage` is trimmed and limited to 4,000 characters. The settings change and in-app broadcast share one database transaction. Invalid settings roll back the message too. This does not send email. Students can still read their own stored conversation when a live availability/visibility/SEB change closes activity access; reading that history does not renew answering presence.
+
+Live assignment policy does not unlock Test composition, child questions, plugin-private authoring, or historical grading evidence. Those authoring locks and explicit regrading/conversion workflows retain their existing behavior.
 
 ## API and persistence
 
@@ -48,7 +58,9 @@ Migration `202610120004_activity_assignment_exceptions` is additive and leaves e
 
 - `packages/contracts/src/activity-assignment-exceptions.test.ts`: target cardinality, duplicate targets, and bounded inputs.
 - `packages/core/src/activity-assignment-exceptions.test.ts`: field-level priority, participant/assignment isolation, student precedence, explicit null/false, all override categories, formative restrictions, and invalid stored settings.
+- `packages/core/src/activity-timing.test.ts`, `test-execution.test.ts`, and `activity-settings-live.test.ts`: live deadline changes, stale expiry protection, and confirmation/message boundaries.
+- `tests/e2e/live-test-settings.spec.ts`: compound runtime refresh, stale automatic submission, and submitted timing preservation.
 - `packages/core/src/gradebook.test.ts`: effective attempt limits and due-date inheritance through team and student rules.
-- `tests/e2e/activity-exceptions.spec.ts`: real editor Save/Cancel/reorder/reopen, desktop/mobile layout, active deadline preservation, all ten override fields, learner access and grading, private targets, membership changes, cleared dates, atomic rejection, legacy omission, formative pruning, and deletion cascades.
+- `tests/e2e/activity-exceptions.spec.ts`: real editor Save/Cancel/reorder/reopen, desktop/mobile layout, live deadlines, optional notices and cancellation, draft preservation, extra-attempt refresh, submitted timing preservation, all ten override fields, learner access and grading, private targets, membership changes, cleared dates, atomic rejection, legacy omission, formative pruning, and deletion cascades.
 
 The browser scenarios belong to `@regression` and use disposable MCQ fixtures with real API/database integration, without AI or sandbox runners. See [browser test instructions](../tests/e2e/README.md) and [student groupings](STUDENT_GROUPINGS.md).

@@ -1,3 +1,4 @@
+import { prisma } from "@cognelo/db";
 import { createAuthenticatedApi, expect, test } from "./fixtures/auth";
 import {
   assignCourseTest,
@@ -104,13 +105,10 @@ test.describe.serial("timed Test countdown", () => {
     await studentPage.setViewportSize({ width: 1280, height: 420 });
     await studentPage.clock.install({ time: new Date() });
     await openStudentActivity(studentPage, data, testTitle);
+    const displayedDeadline = new Date(Date.now() + 390_000).toISOString();
     await studentPage.route(
       `**/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${testActivityId}/test`,
       async (route) => {
-        if (route.request().method() !== "POST") {
-          await route.continue();
-          return;
-        }
         const response = await route.fetch();
         const body = await response.json() as {
           runtime: {
@@ -120,7 +118,7 @@ test.describe.serial("timed Test countdown", () => {
             };
           };
         };
-        body.runtime.timing.expiresAt = new Date(Date.now() + 390_000).toISOString();
+        body.runtime.timing.expiresAt = displayedDeadline;
         body.runtime.timing.remainingSeconds = 390;
         await route.fulfill({ response, json: body });
       }
@@ -172,6 +170,10 @@ test.describe.serial("timed Test countdown", () => {
     await expect(timer).toHaveClass(/test-countdown--critical/);
     await timer.evaluate((element) => element.getAnimations().forEach((animation) => animation.finish()));
     expect(await timer.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(153, 27, 27)");
+    await prisma.activityAttempt.updateMany({
+      where: { activityId: testActivityId, lifecycle: "started" },
+      data: { startedAt: new Date(Date.now() - 31 * 60_000) }
+    });
     await studentPage.clock.fastForward(60_000);
 
     await expect(studentPage).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));

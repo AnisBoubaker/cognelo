@@ -114,6 +114,18 @@ describe("whole Test submission route", () => {
     });
   });
 
+  it("ignores stale automatic expiry after the teacher extends time", async () => {
+    mocks.readJson.mockResolvedValue({ parentAttemptId: "parent-attempt-1", sessionId: "session-1", onlyIfExpired: true });
+    const runtime = { attempt: { id: "parent-attempt-1", lifecycle: "started" }, timing: { isExpired: false }, test: { items: [] } };
+    mocks.getTestRuntime.mockResolvedValue(runtime);
+    const response = await POST(new Request("http://test.local", { method: "POST" }) as never, {
+      params: Promise.resolve({ courseId: "course-1", groupId: "group-1", activityId: "test-activity-1" })
+    });
+    await expect(response.json()).resolves.toEqual({ runtime });
+    expect(mocks.claimTestAttemptSubmission).not.toHaveBeenCalled();
+    expect(mocks.handler).not.toHaveBeenCalled();
+  });
+
   it("returns an already-completed parent attempt for a repeated submit request", async () => {
     const previousRuntime = {
       attempt: { id: "parent-attempt-1", lifecycle: "graded" },

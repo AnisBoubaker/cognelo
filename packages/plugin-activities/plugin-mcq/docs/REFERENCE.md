@@ -35,7 +35,7 @@ The main MCQ source is written as text.
 
 ## Current State
 
-Core applies [team and student assignment exceptions](../../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md) to access, timing, attempts, grading, and challenge policy. Plugin routes consume the resolved assignment and core grade services; active attempt deadlines retain their original snapshot.
+Core applies [team and student assignment exceptions](../../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md) to access, timing, attempts, grading, and challenge policy. Plugin routes consume the resolved assignment and core grade services; unsubmitted attempt deadlines resolve the latest effective limit from the original start, and the host refreshes policy every 20 seconds. Submitted timing stays fixed.
 
 Teacher Student view uses the same parser and deterministic answer-key grader but keeps answers in browser session storage. Its SDK preview handlers return an ephemeral submission/result and never call the core attempt or plugin AI-evaluation persistence paths.
 
@@ -43,7 +43,7 @@ The plugin stores authored content in generic bank/course activity config. Assig
 
 Unsubmitted standalone answers autosave through the core `ActivityResponseDraft` state host for both formative and summative MCQs. Reloading or a periodic account refresh restores that draft without replacing newer in-memory answers. Final summative submission clears the draft after the graded attempt is recorded. Embedded Test MCQs remain on the Test execution host and continue to autosave into `TestItemAttempt`; they never use the standalone draft route.
 
-An MCQ can be timed through the course activity's General/group assignment settings in either formative or summative mode. Core presents the explicit start gate, snapshots the effective limit on the ordinary attempt, blocks draft/submission bypasses before start, and renders the countdown. At zero, the host's `TimedActivityAutoSubmit` signal invokes the same formative check or summative submission function used by the visible action; deterministic grading, feedback behavior, attempt history, and draft cleanup therefore do not gain a parallel timed code path.
+An MCQ can be timed through the course activity's General/group assignment settings in either formative or summative mode. Core presents the explicit start gate, resolves the live effective limit on the ordinary attempt, blocks draft/submission bypasses before start, and renders the countdown. At zero, the host's `TimedActivityAutoSubmit` signal invokes the same formative check or summative submission function used by the visible action; deterministic grading, feedback behavior, attempt history, and draft cleanup therefore do not gain a parallel timed code path.
 
 Explicit course/bank synchronization also relies entirely on the platform's generic title, description, config, metadata, and concept copying. Core blocks bank-to-course retrieval after any attempt, while course-to-bank publication remains allowed because it creates a new bank version without replacing attempted course content.
 

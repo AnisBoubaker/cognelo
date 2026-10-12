@@ -172,6 +172,7 @@ vi.mock("bcryptjs", () => ({
 }));
 
 vi.mock("./authorization", () => authMocks);
+vi.mock("./activity-settings-live", () => ({ confirmLiveActivitySettings: vi.fn() }));
 
 const {
   addGroupParticipant,
