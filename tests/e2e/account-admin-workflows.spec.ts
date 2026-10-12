@@ -8,6 +8,7 @@ import {
   test
 } from "./fixtures/auth";
 import { responseJson } from "./fixtures/activity-suite";
+import { capturedEmailsFor, removeCapturedEmailsFor } from "./fixtures/email-outbox";
 
 test.describe.serial("account lifecycle", () => {
   const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -42,6 +43,7 @@ test.describe.serial("account lifecycle", () => {
 
   test.afterAll(async () => {
     await prisma.user.deleteMany({ where: { id: { in: [profileUserId, verificationUserId, managedUserId] } } });
+    await removeCapturedEmailsFor(verificationEmail);
   });
 
   test("updates a profile, changes the password, and signs back in with the replacement", async ({ browser }) => {
@@ -82,26 +84,16 @@ test.describe.serial("account lifecycle", () => {
     test.setTimeout(120_000);
     const context = await browser.newContext({ baseURL: WEB_BASE_URL, locale: "en-CA" });
     const page = await context.newPage();
-    const sentRequests: Record<string, unknown>[] = [];
     try {
-      await page.route("**/api/auth/email-verification/send", async (route) => {
-        sentRequests.push(route.request().postDataJSON() as Record<string, unknown>);
-        await route.fulfill({
-          contentType: "application/json",
-          body: JSON.stringify({ required: true, sent: true, retryAfterSeconds: 60, expiresInSeconds: 900 })
-        });
-      });
-      await page.route("**/api/auth/email-verification/verify", async (route) => {
-        expect(route.request().postDataJSON()).toEqual({ code: "123456" });
-        await prisma.user.update({ where: { id: verificationUserId }, data: { emailVerifiedAt: new Date() } });
-        await route.fulfill({ contentType: "application/json", body: JSON.stringify({ verified: true }) });
-      });
       await submitLogin(page, verificationEmail, initialPassword);
       await expect(page).toHaveURL(/\/verify-email$/);
       await expect(page.getByRole("heading", { name: "Verify your email" })).toBeVisible();
       await expect(page.getByRole("status")).toContainText("verification code");
-      expect(sentRequests).toHaveLength(1);
-      await page.getByLabel("Verification code").fill("123456");
+      await expect.poll(async () => (await capturedEmailsFor(verificationEmail)).length).toBe(1);
+      const [message] = await capturedEmailsFor(verificationEmail);
+      const code = message!.text.match(/\b\d{6}\b/)?.[0];
+      expect(code).toBeTruthy();
+      await page.getByLabel("Verification code").fill(code!);
       await page.getByRole("button", { name: "Verify email" }).click();
       await expect(page).toHaveURL(/\/subjects$/);
     } finally {
@@ -172,6 +164,22 @@ test.describe.serial("administrator settings integrations", () => {
     await updatedRow.getByRole("button", { name: "Remove" }).click();
     await confirmSharedDialog(page, "Remove");
     await expect(updatedRow).toHaveCount(0);
+  });
+
+  test("captures a real test-email request to cognelo.local in the local outbox", async () => {
+    const api = await createAuthenticatedApi("admin");
+    const recipientEmail = `e2e-mail-capture-${token}@cognelo.local`;
+    try {
+      await responseJson(await api.post("/api/settings/email/test", { data: { recipientEmail } }));
+      const messages = await capturedEmailsFor(recipientEmail);
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toMatchObject({ recipientEmail, subject: "Cognelo email delivery test" });
+      expect(messages[0]!.text).toContain("Cognelo");
+      expect(messages[0]!.html).toContain("Cognelo");
+    } finally {
+      await api.dispose();
+      await removeCapturedEmailsFor(recipientEmail);
+    }
   });
 
   test("saves email settings without retransmitting a retained secret and shows progress for a test email", async ({ adminPage: page }) => {

@@ -9,21 +9,16 @@ import { prisma } from "@cognelo/db";
 import nodemailer from "nodemailer";
 import { isAdmin } from "./authorization";
 import { AppError, forbidden } from "./errors";
+import { captureMockEmail, isMockEmailRecipient, type MailMessage } from "./email-outbox";
 
 const CONFIGURATION_ID = "global";
 const ENCRYPTION_VERSION = "v1";
 
 type StoredConfiguration = NonNullable<Awaited<ReturnType<typeof loadConfiguration>>>;
-type MailMessage = {
-  recipientEmail: string;
-  subject: string;
-  text: string;
-  html: string;
-};
-
 type DeliveryDependencies = {
   createTransport?: typeof nodemailer.createTransport;
   fetch?: typeof fetch;
+  captureEmail?: typeof captureMockEmail;
 };
 
 export async function getEmailDeliveryConfiguration(user: CurrentUser) {
@@ -125,6 +120,16 @@ async function deliverConfiguredMessage(
   encryptionKey: string | undefined,
   dependencies: DeliveryDependencies
 ) {
+  if (isMockEmailRecipient(message.recipientEmail)) {
+    // This guard applies even to reused dev servers with real delivery configured.
+    // A failed local capture must never fall back to a live mail provider.
+    try {
+      await (dependencies.captureEmail ?? captureMockEmail)(message);
+    } catch {
+      throw new AppError(500, "EMAIL_CAPTURE_FAILED", "The local mock email could not be captured.");
+    }
+    return;
+  }
   const configuration = await loadConfiguration();
   if (!configuration) {
     throw new AppError(400, "EMAIL_DELIVERY_NOT_CONFIGURED", "Email delivery has not been configured.");

@@ -12,6 +12,7 @@ This is the routing page for repository-maintained documentation. Read the small
 
 - [Platform details](reference/PLATFORM_DETAILS.md): exhaustive current feature, API, data-model, seed, development, deployment-summary, and frontend notes formerly kept in the root README. Search or open the relevant section; do not load it by default.
 - [Detailed platform decisions](reference/PLATFORM_DECISIONS.md): expanded decisions and implementation constraints formerly kept in project memory. Read only relevant sections.
+- [Email delivery and test recipients](EMAIL_DELIVERY.md): outbound mail boundary and private local capture for synthetic recipients.
 - [Rich-text media](MEDIA_ASSETS.md): media assets, references, lifecycle, and garbage collection.
 - [Browser user flows](../tests/e2e/README.md): E2E coverage, prerequisites, and failure policy.
 

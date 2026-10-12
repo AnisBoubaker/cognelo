@@ -19,6 +19,7 @@ const {
   assertEligibleSystemRecipient,
   getEmailDeliveryConfiguration,
   sendEmailDeliveryTest,
+  sendSystemEmailToEligibleRecipient,
   updateEmailDeliveryConfiguration
 } = await import("./email-delivery");
 
@@ -92,13 +93,13 @@ describe("email delivery", () => {
     const sendMail = vi.fn().mockResolvedValue({ messageId: "test-1" });
     const createTransport = vi.fn(() => ({ sendMail }));
 
-    await expect(sendEmailDeliveryTest(admin, { recipientEmail: "Outside@Example.net" }, encryptionKey, {
+    await expect(sendEmailDeliveryTest(admin, { recipientEmail: "Outside@University.edu" }, encryptionKey, {
       createTransport: createTransport as never
     })).resolves.toEqual({ ok: true });
 
     expect(mockPrisma.user.findFirst).not.toHaveBeenCalled();
     expect(mockPrisma.courseGroupParticipant.findFirst).not.toHaveBeenCalled();
-    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "outside@example.net" }));
+    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "outside@university.edu" }));
   });
 
   it("rejects a future system recipient who is neither active nor activating", async () => {
@@ -109,6 +110,41 @@ describe("email delivery", () => {
 
     mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue({ id: "participant-1" });
     await expect(assertEligibleSystemRecipient("pending@example.net")).resolves.toBeUndefined();
+  });
+
+  it.each(["smtp", "microsoft_graph", null])("captures cognelo.local mail before loading %s configuration or opening a transport", async (transport) => {
+    mockPrisma.emailDeliveryConfiguration.findUnique.mockResolvedValue(transport ? { transport } : null);
+    const createTransport = vi.fn();
+    const fetchImplementation = vi.fn();
+    const captureEmail = vi.fn().mockResolvedValue(undefined);
+    await expect(sendEmailDeliveryTest(admin, { recipientEmail: "Seed@COGNELO.LOCAL" }, undefined, {
+      createTransport, fetch: fetchImplementation, captureEmail
+    })).resolves.toEqual({ ok: true });
+    expect(captureEmail).toHaveBeenCalledWith(expect.objectContaining({ recipientEmail: "seed@cognelo.local", subject: "Cognelo email delivery test" }));
+    expect(mockPrisma.emailDeliveryConfiguration.findUnique).not.toHaveBeenCalled();
+    expect(createTransport).not.toHaveBeenCalled();
+    expect(fetchImplementation).not.toHaveBeenCalled();
+  });
+
+  it("captures system notifications only after checking recipient eligibility", async () => {
+    const message = { recipientEmail: "learner@cognelo.local", subject: "Verification", text: "A code", html: "<p>A code</p>" };
+    const captureEmail = vi.fn().mockResolvedValue(undefined);
+    await expect(sendSystemEmailToEligibleRecipient(message, undefined, { captureEmail })).rejects.toMatchObject({ code: "EMAIL_RECIPIENT_NOT_ELIGIBLE" });
+    expect(captureEmail).not.toHaveBeenCalled();
+    mockPrisma.user.findFirst.mockResolvedValue({ id: "learner" });
+    await expect(sendSystemEmailToEligibleRecipient(message, undefined, { captureEmail })).resolves.toEqual({ ok: true });
+    expect(captureEmail).toHaveBeenCalledWith(message);
+  });
+
+  it("never falls back to real delivery when capture fails", async () => {
+    const createTransport = vi.fn();
+    const fetchImplementation = vi.fn();
+    await expect(sendEmailDeliveryTest(admin, { recipientEmail: "teacher@cognelo.local" }, encryptionKey, {
+      createTransport, fetch: fetchImplementation, captureEmail: vi.fn().mockRejectedValue(new Error("Disk unavailable"))
+    })).rejects.toMatchObject({ code: "EMAIL_CAPTURE_FAILED" });
+    expect(createTransport).not.toHaveBeenCalled();
+    expect(fetchImplementation).not.toHaveBeenCalled();
+    expect(mockPrisma.emailDeliveryConfiguration.findUnique).not.toHaveBeenCalled();
   });
 
   it("sends through Microsoft Graph with OAuth client credentials", async () => {
