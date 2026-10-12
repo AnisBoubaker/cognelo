@@ -671,8 +671,16 @@ test.describe.serial("authoring and completing every activity type", () => {
     await studentPage.getByLabel("Answer 1").fill("The main function prints a greeting and exits successfully.");
     await studentPage.getByRole("button", { name: "Save draft" }).click();
     await expect(studentPage.getByText("Answers saved.")).toBeVisible();
+    const answersSubmitted = studentPage.waitForResponse((response) =>
+      response.request().method() === "POST" && response.url().endsWith("/coding-homework-grader/challenge-answers")
+    );
     await studentPage.getByRole("button", { name: "Submit answers" }).click();
-    await expect(studentPage.getByText("Submission complete", { exact: true }).first()).toBeVisible();
+    expect((await answersSubmitted).ok()).toBeTruthy();
+    await expect(studentPage).toHaveURL(`/courses/${data.courseId}/groups/${data.groupId}`);
+    const homeworkRow = studentPage
+      .getByText(title, { exact: true })
+      .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' table-main ')][1]");
+    await expect(homeworkRow.getByText("Submitted", { exact: true })).toBeVisible();
   });
 
   test("teacher composes a Test from authored activities and the student completes the whole assessment", async ({ teacherPage, studentPage }) => {
