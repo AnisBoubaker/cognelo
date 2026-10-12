@@ -6,6 +6,8 @@ Gradebook attempt review and grading use core grade scope, so explicit course te
 
 ## Read By Topic
 
+- [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)
+
 - [Source grammar and authoring model](docs/REFERENCE.md#authoring-model)
 - [Attempts, drafts, compound Tests, and current behavior](docs/REFERENCE.md#current-state)
 - [Assessment feedback](docs/REFERENCE.md#ai-assessment-feedback)

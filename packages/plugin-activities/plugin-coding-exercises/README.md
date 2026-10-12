@@ -50,6 +50,8 @@ After release, the learner's grading report presents the available automatic-tes
 
 ## Read By Topic
 
+- [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)
+
 - [Architecture boundary and private data](docs/REFERENCE.md#architecture-boundary)
 - [Teacher authoring and generated exercises](docs/REFERENCE.md#authoring-ux)
 - [Feedback, rubrics, grading, and research records](docs/REFERENCE.md#assessment-feedback-and-grading)

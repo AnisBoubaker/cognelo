@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import {
   CourseAllGroupsActivityAssignmentInputSchema,
+  ActivityAssignmentOverrideValuesSchema,
   CourseGroupStatus,
   CourseGroupActivityInputSchema,
   CourseGroupActivityUpdateSchema,
@@ -14,7 +15,7 @@ import {
   CourseGroupUpdateSchema
 } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
-import type { ActivityAssignmentOverrideField, AssignedActivityAssessmentMode, CurrentUser } from "@cognelo/contracts";
+import type { ActivityAssignmentOverrideField, AssignedActivityAssessmentMode, CourseActivityGroupAssignmentSettings, CurrentUser } from "@cognelo/contracts";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import {
   assertCanManageCourse,
@@ -28,6 +29,7 @@ import {
 import { listContentItems } from "./course-content";
 import { AppError, notFound } from "./errors";
 import { assignmentAllowsGradeChallenges, assignmentAssessmentPolicyMode, assignmentTimeLimitMinutes } from "./activity-assignment-policy";
+import { applyAssignmentExceptions, assignmentExceptionsForUser, exceptionsForParticipant, loadAssignmentExceptions, resolveAssignmentExceptions, saveAssignmentExceptions } from "./activity-assignment-exceptions";
 
 type StudentAccessDb = Pick<typeof prisma, "role" | "userRole" | "courseMembership">;
 type GradebookItemDb = Pick<typeof prisma, "gradebookItem">;
@@ -138,9 +140,11 @@ export async function getCourseGroup(user: CurrentUser, courseId: string, groupI
           .map((item) => item.courseGroupActivityId)
           .filter((id): id is string => typeof id === "string")
       );
+  const learnerOverrides = isManager || canTeach ? null : await assignmentExceptionsForUser(group.activities.map((assignment) => assignment.id), user.id);
+  const effectiveActivities = group.activities.map((assignment) => learnerOverrides ? applyAssignmentExceptions(assignment, learnerOverrides.get(assignment.id) ?? {}) : assignment);
   const visibleActivities = visibleAssignmentIds
-    ? group.activities.filter((assignment) => visibleAssignmentIds.has(assignment.id))
-    : group.activities;
+    ? effectiveActivities.filter((assignment) => visibleAssignmentIds.has(assignment.id))
+    : effectiveActivities;
   return {
     ...group,
     activities: isManager || canTeach
@@ -197,9 +201,12 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
     prisma.courseGroup.findMany({
       where: { courseId },
       include: {
+        participants: { where: { role: "student" }, select: { id: true, firstName: true, lastName: true, email: true }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] },
+        studentGroupings: { select: { title: true, teams: { select: { id: true, title: true }, orderBy: [{ title: "asc" }] } }, orderBy: [{ title: "asc" }] },
         activities: {
           where: { activityId },
           include: {
+            assignmentExceptions: { orderBy: [{ priority: "asc" }, { id: "asc" }] },
             gradebookItem: true,
             contentItems: {
               where: { kind: "activity" },
@@ -276,10 +283,13 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
         groupId: group.id,
         title: group.title,
         assigned,
+        students: group.participants ?? [],
+        teams: (group.studentGroupings ?? []).flatMap((grouping) => grouping.teams.map((team) => ({ ...team, groupingTitle: grouping.title }))),
+        exceptions: (assignment?.assignmentExceptions ?? []).map((exception) => ({ ...ActivityAssignmentOverrideValuesSchema.parse(exception.settings), teamId: exception.teamId, participantId: exception.participantId })),
         assignmentId: assignment?.id ?? null,
         overrideFields,
-        availableFrom: assignment?.availableFrom?.toISOString() ?? general.availableFrom,
-        availableUntil: assignment?.availableUntil?.toISOString() ?? general.availableUntil,
+        availableFrom: assignment ? assignment.availableFrom?.toISOString() ?? null : general.availableFrom,
+        availableUntil: assignment ? assignment.availableUntil?.toISOString() ?? null : general.availableUntil,
         timeLimitMinutes: overrideFields.includes("timeLimit")
           ? assignmentTimeLimitMinutes(assignment?.metadata)
           : general.timeLimitMinutes,
@@ -319,7 +329,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
         include: {
           activities: {
             where: { activityId },
-            select: { id: true, activityId: true, position: true, metadata: true }
+            select: { id: true, activityId: true, position: true, metadata: true, assignmentExceptions: { orderBy: [{ priority: "asc" }, { id: "asc" }] } }
           }
         },
         orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }]
@@ -338,7 +348,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
         }
       : undefined;
     const groupById = new Map(groups.map((group) => [group.id, group]));
-    const requestedAssignments = data.groupAssignments ?? groups.map((group) => ({
+    const requestedAssignments: CourseActivityGroupAssignmentSettings[] = data.groupAssignments ?? groups.map((group) => ({
       groupId: group.id,
       assigned: true,
       overrideFields: [],
@@ -511,6 +521,25 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
           title: activity.title,
           placement: effectivePlacement
         });
+        if (requested.exceptions !== undefined || existingAssignment?.assignmentExceptions?.length) {
+          const suppliedExceptions = requested.exceptions ?? existingAssignment!.assignmentExceptions.map((exception) => ({ ...ActivityAssignmentOverrideValuesSchema.parse(exception.settings), teamId: exception.teamId, participantId: exception.participantId }));
+          const exceptions = suppliedExceptions.map((exception) => ({
+            ...exception,
+            overrideFields: exception.overrideFields.filter((field) => allowedFields.has(field)),
+            gradebookSettings: normalizeGradebookItemSettings(exception.gradebookSettings)
+          }));
+          await saveAssignmentExceptions(tx, { courseId, actorUserId: user.id, groupId: group.id, assignmentId: assignment.id, exceptions });
+          const rows = await loadAssignmentExceptions([assignment.id], tx);
+          for (const row of rows.filter((row) => row.team && row.team.members.length === 0)) {
+            const effective = applyAssignmentExceptions(assignment, resolveAssignmentExceptions([row]));
+            validateAvailability(effective.availableFrom?.toISOString(), effective.availableUntil?.toISOString());
+          }
+          const affected = new Set(rows.flatMap((row) => row.participantId ? [row.participantId] : row.team?.members.map((member) => member.participantId) ?? []));
+          for (const participantId of affected) {
+            const effective = applyAssignmentExceptions(assignment, exceptionsForParticipant(rows, assignment.id, participantId));
+            validateAvailability(effective.availableFrom?.toISOString(), effective.availableUntil?.toISOString());
+          }
+        }
       })
     );
 
@@ -817,7 +846,7 @@ async function getGroupAssignedActivityRecord(
   group: Awaited<ReturnType<typeof assertGroupBelongsToCourse>>,
   forceStudentRules: boolean
 ) {
-  const assignment = await prisma.courseGroupActivity.findFirst({
+  let assignment = await prisma.courseGroupActivity.findFirst({
     where: { groupId, activityId },
     include: {
       activity: {
@@ -828,6 +857,11 @@ async function getGroupAssignedActivityRecord(
 
   if (!assignment) {
     throw notFound("Group activity assignment");
+  }
+
+  if (!forceStudentRules) {
+    const overrides = await assignmentExceptionsForUser([assignment.id], user.id);
+    assignment = applyAssignmentExceptions(assignment, overrides.get(assignment.id) ?? {});
   }
 
   if (forceStudentRules || !(isAdmin(user) || (await canManageCourse(user, courseId)))) {

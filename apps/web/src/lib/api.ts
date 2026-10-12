@@ -10,6 +10,7 @@ import type {
   AdminUserUpdate,
   ActivityPluginInstallationUpdate,
   ActivityAssignmentOverrideField,
+  ActivityAssignmentExceptionInput,
   AiAgentConnectionInput,
   AiAgentConnectionUpdate,
   ActivityInput,
@@ -923,6 +924,9 @@ export type CourseActivityAssignmentSettings = {
     title: string;
     assigned: boolean;
     assignmentId: string | null;
+    students: StudentGroupingStudent[];
+    teams: Array<{ id: string; title: string; groupingTitle: string }>;
+    exceptions: ActivityAssignmentExceptionInput[];
     overrideFields: ActivityAssignmentOverrideField[];
     availableFrom: string | null;
     availableUntil: string | null;

@@ -84,6 +84,8 @@ The activity-bank **Create variation** action runs against an independent deep d
 
 ## Playwright Grading
 
+Core applies [team and student assignment exceptions](../../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md) to access, timing, attempts, grading, and challenge policy. Plugin routes consume the resolved assignment and core grade services; active attempt deadlines retain their original snapshot.
+
 Student view runs the selected sample or hidden suite through Playwright but constructs the response in memory. It does not create `PluginWebDesignExerciseSubmission` or test-result rows and is available only through the SDK stateless preview dispatcher.
 
 Implemented plugin subroutes:

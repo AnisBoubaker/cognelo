@@ -1,6 +1,6 @@
 # Student groupings and teams
 
-Status: grouping management, student visibility controls, recorded assignment methods, capacity-aware random assignment, and student team selection implemented. Smart assignment is a disabled placeholder. Activity-specific exceptions and collaborative activity execution are future integrations.
+Status: grouping management, student visibility controls, recorded assignment methods, capacity-aware random assignment, and student team selection implemented. Smart assignment is a disabled placeholder. [Activity-specific exceptions](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md) are implemented; collaborative activity execution remains a future integration.
 
 ## Model and behavior
 
@@ -60,9 +60,9 @@ Migration `202610120001_student_groupings` adds three core tables without changi
 
 Migration `202610120003_student_grouping_visibility` adds visibility and the assignment-method enum/check. Existing groupings remain visible and choice-enabled groupings are backfilled to `student_choice`. Other existing groupings are labeled `manual`: earlier randomization did not record its method, so historical random assignments cannot be inferred. Memberships are unchanged. New random assignments record the method explicitly.
 
-Unenrollment cascades only the student's team memberships; the grouping and teams remain. An open editor attempting to restore a removed enrollment fails membership validation and must reload. Deleting a grouping never unenrolls students. Deleting a section cascades its groupings and teams. The existing section-delete-and-move-roster action also deletes that section's groupings; teams are not transferred into an unrelated section's grouping structure. No activity or academic record currently depends on these team IDs.
+Unenrollment cascades the student's team memberships and individual activity exceptions; the grouping and teams remain. An open editor attempting to restore a removed enrollment fails membership validation and must reload. Deleting a grouping never unenrolls students. Deleting a section cascades its groupings and teams. The existing section-delete-and-move-roster action also deletes that section's groupings; teams are not transferred into an unrelated section's grouping structure. Activity exception rules reference stable team IDs and cascade when those teams are deleted. Deleting a team or grouping preserves existing attempts, grades, and their audit history. See [Activity assignment exceptions](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md).
 
-Future activity links must define archival/deletion rules before depending on this cascade behavior. Extra-time exceptions need explicit precedence and timing-snapshot rules; collaborative work needs team attempt, submission, ownership, and grading policies. Creating a grouping currently changes none of those activity behaviors.
+Activity exceptions define precedence and timing snapshots in their [canonical policy](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md). Creating a grouping alone does not alter activities; a teacher must add its team exceptions in activity settings. Future collaborative work still needs explicit team attempt, shared submission, ownership, grading, and archival policies.
 
 ## Verification
 

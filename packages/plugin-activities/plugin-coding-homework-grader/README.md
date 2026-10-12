@@ -27,6 +27,8 @@ The activity definition explicitly declares read-only Student view support. The 
 
 ## Read By Topic
 
+- [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)
+
 - [Current capabilities and phase summary](docs/REFERENCE.md#current-state)
 - [Authoring, snapshots, extraction, and persistence](docs/REFERENCE.md#implementation-direction)
 - [Durable data and processing decisions](docs/DECISIONS.md)

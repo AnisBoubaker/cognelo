@@ -11,6 +11,7 @@ import {
 import { CourseContentDuplicateSchema, type CurrentUser } from "@cognelo/contracts";
 import { assertCanManageCourse, assertCanViewCourse, canManageCourse } from "./authorization";
 import { AppError, notFound } from "./errors";
+import { assignmentExceptionsForUser } from "./activity-assignment-exceptions";
 import { assertContentResourcePluginActive, assertContentTypePluginEnabled } from "./plugins";
 
 type ContentScope = {
@@ -696,7 +697,17 @@ export async function listContentItems(user: CurrentUser, courseId: string, opti
   const overrides = scope.groupId
     ? await prisma.courseGroupContentVisibilityOverride.findMany({ where: { groupId: scope.groupId } })
     : [];
-  const withVisibility = addEffectiveVisibility(applyGroupVisibilityOverrides(items, overrides));
+  let effectiveItems = applyGroupVisibilityOverrides(items, overrides);
+  if (scope.groupId && !await canManageCourse(user, courseId)) {
+    const assignmentByActivity = new Map(items.filter((item) => item.groupId === scope.groupId && item.courseGroupActivityId).map((item) => [item.activityId, item.courseGroupActivityId!]));
+    const exceptions = await assignmentExceptionsForUser([...assignmentByActivity.values()], user.id);
+    effectiveItems = effectiveItems.map((item) => {
+      const assignmentId = item.courseGroupActivityId ?? assignmentByActivity.get(item.activityId);
+      const isVisible = assignmentId ? exceptions.get(assignmentId)?.isVisible : undefined;
+      return item.kind === "activity" && isVisible !== undefined ? { ...item, isVisible } : item;
+    });
+  }
+  const withVisibility = addEffectiveVisibility(effectiveItems);
   const scopedItems = mergeGroupAssignmentsIntoSharedActivityPlacements(withVisibility, scope.groupId);
   return options.visibleOnly ? scopedItems.filter((item) => item.effectiveVisibility === "visible") : scopedItems;
 }

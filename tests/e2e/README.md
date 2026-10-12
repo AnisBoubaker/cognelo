@@ -24,7 +24,7 @@ The Playwright suite covers the platform's critical browser journeys with real A
 - consistent detailed-gradebook actions through the per-student three-dot contextual menu, including course-content entry into the two-tab activity report, its persistent editor action, lightweight live monitoring of in-progress attempts and their start times, automatic MCQ regrading, MCQ and Parsons review/override persistence, lazy newest-to-older attempt inspection, nested Test-item grading, and the Programming Exercise review surface that combines submitted work, rubric feedback, and the editable final grade;
 - learner-visible Programming Exercise reports covering the automatic/rubric/total recap, teacher comments, rubric explanations, source attempts, and individual test outcomes and scores;
 - shared accessible confirmation dialogs for grade release, AI assessment, participant removal, and other guarded actions instead of native browser popups;
-- activity-settings dialog layout and placeholders, Cancel behavior, formative/summative field filtering, generic General timing plus changed/disabled group overrides, Assign-to-all preservation, unassignment cleanup, inheritance and every group override category, save/reopen persistence, assigned/unassigned access, group visibility, upcoming and expired availability, Safe Exam Browser gating, and effective per-group gradebook policy;
+- activity-settings dialog layout and the AI placeholder, Cancel behavior, formative/summative field filtering, generic General timing plus changed/disabled group overrides, Assign-to-all preservation, unassignment cleanup, inheritance and every group override category, save/reopen persistence, assigned/unassigned access, group visibility, upcoming and expired availability, Safe Exam Browser gating, and effective per-group gradebook policy;
 - explicit timed starts and automatic zero-time submission for standalone activities, plus one-time Test-authoring default copy, independent later Test edits, and the compound Test countdown/finalization path;
 - attempt-scoped live activity broadcasts, including recent-recipient detection, unread/read state, the combined timer-and-envelope control, and isolation of messages when the learner starts a later attempt;
 - bank activity publication from the editor and list, version comparison, duplication, movement between banks, and AI-assisted variation progress for both individual activities and compound Tests, including midpoint failure cleanup and retry;
@@ -65,17 +65,19 @@ Outbox assertions require local access to the API’s storage. Use synthetic dom
 
 ## Focused regression checks
 
-Run the independent authoring-recovery, bank-synchronization, course-loading, and student-grouping scenarios with:
+Run the independent authoring-recovery, bank-synchronization, course-loading, student-grouping, and activity-exception scenarios with:
 
 ```bash
 npm run test:e2e -- --grep @regression
 ```
 
-These seventeen tests require the normal migrated/seeded database, API, and web app, but no AI provider, Judge0, or web-design runner. Each test provisions its own disposable course/section scenario (with bank/MCQ content where needed) through public APIs and runs lifecycle-aware cleanup, so failures do not skip later scenarios in a serial chain. The bank/course fixture creates both shared course placement and group assignment, which are distinct content scopes.
+These twenty-one tests require the normal migrated/seeded database, API, and web app, but no AI provider, Judge0, or web-design runner. Each test provisions its own disposable course/section scenario (with bank/MCQ content where needed) through public APIs and runs lifecycle-aware cleanup, so failures do not skip later scenarios in a serial chain. The bank/course fixture creates both shared course placement and group assignment, which are distinct content scopes.
 
 Grouping scenarios also cover the automatic-assignment dialog, individual capacities and the apply-all shortcut, unassigned-only redistribution and insufficient slots, the Smart placeholder, student choice dates and permissions, names-only My teams cards, explicit confirmation, deadline expiry on an open page, concurrent last-slot claims, and stale teacher saves after student choices. They cover course-language default team names, editable-name persistence and collision avoidance, balanced random assignment with cancel/save, independent team assignments, section boundaries, concurrency, pending enrollments, failed-draft recovery, teacher/TA/student permissions, and enrollment/section deletion cascades.
 
 Visibility coverage proves that hidden groupings are absent from learner responses and reject known-ID choice requests, including for existing members. It exercises Save/Cancel, reveal/hide/manual transitions that retain memberships, an open learner page refreshing after hiding, persisted assignment summaries, and responsive teacher settings.
+
+Activity-exception scenarios cover all ten section override categories, teacher-ordered team priority, individual precedence, hidden grouping targets, Save/Cancel, effective learner access/SEB/attempts/grading/challenges, immutable started deadlines, current membership, cleared section dates, atomic invalid-target/window rejection, legacy preservation, formative pruning, and lifecycle cleanup.
 
 Only deliberate save/session failures and gradebook latency are intercepted. Recovery, synchronization, submission, and persistence assertions use the real services. The loading test releases its pending response in `finally`; it uses request/UI state instead of fixed sleeps. The `@regression` tag selects this focused set, not every regression assertion in the wider suite.
 

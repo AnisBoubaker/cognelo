@@ -243,12 +243,16 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
     await expect(overrideCard(settings, "Grade counted")).toHaveCount(0);
     await expect(settings.getByLabel("Folder")).toHaveCount(0);
 
-    for (const tab of ["AI settings", "Exceptions"]) {
+    for (const tab of ["AI settings"]) {
       await settings.getByRole("tab", { name: tab, exact: true }).click();
       const panel = settings.getByRole("tabpanel");
       await expect(panel.getByText("Settings for this section will be added later.", { exact: true })).toBeVisible();
       await expect(panel.locator("input, select, textarea, button")).toHaveCount(0);
     }
+
+    await settings.getByRole("tab", { name: "Exceptions", exact: true }).click();
+    await expect(settings.getByRole("heading", { name: "Team and student exceptions" })).toBeVisible();
+    await expect(settings.getByLabel("Choose a student")).toBeVisible();
 
     await settings.getByRole("tab", { name: "General", exact: true }).click();
     await settings.getByLabel("Visible to students", { exact: true }).uncheck();

@@ -11,6 +11,7 @@ import {
 import { AppError, forbidden, notFound } from "./errors";
 import { gradeChallengeTargetForGrade } from "./grade-challenge-targets";
 import { assignmentAllowsGradeChallenges } from "./activity-assignment-policy";
+import { applyAssignmentExceptions, applyGradebookExceptions, exceptionsForParticipant, loadAssignmentExceptions } from "./activity-assignment-exceptions";
 
 type JsonInput = Prisma.InputJsonValue;
 export type ActivityAttemptAssessmentMode = "formative" | "summative";
@@ -324,6 +325,9 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
   }
   await assertCanUseAttempt(user, attempt.courseId, attempt.participant);
 
+  const exceptions = await loadAssignmentExceptions([attempt.groupActivityId]);
+  const effectiveAssignment = applyAssignmentExceptions(attempt.groupActivity, exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId));
+
   if (attempt.assessmentMode !== "formative" && attempt.gradebookItem.gradesReleased) {
     throw new AppError(400, "GRADES_RELEASED", "No more submissions are allowed after grades have been released.");
   }
@@ -332,7 +336,7 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
     throw new AppError(400, "ACTIVITY_ATTEMPT_ALREADY_GRADED", "This attempt has already been graded.");
   }
 
-  const lateness = computeAttemptLateness(attempt.groupActivity.availableUntil, attempt.gradebookItem.lateGracePeriodMinutes, now);
+  const lateness = computeAttemptLateness(effectiveAssignment.availableUntil, attempt.gradebookItem.lateGracePeriodMinutes, now);
   const durationSeconds = Math.max(0, Math.round((now.getTime() - attempt.startedAt.getTime()) / 1000));
 
   return prisma.activityAttempt.update({
@@ -372,6 +376,10 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
     throw new AppError(409, "FORMATIVE_ATTEMPT_NOT_GRADEABLE", "Formative attempts cannot contribute to a grade.");
   }
 
+  const exceptions = await loadAssignmentExceptions([attempt.groupActivityId]);
+  const overrides = exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId);
+  const effectiveAttempt = { ...attempt, gradebookItem: applyGradebookExceptions(attempt.gradebookItem, overrides) };
+
   return prisma.$transaction(async (tx) => {
     const previousGrade = await tx.grade.findUnique({
       where: {
@@ -403,9 +411,13 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
           } as JsonInput
         }
       : input;
-    const gradedCandidate = buildGradedAttemptCandidate(gradingInput, attempt);
+    const gradedCandidate = buildGradedAttemptCandidate({
+      ...gradingInput,
+      ...(overrides.gradebookSettings?.pointsPossible !== undefined ? { normalizedMaxScore: undefined, normalizedScore: undefined } : {}),
+      ...(overrides.gradebookSettings?.gradingMode !== undefined ? { isPass: undefined } : {})
+    }, effectiveAttempt);
     const selectedGrade = selectGradebookGrade({
-      gradebookItem: attempt.gradebookItem,
+      gradebookItem: effectiveAttempt.gradebookItem,
       candidates: [
         ...eventCandidates,
         ...(eventCandidates.length === 0 && previousGrade?.selectedAttemptId && previousGrade.selectedAttempt?.assessmentMode !== "formative"
@@ -516,6 +528,9 @@ export async function deleteActivitySubmission(user: CurrentUser, courseId: stri
     throw new AppError(400, "SUBMISSION_ALREADY_DELETED", "This submission has already been deleted.");
   }
 
+  const exceptions = await loadAssignmentExceptions([attempt.groupActivityId]);
+  const effectiveItem = applyGradebookExceptions(attempt.gradebookItem, exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId));
+
   return prisma.$transaction(async (tx) => {
     const previousGrade = await tx.grade.findUnique({
       where: {
@@ -538,7 +553,7 @@ export async function deleteActivitySubmission(user: CurrentUser, courseId: stri
     const remainingCandidates = gradeCandidatesFromEvents(previousEvents.filter((event) => event.attemptId !== attempt.id));
     const selectedGrade = remainingCandidates.length
       ? selectGradebookGrade({
-          gradebookItem: attempt.gradebookItem,
+          gradebookItem: effectiveItem,
           candidates: remainingCandidates
         })
       : null;
@@ -664,7 +679,9 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
     throw notFound("Participant");
   }
 
-  const maxScore = input.maxScore ?? item.pointsPossible;
+  const exceptions = await loadAssignmentExceptions([item.groupActivityId]);
+  const effectiveItem = applyGradebookExceptions(item, exceptionsForParticipant(exceptions, item.groupActivityId, participant.id));
+  const maxScore = input.maxScore ?? effectiveItem.pointsPossible;
   if (maxScore <= 0) {
     throw new AppError(400, "GRADE_NORMALIZED_MAX_INVALID", "Max score must be greater than zero.");
   }
@@ -674,7 +691,7 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
 
   const isPass = computePassStatus({
     explicit: input.isPass,
-    gradebookItem: item,
+    gradebookItem: effectiveItem,
     normalizedScore: input.score,
     normalizedMaxScore: maxScore
   });
@@ -898,6 +915,8 @@ export async function getActivityAttemptRegradeContext(
   if (attempt.assessmentMode === "formative") {
     throw new AppError(409, "FORMATIVE_ATTEMPT_NOT_GRADEABLE", "Formative attempts cannot be regraded.");
   }
+  const exceptions = await loadAssignmentExceptions([attempt.groupActivityId]);
+  attempt.groupActivity = applyAssignmentExceptions(attempt.groupActivity, exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId));
   const activity = attempt.activity;
   return {
     attemptId: attempt.id,
@@ -953,6 +972,10 @@ export async function getActivityAttemptRegradeContexts(
     }
   });
   await Promise.all(attempts.map((attempt) => assertCanGradeGroup(user, courseId, attempt.groupId)));
+  const exceptions = await loadAssignmentExceptions(attempts.map((attempt) => attempt.groupActivityId));
+  for (const attempt of attempts) {
+    attempt.groupActivity = applyAssignmentExceptions(attempt.groupActivity, exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId));
+  }
   const byId = new Map(attempts.map((attempt) => [attempt.id, attempt]));
   return uniqueAttemptIds.map((attemptId) => {
     const attempt = byId.get(attemptId);
@@ -1250,11 +1273,13 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
   const groups = new Map<string, { id: string; title: string }>();
   const activities = new Map<string, { id: string; title: string }>();
 
-  const rows = items.flatMap((item) => {
-    groups.set(item.group.id, { id: item.group.id, title: item.group.title });
-    activities.set(item.activity.id, { id: item.activity.id, title: item.activity.title });
+  const exceptions = await loadAssignmentExceptions(items.map((item) => item.groupActivity.id));
+  const rows = items.flatMap((baseItem) => {
+    groups.set(baseItem.group.id, { id: baseItem.group.id, title: baseItem.group.title });
+    activities.set(baseItem.activity.id, { id: baseItem.activity.id, title: baseItem.activity.title });
 
-    return item.group.participants.flatMap((participant) => {
+    return baseItem.group.participants.flatMap((participant) => {
+      const item = applyGradebookExceptions(baseItem, exceptionsForParticipant(exceptions, baseItem.groupActivity.id, participant.id));
       const grade = item.grades.find((candidate) => candidate.participantId === participant.id) ?? null;
       const attempts = item.attempts.filter((attempt) => attempt.participantId === participant.id);
       const activeAttempts = attempts.filter((attempt) => attempt.lifecycle !== "deleted");
@@ -1554,15 +1579,10 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
     throw forbidden();
   }
 
-  const items = await prisma.gradebookItem.findMany({
+  const storedItems = await prisma.gradebookItem.findMany({
     where: {
       courseId,
-      groupId,
-      OR: [
-        { gradesReleased: true },
-        { attemptLimitMode: { not: "max_attempts" } },
-        { maxAttempts: { gt: 1 } }
-      ]
+      groupId
     },
     include: {
       activity: {
@@ -1600,6 +1620,11 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
     orderBy: [{ titleSnapshot: "asc" }]
   });
 
+  const exceptions = await loadAssignmentExceptions(storedItems.map((item) => item.groupActivityId));
+  const items = storedItems.map((item) => {
+    const overrides = exceptionsForParticipant(exceptions, item.groupActivityId, participant.id);
+    return { ...applyGradebookExceptions(item, overrides), groupActivity: applyAssignmentExceptions(item.groupActivity, overrides) };
+  });
   const rows = items.flatMap((item) => {
       const grade = item.grades[0] && item.grades[0].isActive !== false ? item.grades[0] : null;
       const activeAttempts = item.attempts.filter((attempt) => attempt.lifecycle !== "deleted");
@@ -1798,11 +1823,13 @@ async function resolveAssignedActivityAttemptContext(user: CurrentUser, input: S
   }
 
   const participant = await resolveAttemptParticipant(user, input.courseId, input.groupId, input.participantId);
+  const exceptions = await loadAssignmentExceptions([groupActivity.id]);
+  const overrides = exceptionsForParticipant(exceptions, groupActivity.id, participant.id);
 
   return {
     courseId: groupActivity.group.courseId,
-    groupActivity,
-    gradebookItem: groupActivity.gradebookItem,
+    groupActivity: applyAssignmentExceptions(groupActivity, overrides),
+    gradebookItem: applyGradebookExceptions(groupActivity.gradebookItem, overrides),
     participant
   };
 }
