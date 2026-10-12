@@ -514,33 +514,54 @@ export type CourseGroupInput = z.infer<typeof CourseGroupInputSchema>;
 export const StudentTeamInputSchema = z.object({
   id: z.string().min(1).optional(),
   title: z.string().trim().min(1).max(120),
+  capacity: z.number().int().min(0).max(5000).default(4),
   participantIds: z.array(z.string().min(1)).max(5000).default([])
 });
 
-export const StudentGroupingInputSchema = z.object({
+const StudentGroupingBaseSchema = z.object({
   title: z.string().trim().min(1).max(120),
   description: z.string().trim().max(2000).default(""),
+  studentChoiceEnabled: z.boolean().default(false),
+  choiceOpensAt: z.string().datetime().nullable().default(null),
+  choiceClosesAt: z.string().datetime().nullable().default(null),
+  allowChoiceChanges: z.boolean().default(false),
   teams: z.array(StudentTeamInputSchema).max(500).default([])
 });
+function validateStudentChoiceDates(value: { choiceOpensAt: string | null; choiceClosesAt: string | null }, context: z.RefinementCtx) {
+  if (value.choiceOpensAt && value.choiceClosesAt && new Date(value.choiceOpensAt) >= new Date(value.choiceClosesAt)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["choiceClosesAt"], message: "The closing date must be after the opening date." });
+  }
+}
+export const StudentGroupingInputSchema = StudentGroupingBaseSchema.superRefine(validateStudentChoiceDates);
 export type StudentGroupingInput = z.infer<typeof StudentGroupingInputSchema>;
-export const StudentGroupingUpdateSchema = StudentGroupingInputSchema.extend({
+export const StudentGroupingUpdateSchema = StudentGroupingBaseSchema.extend({
   revision: z.number().int().positive()
-});
+}).superRefine(validateStudentChoiceDates);
 export type StudentGroupingUpdate = z.infer<typeof StudentGroupingUpdateSchema>;
 export const StudentGroupingDeleteSchema = z.object({ revision: z.number().int().positive() });
+export const StudentTeamChoiceSchema = z.object({ teamId: z.string().min(1) }).strict();
 export type StudentGroupingStudent = {
   id: string;
   firstName: string;
   lastName: string;
   email: string;
 };
-export type StudentGroupingDto = {
+export type StudentGroupingDto = Omit<StudentGroupingInput, "teams"> & {
   id: string;
   groupId: string;
-  title: string;
-  description: string;
   revision: number;
-  teams: Array<{ id: string; title: string; participantIds: string[] }>;
+  teams: Array<{ id: string; title: string; capacity: number; participantIds: string[] }>;
+};
+export type StudentTeamChoiceState = "disabled" | "upcoming" | "closed" | "locked" | "open";
+export type MyStudentGroupingDto = {
+  id: string;
+  title: string;
+  ownTeamId: string | null;
+  choiceState: StudentTeamChoiceState;
+  choiceOpensAt: string | null;
+  choiceClosesAt: string | null;
+  allowChoiceChanges: boolean;
+  teams: Array<{ id: string; title: string; capacity: number; members: Array<{ name: string; isSelf: boolean }> }>;
 };
 
 export const CourseGroupUpdateSchema = z

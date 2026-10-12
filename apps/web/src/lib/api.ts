@@ -1,4 +1,5 @@
 import type {
+  MyStudentGroupingDto,
   StudentGroupingDto,
   StudentGroupingInput,
   StudentGroupingUpdate,
@@ -1965,6 +1966,10 @@ export const api = {
   archiveCourse: (courseId: string) => request<{ course: Course }>(`/courses/${courseId}`, { method: "DELETE" }),
   groups: (courseId: string) => request<{ groups: CourseGroup[] }>(`/courses/${courseId}/groups`),
   group: (courseId: string, groupId: string) => request<{ group: CourseGroup }>(`/courses/${courseId}/groups/${groupId}`),
+  myStudentGroupings: (courseId: string, groupId: string) =>
+    request<{ groupings: MyStudentGroupingDto[] }>(`/courses/${courseId}/groups/${groupId}/my-teams`),
+  chooseStudentTeam: (courseId: string, groupId: string, groupingId: string, teamId: string) =>
+    request<{ ok: true }>(`/courses/${courseId}/groups/${groupId}/my-teams/${groupingId}`, { method: "POST", body: JSON.stringify({ teamId }) }),
   studentGroupings: (courseId: string, groupId: string) =>
     request<{ groupings: StudentGroupingDto[]; students: StudentGroupingStudent[] }>(`/courses/${courseId}/groups/${groupId}/groupings`),
   createStudentGrouping: (courseId: string, groupId: string, input: StudentGroupingInput) =>

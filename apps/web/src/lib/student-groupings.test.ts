@@ -23,13 +23,13 @@ describe("default student team names", () => {
 
 describe("random student assignment", () => {
   const teams = () => [
-    { id: "blue", key: "blue-key", title: "Blue", participantIds: ["old-member"] },
-    { id: "green", key: "green-key", title: "Green", participantIds: [] }
+    { id: "blue", key: "blue-key", title: "Blue", capacity: 100, participantIds: ["old-member"] },
+    { id: "green", key: "green-key", title: "Green", capacity: 100, participantIds: [] }
   ];
 
   it.each([0, 1, 2, 3, 17, 100])("assigns each of %i students once with balanced team sizes", (count) => {
     const students = Array.from({ length: count }, (_, index) => `student-${index}`);
-    const result = randomlyAssignStudents(teams(), students, () => 0.4);
+    const result = randomlyAssignStudents(teams(), students, "all", () => 0.4);
     const assigned = result.flatMap((team) => team.participantIds);
     expect(assigned.sort()).toEqual([...students].sort());
     expect(new Set(assigned).size).toBe(count);
@@ -40,7 +40,7 @@ describe("random student assignment", () => {
   it("replaces memberships while preserving team identity and leaving the saved input untouched", () => {
     const original = teams();
     const students = ["a", "b", "c"];
-    const result = randomlyAssignStudents(original, students, () => 0);
+    const result = randomlyAssignStudents(original, students, "all", () => 0);
     expect(result.map(({ participantIds: _members, ...team }) => team)).toEqual(original.map(({ participantIds: _members, ...team }) => team));
     expect(original).toEqual(teams());
     expect(students).toEqual(["a", "b", "c"]);
@@ -49,16 +49,36 @@ describe("random student assignment", () => {
 
   it("uses the random source for both memberships and the extra-student team", () => {
     const students = ["a", "b", "c", "d", "e"];
-    const first = randomlyAssignStudents(teams(), students, () => 0);
-    const second = randomlyAssignStudents(teams(), students, () => 0.999);
+    const first = randomlyAssignStudents(teams(), students, "all", () => 0);
+    const second = randomlyAssignStudents(teams(), students, "all", () => 0.999);
     expect(first[0]!.participantIds).toHaveLength(3);
     expect(second[1]!.participantIds).toHaveLength(3);
     expect(first).not.toEqual(second);
   });
 
   it("supports one team, more teams than students, and no teams", () => {
-    expect(randomlyAssignStudents(teams().slice(0, 1), ["a", "b"], () => 0)[0]!.participantIds).toEqual(["a", "b"]);
-    expect(randomlyAssignStudents(teams(), ["a"], () => 0.999).map((team) => team.participantIds)).toEqual([[], ["a"]]);
-    expect(randomlyAssignStudents([], ["a"])).toEqual([]);
+    expect(randomlyAssignStudents(teams().slice(0, 1), ["a", "b"], "all", () => 0)[0]!.participantIds).toEqual(["a", "b"]);
+    expect(randomlyAssignStudents(teams(), ["a"], "all", () => 0.999).map((team) => team.participantIds)).toEqual([[], ["a"]]);
+    expect(randomlyAssignStudents([], ["a"], "all")).toEqual([]);
   });
+  it("preserves existing memberships when only assigning unassigned students", () => {
+    const result = randomlyAssignStudents(teams(), ["old-member", "a", "b"], "unassigned", () => 0);
+    expect(result[0]!.participantIds).toContain("old-member");
+    expect(result.flatMap((team) => team.participantIds).sort()).toEqual(["a", "b", "old-member"]);
+    expect(teams()[0]!.participantIds).toEqual(["old-member"]);
+  });
+
+  it.each(["unassigned", "all"] as const)("respects unequal and zero capacities in %s mode, leaving excess students unassigned", (scope) => {
+    const input = [
+      { capacity: 1, participantIds: ["existing"] },
+      { capacity: 2, participantIds: [] },
+      { capacity: 0, participantIds: [] }
+    ];
+    const result = randomlyAssignStudents(input, ["existing", "a", "b", "c", "d"], scope, () => 0.3);
+    expect(result.map((team) => team.participantIds.length)).toEqual([1, 2, 0]);
+    expect(new Set(result.flatMap((team) => team.participantIds)).size).toBe(3);
+    if (scope === "unassigned") expect(result[0]!.participantIds).toEqual(["existing"]);
+    expect(input[0]!.participantIds).toEqual(["existing"]);
+  });
+
 });

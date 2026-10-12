@@ -127,7 +127,7 @@ test.describe("section groupings and teams", { tag: "@regression" }, () => {
       }
       const { students } = await responseJson<{ students: StudentGroupingStudent[] }>(await api.get(pathFor(data)));
       const { grouping } = await responseJson<{ grouping: StudentGroupingDto }>(await api.post(pathFor(data), {
-        data: { title: "Random teams", teams: [{ title: "Blue", participantIds: students.map((student) => student.id) }, { title: "Green", participantIds: [] }] }
+        data: { title: "Random teams", teams: [{ title: "Blue", capacity: 5, participantIds: students.map((student) => student.id) }, { title: "Green", participantIds: [] }] }
       }));
       const { grouping: other } = await responseJson<{ grouping: StudentGroupingDto }>(await api.post(pathFor(data), {
         data: { title: "Independent grouping", teams: [{ title: "Partners", participantIds: [students[0]!.id] }] }
@@ -135,13 +135,15 @@ test.describe("section groupings and teams", { tag: "@regression" }, () => {
       await page.goto(`/courses/${data.courseId}?tab=groupings`);
       await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
       await page.getByRole("button", { name: "Create grouping", exact: true }).click();
-      const randomize = page.getByRole("button", { name: "Randomly assign", exact: true });
+      const randomize = page.getByRole("button", { name: "Automatic assign", exact: true });
       await expect(randomize).toBeDisabled();
       await page.getByRole("button", { name: "Close", exact: true }).click();
       await page.getByRole("article", { name: "Random teams", exact: true }).getByRole("button", { name: "Edit", exact: true }).click();
       await page.getByLabel("Search students").fill(students[0]!.email);
       await page.getByLabel("Show unassigned students only").check();
       await randomize.click();
+      await page.getByRole("dialog").getByLabel("Reassign all students", { exact: true }).check();
+      await page.getByRole("dialog").getByRole("button", { name: "Apply to grouping", exact: true }).click();
       await expect(page.getByLabel("Search students")).toHaveValue("");
       await expect(page.getByLabel("Show unassigned students only")).not.toBeChecked();
       await expect(page.getByText("Students: 3", { exact: true })).toBeVisible();
@@ -154,6 +156,8 @@ test.describe("section groupings and teams", { tag: "@regression" }, () => {
       await expect(page.getByText("Students: 5", { exact: true })).toBeVisible();
       for (const student of students) await expect(page.getByLabel(studentLabel(student))).toHaveValue(grouping.teams.find((team) => team.title === "Blue")!.id);
       await randomize.click();
+      await page.getByRole("dialog").getByLabel("Reassign all students", { exact: true }).check();
+      await page.getByRole("dialog").getByRole("button", { name: "Apply to grouping", exact: true }).click();
       await page.getByRole("button", { name: "Save grouping", exact: true }).click();
       await expect(page.getByText("Everything is saved.", { exact: true })).toBeVisible();
       await page.reload();

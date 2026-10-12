@@ -17,7 +17,18 @@ function toDto(grouping: StoredGrouping): StudentGroupingDto {
   return {
     id: grouping.id, groupId: grouping.groupId, title: grouping.title,
     description: grouping.description, revision: grouping.revision,
-    teams: grouping.teams.map((team) => ({ id: team.id, title: team.title, participantIds: team.members.map((member) => member.participantId) }))
+    studentChoiceEnabled: grouping.studentChoiceEnabled, choiceOpensAt: grouping.choiceOpensAt?.toISOString() ?? null,
+    choiceClosesAt: grouping.choiceClosesAt?.toISOString() ?? null, allowChoiceChanges: grouping.allowChoiceChanges,
+    teams: grouping.teams.map((team) => ({ id: team.id, title: team.title, capacity: team.capacity, participantIds: team.members.map((member) => member.participantId) }))
+  };
+}
+
+function groupingSettings(data: StudentGroupingInput) {
+  return {
+    title: data.title, description: data.description, studentChoiceEnabled: data.studentChoiceEnabled,
+    choiceOpensAt: data.choiceOpensAt ? new Date(data.choiceOpensAt) : null,
+    choiceClosesAt: data.choiceClosesAt ? new Date(data.choiceClosesAt) : null,
+    allowChoiceChanges: data.allowChoiceChanges
   };
 }
 
@@ -48,6 +59,9 @@ async function validateTeams(tx: Prisma.TransactionClient, groupId: string, team
   }
   if (new Set(teams.map((team) => team.title.toLowerCase())).size !== teams.length) {
     throw new AppError(400, "STUDENT_GROUPING_TEAM_NAMES_DUPLICATE", "Use a different name for each team.");
+  }
+  if (teams.some((team) => team.participantIds.length > team.capacity)) {
+    throw new AppError(400, "STUDENT_TEAM_CAPACITY_EXCEEDED", "A team has more students than available slots.");
   }
   const ids = teams.flatMap((team) => team.participantIds);
   if (new Set(ids).size !== ids.length) {
@@ -83,7 +97,7 @@ export async function createStudentGrouping(user: CurrentUser, courseId: string,
   return transaction(async (tx) => {
     await validateTeams(tx, groupId, data.teams);
     const grouping = await tx.studentGrouping.create({
-      data: { groupId, title: data.title, description: data.description, teams: { create: data.teams.map((team) => ({ title: team.title })) } },
+      data: { groupId, ...groupingSettings(data), teams: { create: data.teams.map((team) => ({ title: team.title, capacity: team.capacity })) } },
       include: includeTeams
     });
     await tx.studentTeamMember.createMany({ data: data.teams.flatMap((team) => team.participantIds.map((participantId) => ({
@@ -108,7 +122,7 @@ export async function updateStudentGrouping(user: CurrentUser, courseId: string,
     await validateTeams(tx, groupId, data.teams, previous);
     const updated = await tx.studentGrouping.updateMany({
       where: { id: groupingId, groupId, revision: data.revision },
-      data: { title: data.title, description: data.description, revision: { increment: 1 } }
+      data: { ...groupingSettings(data), revision: { increment: 1 } }
     });
     if (updated.count !== 1) throw conflict();
     await tx.studentTeamMember.deleteMany({ where: { groupingId } });
@@ -119,8 +133,8 @@ export async function updateStudentGrouping(user: CurrentUser, courseId: string,
     }
     for (const team of data.teams) {
       const saved = team.id
-        ? await tx.studentTeam.update({ where: { id: team.id }, data: { title: team.title } })
-        : await tx.studentTeam.create({ data: { groupingId, title: team.title } });
+        ? await tx.studentTeam.update({ where: { id: team.id }, data: { title: team.title, capacity: team.capacity } })
+        : await tx.studentTeam.create({ data: { groupingId, title: team.title, capacity: team.capacity } });
       await tx.studentTeamMember.createMany({ data: team.participantIds.map((participantId) => ({ groupingId, teamId: saved.id, participantId })) });
     }
     const grouping = await tx.studentGrouping.findUniqueOrThrow({ where: { id: groupingId }, include: includeTeams });

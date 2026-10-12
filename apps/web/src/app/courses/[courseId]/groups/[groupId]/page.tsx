@@ -16,6 +16,7 @@ import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import { CourseGradeChallengesPanel } from "@/components/course-grade-challenges-panel";
 import { StudentCourseContent } from "@/components/student-course-content";
+import { MyTeamsPanel } from "@/components/my-teams-panel";
 import { StudentGroupingsPanel } from "@/components/student-groupings-panel";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import {
@@ -281,7 +282,7 @@ export default function CourseGroupPage() {
 
           <WorkspaceTabs
             ariaLabel={t("groupPage.workspaceTabs")}
-            initialTab={searchParams.get("tab") === "grades" ? "grades" : "content"}
+            initialTab={["grades", "my-teams"].includes(searchParams.get("tab") ?? "") ? searchParams.get("tab")! : "content"}
             tabs={[
               {
                 id: "content",
@@ -316,6 +317,11 @@ export default function CourseGroupPage() {
                     />
                   </section>
                 )
+              },
+              {
+                id: "my-teams",
+                label: t("studentGroupings.myTeams"),
+                render: () => <MyTeamsPanel courseId={courseId} groupId={groupId} />
               },
               {
                 id: "grades",
