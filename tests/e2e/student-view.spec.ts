@@ -136,7 +136,8 @@ test.describe.serial("teacher Student view", () => {
     await teacherPage.getByRole("link", { name: parsonsTitle, exact: true }).click();
     await expect(teacherPage.getByRole("heading", { name: "Rebuild the solution", exact: true })).toBeVisible();
     await teacherPage.getByRole("button", { name: "Check answer", exact: true }).click();
-    await expect(teacherPage.getByText(/correct|misplaced/i).first()).toBeVisible();
+    // Initial block order is randomized; both evaluation outcomes are valid.
+    await expect(teacherPage.getByText(/correct|out of order/i).first()).toBeVisible();
 
     const api = await createAuthenticatedApi("teacher");
     try {

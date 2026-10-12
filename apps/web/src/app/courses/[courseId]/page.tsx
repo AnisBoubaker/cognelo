@@ -23,6 +23,7 @@ import { ActivityTypeIcon, AppIcon, FolderContentIcon as SharedFolderContentIcon
 import { useAuth } from "@/components/auth-provider";
 import { CourseSettingsPanel, type CourseSettingsSection } from "@/components/course-settings-panel";
 import { CourseParticipantsPanel } from "@/components/course-participants-panel";
+import { CourseStudentGroupingsPanel } from "@/components/student-groupings-panel";
 import { CourseStaffPanel } from "@/components/course-staff-panel";
 import { CourseGradeChallengesPanel } from "@/components/course-grade-challenges-panel";
 import { GradebookExportDialog, type GradebookExportTarget } from "@/components/gradebook-export-dialog";
@@ -1376,7 +1377,7 @@ export default function CourseDetailPage() {
             <WorkspaceTabs
               ariaLabel={t("courseDetail.workspaceTabs")}
               initialTab={activeCourseTab}
-              toolbar={(
+              toolbar={activeCourseTab !== "groupings" ? (
                 <div className="course-view-selector" role="group" aria-label={t("courseDetail.contentViewSelectorLabel")}>
                   <Link
                     aria-current={contentViewSelectorMode === "course" ? "page" : undefined}
@@ -1428,7 +1429,7 @@ export default function CourseDetailPage() {
                     </Link>
                   ) : null}
                 </div>
-              )}
+              ) : null}
               tabs={[
                 {
                   href: `/courses/${courseId}?tab=content`,
@@ -1874,6 +1875,12 @@ export default function CourseDetailPage() {
                       />
                     </div>
                   )
+                },
+                {
+                  href: `/courses/${courseId}?tab=groupings`,
+                  id: "groupings",
+                  label: t("studentGroupings.title"),
+                  render: () => <CourseStudentGroupingsPanel courseId={courseId} groups={sortedCourseGroups} initialGroupId={searchParams.get("groupId")} />
                 },
                 ...(course.permissions?.canViewGradebook ? [{
                   href: `/courses/${courseId}?tab=gradebook`,

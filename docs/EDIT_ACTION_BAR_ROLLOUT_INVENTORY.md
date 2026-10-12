@@ -31,6 +31,7 @@ The reusable implementation should complement `useUnsavedChangesGuard`: the guar
 
 | Surface | Route/context | Owner | Classification | Current state and rollout note |
 | --- | --- | --- | --- | --- |
+| Student grouping editor | Course Groupings tab or section Groupings tab | `apps/web/src/components/student-groupings-panel.tsx` | **Implemented** | One atomic draft covers grouping details, teams, and assignments; Cancel restores the saved snapshot and the navigation guard shares the same save boundary. |
 | Course general settings | `/courses/:courseId?tab=settings&section=general` | `apps/web/src/components/course-settings-panel.tsx`, `apps/web/src/components/course-form.tsx` | **Implemented** | The form-local bar restores saved course values. |
 | Course AI settings | `/courses/:courseId?tab=settings&section=ai` | `apps/web/src/components/course-settings-panel.tsx` | **Implemented** | Its independent bar restores the saved agent selection. |
 | Profile identity | `/settings/profile` | `apps/web/src/app/settings/profile/page.tsx` | **Implemented** | Independent section-local identity bar. |

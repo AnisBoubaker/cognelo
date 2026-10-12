@@ -2,6 +2,8 @@
 
 Status: implemented and covered by the repository unit/API/Playwright suites on 2026-10-07. Scenario IDs are a traceability catalog; related assertions may be grouped into one stateful Playwright test.
 
+Student grouping management uses the same section scope as roster management; TAs and learners cannot list or mutate groupings. The additional CRUD, denial, and concurrency coverage lives in `student-groupings.spec.ts`; see [Student groupings and teams](STUDENT_GROUPINGS.md).
+
 This document defines the separation between global roles, course-wide staff, and section-scoped staff, records the resolved product policies, and maps the executable coverage that proves authorization and real feature behavior.
 
 ## Scope

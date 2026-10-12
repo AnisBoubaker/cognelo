@@ -26,6 +26,7 @@ export * from "./plugins";
 export * from "./safe-exam-browser";
 export * from "./subjects";
 export * from "./student-preview";
+export * from "./student-groupings";
 export * from "./tests";
 export * from "./test-execution";
 export * from "./users";

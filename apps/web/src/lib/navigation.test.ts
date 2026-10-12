@@ -18,7 +18,7 @@ describe("primary landing navigation", () => {
 });
 
 describe("course workspace navigation", () => {
-  it.each(["content", "participants", "gradebook", "challenges", "settings"] as const)(
+  it.each(["content", "groupings", "participants", "gradebook", "challenges", "settings"] as const)(
     "opens the %s tab requested by the URL",
     (tab) => {
       expect(resolveCourseWorkspaceTab(tab)).toBe(tab);

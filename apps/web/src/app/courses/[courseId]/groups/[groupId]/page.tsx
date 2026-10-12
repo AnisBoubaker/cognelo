@@ -16,6 +16,7 @@ import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import { CourseGradeChallengesPanel } from "@/components/course-grade-challenges-panel";
 import { StudentCourseContent } from "@/components/student-course-content";
+import { StudentGroupingsPanel } from "@/components/student-groupings-panel";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import {
   api,
@@ -124,9 +125,11 @@ export default function CourseGroupPage() {
 
   useEffect(() => {
     if (canManage && group) {
-      router.replace(`/courses/${courseId}?tab=content&view=group&groupId=${encodeURIComponent(groupId)}`);
+      router.replace(searchParams.get("tab") === "groupings"
+        ? `/courses/${courseId}?tab=groupings&groupId=${encodeURIComponent(groupId)}`
+        : `/courses/${courseId}?tab=content&view=group&groupId=${encodeURIComponent(groupId)}`);
     }
-  }, [canManage, courseId, group, groupId, router]);
+  }, [canManage, courseId, group, groupId, router, searchParams]);
 
   const refresh = useCallback(async () => {
     setError("");
@@ -1101,7 +1104,7 @@ export default function CourseGroupPage() {
 
             <WorkspaceTabs
               ariaLabel={t("groupPage.workspaceTabs")}
-              initialTab={searchParams.get("tab") === "gradebook" ? "gradebook" : "content"}
+              initialTab={searchParams.get("tab") ?? "content"}
               tabs={[
                 {
                   id: "activities",
@@ -1710,6 +1713,11 @@ export default function CourseGroupPage() {
                   )
                 },
                 {
+                  id: "groupings",
+                  label: t("studentGroupings.title"),
+                  render: () => <StudentGroupingsPanel courseId={courseId} groupId={groupId} />
+                },
+                {
                   id: "participants",
                   label: t("groupPage.participantsTab"),
                   render: () => (
@@ -1930,10 +1938,11 @@ export default function CourseGroupPage() {
                       </section>
                     )
                 }
-              ].filter((tab) =>
+              ].map((tab) => ({ ...tab, href: `/courses/${courseId}/groups/${groupId}?tab=${tab.id}` })).filter((tab) =>
                 tab.id !== "activities" &&
                 tab.id !== "materials" &&
-                (canManage || tab.id !== "settings")
+                (canManage || tab.id !== "settings") &&
+                (canManageRoster || tab.id !== "groupings")
               )}
             />
             {dragPreview ? (

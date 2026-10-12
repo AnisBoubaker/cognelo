@@ -511,6 +511,38 @@ export const CourseGroupInputSchema = z.object({
 });
 export type CourseGroupInput = z.infer<typeof CourseGroupInputSchema>;
 
+export const StudentTeamInputSchema = z.object({
+  id: z.string().min(1).optional(),
+  title: z.string().trim().min(1).max(120),
+  participantIds: z.array(z.string().min(1)).max(5000).default([])
+});
+
+export const StudentGroupingInputSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(2000).default(""),
+  teams: z.array(StudentTeamInputSchema).max(500).default([])
+});
+export type StudentGroupingInput = z.infer<typeof StudentGroupingInputSchema>;
+export const StudentGroupingUpdateSchema = StudentGroupingInputSchema.extend({
+  revision: z.number().int().positive()
+});
+export type StudentGroupingUpdate = z.infer<typeof StudentGroupingUpdateSchema>;
+export const StudentGroupingDeleteSchema = z.object({ revision: z.number().int().positive() });
+export type StudentGroupingStudent = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+};
+export type StudentGroupingDto = {
+  id: string;
+  groupId: string;
+  title: string;
+  description: string;
+  revision: number;
+  teams: Array<{ id: string; title: string; participantIds: string[] }>;
+};
+
 export const CourseGroupUpdateSchema = z
   .object({
     title: z.string().min(2).max(160).optional(),

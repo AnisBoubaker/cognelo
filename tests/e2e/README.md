@@ -59,13 +59,15 @@ The broad activity suite exercises real plugin integrations. Coding exercise run
 
 ## Focused regression checks
 
-Run the independent authoring-recovery, bank-synchronization, and course-loading scenarios with:
+Run the independent authoring-recovery, bank-synchronization, course-loading, and student-grouping scenarios with:
 
 ```bash
 npm run test:e2e -- --grep @regression
 ```
 
-These six tests require the normal migrated/seeded database, API, and web app, but no AI provider, Judge0, or web-design runner. Each test provisions its own disposable bank/course/MCQ scenario through public APIs and runs lifecycle-aware cleanup, so failures do not skip later scenarios in a serial chain. The fixture creates both shared course placement and group assignment, which are distinct content scopes.
+These eleven tests require the normal migrated/seeded database, API, and web app, but no AI provider, Judge0, or web-design runner. Each test provisions its own disposable course/section scenario (with bank/MCQ content where needed) through public APIs and runs lifecycle-aware cleanup, so failures do not skip later scenarios in a serial chain. The bank/course fixture creates both shared course placement and group assignment, which are distinct content scopes.
+
+Grouping scenarios cover independent team assignments, section boundaries, concurrency, pending enrollments, failed-draft recovery, teacher/TA/student permissions, and enrollment/section deletion cascades.
 
 Only deliberate save/session failures and gradebook latency are intercepted. Recovery, synchronization, submission, and persistence assertions use the real services. The loading test releases its pending response in `finally`; it uses request/UI state instead of fixed sleeps. The `@regression` tag selects this focused set, not every regression assertion in the wider suite.
 
@@ -80,6 +82,8 @@ An E2E run is observational unless the task explicitly asks for product fixes. W
 The maximum-attempt integrity check waits for each submission to finish, verifies the exhausted activity exposes only submission history, and confirms a direct extra submission request is rejected. The released-grade visibility check asserts that the selected released grade appears to the learner without exposing raw grading payloads.
 
 The Coding Homework completion check waits for successful final answer submission, then verifies navigation back to the learner's course group and the activity's **Submitted** status. The assigned-activity host navigates away on success, so completion text inside the previous activity renderer is not a stable assertion.
+
+The Parsons Student view check accepts either correct feedback or the current “out of order” feedback because the initial block order is randomized. The assertion must not depend on the initial shuffle. See the [2026-10-12 verification record](../../docs/E2E_RUN_2026-10-12.md) for this correction and the unresolved intermittent nested-content duplication observation.
 
 ## Authorization scenario catalog
 
