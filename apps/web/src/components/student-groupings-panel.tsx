@@ -14,9 +14,9 @@ function studentInitials(name: string) {
   const words = name.trim().split(/\s+/);
   return `${words[0]?.[0] ?? ""}${words.length > 1 ? words.at(-1)?.[0] ?? "" : ""}`.toLocaleUpperCase();
 }
-const emptyDraft = (): Draft => ({ title: "", description: "", studentChoiceEnabled: false, choiceOpensAt: null, choiceClosesAt: null, allowChoiceChanges: false, teams: [] });
+const emptyDraft = (): Draft => ({ title: "", description: "", visibleToStudents: true, assignmentMethod: "manual", studentChoiceEnabled: false, choiceOpensAt: null, choiceClosesAt: null, allowChoiceChanges: false, teams: [] });
 const draftFrom = (grouping: StudentGroupingDto): Draft => ({
-  title: grouping.title, description: grouping.description, studentChoiceEnabled: grouping.studentChoiceEnabled,
+  title: grouping.title, description: grouping.description, visibleToStudents: grouping.visibleToStudents, assignmentMethod: grouping.assignmentMethod, studentChoiceEnabled: grouping.studentChoiceEnabled,
   choiceOpensAt: grouping.choiceOpensAt, choiceClosesAt: grouping.choiceClosesAt, allowChoiceChanges: grouping.allowChoiceChanges,
   teams: grouping.teams.map((team) => ({ ...team, key: team.id }))
 });
@@ -133,6 +133,16 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
   );
   const names = new Map(students.map((student) => [student.id, `${student.firstName} ${student.lastName}`.trim() || student.email]));
 
+  const methodLabel = (method: Draft["assignmentMethod"]) => t(`studentGroupings.${method === "student_choice" ? "studentChoiceMethod" : method === "random" ? "randomMethod" : "manualMethod"}`);
+  const formatChoiceDate = (value: string | null, fallback: string) => value
+    ? new Date(value).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : t(`studentGroupings.${fallback}`);
+  const choiceSummary = (value: Draft | StudentGroupingDto) => value.studentChoiceEnabled ? <div className="student-grouping-choice-summary">
+    <span>{t("studentGroupings.choiceFrom")}: <strong>{formatChoiceDate(value.choiceOpensAt, "immediately")}</strong></span>
+    <span>{t("studentGroupings.choiceUntil")}: <strong>{formatChoiceDate(value.choiceClosesAt, "noDeadline")}</strong></span>
+    <span>{t(value.allowChoiceChanges ? "studentGroupings.studentChangesAllowed" : "studentGroupings.studentChangesLocked")}</span>
+    {!value.visibleToStudents ? <span className="student-grouping-hidden-note">{t("studentGroupings.hiddenChoiceHelp")}</span> : null}
+  </div> : null;
+
   return <section className="stack student-groupings">
     <div className="section-heading student-groupings-heading">
       <div><h2>{t("studentGroupings.title")}</h2><p className="muted">{t("studentGroupings.help")}</p></div>
@@ -144,6 +154,23 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
       <fieldset className="student-grouping-fields stack" disabled={busy}>
         <div className="field"><label htmlFor="student-grouping-title">{t("studentGroupings.name")}</label><input id="student-grouping-title" value={draft.title} maxLength={120} required onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></div>
         <div className="field"><label htmlFor="student-grouping-description">{t("studentGroupings.description")}</label><textarea id="student-grouping-description" value={draft.description} maxLength={2000} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></div>
+        <div className="student-grouping-settings">
+          <section className="student-grouping-setting" aria-label={t("studentGroupings.studentVisibility")}>
+            <h3>{t("studentGroupings.studentVisibility")}</h3>
+            <label className="checkbox-row"><input type="checkbox" checked={draft.visibleToStudents} onChange={(event) => setDraft({ ...draft, visibleToStudents: event.target.checked })} />{t("studentGroupings.showToStudents")}</label>
+            <p className="muted">{t(draft.visibleToStudents ? "studentGroupings.visibleHelp" : "studentGroupings.hiddenHelp")}</p>
+          </section>
+          <section className="student-grouping-setting" aria-label={t("studentGroupings.assignmentMethod")}>
+            <h3>{t("studentGroupings.assignmentMethod")}</h3>
+            <strong className="student-grouping-method">{methodLabel(draft.assignmentMethod)}</strong>
+            {choiceSummary(draft)}
+            {!draft.studentChoiceEnabled ? <p className="muted">{t(draft.assignmentMethod === "random" ? "studentGroupings.randomMethodHelp" : "studentGroupings.manualMethodHelp")}</p> : null}
+            <div className="student-grouping-setting-actions">
+              <button className="secondary" type="button" disabled={!draft.teams.length} onClick={() => setAssignmentDialogOpen(true)}>{t("studentGroupings.automaticAssign")}</button>
+              {draft.assignmentMethod !== "manual" ? <button className="secondary" type="button" onClick={() => setDraft({ ...draft, assignmentMethod: "manual", studentChoiceEnabled: false, choiceOpensAt: null, choiceClosesAt: null, allowChoiceChanges: false })}>{t("studentGroupings.useManual")}</button> : null}
+            </div>
+          </section>
+        </div>
         <div className="section-heading"><h3>{t("studentGroupings.teams")}</h3><button className="secondary" type="button" disabled={draft.teams.length >= 500} onClick={() => setDraft((current) => ({ ...current, teams: [...current.teams, { key: crypto.randomUUID(), title: nextStudentTeamName(current.teams.map((team) => team.title), teachingLanguage), capacity: 4, participantIds: [] }] }))}>{t("studentGroupings.addTeam")}</button></div>
         {draft.teams.length ? draft.teams.map((team, index) => <div className="student-team-editor" key={team.key}>
           <div className="field"><input aria-label={t("studentGroupings.teamName", { number: index + 1 })} id={`team-${team.key}`} value={team.title} required maxLength={120} onChange={(event) => setDraft({ ...draft, teams: draft.teams.map((item) => item.key === team.key ? { ...item, title: event.target.value } : item) })} /></div>
@@ -153,9 +180,7 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
         </div>) : <p className="muted">{t("studentGroupings.noTeams")}</p>}
         <div className="section-heading">
           <h3>{t("studentGroupings.students")}</h3>
-          <button className="secondary" type="button" disabled={!draft.teams.length} onClick={() => setAssignmentDialogOpen(true)} aria-describedby="automatic-assignment-help">{t("studentGroupings.automaticAssign")}</button>
         </div>
-        <p className="muted" id="automatic-assignment-help">{t("studentGroupings.automaticAssignmentHelp")}</p>
         <p className="muted">{t("studentGroupings.assignmentHelp", { count: students.length - assignments.size })}</p>
         <div className="field"><label htmlFor="grouping-student-search">{t("studentGroupings.search")}</label><input id="grouping-student-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
         <label className="checkbox-row"><input type="checkbox" checked={unassignedOnly} onChange={(event) => setUnassignedOnly(event.target.checked)} />{t("studentGroupings.unassignedOnly")}</label>
@@ -179,6 +204,13 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
           <button className="secondary icon-button student-grouping-remove" type="button" aria-label={t("common.remove")} title={t("common.remove")} disabled={busy} onClick={() => void remove(grouping)}><AppIcon name="remove" /></button>
         </div>
       </header>
+      <div className="student-grouping-policy">
+        <div className="student-grouping-badges">
+          <span className="student-grouping-badge">{t("studentGroupings.assignmentSummary", { method: methodLabel(grouping.assignmentMethod) })}</span>
+          <span className={`student-grouping-badge${grouping.visibleToStudents ? "" : " is-hidden"}`}>{t(grouping.visibleToStudents ? "studentGroupings.visibleToStudents" : "studentGroupings.hiddenFromStudents")}</span>
+        </div>
+        {choiceSummary(grouping)}
+      </div>
       <div className="student-team-cards">{grouping.teams.map((team) => <section key={team.id} className="student-team-card" aria-label={team.title}>
         <h4>{team.title} <span className="student-team-count">({team.participantIds.length})</span></h4>
         {team.participantIds.length ? <ul className="student-team-members" role="list">{team.participantIds.map((id) => {
@@ -188,7 +220,6 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
       </section>)}</div>
       {!grouping.teams.length ? <p className="student-grouping-no-teams muted">{t("studentGroupings.noTeams")}</p> : null}
       <footer className="student-grouping-card-footer">
-        {grouping.studentChoiceEnabled ? <span className="student-grouping-unassigned">{t("studentGroupings.studentChoiceMethod")}</span> : null}
         <span className="student-grouping-unassigned"><AppIcon name="participants" size={16} />{t("studentGroupings.unassignedCount", { count: students.length - grouping.teams.reduce((count, team) => count + team.participantIds.length, 0) })}</span>
       </footer>
     </article>) : <p className="muted">{t("studentGroupings.empty")}</p>}

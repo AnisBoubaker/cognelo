@@ -3,6 +3,23 @@ import type { MessageTree } from "../types";
 
 export const enMessages = {
     studentGroupings: {
+      "manualMethod": "Manual",
+      "useManual": "Use manual assignment",
+      "studentVisibility": "Student visibility",
+      "showToStudents": "Show grouping to students",
+      "visibleHelp": "Students can see this grouping in My teams.",
+      "hiddenHelp": "Students cannot see this grouping or choose a team. Existing assignments are kept.",
+      "hiddenChoiceHelp": "Student choice is paused while this grouping is hidden.",
+      "visibleToStudents": "Visible to students",
+      "hiddenFromStudents": "Hidden from students",
+      "assignmentSummary": "Assignment: {method}",
+      "immediately": "Immediately",
+      "noDeadline": "No deadline",
+      "studentChangesAllowed": "Students can change teams while selection is open, until the deadline.",
+      "studentChangesLocked": "Students cannot change teams after confirming their choice.",
+      "manualMethodHelp": "Assign students using the team selectors below.",
+      "randomMethodHelp": "Random assignment has been applied. You can adjust the teams below or run it again.",
+
       "automaticAssign": "Automatic assign",
       "applyAssignment": "Apply to grouping",
       "assignmentMethod": "Assignment method",
@@ -27,7 +44,7 @@ export const enMessages = {
       "automaticAssignmentHelp": "Set an assignment method and team slots. Apply, then save the grouping to publish your changes.",
       "myTeams": "My teams",
       "myTeamsError": "Unable to load or confirm your teams. Please try again.",
-      "noMyTeams": "Your section has no groupings yet.",
+      "noMyTeams": "No groupings are currently available to you.",
       "choiceSaved": "Your team choice is confirmed.",
       "teamFull": "This team is full. Choose another team.",
       "choiceConflict": "Team availability changed. Review the teams and confirm again.",

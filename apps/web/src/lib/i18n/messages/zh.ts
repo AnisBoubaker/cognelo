@@ -3,6 +3,23 @@ import type { MessageTree } from "../types";
 
 export const zhMessages = {
     studentGroupings: {
+      "manualMethod": "手动",
+      "useManual": "使用手动分配",
+      "studentVisibility": "学生可见性",
+      "showToStudents": "向学生显示此分组",
+      "visibleHelp": "学生可在“我的团队”中查看此分组。",
+      "hiddenHelp": "学生无法查看此分组或选择团队。已有分配将保留。",
+      "hiddenChoiceHelp": "此分组隐藏期间，学生选择将暂停。",
+      "visibleToStudents": "对学生可见",
+      "hiddenFromStudents": "对学生隐藏",
+      "assignmentSummary": "分配方式：{method}",
+      "immediately": "立即",
+      "noDeadline": "无截止时间",
+      "studentChangesAllowed": "学生可以在选择开放期间更换团队，直至截止时间。",
+      "studentChangesLocked": "学生确认选择后无法更换团队。",
+      "manualMethodHelp": "使用下方的团队选择器分配学生。",
+      "randomMethodHelp": "已应用随机分配。您可以在下方调整团队，或重新随机分配。",
+
       "automaticAssign": "自动分配",
       "applyAssignment": "应用到分组",
       "assignmentMethod": "分配方式",
@@ -27,7 +44,7 @@ export const zhMessages = {
       "automaticAssignmentHelp": "设置分配方式和团队名额。应用后保存分组以发布更改。",
       "myTeams": "我的团队",
       "myTeamsError": "无法加载或确认您的团队，请重试。",
-      "noMyTeams": "您的班级暂无分组。",
+      "noMyTeams": "目前没有可供您查看的分组。",
       "choiceSaved": "您的团队选择已确认。",
       "teamFull": "该团队已满，请选择其他团队。",
       "choiceConflict": "可用名额已变化，请查看团队后重新确认。",

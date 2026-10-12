@@ -620,11 +620,19 @@ model CourseGroupParticipant {
   @@index([userId])
 }
 
+enum StudentGroupingAssignmentMethod {
+  manual
+  random
+  student_choice
+}
+
 model StudentGrouping {
   id                   String        @id @default(cuid())
   groupId              String
   title                String
   description          String        @default("")
+  visibleToStudents    Boolean       @default(true)
+  assignmentMethod     StudentGroupingAssignmentMethod @default(manual)
   studentChoiceEnabled Boolean       @default(false)
   choiceOpensAt        DateTime?
   choiceClosesAt       DateTime?

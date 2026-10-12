@@ -3,6 +3,23 @@ import type { MessageTree } from "../types";
 
 export const arMessages = {
     studentGroupings: {
+      "manualMethod": "يدوي",
+      "studentChangesAllowed": "يمكن للطلاب تغيير فرقهم خلال فترة الاختيار وحتى الموعد النهائي.",
+      "studentChangesLocked": "لا يمكن للطلاب تغيير فرقهم بعد تأكيد اختيارهم.",
+      "useManual": "استخدام التوزيع اليدوي",
+      "studentVisibility": "الظهور للطلاب",
+      "showToStudents": "إظهار التجميع للطلاب",
+      "visibleHelp": "يمكن للطلاب رؤية هذا التجميع في فرقي.",
+      "hiddenHelp": "لا يمكن للطلاب رؤية هذا التجميع أو اختيار فريق. تُحفظ التوزيعات الحالية.",
+      "hiddenChoiceHelp": "يتوقف اختيار الطلاب ما دام هذا التجميع مخفيًا.",
+      "visibleToStudents": "ظاهر للطلاب",
+      "hiddenFromStudents": "مخفي عن الطلاب",
+      "assignmentSummary": "التوزيع: {method}",
+      "immediately": "فورًا",
+      "noDeadline": "دون موعد نهائي",
+      "manualMethodHelp": "وزّع الطلاب باستخدام قوائم الفرق أدناه.",
+      "randomMethodHelp": "تم تطبيق التوزيع العشوائي. يمكنك تعديل الفرق أدناه أو تشغيله مجددًا.",
+
       "automaticAssign": "التوزيع التلقائي",
       "applyAssignment": "تطبيق على التجميع",
       "assignmentMethod": "طريقة التوزيع",
@@ -27,7 +44,7 @@ export const arMessages = {
       "automaticAssignmentHelp": "حدد طريقة التوزيع والأماكن، ثم طبّق واحفظ التجميع لنشر التغييرات.",
       "myTeams": "فرقي",
       "myTeamsError": "تعذر تحميل الفرق أو تأكيد اختيارك. حاول مجددًا.",
-      "noMyTeams": "لا توجد تجميعات في شعبتك بعد.",
+      "noMyTeams": "لا توجد تجميعات متاحة لك حاليًا.",
       "choiceSaved": "تم تأكيد اختيار فريقك.",
       "teamFull": "هذا الفريق ممتلئ. اختر فريقًا آخر.",
       "choiceConflict": "تغيرت الأماكن المتاحة. راجع الفرق وأكد مجددًا.",

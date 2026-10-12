@@ -518,9 +518,14 @@ export const StudentTeamInputSchema = z.object({
   participantIds: z.array(z.string().min(1)).max(5000).default([])
 });
 
+export const StudentGroupingAssignmentMethodSchema = z.enum(["manual", "random", "student_choice"]);
+export type StudentGroupingAssignmentMethod = z.infer<typeof StudentGroupingAssignmentMethodSchema>;
+
 const StudentGroupingBaseSchema = z.object({
   title: z.string().trim().min(1).max(120),
   description: z.string().trim().max(2000).default(""),
+  visibleToStudents: z.boolean().default(true),
+  assignmentMethod: StudentGroupingAssignmentMethodSchema.optional(),
   studentChoiceEnabled: z.boolean().default(false),
   choiceOpensAt: z.string().datetime().nullable().default(null),
   choiceClosesAt: z.string().datetime().nullable().default(null),
@@ -532,11 +537,17 @@ function validateStudentChoiceDates(value: { choiceOpensAt: string | null; choic
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["choiceClosesAt"], message: "The closing date must be after the opening date." });
   }
 }
-export const StudentGroupingInputSchema = StudentGroupingBaseSchema.superRefine(validateStudentChoiceDates);
+function normalizeStudentGroupingMethod<T extends { assignmentMethod?: StudentGroupingAssignmentMethod; studentChoiceEnabled: boolean }>(value: T) {
+  // Keep older clients that only send the choice flag working. The explicit method is authoritative.
+  const assignmentMethod = value.assignmentMethod ?? (value.studentChoiceEnabled ? "student_choice" : "manual");
+  return { ...value, assignmentMethod, studentChoiceEnabled: assignmentMethod === "student_choice" };
+}
+export const StudentGroupingInputSchema = StudentGroupingBaseSchema.superRefine(validateStudentChoiceDates).transform(normalizeStudentGroupingMethod);
 export type StudentGroupingInput = z.infer<typeof StudentGroupingInputSchema>;
 export const StudentGroupingUpdateSchema = StudentGroupingBaseSchema.extend({
+  visibleToStudents: z.boolean().optional(),
   revision: z.number().int().positive()
-}).superRefine(validateStudentChoiceDates);
+}).superRefine(validateStudentChoiceDates).transform(normalizeStudentGroupingMethod);
 export type StudentGroupingUpdate = z.infer<typeof StudentGroupingUpdateSchema>;
 export const StudentGroupingDeleteSchema = z.object({ revision: z.number().int().positive() });
 export const StudentTeamChoiceSchema = z.object({ teamId: z.string().min(1) }).strict();

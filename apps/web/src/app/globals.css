@@ -6080,3 +6080,23 @@ a.card:hover,
 .student-choice-footer:empty { display: none; }
 .student-choice-footer p { margin: 0; font-size: 0.875rem; }
 .student-choice-footer [role=alert], .student-choice-footer [role=status] { flex-basis: 100%; }
+
+.student-grouping-settings { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 1rem; }
+.student-grouping-setting { display: grid; align-content: start; gap: 0.75rem; min-width: 0; padding: 1rem; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; }
+.student-grouping-setting h3 { margin: 0; font-size: 0.85rem; color: var(--muted); }
+.student-grouping-setting p { margin: 0; font-size: 0.875rem; line-height: 1.5; }
+.student-grouping-setting .checkbox-row input { flex: 0 0 auto; }
+.student-grouping-method { font-size: 1rem; }
+.student-grouping-setting-actions, .student-grouping-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.student-grouping-setting-actions button { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+.student-grouping-policy { padding: 0.85rem 1.25rem; border-block-end: 1px solid var(--line); }
+.student-grouping-badge { display: inline-flex; padding: 0.25rem 0.65rem; background: var(--surface-3); color: var(--ink); border-radius: 6px; font-size: 0.8rem; line-height: 1.5; }
+.student-grouping-badge.is-hidden { background: #fff4df; color: #805719; }
+.student-grouping-choice-summary { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; font-size: 0.825rem; line-height: 1.5; color: var(--muted); }
+.student-grouping-choice-summary > :nth-child(n+3) { flex-basis: 100%; }
+.student-grouping-policy .student-grouping-choice-summary { margin-block-start: 0.65rem; }
+.student-grouping-hidden-note { color: #805719; }
+@media (max-width: 600px) {
+  .student-grouping-settings { grid-template-columns: minmax(0, 1fr); }
+  .student-grouping-policy { padding-inline: 1rem; }
+}
