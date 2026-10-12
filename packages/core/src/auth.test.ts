@@ -109,6 +109,8 @@ describe("auth services", () => {
   });
 
   it("renews a valid active session with a new eight-hour window", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-12T12:00:00.000Z"));
     mockPrisma.user.findUnique.mockResolvedValueOnce({
       ...activeUser,
       passwordHash: await bcrypt.hash("Password123!", 4)
@@ -116,7 +118,6 @@ describe("auth services", () => {
     const original = await loginWithPassword("teacher@example.test", "Password123!", secret);
     const originalPayload = JSON.parse(Buffer.from(original.token.split(".")[1]!, "base64url").toString()) as { exp: number };
 
-    vi.useFakeTimers();
     vi.setSystemTime(Date.now() + 60 * 60 * 1000);
     mockPrisma.user.findUnique.mockResolvedValueOnce(activeUser);
     const refreshed = await refreshAuthSession(original.token, secret);
