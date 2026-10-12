@@ -6003,6 +6003,15 @@ a.card:hover,
 }
 
 /* Section groupings: teams and roster assignments share one saved draft. */
+.student-groupings-workspace { gap: 1.5rem; }
+.student-groupings-section-picker { width: min(100%, 24rem); }
+.student-groupings-section-picker select { min-height: 2.75rem; }
+.student-groupings-heading { align-items: flex-start; }
+.student-groupings-heading h2 { font-size: 1.5rem; letter-spacing: -0.02em; }
+.student-groupings-heading p { max-width: 65ch; margin-block-start: 0.4rem; line-height: 1.5; }
+.student-groupings-heading > button { flex: 0 0 auto; }
+.student-groupings-heading > button,
+.student-grouping-card-actions > button { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; }
 .student-grouping-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
 .student-team-editor { display: flex; align-items: end; gap: 1rem; flex-wrap: wrap; }
 .student-team-editor .field { flex: 1 1 12rem; }
@@ -6010,11 +6019,38 @@ a.card:hover,
 .student-grouping-roster { display: grid; gap: 0.75rem; max-height: 32rem; overflow: auto; }
 .student-grouping-student { display: grid; grid-template-columns: minmax(0, 1fr) minmax(10rem, 1fr); align-items: center; gap: 1rem; }
 .student-grouping-student label { display: grid; overflow-wrap: anywhere; }
-.student-team-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 1.5rem; }
-.student-team-cards h4 { margin: 0; }
+.student-grouping-card { min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
+.student-grouping-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem; border-block-end: 1px solid var(--line); }
+.student-grouping-card-title { min-width: 0; overflow-wrap: anywhere; }
+.student-grouping-card-title h3 { margin: 0; font-size: 1.1rem; }
+.student-grouping-card-title p { margin: 0.35rem 0 0; font-size: 0.9rem; line-height: 1.5; }
+.student-grouping-card-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 0.5rem; }
+.student-grouping-card-actions button { min-height: 2.25rem; padding: 0.45rem 0.75rem; font-size: 0.85rem; box-shadow: none; }
+.student-grouping-card-actions .student-grouping-remove { width: 2.25rem; padding: 0.45rem; border-color: transparent; color: var(--muted); background: transparent; }
+.student-grouping-card-actions .student-grouping-remove:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 6%, white); }
+.student-team-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); align-items: start; gap: 1rem; padding: 1.25rem; background: var(--surface-2); }
+.student-team-cards:empty { display: none; }
+.student-team-card { --team-color: #2774b7; min-width: 0; border: 1px solid var(--line); border-block-start: 3px solid color-mix(in srgb, var(--team-color) 65%, white); border-radius: 10px; padding: 1rem; background: var(--surface); }
+.student-team-card:nth-child(4n + 2) { --team-color: #237e78; }
+.student-team-card:nth-child(4n + 3) { --team-color: #7951a8; }
+.student-team-card:nth-child(4n + 4) { --team-color: #936122; }
+.student-team-card h4 { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; margin: 0 0 0.9rem; font-size: 0.95rem; line-height: 1.5; overflow-wrap: anywhere; }
+.student-team-count { flex: 0 0 auto; min-width: 1.8rem; padding: 0.1rem 0.4rem; border-radius: 6px; background: color-mix(in srgb, var(--team-color) 9%, white); color: var(--team-color); font-size: 0.75rem; text-align: center; font-variant-numeric: tabular-nums; }
+.student-team-members { display: grid; gap: 0.45rem; list-style: none; padding: 0; margin: 0; }
+.student-team-members li { display: flex; align-items: center; gap: 0.6rem; min-width: 0; font-size: 0.875rem; line-height: 1.4; }
+.student-team-members li > :last-child { min-width: 0; overflow-wrap: anywhere; }
+.student-team-avatar { display: inline-flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; flex: 0 0 auto; border-radius: 50%; background: color-mix(in srgb, var(--team-color) 8%, white); color: var(--team-color); font-size: 0.6rem; font-weight: 700; }
+.student-team-empty { margin: 0; font-size: 0.875rem; line-height: 1.5; }
+.student-grouping-no-teams { padding: 1.25rem; margin: 0; }
+.student-grouping-card-footer { display: flex; padding: 0.85rem 1.25rem; border-block-start: 1px solid var(--line); }
+.student-grouping-unassigned { display: inline-flex; align-items: center; gap: 0.45rem; color: var(--muted); font-size: 0.8rem; line-height: 1.5; }
 .student-groupings .checkbox-row { display: flex; align-items: center; gap: 0.5rem; }
 .student-groupings .checkbox-row input { width: auto; }
 @media (max-width: 600px) {
   .student-grouping-student { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
   .student-groupings .section-heading { flex-wrap: wrap; }
+  .student-grouping-card-header { flex-wrap: wrap; padding: 1rem; }
+  .student-grouping-card-actions { margin-inline-start: auto; }
+  .student-team-cards { padding: 1rem; }
+  .student-grouping-card-footer { padding-inline: 1rem; }
 }

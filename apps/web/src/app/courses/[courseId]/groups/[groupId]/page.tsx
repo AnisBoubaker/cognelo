@@ -1715,7 +1715,7 @@ export default function CourseGroupPage() {
                 {
                   id: "groupings",
                   label: t("studentGroupings.title"),
-                  render: () => <StudentGroupingsPanel courseId={courseId} groupId={groupId} />
+                  render: () => <StudentGroupingsPanel courseId={courseId} groupId={groupId} teachingLanguage={course.subject?.teachingLanguage ?? "en"} />
                 },
                 {
                   id: "participants",

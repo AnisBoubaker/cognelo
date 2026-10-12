@@ -1880,7 +1880,7 @@ export default function CourseDetailPage() {
                   href: `/courses/${courseId}?tab=groupings`,
                   id: "groupings",
                   label: t("studentGroupings.title"),
-                  render: () => <CourseStudentGroupingsPanel courseId={courseId} groups={sortedCourseGroups} initialGroupId={searchParams.get("groupId")} />
+                  render: () => <CourseStudentGroupingsPanel courseId={courseId} teachingLanguage={course.subject?.teachingLanguage ?? "en"} groups={sortedCourseGroups} initialGroupId={searchParams.get("groupId")} />
                 },
                 ...(course.permissions?.canViewGradebook ? [{
                   href: `/courses/${courseId}?tab=gradebook`,

@@ -38,8 +38,10 @@ test.describe("section groupings and teams", { tag: "@regression" }, () => {
       await page.getByLabel("Grouping name").fill("Project teams");
       await page.getByLabel("Description (optional)").fill("Semester project");
       await page.getByRole("button", { name: "Add team", exact: true }).click();
+      await expect(page.getByLabel("Team 1 name")).toHaveValue("Team 1");
       await page.getByLabel("Team 1 name").fill("Blue");
       await page.getByRole("button", { name: "Add team", exact: true }).click();
+      await expect(page.getByLabel("Team 2 name")).toHaveValue("Team 2");
       await page.getByLabel("Team 2 name").fill("Green");
       await page.getByLabel(studentLabel(first!)).selectOption({ label: "Blue" });
       await page.getByLabel("Search students").fill(second!.email);
@@ -84,6 +86,85 @@ test.describe("section groupings and teams", { tag: "@regression" }, () => {
       expect(remaining.students).toHaveLength(2);
       await page.getByLabel("Section", { exact: true }).selectOption(data.otherSectionId);
       await expect(page.getByRole("article", { name: "Lab teams" })).toBeHidden();
+    } finally { await api.dispose(); }
+  });
+
+  test("uses the course teaching language for editable team names and avoids collisions after removal", async ({ teacherPage: page, groupingsData: data }) => {
+    const api = await createAuthenticatedApi("teacher");
+    try {
+      await responseJson(await api.patch(`/api/subjects/${data.subjectId}`, { data: { teachingLanguage: "fr" } }));
+      // The teacher's interface stays English while the course is taught in French.
+      await page.goto(`/courses/${data.courseId}?tab=groupings`);
+      await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
+      await page.getByRole("button", { name: "Create grouping", exact: true }).click();
+      await page.getByLabel("Grouping name").fill("Travail en équipe");
+      await page.getByRole("button", { name: "Add team", exact: true }).click();
+      await expect(page.getByLabel("Team 1 name")).toHaveValue("Équipe 1");
+      await page.getByRole("button", { name: "Add team", exact: true }).click();
+      await expect(page.getByLabel("Team 2 name")).toHaveValue("Équipe 2");
+      await page.getByRole("button", { name: "Remove team 1", exact: true }).click();
+      await page.getByRole("button", { name: "Add team", exact: true }).click();
+      await expect(page.getByLabel("Team 1 name")).toHaveValue("Équipe 2");
+      await expect(page.getByLabel("Team 2 name")).toHaveValue("Équipe 3");
+      await page.getByLabel("Team 1 name").fill("Les explorateurs");
+      await page.getByRole("button", { name: "Create grouping", exact: true }).click();
+      await expect(page.getByText("Everything is saved.", { exact: true })).toBeVisible();
+      await page.reload();
+      await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
+      const grouping = page.getByRole("article", { name: "Travail en équipe", exact: true });
+      await expect(grouping.getByRole("heading", { name: "Les explorateurs (0)" })).toBeVisible();
+      await expect(grouping.getByRole("heading", { name: "Équipe 3 (0)" })).toBeVisible();
+    } finally { await api.dispose(); }
+  });
+
+  test("randomly balances the whole section, supports cancel, and saves only when requested", async ({ teacherPage: page, groupingsData: data }) => {
+    const api = await createAuthenticatedApi("teacher");
+    try {
+      for (let index = 0; index < 3; index++) {
+        await responseJson(await api.post(`/api/courses/${data.courseId}/groups/${data.groupId}/participants`, {
+          data: { email: `random-${index}-${data.token}@example.test`, firstName: "Random", lastName: `Student ${index}`, role: "student" }
+        }));
+      }
+      const { students } = await responseJson<{ students: StudentGroupingStudent[] }>(await api.get(pathFor(data)));
+      const { grouping } = await responseJson<{ grouping: StudentGroupingDto }>(await api.post(pathFor(data), {
+        data: { title: "Random teams", teams: [{ title: "Blue", participantIds: students.map((student) => student.id) }, { title: "Green", participantIds: [] }] }
+      }));
+      const { grouping: other } = await responseJson<{ grouping: StudentGroupingDto }>(await api.post(pathFor(data), {
+        data: { title: "Independent grouping", teams: [{ title: "Partners", participantIds: [students[0]!.id] }] }
+      }));
+      await page.goto(`/courses/${data.courseId}?tab=groupings`);
+      await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
+      await page.getByRole("button", { name: "Create grouping", exact: true }).click();
+      const randomize = page.getByRole("button", { name: "Randomly assign", exact: true });
+      await expect(randomize).toBeDisabled();
+      await page.getByRole("button", { name: "Close", exact: true }).click();
+      await page.getByRole("article", { name: "Random teams", exact: true }).getByRole("button", { name: "Edit", exact: true }).click();
+      await page.getByLabel("Search students").fill(students[0]!.email);
+      await page.getByLabel("Show unassigned students only").check();
+      await randomize.click();
+      await expect(page.getByLabel("Search students")).toHaveValue("");
+      await expect(page.getByLabel("Show unassigned students only")).not.toBeChecked();
+      await expect(page.getByText("Students: 3", { exact: true })).toBeVisible();
+      await expect(page.getByText("Students: 2", { exact: true })).toBeVisible();
+      for (const student of students) await expect(page.getByLabel(studentLabel(student))).not.toHaveValue("");
+      // Randomization changes the draft, not the stored grouping.
+      let stored = (await responseJson<{ groupings: StudentGroupingDto[] }>(await api.get(pathFor(data)))).groupings;
+      expect(stored.find((item) => item.id === grouping.id)).toEqual(grouping);
+      await page.getByRole("button", { name: "Cancel", exact: true }).click();
+      await expect(page.getByText("Students: 5", { exact: true })).toBeVisible();
+      for (const student of students) await expect(page.getByLabel(studentLabel(student))).toHaveValue(grouping.teams.find((team) => team.title === "Blue")!.id);
+      await randomize.click();
+      await page.getByRole("button", { name: "Save grouping", exact: true }).click();
+      await expect(page.getByText("Everything is saved.", { exact: true })).toBeVisible();
+      await page.reload();
+      await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
+      await expect(page.getByRole("article", { name: "Random teams", exact: true }).getByText("Unassigned students: 0", { exact: true })).toBeVisible();
+      stored = (await responseJson<{ groupings: StudentGroupingDto[] }>(await api.get(pathFor(data)))).groupings;
+      const saved = stored.find((item) => item.id === grouping.id)!;
+      expect(saved.teams.map((team) => team.participantIds.length).sort()).toEqual([2, 3]);
+      expect(saved.teams.flatMap((team) => team.participantIds).sort()).toEqual(students.map((student) => student.id).sort());
+      expect(saved.teams.map((team) => ({ id: team.id, title: team.title }))).toEqual(grouping.teams.map((team) => ({ id: team.id, title: team.title })));
+      expect(stored.find((item) => item.id === other.id)).toEqual(other);
     } finally { await api.dispose(); }
   });
 
