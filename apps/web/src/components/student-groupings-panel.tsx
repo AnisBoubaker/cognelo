@@ -2,22 +2,22 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EditActionBar, getEditActionBarCopy, useDialogs, useUnsavedChangesGuard } from "@cognelo/activity-ui";
-import type { StudentGroupingInput, SubjectTeachingLanguage } from "@cognelo/contracts";
+import type { SubjectTeachingLanguage } from "@cognelo/contracts";
 import { api, ApiError, type CourseGroup, type StudentGroupingDto, type StudentGroupingStudent } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { AppIcon } from "@/components/app-icon";
-import { nextStudentTeamName, randomlyAssignStudents } from "@/lib/student-groupings";
+import { nextStudentTeamName } from "@/lib/student-groupings";
 
-type Draft = Omit<StudentGroupingInput, "teams"> & {
-  teams: Array<StudentGroupingInput["teams"][number] & { key: string }>;
-};
+import { StudentAssignmentDialog, type StudentGroupingDraft as Draft } from "./student-assignment-dialog";
+
 function studentInitials(name: string) {
   const words = name.trim().split(/\s+/);
   return `${words[0]?.[0] ?? ""}${words.length > 1 ? words.at(-1)?.[0] ?? "" : ""}`.toLocaleUpperCase();
 }
-const emptyDraft = (): Draft => ({ title: "", description: "", teams: [] });
+const emptyDraft = (): Draft => ({ title: "", description: "", studentChoiceEnabled: false, choiceOpensAt: null, choiceClosesAt: null, allowChoiceChanges: false, teams: [] });
 const draftFrom = (grouping: StudentGroupingDto): Draft => ({
-  title: grouping.title, description: grouping.description,
+  title: grouping.title, description: grouping.description, studentChoiceEnabled: grouping.studentChoiceEnabled,
+  choiceOpensAt: grouping.choiceOpensAt, choiceClosesAt: grouping.choiceClosesAt, allowChoiceChanges: grouping.allowChoiceChanges,
   teams: grouping.teams.map((team) => ({ ...team, key: team.id }))
 });
 
@@ -53,6 +53,7 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
   const [search, setSearch] = useState("");
   const [unassignedOnly, setUnassignedOnly] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
   const saving = useRef(false);
   const isDirty = editing && JSON.stringify(draft) !== JSON.stringify(saved ? draftFrom(saved) : emptyDraft());
 
@@ -60,7 +61,7 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
     const keys: Record<string, string> = {
       STUDENT_GROUPING_TITLE_EXISTS: "duplicateGrouping", STUDENT_GROUPING_TEAM_NAMES_DUPLICATE: "duplicateTeam",
       STUDENT_GROUPING_MEMBERS_DUPLICATE: "duplicateMember", STUDENT_GROUPING_MEMBERS_INVALID: "invalidMember",
-      STUDENT_GROUPING_TEAMS_INVALID: "invalidTeam", STUDENT_GROUPING_CONFLICT: "conflict"
+      STUDENT_GROUPING_TEAMS_INVALID: "invalidTeam", STUDENT_GROUPING_CONFLICT: "conflict", STUDENT_TEAM_CAPACITY_EXCEEDED: "capacityExceeded"
     };
     return t(`studentGroupings.${caught instanceof ApiError && caught.code && keys[caught.code] ? keys[caught.code] : "error"}`);
   }, [t]);
@@ -101,10 +102,6 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
   function edit(grouping: StudentGroupingDto | null) {
     setSaved(grouping); setDraft(grouping ? draftFrom(grouping) : emptyDraft());
     setSearch(""); setUnassignedOnly(false); setError(""); setEditing(true);
-  }
-  function assignRandomly() {
-    setDraft({ ...draft, teams: randomlyAssignStudents(draft.teams, students.map((student) => student.id)) });
-    setSearch(""); setUnassignedOnly(false);
   }
   async function reload() {
     if (isDirty && !await dialogs.confirm({ message: t("studentGroupings.discardConfirm"), confirmLabel: t("studentGroupings.discard") })) return;
@@ -147,17 +144,18 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
       <fieldset className="student-grouping-fields stack" disabled={busy}>
         <div className="field"><label htmlFor="student-grouping-title">{t("studentGroupings.name")}</label><input id="student-grouping-title" value={draft.title} maxLength={120} required onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></div>
         <div className="field"><label htmlFor="student-grouping-description">{t("studentGroupings.description")}</label><textarea id="student-grouping-description" value={draft.description} maxLength={2000} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></div>
-        <div className="section-heading"><h3>{t("studentGroupings.teams")}</h3><button className="secondary" type="button" disabled={draft.teams.length >= 500} onClick={() => setDraft((current) => ({ ...current, teams: [...current.teams, { key: crypto.randomUUID(), title: nextStudentTeamName(current.teams.map((team) => team.title), teachingLanguage), participantIds: [] }] }))}>{t("studentGroupings.addTeam")}</button></div>
+        <div className="section-heading"><h3>{t("studentGroupings.teams")}</h3><button className="secondary" type="button" disabled={draft.teams.length >= 500} onClick={() => setDraft((current) => ({ ...current, teams: [...current.teams, { key: crypto.randomUUID(), title: nextStudentTeamName(current.teams.map((team) => team.title), teachingLanguage), capacity: 4, participantIds: [] }] }))}>{t("studentGroupings.addTeam")}</button></div>
         {draft.teams.length ? draft.teams.map((team, index) => <div className="student-team-editor" key={team.key}>
           <div className="field"><input aria-label={t("studentGroupings.teamName", { number: index + 1 })} id={`team-${team.key}`} value={team.title} required maxLength={120} onChange={(event) => setDraft({ ...draft, teams: draft.teams.map((item) => item.key === team.key ? { ...item, title: event.target.value } : item) })} /></div>
+          <div className="field student-team-capacity"><label htmlFor={`team-capacity-${team.key}`}>{t("studentGroupings.slotsPerTeam")}</label><input id={`team-capacity-${team.key}`} aria-label={t("studentGroupings.teamSlotLabel", { team: team.title })} type="number" min={team.participantIds.length} max={5000} required value={Number.isFinite(team.capacity) ? team.capacity : ""} onChange={(event) => setDraft({ ...draft, teams: draft.teams.map((item) => item.key === team.key ? { ...item, capacity: event.target.valueAsNumber } : item) })} /></div>
           <span className="muted">{t("studentGroupings.memberCount", { count: team.participantIds.length })}</span>
           <button className="secondary" type="button" aria-label={t("studentGroupings.removeTeam", { number: index + 1 })} onClick={() => setDraft({ ...draft, teams: draft.teams.filter((item) => item.key !== team.key) })}>{t("common.remove")}</button>
         </div>) : <p className="muted">{t("studentGroupings.noTeams")}</p>}
         <div className="section-heading">
           <h3>{t("studentGroupings.students")}</h3>
-          <button className="secondary" type="button" disabled={!draft.teams.length || !students.length} onClick={assignRandomly} aria-describedby="random-assignment-help">{t("studentGroupings.assignRandomly")}</button>
+          <button className="secondary" type="button" disabled={!draft.teams.length} onClick={() => setAssignmentDialogOpen(true)} aria-describedby="automatic-assignment-help">{t("studentGroupings.automaticAssign")}</button>
         </div>
-        <p className="muted" id="random-assignment-help">{t("studentGroupings.randomAssignmentHelp")}</p>
+        <p className="muted" id="automatic-assignment-help">{t("studentGroupings.automaticAssignmentHelp")}</p>
         <p className="muted">{t("studentGroupings.assignmentHelp", { count: students.length - assignments.size })}</p>
         <div className="field"><label htmlFor="grouping-student-search">{t("studentGroupings.search")}</label><input id="grouping-student-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
         <label className="checkbox-row"><input type="checkbox" checked={unassignedOnly} onChange={(event) => setUnassignedOnly(event.target.checked)} />{t("studentGroupings.unassignedOnly")}</label>
@@ -166,13 +164,13 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
             <label htmlFor={`student-team-${student.id}`}><strong>{names.get(student.id)}</strong><span className="muted">{student.email}</span></label>
             <select id={`student-team-${student.id}`} value={assignments.get(student.id) ?? ""} onChange={(event) => setDraft({ ...draft, teams: draft.teams.map((team) => ({ ...team, participantIds: [...team.participantIds.filter((id) => id !== student.id), ...(team.key === event.target.value ? [student.id] : [])].sort() })) })}>
               <option value="">{t("studentGroupings.unassigned")}</option>
-              {draft.teams.map((team, index) => <option key={team.key} value={team.key}>{team.title || t("studentGroupings.teamName", { number: index + 1 })}</option>)}
+              {draft.teams.map((team, index) => <option key={team.key} value={team.key} disabled={team.participantIds.length >= team.capacity && !team.participantIds.includes(student.id)}>{team.title || t("studentGroupings.teamName", { number: index + 1 })}</option>)}
             </select>
           </div>)}
           {!visibleStudents.length ? <p className="muted">{t(students.length ? "studentGroupings.noMatches" : "studentGroupings.noStudents")}</p> : null}
         </div>
       </fieldset>
-      <EditActionBar isDirty={isDirty} isSaving={busy} savedLabel={copy.saved} unsavedLabel={copy.unsaved} saveLabel={t(saved ? "studentGroupings.save" : "studentGroupings.create")} savingLabel={copy.saving} cancelLabel={copy.cancel} onCancel={reset} form="student-grouping-form" saveDisabled={!draft.title.trim() || draft.teams.some((team) => !team.title.trim())} />
+      <EditActionBar isDirty={isDirty} isSaving={busy} savedLabel={copy.saved} unsavedLabel={copy.unsaved} saveLabel={t(saved ? "studentGroupings.save" : "studentGroupings.create")} savingLabel={copy.saving} cancelLabel={copy.cancel} onCancel={reset} form="student-grouping-form" saveDisabled={!draft.title.trim() || draft.teams.some((team) => !team.title.trim() || !Number.isInteger(team.capacity) || team.capacity < team.participantIds.length || team.capacity > 5000)} />
     </form> : groupings.length ? [...groupings].sort((a, b) => a.title.localeCompare(b.title)).map((grouping) => <article className="student-grouping-card" key={grouping.id} aria-label={grouping.title}>
       <header className="student-grouping-card-header">
         <div className="student-grouping-card-title"><h3>{grouping.title}</h3>{grouping.description ? <p className="muted">{grouping.description}</p> : null}</div>
@@ -190,8 +188,10 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
       </section>)}</div>
       {!grouping.teams.length ? <p className="student-grouping-no-teams muted">{t("studentGroupings.noTeams")}</p> : null}
       <footer className="student-grouping-card-footer">
+        {grouping.studentChoiceEnabled ? <span className="student-grouping-unassigned">{t("studentGroupings.studentChoiceMethod")}</span> : null}
         <span className="student-grouping-unassigned"><AppIcon name="participants" size={16} />{t("studentGroupings.unassignedCount", { count: students.length - grouping.teams.reduce((count, team) => count + team.participantIds.length, 0) })}</span>
       </footer>
     </article>) : <p className="muted">{t("studentGroupings.empty")}</p>}
+    {assignmentDialogOpen ? <StudentAssignmentDialog draft={draft} studentIds={students.map((student) => student.id)} onClose={() => setAssignmentDialogOpen(false)} onApply={(updated) => { setDraft(updated); setSearch(""); setUnassignedOnly(false); setAssignmentDialogOpen(false); }} /> : null}
   </section>;
 }

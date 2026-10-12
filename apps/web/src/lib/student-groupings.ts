@@ -11,20 +11,30 @@ export function nextStudentTeamName(existingNames: string[], teachingLanguage: S
   return name;
 }
 
-export function randomlyAssignStudents<T extends { participantIds: string[] }>(
-  teams: T[], studentIds: string[], random: () => number = Math.random
+export function randomlyAssignStudents<T extends { participantIds: string[]; capacity: number }>(
+  teams: T[], studentIds: string[], scope: "unassigned" | "all", random: () => number = Math.random
 ): T[] {
-  if (!teams.length) return [];
-  const result = teams.map((team) => ({ ...team, participantIds: [] as string[] }));
-  const shuffledStudents = [...studentIds];
-  // Fisher–Yates keeps every student equally likely to occupy each slot.
+  const result = teams.map((team) => ({ ...team, participantIds: scope === "all" ? [] as string[] : [...team.participantIds] }));
+  const assigned = new Set(result.flatMap((team) => team.participantIds));
+  const shuffledStudents = studentIds.filter((id) => !assigned.has(id));
   for (let index = shuffledStudents.length - 1; index > 0; index--) {
     const other = Math.floor(random() * (index + 1));
     [shuffledStudents[index], shuffledStudents[other]] = [shuffledStudents[other]!, shuffledStudents[index]!];
   }
-  // Vary the starting team so the same teams do not always receive the extra students.
-  const offset = Math.floor(random() * result.length);
-  shuffledStudents.forEach((id, index) => result[(index + offset) % result.length]!.participantIds.push(id));
+  for (const id of shuffledStudents) {
+    const available = result.filter((team) => team.participantIds.length < team.capacity);
+    if (!available.length) break;
+    const smallest = Math.min(...available.map((team) => team.participantIds.length));
+    const candidates = available.filter((team) => team.participantIds.length === smallest);
+    candidates[Math.floor(random() * candidates.length)]!.participantIds.push(id);
+  }
   result.forEach((team) => team.participantIds.sort());
   return result;
+}
+
+export function toTeamChoiceLocalDate(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }

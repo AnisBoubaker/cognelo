@@ -20,10 +20,10 @@ vi.mock("./authorization", () => ({ assertCanManageGroupRoster: mocks.authorize 
 const { createStudentGrouping, listStudentGroupings, updateStudentGrouping, deleteStudentGrouping } = await import("./student-groupings");
 const user: CurrentUser = { id: "teacher", email: "teacher@example.test", name: null, firstName: null, lastName: null, roles: ["teacher"] };
 const stored = () => ({
-  id: "grouping", groupId: "section", title: "Project teams", description: "", revision: 1,
-  teams: [{ id: "team", title: "Team A", members: [{ participantId: "student" }] }]
+  id: "grouping", groupId: "section", title: "Project teams", description: "", revision: 1, studentChoiceEnabled: false, choiceOpensAt: null, choiceClosesAt: null, allowChoiceChanges: false,
+  teams: [{ id: "team", title: "Team A", capacity: 4, members: [{ participantId: "student" }] }]
 });
-const input = { title: "Project teams", teams: [{ title: "Team A", participantIds: ["student"] }] };
+const input = { title: "Project teams", teams: [{ title: "Team A", capacity: 4, participantIds: ["student"] }] };
 const update = { ...input, revision: 1, teams: [{ ...input.teams[0]!, id: "team" }] };
 const knownError = (code: string) => new Prisma.PrismaClientKnownRequestError("Database conflict", { code, clientVersion: "test" });
 
@@ -66,7 +66,7 @@ describe("section student groupings", () => {
 
   it("lists only students and groupings from the selected section", async () => {
     const result = await listStudentGroupings(user, "course", "section");
-    expect(result.groupings[0]?.teams).toEqual([{ id: "team", title: "Team A", participantIds: ["student"] }]);
+    expect(result.groupings[0]?.teams).toEqual([{ id: "team", title: "Team A", capacity: 4, participantIds: ["student"] }]);
     expect(mocks.courseGroupParticipant.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { groupId: "section", role: "student" } }));
     expect(mocks.studentGrouping.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { groupId: "section" } }));
   });
@@ -101,7 +101,7 @@ describe("section student groupings", () => {
     expect(result.revision).toBe(2);
     expect(mocks.studentGrouping.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "grouping", groupId: "section", revision: 1 } }));
     expect(mocks.studentTeam.deleteMany).toHaveBeenCalledWith({ where: { groupingId: "grouping", id: { notIn: ["team"] } } });
-    expect(mocks.studentTeam.update).toHaveBeenLastCalledWith({ where: { id: "team" }, data: { title: "Team A" } });
+    expect(mocks.studentTeam.update).toHaveBeenLastCalledWith({ where: { id: "team" }, data: { title: "Team A", capacity: 4 } });
     expect(mocks.studentTeam.create).not.toHaveBeenCalled();
     expect(mocks.courseAuditEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "student_grouping_updated", previousValue: expect.objectContaining({ revision: 1 }), nextValue: expect.objectContaining({ revision: 2 }) }) });
   });
@@ -135,11 +135,22 @@ describe("section student groupings", () => {
   it("deletes only the grouping and records its prior composition", async () => {
     await expect(deleteStudentGrouping(user, "course", "section", "grouping", { revision: 1 })).resolves.toEqual({ ok: true });
     expect(mocks.studentGrouping.deleteMany).toHaveBeenCalledWith({ where: { id: "grouping", groupId: "section", revision: 1 } });
-    expect(mocks.courseAuditEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "student_grouping_deleted", previousValue: expect.objectContaining({ teams: [{ id: "team", title: "Team A", participantIds: ["student"] }] }) }) });
+    expect(mocks.courseAuditEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "student_grouping_deleted", previousValue: expect.objectContaining({ teams: [{ id: "team", title: "Team A", capacity: 4, participantIds: ["student"] }] }) }) });
   });
 
   it.each(["P2002", "P2034", "P2003"])("translates database conflict %s to a recoverable response", async (code) => {
     mocks.transaction.mockRejectedValue(knownError(code));
     await expect(createStudentGrouping(user, "course", "section", input)).rejects.toMatchObject({ status: 409, code: code === "P2002" ? "STUDENT_GROUPING_TITLE_EXISTS" : "STUDENT_GROUPING_CONFLICT" });
   });
+  it("rejects capacities smaller than existing membership", async () => {
+    await expect(updateStudentGrouping(user, "course", "section", "grouping", { ...update, teams: [{ ...update.teams[0], capacity: 0 }] })).rejects.toMatchObject({ code: "STUDENT_TEAM_CAPACITY_EXCEEDED", status: 400 });
+    expect(mocks.studentTeamMember.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("persists student selection dates and change permissions", async () => {
+    const policy = { studentChoiceEnabled: true, choiceOpensAt: "2026-10-01T12:00:00.000Z", choiceClosesAt: "2026-10-12T12:00:00.000Z", allowChoiceChanges: true };
+    await createStudentGrouping(user, "course", "section", { ...input, ...policy });
+    expect(mocks.studentGrouping.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ ...policy, choiceOpensAt: new Date(policy.choiceOpensAt), choiceClosesAt: new Date(policy.choiceClosesAt) }) }));
+  });
+
 });

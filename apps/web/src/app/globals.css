@@ -6054,3 +6054,29 @@ a.card:hover,
   .student-team-cards { padding: 1rem; }
   .student-grouping-card-footer { padding-inline: 1rem; }
 }
+
+.student-team-editor .student-team-capacity { flex: 0 1 7rem; }
+.student-grouping-card-footer { gap: 1rem; flex-wrap: wrap; }
+.dialog-panel:has(.student-assignment-dialog) { width: min(44rem, 100%); max-width: 44rem; max-height: calc(100dvh - 2rem); overflow-y: auto; }
+.student-assignment-dialog { margin-block-start: 1rem; color: var(--ink); gap: 1.25rem; }
+.student-assignment-methods { display: grid; gap: 0.65rem; border: 1px solid var(--line); border-radius: 10px; padding: 1rem; margin: 0; min-width: 0; }
+.student-assignment-methods legend { font-weight: 650; padding-inline: 0.3rem; }
+.student-assignment-methods label, .student-assignment-dialog .checkbox-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.student-assignment-methods input, .student-assignment-dialog input[type=checkbox], .student-team-select input { width: auto; flex: 0 0 auto; }
+.student-assignment-dialog .checkbox-row { flex-wrap: nowrap; align-items: flex-start; }
+.student-assignment-methods small { font-size: 0.8rem; }
+.student-assignment-dialog p { margin: 0; font-size: 0.875rem; line-height: 1.5; }
+.student-assignment-dialog .row { align-items: end; flex-wrap: wrap; gap: 0.75rem; }
+.student-assignment-dialog .row .field { flex: 1 1 10rem; }
+.student-assignment-capacities { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); gap: 0.75rem; }
+.student-assignment-dialog .form-grid-two { gap: 0.75rem; }
+.student-team-card.is-selected { outline: 2px solid var(--team-color); outline-offset: 2px; }
+.student-team-current { font-size: 0.8rem; color: var(--team-color); font-weight: 650; margin-block: -0.35rem 0.8rem; }
+.student-team-open-slot .student-team-avatar { background: transparent; border: 1px dashed var(--line); color: var(--muted); }
+.student-team-select { display: flex; align-items: center; gap: 0.5rem; margin-block-start: 1rem; padding-block-start: 0.75rem; border-block-start: 1px solid var(--line); font-size: 0.875rem; cursor: pointer; }
+.student-team-select:has(input:disabled) { cursor: default; color: var(--muted); }
+.student-choice-dates { display: flex; gap: 0.3rem 1.25rem; flex-wrap: wrap; }
+.student-choice-footer { align-items: center; justify-content: space-between; }
+.student-choice-footer:empty { display: none; }
+.student-choice-footer p { margin: 0; font-size: 0.875rem; }
+.student-choice-footer [role=alert], .student-choice-footer [role=status] { flex-basis: 100%; }
