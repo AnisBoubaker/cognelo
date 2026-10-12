@@ -57,6 +57,12 @@ The runner starts the API and web development servers when they are not already 
 
 The broad activity suite exercises real plugin integrations. Coding exercise runs require Judge0, web-design runs require the Playwright runner, and Coding Homework challenge generation requires a configured question-authoring model plus the API background worker. Start those services and configure the model connection before running the complete suite.
 
+## Test email
+
+The shared API delivery boundary captures `cognelo.local` and reserved example/test recipients in the private `storage/email-outbox/` directory, even when the reused server has real SMTP or Graph configured. The account verification scenario reads the captured code and exercises the real send/verify APIs. A separate administrator scenario verifies capture through the actual test-email endpoint. The email-settings progress/secret-retention scenario still intercepts its settings requests to avoid changing the instance configuration.
+
+Outbox assertions require local access to the API’s storage. Use synthetic domains for overridden E2E account emails; ordinary domains retain real delivery behavior. See [Email delivery and test recipients](../../docs/EMAIL_DELIVERY.md) for exact matching, privacy, cleanup, and failure behavior.
+
 ## Focused regression checks
 
 Run the independent authoring-recovery, bank-synchronization, course-loading, and student-grouping scenarios with:
@@ -65,9 +71,9 @@ Run the independent authoring-recovery, bank-synchronization, course-loading, an
 npm run test:e2e -- --grep @regression
 ```
 
-These eleven tests require the normal migrated/seeded database, API, and web app, but no AI provider, Judge0, or web-design runner. Each test provisions its own disposable course/section scenario (with bank/MCQ content where needed) through public APIs and runs lifecycle-aware cleanup, so failures do not skip later scenarios in a serial chain. The bank/course fixture creates both shared course placement and group assignment, which are distinct content scopes.
+These thirteen tests require the normal migrated/seeded database, API, and web app, but no AI provider, Judge0, or web-design runner. Each test provisions its own disposable course/section scenario (with bank/MCQ content where needed) through public APIs and runs lifecycle-aware cleanup, so failures do not skip later scenarios in a serial chain. The bank/course fixture creates both shared course placement and group assignment, which are distinct content scopes.
 
-Grouping scenarios cover independent team assignments, section boundaries, concurrency, pending enrollments, failed-draft recovery, teacher/TA/student permissions, and enrollment/section deletion cascades.
+Grouping scenarios cover course-language default team names, editable-name persistence and collision avoidance, balanced random assignment with cancel/save, independent team assignments, section boundaries, concurrency, pending enrollments, failed-draft recovery, teacher/TA/student permissions, and enrollment/section deletion cascades.
 
 Only deliberate save/session failures and gradebook latency are intercepted. Recovery, synchronization, submission, and persistence assertions use the real services. The loading test releases its pending response in `finally`; it uses request/UI state instead of fixed sleeps. The `@regression` tag selects this focused set, not every regression assertion in the wider suite.
 
