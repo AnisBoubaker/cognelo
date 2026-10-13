@@ -163,6 +163,7 @@ async function processActivityVariation(job: BackgroundJobRecord) {
       });
     }
 
+    const warnings: Array<{ activityId: string; title: string; code: string; message: string }> = [];
     for (const [index, copy] of copies.entries()) {
       const handler = resolveBankActivityVariationHandler(copy.activityTypeKey);
       if (!handler) {
@@ -181,7 +182,7 @@ async function processActivityVariation(job: BackgroundJobRecord) {
         step: "content",
         total: copies.length
       });
-      await handler({
+      const result = await handler({
         user: payload.user,
         activityBankId: payload.activityBankId,
         sourceActivity: toServerActivityRecord(sourceActivity),
@@ -201,6 +202,12 @@ async function processActivityVariation(job: BackgroundJobRecord) {
           });
         }
       });
+      if (result?.warnings?.length) {
+        const variedActivity = await getBankActivity(payload.user, payload.activityBankId, copy.bankActivityId);
+        warnings.push(...result.warnings.map((warning) => ({
+          ...warning, activityId: copy.bankActivityId, title: variedActivity.title
+        })));
+      }
       await reportJobProgress(job.id, {
         completed: index + 1,
         currentActivityTitle: sourceActivity.title,
@@ -221,7 +228,7 @@ async function processActivityVariation(job: BackgroundJobRecord) {
       step: "saving",
       total: copies.length
     });
-    return { activityId: createdBankActivityId, title: createdActivity?.title ?? payload.title };
+    return { activityId: createdBankActivityId, title: createdActivity?.title ?? payload.title, warnings };
   } catch (error) {
     let cleanupError: unknown = null;
     if (createdBankActivityId) {

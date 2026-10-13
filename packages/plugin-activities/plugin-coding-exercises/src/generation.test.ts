@@ -616,12 +616,12 @@ describe("coding exercise AI generation", () => {
     }
   });
 
-  it("keeps the exact-count requirement for automatic bank variations", async () => {
+  it("returns partial suites to variation callers when requested counts cannot be reached", async () => {
     mocks.generateQuestionAuthoringText.mockResolvedValue(JSON.stringify(mixedTests));
     mocks.validateReferenceSolutionAgainstHiddenTests.mockImplementation((input: ValidationInput) => validationFor(input, ["hidden-bad"]));
 
-    await expect(generateCodingExerciseTests({ ...testsInput, requireCompleteSuite: true })).rejects.toMatchObject({
-      code: "CODING_EXERCISE_TEST_GENERATION_INVALID"
+    await expect(generateCodingExerciseTests(testsInput)).resolves.toMatchObject({
+      status: "warning", sampleTests: [{ id: "sample-good" }], hiddenTests: [{ id: "hidden-good" }]
     });
   });
 

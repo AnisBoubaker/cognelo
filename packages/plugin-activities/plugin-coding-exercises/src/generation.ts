@@ -357,7 +357,6 @@ export async function generateCodingExerciseTests(input: {
   hiddenTestCount?: number;
   existingTests?: ExistingTests;
   knowledge?: ActivityGenerationKnowledge;
-  requireCompleteSuite?: boolean;
 }) {
   const visibleTestCount = input.visibleTestCount ?? codingExerciseDefaultVisibleTestCount;
   const hiddenTestCount = input.hiddenTestCount ?? codingExerciseDefaultHiddenTestCount;
@@ -383,7 +382,7 @@ export async function generateCodingExerciseTests(input: {
         maxOutputTokens: 9000
       });
     } catch (error) {
-      if (retained && !input.requireCompleteSuite) return partialResult(attempt);
+      if (retained) return partialResult(attempt);
       throw error;
     }
     const parsed = parseGeneratedJson(raw);
@@ -401,7 +400,7 @@ export async function generateCodingExerciseTests(input: {
 
     const impossible = generatedImpossibleSchema.safeParse(parsed.value);
     if (impossible.success) {
-      if (retained && !input.requireCompleteSuite) return partialResult(attempt);
+      if (retained) return partialResult(attempt);
       return {
         status: "error" as const,
         message: impossible.data.message,
@@ -421,7 +420,7 @@ export async function generateCodingExerciseTests(input: {
       existingTests: input.existingTests,
       retained
     }).catch((error: unknown) => {
-      if (!retained || input.requireCompleteSuite) throw error;
+      if (!retained) throw error;
       return { issues: ["Further test validation was unavailable."] };
     });
     if ("fatalError" in validation && validation.fatalError) {
@@ -457,7 +456,7 @@ export async function generateCodingExerciseTests(input: {
     );
   }
 
-  if (retained && !input.requireCompleteSuite) return partialResult(3);
+  if (retained) return partialResult(3);
 
   throw new AppError(422, "CODING_EXERCISE_TEST_GENERATION_INVALID", "The AI agent could not generate valid coding exercise tests.", {
     issues: lastIssues,

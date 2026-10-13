@@ -792,6 +792,7 @@ export const frMessages = {
       variationQueued: "En attente du démarrage…",
       variationFailed: "La variante n’a pas pu être créée.",
       variationComplete: 'Le nouvel exercice est « {title} ».',
+      variationCompleteWithWarnings: 'La variante « {title} » a été créée avec des avertissements. Vérifiez les éléments suivants avant de publier.',
       variationError: "Impossible de créer la variante de l’activité.",
       variationStatusError: "Impossible de vérifier la progression de la variante.",
       variationStep: {

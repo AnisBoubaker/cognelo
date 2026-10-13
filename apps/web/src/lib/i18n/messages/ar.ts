@@ -544,6 +544,7 @@ export const arMessages = {
       variationQueued: "بانتظار البدء…",
       variationFailed: "تعذّر إنشاء التنويع.",
       variationComplete: "التمرين الجديد هو «{title}».",
+      variationCompleteWithWarnings: "تم إنشاء النسخة «{title}» مع تحذيرات. راجع ما يلي قبل النشر.",
       variationError: "تعذّر إنشاء تنويع النشاط.",
       variationStatusError: "تعذّر التحقق من تقدّم التنويع.",
       variationStep: {

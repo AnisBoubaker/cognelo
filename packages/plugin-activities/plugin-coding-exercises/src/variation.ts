@@ -12,6 +12,7 @@ import {
   generateCodingExerciseVariationMetadata
 } from "./generation";
 import { listBankCodingExerciseHiddenTests, replaceBankCodingExerciseHiddenTests } from "./hidden-tests";
+import { formatCodingExercisesMessage } from "./web/messages";
 
 export const createCodingExerciseBankActivityVariation: BankActivityVariationHandler = async (input) => {
   const sourceConfig = parseCodingExerciseConfig(input.sourceActivity.config);
@@ -69,8 +70,14 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
       locale: input.locale,
       subject: input.subject,
       knowledge: input.knowledge
+    }).catch((error: unknown) => {
+      // A failed optional testability retry must not erase the earlier exercise.
+      if (solutionResult) return null;
+      throw error;
     });
+    if (!candidateSolution) break;
     if (candidateSolution.status === "error") {
+      if (solutionResult) break;
       if (attempt < 2 && (visibleTestCount || hiddenTestCount)) {
         solutionBrief = buildTestabilityRetryBrief(variationBrief, visibleTestCount, hiddenTestCount, [candidateSolution.message]);
         continue;
@@ -78,9 +85,11 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
       throw new AppError(422, "CODING_EXERCISE_VARIATION_SOLUTION_UNAVAILABLE", candidateSolution.message);
     }
     if (sourceReferenceSolution && candidateSolution.referenceSolution.trim() === sourceReferenceSolution.trim()) {
+      if (solutionResult) break;
       throw new AppError(422, "CODING_EXERCISE_VARIATION_SOLUTION_NOT_DISTINCT", "The AI agent repeated the original programming exercise solution.");
     }
 
+    solutionResult = candidateSolution;
     await input.reportProgress({ fraction: attempt === 1 ? 0.58 : 0.76, step: "tests" });
     try {
       const candidateTests = visibleTestCount || hiddenTestCount
@@ -96,7 +105,6 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
             templateVisibleLineNumbers: candidateSolution.templateVisibleLineNumbers,
             visibleTestCount,
             hiddenTestCount,
-            requireCompleteSuite: true,
             knowledge: input.knowledge
           })
         : null;
@@ -105,14 +113,15 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
           solutionBrief = buildTestabilityRetryBrief(variationBrief, visibleTestCount, hiddenTestCount, [candidateTests.message]);
           continue;
         }
-        throw new AppError(422, "CODING_EXERCISE_VARIATION_TESTS_UNAVAILABLE", candidateTests.message);
+        break;
       }
       solutionResult = candidateSolution;
       testsResult = candidateTests;
       break;
     } catch (error) {
       const feedback = recoverableTestGenerationFeedback(error);
-      if (attempt >= 2 || !feedback) throw error;
+      if (!feedback) throw error;
+      if (attempt >= 2) break;
       solutionBrief = buildTestabilityRetryBrief(variationBrief, visibleTestCount, hiddenTestCount, feedback);
     }
   }
@@ -120,11 +129,11 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
     throw new AppError(422, "CODING_EXERCISE_VARIATION_SOLUTION_UNAVAILABLE", "The AI agent could not generate a reference solution that supports the required test suite.");
   }
   if (testsResult && testSuitesMatch(sourceConfig.sampleTests, sourcePrivate.tests, testsResult.sampleTests, testsResult.hiddenTests)) {
-    throw new AppError(422, "CODING_EXERCISE_VARIATION_TESTS_NOT_DISTINCT", "The AI agent repeated the original programming exercise tests.");
+    testsResult = null;
   }
 
   const nextPrivateConfig = mergeCodingExerciseGeneratedSolutionPrivateConfig(sourcePrivateConfig, solutionResult);
-  const sampleTests = testsResult?.sampleTests ?? [];
+  let sampleTests = testsResult?.sampleTests ?? [];
   const generatedHiddenTests = testsResult?.hiddenTests ?? [];
   assertVariationTestCounts({
     expectedVisible: visibleTestCount,
@@ -132,7 +141,7 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
     actualVisible: sampleTests.length,
     actualHidden: generatedHiddenTests.length
   });
-  const hiddenTests = generatedHiddenTests.map((test, index) => ({
+  let hiddenTests = generatedHiddenTests.map((test, index) => ({
     ...test,
     weight: sourcePrivate.tests[index]?.weight ?? test.weight
   }));
@@ -145,27 +154,69 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
   };
 
   await input.reportProgress({ fraction: 0.82, step: "validating" });
+  // Save still uses ordinary reference validation. If a case fails a final
+  // recheck, prune only non-passing cases and validate the smaller suite again.
+  // Each retry strictly reduces the suite; infrastructure/persistence errors throw.
+  for (;;) {
+    nextConfig.sampleTests = sampleTests;
+    try {
+      await replaceBankCodingExerciseHiddenTests({
+        activityBankId: input.activityBankId,
+        bankActivityId: input.activity.id,
+        activityConfig: nextConfig,
+        user: input.user,
+        input: {
+          tests: hiddenTests,
+          sampleTests,
+          referenceSolution: solutionResult.referenceSolution,
+          privateConfig: nextPrivateConfig,
+          activityConfig: nextConfig
+        }
+      });
+      break;
+    } catch (error) {
+      if (!(error instanceof AppError) || error.code !== "REFERENCE_SOLUTION_VALIDATION_FAILED") throw error;
+      const summary = (error.details as { validationSummary?: Record<string, unknown> } | undefined)?.validationSummary;
+      const sampleIds = passingTestIds(summary?.sampleTests);
+      const hiddenIds = passingTestIds(summary?.hiddenTests);
+      if (!sampleIds || !hiddenIds) throw error;
+      const passingSamples = sampleTests.filter((test) => sampleIds.has(test.id));
+      const passingHidden = hiddenTests.filter((test) => hiddenIds.has(test.id));
+      if (passingSamples.length + passingHidden.length >= sampleTests.length + hiddenTests.length) throw error;
+      sampleTests = passingSamples;
+      hiddenTests = passingHidden;
+    }
+  }
   await updateBankActivity(input.user, input.activity.id, {
     title: metadataResult.title,
     description: metadataResult.description,
     config: nextConfig,
     lifecycle: "draft"
   });
-  await replaceBankCodingExerciseHiddenTests({
-    activityBankId: input.activityBankId,
-    bankActivityId: input.activity.id,
-    activityConfig: nextConfig,
-    user: input.user,
-    input: {
-      tests: hiddenTests,
-      sampleTests,
-      referenceSolution: solutionResult.referenceSolution,
-      privateConfig: nextPrivateConfig,
-      activityConfig: nextConfig
-    }
-  });
   await input.reportProgress({ fraction: 0.98, step: "saving" });
+  const warnings: Array<{ code: string; message: string }> = [];
+  if (sampleTests.length < visibleTestCount || hiddenTests.length < hiddenTestCount) {
+    warnings.push({
+      code: "CODING_EXERCISE_VARIATION_INCOMPLETE_TESTS",
+      message: formatCodingExercisesMessage(input.locale, "variationTestsIncomplete", {
+        visible: sampleTests.length, expectedVisible: visibleTestCount,
+        hidden: hiddenTests.length, expectedHidden: hiddenTestCount
+      })
+    });
+  }
+  if (testsResult?.warningMessage) {
+    warnings.push({ code: "CODING_EXERCISE_VARIATION_TEST_ASSUMPTIONS", message: testsResult.warningMessage });
+  }
+  return { warnings };
 };
+
+function passingTestIds(value: unknown) {
+  if (!value || typeof value !== "object" || !("tests" in value) || !Array.isArray(value.tests)) return null;
+  return new Set(value.tests.flatMap((test: unknown) =>
+    test && typeof test === "object" && "passed" in test && test.passed === true && "id" in test && typeof test.id === "string"
+      ? [test.id] : []
+  ));
+}
 
 function assertVariationTestCounts(input: {
   expectedVisible: number;
@@ -173,11 +224,11 @@ function assertVariationTestCounts(input: {
   actualVisible: number;
   actualHidden: number;
 }) {
-  if (input.actualVisible === input.expectedVisible && input.actualHidden === input.expectedHidden) return;
+  if (input.actualVisible <= input.expectedVisible && input.actualHidden <= input.expectedHidden) return;
   throw new AppError(
     422,
     "CODING_EXERCISE_VARIATION_TEST_COUNT_MISMATCH",
-    "The generated variation did not preserve the original visible and hidden test counts.",
+    "The generated variation exceeded the requested visible or hidden test count.",
     input
   );
 }

@@ -86,6 +86,11 @@ export type BankActivityVariationProgress = {
   step: "content" | "prompt" | "solution" | "tests" | "validating" | "saving";
 };
 
+export type BankActivityVariationResult = {
+  // Safe, localized review guidance only; never expose private generation artifacts.
+  warnings?: Array<{ code: string; message: string }>;
+};
+
 export type BankActivityVariationHandler = (input: {
   user: CurrentUser;
   activityBankId: string;
@@ -96,7 +101,7 @@ export type BankActivityVariationHandler = (input: {
   subject: { title: string; description: string };
   knowledge: ActivityVariationKnowledge;
   reportProgress: (progress: BankActivityVariationProgress) => Promise<void>;
-}) => Promise<void>;
+}) => Promise<void | BankActivityVariationResult>;
 
 export type CourseActivityDeletedHook = (input: {
   user: CurrentUser;

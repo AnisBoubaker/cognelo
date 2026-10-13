@@ -6,7 +6,7 @@ import {
   listActivityCategories,
   type ActivityCategoryId
 } from "@cognelo/activity-sdk/categories";
-import { ActivityVersionDiffView, ConfirmationDialog, ContextMenu, ProgressDialog } from "@cognelo/activity-ui";
+import { ActivityVersionDiffView, ConfirmationDialog, ContextMenu, ProgressDialog, useNotifications } from "@cognelo/activity-ui";
 import type { ActivityVersionDiff } from "@cognelo/contracts";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -60,6 +60,8 @@ export default function ActivityBankDetailPage() {
   const router = useRouter();
   const activityBankId = params.activityBankId;
   const { locale, t } = useI18n();
+  const { warning: notifyWarning } = useNotifications();
+  const notifiedVariationJobs = useRef(new Set<string>());
   const [bank, setBank] = useState<ActivityBank | null>(null);
   const [activityBanks, setActivityBanks] = useState<ActivityBank[]>([]);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
@@ -168,7 +170,17 @@ export default function ActivityBankDetailPage() {
         const result = await api.bankActivityVariationJob(variationBankId, variationSourceActivityId, variationJobId);
         if (disposed) return;
         setVariationJob(result.job);
-        if (result.job.status === "succeeded") await loadPage();
+        if (result.job.status === "succeeded") {
+          const warnings = result.job.result?.warnings ?? [];
+          if (warnings.length && !notifiedVariationJobs.current.has(result.job.id)) {
+            notifiedVariationJobs.current.add(result.job.id);
+            notifyWarning([
+              t("activityBankDetail.variationCompleteWithWarnings", { title: result.job.result?.title ?? "" }),
+              ...warnings.map((warning) => `${warning.title}: ${warning.message}`)
+            ].join("\n"));
+          }
+          await loadPage();
+        }
       } catch (err) {
         if (!disposed) setError(err instanceof Error ? err.message : t("activityBankDetail.variationStatusError"));
       }
@@ -179,7 +191,7 @@ export default function ActivityBankDetailPage() {
       disposed = true;
       window.clearInterval(timer);
     };
-  }, [loadPage, t, variationBankId, variationJobId, variationJobStatus, variationSourceActivityId]);
+  }, [loadPage, notifyWarning, t, variationBankId, variationJobId, variationJobStatus, variationSourceActivityId]);
 
   async function createBankActivity(selectedActivityTypeKey: string) {
     if (!bank) {
@@ -1036,7 +1048,21 @@ export default function ActivityBankDetailPage() {
           open={Boolean(variationActivity && (creatingVariation || variationJob))}
           eyebrow={t("activityBankDetail.variationEyebrow")}
           title={t("activityBankDetail.variationTitle")}
-          message={variationJob ? variationStatusText(variationJob, t) : t("activityBankDetail.variationQueued")}
+          message={variationJob ? (
+            <div className="stack">
+              <p>{variationStatusText(variationJob, t)}</p>
+              {variationJob.status === "succeeded" && Boolean(variationJob.result?.warnings?.length) ? (
+                <ul>
+                  {variationJob.result?.warnings?.map((warning, index) => (
+                    <li key={`${warning.activityId}-${warning.code}-${index}`}>
+                      <Link href={`/activity-banks/${activityBankId}/activities/${warning.activityId}`}>{warning.title}</Link>
+                      <p>{warning.message}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : t("activityBankDetail.variationQueued")}
           progress={variationJob ? variationProgressPercent(variationJob) : null}
           progressLabel={t("activityBankDetail.variationProgressLabel")}
           progressSummary={variationJob && variationJob.status !== "succeeded"
@@ -1334,7 +1360,8 @@ function variationProgressPercent(job: ActivityVariationJob) {
 
 function variationStatusText(job: ActivityVariationJob, t: I18nTranslate) {
   if (job.status === "failed") return t("activityBankDetail.variationFailed");
-  if (job.status === "succeeded") return t("activityBankDetail.variationComplete", { title: job.result?.title ?? "" });
+  if (job.status === "succeeded") return t(job.result?.warnings?.length
+    ? "activityBankDetail.variationCompleteWithWarnings" : "activityBankDetail.variationComplete", { title: job.result?.title ?? "" });
   if (job.status === "queued") return t("activityBankDetail.variationQueued");
   const title = job.progress.currentActivityTitle ?? "";
   const step = job.progress.step ?? "content";
