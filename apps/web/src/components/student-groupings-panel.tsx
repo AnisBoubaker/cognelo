@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { EditActionBar, getEditActionBarCopy, useDialogs, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { EditActionBar, getEditActionBarCopy, useDialogs, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { SubjectTeachingLanguage } from "@cognelo/contracts";
 import { api, ApiError, type CourseGroup, type StudentGroupingDto, type StudentGroupingStudent } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -42,6 +42,7 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
 }) {
   const { locale, t } = useI18n();
   const dialogs = useDialogs();
+  const notifications = useNotifications();
   const copy = getEditActionBarCopy(locale);
   const [groupings, setGroupings] = useState<StudentGroupingDto[]>([]);
   const [students, setStudents] = useState<StudentGroupingStudent[]>([]);
@@ -88,11 +89,12 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
         : await api.createStudentGrouping(courseId, groupId, input);
       setGroupings((current) => [...current.filter((grouping) => grouping.id !== result.grouping.id), result.grouping]);
       setSaved(result.grouping); setDraft(draftFrom(result.grouping));
+      notifications.success(t(saved ? "studentGroupings.saved" : "studentGroupings.created"));
     } catch (caught) {
       setError(errorMessage(caught));
       throw caught;
     } finally { setBusy(false); saving.current = false; }
-  }, [courseId, draft, errorMessage, groupId, saved]);
+  }, [courseId, draft, errorMessage, groupId, notifications, saved, t]);
   useUnsavedChangesGuard({ isDirty, onSave: save, onDiscard: reset });
 
   async function close() {

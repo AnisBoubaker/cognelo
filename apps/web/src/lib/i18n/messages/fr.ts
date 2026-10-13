@@ -22,6 +22,8 @@ export const frMessages = {
     "removedTarget": "Équipe ou étudiant supprimé"
   },
     studentGroupings: {
+      "created": "Regroupement créé.",
+      "saved": "Regroupement enregistré.",
       "manualMethod": "Manuelle",
       "useManual": "Passer à l’attribution manuelle",
       "studentVisibility": "Visibilité pour les étudiants",
