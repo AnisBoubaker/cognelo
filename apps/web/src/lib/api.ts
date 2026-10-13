@@ -260,6 +260,7 @@ export type CodingExerciseTestsGenerationInput = CodingExerciseGenerationBaseInp
   templateVisibleLineNumbers: number[];
   visibleTestCount: number;
   hiddenTestCount: number;
+  existingTests?: Pick<Exclude<CodingExerciseTestsGenerationResult, { status: "error" }>, "sampleTests" | "hiddenTests">;
 };
 
 export type CodingExerciseRubricGenerationInput = CodingExerciseGenerationBaseInput & {
