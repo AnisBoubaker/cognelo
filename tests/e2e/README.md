@@ -30,7 +30,7 @@ The Playwright suite covers the platform's critical browser journeys with real A
 - attempt-scoped live activity broadcasts, including recent-recipient detection, unread/read state, the combined timer-and-envelope control, and isolation of messages when the learner starts a later attempt;
 - bank activity publication from the editor and list, version comparison, duplication, movement between banks, and AI-assisted variation progress for both individual activities and compound Tests, including midpoint failure cleanup and retry;
 - explicit bank-to-course synchronization confirmation/cancellation, preservation of assignment and placement, immutable earlier versions, post-submission retrieval rejection, and course-to-bank publication without changing attempts or grades;
-- on-demand gradebook summary loading and continued content-menu interaction while the gradebook request is pending;
+- on-demand gradebook summary loading, continued content-menu interaction while the gradebook request is pending, and desktop/mobile scroll and collapsed-folder preservation during slow content-settings refreshes and visibility changes;
 - administrator-managed Judge0, web-design, and SageMath execution-runner endpoints, including per-endpoint capability checks; and
 - group settings updates and restoration;
 - English/French locale persistence across navigation and reload; and
@@ -80,7 +80,7 @@ Visibility coverage proves that hidden groupings are absent from learner respons
 
 Activity-exception scenarios cover all ten section override categories, teacher-ordered team priority, individual precedence, hidden grouping targets, Save/Cancel, effective learner access/SEB/attempts/grading/challenges, live started deadlines, teacher warning/cancellation and optional in-app messages, draft preservation during refresh and temporary hiding, extra attempts on an open page, submitted timing preservation, current membership, cleared section dates, atomic invalid-target/window rejection, legacy preservation, formative pruning, and lifecycle cleanup.
 
-Only deliberate save/session failures and gradebook latency are intercepted. Recovery, synchronization, submission, and persistence assertions use the real services. The loading test releases its pending response in `finally`; it uses request/UI state instead of fixed sleeps. The `@regression` tag selects this focused set, not every regression assertion in the wider suite.
+Only deliberate save/session failures and content/gradebook latency are intercepted. Recovery, synchronization, submission, and persistence assertions use the real services. Loading tests release their pending responses in `finally`; they use request/UI state instead of fixed sleeps. The `@regression` tag selects this focused set, not every regression assertion in the wider suite.
 
 The broader suite still runs only the configured Chromium project. Useful next additions include the remaining synchronization branches (restore-original and both-copies-changed), compound-Test resume/navigation boundaries, and Firefox/WebKit coverage if those browsers become supported test targets.
 
