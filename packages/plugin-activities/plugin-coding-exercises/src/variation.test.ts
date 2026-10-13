@@ -27,10 +27,10 @@ vi.mock("./hidden-tests", () => ({
   replaceBankCodingExerciseHiddenTests: mocks.replacePrivate
 }));
 
-const [{ AppError }, { createCodingExerciseBankActivityVariation }] = await Promise.all([
-  import("@cognelo/core"),
-  import("./variation")
-]);
+// Load the mocked error class first so concurrent mock-factory evaluation cannot
+// give the variation handler a different AppError constructor for instanceof.
+const { AppError } = await import("@cognelo/core");
+const { createCodingExerciseBankActivityVariation } = await import("./variation");
 
 describe("coding exercise bank variations", () => {
   beforeEach(() => {
