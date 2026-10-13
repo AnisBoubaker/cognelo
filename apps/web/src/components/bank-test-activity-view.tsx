@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ConfirmationDialog, EditActionBar, ProgressDialog, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
+import { TestItemWeight } from "@/components/test-item-weight";
 import {
   api,
   type ActivityBank,
@@ -147,6 +148,7 @@ export function BankTestActivityView({ activity, bank, locale, onActivityUpdated
   }
 
   const settings = test.settings;
+  const totalPoints = test.items.reduce((total, item) => total + item.pointsPossible, 0);
   return (
     <div className="stack">
       <section className="section stack">
@@ -224,7 +226,10 @@ export function BankTestActivityView({ activity, bank, locale, onActivityUpdated
         {test.items.length ? test.items.map((item, index) => (
           <article className="card card-compact" key={item.id}>
             <div className="stack">
-              <strong>{index + 1}. {item.activity.title}</strong>
+              <div className="row row-between">
+                <strong>{index + 1}. {item.activity.title}</strong>
+                <TestItemWeight points={item.pointsPossible} totalPoints={totalPoints} locale={locale} />
+              </div>
               <span className="muted">{item.activity.activityType.name}</span>
               <div className="form-grid-two">
                 <label className="field">Points

@@ -1140,6 +1140,7 @@ export const frMessages = {
       testSubmittedLabel: "Test remis",
       testAttemptNumber: "Tentative {number}",
       testActivityPosition: "Activité {current} sur {total}",
+      testItemWeight: "{percentage} du test",
       testActivitiesLabel: "Activités du test",
       testRendererUnavailable: "Ce type d’activité n’a pas encore de vue pour les tests.",
       testPreviousActivity: "Activité précédente",

@@ -6,6 +6,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { ConfirmationDialog, EditActionBar, MarkdownRenderer, ProgressDialog, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
+import { TestItemWeight } from "@/components/test-item-weight";
 import {
   api,
   ApiError,
@@ -229,6 +230,7 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
   }
 
   const settings = test.settings;
+  const totalPoints = test.items.reduce((total, item) => total + item.pointsPossible, 0);
   return (
     <div className="stack">
       <section className="section stack">
@@ -324,7 +326,10 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
         {test.items.length ? test.items.map((item, index) => (
           <article className="card card-compact" key={item.id}>
             <div className="stack">
-              <strong>{index + 1}. {item.activity.title}</strong>
+              <div className="row row-between">
+                <strong>{index + 1}. {item.activity.title}</strong>
+                <TestItemWeight points={item.pointsPossible} totalPoints={totalPoints} locale={locale} />
+              </div>
               <span className="muted">{item.activity.activityType.name}</span>
               <div className="form-grid-two">
                 <label className="field">Points
@@ -434,6 +439,7 @@ function TestStudentRuntime({
   activity,
   activityRouteCourseId,
   groupId,
+  locale,
   onSubmitted,
   studentViewMode = "attempt",
   onNewAttemptAvailabilityChange,
@@ -759,6 +765,7 @@ function TestStudentRuntime({
 
   const attemptStarted = runtime.attempt?.lifecycle === "started" && !runtime.resume.blocked;
   const selectedItem = selectedRuntimeItem;
+  const totalPoints = runtime.test.items.reduce((total, item) => total + item.pointsPossible, 0);
   const isReadOnly = !attemptStarted;
   const reviewing = reviewAnswers !== null && attemptStarted;
   const countdownTone = remainingSeconds === null
@@ -840,7 +847,10 @@ function TestStudentRuntime({
             {runtime.test.items.map((item, index) => (
               <li className="test-review-item" key={item.id}>
                 <span className="test-review-number" aria-hidden="true">{index + 1}</span>
-                <strong className="test-review-title">{item.activity.title}</strong>
+                <div className="test-review-title stack stack-tight">
+                  <strong>{item.activity.title}</strong>
+                  <TestItemWeight points={item.pointsPossible} totalPoints={totalPoints} locale={locale} />
+                </div>
                 <span className={`metadata-badge${reviewAnswers[item.id] ? "" : " is-warning"}`}>
                   {t(reviewAnswers[item.id] ? "courseDetail.testAnswered" : "courseDetail.testNotAnswered")}
                 </span>
@@ -897,7 +907,10 @@ function TestStudentRuntime({
             <section className="section stack" key={`${selectedItem.id}:${JSON.stringify(selectedItem.activity.config)}:${selectedItem.activity.description}`}>
               <div>
                 <p className="eyebrow">{t("courseDetail.testActivityPosition", { current: selectedIndex + 1, total: runtime.test.items.length })}</p>
-                <h2>{selectedItem.activity.title}</h2>
+                <div className="row row-between">
+                  <h2>{selectedItem.activity.title}</h2>
+                  <TestItemWeight points={selectedItem.pointsPossible} totalPoints={totalPoints} locale={locale} />
+                </div>
               </div>
               {runtime.resume.blocked ? (
                 <p className="muted">{t("courseDetail.testResumeDisabledSubmitting")}</p>

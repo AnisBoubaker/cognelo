@@ -1139,6 +1139,7 @@ export const zhMessages = {
       testSubmittedLabel: "已提交的测试",
       testAttemptNumber: "第 {number} 次尝试",
       testActivityPosition: "活动 {current}/{total}",
+      testItemWeight: "占测验总分的 {percentage}",
       testActivitiesLabel: "测试活动",
       testRendererUnavailable: "此活动类型尚无测试视图。",
       testPreviousActivity: "上一个活动",

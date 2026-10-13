@@ -325,6 +325,8 @@ The current `ActivityAttempt.pluginKey` name is too narrow for a core runtime. T
 
 Each item has `pointsPossible`, defaulting to equal points.
 
+Teachers continue to enter item points. Course and reusable-bank Test editors display each item's calculated weight beside its title, and learners see the same weight on the exercise and final answer-review screens: `pointsPossible / sum(item pointsPossible)`, formatted as a localized percentage with up to two decimal places. This is the exercise's share of the Test, never the learner's earned grade. Active views recalculate from the current composition; submitted views use the final revision. Stored points and grading calculations remain unchanged.
+
 For each completed item:
 
 ```text
@@ -368,7 +370,7 @@ The Test editor includes:
 - Add activity from bank;
 - Create activity;
 - edit, duplicate, reorder, and remove item actions;
-- points per item and calculated total;
+- points per item and calculated percentage of the Test total;
 - teacher preview;
 - save/discard and unsaved-change protection.
 
@@ -384,6 +386,7 @@ The Test opens as one assigned activity. The shell provides:
 - attempt/start confirmation;
 - optional timer;
 - progress and item navigation;
+- each exercise's percentage of the Test total;
 - one embedded child activity at a time, or a continuous layout when configured;
 - save/resume state;
 - a final answer-review screen followed by an explicit submission confirmation;
@@ -394,7 +397,7 @@ When a new attempt is blocked by grade release, the due date, or the attempt lim
 
 No child activity should expose standalone submit, attempt-limit, grade-release, or assignment controls.
 
-Manual submission is a separate final step: **Submit the test** appears only on the last exercise, in place of **Next activity**, and opens a review screen within the same mounted attempt/session. It lists every exercise in attempt order with only **Answered** or **Not answered**, never grades, correctness, answer keys, or test outcomes. The review reads persisted responses after pending saves drain. Students can return to any exercise or cancel the final confirmation without submitting. **Submit for grading** opens the shared confirmation dialog, explicitly warning that submission is final and answers can no longer be modified. Unanswered exercises do not block submission. The timer and live-settings polling remain active on the review screen and in the confirmation dialog; deadline expiry and no-resume finalization still submit automatically without requiring these manual steps. Teacher Student view uses the same screens with browser-scoped state.
+Manual submission is a separate final step: **Submit the test** appears only on the last exercise, in place of **Next activity**, and opens a review screen within the same mounted attempt/session. It lists every exercise in attempt order with its percentage weight and either **Answered** or **Not answered**, never earned grades, correctness, answer keys, or test outcomes. The review reads persisted responses after pending saves drain. Students can return to any exercise or cancel the final confirmation without submitting. **Submit for grading** opens the shared confirmation dialog, explicitly warning that submission is final and answers can no longer be modified. Unanswered exercises do not block submission. The timer and live-settings polling remain active on the review screen and in the confirmation dialog; deadline expiry and no-resume finalization still submit automatically without requiring these manual steps. Teacher Student view uses the same screens with browser-scoped state.
 
 Response presence is plugin-owned and registered beside the embedded renderers in `apps/web/src/lib/test-item-answer-status.ts`. MCQs require a selected choice for each question, regardless of correctness. Coding and web-design exercises require nonempty student code differing from their starter. Parsons saves a response marker on move/indent, clears it on reset, and leaves initial shuffled arrangements unanswered; pre-marker drafts retain their saved arrangement as an answer because historical interaction cannot be reconstructed. These checks never invoke a grader.
 

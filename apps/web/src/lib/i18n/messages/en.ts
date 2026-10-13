@@ -1147,6 +1147,7 @@ export const enMessages = {
       testSubmittedLabel: "Submitted Test",
       testAttemptNumber: "Attempt {number}",
       testActivityPosition: "Activity {current} of {total}",
+      testItemWeight: "{percentage} of Test",
       testActivitiesLabel: "Test activities",
       testRendererUnavailable: "This activity type does not have a Test renderer yet.",
       testPreviousActivity: "Previous activity",

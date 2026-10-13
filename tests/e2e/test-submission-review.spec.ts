@@ -3,7 +3,7 @@ import { test, expect, ORIGINAL_SOURCE } from "./fixtures/bank-course";
 import { assignCourseTest, responseJson } from "./fixtures/activity-suite";
 
 for (const navigationMode of ["free", "sequential"] as const) {
-  test(`reviews answers before final submission with ${navigationMode} navigation`, { tag: "@regression" }, async ({ bankCourse: data, teacherApi, studentPage }) => {
+  test(`reviews answers before final submission with ${navigationMode} navigation`, { tag: "@regression" }, async ({ bankCourse: data, teacherApi, teacherPage, studentPage }) => {
     const title = `Submission review ${navigationMode} ${data.token}`;
     const { test: created } = await responseJson<{ test: { activity: { id: string } } }>(await teacherApi.post(`/api/courses/${data.courseId}/tests`, { data: {
       title, lifecycle: "published", settings: { timeLimitMinutes: 30, navigationMode, randomizeItems: false, allowResume: navigationMode === "free" },
@@ -21,14 +21,26 @@ for (const navigationMode of ["free", "sequential"] as const) {
       config: { language: "python", prompt: "Put the lines in order.", solution: "print('first')\nprint('second')", stripIndentation: false, groups: [], precedenceRules: [] }, pointsPossible: 10, isRequired: true
     } }));
     await assignCourseTest(data, activityId, title);
+    await teacherPage.goto(`/courses/${data.courseId}/activities/${activityId}`);
+    await expect(teacherPage.getByText("33.33% of Test", { exact: true })).toHaveCount(3);
+    const secondExercise = teacherPage.getByRole("article").filter({ hasText: "Second exercise" });
+    await expect(secondExercise.getByLabel("Points", { exact: true })).toHaveValue("10");
+    await secondExercise.getByLabel("Points", { exact: true }).fill("20");
+    await secondExercise.getByLabel("Points", { exact: true }).press("Tab");
+    await expect(secondExercise.getByText("50% of Test", { exact: true })).toBeVisible();
+    await expect(teacherPage.getByText("25% of Test", { exact: true })).toHaveCount(2);
+    await teacherPage.reload();
+    await expect(secondExercise.getByLabel("Points", { exact: true })).toHaveValue("20");
     await studentPage.goto(`/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${activityId}`);
     await studentPage.getByRole("button", { name: "Start Test", exact: true }).click();
     await studentPage.getByRole("dialog").getByRole("button", { name: "Start Test", exact: true }).click();
+    await expect(studentPage.getByText("25% of Test", { exact: true })).toBeVisible();
     await expect(studentPage.getByRole("button", { name: "Submit the test", exact: true })).toHaveCount(0);
     // A wrong response is answered; correctness must not affect the review.
     await studentPage.getByLabel("Five", { exact: true }).check();
     await studentPage.getByRole("button", { name: "Next activity", exact: true }).click();
     await expect(studentPage.getByRole("heading", { name: "Second exercise", exact: true })).toBeVisible();
+    await expect(studentPage.getByText("50% of Test", { exact: true })).toBeVisible();
     await expect(studentPage.getByRole("button", { name: "Submit the test", exact: true })).toHaveCount(0);
     await studentPage.getByRole("button", { name: "Next activity", exact: true }).click();
     await expect(studentPage.getByRole("heading", { name: "Arrange the program", exact: true })).toBeVisible();
@@ -40,6 +52,8 @@ for (const navigationMode of ["free", "sequential"] as const) {
     await expect(review.getByText("1 of 3 exercises answered", { exact: true })).toBeVisible();
     await expect(review.getByRole("listitem").filter({ hasText: "First exercise" }).getByText("Answered", { exact: true })).toBeVisible();
     await expect(review.getByText("Not answered", { exact: true })).toHaveCount(2);
+    await expect(review.getByRole("listitem").filter({ hasText: "Second exercise" }).getByText("50% of Test", { exact: true })).toBeVisible();
+    await expect(review.getByText("25% of Test", { exact: true })).toHaveCount(2);
     await expect(review.getByText(/correct|incorrect|score|points/i)).toHaveCount(0);
     expect((await prisma.activityAttempt.findFirstOrThrow({ where: { activityId } })).lifecycle).toBe("started");
     await review.getByRole("button", { name: "Submit for grading", exact: true }).click();
@@ -117,6 +131,7 @@ test("teacher Student view reviews and restores temporary answers without creati
   await teacherPage.goto(`/courses/${data.courseId}/groups/${data.groupId}/student-view/activities/${activityId}`);
   await teacherPage.getByRole("button", { name: "Start Test", exact: true }).click();
   await teacherPage.getByRole("dialog").getByRole("button", { name: "Start Test", exact: true }).click();
+  await expect(teacherPage.getByText("100% of Test", { exact: true })).toBeVisible();
   await teacherPage.getByLabel("Five", { exact: true }).check();
   await teacherPage.getByRole("button", { name: "Submit the test", exact: true }).click();
   const review = teacherPage.getByRole("region", { name: "Review your answers" });
