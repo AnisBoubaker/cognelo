@@ -25,6 +25,8 @@ Teacher review can resolve one exact linked final submission. The shared report 
 
 The activity definition explicitly declares read-only Student view support. The upload-based activity remains available for inspection, but its ZIP submission workflow stays disabled because the existing pipeline requires durable attachments and background jobs; preview must not borrow academic records and delete them afterward.
 
+Teachers can [reopen the last submission](../../../docs/SUBMISSION_CONTINUATION.md) so its saved answers can be continued using the original start and current effective settings.
+
 ## Read By Topic
 
 - [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)

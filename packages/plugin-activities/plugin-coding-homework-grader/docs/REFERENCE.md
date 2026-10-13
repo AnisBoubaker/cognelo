@@ -139,3 +139,7 @@ Draft saves update mutable generic/private bank authoring without creating a ver
 ## Contributor Workflow
 
 When changing this plugin, update this detailed reference or the phased implementation plan, the package README if its overview or routing changed, and `PROJECT_MEMORY.md` only when a durable invariant changed.
+
+## Reopening the last submission
+
+Reopens the existing challenge answers while retaining the uploaded ZIP and generated questions. Prior mutable completion evidence is audited; final answers submit through the same core attempt without regenerating questions. The shared [continuation service](../../../../docs/SUBMISSION_CONTINUATION.md) enforces latest-attempt and staff scope, archives prior evidence, preserves attempt identity and original start, and applies current General/section/team/student settings. Later extensions or individual exceptions therefore affect the resumed deadline without resetting it.

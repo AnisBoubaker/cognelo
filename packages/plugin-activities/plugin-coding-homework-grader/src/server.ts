@@ -36,6 +36,23 @@ registerCodingHomeworkBackgroundJobs();
 
 export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
   key: "coding-homework-grader",
+  attemptContinuation: {
+    activityTypeKeys: ["coding-homework-grader"],
+    reopen: async ({ activityId, userId, pluginAttemptRef, metadata, transaction }) => {
+      if (!pluginAttemptRef && metadata.timedOut) return {};
+      const [submission] = await transaction.query<Array<{ id: string; status: string; metadata: unknown }>>`
+        SELECT id, status, metadata FROM "PluginCodingHomeworkSubmission"
+        WHERE id = ${pluginAttemptRef} AND "activityId" = ${activityId} AND "userId" = ${userId}`;
+      if (!submission) throw new AppError(409, "SUBMISSION_STATE_MISSING", "The submitted answers are unavailable.");
+      const questions = await transaction.query<Array<Record<string, unknown>>>`
+        SELECT id, "studentAnswer", "answerSubmittedAt" FROM "PluginCodingHomeworkChallengeQuestion" WHERE "submissionId" = ${pluginAttemptRef}`;
+      await transaction.execute`UPDATE "PluginCodingHomeworkSubmission" SET status = 'challenge_ready', "updatedAt" = NOW()
+        WHERE id = ${pluginAttemptRef}`;
+      await transaction.execute`UPDATE "PluginCodingHomeworkChallengeQuestion" SET "answerSubmittedAt" = NULL, "updatedAt" = NOW()
+        WHERE "submissionId" = ${pluginAttemptRef}`;
+      return { audit: { submission, questions: JSON.parse(JSON.stringify(questions)) } };
+    }
+  },
   routes: [
     codingHomeworkAuthoringRoute,
     codingHomeworkAssignmentPdfRoute,

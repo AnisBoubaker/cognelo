@@ -21,3 +21,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - The teacher gradebook-attempt route accepts an exact attempt ID constrained by course, group, activity, and participant so the shared report can load newest-first and fetch older payloads lazily. Historical and formative attempts are read-only in that dialog, including any generated feedback attached to the inspected attempt.
 - Gradebook attempt review and grading consume core course capabilities: explicit course teachers/admins work course-wide, while section teachers/TAs are restricted to their assigned groups. Authoring and grade release remain course-management operations.
 - Teacher feedback and learner copy use mechanism-neutral wording.
+
+- [Submission continuation](../../../docs/SUBMISSION_CONTINUATION.md): Restores the submitted choices to the core response draft; the ordinary submission path reuses the reopened core attempt. Restore through the host transaction; reopening preserves the original start and applies current exceptions.

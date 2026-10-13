@@ -10,6 +10,11 @@ import { createMcqBankActivityVariation } from "./variation";
 
 export const mcqServerPlugin: ServerActivityPlugin = {
   key: "mcq",
+  attemptContinuation: {
+    activityTypeKeys: ["mcq"],
+    reopen: async ({ metadata }) => metadata.timedOut && !metadata.submittedAnswers
+      ? {} : ({ responseState: { answers: submittedAnswersFromMetadata(metadata) } })
+  },
   routes: [mcqGenerateRoute, mcqSubmissionRoute, mcqFormativeFeedbackRoute, mcqGradebookAttemptsRoute],
   bankVariation: {
     activityTypeKeys: ["mcq"],

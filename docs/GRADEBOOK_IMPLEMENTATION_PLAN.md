@@ -23,6 +23,8 @@ It is intentionally a planning artifact. Implementation should proceed iterative
 
 ### Attempts
 
+- Implemented: [Reopen last submission](SUBMISSION_CONTINUATION.md) restores the same attempt and answers using the original start and current effective settings, including later extensions/student exceptions. Its former grade is withdrawn/recomputed and prior submission evidence is audited.
+
 - Core owns shared attempt metadata in an `ActivityAttempt` table.
 - Unfinished standalone responses are stored separately in `ActivityResponseDraft`; autosaving ordinary work must not start or consume a gradebook attempt.
 - Plugins own plugin-specific attempt state, submissions, artifacts, events, and grading internals.

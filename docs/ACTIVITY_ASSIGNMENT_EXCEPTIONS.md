@@ -64,3 +64,7 @@ Migration `202610120004_activity_assignment_exceptions` is additive and leaves e
 - `tests/e2e/activity-exceptions.spec.ts`: real editor Save/Cancel/reorder/reopen, desktop/mobile layout, live deadlines, optional notices and cancellation, draft preservation, extra-attempt refresh, submitted timing preservation, all ten override fields, learner access and grading, private targets, membership changes, cleared dates, atomic rejection, legacy omission, formative pruning, and deletion cascades.
 
 The browser scenarios belong to `@regression` and use disposable MCQ fixtures with real API/database integration, without AI or sandbox runners. See [browser test instructions](../tests/e2e/README.md) and [student groupings](STUDENT_GROUPINGS.md).
+
+## Reopened submissions
+
+[Reopening the last submission](SUBMISSION_CONTINUATION.md) preserves its original start but resolves the current effective policy again. Extensions or team/student exceptions added after submission apply to the resumed work, including on compound Tests; reopening itself never adds time or changes assignment settings.

@@ -691,6 +691,7 @@ function buildTestRuntime(
   const attemptSessionId = typeof manifest.sessionId === "string" ? manifest.sessionId : null;
   const resumeBlocked = Boolean(
     attempt?.lifecycle === "started" &&
+    !asRecord(attempt?.metadata).continuation &&
     !resumeAllowed &&
     attemptSessionId &&
     attemptSessionId !== sessionId
@@ -718,6 +719,7 @@ function buildTestRuntime(
 }
 
 function assertTestAttemptResumePolicy(attempt: { metadata: unknown }, sessionId?: string | null) {
+  if (asRecord(attempt.metadata).continuation) return;
   const manifest = asRecord(asRecord(attempt.metadata).manifest);
   if (asRecord(manifest.settings).allowResume !== false) return;
   const attemptSessionId = typeof manifest.sessionId === "string" ? manifest.sessionId : null;

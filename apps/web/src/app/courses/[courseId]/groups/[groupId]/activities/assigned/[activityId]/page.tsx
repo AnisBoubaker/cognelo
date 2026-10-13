@@ -37,6 +37,7 @@ export default function GroupActivityPage() {
   const [canStartNewAttempt, setCanStartNewAttempt] = useState<boolean | null>(null);
   const [unlockedAttemptRevision, setUnlockedAttemptRevision] = useState(0);
   const canStartNewAttemptRef = useRef<boolean | null>(null);
+  const continuationVersionRef = useRef<string | null>(null);
   const [hasPreviousSubmissions, setHasPreviousSubmissions] = useState<boolean | null>(null);
   const [selectedTab, setSelectedTab] = useState<"attempt" | "previous" | "deleted">("attempt");
   const [isActivityUnavailable, setIsActivityUnavailable] = useState(false);
@@ -110,6 +111,7 @@ export default function GroupActivityPage() {
     api.timedActivityRuntime(courseId, groupId, activityId)
       .then(({ runtime }) => {
         if (cancelled) return;
+        continuationVersionRef.current = runtime.attempt?.reopenedAt ?? null;
         setTimedRuntime(runtime);
         setTimedRemainingSeconds(runtime.timing.remainingSeconds);
         setTimingStatus("ready");
@@ -153,9 +155,12 @@ export default function GroupActivityPage() {
           const canStart = Boolean(runtime.attempt) || runtime.availability.canStart;
           // Exhausted plugin renderers cache their read-only status. Refresh them
           // only when another attempt is unlocked, never while an editor is active.
-          if (canStartNewAttemptRef.current === false && canStart) {
+          const reopenedAt = runtime.attempt?.reopenedAt ?? null;
+          if ((canStartNewAttemptRef.current === false && canStart) || (reopenedAt && reopenedAt !== continuationVersionRef.current)) {
             setUnlockedAttemptRevision((current) => current + 1);
+            if (reopenedAt) setSelectedTab("attempt");
           }
+          continuationVersionRef.current = reopenedAt;
           setCanStartNewAttempt(canStart);
           if (!runtime.timing.isExpired) autoSubmittedTimedAttemptRef.current = null;
         }

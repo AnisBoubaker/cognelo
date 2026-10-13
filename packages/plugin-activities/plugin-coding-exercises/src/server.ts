@@ -40,6 +40,17 @@ export { listCodingExerciseProgrammingLanguages } from "./judge0";
 
 export const codingExercisesServerPlugin: ServerActivityPlugin = {
   key: "coding-exercises",
+  attemptContinuation: {
+    activityTypeKeys: ["coding-exercise"],
+    reopen: async ({ activityId, userId, pluginAttemptRef, metadata, transaction }) => {
+      if (!pluginAttemptRef && metadata.timedOut) return {};
+      const [execution] = await transaction.query<Array<{ sourceCode: string }>>`
+        SELECT "sourceCode" FROM "PluginCodingExerciseExecution"
+        WHERE id = ${pluginAttemptRef} AND "activityId" = ${activityId} AND "userId" = ${userId}`;
+      if (!execution) throw new AppError(409, "SUBMISSION_STATE_MISSING", "The submitted code is unavailable.");
+      return { responseState: { sourceCode: execution.sourceCode } };
+    }
+  },
   hostCapabilities: {
     "programming-languages": listCodingExerciseProgrammingLanguages
   },

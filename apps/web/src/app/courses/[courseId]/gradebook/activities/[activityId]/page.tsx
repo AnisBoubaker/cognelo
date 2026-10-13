@@ -329,6 +329,23 @@ export default function GradebookActivityResultsPage() {
     });
   }
 
+  async function reopenSubmission(row: CourseGradebookRow) {
+    const attempt = latestReopenableAttempt(row);
+    if (!attempt || !await dialogs.confirm({
+      title: t("courseDetail.reopenSubmission"),
+      message: t("courseDetail.reopenSubmissionConfirm", { name: row.participantName, number: attempt.attemptNumber }),
+      confirmLabel: t("courseDetail.reopenSubmission")
+    })) return;
+    setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:reopen`);
+    try {
+      await api.reopenActivitySubmission(courseId, attempt.id);
+      await refresh();
+      notifications.success(t("courseDetail.submissionReopened"));
+    } catch (error) {
+      notifications.error(error instanceof Error ? error.message : t("courseDetail.loadError"));
+    } finally { setSavingGradeKey(null); }
+  }
+
   async function regradeRow(row: CourseGradebookRow) {
     const attempt = selectedSubmittedAttempt(row);
     if (!attempt) {
@@ -883,6 +900,7 @@ export default function GradebookActivityResultsPage() {
                   locale={locale}
                   savingGradeKey={savingGradeKey}
                   onReviewAndGrade={openReviewAndGrade}
+                  onReopenSubmission={reopenSubmission}
                   onRegrade={regradeRow}
                   onGenerateAiFeedback={generateAiFeedbackForRow}
                   t={t}
@@ -1179,6 +1197,7 @@ function GradebookStudentRow({
   locale,
   savingGradeKey,
   onReviewAndGrade,
+  onReopenSubmission,
   onRegrade,
   onGenerateAiFeedback,
   t
@@ -1188,6 +1207,7 @@ function GradebookStudentRow({
   locale: Locale;
   savingGradeKey: string | null;
   onReviewAndGrade: (row: CourseGradebookRow) => Promise<void>;
+  onReopenSubmission: (row: CourseGradebookRow) => Promise<void>;
   onRegrade: (row: CourseGradebookRow) => Promise<void>;
   onGenerateAiFeedback: (row: CourseGradebookRow) => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
@@ -1198,7 +1218,8 @@ function GradebookStudentRow({
   const actionMenuOpen = actionMenuAnchor !== null;
   const canAssessWithAi = row.assessmentMode === "summative" && activityActions.canAssessWithAi;
   const canRerunAutomaticGrading = row.assessmentMode === "summative" && activityActions.canRerunAutomaticGrading;
-  const hasActions = canAssessWithAi || canRerunAutomaticGrading || activityActions.canReviewAndGrade;
+  const canReopen = row.supportsSubmissionContinuation === true && Boolean(latestReopenableAttempt(row)) && !inProgressAttempt;
+  const hasActions = canReopen || canAssessWithAi || canRerunAutomaticGrading || activityActions.canReviewAndGrade;
 
   function closeActionMenu() {
     setActionMenuAnchor(null);
@@ -1260,6 +1281,14 @@ function GradebookStudentRow({
               open={actionMenuOpen}
               onClose={closeActionMenu}
             >
+              {canReopen ? (
+                <button className="content-context-menu-item" role="menuitem" type="button"
+                  disabled={savingGradeKey !== null}
+                  onClick={() => { closeActionMenu(); void onReopenSubmission(row); }}>
+                  <AppIcon name="sync" />
+                  <span>{t("courseDetail.reopenSubmission")}</span>
+                </button>
+              ) : null}
               {canAssessWithAi ? (
                 <button
                   className="content-context-menu-item"
@@ -1389,4 +1418,11 @@ function calculatedNormalizedGrade(
 ) {
   const percent = getAiFeedbackReviewCalculatedGradePercent(activityTypeKey, feedback);
   return percent === null ? null : percent * row.maxScore / 100;
+}
+
+function latestReopenableAttempt(row: CourseGradebookRow) {
+  const latest = row.attempts.filter((attempt) => attempt.lifecycle !== "deleted")
+    .sort((a, b) => b.attemptNumber - a.attemptNumber)[0];
+  return latest?.submittedAt && latest.assessmentMode === row.assessmentMode &&
+    (latest.lifecycle === "submitted" || latest.lifecycle === "graded") ? latest : null;
 }

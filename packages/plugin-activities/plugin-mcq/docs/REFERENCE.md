@@ -92,3 +92,7 @@ MCQ registers a teacher feedback renderer and server handlers. **Review and grad
 Standalone MCQ gradebook results expose **Class overview** and reuse the Test aggregate report: correct choices, response counts, exact-answer accuracy, score statistics, and hoverable respondent names per choice.
 
 When changing this plugin, update this detailed reference, the package README if its overview or routing changed, and `PROJECT_MEMORY.md` only when a durable invariant changed.
+
+## Reopening the last submission
+
+Restores the submitted choices to the core response draft; the ordinary submission path reuses the reopened core attempt. The shared [continuation service](../../../../docs/SUBMISSION_CONTINUATION.md) enforces latest-attempt and staff scope, archives prior evidence, preserves attempt identity and original start, and applies current General/section/team/student settings. Later extensions or individual exceptions therefore affect the resumed deadline without resetting it.

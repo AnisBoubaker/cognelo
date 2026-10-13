@@ -7,6 +7,17 @@ import { createWebDesignBankActivityVariation } from "./variation";
 
 export const webDesignCodingExercisesServerPlugin: ServerActivityPlugin = {
   key: "web-design-coding-exercises",
+  attemptContinuation: {
+    activityTypeKeys: ["web-design-coding-exercise"],
+    reopen: async ({ activityId, userId, pluginAttemptRef, metadata, transaction }) => {
+      if (!pluginAttemptRef && metadata.timedOut) return {};
+      const [submission] = await transaction.query<Array<{ files: unknown }>>`
+        SELECT files FROM "PluginWebDesignExerciseSubmission"
+        WHERE id = ${pluginAttemptRef} AND "activityId" = ${activityId} AND "userId" = ${userId}`;
+      if (!submission) throw new AppError(409, "SUBMISSION_STATE_MISSING", "The submitted files are unavailable.");
+      return { responseState: { files: submission.files } };
+    }
+  },
   routes: [webDesignExerciseTestsRoute, webDesignExerciseExpectedResultRoute, webDesignExerciseRunRoute, webDesignExerciseSubmitRoute, webDesignExerciseReviewAllRoute],
   bankVariation: {
     activityTypeKeys: ["web-design-coding-exercise"],

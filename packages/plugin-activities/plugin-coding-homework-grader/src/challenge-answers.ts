@@ -125,7 +125,7 @@ export async function saveCodingHomeworkChallengeAnswers(
   }
 
   const coreAttemptId =
-    options.finalize && !submission.coreAttemptId && options.gradebook
+    options.finalize && options.gradebook
       ? await createSubmittedCoreAttempt(scope, submission, nextAnswers, submittedAt ?? new Date(), options.gradebook)
       : submission.coreAttemptId;
 

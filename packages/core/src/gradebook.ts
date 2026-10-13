@@ -1,3 +1,4 @@
+import { resolveAttemptContinuationHandler } from "@cognelo/activity-sdk/server";
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 import {
@@ -142,18 +143,20 @@ export async function startActivityAttempt(user: CurrentUser, input: StartActivi
   if (input.assessmentMode && input.assessmentMode !== assessmentMode) {
     throw new AppError(409, "ATTEMPT_MODE_MISMATCH", "The attempt mode no longer matches the activity assignment mode.");
   }
-  const activeTimedAttempt = await findActiveTimedAttempt(context.groupActivity.id, context.participant.id);
-  if (activeTimedAttempt) {
+  const resumableAttempt = await findResumableAttempt(context.groupActivity.id, context.participant.id);
+  if (resumableAttempt) {
     return prisma.activityAttempt.update({
-      where: { id: activeTimedAttempt.id },
+      where: { id: resumableAttempt.id },
       data: {
         pluginKey: input.pluginKey,
         pluginVersion: input.pluginVersion,
-        pluginAttemptRef: input.pluginAttemptRef ?? activeTimedAttempt.pluginAttemptRef,
-        activityConfigFingerprint: input.activityConfigFingerprint ?? activeTimedAttempt.activityConfigFingerprint,
-        testRevisionId: input.testRevisionId ?? activeTimedAttempt.testRevisionId,
+        pluginAttemptRef: input.pluginAttemptRef ?? resumableAttempt.pluginAttemptRef,
+        activityConfigFingerprint: asJsonObject(resumableAttempt.metadata)?.continuation
+          ? resumableAttempt.activityConfigFingerprint : input.activityConfigFingerprint ?? resumableAttempt.activityConfigFingerprint,
+        testRevisionId: asJsonObject(resumableAttempt.metadata)?.continuation
+          ? resumableAttempt.testRevisionId : input.testRevisionId ?? resumableAttempt.testRevisionId,
         metadata: {
-          ...(asJsonObject(activeTimedAttempt.metadata) ?? {}),
+          ...(asJsonObject(resumableAttempt.metadata) ?? {}),
           ...(asJsonObject(input.metadata) ?? {})
         } as JsonInput
       }
@@ -232,9 +235,9 @@ export async function getActivityAttemptAvailability(user: CurrentUser, input: A
   });
   const assessmentMode = assignmentAssessmentMode(context.groupActivity.metadata);
   const details = await activityAttemptAvailabilityDetails(context, assessmentMode);
-  const activeTimedAttempt = await findActiveTimedAttempt(context.groupActivity.id, context.participant.id);
-  if (activeTimedAttempt) {
-    return { ...details, canStart: true as const, reason: null, activeAttemptId: activeTimedAttempt.id };
+  const resumableAttempt = await findResumableAttempt(context.groupActivity.id, context.participant.id);
+  if (resumableAttempt) {
+    return { ...details, canStart: true as const, reason: null, activeAttemptId: resumableAttempt.id };
   }
 
   try {
@@ -259,12 +262,12 @@ export function activityAttemptTimeLimitMinutes(value: unknown): number | null {
     : null;
 }
 
-async function findActiveTimedAttempt(groupActivityId: string, participantId: string) {
+async function findResumableAttempt(groupActivityId: string, participantId: string) {
   const attempts = await prisma.activityAttempt.findMany({
     where: { groupActivityId, participantId, lifecycle: "started" },
     orderBy: [{ attemptNumber: "desc" }]
   });
-  return attempts.find((attempt) => activityAttemptTimeLimitMinutes(attempt.metadata) !== null) ?? null;
+  return attempts.find((attempt) => (activityAttemptTimeLimitMinutes(attempt.metadata) !== null || asJsonObject(attempt.metadata)?.continuation)) ?? null;
 }
 
 async function activityAttemptAvailabilityDetails(
@@ -334,7 +337,7 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
   const exceptions = await loadAssignmentExceptions([attempt.groupActivityId]);
   const effectiveAssignment = applyAssignmentExceptions(attempt.groupActivity, exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId));
 
-  if (attempt.assessmentMode !== "formative" && attempt.gradebookItem.gradesReleased) {
+  if (attempt.assessmentMode !== "formative" && attempt.gradebookItem.gradesReleased && !asJsonObject(attempt.metadata)?.continuation) {
     throw new AppError(400, "GRADES_RELEASED", "No more submissions are allowed after grades have been released.");
   }
 
@@ -382,6 +385,10 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
     throw new AppError(409, "FORMATIVE_ATTEMPT_NOT_GRADEABLE", "Formative attempts cannot contribute to a grade.");
   }
 
+  if (attempt.lifecycle === "started" || attempt.lifecycle === "deleted") {
+    throw new AppError(409, "SUBMISSION_NOT_COMPLETED", "Submit the attempt before grading it.");
+  }
+
   const exceptions = await loadAssignmentExceptions([attempt.groupActivityId]);
   const overrides = exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId);
   const effectiveAttempt = { ...attempt, gradebookItem: applyGradebookExceptions(attempt.gradebookItem, overrides) };
@@ -401,7 +408,7 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
         gradebookItemId: attempt.gradebookItemId,
         participantId: attempt.participantId,
         attemptId: { not: null },
-        attempt: { assessmentMode: "summative" }
+        attempt: { assessmentMode: "summative", lifecycle: { in: ["submitted", "graded"] } }
       },
       orderBy: [{ createdAt: "asc" }]
     });
@@ -426,7 +433,7 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
       gradebookItem: effectiveAttempt.gradebookItem,
       candidates: [
         ...eventCandidates,
-        ...(eventCandidates.length === 0 && previousGrade?.selectedAttemptId && previousGrade.selectedAttempt?.assessmentMode !== "formative"
+        ...(eventCandidates.length === 0 && previousGrade?.isActive && previousGrade?.selectedAttemptId && previousGrade.selectedAttempt?.assessmentMode !== "formative"
           ? [gradeCandidateFromCurrentGrade(previousGrade)]
           : []),
         gradedCandidate
@@ -479,7 +486,7 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
       }
     });
     const gradedAttempt = await tx.activityAttempt.update({
-      where: { id: attempt.id },
+      where: { id: attempt.id, ...(attempt.updatedAt ? { updatedAt: attempt.updatedAt } : {}) },
       data: {
         lifecycle: "graded",
         submittedAt: attempt.submittedAt ?? now,
@@ -508,6 +515,129 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
 
     return { attempt: gradedAttempt, grade };
   });
+}
+
+export async function reopenActivitySubmission(user: CurrentUser, courseId: string, attemptId: string) {
+  await assertCanViewCourseGradebook(user, courseId);
+  const scopedAttempt = await prisma.activityAttempt.findFirst({ where: { id: attemptId, courseId } });
+  if (!scopedAttempt) throw notFound("Activity attempt");
+  await assertCanGradeGroup(user, courseId, scopedAttempt.groupId);
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const attempt = await tx.activityAttempt.findUnique({
+        where: { id: attemptId },
+        include: { gradebookItem: true, groupActivity: true, activity: { include: { activityType: true } }, testItemAttempts: true }
+      });
+      if (!attempt || !attempt.submittedAt || !["submitted", "graded"].includes(attempt.lifecycle)) {
+        throw new AppError(409, "SUBMISSION_NOT_COMPLETED", "Only a submitted attempt can be reopened.");
+      }
+      const latest = await tx.activityAttempt.findFirst({
+        where: { groupActivityId: attempt.groupActivityId, participantId: attempt.participantId, lifecycle: { not: "deleted" } },
+        orderBy: { attemptNumber: "desc" },
+        select: { id: true }
+      });
+      if (latest?.id !== attempt.id) {
+        throw new AppError(409, "SUBMISSION_NOT_LATEST", "Only the latest attempt can be reopened. A newer attempt already exists.");
+      }
+      if (assignmentAssessmentMode(attempt.groupActivity.metadata) !== attempt.assessmentMode) {
+        throw new AppError(409, "ATTEMPT_MODE_MISMATCH", "The attempt mode no longer matches the activity assignment mode.");
+      }
+      const metadata = { ...(asJsonObject(attempt.metadata) ?? {}) };
+      const now = new Date();
+      let restored: { responseState?: Record<string, unknown>; audit?: Record<string, unknown> } = {};
+      if (attempt.pluginKey === "core:test") {
+        const claim = await tx.testSubmissionClaim.findUnique({ where: { parentAttemptId: attempt.id } });
+        if (claim?.status === "processing") {
+          throw new AppError(409, "SUBMISSION_PROCESSING", "Wait for submission processing to finish before reopening it.");
+        }
+        for (const item of attempt.testItemAttempts) {
+          await tx.testItemAttempt.update({
+            where: { id: item.id },
+            data: {
+              lifecycle: "started", submittedAt: null, gradedAt: null,
+              rawScore: null, rawMaxScore: null, normalizedScore: null, normalizedMaxScore: null,
+              pluginAttemptRef: null, feedback: {}, result: { state: asJsonObject(asJsonObject(item.result)?.state) ?? {} } as JsonInput
+            }
+          });
+        }
+        await tx.testSubmissionClaim.deleteMany({ where: { parentAttemptId: attempt.id } });
+      } else {
+        const handler = resolveAttemptContinuationHandler(attempt.activity.activityType.key);
+        if (!handler) throw new AppError(409, "SUBMISSION_REOPEN_UNSUPPORTED", "This activity does not support reopening submissions.");
+        restored = await handler({
+          activityId: attempt.activityId, userId: attempt.userId, pluginAttemptRef: attempt.pluginAttemptRef, metadata,
+          transaction: {
+            query: (query, ...values) => tx.$queryRaw(query, ...values),
+            execute: (query, ...values) => tx.$executeRaw(query, ...values)
+          }
+        });
+        const responseState = restored.responseState ?? asJsonObject(metadata.savedResponse);
+        if (responseState) {
+          await tx.activityResponseDraft.upsert({
+            where: { groupActivityId_participantId: { groupActivityId: attempt.groupActivityId, participantId: attempt.participantId } },
+            create: { groupActivityId: attempt.groupActivityId, participantId: attempt.participantId, state: responseState as JsonInput },
+            update: { state: responseState as JsonInput }
+          });
+        }
+      }
+      // Submission evidence is archived in the event before clearing completion state.
+      delete metadata.submittedTimeLimitMinutes;
+      delete metadata.teacherFeedback;
+      delete metadata.timedOut;
+      delete metadata.savedResponse;
+      metadata.continuation = { reopenedAt: now.toISOString(), reopenedByUserId: user.id };
+      const reopened = await tx.activityAttempt.update({
+        where: { id: attempt.id },
+        data: { lifecycle: "started", submittedAt: null, gradedAt: null, durationSeconds: null, isLate: false, lateBySeconds: null, metadata: metadata as JsonInput }
+      });
+      const previousGrade = await tx.grade.findUnique({
+        where: { gradebookItemId_participantId: { gradebookItemId: attempt.gradebookItemId, participantId: attempt.participantId } }
+      });
+      const events = await tx.gradeEvent.findMany({
+        where: {
+          gradebookItemId: attempt.gradebookItemId, participantId: attempt.participantId,
+          attempt: { assessmentMode: "summative", lifecycle: { in: ["submitted", "graded"] } }
+        },
+        orderBy: { createdAt: "asc" }
+      });
+      const exceptions = await loadAssignmentExceptions([attempt.groupActivityId], tx);
+      const item = applyGradebookExceptions(attempt.gradebookItem, exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId));
+      const candidates = gradeCandidatesFromEvents(events);
+      const selected = candidates.length ? selectGradebookGrade({ gradebookItem: item, candidates }) : null;
+      let grade = previousGrade;
+      if (previousGrade && attempt.assessmentMode === "summative") {
+        grade = await tx.grade.update({
+          where: { id: previousGrade.id },
+          data: selected ? {
+            selectedAttemptId: selected.attemptId, rawScore: selected.rawScore, rawMaxScore: selected.rawMaxScore,
+            normalizedScore: selected.normalizedScore, normalizedMaxScore: selected.normalizedMaxScore,
+            isPass: selected.isPass, latePenaltyApplied: selected.latePenaltyApplied, latePenaltyPercent: selected.latePenaltyPercent,
+            normalizedResult: selected.normalizedResult as JsonInput, rawResult: {}, metadata: {},
+            source: "auto", isActive: true, gradedAt: now, gradedByUserId: user.id
+          } : { isActive: false }
+        });
+      }
+      await tx.gradeEvent.create({
+        data: {
+          gradeId: grade?.id, gradebookItemId: attempt.gradebookItemId, participantId: attempt.participantId,
+          attemptId: attempt.id, actorUserId: user.id, eventType: "submission_reopened",
+          previousValue: {
+            attempt: activityAttemptSnapshot(attempt), grade: previousGrade ? gradeSnapshot(previousGrade) : null,
+            testItems: JSON.parse(JSON.stringify(attempt.testItemAttempts)), plugin: restored.audit ?? {}
+          } as JsonInput,
+          nextValue: { attempt: activityAttemptSnapshot(reopened), grade: grade ? gradeSnapshot(grade) : null } as JsonInput,
+          createdAt: now
+        }
+      });
+      return { attempt: reopened };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+      throw new AppError(409, "SUBMISSION_CHANGED", "The attempt changed. Refresh the results and try again.");
+    }
+    throw error;
+  }
 }
 
 export async function deleteActivitySubmission(user: CurrentUser, courseId: string, input: DeleteActivitySubmissionInput) {
@@ -551,7 +681,7 @@ export async function deleteActivitySubmission(user: CurrentUser, courseId: stri
         gradebookItemId: attempt.gradebookItemId,
         participantId: attempt.participantId,
         attemptId: { not: null },
-        attempt: { assessmentMode: "summative" },
+        attempt: { assessmentMode: "summative", lifecycle: { in: ["submitted", "graded"] } },
         eventType: { not: "submission_deleted" }
       },
       orderBy: [{ createdAt: "asc" }]
@@ -1310,6 +1440,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         activityTitle: item.titleSnapshot || item.activity.title,
         activityTypeKey: item.activity.activityType.key,
         activityTypeName: item.activity.activityType.name,
+        supportsSubmissionContinuation: item.activity.activityType.key === "test" || Boolean(resolveAttemptContinuationHandler(item.activity.activityType.key)),
         assessmentMode,
         gradesReleased: item.gradesReleased,
         participantId: participant.id,
@@ -2380,17 +2511,18 @@ function computePassStatus(input: {
   return input.normalizedScore >= requiredScore;
 }
 
-function gradeCandidatesFromEvents(events: Array<{ attemptId: string | null; nextValue: unknown }>) {
-  return events.flatMap((event) => {
-    if (!event.attemptId) {
-      return [];
+function gradeCandidatesFromEvents(events: Array<{ attemptId: string | null; nextValue: unknown; eventType?: string }>) {
+  let candidates: GradedAttemptCandidate[] = [];
+  for (const event of events) {
+    if (!event.attemptId) continue;
+    if (event.eventType === "submission_reopened" || event.eventType === "submission_deleted") {
+      candidates = candidates.filter((candidate) => candidate.attemptId !== event.attemptId);
+      continue;
     }
     const value = asJsonObject(event.nextValue);
-    if (!value) {
-      return [];
-    }
-    return gradeCandidateFromSnapshot(event.attemptId, value);
-  });
+    if (value) candidates.push(...gradeCandidateFromSnapshot(event.attemptId, value));
+  }
+  return candidates;
 }
 
 function gradeCandidateFromCurrentGrade(grade: {
