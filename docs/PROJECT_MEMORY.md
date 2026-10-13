@@ -4,6 +4,7 @@ This file is intentionally short. It records only cross-cutting decisions that a
 
 ## Platform Invariants
 
+- Course-content mutation refreshes must keep the existing tree mounted. Replacing it with a loading message collapses the page height and loses scroll position; reserve that loading state for initial loads and workspace navigation. See [Course content tree](COURSE_CONTENT_TREE_IMPLEMENTATION_PLAN.md#phase-7-unified-teacher-content-tree---complete).
 - Synthetic email recipients, including `cognelo.local`, are captured in the private local outbox at the shared delivery boundary, even when real SMTP/Graph is configured. Keep system-mail eligibility checks before capture; never fall back to a provider when capture fails. See [Email delivery](EMAIL_DELIVERY.md).
 - Keep `apps/api` and `apps/web` separate. Shared business rules belong in `packages/core`; shared schemas belong in `packages/contracts`.
 - Keep core persistence generic. Activity- or content-type-specific tables, migrations, routes, services, translations, and UI belong to the owning plugin.

@@ -145,10 +145,12 @@ export default function CourseDetailPage() {
     }
   }, [requestedContentGroupId]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async ({ showContentLoading = false }: { showContentLoading?: boolean } = {}) => {
     const requestId = ++refreshRequestIdRef.current;
     const isCurrentRequest = () => refreshRequestIdRef.current === requestId;
-    setContentLoading(activeCourseTab === "content");
+    // Keep the mounted tree and its height during mutation refreshes so the
+    // browser does not clamp the teacher's scroll position to a loading message.
+    if (showContentLoading) setContentLoading(activeCourseTab === "content");
     setGradebookLoading(activeCourseTab === "gradebook");
 
     try {
@@ -237,7 +239,7 @@ export default function CourseDetailPage() {
   }, [activeCourseTab, canViewSubjectCatalog, courseId, gradebookActivityId, gradebookGroupId, gradebookStatus, requestedContentGroupId]);
 
   useEffect(() => {
-    refresh().catch((err) => setError(err instanceof Error ? err.message : t("courseDetail.loadError")));
+    refresh({ showContentLoading: true }).catch((err) => setError(err instanceof Error ? err.message : t("courseDetail.loadError")));
   }, [refresh, t]);
 
   useEffect(() => {
