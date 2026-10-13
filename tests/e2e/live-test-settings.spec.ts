@@ -23,10 +23,12 @@ test("compound Test applies live exceptions and ignores stale automatic submissi
     await studentPage.getByRole("button", { name: "Start Test", exact: true }).click();
     await studentPage.getByRole("dialog", { name: "Start this Test now?" }).getByRole("button", { name: "Start Test", exact: true }).click();
     await studentPage.getByLabel("Four", { exact: true }).check();
-    await expect(studentPage.getByRole("button", { name: "Open activity messages" })).toBeVisible();
+    await expect(studentPage.getByRole("button", { name: "Open activity messages" })).toBeHidden();
+    await responseJson(await studentApi.get(`${assignedPath}/messages`));
     const { settings } = await responseJson<{ settings: CourseActivityAssignmentSettings }>(await teacherApi.get(settingsPath));
     const { runtime: initial } = await responseJson<{ runtime: CourseTestRuntime }>(await studentApi.get(`${assignedPath}/test`));
     settings.general.timeLimitMinutes = 45;
+    settings.general.messagingEnabled = true;
     settings.general.assessmentMode = "summative";
     const section = settings.groups.find((group) => group.groupId === data.groupId)!;
     const student = section.students.find((participant) => participant.email === credentialsFor("student").email)!;
@@ -40,6 +42,7 @@ test("compound Test applies live exceptions and ignores stale automatic submissi
     await responseJson(await teacherApi.post(settingsPath, { data: { ...update, confirmActiveStudents: true } }));
     await expect(studentPage.getByRole("timer")).toContainText(/59:/, { timeout: 30_000 });
     await expect(studentPage.getByLabel("Four", { exact: true })).toBeChecked();
+    await expect(studentPage.getByRole("button", { name: "Open activity messages" })).toBeVisible({ timeout: 10_000 });
     const { runtime: extended } = await responseJson<{ runtime: CourseTestRuntime }>(await studentApi.get(`${assignedPath}/test`));
     expect(extended.attempt!.id).toBe(initial.attempt!.id);
     expect(new Date(extended.timing.expiresAt!).getTime() - new Date(initial.timing.expiresAt!).getTime()).toBe(30 * 60_000);

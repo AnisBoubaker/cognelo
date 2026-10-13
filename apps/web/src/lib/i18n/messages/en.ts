@@ -159,6 +159,9 @@ export const enMessages = {
       time: "Time"
     },
     activityMessenger: {
+      enabledLabel: "Enable activity messaging",
+      enabledHelp: "Let teachers send messages to students answering this activity. Changes apply to students already answering.",
+      disabled: "Messaging is disabled for this activity. Enable it in the activity's course content settings.",
       label: "Messages",
       open: "Open activity messages",
       openUnread: "Open activity messages ({count} unread)",

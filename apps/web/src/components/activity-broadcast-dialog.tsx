@@ -48,7 +48,7 @@ export function ActivityBroadcastDialog({
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const message = body.trim();
-    if (!message || !overview?.activeRecipientCount) return;
+    if (!message || !overview?.enabled || !overview.activeRecipientCount) return;
     setSending(true);
     setError("");
     try {
@@ -77,6 +77,7 @@ export function ActivityBroadcastDialog({
         </div>
 
         <form className="form activity-broadcast-composer" onSubmit={send}>
+          {overview && !overview.enabled ? <p className="muted" role="status">{t("activityMessenger.disabled")}</p> : null}
           <div className="activity-broadcast-presence" role="status">
             <span aria-hidden="true" className={`activity-presence-dot${overview?.activeRecipientCount ? " is-active" : ""}`} />
             {loading
@@ -87,6 +88,7 @@ export function ActivityBroadcastDialog({
             <label htmlFor="activity-broadcast-body">{t("activityMessenger.messageLabel")}</label>
             <textarea
               autoFocus
+              disabled={!overview?.enabled || sending}
               id="activity-broadcast-body"
               maxLength={2000}
               placeholder={t("activityMessenger.messagePlaceholder")}
@@ -102,7 +104,7 @@ export function ActivityBroadcastDialog({
           {error ? <p className="error" role="alert">{error}</p> : null}
           <div className="dialog-actions">
             <button className="secondary" disabled={sending} type="button" onClick={onClose}>{t("common.cancel")}</button>
-            <button disabled={sending || !body.trim() || !overview?.activeRecipientCount} type="submit">
+            <button disabled={sending || !body.trim() || !overview?.enabled || !overview.activeRecipientCount} type="submit">
               <AppIcon name="messages" />
               {sending ? t("activityMessenger.sending") : t("activityMessenger.sendBroadcast")}
             </button>

@@ -29,7 +29,7 @@ import {
 import { listContentItems } from "./course-content";
 import { AppError, notFound } from "./errors";
 import { confirmLiveActivitySettings } from "./activity-settings-live";
-import { assignmentAllowsGradeChallenges, assignmentAssessmentPolicyMode, assignmentTimeLimitMinutes } from "./activity-assignment-policy";
+import { assignmentAllowsGradeChallenges, assignmentAssessmentPolicyMode, assignmentTimeLimitMinutes, courseActivityMessagingEnabled } from "./activity-assignment-policy";
 import { applyAssignmentExceptions, assignmentExceptionsForUser, exceptionsForParticipant, loadAssignmentExceptions, resolveAssignmentExceptions, saveAssignmentExceptions } from "./activity-assignment-exceptions";
 
 type StudentAccessDb = Pick<typeof prisma, "role" | "userRole" | "courseMembership">;
@@ -44,6 +44,7 @@ type CourseWideAssignmentMetadata = {
   timeLimitMinutes?: number | null;
   enablePerGroupSettings?: boolean;
   assessmentMode?: AssignedActivityAssessmentMode;
+  messagingEnabled?: boolean;
   requireSafeExamBrowser?: boolean;
   gradeChallengesEnabled?: boolean;
   gradebookSettings?: GradebookItemSettingsInput;
@@ -241,6 +242,7 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
     metadata: rule?.contentPlacement?.metadata ?? asMetadataRecord(coursePlacement?.metadata)
   };
   const general = {
+    messagingEnabled: courseActivityMessagingEnabled(activity.metadata),
     availableFrom: rule?.availableFrom ?? null,
     availableUntil: rule?.availableUntil ?? null,
     timeLimitMinutes: normalizeTimeLimitMinutes(rule?.timeLimitMinutes),
@@ -382,6 +384,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
             enablePerGroupSettings: true,
             futureGroupsAssigned: false,
             assessmentMode: data.assessmentMode,
+            messagingEnabled: data.messagingEnabled ?? courseActivityMessagingEnabled(activity.metadata),
             ...(data.requireSafeExamBrowser ? { requireSafeExamBrowser: true } : {}),
             ...(data.gradeChallengesEnabled ? { gradeChallengesEnabled: true } : {}),
             ...(data.assessmentMode === "summative" ? { gradebookSettings } : {}),

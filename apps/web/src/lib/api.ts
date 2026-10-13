@@ -878,6 +878,7 @@ export type ActivityBroadcast = {
 };
 
 export type ActivityMessagingOverview = {
+  enabled: boolean;
   activeRecipientCount: number;
   broadcasts: ActivityBroadcast[];
 };
@@ -906,6 +907,7 @@ export type ActivityAssignmentGradebookSettings = {
 
 export type CourseActivityAssignmentSettings = {
   general: {
+    messagingEnabled: boolean;
     availableFrom: string | null;
     availableUntil: string | null;
     timeLimitMinutes: number | null;

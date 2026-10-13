@@ -1,6 +1,6 @@
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
-import { assignmentTimeLimitMinutes } from "./activity-assignment-policy";
+import { assignmentTimeLimitMinutes, courseActivityMessagingEnabled } from "./activity-assignment-policy";
 import { getActivityMessagingGroupScope } from "./authorization";
 import { AppError, forbidden, notFound } from "./errors";
 import { getActivityAttemptAvailability } from "./gradebook";
@@ -36,6 +36,7 @@ export type ActivityBroadcastView = {
 };
 
 export type ActivityMessagingOverview = {
+  enabled: boolean;
   activeRecipientCount: number;
   broadcasts: ActivityBroadcastView[];
 };
@@ -115,7 +116,11 @@ export async function getLearnerActivityConversation(
     select: { id: true, attemptId: true, attemptNumber: true }
   });
 
-  return readConversation(user, conversation);
+  // Keep presence for live-settings warnings while messaging is disabled. Polling
+  // continues without revealing messages, so enabling works during an attempt.
+  return courseActivityMessagingEnabled(activity.metadata)
+    ? readConversation(user, conversation)
+    : { conversation: null };
 }
 
 // Notices remain readable if a live policy change closes access to the activity.
@@ -124,9 +129,10 @@ export async function getStoredLearnerActivityConversation(user: CurrentUser, co
   const conversation = await prisma.activityConversation.findFirst({
     where: { courseId, groupId, activityId, participant: { userId: user.id, role: "student" } },
     orderBy: [{ attemptNumber: "desc" }],
-    select: { id: true, attemptId: true, attemptNumber: true }
+    select: { id: true, attemptId: true, attemptNumber: true, activity: { select: { metadata: true } } }
   });
-  return conversation ? readConversation(user, conversation) : { conversation: null };
+  if (!conversation || !courseActivityMessagingEnabled(conversation.activity.metadata)) return { conversation: null };
+  return readConversation(user, { id: conversation.id, attemptId: conversation.attemptId, attemptNumber: conversation.attemptNumber });
 }
 
 async function readConversation(user: CurrentUser, conversation: { id: string; attemptId: string | null; attemptNumber: number }) {
@@ -179,9 +185,10 @@ export async function markLearnerActivityConversationRead(
       activityId,
       participant: { userId: user.id, role: "student" }
     },
-    select: { id: true }
+    select: { id: true, activity: { select: { metadata: true } } }
   });
   if (!conversation) throw notFound("Activity conversation");
+  if (!courseActivityMessagingEnabled(conversation.activity.metadata)) throw messagingDisabled();
   await prisma.activityConversationRead.upsert({
     where: { conversationId_userId: { conversationId, userId: user.id } },
     create: { conversationId, userId: user.id, lastReadAt: now },
@@ -197,7 +204,7 @@ export async function getActivityMessagingOverview(
   groupId?: string | null,
   now = new Date()
 ): Promise<ActivityMessagingOverview> {
-  const groupScope = await assertActivityMessagingAccess(user, courseId, activityId, groupId);
+  const { groupScope, enabled } = await assertActivityMessagingAccess(user, courseId, activityId, groupId);
   const activeConversations = await listActiveConversations(courseId, activityId, groupScope, now);
   const conversationWhere = {
     courseId,
@@ -229,6 +236,7 @@ export async function getActivityMessagingOverview(
   });
 
   return {
+    enabled,
     activeRecipientCount: activeConversations.length,
     broadcasts: broadcasts.map((broadcast) => ({
       id: broadcast.id,
@@ -254,7 +262,8 @@ export async function sendActivityBroadcast(
   groupId?: string | null,
   now = new Date()
 ) {
-  const groupScope = await assertActivityMessagingAccess(user, courseId, activityId, groupId);
+  const { groupScope, enabled } = await assertActivityMessagingAccess(user, courseId, activityId, groupId);
+  if (!enabled) throw messagingDisabled();
   const activeConversations = await listActiveConversations(courseId, activityId, groupScope, now);
   if (!activeConversations.length) {
     throw new AppError(409, "NO_ACTIVE_ACTIVITY_ATTEMPTS", "No learners are currently active in this activity.");
@@ -262,6 +271,8 @@ export async function sendActivityBroadcast(
   const senderName = displayUserName(user);
   const targetGroupIds = [...new Set(activeConversations.map((conversation) => conversation.groupId))].sort();
   const broadcast = await prisma.$transaction(async (tx) => {
+    const activity = await tx.activity.findFirst({ where: { id: activityId, courseId }, select: { metadata: true } });
+    if (!courseActivityMessagingEnabled(activity?.metadata)) throw messagingDisabled();
     const created = await tx.activityMessageBroadcast.create({
       data: {
         courseId,
@@ -306,7 +317,7 @@ async function assertActivityMessagingAccess(
 ) {
   const activity = await prisma.activity.findFirst({
     where: { id: activityId, courseId },
-    select: { id: true }
+    select: { id: true, metadata: true }
   });
   if (!activity) throw notFound("Activity");
   const groupScope = await getActivityMessagingGroupScope(user, courseId, groupId);
@@ -317,7 +328,11 @@ async function assertActivityMessagingAccess(
     });
     if (!assignment) throw notFound("Group activity assignment");
   }
-  return groupScope;
+  return { groupScope, enabled: courseActivityMessagingEnabled(activity.metadata) };
+}
+
+function messagingDisabled() {
+  return new AppError(403, "ACTIVITY_MESSAGING_DISABLED", "Messaging is disabled for this activity.");
 }
 
 export async function listActiveConversations(

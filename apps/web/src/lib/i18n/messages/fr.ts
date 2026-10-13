@@ -159,6 +159,9 @@ export const frMessages = {
       time: "Heure"
     },
     activityMessenger: {
+      enabledLabel: "Activer la messagerie de l’activité",
+      enabledHelp: "Permettre aux enseignants d’envoyer des messages aux étudiants qui répondent à cette activité. Les changements s’appliquent aussi aux étudiants déjà en cours de réponse.",
+      disabled: "La messagerie est désactivée pour cette activité. Activez-la dans les paramètres de l’activité du contenu du cours.",
       label: "Messages",
       open: "Ouvrir les messages de l’activité",
       openUnread: "Ouvrir les messages de l’activité ({count} non lus)",

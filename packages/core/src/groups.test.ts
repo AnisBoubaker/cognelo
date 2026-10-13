@@ -275,6 +275,7 @@ describe("group services", () => {
     await expect(getCourseActivityAssignmentSettings(teacherUser, "course-1", "activity-1")).resolves.toMatchObject({
       general: {
         assessmentMode: "formative",
+        messagingEnabled: false,
         contentPlacement: { parentId: "folder-1", isVisible: true }
       },
       groups: [
@@ -564,6 +565,7 @@ describe("group services", () => {
               enablePerGroupSettings: true,
               futureGroupsAssigned: false,
               assessmentMode: "formative",
+              messagingEnabled: false,
               timeLimitMinutes: null,
               assignedGroupIds: ["group-1", "group-2"]
             }
