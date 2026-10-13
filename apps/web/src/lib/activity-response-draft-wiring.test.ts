@@ -23,6 +23,6 @@ describe("activity response draft wiring", () => {
   });
 
   it("remounts the embedded renderer when Test navigation selects another item", () => {
-    expect(testRuntimeSource).toContain('key={selectedItem.id}');
+    expect(testRuntimeSource).toContain('key={`${selectedItem.id}:${JSON.stringify(selectedItem.activity.config)}:${selectedItem.activity.description}`}');
   });
 });

@@ -521,7 +521,8 @@ test.describe.serial("authoring and completing every activity type", () => {
     await submitForGrading.click();
     const firstConfirmation = studentPage.getByRole("dialog", { name: "Submission complete" });
     await expect(firstConfirmation).toBeVisible({ timeout: 60_000 });
-    await expect(firstConfirmation.getByRole("img", { name: "Passed" })).toBeVisible();
+    await expect(firstConfirmation.getByRole("img", { name: "Passed" })).toHaveCount(0);
+    await expect(firstConfirmation.getByRole("img", { name: "Failed" })).toHaveCount(0);
     await expect(firstConfirmation).toContainText("1 submission(s) remaining.");
     await firstConfirmation.getByRole("button", { name: "OK" }).click();
 

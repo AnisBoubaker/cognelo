@@ -175,12 +175,12 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
       await snapshotCodingExerciseAiFeedbackConfig({ activityId: activity.id, executionId: execution.id });
       const earnedWeight = numberValue(execution.resultSummary.earnedWeight);
       const totalWeight = numberValue(execution.resultSummary.totalWeight);
-      if (earnedWeight === null || totalWeight === null || totalWeight <= 0) {
+      if (earnedWeight === null || totalWeight === null || totalWeight < 0) {
         throw new AppError(409, "CODING_EXERCISE_RESULT_INVALID", "The coding exercise did not return a valid weighted result.");
       }
       return {
         state: { sourceCode: input.sourceCode, executionId: execution.id },
-        gradingResult: {
+        gradingResult: totalWeight === 0 ? null : {
           rawScore: earnedWeight,
           rawMaxScore: totalWeight,
           analyticsPayload: execution.resultSummary,

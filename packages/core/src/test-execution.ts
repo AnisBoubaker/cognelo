@@ -1,3 +1,4 @@
+import { lockTestAuthoring } from "./activity-authoring-live";
 import { createHash } from "node:crypto";
 import { getActivityDefinition, type ActivityGradingResult } from "@cognelo/activity-sdk";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -45,7 +46,7 @@ export async function getTestRuntime(
       pluginKey: CORE_TEST_RUNTIME_KEY,
       lifecycle: { not: "deleted" }
     },
-    include: { testItemAttempts: true },
+    include: { testItemAttempts: true, testRevision: { include: { items: true } } },
     orderBy: [{ attemptNumber: "desc" }]
   });
   const attempt = view === "previous"
@@ -66,7 +67,7 @@ export async function startOrResumeTestAttempt(
   sessionId?: string | null
 ) {
   const context = await resolveTestRuntimeContext(user, courseId, groupId, testActivityId);
-  assertCompositeItemsSupported(context.test.items);
+  assertCompositeItemsSupported(activeRuntimeItems(context.test.items));
   const existing = await prisma.activityAttempt.findFirst({
     where: {
       courseId,
@@ -135,9 +136,9 @@ export async function getTestItemExecutionContext(
     options.allowCompletedParent === true
   );
   if (!options.allowExpiredParent) assertTestAttemptWithinTime(parentAttempt, context.assignedActivity.assignment.metadata);
-  if (!options.allowResumePolicyBypass) assertTestAttemptResumePolicy(parentAttempt, options.sessionId);
+  if (!options.allowResumePolicyBypass) assertTestAttemptResumePolicy(parentAttempt, options.sessionId, context.test.settings);
   const item = context.test.items.find((candidate) => candidate.id === testItemId);
-  if (!item || !manifestItemIds(parentAttempt.metadata).has(item.id)) {
+  if (!item || (parentAttempt.lifecycle === "started" ? item.removedAt !== null && item.removedAt !== undefined : !manifestItemIds(parentAttempt.metadata).has(item.id))) {
     throw notFound("Test item");
   }
   const definition = getActivityDefinition(item.activity.activityType.key);
@@ -147,6 +148,9 @@ export async function getTestItemExecutionContext(
   const itemAttempt = await prisma.testItemAttempt.findUnique({
     where: { parentAttemptId_testItemId: { parentAttemptId, testItemId } }
   });
+  if (itemAttempt && parentAttempt.lifecycle === "started") {
+    itemAttempt.result = { ...asRecord(itemAttempt.result), state: reconcileItemState(item.activity, itemAttempt.result) } as Prisma.JsonObject;
+  }
   return { ...context, parentAttempt, item, itemAttempt };
 }
 
@@ -158,7 +162,7 @@ export async function saveTestItemAttemptState(
   parentAttemptId: string,
   testItemId: string,
   state: Record<string, unknown>,
-  options: { sessionId?: string | null } = {}
+  options: { sessionId?: string | null; configSnapshot?: Record<string, unknown> } = {}
 ) {
   const context = await getTestItemExecutionContext(
     user,
@@ -181,16 +185,16 @@ export async function saveTestItemAttemptState(
     throw notFound("Test item attempt");
   }
   assertTestAttemptWithinTime(context.parentAttempt, context.assignedActivity.assignment.metadata);
-  assertTestAttemptResumePolicy(context.parentAttempt, options.sessionId);
+  assertTestAttemptResumePolicy(context.parentAttempt, options.sessionId, context.test.settings);
   return prisma.testItemAttempt.upsert({
     where: { parentAttemptId_testItemId: { parentAttemptId, testItemId } },
-    update: { result: { state } as Prisma.InputJsonValue },
+    update: { result: { ...asRecord(context.itemAttempt?.result), state, configSnapshot: options.configSnapshot ?? context.item.activity.config } as Prisma.InputJsonValue },
     create: {
       parentAttemptId,
       testItemId,
       activityId: context.item.activityId,
       lifecycle: "started",
-      result: { state } as Prisma.InputJsonValue,
+      result: { state, configSnapshot: options.configSnapshot ?? context.item.activity.config } as Prisma.InputJsonValue,
       activityConfigFingerprint: fingerprint(context.item.activity.config)
     }
   });
@@ -205,7 +209,7 @@ export async function submitTestItemAttemptResult(
   testItemId: string,
   input: {
     state: Record<string, unknown>;
-    gradingResult: ActivityGradingResult;
+    gradingResult: ActivityGradingResult | null;
     pluginAttemptRef?: string | null;
     now?: Date;
   }
@@ -222,48 +226,52 @@ export async function submitTestItemAttemptResult(
   if (context.itemAttempt && context.itemAttempt.lifecycle !== "started") {
     throw new AppError(409, "TEST_ITEM_ALREADY_SUBMITTED", "This Test item has already been submitted.");
   }
-  if (!Number.isFinite(input.gradingResult.rawMaxScore) || input.gradingResult.rawMaxScore <= 0) {
+  if (input.gradingResult && (!Number.isFinite(input.gradingResult.rawMaxScore) || input.gradingResult.rawMaxScore <= 0)) {
     throw new AppError(422, "TEST_ITEM_GRADING_RESULT_INVALID", "The activity returned an invalid maximum score.");
   }
   const now = input.now ?? new Date();
-  const normalizedScore = (input.gradingResult.rawScore / input.gradingResult.rawMaxScore) * context.item.pointsPossible;
+  const normalizedScore = input.gradingResult ? (input.gradingResult.rawScore / input.gradingResult.rawMaxScore) * context.item.pointsPossible : null;
   return prisma.testItemAttempt.upsert({
     where: { parentAttemptId_testItemId: { parentAttemptId, testItemId } },
     update: {
-      lifecycle: "graded",
-      rawScore: input.gradingResult.rawScore,
-      rawMaxScore: input.gradingResult.rawMaxScore,
+      lifecycle: input.gradingResult ? "graded" : "submitted",
+      rawScore: input.gradingResult?.rawScore ?? null,
+      rawMaxScore: input.gradingResult?.rawMaxScore ?? null,
       normalizedScore,
       normalizedMaxScore: context.item.pointsPossible,
       pluginAttemptRef: input.pluginAttemptRef,
       result: {
+        ...asRecord(context.itemAttempt?.result),
         state: input.state,
-        analyticsPayload: input.gradingResult.analyticsPayload ?? {},
-        metadata: input.gradingResult.metadata ?? {}
+        configSnapshot: context.item.activity.config,
+        analyticsPayload: input.gradingResult?.analyticsPayload ?? {},
+        metadata: input.gradingResult?.metadata ?? {}
       } as Prisma.InputJsonValue,
-      feedback: (input.gradingResult.feedback ?? {}) as Prisma.InputJsonValue,
+      feedback: (input.gradingResult?.feedback ?? {}) as Prisma.InputJsonValue,
+      activityConfigFingerprint: fingerprint(context.item.activity.config),
       submittedAt: now,
-      gradedAt: now
+      gradedAt: input.gradingResult ? now : null
     },
     create: {
       parentAttemptId,
       testItemId,
       activityId: context.item.activityId,
-      lifecycle: "graded",
-      rawScore: input.gradingResult.rawScore,
-      rawMaxScore: input.gradingResult.rawMaxScore,
+      lifecycle: input.gradingResult ? "graded" : "submitted",
+      rawScore: input.gradingResult?.rawScore ?? null,
+      rawMaxScore: input.gradingResult?.rawMaxScore ?? null,
       normalizedScore,
       normalizedMaxScore: context.item.pointsPossible,
       pluginAttemptRef: input.pluginAttemptRef,
       result: {
         state: input.state,
-        analyticsPayload: input.gradingResult.analyticsPayload ?? {},
-        metadata: input.gradingResult.metadata ?? {}
+        configSnapshot: context.item.activity.config,
+        analyticsPayload: input.gradingResult?.analyticsPayload ?? {},
+        metadata: input.gradingResult?.metadata ?? {}
       } as Prisma.InputJsonValue,
-      feedback: (input.gradingResult.feedback ?? {}) as Prisma.InputJsonValue,
+      feedback: (input.gradingResult?.feedback ?? {}) as Prisma.InputJsonValue,
       activityConfigFingerprint: fingerprint(context.item.activity.config),
       submittedAt: now,
-      gradedAt: now
+      gradedAt: input.gradingResult ? now : null
     }
   });
 }
@@ -294,28 +302,47 @@ export async function submitTestAttempt(
       .filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded")
       .map((attempt) => attempt.testItemId)
   );
-  const requiredManifestItems = manifestItems(parentAttempt.metadata).filter((item) => item.isRequired !== false);
+  const revision = await ensureCurrentTestRevision(context);
+  const currentItems = activeRuntimeItems(context.test.items);
+  const submissionManifest = {
+    ...asRecord(asRecord(parentAttempt.metadata).manifest),
+    testRevisionId: revision.id, revisionNumber: revision.revisionNumber,
+    settings: context.test.settings,
+    items: orderedLiveItems(currentItems, parentAttempt.metadata, context.test.settings).map((item) => ({
+      testItemId: item.id, activityId: item.activityId, activityTypeKey: item.activity.activityType.key,
+      title: item.activity.title, position: item.position, pointsPossible: item.pointsPossible, isRequired: item.isRequired
+    }))
+  };
+  const requiredManifestItems = submissionManifest.items.filter((item) => item.isRequired !== false);
   const missingRequiredItemIds = requiredManifestItems.map((item) => item.testItemId).filter((id) => !completedIds.has(id));
   if (missingRequiredItemIds.length) {
     throw new AppError(409, "TEST_REQUIRED_ITEMS_INCOMPLETE", "Complete all required Test activities before submitting.", {
       missingRequiredItemIds
     });
   }
+  await prisma.activityAttempt.update({ where: { id: parentAttempt.id }, data: { testRevisionId: revision.id } });
   await submitActivityAttempt(user, {
     attemptId: parentAttempt.id,
     pluginAttemptRef: parentAttempt.id,
     metadata: {
       ...asRecord(parentAttempt.metadata),
-      submittedItemIds: [...completedIds]
+      submittedItemIds: [...completedIds], submissionManifest
     } as Prisma.InputJsonValue
   });
-  await recordTestAttemptGrade(user, courseId, parentAttempt.id, "auto");
+  // Submission is final even when one child needs manual/rubric grading.
+  if (currentItems.every((item) => parentAttempt.testItemAttempts.some((attempt) => attempt.testItemId === item.id && attempt.lifecycle === "graded"))) {
+    await recordTestAttemptGrade(user, courseId, parentAttempt.id, "auto");
+  }
   return getTestRuntime(user, courseId, groupId, testActivityId, "previous");
 }
 
 export async function claimTestAttemptSubmission(parentAttemptId: string) {
   try {
-    await prisma.testSubmissionClaim.create({ data: { parentAttemptId, status: "processing" } });
+    await prisma.$transaction(async (tx) => {
+      const attempt = await tx.activityAttempt.findUniqueOrThrow({ where: { id: parentAttemptId }, select: { activityId: true } });
+      await lockTestAuthoring(tx, attempt.activityId);
+      await tx.testSubmissionClaim.create({ data: { parentAttemptId, status: "processing" } });
+    });
     return true;
   } catch (error) {
     if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
@@ -327,8 +354,7 @@ export async function claimTestAttemptSubmission(parentAttemptId: string) {
       }
     });
     if (!stale.count) return false;
-    await prisma.testSubmissionClaim.create({ data: { parentAttemptId, status: "processing" } });
-    return true;
+    return claimTestAttemptSubmission(parentAttemptId);
   }
 }
 
@@ -658,28 +684,33 @@ function buildTestRuntime(
   sessionId?: string | null
 ) {
   const itemAttempts = new Map((attempt?.testItemAttempts ?? []).map((itemAttempt) => [String(itemAttempt.testItemId), itemAttempt]));
-  const itemOrder = attempt ? manifestItems(attempt.metadata).map((item) => item.testItemId) : context.test.items.map((item) => item.id);
+  const itemOrder = attempt && attempt.lifecycle !== "started"
+    ? manifestItems(attempt.metadata).map((item) => item.testItemId)
+    : orderedLiveItems(activeRuntimeItems(context.test.items), attempt?.metadata, context.test.settings).map((item) => item.id);
+  const revision = (attempt as typeof attempt & { testRevision?: { title: string; description: string; items: Array<{ sourceTestItemId: string; title: string; description: string; config: unknown; metadata: unknown; pointsPossible: number }> } })?.testRevision;
   const itemById = new Map(context.test.items.map((item) => [item.id, item]));
   const items = itemOrder.flatMap((itemId) => {
     const item = itemById.get(itemId);
     if (!item) return [];
     const itemAttempt = itemAttempts.get(itemId);
+    const saved = attempt?.lifecycle !== "started" ? revision?.items.find((entry) => entry.sourceTestItemId === item.id) : null;
     return [{
       ...item,
+      ...(saved ? { pointsPossible: saved.pointsPossible, activity: { ...item.activity, title: saved.title, description: saved.description, config: saved.config, metadata: saved.metadata } } : {}),
       itemAttempt: itemAttempt ? {
         id: String(itemAttempt.id),
         lifecycle: String(itemAttempt.lifecycle),
-        rawScore: numberOrNull(itemAttempt.rawScore),
-        rawMaxScore: numberOrNull(itemAttempt.rawMaxScore),
-        normalizedScore: numberOrNull(itemAttempt.normalizedScore),
-        normalizedMaxScore: numberOrNull(itemAttempt.normalizedMaxScore),
-        state: asRecord(asRecord(itemAttempt.result).state),
+        rawScore: availability.gradesReleased ? numberOrNull(itemAttempt.rawScore) : null,
+        rawMaxScore: availability.gradesReleased ? numberOrNull(itemAttempt.rawMaxScore) : null,
+        normalizedScore: availability.gradesReleased ? numberOrNull(itemAttempt.normalizedScore) : null,
+        normalizedMaxScore: availability.gradesReleased ? numberOrNull(itemAttempt.normalizedMaxScore) : null,
+        state: projectStudentTestItemState(item.activity.activityType.key, attempt?.lifecycle === "started" ? reconcileItemState(item.activity, itemAttempt.result) : asRecord(asRecord(itemAttempt.result).state)),
         submittedAt: itemAttempt.submittedAt ?? null,
         gradedAt: itemAttempt.gradedAt ?? null
       } : null
     }];
   });
-  const savedSettings = attempt ? asRecord(asRecord(attempt.metadata).manifest).settings ?? context.test.settings : context.test.settings;
+  const savedSettings = attempt && attempt.lifecycle !== "started" ? currentManifest(attempt.metadata).settings ?? context.test.settings : context.test.settings;
   const submittedMetadata = asRecord(attempt?.metadata);
   const runtimeSettings = !attempt || attempt.lifecycle === "started"
     ? withAssignmentTimeLimit(savedSettings, context.assignedActivity.assignment.metadata)
@@ -699,7 +730,7 @@ function buildTestRuntime(
   return {
     test: {
       id: context.test.id,
-      activity: context.test.activity,
+      activity: revision && attempt?.lifecycle !== "started" ? { ...context.test.activity, title: revision.title, description: revision.description } : context.test.activity,
       settings: runtimeSettings,
       items
     },
@@ -718,10 +749,10 @@ function buildTestRuntime(
   };
 }
 
-function assertTestAttemptResumePolicy(attempt: { metadata: unknown }, sessionId?: string | null) {
+function assertTestAttemptResumePolicy(attempt: { metadata: unknown }, sessionId?: string | null, settings?: unknown) {
   if (asRecord(attempt.metadata).continuation) return;
   const manifest = asRecord(asRecord(attempt.metadata).manifest);
-  if (asRecord(manifest.settings).allowResume !== false) return;
+  if (asRecord(settings ?? manifest.settings).allowResume !== false) return;
   const attemptSessionId = typeof manifest.sessionId === "string" ? manifest.sessionId : null;
   if (attemptSessionId && attemptSessionId !== sessionId) {
     throw new AppError(409, "TEST_RESUME_DISABLED", "This Test does not allow an unfinished attempt to be resumed.");
@@ -733,7 +764,7 @@ async function ensureCurrentTestRevision(context: Awaited<ReturnType<typeof reso
     title: context.test.activity.title,
     description: context.test.activity.description,
     settings: context.test.settings,
-    items: context.test.items.map((item) => ({
+    items: activeRuntimeItems(context.test.items).map((item) => ({
       sourceTestItemId: item.id,
       sourceActivityId: item.activityId,
       activityTypeKey: item.activity.activityType.key,
@@ -882,7 +913,7 @@ function fingerprint(value: unknown) {
 }
 
 function manifestItems(metadata: unknown) {
-  const manifest = asRecord(asRecord(metadata).manifest);
+  const manifest = currentManifest(metadata);
   const items = Array.isArray(manifest.items) ? manifest.items : [];
   return items.flatMap((value) => {
     const item = asRecord(value);
@@ -908,4 +939,30 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function numberOrNull(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function currentManifest(metadata: unknown) {
+  const record = asRecord(metadata);
+  return asRecord(record.submissionManifest ?? record.manifest);
+}
+function activeRuntimeItems<T extends { removedAt?: Date | null }>(items: T[]) {
+  return items.filter((item) => !item.removedAt);
+}
+function orderedLiveItems<T extends { id: string }>(items: T[], metadata: unknown, settings: unknown) {
+  if (asRecord(settings).randomizeItems !== true || !metadata) return items;
+  const oldOrder = manifestItems(metadata).map((item) => item.testItemId);
+  return [...items].sort((a, b) => {
+    const aIndex = oldOrder.indexOf(a.id), bIndex = oldOrder.indexOf(b.id);
+    return (aIndex < 0 ? oldOrder.length : aIndex) - (bIndex < 0 ? oldOrder.length : bIndex);
+  });
+}
+
+function reconcileItemState(activity: { config: unknown; activityType: { key: string } }, result: unknown) {
+  const saved = asRecord(result), state = asRecord(saved.state);
+  if (!saved.configSnapshot) return state;
+  return getActivityDefinition(activity.activityType.key)?.reconcileResponseState?.(saved.configSnapshot, activity.config, state) ?? state;
+}
+
+export function projectStudentTestItemState(activityTypeKey: string, state: Record<string, unknown>) {
+  return getActivityDefinition(activityTypeKey)?.studentResponseState?.(state) ?? state;
 }

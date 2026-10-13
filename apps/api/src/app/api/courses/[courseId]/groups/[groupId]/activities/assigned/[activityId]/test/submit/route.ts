@@ -29,7 +29,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const { courseId, groupId, activityId } = await params;
     await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId);
     const input = inputSchema.parse(await readJson(request));
-    const runtime = await getTestRuntime(user, courseId, groupId, activityId, "attempt", input.sessionId);
+    let runtime = await getTestRuntime(user, courseId, groupId, activityId, "attempt", input.sessionId);
     if (!runtime.attempt || runtime.attempt.id !== input.parentAttemptId || runtime.attempt.lifecycle !== "started") {
       const previousRuntime = await getTestRuntime(user, courseId, groupId, activityId, "previous");
       if (previousRuntime.attempt?.id === input.parentAttemptId) {
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     try {
+      runtime = await getTestRuntime(user, courseId, groupId, activityId, "attempt", input.sessionId);
       for (const item of runtime.test.items) {
         if (item.itemAttempt?.lifecycle === "submitted" || item.itemAttempt?.lifecycle === "graded") {
           continue;

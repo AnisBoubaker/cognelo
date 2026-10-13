@@ -100,6 +100,7 @@ type WebDesignExerciseClient = {
     courseId: string,
     activityId: string,
     input: {
+      confirmActiveStudents?: boolean;
       shouldCaptureExpectedResult?: boolean;
       shouldCropExpectedResult?: boolean;
       referenceFiles: WebDesignExerciseFile[];
@@ -480,7 +481,7 @@ export function WebDesignCodingExerciseActivityView({
     setTitle(activity.title);
     setDescription(activity.description);
     setPrompt(nextConfig.prompt);
-    setStarterFiles(nextConfig.files);
+    if (isNewActivity || canManage) setStarterFiles(nextConfig.files);
     if (!canManage) {
       setSavedSnapshot(
         buildWebDesignAuthoringSnapshot({
@@ -493,7 +494,7 @@ export function WebDesignCodingExerciseActivityView({
         })
       );
     }
-    setActivePath(nextConfig.files[0]?.path ?? "index.html");
+    if (isNewActivity || canManage) setActivePath(nextConfig.files[0]?.path ?? "index.html");
     setActiveStarterPath(nextConfig.files[0]?.path ?? "index.html");
     if (isNewActivity) {
       setSolutionFiles(nextConfig.files);
@@ -730,15 +731,16 @@ export function WebDesignCodingExerciseActivityView({
     setError("");
 
     try {
-      await onSave({
+      const savedActivity = await onSave({
         title,
         description,
         config: nextConfig
       });
-      await saveSolutionAndTests();
+      await saveSolutionAndTests(undefined, Boolean((savedActivity as { liveChangeConfirmed?: boolean }).liveChangeConfirmed));
       setSavedSnapshot(currentSnapshot);
       notifications.success(copy.saved);
     } catch (err) {
+      if (err && typeof err === "object" && "code" in err && err.code === "ACTION_CANCELLED") throw err;
       if (!handleReferenceValidationError(err)) {
         notifications.error(err instanceof Error ? err.message : copy.saveError);
       }
@@ -762,16 +764,17 @@ export function WebDesignCodingExerciseActivityView({
 
   async function saveExercise(event: FormEvent) {
     event.preventDefault();
-    await saveWebDesignExercise();
+    await saveWebDesignExercise().catch(() => undefined);
   }
 
-  async function saveSolutionAndTests(testsOverride?: WebDesignExerciseTestRecord[]) {
+  async function saveSolutionAndTests(testsOverride?: WebDesignExerciseTestRecord[], confirmActiveStudents = false) {
     if (!course?.id || !webDesignClient) {
       return null;
     }
 
     const testsToSave = testsOverride ?? (authoringTestsLoaded ? authoringTests : (await webDesignClient.listTests(course.id, activity.id)).tests);
     const result = await webDesignClient.saveTests(course.id, activity.id, {
+      confirmActiveStudents,
       shouldCaptureExpectedResult: webDesignPromptIncludesExpectedResult(prompt),
       shouldCropExpectedResult: webDesignPromptRequestsCroppedExpectedResult(prompt),
       referenceFiles: normalizedSolutionFiles,
@@ -1506,7 +1509,7 @@ function StudentTestResultPanel({
     >
       <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
         <h3 style={{ margin: 0 }}>{copy.result}</h3>
-        {submission ? (
+        {submission && submission.score !== null && submission.maxScore !== null ? (
           <strong style={{ color: submission.status === "completed" ? "#166534" : "#b42318" }}>
             {submission.score ?? 0}/{submission.maxScore ?? 0}
           </strong>

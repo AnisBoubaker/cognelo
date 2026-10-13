@@ -703,7 +703,11 @@ export const CourseContentDuplicateSchema = z.object({
 });
 export type CourseContentDuplicate = z.infer<typeof CourseContentDuplicateSchema>;
 
-export const ActivityUpdateSchema = ActivityInputSchema.partial();
+export const LiveActivityChangeSchema = z.object({
+  confirmActiveStudents: z.boolean().optional(),
+  studentMessage: z.string().trim().max(4000).optional()
+});
+export const ActivityUpdateSchema = ActivityInputSchema.partial().extend(LiveActivityChangeSchema.shape);
 export type ActivityUpdate = z.infer<typeof ActivityUpdateSchema>;
 
 export const TestSettingsSchema = z.object({
@@ -725,6 +729,7 @@ export const TestCreateSchema = z.object({
 export type TestCreate = z.infer<typeof TestCreateSchema>;
 
 export const TestUpdateSchema = z.object({
+  ...LiveActivityChangeSchema.shape,
   title: z.string().trim().min(2).max(180).optional(),
   description: z.string().max(4000).optional(),
   lifecycle: ActivityLifecycleSchema.optional(),
@@ -772,6 +777,7 @@ export const TestDuplicateSchema = z.object({
 export type TestDuplicate = z.infer<typeof TestDuplicateSchema>;
 
 const TestItemSettingsSchema = z.object({
+  ...LiveActivityChangeSchema.shape,
   pointsPossible: z.number().positive().max(100000).optional().default(1),
   isRequired: z.boolean().optional().default(true),
   position: z.number().int().min(0).optional(),
@@ -797,6 +803,7 @@ export const TestItemCreateSchema = z.discriminatedUnion("source", [
 export type TestItemCreate = z.infer<typeof TestItemCreateSchema>;
 
 export const TestItemUpdateSchema = z.object({
+  ...LiveActivityChangeSchema.shape,
   pointsPossible: z.number().positive().max(100000).optional(),
   isRequired: z.boolean().optional(),
   position: z.number().int().min(0).optional(),

@@ -4,7 +4,7 @@ import type { CurrentUser } from "@cognelo/contracts";
 const db = vi.hoisted(() => ({
   courseGroupParticipant: { findFirst: vi.fn() },
   test: { findFirst: vi.fn() },
-  activityAttempt: { findMany: vi.fn(), findFirst: vi.fn() },
+  activityAttempt: { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
   testItemAttempt: { findUnique: vi.fn(), upsert: vi.fn(), update: vi.fn() },
   testRevision: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn() }
 }));
@@ -249,6 +249,15 @@ describe("compound Test execution", () => {
     }));
   });
 
+  it("records an ungraded child as submitted without inventing a score", async () => {
+    await submitTestItemAttemptResult(student, "course-1", "group-1", "test-activity-1", "parent-attempt-1", "item-1", {
+      state: { sourceCode: "print(1)" }, gradingResult: null
+    });
+    expect(db.testItemAttempt.upsert).toHaveBeenLastCalledWith(expect.objectContaining({
+      create: expect.objectContaining({ lifecycle: "submitted", rawScore: null, rawMaxScore: null, normalizedScore: null, gradedAt: null })
+    }));
+  });
+
   it("treats a trailing autosave after Test submission as an idempotent read", async () => {
     const gradedItemAttempt = {
       id: "item-attempt-1",
@@ -363,6 +372,7 @@ describe("compound Test execution", () => {
   });
 
   it("blocks child access from a new browser session when resume is disabled", async () => {
+    db.test.findFirst.mockResolvedValue({ ...testRecord, settings: { ...testRecord.settings, allowResume: false } });
     db.activityAttempt.findFirst.mockResolvedValue(parentAttempt({
       metadata: {
         manifest: {

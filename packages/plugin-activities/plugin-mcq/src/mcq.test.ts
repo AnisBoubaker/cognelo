@@ -1,8 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { gradeMcqAnswers, parseMcqSource, renderInlineMarkdown } from "./mcq";
+import { gradeMcqAnswers, parseMcqSource, reconcileMcqResponseState, renderInlineMarkdown } from "./mcq";
 import { mcqPlugin } from "./plugin";
 import { mcqServerPlugin } from "./server";
 import { deriveMcqStudentAttemptState } from "./client";
+
+describe("live MCQ response reconciliation", () => {
+  const original = { source: "## Addition\nChoose a number.\n\n- [x] Four\n- [ ] Five" };
+  const state = { answers: { "question-1": ["question-1-choice-2"] } };
+  it("keeps the same selected choice when the teacher reorders and corrects the key", () => {
+    const before = parseMcqSource(original.source, "none");
+    const selected = { answers: { [before.questions[0].id]: [before.questions[0].choices[1].id] } };
+    const next = { source: "## Addition\nChoose five.\n\n- [x] Five\n- [ ] Four" };
+    const after = parseMcqSource(next.source, "none");
+    expect(reconcileMcqResponseState(original, next, selected)).toEqual({ answers: { [after.questions[0].id]: [after.questions[0].choices[0].id] } });
+  });
+  it("does not turn a removed choice into a different answer", () => {
+    const before = parseMcqSource(original.source, "none");
+    const selected = { answers: { [before.questions[0].id]: [before.questions[0].choices[1].id] } };
+    const next = { source: "## Addition\nChoose a number.\n\n- [x] Four\n- [ ] Six" };
+    // A text correction in the same slot preserves a selection.
+    expect(reconcileMcqResponseState(original, next, selected).answers[before.questions[0].id]).toEqual(selected.answers[before.questions[0].id]);
+    const removed = { source: "## Addition\nChoose a number.\n\n- [x] Four" };
+    expect(reconcileMcqResponseState(original, removed, selected).answers[before.questions[0].id]).toEqual([]);
+  });
+  it("handles malformed saved answers without breaking the live runtime", () => {
+    expect(reconcileMcqResponseState(original, original, { ...state, answers: { "question-1": null } }).answers).toEqual({ "question-1": [] });
+  });
+});
 
 describe("MCQ student attempt state", () => {
   it("starts an unlimited new attempt empty after a completed submission", () => {

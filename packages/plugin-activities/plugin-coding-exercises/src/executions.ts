@@ -83,7 +83,7 @@ export const codingExerciseRunInputSchema = z.object({
 export type CodingExerciseRunInput = z.input<typeof codingExerciseRunInputSchema>;
 
 export const codingExerciseSubmitInputSchema = z.object({
-  sourceCode: codingExerciseStudentSourceSchema
+  sourceCode: z.string().max(60000).default("")
 });
 
 type HiddenTestCase = {
@@ -461,10 +461,6 @@ export async function submitCodingExercise(params: {
   });
   const normalizedHiddenTests = hiddenTests.map((hiddenTest) => toHiddenTestCase(hiddenTest));
 
-  if (!normalizedHiddenTests.length) {
-    throw new AppError(400, "HIDDEN_TESTS_REQUIRED", "This coding exercise does not have any enabled hidden tests yet.");
-  }
-
   const pendingExecution = await codingExerciseExecutionClient.pluginCodingExerciseExecution.create({
     data: {
       activityId: params.activityId,
@@ -490,7 +486,7 @@ export async function submitCodingExercise(params: {
     const updatedExecution = await codingExerciseExecutionClient.pluginCodingExerciseExecution.update({
       where: { id: pendingExecution.id },
       data: {
-        status: evaluated.summary.accepted ? "completed" : "failed",
+        status: evaluated.summary.accepted !== false ? "completed" : "failed",
         judge0Token: evaluated.latestToken,
         stdout: evaluated.latestStdout,
         stderr: evaluated.latestStderr,
@@ -542,16 +538,13 @@ export async function submitCodingExercisePreview(params: {
     })
   ]);
   const normalizedHiddenTests = hiddenTests.map(toHiddenTestCase);
-  if (!normalizedHiddenTests.length) {
-    throw new AppError(400, "HIDDEN_TESTS_REQUIRED", "This coding exercise does not have any enabled hidden tests yet.");
-  }
   try {
     const evaluated = await executeHiddenTests({ config, privateConfig, runtime, hiddenTests: normalizedHiddenTests, sourceCode: input.sourceCode });
     return previewCodingExecutionRecord({
       activityId: params.activityId,
       userId: params.userId,
       kind: "submit",
-      status: evaluated.summary.accepted ? "completed" : "failed",
+      status: evaluated.summary.accepted !== false ? "completed" : "failed",
       languageKey: runtime.languageKey,
       judge0LanguageId: runtime.languageId,
       sourceCode: input.sourceCode,
@@ -656,7 +649,8 @@ async function executeHiddenTests(input: {
       judge0LanguageName: runtime.languageName,
       executionMode: config.executionMode,
       phase: "finished",
-      accepted: earnedWeight === totalWeight,
+      accepted: totalWeight > 0 ? earnedWeight === totalWeight : null,
+      gradingPending: totalWeight === 0,
       outputTruncated,
       testCount: hiddenTests.length,
       passedCount: testResults.filter((test) => test.passed).length,

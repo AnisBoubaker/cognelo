@@ -1,3 +1,4 @@
+import { canShowStudentActivityGrade } from "@cognelo/core";
 import { z } from "zod";
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import {
@@ -97,9 +98,10 @@ export const mcqSubmissionRoute: PluginRouteDefinition = {
       const feedbackByAttemptId = showAiFeedback
         ? await listLatestMcqAiFeedbackByAttemptId(context.activity.id, submissions.map((submission) => submission.id), true)
         : new Map<string, Record<string, unknown>>();
+      const showGrade = await canShowStudentActivityGrade(context);
       const attempts = submissions.map((submission) => ({
         submission: { ...submission, aiFeedback: feedbackByAttemptId.get(submission.id) ?? null },
-        grade: toMcqSubmissionGrade(buildMcqGradingResultFromConfig(context.activity.config, submission.answers))
+        grade: showGrade ? toMcqSubmissionGrade(buildMcqGradingResultFromConfig(context.activity.config, submission.answers)) : null
       }));
       return {
         submission: attempts[0]?.submission ?? null,
@@ -176,7 +178,7 @@ export const mcqSubmissionRoute: PluginRouteDefinition = {
           submittedAt: submittedAttempt.submittedAt,
           gradedAt: submittedAttempt.gradedAt
         }),
-        result: gradingResult
+        result: null
       };
     }
   }

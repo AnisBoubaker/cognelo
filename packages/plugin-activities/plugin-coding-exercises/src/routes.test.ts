@@ -36,6 +36,7 @@ vi.mock("@cognelo/core", async () => {
   const actual = await vi.importActual<typeof import("@cognelo/core")>("@cognelo/core");
   return {
     ...actual,
+    canShowStudentActivityGrade: vi.fn(async (context) => context.activity.assignment?.metadata?.assessmentMode !== "summative"),
     assertCanManageActivityBank: mocks.assertCanManageActivityBank,
     assertCanManageCourse: mocks.assertCanManageCourse,
     assertCanManageCourseOrViewGradebook: mocks.assertCanManageCourseOrViewGradebook,

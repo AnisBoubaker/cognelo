@@ -73,7 +73,7 @@ describe("Parsons attempts persistence helpers", () => {
     });
   });
 
-  it("abandons stale attempts when the config fingerprint changes", async () => {
+  it("preserves active attempts and arrangements when the config fingerprint changes", async () => {
     mockPrisma.pluginParsonsAttempt.findFirst.mockResolvedValueOnce(
       attempt({
         latestState: {
@@ -82,19 +82,19 @@ describe("Parsons attempts persistence helpers", () => {
         }
       })
     );
-    mockPrisma.pluginParsonsAttempt.create.mockResolvedValueOnce(attempt({ id: "attempt-new" }));
+    mockPrisma.pluginParsonsAttempt.update.mockResolvedValueOnce(attempt());
 
     await ensureParsonsAttempt({ activityId: "activity-1", userId: "user-1", config });
 
     expect(mockPrisma.pluginParsonsAttempt.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "attempt-1" },
-        data: expect.objectContaining({ status: "abandoned" })
+        data: expect.objectContaining({ latestState: expect.objectContaining({ configFingerprint: getParsonsConfigFingerprint(config), blocks: state.blocks }) })
       })
     );
   });
 
-  it("updates attempt state, records events, and rejects stale fingerprints", async () => {
+  it("updates attempt state, records events, and reconciles stale fingerprints", async () => {
     mockPrisma.pluginParsonsAttempt.findFirst.mockResolvedValueOnce(attempt());
     tx.pluginParsonsAttempt.update.mockResolvedValueOnce(attempt({ checkCount: 1, resultSummary: { latestCorrect: true } }));
 
@@ -117,6 +117,7 @@ describe("Parsons attempts persistence helpers", () => {
     expect(tx.pluginParsonsAttemptEvent.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ type: "check" }) }));
 
     mockPrisma.pluginParsonsAttempt.findFirst.mockResolvedValueOnce(attempt());
+    tx.pluginParsonsAttempt.update.mockResolvedValueOnce(attempt());
     await expect(
       updateParsonsAttempt({
         activityId: "activity-1",
@@ -129,7 +130,7 @@ describe("Parsons attempts persistence helpers", () => {
           abandon: false
         }
       })
-    ).resolves.toBeNull();
+    ).resolves.toMatchObject({ latestState: { configFingerprint: getParsonsConfigFingerprint(config) } });
   });
 
   it("lists recent attempt signals with events", async () => {

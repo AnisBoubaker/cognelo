@@ -644,3 +644,37 @@ function findNextSpecial(text: string, start: number) {
 export function renderInlineTokens(tokens: InlineToken[], render: (token: InlineToken, index: number) => ReactNode) {
   return tokens.map(render);
 }
+
+/** Match unchanged questions/choices by their authored text before using position for corrections. */
+export function reconcileMcqResponseState(previousConfig: unknown, nextConfig: unknown, state: Record<string, unknown>) {
+  const previous = parseMcqSource(String((previousConfig as { source?: string })?.source ?? ""), "none");
+  const next = parseMcqSource(String((nextConfig as { source?: string })?.source ?? ""), "none");
+  const answers = state.answers && typeof state.answers === "object" ? state.answers as Record<string, string[]> : {};
+  const mapped: Record<string, string[]> = {};
+  const reservedQuestions = new Set<string>();
+  const targets = previous.questions.map((question) => {
+    const target = next.questions.find((candidate) => !reservedQuestions.has(candidate.id) && candidate.title === question.title);
+    if (target) reservedQuestions.add(target.id);
+    return target;
+  });
+  for (const [index, question] of previous.questions.entries()) {
+    const positional = next.questions[index];
+    const target = targets[index] ?? (previous.questions.length === next.questions.length && positional && !reservedQuestions.has(positional.id) ? positional : undefined);
+    if (!target) continue;
+    const reservedChoices = new Set<string>();
+    const replacements = question.choices.map((choice) => {
+      const replacement = target.choices.find((candidate) => !reservedChoices.has(candidate.id) && JSON.stringify(candidate.blocks) === JSON.stringify(choice.blocks));
+      if (replacement) reservedChoices.add(replacement.id);
+      return replacement;
+    });
+    mapped[target.id] = (Array.isArray(answers[question.id]) ? answers[question.id] : []).flatMap((id) => {
+      const choiceIndex = question.choices.findIndex((choice) => choice.id === id);
+      const choice = question.choices[choiceIndex];
+      if (!choice) return [];
+      const positional = target.choices[choiceIndex];
+      const replacement = replacements[choiceIndex] ?? (question.choices.length === target.choices.length && positional && !reservedChoices.has(positional.id) ? positional : undefined);
+      return replacement ? [replacement.id] : [];
+    });
+  }
+  return { ...state, answers: mapped };
+}

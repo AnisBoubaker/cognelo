@@ -151,3 +151,10 @@ When changing this plugin, update this detailed reference, the package README if
 ## Reopening the last submission
 
 Restores files from the exact learner-owned submission to the core response draft without changing the immutable submitted bundle or test results. Ordinary resubmission attaches fresh evidence to the same core attempt. The shared [continuation service](../../../../docs/SUBMISSION_CONTINUATION.md) enforces latest-attempt and staff scope, archives prior evidence, preserves attempt identity and original start, and applies current General/section/team/student settings. Later extensions or individual exceptions therefore affect the resumed deadline without resetting it.
+
+
+## Live authoring and grade visibility
+
+Live prompt/config refresh preserves the learner file bundle. Course private saves use the core live-authoring transaction and append full before/after data to `PluginWebDesignExerciseAuthoringRevision`; core audits retain only hashes. Migration `202610130010_authoring_revisions` is registered in `src/db.ts`, including backup ownership, and deletion hooks remove revisions. Existing reference validation remains mandatory. Summative submission/history APIs redact scores, test outcomes, summaries, and diagnostics before release; practice sample runs retain feedback.
+
+Shared confirmation, submitted-Test snapshots, and concurrency are documented in [Live activity authoring](../../../../docs/LIVE_ACTIVITY_AUTHORING.md).

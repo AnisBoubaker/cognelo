@@ -67,6 +67,10 @@ Core only creates the generic course-local `Activity` row and copies selected `A
 
 Plugins that store private bank-owned data must also use `ServerActivityPlugin.hooks.onBankActivityDeleted` to remove bank-owned private rows when a bank activity is deleted. This cleanup must leave copied course-owned rows alone, because existing course activities become course-local copies after their bank links are cleared.
 
+### Live authoring and learner grading state
+
+Use `withActivityAuthoringChange` for course-private authoring writes, executing private SQL through its supplied transaction so validation, active-student confirmation, notice, and audit remain coordinated with the parent Test. Full private revisions stay in plugin tables; core receives only fingerprints. `ActivityDefinition.reconcileResponseState` preserves responses after configuration edits, and `studentResponseState` strips evaluation from generic learner drafts/history. A composite submission may return `gradingResult: null` for successfully submitted work awaiting grading. Assigned summative result/status/history routes must use `canShowStudentActivityGrade` before returning scores or grading evidence; hiding only the UI is insufficient. See [Live activity authoring](../LIVE_ACTIVITY_AUTHORING.md).
+
 ## Plugin Route Dispatch
 
 The shared plugin route system lives in:

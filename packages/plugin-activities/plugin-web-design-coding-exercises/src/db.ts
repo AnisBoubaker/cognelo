@@ -1,6 +1,7 @@
 export const webDesignCodingExercisesDatabaseModule = {
   namespace: "plugin_web_design_coding_exercises",
   tables: [
+    "PluginWebDesignExerciseAuthoringRevision",
     "PluginWebDesignExerciseReferenceBundle",
     "PluginWebDesignExerciseTest",
     "PluginWebDesignExerciseSubmission",
@@ -132,7 +133,14 @@ export const webDesignCodingExercisesDatabaseModule = {
           WHEN duplicate_object THEN null;
         END $$`
       ]
-    }
+    },
+    { id: "202610130010_authoring_revisions", statements: [
+      `CREATE TABLE IF NOT EXISTS "PluginWebDesignExerciseAuthoringRevision" (
+  "id" TEXT PRIMARY KEY, "activityId" TEXT NOT NULL, "actorUserId" TEXT NOT NULL,
+  "previousValue" JSONB NOT NULL, "nextValue" JSONB NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`,
+      `CREATE INDEX IF NOT EXISTS "PluginWebDesignExerciseAuthoringRevision_activityId_createdAt_idx" ON "PluginWebDesignExerciseAuthoringRevision" ("activityId", "createdAt")`
+    ] }
   ],
   notes: [
     "Student-visible starter files live in shared activity config.",

@@ -494,6 +494,7 @@ export async function createBankTestFromCourse(
       include: {
         activity: { include: { activityType: true, knowledgeConcepts: true } },
         items: {
+          where: { removedAt: null },
           include: { activity: { include: { activityType: true, knowledgeConcepts: true } } },
           orderBy: [{ position: "asc" }, { createdAt: "asc" }]
         }

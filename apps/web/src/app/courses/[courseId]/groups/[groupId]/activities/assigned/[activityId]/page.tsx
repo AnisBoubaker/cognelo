@@ -125,7 +125,7 @@ export default function GroupActivityPage() {
     return () => { cancelled = true; };
   }, [hasStandaloneActivity, activityId, courseId, groupId, isLearner, t]);
 
-  // Refresh policy without replacing the response editor or its in-memory draft.
+  // Refresh content and policy in place; plugin editors preserve their active response.
   useEffect(() => {
     if (!isLearner) return;
     let cancelled = false;
@@ -145,8 +145,7 @@ export default function GroupActivityPage() {
         const { activity: latest } = await api.groupActivity(courseId, groupId, activityId);
         if (cancelled) return;
         setIsActivityUnavailable(false);
-        setActivity((current) => !current ? latest : JSON.stringify(current.assignment) === JSON.stringify(latest.assignment)
-          ? current : { ...current, assignment: latest.assignment });
+        setActivity((current) => JSON.stringify(current) === JSON.stringify(latest) ? current : latest);
         if (latest.activityType.key !== "test") {
           const { runtime } = await api.timedActivityRuntime(courseId, groupId, activityId);
           if (cancelled) return;

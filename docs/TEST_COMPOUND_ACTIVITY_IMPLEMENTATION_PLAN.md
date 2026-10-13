@@ -402,37 +402,15 @@ Starting an attempt and final submission also use the shared blocking, indetermi
 
 ## Version and Edit Safety
 
-Edit safety rules:
-
-- unrestricted edits are allowed until the first Test attempt starts;
-- starting an attempt creates an immutable `TestRevision` plus ordered `TestRevisionItem` snapshots, retains any referenced rich-text media for both snapshot levels, and attaches the parent attempt to that revision;
-- after the first attempt, structure, points, generic child configuration, and supported plugin-owned private authoring data are locked;
-- teachers use **Duplicate Test** to create an independent draft shell, child activities, item settings, and plugin-owned private data for future changes.
+Course Test authoring remains editable after attempts start. Prompts, answer keys, grading tests, settings, points, and composition apply to active attempts with confirmation, optional messaging, and an audit trail. Initial revisions preserve the start; final submission records the revision actually graded. Submitted history retains its final snapshot. Removed items are soft-deleted to preserve evidence. See [Live activity authoring](LIVE_ACTIVITY_AUTHORING.md) for concurrency, private revisions, response preservation, and migration details.
 
 Reusable bank Test publications are also immutable composition snapshots. Draft edits update the mutable `BankTest` graph and return the shell to Draft. Publishing reuses the latest version when the complete generic graph is unchanged; otherwise it publishes changed children, creates a new shell `ActivityVersion`, and records the ordered `BankTestVersionItem` snapshot. Plugin-private authoring data retains the platform's existing limitation: it is copied independently but is current bank state rather than version-snapshotted private state.
 
-## Live assignment settings and deferred content interventions
+## Live assignment settings and content interventions
 
-Live assignment settings are implemented: unsubmitted parents resolve the latest effective time limit, including section/team/student exceptions, from their original start. Learner pages refresh within 20 seconds. Settings saves warn about answering students and offer cancel or an optional in-app notice. Submitted timing remains fixed. See [live assignment policy](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md#live-updates-and-teacher-notices). Content and grading-test corrections remain deferred and require a separate product decision.
+Live assignment policy and authored content both refresh within 20 seconds while work is unsubmitted. Deadlines use the original start and current General/section/team/student policy. Question and private-test corrections use the current definitions at final submission; every accepted authoring change is logged and teachers can notify currently answering students. Submitted timing, composition, and grades remain stable until an explicit continuation or regrade. See [live assignment policy](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md#live-updates-and-teacher-notices) and [live authoring](LIVE_ACTIVITY_AUTHORING.md).
 
-### Current behavior and limitation
-
-- After the first Test attempt starts, the supported service routes reject changes to Test authoring settings, contained activity public configuration, and guarded plugin-private authoring such as Programming Exercise templates, reference solutions, rubrics, and hidden tests. The independent course activity timing policy, including [team/student exceptions](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md), applies live until parent submission; authored navigation and composition retain their manifest snapshot.
-- A Test attempt records its settings, ordered item manifest, immutable `TestRevision`, and child-configuration fingerprints when it starts.
-- The active student runtime does not poll for authored-content changes or compare the recorded child fingerprint with the live child before every action. Display and composite execution currently read the live child `Activity`; Programming Exercise submission reads the live plugin-private template and hidden-test rows. Safety therefore depends on every mutation path honoring the post-attempt authoring lock.
-- The browser counts down from the server-provided deadline and initiates submission at zero after pending saves finish. There is no server-scheduled submission exactly at the deadline. Reloading an expired active attempt causes the browser to observe zero and initiate submission, while the server rejects further child writes after expiry.
-- Teachers can extend or shorten active time through assignment settings, section overrides, or exceptions. Correcting public prompts/sample tests or grading tests remains locked after attempts; duplication still affects future use only.
-
-### Questions remaining for content interventions
-
-- Which public corrections may be applied to an active attempt: typographical prompt fixes, visible sample-test inputs/outputs, starter code, or broader activity configuration?
-- How should students be informed about a correction, and must the system preserve when each learner first saw the original and corrected versions?
-- Should a correction apply to all active attempts uniformly, or can its scope differ by group or learner without compromising fairness?
-- How should grading-affecting corrections work for hidden tests, templates, points, or required items: replace and regrade consistently, accept multiple versions, neutralize the affected item, award credit, or use another policy?
-- Which changes require confirmation, a teacher-entered reason, append-only audit history, student notification, and later reporting?
-- Must active display and execution be rebuilt to use the immutable `TestRevision` plus versioned plugin-private snapshots before any intervention workflow is safe, or is a different consistency boundary preferred?
-
-Versioned content amendments and audited grading corrections remain ideas for a later discussion. Assignment timing and stale automatic-expiry handling follow the implemented policy above.
+Programming children with no enabled hidden tests return no automatic grade; they still submit, and the parent remains submitted pending grading instead of failing final submission. Summative runtime/history payloads withhold numeric results until release; generic child draft endpoints never expose evaluation evidence.
 
 ## API and Service Boundaries
 
@@ -506,7 +484,7 @@ Implemented in Phase 5:
 - Final Test submission now aggregates the manifest's weighted item scores and records one ordinary parent `Grade`. Existing grade strategies, late penalties, release controls, and `GradeEvent` audit records therefore apply without a Test-specific gradebook.
 - The normalized parent result carries a plugin-neutral per-item breakdown. Teachers see it in detailed results, and students see it only through the existing released-grade feedback path.
 - Teachers can adjust an individual Test item score; the item stores the manual-grading reason and the parent grade is recomputed immediately. Whole-Test overrides preserve the structured item breakdown.
-- Test regrading recomputes the parent from its immutable child result snapshot. Re-executing child plugin grading logic is unnecessary while attempted Test content is locked; later revision support must dispatch regrading through each child's registered adapter.
+- Test regrading recomputes the parent from its saved child results. Live authoring affects only unsubmitted work; submitted child evaluation changes require an explicit grading workflow. Submission records the final composition revision.
 - Child scores are not exposed by the embedded activity renderer. The released parent Test grade and breakdown are the student-facing result.
 - Teacher review reads child attempt state directly, including submissions created before parent aggregation was introduced. **Class overview** uses each student's latest completed Test attempt and is a report: the Test shell shows submission rate, score distribution, duration, lateness, and plugin-neutral per-activity performance, then dispatches each contained activity through a review registry for richer analysis. The MCQ renderer adds activity score statistics and per-question exact-answer accuracy/unanswered counts while preserving selection counts and respondent names per choice, without coupling the Test shell to MCQ parsing.
 

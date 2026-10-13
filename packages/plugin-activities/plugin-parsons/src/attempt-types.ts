@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { resetParsonsBlocks, type ParsonsBlock, type ParsonsConfig } from "./parsons";
+import { buildParsonsBlocks, parseParsonsConfig, resetParsonsBlocks, type ParsonsBlock, type ParsonsConfig } from "./parsons";
 
 export const parsonsBlockSchema = z.object({
   id: z.string().min(1).max(160),
@@ -95,6 +95,29 @@ export function getParsonsConfigFingerprint(config: ParsonsConfig) {
       precedenceRules: config.precedenceRules
     })
   );
+}
+
+/** Keep the student's arrangement while applying corrected lines/rules. New lines are appended. */
+export function reconcileParsonsResponseState(_previousConfig: unknown, nextConfig: unknown, value: Record<string, unknown>): Record<string, unknown> {
+  const config = parseParsonsConfig(nextConfig as Record<string, unknown>);
+  const parsed = parsonsAttemptStateSchema.safeParse(value);
+  if (!parsed.success) return value;
+  const state = parsed.data;
+  const configFingerprint = getParsonsConfigFingerprint(config);
+  if (state.configFingerprint === configFingerprint) return { ...state, lastEvaluation: null };
+  const available = buildParsonsBlocks(`revision-${configFingerprint}`, config);
+  // Reserve text matches first, so a removed/edited line cannot steal another line's identity.
+  const matches = state.blocks.map((block) => available.find((candidate) => candidate.originalText === block.originalText));
+  const used = new Set<ParsonsBlock>();
+  const blocks = state.blocks.flatMap((block, index) => {
+    const current = (matches[index] && !used.has(matches[index]!)) ? matches[index] : available.find((candidate) =>
+      !used.has(candidate) && !matches.includes(candidate) && candidate.physicalLineIndex === block.physicalLineIndex);
+    if (!current) return [];
+    used.add(current);
+    return [{ ...current, id: block.id, currentIndent: config.stripIndentation ? block.currentIndent : current.currentIndent }];
+  });
+  blocks.push(...available.filter((block) => !used.has(block)));
+  return { ...state, configFingerprint, blocks, selectedBlockId: blocks.some((block) => block.id === state.selectedBlockId) ? state.selectedBlockId : null, lastEvaluation: null };
 }
 
 function hashValue(value: string) {

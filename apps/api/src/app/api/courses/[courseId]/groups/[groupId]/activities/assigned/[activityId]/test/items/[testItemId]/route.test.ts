@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@cognelo/core", () => ({
   AppError: class AppError extends Error {},
+  projectStudentTestItemState: (_key: string, state: Record<string, unknown>) => state,
   getTestItemExecutionContext: mocks.getTestItemExecutionContext,
   saveTestItemAttemptState: mocks.saveTestItemAttemptState
 }));
@@ -46,6 +47,7 @@ describe("Test child state route", () => {
       gradedAt: null
     });
     mocks.getTestItemExecutionContext.mockResolvedValue({
+      item: { activity: { activityType: { key: "mcq" } } },
       itemAttempt: {
         id: "item-attempt-1",
         lifecycle: "graded",
@@ -105,7 +107,7 @@ describe("Test child state route", () => {
       "parent-attempt-1",
       "item-1",
       { answers: { "question-1": ["choice-1"] } },
-      { sessionId: "session-1" }
+      { sessionId: "session-1", configSnapshot: undefined }
     );
     await expect(response.json()).resolves.toMatchObject({
       itemAttempt: {

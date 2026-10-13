@@ -66,6 +66,8 @@ const unavailable = async () => {
   throw new Error("DialogProvider is required before requesting a shared dialog.");
 };
 
+const DialogOpenContext = createContext(false);
+
 const DialogContext = createContext<DialogContextValue>({
   alert: unavailable,
   confirm: unavailable,
@@ -128,7 +130,7 @@ export function DialogProvider({ children, labels }: { children: ReactNode; labe
 
   return (
     <DialogContext.Provider value={context}>
-      {children}
+      <DialogOpenContext.Provider value={Boolean(active)}>{children}</DialogOpenContext.Provider>
       <ConfirmationDialog
         open={Boolean(active)}
         eyebrow={active?.options.eyebrow}
@@ -171,3 +173,6 @@ export function DialogProvider({ children, labels }: { children: ReactNode; labe
 export function useDialogs() {
   return useContext(DialogContext);
 }
+
+/** Long-running operations may pause for a shared confirmation. */
+export function useSharedDialogOpen() { return useContext(DialogOpenContext); }

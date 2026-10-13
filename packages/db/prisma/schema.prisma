@@ -1187,6 +1187,7 @@ model TestItem {
   pointsPossible Float             @default(1)
   isRequired     Boolean           @default(true)
   metadata       Json              @default("{}")
+  removedAt      DateTime?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   test           Test              @relation(fields: [testId], references: [id], onDelete: Cascade)

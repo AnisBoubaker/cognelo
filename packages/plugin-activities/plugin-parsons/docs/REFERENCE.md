@@ -142,3 +142,10 @@ When changing this plugin, update this detailed reference, the package README if
 ## Reopening the last submission
 
 Restores the submitted arrangement on its existing plugin attempt, reopens it, and clears completion/evaluation state after archiving prior state/results. Existing interaction events are retained; ordinary resubmission reuses the core attempt. The shared [continuation service](../../../../docs/SUBMISSION_CONTINUATION.md) enforces latest-attempt and staff scope, archives prior evidence, preserves attempt identity and original start, and applies current General/section/team/student settings. Later extensions or individual exceptions therefore affect the resumed deadline without resetting it.
+
+
+## Live authoring and grade visibility
+
+The learner prompt and rules refresh without replacing the current arrangement. Configuration changes reconcile existing blocks, update the same active attempt rather than abandon it, and append new lines. Standalone submission/check evaluation is computed on the server against the current solution; client-provided correctness is not authoritative. Summative attempt/history payloads remove evaluation until release, and `studentResponseState` always removes legacy embedded evaluation from composite drafts.
+
+Shared confirmation, submitted-Test snapshots, and concurrency are documented in [Live activity authoring](../../../../docs/LIVE_ACTIVITY_AUTHORING.md).

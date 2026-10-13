@@ -19,6 +19,7 @@ vi.mock("@cognelo/core", async () => {
   const actual = await vi.importActual<typeof import("@cognelo/core")>("@cognelo/core");
   return {
     ...actual,
+    canShowStudentActivityGrade: vi.fn(async (context) => context.activity.assignment?.metadata?.assessmentMode !== "summative"),
     assertCanManageCourse: mocks.assertCanManageCourse,
     assertCanManageCourseOrViewGradebook: mocks.assertCanManageCourseOrViewGradebook,
     clearActivityResponseDraft: mocks.clearActivityResponseDraft,
@@ -78,6 +79,18 @@ describe("web design coding exercise routes", () => {
     mocks.submitWebDesignExercise.mockResolvedValue({ id: "submit-1" });
     mocks.startActivityAttempt.mockResolvedValue({ id: "core-attempt-1" });
     mocks.submitActivityAttempt.mockResolvedValue({ id: "core-attempt-1" });
+  });
+
+  it("withholds summative grades and private outcomes on both history endpoints", async () => {
+    const submission = { id: "submitted", kind: "submit", status: "failed", score: 0, maxScore: 10,
+      message: "Private assertion failed", resultSummary: { score: 0 }, testResults: [{ name: "Private test", status: "failed" }] };
+    mocks.listRecentWebDesignExerciseSubmissions.mockResolvedValue([submission]);
+    const studentContext = { ...context, groupId: "group-1", activity: { ...context.activity, assignment: { id: "assignment", metadata: { assessmentMode: "summative" } } } };
+    for (const route of [webDesignExerciseRunRoute, webDesignExerciseSubmitRoute]) {
+      await expect(route.methods.GET?.({ request: new Request("http://test.local"), context: studentContext, readJson: async () => ({}) })).resolves.toEqual({
+        submissions: [{ ...submission, status: "completed", score: null, maxScore: null, message: null, resultSummary: { gradingWithheld: true }, testResults: [] }]
+      });
+    }
   });
 
   it("manages tests and expected results in course context", async () => {

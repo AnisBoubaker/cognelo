@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   assertCanGradeGroup: vi.fn(),
   assertCanManageCourse: vi.fn(),
   ensureParsonsAttempt: vi.fn(),
+  evaluateParsonsAttemptStateForConfig: vi.fn(() => ({ isCorrect: true, orderCorrect: true, indentationCorrect: true, misplacedBlocks: 0, incorrectIndents: 0 })),
   findLatestParsonsAttempt: vi.fn(),
   generateParsonsProblem: vi.fn(),
   getActivityAttemptAvailability: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock("@cognelo/core", async () => {
   const actual = await vi.importActual<typeof import("@cognelo/core")>("@cognelo/core");
   return {
     ...actual,
+    canShowStudentActivityGrade: vi.fn(async (context) => context.activity.assignment?.metadata?.assessmentMode !== "summative"),
     assertCanGradeGroup: mocks.assertCanGradeGroup,
     assertCanManageCourse: mocks.assertCanManageCourse,
     getActivityAttemptAvailability: mocks.getActivityAttemptAvailability,
@@ -38,6 +40,7 @@ vi.mock("@cognelo/db", () => ({
 
 vi.mock("./attempts", () => ({
   ensureParsonsAttempt: mocks.ensureParsonsAttempt,
+  evaluateParsonsAttemptStateForConfig: mocks.evaluateParsonsAttemptStateForConfig,
   findLatestParsonsAttempt: mocks.findLatestParsonsAttempt,
   listParsonsGradebookAttempts: mocks.listParsonsGradebookAttempts,
   updateParsonsAttempt: mocks.updateParsonsAttempt
@@ -176,7 +179,7 @@ describe("Parsons plugin routes", () => {
           result: { isCorrect: true, orderCorrect: true, indentationCorrect: true, misplacedBlocks: 0, incorrectIndents: 0 }
         })
       })
-    ).resolves.toEqual({ attempt: { id: "attempt-1", latestState: { configFingerprint: "fingerprint-1" } } });
+    ).resolves.toMatchObject({ attempt: { id: "attempt-1", latestState: { configFingerprint: "fingerprint-1", lastEvaluation: null }, resultSummary: {} } });
 
     expect(mocks.startActivityAttempt).toHaveBeenCalledWith(
       context.user,
@@ -228,7 +231,7 @@ describe("Parsons plugin routes", () => {
         },
         readJson: async () => ({})
       })
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       attempt: { id: "completed-attempt-1", status: "completed" },
       attemptAvailability: { canStart: false, reason: "ATTEMPT_LIMIT_REACHED" }
     });

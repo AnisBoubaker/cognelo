@@ -111,7 +111,8 @@ const dbMocks = vi.hoisted(() => {
 });
 
 const coreMocks = vi.hoisted(() => ({
-  assertActivityAuthoringMutable: vi.fn(),
+  authoringSql: vi.fn(),
+  withActivityAuthoringChange: vi.fn(),
   assertCanManageActivityBank: vi.fn(),
   assertCanManageCourse: vi.fn(),
   AppError: class AppError extends Error {
@@ -205,6 +206,7 @@ const hiddenInput = {
 describe("coding exercise hidden test persistence", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    coreMocks.withActivityAuthoringChange.mockImplementation(async (_user, _course, _activity, _input, mutate) => mutate({ $executeRaw: coreMocks.authoringSql, $queryRaw: async () => [] }));
   });
 
   it("lists course and bank hidden tests with separate reference solution storage", async () => {
@@ -237,31 +239,14 @@ describe("coding exercise hidden test persistence", () => {
       input: hiddenInput
     });
 
-    expect(dbMocks.transaction.pluginCodingExerciseHiddenTest.deleteMany).toHaveBeenCalledWith({
-      where: { activityId: "course-activity-1" }
-    });
-    expect(dbMocks.transaction.pluginCodingExerciseHiddenTest.createMany).toHaveBeenCalledWith({
-      data: [
-        expect.objectContaining({
-          activityId: "course-activity-1",
-          name: "First",
-          orderIndex: 0,
-          metadata: expect.objectContaining({ outputMatchMode: "contains_lines", containsLinesOrderMatters: true })
-        }),
-        expect.objectContaining({
-          activityId: "course-activity-1",
-          name: "Second",
-          orderIndex: 1,
-          metadata: expect.objectContaining({ outputMatchMode: "regex", containsLinesOrderMatters: false })
-        })
-      ]
-    });
-    expect(dbMocks.transaction.pluginCodingExerciseReferenceSolution.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { activityId: "course-activity-1" },
-        create: expect.objectContaining({ activityId: "course-activity-1" })
-      })
-    );
+    const statements = coreMocks.authoringSql.mock.calls;
+    expect(statements).toHaveLength(5);
+    expect(statements[0][0].join("?")).toContain('DELETE FROM "PluginCodingExerciseHiddenTest"');
+    expect(statements[1]).toContain("First");
+    expect(statements[2]).toContain("Second");
+    expect(statements[4][0].join("?")).toContain('INSERT INTO "PluginCodingExerciseAuthoringRevision"');
+    expect(coreMocks.withActivityAuthoringChange).toHaveBeenCalledWith(expect.anything(), "course-1", "course-activity-1", expect.anything(), expect.any(Function), expect.objectContaining({ eventType: "activity_private_content_updated" }));
+
   });
 
   it("does not validate or save tests until a programming language is selected", async () => {
@@ -309,7 +294,7 @@ describe("coding exercise hidden test persistence", () => {
     });
 
     expect(executionMocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(1);
-    expect(dbMocks.transaction.pluginCodingExerciseHiddenTest.deleteMany).toHaveBeenCalledTimes(1);
+    expect(coreMocks.withActivityAuthoringChange).toHaveBeenCalledTimes(1);
   });
 
   it("does not trust a modified preflight validation receipt", async () => {

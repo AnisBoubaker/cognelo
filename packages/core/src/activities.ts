@@ -1,3 +1,4 @@
+import { withActivityAuthoringChange } from "./activity-authoring-live";
 import { getActivityDefinition, getActivityPluginForActivityType, isCoreActivityType, listActivityDefinitions } from "@cognelo/activity-sdk";
 import { ActivityInputSchema, ActivityUpdateSchema, CourseActivityBankSyncSchema, CourseActivityDuplicateSchema } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
@@ -228,18 +229,6 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
   if (!activity) {
     throw notFound("Activity");
   }
-  if (activity.testItem) {
-    const attemptCount = await prisma.activityAttempt.count({
-      where: { activityId: activity.testItem.test.activityId }
-    });
-    if (attemptCount > 0) {
-      throw new AppError(
-        409,
-        "TEST_STRUCTURE_LOCKED",
-        "This activity cannot be changed after a student has started its Test. Duplicate the Test to create a changed assessment."
-      );
-    }
-  }
 
   const definition = getActivityDefinition(data.activityTypeKey ?? activity.activityType.key);
   const mergedConfig =
@@ -264,7 +253,7 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
     await assertValidConceptSelections(nextKnowledgeConceptSelections, course.subjectId);
   }
 
-  return prisma.$transaction(async (tx) => {
+  return withActivityAuthoringChange(user, courseId, activityId, data, async (tx) => {
     const updatedActivity = await tx.activity.update({
       where: { id: activityId },
       data: {
@@ -560,23 +549,6 @@ function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
   if (value && typeof value === "object") return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, nested]) => `${JSON.stringify(key)}:${stableJson(nested)}`).join(",")}}`;
   return JSON.stringify(value);
-}
-
-export async function assertActivityAuthoringMutable(courseId: string, activityId: string) {
-  const contained = await prisma.activity.findFirst({
-    where: { id: activityId, courseId },
-    select: { testItem: { select: { test: { select: { activityId: true } } } } }
-  });
-  if (!contained) throw notFound("Activity");
-  if (!contained.testItem) return;
-  const attemptCount = await prisma.activityAttempt.count({ where: { activityId: contained.testItem.test.activityId } });
-  if (attemptCount > 0) {
-    throw new AppError(
-      409,
-      "TEST_STRUCTURE_LOCKED",
-      "This activity cannot be changed after a student has started its Test. Duplicate the Test to create a changed assessment."
-    );
-  }
 }
 
 async function resolveEnabledActivityTypeId(activityTypeKey: string) {

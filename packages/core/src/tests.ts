@@ -1,3 +1,4 @@
+import { withActivityAuthoringChange } from "./activity-authoring-live";
 import { getActivityProviderForActivityType } from "@cognelo/activity-sdk";
 import { TestCreateSchema, TestDuplicateSchema, TestItemCreateSchema, TestItemUpdateSchema, TestSettingsSchema, TestUpdateSchema } from "@cognelo/contracts";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -12,6 +13,7 @@ import { withCourseActivityTimeLimitDefault } from "./activity-assignment-policy
 const testInclude = {
   activity: { include: { activityType: true, bankActivity: true, activityVersion: true } },
   items: {
+    where: { removedAt: null },
     include: {
       activity: { include: { activityType: true, bankActivity: true, activityVersion: true } }
     },
@@ -191,11 +193,8 @@ export async function updateTest(user: CurrentUser, courseId: string, activityId
   const settings = data.settings
     ? TestSettingsSchema.parse({ ...asRecord(current.settings), ...data.settings })
     : undefined;
-  if (settings) {
-    await assertTestStructureMutable(activityId);
-  }
 
-  return prisma.$transaction(async (tx) => {
+  return withActivityAuthoringChange(user, courseId, activityId, data, async (tx) => {
     if (data.title !== undefined || data.description !== undefined || data.lifecycle !== undefined) {
       const activity = await tx.activity.update({
         where: { id: activityId },
@@ -227,7 +226,6 @@ export async function createTestItem(user: CurrentUser, courseId: string, testAc
   if (!test) {
     throw notFound("Test");
   }
-  await assertTestStructureMutable(testActivityId);
   const position = data.position ?? test._count.items;
 
   let activity;
@@ -256,7 +254,7 @@ export async function createTestItem(user: CurrentUser, courseId: string, testAc
   }
 
   try {
-    const item = await prisma.testItem.create({
+    const item = await withActivityAuthoringChange(user, courseId, testActivityId, data, (tx) => tx.testItem.create({
       data: {
         testId: test.id,
         activityId: activity.id,
@@ -268,7 +266,7 @@ export async function createTestItem(user: CurrentUser, courseId: string, testAc
       include: {
         activity: { include: { activityType: true, bankActivity: true, activityVersion: true } }
       }
-    });
+    }), { eventType: "test_item_added" });
     return { item, activity, testId: test.id };
   } catch (error) {
     await prisma.activity.delete({ where: { id: activity.id } }).catch(() => undefined);
@@ -297,9 +295,8 @@ async function resolveBankTestItemSource(bankActivityId: string, activityVersion
 export async function updateTestItem(user: CurrentUser, courseId: string, testActivityId: string, testItemId: string, input: unknown) {
   await assertCanManageCourse(user, courseId);
   const data = TestItemUpdateSchema.parse(input);
-  await assertTestStructureMutable(testActivityId);
   const item = await findTestItem(courseId, testActivityId, testItemId);
-  return prisma.testItem.update({
+  return withActivityAuthoringChange(user, courseId, testActivityId, data, (tx) => tx.testItem.update({
     where: { id: item.id },
     data: {
       pointsPossible: data.pointsPossible,
@@ -308,7 +305,7 @@ export async function updateTestItem(user: CurrentUser, courseId: string, testAc
       metadata: data.metadata as Prisma.InputJsonValue | undefined
     },
     include: { activity: { include: { activityType: true, bankActivity: true, activityVersion: true } } }
-  });
+  }), { eventType: "test_item_updated" });
 }
 
 export async function getTestItemForDeletion(user: CurrentUser, courseId: string, testActivityId: string, testItemId: string) {
@@ -316,17 +313,18 @@ export async function getTestItemForDeletion(user: CurrentUser, courseId: string
   return findTestItem(courseId, testActivityId, testItemId);
 }
 
-export async function deleteTestItem(user: CurrentUser, courseId: string, testActivityId: string, testItemId: string) {
+export async function deleteTestItem(user: CurrentUser, courseId: string, testActivityId: string, testItemId: string, input: unknown = {}) {
   await assertCanManageCourse(user, courseId);
-  await assertTestStructureMutable(testActivityId);
   const item = await findTestItem(courseId, testActivityId, testItemId);
-  await prisma.activity.delete({ where: { id: item.activityId } });
+  await withActivityAuthoringChange(user, courseId, testActivityId, input, (tx) =>
+    tx.testItem.update({ where: { id: item.id }, data: { removedAt: new Date() } }),
+    { eventType: "test_item_removed" });
   return { ok: true } as const;
 }
 
 export async function getTestForDeletion(user: CurrentUser, courseId: string, activityId: string) {
   await assertCanManageCourse(user, courseId);
-  const test = await prisma.test.findFirst({ where: { courseId, activityId }, include: testInclude });
+  const test = await prisma.test.findFirst({ where: { courseId, activityId }, include: { ...testInclude, items: { ...testInclude.items, where: {} } } });
   if (!test) {
     throw notFound("Test");
   }
@@ -364,24 +362,13 @@ export async function deleteTest(
 
 async function findTestItem(courseId: string, testActivityId: string, testItemId: string) {
   const item = await prisma.testItem.findFirst({
-    where: { id: testItemId, test: { courseId, activityId: testActivityId } },
+    where: { id: testItemId, removedAt: null, test: { courseId, activityId: testActivityId } },
     include: { activity: { include: { activityType: true, bankActivity: true, activityVersion: true } } }
   });
   if (!item) {
     throw notFound("Test item");
   }
   return item;
-}
-
-async function assertTestStructureMutable(testActivityId: string) {
-  const attemptCount = await prisma.activityAttempt.count({ where: { activityId: testActivityId } });
-  if (attemptCount > 0) {
-    throw new AppError(
-      409,
-      "TEST_STRUCTURE_LOCKED",
-      "This Test cannot be reconfigured after a student has started an attempt. Duplicate it to create a changed assessment."
-    );
-  }
 }
 
 function assertActivityCanBelongToTest(activityTypeKey: string) {

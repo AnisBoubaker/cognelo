@@ -43,7 +43,7 @@ Shared cross-plugin frontend primitives live in `packages/activity-ui`. In addit
 
 The API applies centralized Origin-based CSRF protection to every unsafe request carrying the HttpOnly session cookie. Generic plugin dispatch is also an authorization boundary: course routes default to course-management permission but may declaratively request gradebook-read permission per method, bank authoring dispatchers require bank management, assigned group dispatch validates group assignment access, unsafe content-resource plugin methods require course management, and registrations without explicit supported type keys fail closed. Host dispatchers never identify concrete plugin paths.
 
-The shared `DialogProvider` queues promise-based confirmations and text prompts on the accessible `ConfirmationDialog`. Application and plugin UI use this layer instead of native browser modal APIs; only explicitly sandboxed learner-authored previews may expose those APIs.
+A running progress dialog temporarily yields to shared confirmation prompts, allowing a teacher to accept or cancel a live edit. The shared `DialogProvider` queues promise-based confirmations and text prompts on the accessible `ConfirmationDialog`. Application and plugin UI use this layer instead of native browser modal APIs; only explicitly sandboxed learner-authored previews may expose those APIs.
 
 ## Browser Test Architecture
 
@@ -129,6 +129,8 @@ The group **Student view** reuses the exact learner course-content component plu
 Activity contracts and provider metadata live in `packages/activity-sdk`; installed plugin definitions are registered by `packages/plugin-registry`. Plugin-backed types resolve to an installed activity plugin under `packages/plugin-activities/*`; core-backed types use core services/renderers and do not have plugin installation, activation, backup, or dispatch behavior. Core services store bank activities, activity versions, and course-local activity copies, validate common state, and keep generic `config` and `metadata` as JSON. The shared activity description is the student prompt and allows up to 30,000 characters for passage-based activities.
 
 The first core-backed definition is `test`. A Test is a compound summative activity whose normalized `TestItem` rows own ordinary plugin-backed child activities. Its dedicated course authoring action is available while the type stays disabled in the generic plugin activity list; child activities are hidden from ordinary course and assignment lists. The outer Test Activity is the only assignable/content/gradebook unit. Manual Test submission opens an answer-status review from the last exercise, then requires a final grading confirmation; plugin-owned response checks are registered by the web composition layer and never evaluate correctness. The implementation sequence and runtime contract live in `docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md`.
+
+Course authoring remains live while attempts are unsubmitted. Core coordinates parent-Test locks, confirmation/messages, public audit, soft removal, and final submission revisions; plugins own private authoring revisions and pure response-reconciliation/student-state projection hooks. Summative result APIs enforce core release visibility, and a composite handler may return a null grading result for submitted work awaiting grading. See [Live activity authoring](LIVE_ACTIVITY_AUTHORING.md).
 
 To add a new plugin-backed activity type:
 

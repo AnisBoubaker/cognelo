@@ -73,7 +73,7 @@ export const parsonsServerPlugin: ServerActivityPlugin = {
       const state = parsedState.success ? parsedState.data : createInitialParsonsAttemptState(config);
       const evaluation = evaluateParsonsAttemptStateForConfig(state, config);
       return {
-        state: { ...state, lastEvaluation: evaluation },
+        state: { ...state, lastEvaluation: null },
         gradingResult: buildParsonsGradingResult(evaluation)
       };
     }

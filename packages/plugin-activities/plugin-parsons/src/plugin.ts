@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ActivityPlugin } from "@cognelo/activity-sdk";
 import { parsonsDatabaseModule } from "./db";
+import { reconcileParsonsResponseState } from "./attempt-types";
 
 const parsonsGroupSchema = z.object({
   id: z.string().min(1).max(80),
@@ -66,6 +67,8 @@ export const parsonsPlugin: ActivityPlugin = {
   activities: [
     {
       key: "parsons-problem",
+      studentResponseState: (state) => ({ ...state, lastEvaluation: null }),
+      reconcileResponseState: reconcileParsonsResponseState,
       name: "Parsons problem",
       description: "Reorder scrambled code blocks and optionally restore indentation to rebuild a working program.",
       defaultCategoryIds: ["programming"],

@@ -1,6 +1,7 @@
+import { randomUUID } from "node:crypto";
 import type { CurrentUser } from "@cognelo/contracts";
 import { getServerEnv } from "@cognelo/config";
-import { assertActivityAuthoringMutable, assertCanManageActivityBank, assertCanManageCourse, AppError } from "@cognelo/core";
+import { withActivityAuthoringChange, assertCanManageActivityBank, assertCanManageCourse, AppError } from "@cognelo/core";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   codingExerciseHiddenTestsInputSchema,
@@ -118,7 +119,6 @@ export async function replaceCodingExerciseHiddenTests(params: {
   input: unknown;
 }) {
   await assertCanManageCourse(params.user, params.courseId);
-  await assertActivityAuthoringMutable(params.courseId, params.activityId);
   const previousReferenceSolution = await getCodingExerciseReferenceSolution({ activityId: params.activityId });
   const input = await validateCodingExerciseHiddenTestsInput({
     activityConfig: params.activityConfig,
@@ -130,46 +130,27 @@ export async function replaceCodingExerciseHiddenTests(params: {
     return toValidatedHiddenTestsResponse(input);
   }
 
-  await codingExerciseHiddenTestsClient.$transaction(async (transaction) => {
-    await transaction.pluginCodingExerciseHiddenTest.deleteMany({
-      where: { activityId: params.activityId }
-    });
-
-    if (input.tests.length) {
-      await transaction.pluginCodingExerciseHiddenTest.createMany({
-        data: input.tests.map((test, index) => ({
-          activityId: params.activityId,
-          name: test.name,
-          stdin: test.stdin,
-          expectedOutput: test.expectedOutput,
-          orderIndex: index,
-          isEnabled: test.isEnabled,
-          weight: test.weight,
-          metadata: {
-            stableId: test.id,
-            testCode: test.testCode,
-            outputMatchMode: test.outputMatchMode,
-            containsLinesOrderMatters: test.containsLinesOrderMatters
-          } as Prisma.InputJsonValue
-        }))
-      });
+  const next = { tests: input.tests, referenceSolution: input.referenceSolution, privateConfig: input.privateConfig, activityConfig: params.activityConfig };
+  const privateChange: { before: unknown; after: unknown } = { before: null, after: next };
+  await withActivityAuthoringChange(params.user, params.courseId, params.activityId, params.input, async (tx) => {
+    const previousTests = await tx.$queryRaw<Record<string, unknown>[]>`SELECT * FROM "PluginCodingExerciseHiddenTest" WHERE "activityId" = ${params.activityId} ORDER BY "orderIndex", "createdAt"`;
+    const previousReferences = await tx.$queryRaw<Record<string, unknown>[]>`SELECT * FROM "PluginCodingExerciseReferenceSolution" WHERE "activityId" = ${params.activityId}`;
+    privateChange.before = { tests: previousTests, referenceSolution: previousReferences[0] ?? null };
+    await tx.$executeRaw`DELETE FROM "PluginCodingExerciseHiddenTest" WHERE "activityId" = ${params.activityId}`;
+    for (const [index, test] of input.tests.entries()) {
+      const metadata = { stableId: test.id, testCode: test.testCode, outputMatchMode: test.outputMatchMode, containsLinesOrderMatters: test.containsLinesOrderMatters };
+      await tx.$executeRaw`INSERT INTO "PluginCodingExerciseHiddenTest"
+        ("id", "activityId", "name", "stdin", "expectedOutput", "orderIndex", "isEnabled", "weight", "metadata", "createdAt", "updatedAt")
+        VALUES (${randomUUID()}, ${params.activityId}, ${test.name}, ${test.stdin}, ${test.expectedOutput}, ${index}, ${test.isEnabled}, ${test.weight}, ${JSON.stringify(metadata)}::jsonb, NOW(), NOW())`;
     }
-
-    await (transaction as typeof codingExerciseHiddenTestsClient).pluginCodingExerciseReferenceSolution.upsert({
-      where: { activityId: params.activityId },
-      create: {
-        activityId: params.activityId,
-        sourceCode: input.referenceSolution,
-        privateConfig: input.privateConfig as Prisma.InputJsonValue,
-        validationSummary: input.validationSummary as Prisma.InputJsonValue
-      },
-      update: {
-        sourceCode: input.referenceSolution,
-        privateConfig: input.privateConfig as Prisma.InputJsonValue,
-        validationSummary: input.validationSummary as Prisma.InputJsonValue
-      }
-    });
-  });
+    await tx.$executeRaw`INSERT INTO "PluginCodingExerciseReferenceSolution"
+      ("id", "activityId", "sourceCode", "privateConfig", "validationSummary", "createdAt", "updatedAt")
+      VALUES (${randomUUID()}, ${params.activityId}, ${input.referenceSolution}, ${JSON.stringify(input.privateConfig)}::jsonb, ${JSON.stringify(input.validationSummary)}::jsonb, NOW(), NOW())
+      ON CONFLICT ("activityId") DO UPDATE SET "sourceCode" = EXCLUDED."sourceCode", "privateConfig" = EXCLUDED."privateConfig", "validationSummary" = EXCLUDED."validationSummary", "updatedAt" = NOW()`;
+    await tx.$executeRaw`INSERT INTO "PluginCodingExerciseAuthoringRevision"
+      ("id", "activityId", "actorUserId", "previousValue", "nextValue", "createdAt")
+      VALUES (${randomUUID()}, ${params.activityId}, ${params.user.id}, ${JSON.stringify(privateChange.before)}::jsonb, ${JSON.stringify(next)}::jsonb, NOW())`;
+  }, { eventType: "activity_private_content_updated", privateChange });
 
   return listCodingExerciseHiddenTests({ activityId: params.activityId });
 }
@@ -399,6 +380,7 @@ export async function deleteBankCodingExerciseData(params: { bankActivityId: str
 
 export async function deleteCourseCodingExerciseData(params: { activityId: string }) {
   await prisma.$transaction(async (transaction) => {
+    await transaction.pluginCodingExerciseAuthoringRevision.deleteMany({ where: { activityId: params.activityId } });
     await transaction.pluginCodingExerciseTestEvaluation.deleteMany({ where: { activityId: params.activityId } });
     await transaction.pluginCodingExerciseAiEvaluation.deleteMany({ where: { activityId: params.activityId } });
     await transaction.pluginCodingExerciseExecution.deleteMany({ where: { activityId: params.activityId } });
