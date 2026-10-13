@@ -22,7 +22,7 @@ import {
 import { activityCreationConfig } from "@/lib/activity-creation-defaults";
 import type { Locale } from "@/lib/i18n";
 import { createStudentPreviewStateHost } from "@/lib/student-preview-state-host";
-import { getTestCountdownTone, shouldAutoSubmitTestAttempt } from "@/lib/test-countdown";
+import { formatRemainingTime, getTestCountdownTone, shouldAutoSubmitTestAttempt } from "@/lib/test-countdown";
 import { ActivityLiveControlPortal } from "@/components/activity-live-controls";
 
 type Props = {
@@ -862,10 +862,4 @@ function testAvailabilityMessageKey(reason: string | null) {
     default:
       return "courseDetail.testUnavailableGeneric";
   }
-}
-
-function formatRemainingTime(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }

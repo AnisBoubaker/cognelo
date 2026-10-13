@@ -15,7 +15,7 @@ import { getGradeChallengeReferences, type GradeChallengeReference } from "@/lib
 import { useI18n } from "@/lib/i18n";
 import { activityRenderers } from "@/lib/activity-renderers";
 import { readSafeExamBrowserProof } from "@/lib/safe-exam-browser";
-import { getTestCountdownTone } from "@/lib/test-countdown";
+import { formatRemainingTime, getTestCountdownTone } from "@/lib/test-countdown";
 
 export default function GroupActivityPage() {
   const params = useParams<{ courseId: string; groupId: string; activityId: string }>();
@@ -682,15 +682,6 @@ export default function GroupActivityPage() {
       </main>
     </AppShell>
   );
-}
-
-function formatRemainingTime(remainingSeconds: number) {
-  const hours = Math.floor(remainingSeconds / 3600);
-  const minutes = Math.floor((remainingSeconds % 3600) / 60);
-  const seconds = remainingSeconds % 60;
-  return hours > 0
-    ? `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
-    : `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 function DeletedSubmissionList({

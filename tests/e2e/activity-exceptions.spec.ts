@@ -82,7 +82,7 @@ test.describe("team and student activity exceptions", { tag: "@regression" }, ()
     updated.groups[0]!.exceptions.push({ ...updated.general, teamId: null, participantId: ex.student.id, overrideFields: ["timeLimit"], timeLimitMinutes: 75 });
     await responseJson(await teacherApi.post(ex.settingsPath, { data: { ...updated.general, groupAssignments: updated.groups, confirmActiveStudents: true } }));
     await studentPage.evaluate(() => window.dispatchEvent(new Event("focus")));
-    await expect(studentPage.getByRole("timer")).toContainText(/1:14:/);
+    await expect(studentPage.getByRole("timer")).toContainText(/01:14:\d{2}/);
     const after = await responseJson<typeof before>(await studentApi.get(`${ex.assignedPath}/timing`));
     expect(after.runtime.attempt.id).toBe(before.runtime.attempt.id);
     expect(new Date(after.runtime.timing.expiresAt).getTime() - new Date(before.runtime.timing.expiresAt).getTime()).toBe(45 * 60_000);

@@ -132,6 +132,7 @@ test.describe.serial("timed Test countdown", () => {
     const timer = studentPage.getByRole("timer");
     const accountSelector = studentPage.getByRole("button", { name: "Open account menu" });
     await expect(timer).toBeVisible();
+    await expect(timer).toContainText(/00:06:\d{2}/);
     await studentPage.evaluate(() => window.scrollTo(0, 0));
     await expect.poll(() => studentPage.evaluate(() => window.scrollY)).toBe(0);
     await expect(timer).toHaveClass(/test-countdown--normal/);
