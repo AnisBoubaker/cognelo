@@ -792,6 +792,7 @@ export const zhMessages = {
       variationQueued: "正在等待开始…",
       variationFailed: "无法创建变体。",
       variationComplete: "新练习是“{title}”。",
+      variationCompleteWithWarnings: "变式“{title}”已创建，但有警告。发布前请检查以下内容。",
       variationError: "无法创建活动变体。",
       variationStatusError: "无法检查变体进度。",
       variationStep: {

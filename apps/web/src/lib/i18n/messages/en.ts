@@ -792,6 +792,7 @@ export const enMessages = {
       variationQueued: "Waiting to start…",
       variationFailed: "The variation could not be created.",
       variationComplete: 'The new exercise is "{title}".',
+      variationCompleteWithWarnings: 'The variation "{title}" was created with warnings. Review the following before publishing.',
       variationError: "Unable to create the activity variation.",
       variationStatusError: "Unable to check variation progress.",
       variationStep: {

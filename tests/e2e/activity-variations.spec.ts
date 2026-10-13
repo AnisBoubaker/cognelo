@@ -118,7 +118,7 @@ test.describe("AI-assisted activity variations", () => {
             progress: { completed: 0, fraction: 0.58, stage: "generating", step: "tests", total: 1 },
             result: null,
             error: status === "failed"
-              ? { code: "INVALID_GENERATED_TESTS", message: "The AI agent could not generate valid coding exercise tests." }
+              ? { code: "CODING_EXERCISE_VARIATION_SOLUTION_UNAVAILABLE", message: "The AI agent could not generate a reference solution." }
               : null,
             createdAt: now,
             updatedAt: now
@@ -133,7 +133,7 @@ test.describe("AI-assisted activity variations", () => {
     await page.getByRole("dialog", { name: "Create an activity variation" }).getByRole("button", { name: "Create variation", exact: true }).click();
     const progress = page.getByRole("dialog", { name: "Create an activity variation" });
     await expect(progress).toContainText("The variation could not be created.");
-    await expect(progress).toContainText("could not generate valid coding exercise tests");
+    await expect(progress).toContainText("could not generate a reference solution");
     await expect.poll(async () => prisma.bankActivity.count({ where: { bankId: data.activityBankId } })).toBe(before);
     await progress.getByRole("button", { name: "Close", exact: true }).click();
     await page.unroute(endpoint);
@@ -147,6 +147,23 @@ test.describe("AI-assisted activity variations", () => {
       total: 1
     });
   });
+
+  test("reports review warnings for completed exercises and compound Test variations", async ({ teacherPage: page }) => {
+    if (!data) throw new Error("The variation fixture was not provisioned.");
+    for (const compound of [false, true]) {
+      await runMockedVariation(page, {
+        activityBankId: data.activityBankId,
+        activityId: compound ? testActivityId : sourceActivityId,
+        sourceTitle: compound ? testTitle : sourceTitle,
+        resultTitle: compound ? "New Test with review warnings" : "New exercise with review warnings",
+        instructions: "", total: compound ? 2 : 1,
+        warnings: [{
+          activityId: "created-coding-child", title: "Generated programming exercise", code: "CODING_EXERCISE_VARIATION_INCOMPLETE_TESTS",
+          message: "Kept 1 of 2 visible tests and 0 of 3 hidden tests. Review the reference solution, template, missing test coverage, and hidden-test weights before publishing."
+        }]
+      });
+    }
+  });
 });
 
 async function runMockedVariation(page: Page, input: {
@@ -156,6 +173,7 @@ async function runMockedVariation(page: Page, input: {
   resultTitle: string;
   instructions: string;
   total: number;
+  warnings?: Array<{ activityId: string; title: string; code: string; message: string }>;
 }) {
   const endpoint = `**/api/activity-banks/${input.activityBankId}/activities/${input.activityId}/variation*`;
   const requestBodies: Record<string, unknown>[] = [];
@@ -203,7 +221,7 @@ async function runMockedVariation(page: Page, input: {
                 step: "tests",
                 total: input.total
               },
-          result: succeeded ? { activityId: `generated-${input.activityId}`, title: input.resultTitle } : null,
+          result: succeeded ? { activityId: `generated-${input.activityId}`, title: input.resultTitle, warnings: input.warnings } : null,
           error: null,
           createdAt: now,
           updatedAt: now
@@ -224,7 +242,15 @@ async function runMockedVariation(page: Page, input: {
   await expect(progress).toContainText(input.total === 1 ? "0 of 1 activities" : "1 of 2 activities");
   await expect(progress).toContainText(input.total === 1 ? "58%" : "50%");
   releaseCompletion();
-  await expect(progress).toContainText(`The new exercise is "${input.resultTitle}".`);
+  if (input.warnings?.length) {
+    await expect(progress).toContainText(`The variation "${input.resultTitle}" was created with warnings.`);
+    for (const warning of input.warnings) {
+      await expect(progress.getByRole("link", { name: warning.title, exact: true })).toHaveAttribute("href", `/activity-banks/${input.activityBankId}/activities/${warning.activityId}`);
+      await expect(progress).toContainText(warning.message);
+    }
+  } else {
+    await expect(progress).toContainText(`The new exercise is "${input.resultTitle}".`);
+  }
   await expect(progress.getByRole("progressbar", { name: "Activity variation progress" })).toHaveAttribute("value", "100");
   expect(requestBodies).toEqual([{
     title: `${input.sourceTitle} (variation)`,
@@ -232,5 +258,8 @@ async function runMockedVariation(page: Page, input: {
     locale: "en"
   }]);
   await progress.getByRole("button", { name: "Close", exact: true }).click();
+  if (input.warnings?.length) {
+    await expect(page.getByRole("status").filter({ hasText: `The variation "${input.resultTitle}" was created with warnings.` })).toContainText(input.warnings[0].message);
+  }
   await page.unroute(endpoint);
 }

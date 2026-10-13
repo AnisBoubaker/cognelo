@@ -537,6 +537,7 @@ Teacher-triggered AI assessment is integrated at the parent attempt boundary. Te
 - [x] Deep-copy published bank Tests into courses and run bank-to-course hooks for every child.
 - [x] Publish an existing course Test into a bank, run course-to-bank hooks for every child, and link the course graph only after successful publication.
 - [x] Deep-duplicate, move, and delete complete bank Test graphs with plugin lifecycle cleanup and failure compensation.
+- [x] Collect plugin completion warnings during bank Test variation and continue to later children. Programming Exercises retain validated test subsets (or no tests after recoverable generation failure); completion identifies each affected child and its review needs. Unrelated thrown failures retain whole-graph compensation.
 - [ ] Add compound Test synchronization in both directions. Retrieval must replace the complete course graph only before any Test attempt exists; publication to the bank remains allowed after attempts because it does not mutate the attempted course graph.
 
 Until the final item is implemented, imported Test provenance is retained but the generic single-activity synchronization action is hidden and rejected for Test shells so it cannot update only the shell and leave composition stale.

@@ -493,7 +493,11 @@ export type ActivityVariationJob = {
     step?: "content" | "prompt" | "solution" | "tests" | "validating" | "saving";
     total?: number;
   };
-  result: { activityId?: string; title?: string } | null;
+  result: {
+    activityId?: string;
+    title?: string;
+    warnings?: Array<{ activityId: string; title: string; code: string; message: string }>;
+  } | null;
   error: { code?: string; message?: string } | null;
   createdAt: string;
   updatedAt: string;

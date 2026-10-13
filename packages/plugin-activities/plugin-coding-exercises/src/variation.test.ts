@@ -34,7 +34,7 @@ const [{ AppError }, { createCodingExerciseBankActivityVariation }] = await Prom
 
 describe("coding exercise bank variations", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mocks.listPrivate.mockResolvedValue({
       tests: [{ id: "hidden-original", name: "Original", stdin: "1", expectedOutput: "2", testCode: "", isEnabled: true, weight: 7, outputMatchMode: "exact", containsLinesOrderMatters: false }],
       referenceSolution: {
@@ -112,7 +112,7 @@ describe("coding exercise bank variations", () => {
     expect(reportProgress).toHaveBeenCalledWith({ fraction: 0.82, step: "validating" });
   });
 
-  it("rejects a generated test suite that repeats the source tests", async () => {
+  it("omits a generated suite that repeats the source and keeps the new exercise with a review warning", async () => {
     mocks.generateTests.mockResolvedValue({
       status: "ok",
       sampleTests: [{ id: "sample-new", title: "Adds one", input: "1", output: "2", testCode: "", outputMatchMode: "exact", containsLinesOrderMatters: false }],
@@ -129,12 +129,12 @@ describe("coding exercise bank variations", () => {
       subject: { title: "Programming", description: "Introductory programming" },
       knowledge: { mode: "selected", concepts: [], selectedConcepts: [] },
       reportProgress: vi.fn(async () => undefined)
-    })).rejects.toMatchObject({ code: "CODING_EXERCISE_VARIATION_TESTS_NOT_DISTINCT" });
-    expect(mocks.updateBankActivity).not.toHaveBeenCalled();
-    expect(mocks.replacePrivate).not.toHaveBeenCalled();
+    })).resolves.toMatchObject({ warnings: [{ code: "CODING_EXERCISE_VARIATION_INCOMPLETE_TESTS" }] });
+    expect(mocks.updateBankActivity).toHaveBeenCalled();
+    expect(mocks.replacePrivate.mock.calls[0][0].input).toMatchObject({ sampleTests: [], tests: [] });
   });
 
-  it("refuses to save a variation whose visible or hidden test count changed", async () => {
+  it("refuses an oversized generated suite", async () => {
     mocks.generateTests.mockResolvedValue({
       status: "ok",
       sampleTests: [
@@ -205,7 +205,90 @@ describe("coding exercise bank variations", () => {
     expect(mocks.generateTests).toHaveBeenCalledTimes(2);
     expect(mocks.replacePrivate.mock.calls[0]?.[0]?.input.referenceSolution).toContain("double_value");
   });
+
+  it.each(["sampleTests", "hiddenTests"] as const)("keeps passing tests when %s could not be generated", async (missing) => {
+    const generated = await mocks.generateTests();
+    mocks.generateTests.mockClear().mockResolvedValue({ ...generated, status: "warning", [missing]: [] });
+    const result = await createCodingExerciseBankActivityVariation(variationInput());
+    expect(result).toMatchObject({ warnings: [{
+      code: "CODING_EXERCISE_VARIATION_INCOMPLETE_TESTS",
+      message: expect.stringContaining("Review the reference solution, template, missing test coverage, and hidden-test weights")
+    }] });
+    expect(mocks.generateSolution).toHaveBeenCalledTimes(1);
+    const saved = mocks.replacePrivate.mock.calls[0][0].input;
+    expect(saved.sampleTests).toHaveLength(missing === "sampleTests" ? 0 : 1);
+    expect(saved.tests).toHaveLength(missing === "hiddenTests" ? 0 : 1);
+    if (missing === "sampleTests") expect(saved.tests[0].weight).toBe(7);
+    expect(mocks.updateBankActivity.mock.calls[0][2].config.sampleTests).toEqual(saved.sampleTests);
+  });
+
+  it.each(["invalid tests", "compilation failure", "model declined"])("saves a reviewable exercise without tests after repeated %s", async (failure) => {
+    if (failure === "model declined") mocks.generateTests.mockResolvedValue({ status: "error", message: "Cannot generate meaningful tests." });
+    else mocks.generateTests.mockRejectedValue(new AppError(422,
+      failure === "invalid tests" ? "CODING_EXERCISE_TEST_GENERATION_INVALID" : "REFERENCE_SOLUTION_COMPILATION_FAILED", "Tests failed."
+    ));
+    const result = await createCodingExerciseBankActivityVariation(variationInput());
+    expect(result).toMatchObject({ warnings: [{ message: expect.stringContaining("Kept 0 of 1 visible tests and 0 of 1 hidden tests") }] });
+    expect(mocks.generateTests).toHaveBeenCalledTimes(2);
+    expect(mocks.replacePrivate.mock.calls[0][0].input).toMatchObject({
+      sampleTests: [], tests: [], referenceSolution: "print(int(input()) * 2)"
+    });
+    expect(mocks.updateBankActivity.mock.calls[0][2]).toMatchObject({ title: "Double an integer", lifecycle: "draft", config: { sampleTests: [] } });
+  });
+
+  it("drops a case that fails the final save validation while retaining the other passing cases", async () => {
+    mocks.replacePrivate.mockRejectedValueOnce(new AppError(422, "REFERENCE_SOLUTION_VALIDATION_FAILED", "Hidden test failed.", {
+      validationSummary: {
+        sampleTests: { tests: [{ id: "sample-new", passed: true }] },
+        hiddenTests: { tests: [{ id: "hidden-new", passed: false }] }
+      }
+    }));
+    const result = await createCodingExerciseBankActivityVariation(variationInput());
+    expect(result).toMatchObject({ warnings: [{ message: expect.stringContaining("Kept 1 of 1 visible tests and 0 of 1 hidden tests") }] });
+    expect(mocks.replacePrivate).toHaveBeenCalledTimes(2);
+    expect(mocks.replacePrivate.mock.calls[1][0].input).toMatchObject({ sampleTests: [{ id: "sample-new" }], tests: [] });
+  });
+
+  it("keeps the earlier generated solution if the optional testability retry fails", async () => {
+    const initialSolution = await mocks.generateSolution();
+    mocks.generateSolution.mockClear().mockResolvedValueOnce(initialSolution).mockRejectedValueOnce(new Error("Model unavailable for the optional retry."));
+    mocks.generateTests.mockRejectedValue(new AppError(422, "CODING_EXERCISE_TEST_GENERATION_INVALID", "Tests failed."));
+    await expect(createCodingExerciseBankActivityVariation(variationInput())).resolves.toMatchObject({
+      warnings: [{ code: "CODING_EXERCISE_VARIATION_INCOMPLETE_TESTS" }]
+    });
+    expect(mocks.replacePrivate.mock.calls[0][0].input).toMatchObject({
+      sampleTests: [], tests: [], referenceSolution: initialSolution.referenceSolution
+    });
+  });
+
+  it("still fails on execution-service or persistence errors", async () => {
+    mocks.generateTests.mockRejectedValueOnce(new AppError(503, "JUDGE0_EXECUTION_UNAVAILABLE", "Runner unavailable."));
+    await expect(createCodingExerciseBankActivityVariation(variationInput())).rejects.toMatchObject({ code: "JUDGE0_EXECUTION_UNAVAILABLE" });
+    expect(mocks.replacePrivate).not.toHaveBeenCalled();
+    mocks.replacePrivate.mockRejectedValueOnce(new Error("Database unavailable."));
+    await expect(createCodingExerciseBankActivityVariation(variationInput())).rejects.toThrow("Database unavailable.");
+    expect(mocks.updateBankActivity).not.toHaveBeenCalled();
+  });
+
+  it("does not warn when the source intentionally has no tests", async () => {
+    const original = await mocks.listPrivate();
+    mocks.listPrivate.mockResolvedValue({ ...original, tests: [] });
+    const input = variationInput();
+    input.sourceActivity.config.sampleTests = [];
+    await expect(createCodingExerciseBankActivityVariation(input)).resolves.toEqual({ warnings: [] });
+    expect(mocks.generateTests).not.toHaveBeenCalled();
+  });
 });
+
+function variationInput() {
+  return {
+    user: { id: "teacher-1", email: "teacher@example.test", name: null, firstName: null, lastName: null, roles: ["teacher" as const] },
+    activityBankId: "bank-1", sourceActivity: activity("source-1"), activity: activity("variation-1"),
+    instructions: "", locale: "en" as const, subject: { title: "Programming", description: "Introductory programming" },
+    knowledge: { mode: "selected" as const, concepts: [], selectedConcepts: [] },
+    reportProgress: vi.fn(async () => undefined)
+  };
+}
 
 function activity(id: string) {
   return {
