@@ -3,6 +3,7 @@ import type { Prisma } from "@cognelo/db";
 import { listActiveConversations } from "./activity-messaging";
 import { AppError, forbidden } from "./errors";
 import { getActivityMessagingGroupScope } from "./authorization";
+import { courseActivityMessagingEnabled } from "./activity-assignment-policy";
 
 /** Called inside the settings transaction, after authorization and before writes. */
 export async function confirmLiveActivitySettings(
@@ -10,18 +11,25 @@ export async function confirmLiveActivitySettings(
   user: CurrentUser,
   courseId: string,
   activityId: string,
-  input: { confirmActiveStudents?: boolean; studentMessage?: string },
+  input: { confirmActiveStudents?: boolean; studentMessage?: string; messagingEnabled?: boolean },
   groupIds: string[] | null = null
 ) {
   const now = new Date();
   const conversations = await listActiveConversations(courseId, activityId, groupIds, now, tx);
   let canNotifyStudents = false;
   if (conversations.length) {
-    try {
-      const messageScope = await getActivityMessagingGroupScope(user, courseId);
-      canNotifyStudents = !messageScope || conversations.every((conversation) => messageScope.includes(conversation.groupId));
-    } catch (error) {
-      if (!(error instanceof AppError) || error.code !== "FORBIDDEN") throw error;
+    // Use the setting being saved, so enabling can include a notice and disabling
+    // cannot silently deliver a message that learners are no longer able to read.
+    const enabled = input.messagingEnabled ?? courseActivityMessagingEnabled((await tx.activity.findFirst({
+      where: { id: activityId, courseId }, select: { metadata: true }
+    }))?.metadata);
+    if (enabled) {
+      try {
+        const messageScope = await getActivityMessagingGroupScope(user, courseId);
+        canNotifyStudents = !messageScope || conversations.every((conversation) => messageScope.includes(conversation.groupId));
+      } catch (error) {
+        if (!(error instanceof AppError) || error.code !== "FORBIDDEN") throw error;
+      }
     }
   }
   if (conversations.length && !input.confirmActiveStudents) {

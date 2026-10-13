@@ -24,6 +24,8 @@ export function ActivityMessenger({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const refresh = useCallback(async () => {
+    // `enabled` means this is an active learner view. Keep polling when the
+    // activity's messaging switch is off so it can become available live.
     if (!enabled || document.visibilityState !== "visible") return;
     try {
       const result = await api.learnerActivityConversation(courseId, groupId, activityId);

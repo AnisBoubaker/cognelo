@@ -1,5 +1,13 @@
 export type AssignmentAssessmentPolicyMode = "formative" | "formative_ai" | "summative";
 
+/** Messaging is a course-activity setting, shared by every section and attempt. */
+export function courseActivityMessagingEnabled(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const rule = (value as Record<string, unknown>).allGroupsAssignment;
+  return Boolean(rule && typeof rule === "object" && !Array.isArray(rule)
+    && (rule as Record<string, unknown>).messagingEnabled === true);
+}
+
 export function assignmentAssessmentPolicyMode(value: unknown): AssignmentAssessmentPolicyMode {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return "formative";

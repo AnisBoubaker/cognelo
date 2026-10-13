@@ -53,6 +53,7 @@ test.describe("team and student activity exceptions", { tag: "@regression" }, ()
     const value = await settings(teacherApi, ex.settingsPath);
     value.general.assessmentMode = "summative";
     value.general.timeLimitMinutes = 30;
+    value.general.messagingEnabled = true;
     await save(teacherApi, ex.settingsPath, value);
     await studentPage.goto(ex.assignedPath.replace("/api", ""));
     await studentPage.getByRole("button", { name: "Start timed attempt" }).click();

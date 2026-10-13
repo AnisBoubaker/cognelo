@@ -159,6 +159,9 @@ export const zhMessages = {
       time: "时间"
     },
     activityMessenger: {
+      enabledLabel: "启用活动消息",
+      enabledHelp: "允许教师向正在完成此活动的学生发送消息。更改也会应用于已经开始作答的学生。",
+      disabled: "此活动的消息功能已关闭。请在课程内容中的活动设置里启用。",
       label: "消息",
       open: "打开活动消息",
       openUnread: "打开活动消息（{count} 条未读）",

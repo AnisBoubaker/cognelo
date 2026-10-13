@@ -1,5 +1,6 @@
-import { expect, test } from "./fixtures/auth";
-import { prisma } from "@cognelo/db";
+import { createAuthenticatedApi, expect, test } from "./fixtures/auth";
+import { responseJson } from "./fixtures/activity-suite";
+import type { CourseActivityAssignmentSettings } from "../../apps/web/src/lib/api";
 import { provisionLearningFlow, removeLearningFlow, type LearningFlowData } from "./fixtures/learning-flow";
 
 test.describe("attempt-scoped activity messaging", () => {
@@ -7,15 +8,12 @@ test.describe("attempt-scoped activity messaging", () => {
 
   test.beforeAll(async () => {
     data = await provisionLearningFlow();
-    await prisma.courseGroupActivity.updateMany({
-      where: { activityId: data.activityId, groupId: data.groupId },
-      data: {
-        metadata: {
-          assessmentMode: "summative",
-          timeLimitMinutes: 30
-        }
-      }
-    });
+    const api = await createAuthenticatedApi("teacher");
+    try {
+      const path = `/api/courses/${data.courseId}/activities/${data.activityId}/assign-all-groups`;
+      const { settings } = await responseJson<{ settings: CourseActivityAssignmentSettings }>(await api.get(path));
+      await responseJson(await api.post(path, { data: { ...settings.general, assessmentMode: "summative", timeLimitMinutes: 30, messagingEnabled: true, groupAssignments: settings.groups } }));
+    } finally { await api.dispose(); }
   });
 
   test.afterAll(async () => {

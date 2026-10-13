@@ -47,6 +47,7 @@ Open these only when changing or reviewing the named area:
 - [Role authorization and multi-teacher E2E plan](ROLE_AUTHORIZATION_E2E_IMPLEMENTATION_PLAN.md)
 - [Student groupings and teams](STUDENT_GROUPINGS.md)
 - [Activity assignment exceptions and live settings](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)
+- [Activity messaging](ACTIVITY_MESSAGING.md)
 - [Student model](STUDENT_MODEL_IMPLEMENTATION_PLAN.md)
 - [Student view](STUDENT_VIEW_IMPLEMENTATION_PLAN.md)
 - [Compound Test activity](TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md)

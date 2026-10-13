@@ -7,6 +7,7 @@ const messaging = vi.hoisted(() => ({ listActiveConversations: vi.fn() }));
 vi.mock("./activity-messaging", () => messaging);
 import { confirmLiveActivitySettings } from "./activity-settings-live";
 const tx = {
+  activity: { findFirst: vi.fn() },
   activityMessageBroadcast: { create: vi.fn() },
   activityConversationMessage: { createMany: vi.fn() }
 };
@@ -14,6 +15,7 @@ const teacher = { id: "teacher", firstName: "Ada", lastName: "Teacher", email: "
 describe("live settings confirmation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    tx.activity.findFirst.mockResolvedValue({ metadata: { allGroupsAssignment: { messagingEnabled: true } } });
     authorization.getActivityMessagingGroupScope.mockResolvedValue(null);
     messaging.listActiveConversations.mockResolvedValue([{ id: "conversation", groupId: "section" }]);
     tx.activityMessageBroadcast.create.mockResolvedValue({ id: "broadcast" });
@@ -26,6 +28,20 @@ describe("live settings confirmation", () => {
   it("lets teachers confirm without sending a message", async () => {
     await confirmLiveActivitySettings(tx as never, teacher, "course", "activity", { confirmActiveStudents: true });
     expect(tx.activityMessageBroadcast.create).not.toHaveBeenCalled();
+  });
+  it("still warns about active students while disabling messaging, without offering notices", async () => {
+    await expect(confirmLiveActivitySettings(tx as never, teacher, "course", "activity", { messagingEnabled: false }))
+      .rejects.toMatchObject({ code: "ACTIVITY_SETTINGS_ACTIVE_STUDENTS", details: { activeStudentCount: 1, canNotifyStudents: false } });
+    await expect(confirmLiveActivitySettings(tx as never, teacher, "course", "activity", { messagingEnabled: false, confirmActiveStudents: true, studentMessage: "Hidden notice" }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(tx.activityMessageBroadcast.create).not.toHaveBeenCalled();
+  });
+  it("uses the current switch for section saves and the new switch when enabling", async () => {
+    tx.activity.findFirst.mockResolvedValue({ metadata: {} });
+    await expect(confirmLiveActivitySettings(tx as never, teacher, "course", "activity", {}, ["section"]))
+      .rejects.toMatchObject({ details: { canNotifyStudents: false } });
+    await confirmLiveActivitySettings(tx as never, teacher, "course", "activity", { messagingEnabled: true, confirmActiveStudents: true, studentMessage: "Messaging is now available" });
+    expect(tx.activityMessageBroadcast.create).toHaveBeenCalledOnce();
   });
   it("writes the optional notice through the same transaction and section scope", async () => {
     await confirmLiveActivitySettings(tx as never, teacher, "course", "activity", { confirmActiveStudents: true, studentMessage: " Extra time " }, ["section"]);

@@ -72,6 +72,7 @@ export default function GradebookActivityResultsPage() {
   const [reviewAndGradeRow, setReviewAndGradeRow] = useState<CourseGradebookRow | null>(null);
   const [showGradeExport, setShowGradeExport] = useState(false);
   const [showActivityMessenger, setShowActivityMessenger] = useState(false);
+  const [messagingEnabled, setMessagingEnabled] = useState(false);
   const [reportTab, setReportTab] = useState<"overview" | "students">(
     requestedReportTab ?? (origin === "content" ? "overview" : "students")
   );
@@ -152,12 +153,38 @@ export default function GradebookActivityResultsPage() {
   const activityActions = getGradebookActivityActions(activityTypeKey);
   const isSummativeActivity = (rows[0]?.assessmentMode ?? gradebook?.items[0]?.assessmentMode) === "summative";
   const canManageCourse = Boolean(course?.permissions?.canManageCourse);
-  const canMessageStudents = Boolean(
+  const hasMessagingPermission = Boolean(
     course?.permissions?.canReleaseGrades ||
     course?.permissions?.sectionRoles.some((assignment) => (
       assignment.role === "teacher" && (!groupId || assignment.groupId === groupId)
     ))
   );
+  const canMessageStudents = hasMessagingPermission && messagingEnabled;
+  useEffect(() => {
+    let cancelled = false;
+    setMessagingEnabled(false);
+    setShowActivityMessenger(false);
+    if (!hasMessagingPermission) return;
+    const refresh = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const { messaging } = await api.activityMessagingOverview(courseId, activityId, groupId);
+        if (cancelled) return;
+        setMessagingEnabled(messaging.enabled);
+        if (!messaging.enabled) setShowActivityMessenger(false);
+      } catch {
+        // Keep the last known setting during a temporary network failure.
+      }
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 10_000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [activityId, courseId, groupId, hasMessagingPermission]);
   const groupTitle = groupId ? gradebook?.items.find((item) => item.groupId === groupId)?.groupTitle : null;
   const backHref = origin === "content"
     ? `/courses/${courseId}?tab=content`

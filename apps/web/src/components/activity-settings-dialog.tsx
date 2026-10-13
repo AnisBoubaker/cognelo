@@ -47,6 +47,7 @@ type GroupAssignmentDraft = AssignmentValueDraft & {
 type ExceptionDraft = AssignmentValueDraft & { key: string; teamId: string | null; participantId: string | null; overrideFields: ActivityAssignmentOverrideField[] };
 type ActivitySettingsDraft = {
   assessmentMode: AssignedActivityAssessmentMode;
+  messagingEnabled: boolean;
   contentParentId: string;
   general: AssignmentValueDraft;
   groups: GroupAssignmentDraft[];
@@ -186,6 +187,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
         timeLimitMinutes: buildTimeLimitMinutes(draft.general),
         enablePerGroupSettings: true,
         assessmentMode: draft.assessmentMode,
+        messagingEnabled: draft.messagingEnabled,
         confirmSummativeToFormative: convertsSummativeToFormative,
         requireSafeExamBrowser: draft.assessmentMode === "summative" && draft.general.requireSafeExamBrowser,
         gradeChallengesEnabled: draft.assessmentMode === "summative" && draft.general.gradeChallengesEnabled,
@@ -330,6 +332,20 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                     value={draft.general}
                     onChange={updateGeneral}
                   />
+                  <div>
+                    <label className="checkbox-row" htmlFor={`activity-settings-messaging-${activity.id}`}>
+                      <input
+                        aria-describedby={`activity-settings-messaging-help-${activity.id}`}
+                        checked={draft.messagingEnabled}
+                        disabled={saving}
+                        id={`activity-settings-messaging-${activity.id}`}
+                        type="checkbox"
+                        onChange={(event) => setDraft((current) => current ? { ...current, messagingEnabled: event.target.checked } : current)}
+                      />
+                      {t("activityMessenger.enabledLabel")}
+                    </label>
+                    <p className="muted" id={`activity-settings-messaging-help-${activity.id}`}>{t("activityMessenger.enabledHelp")}</p>
+                  </div>
                   <label className="checkbox-row" htmlFor={`activity-settings-visible-${activity.id}`}>
                     <input
                       checked={draft.general.isVisible}
@@ -920,6 +936,7 @@ function buildDraft(settings: CourseActivityAssignmentSettings, isTest: boolean)
   const assessmentMode = isTest ? "summative" : settings.general.assessmentMode;
   return {
     assessmentMode,
+    messagingEnabled: settings.general.messagingEnabled,
     contentParentId: settings.general.contentPlacement.parentId ?? "",
     general: assignmentValueDraft(settings.general),
     groups: settings.groups.map((group) => ({
