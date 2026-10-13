@@ -34,6 +34,24 @@ async function replaceCodeEditorContents(page: Page, label: string, value: strin
   await expect(editorSurface).toContainText(value, { timeout: 10_000 });
 }
 
+async function reopenLatestSubmission(data: ActivitySuiteData, title: string) {
+  const activity = await prisma.activity.findFirstOrThrow({ where: { courseId: data.courseId, title } });
+  const before = await prisma.activityAttempt.findFirstOrThrow({ where: { activityId: activity.id }, orderBy: { attemptNumber: "desc" } });
+  const count = await prisma.activityAttempt.count({ where: { activityId: activity.id } });
+  const api = await createAuthenticatedApi("teacher");
+  try {
+    const response = await api.post(`/api/courses/${data.courseId}/gradebook/attempts/${before.id}/reopen`);
+    expect(response.ok(), await response.text()).toBeTruthy();
+  } finally { await api.dispose(); }
+  return async () => {
+    expect(await prisma.activityAttempt.count({ where: { activityId: activity.id } })).toBe(count);
+    const after = await prisma.activityAttempt.findUniqueOrThrow({ where: { id: before.id } });
+    expect(after.startedAt).toEqual(before.startedAt);
+    expect(after.attemptNumber).toBe(before.attemptNumber);
+    expect(["submitted", "graded"]).toContain(after.lifecycle);
+  };
+}
+
 async function verifySharedRichTextEditorLayout(page: Page, field: Locator) {
   const editor = field.locator(".rich-text-editor");
   const visualPanel = editor.locator(".rich-text-editor-visual-panel");
@@ -216,6 +234,13 @@ test.describe.serial("authoring and completing every activity type", () => {
     await confirmation.getByRole("button", { name: "Submit solution" }).click();
     await submissionFinished;
     await expect(studentPage).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));
+    const verifyContinuation = await reopenLatestSubmission(data, parsonsTitle);
+    await openStudentActivity(studentPage, data, parsonsTitle);
+    await expect(studentPage.getByText("print('E2E Parsons')", { exact: true })).toBeVisible();
+    await studentPage.getByRole("button", { name: "Submit", exact: true }).click();
+    await studentPage.getByRole("dialog", { name: "Submit solution?" }).getByRole("button", { name: "Submit solution" }).click();
+    await expect(studentPage).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));
+    await verifyContinuation();
   });
 
   test("teacher authors a coding exercise and the student runs and submits code", async ({ teacherPage, studentPage }) => {
@@ -301,10 +326,11 @@ test.describe.serial("authoring and completing every activity type", () => {
     await addTableDialog.getByLabel("Rows").fill("2");
     await addTableDialog.getByLabel("Columns").fill("2");
     const unexpectedTableSaveRequests: string[] = [];
+    const bankActivitySavePath = `/api/activity-banks/${data.activityBankId}/activities/${bankActivityId}`;
     const trackUnexpectedTableSave = (request: Request) => {
       if (
         request.method() === "PATCH" &&
-        new URL(request.url()).pathname.endsWith(`/api/activity-banks/${data.activityBankId}/activities/${bankActivityId}`)
+        new URL(request.url()).pathname.endsWith(bankActivitySavePath)
       ) {
         unexpectedTableSaveRequests.push(request.url());
       }
@@ -530,6 +556,14 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(studentPage.getByRole("tab", { name: "Previous submissions" })).toBeVisible();
     await expect(studentPage.getByText("Read one name from standard input", { exact: false })).toHaveCount(0);
     await expect(studentPage.locator(".coding-exercise-attempt-accordion")).toHaveCount(2);
+    const verifyContinuation = await reopenLatestSubmission(data, title);
+    await openStudentActivity(studentPage, data, title);
+    await expect(studentPage.getByRole("textbox", { name: title, exact: true }).locator("xpath=ancestor::div[contains(@class, 'monaco-code-editor')][1]").locator(".view-lines")).toContainText(solution);
+    await studentPage.getByRole("button", { name: "Submit for grading" }).click();
+    await expect(finalConfirmation).toBeVisible({ timeout: 60_000 });
+    await finalConfirmation.getByRole("button", { name: "OK" }).click();
+    await expect(studentPage).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));
+    await verifyContinuation();
   });
 
   test("teacher authors a web-design exercise and the student edits, previews, tests, and submits it", async ({ teacherPage, studentPage }) => {
@@ -619,6 +653,13 @@ test.describe.serial("authoring and completing every activity type", () => {
     await studentPage.getByRole("button", { name: "Submit", exact: true }).click();
     await submissionFinished;
     await expect(studentPage.getByRole("heading", { name: "Result" })).toBeVisible({ timeout: 60_000 });
+    const verifyContinuation = await reopenLatestSubmission(data, title);
+    await openStudentActivity(studentPage, data, title);
+    await expect(studentPage.getByRole("button", { name: "Submit", exact: true })).toBeEnabled();
+    const resubmitted = studentPage.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith("/web-design-coding-exercises/submit"), { timeout: 120_000 });
+    await studentPage.getByRole("button", { name: "Submit", exact: true }).click();
+    expect((await resubmitted).ok()).toBeTruthy();
+    await verifyContinuation();
   });
 
   test("teacher authors a Coding Homework assignment and the student completes ZIP and challenge stages", async ({ teacherPage, studentPage }) => {
@@ -681,6 +722,13 @@ test.describe.serial("authoring and completing every activity type", () => {
       .getByText(title, { exact: true })
       .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' table-main ')][1]");
     await expect(homeworkRow.getByText("Submitted", { exact: true })).toBeVisible();
+    const verifyContinuation = await reopenLatestSubmission(data, title);
+    await openStudentActivity(studentPage, data, title);
+    await expect(studentPage.getByLabel("Answer 1")).toHaveValue("The main function prints a greeting and exits successfully.");
+    await studentPage.getByLabel("Answer 1").fill("The main function calls puts to print hello, then returns zero.");
+    await studentPage.getByRole("button", { name: "Submit answers" }).click();
+    await expect(studentPage).toHaveURL(`/courses/${data.courseId}/groups/${data.groupId}`);
+    await verifyContinuation();
   });
 
   test("teacher composes a Test from authored activities and the student completes the whole assessment", async ({ teacherPage, studentPage }) => {

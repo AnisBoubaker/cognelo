@@ -879,6 +879,10 @@ export const zhMessages = {
       loadError: "无法加载课程。"
     },
     courseDetail: {
+      reopenSubmission: "重新开放最后一次提交",
+      reopenSubmissionConfirm: "重新开放 {name} 的第 {number} 次作答？已保存的答案将恢复为可编辑状态，此次提交的成绩将撤回。保留原始开始时间，并应用当前设置和例外，包括提交后授予的延时。重新开放本身不会增加时间或作答次数。已过期的截止时间仍然有效。",
+      submissionReopened: "最后一次提交已重新开放。",
+
       liveSettingsTitle: "学生正在作答",
       liveSettingsWarning: "学生目前正在完成此活动。设置将在30秒内应用于尚未提交的作业。取消可保留当前设置。",
       liveSettingsMessage: "给学生的消息（可选）",

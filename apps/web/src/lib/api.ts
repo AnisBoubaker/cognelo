@@ -838,6 +838,7 @@ export type TimedActivityRuntime = {
     attemptNumber: number;
     lifecycle: "started";
     startedAt: string;
+    reopenedAt?: string;
   } | null;
   timing: {
     expiresAt: string | null;
@@ -1202,6 +1203,7 @@ export type CourseGradebookRow = {
   activityTitle: string;
   activityTypeKey: string;
   activityTypeName: string;
+  supportsSubmissionContinuation?: boolean;
   assessmentMode: "formative" | "summative";
   gradesReleased: boolean;
   participantId: string;
@@ -1938,6 +1940,10 @@ export const api = {
     ),
   testAttemptReview: (courseId: string, attemptId: string) =>
     request<{ review: CourseTestAttemptReview }>(`/courses/${courseId}/gradebook/attempts/${attemptId}/test-review`),
+  reopenActivitySubmission: (courseId: string, attemptId: string) =>
+    request<{ result: { attempt: GradebookMutationAttempt } }>(
+      `/courses/${courseId}/gradebook/attempts/${attemptId}/reopen`, { method: "POST" }
+    ),
   deleteActivitySubmission: (courseId: string, attemptId: string, input: { reason: string }) =>
     request<{ result: { attempt: GradebookMutationAttempt; grade: GradebookMutationGrade | null } }>(
       `/courses/${courseId}/gradebook/attempts/${attemptId}`,

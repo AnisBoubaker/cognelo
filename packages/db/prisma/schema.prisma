@@ -120,6 +120,7 @@ enum GradeEventType {
   released
   hidden
   submission_deleted
+  submission_reopened
   ai_feedback_recorded
   assessment_mode_changed
 }

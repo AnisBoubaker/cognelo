@@ -12,6 +12,23 @@ import { createParsonsBankActivityVariation } from "./variation";
 
 export const parsonsServerPlugin: ServerActivityPlugin = {
   key: "parsons",
+  attemptContinuation: {
+    activityTypeKeys: ["parsons-problem"],
+    reopen: async ({ activityId, userId, pluginAttemptRef, metadata, transaction }) => {
+      if (!pluginAttemptRef && metadata.timedOut) return {};
+      const [attempt] = await transaction.query<Array<{ latestState: Record<string, unknown>; resultSummary: unknown }>>`
+        SELECT "latestState", "resultSummary" FROM "PluginParsonsAttempt"
+        WHERE id = ${pluginAttemptRef} AND "activityId" = ${activityId} AND "userId" = ${userId}`;
+      if (!attempt) throw new AppError(409, "SUBMISSION_STATE_MISSING", "The submitted arrangement is unavailable.");
+      await transaction.execute`UPDATE "PluginParsonsAttempt" SET status = 'abandoned', "completedAt" = NOW(), "updatedAt" = NOW()
+        WHERE "activityId" = ${activityId} AND "userId" = ${userId} AND status = 'in_progress' AND id <> ${pluginAttemptRef}`;
+      const state = { ...(metadata.submittedState as Record<string, unknown> ?? attempt.latestState), lastEvaluation: null };
+      await transaction.execute`UPDATE "PluginParsonsAttempt" SET status = 'in_progress', "completedAt" = NULL,
+        "latestState" = ${JSON.stringify(state)}::jsonb, "resultSummary" = '{}'::jsonb, "updatedAt" = NOW()
+        WHERE id = ${pluginAttemptRef}`;
+      return { audit: attempt };
+    }
+  },
   routes: [parsonsAttemptRoute, parsonsGenerateRoute, parsonsGradebookAttemptsRoute, parsonsStudentSubmissionsRoute],
   bankVariation: {
     activityTypeKeys: ["parsons-problem"],

@@ -48,6 +48,8 @@ After release, the learner's grading report presents the available automatic-tes
 - Course and bank copies have independent private rows connected by explicit lifecycle hooks.
 - Reusable bank Tests invoke those same hooks for each Test-owned child during bank copy, course import, course publication, duplication, and deletion.
 
+Teachers can [reopen the last submission](../../../docs/SUBMISSION_CONTINUATION.md) so its saved answers can be continued using the original start and current effective settings.
+
 ## Read By Topic
 
 - [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)

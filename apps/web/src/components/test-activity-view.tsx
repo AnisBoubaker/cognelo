@@ -492,10 +492,10 @@ function TestStudentRuntime({
         const { runtime: next } = await api.testRuntime(courseId, groupId, activity.id, studentViewMode, sessionId);
         if (cancelled) return;
         // Keep item objects stable: polling must never replace unsaved child responses.
-        setRuntime((current) => current && current.attempt?.id === next.attempt?.id ? {
+        setRuntime((current) => current && current.attempt?.id === next.attempt?.id && current.attempt?.lifecycle === next.attempt?.lifecycle ? {
           ...current, test: { ...current.test, settings: next.test.settings },
           timing: next.timing, availability: next.availability, resume: next.resume
-        } : current);
+        } : next);
         onNewAttemptAvailabilityChange?.(next.attempt?.lifecycle === "started" || next.availability.canStart);
         if (!next.timing.isExpired) autoSubmittedAttemptRef.current = null;
       } catch { /* Access changes are handled by the assigned activity host. */ }

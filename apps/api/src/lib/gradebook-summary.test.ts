@@ -177,6 +177,7 @@ function gradebookRow(overrides: {
     lateAttemptCount: 0,
     submittedAttemptCount: overrides.submittedAttemptCount,
     needsGradingCount: 0,
+    supportsSubmissionContinuation: true,
     deletedSubmissions: [],
     attempts: overrides.submittedAttemptCount
       ? [{

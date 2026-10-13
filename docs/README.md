@@ -42,6 +42,7 @@ Open these only when changing or reviewing the named area:
 - [Coding Homework Grader](CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md)
 - [Content-type plugins](CONTENT_TYPE_PLUGIN_IMPLEMENTATION_PLAN.md)
 - [Course content tree](COURSE_CONTENT_TREE_IMPLEMENTATION_PLAN.md)
+- [Reopening student submissions](SUBMISSION_CONTINUATION.md)
 - [Gradebook](GRADEBOOK_IMPLEMENTATION_PLAN.md)
 - [Role authorization and multi-teacher E2E plan](ROLE_AUTHORIZATION_E2E_IMPLEMENTATION_PLAN.md)
 - [Student groupings and teams](STUDENT_GROUPINGS.md)

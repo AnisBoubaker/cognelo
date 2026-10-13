@@ -134,3 +134,7 @@ Course Student view injects an ephemeral attempts client backed by browser sessi
 Standalone activity **Class overview** loads each participant's latest completed attempt and shows the reference solution, an error-count distribution, and a grade distribution. Hovering a bar identifies the students in that bucket.
 
 When changing this plugin, update this detailed reference, the package README if its overview or routing changed, and `PROJECT_MEMORY.md` only when a durable invariant changed. Update root documents only for platform-wide contracts.
+
+## Reopening the last submission
+
+Restores the submitted arrangement on its existing plugin attempt, reopens it, and clears completion/evaluation state after archiving prior state/results. Existing interaction events are retained; ordinary resubmission reuses the core attempt. The shared [continuation service](../../../../docs/SUBMISSION_CONTINUATION.md) enforces latest-attempt and staff scope, archives prior evidence, preserves attempt identity and original start, and applies current General/section/team/student settings. Later extensions or individual exceptions therefore affect the resumed deadline without resetting it.

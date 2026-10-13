@@ -29,7 +29,8 @@ export async function getTimedActivityRuntime(
       id: activeAttempt.id,
       attemptNumber: activeAttempt.attemptNumber,
       lifecycle: activeAttempt.lifecycle,
-      startedAt: activeAttempt.startedAt.toISOString()
+      startedAt: activeAttempt.startedAt.toISOString(),
+      reopenedAt: asRecord(asRecord(activeAttempt.metadata).continuation).reopenedAt as string | undefined
     } : null,
     timing: {
       expiresAt: expiresAt?.toISOString() ?? null,
@@ -167,7 +168,7 @@ async function findActiveAttempt(groupActivityId: string, participantId: string)
     where: { groupActivityId, participantId, lifecycle: "started" },
     orderBy: [{ attemptNumber: "desc" }]
   });
-  return attempts.find((attempt) => activityAttemptTimeLimitMinutes(attempt.metadata) !== null) ?? null;
+  return attempts.find((attempt) => (activityAttemptTimeLimitMinutes(attempt.metadata) !== null || asRecord(attempt.metadata).continuation)) ?? null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

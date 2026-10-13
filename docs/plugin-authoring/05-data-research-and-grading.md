@@ -108,6 +108,10 @@ When a learner's released report needs plugin-owned evidence beyond core's sanit
 
 If a final grade has multiple independently completed components, register `gradeCompletion.activityTypeKeys` and the batch `gradeCompletion.getCompletions` handler. The host supplies scored rows grouped by activity; return `complete` or `partial` with completed/required component counts for every supplied participant. Use the activity's current private grading policy and normalized grading evidence, and treat an explicit teacher final-grade override as complete. Core separately identifies submitted rows with no grade. Either an ungraded or partial submitted row prevents release, while a learner with no submitted attempt never blocks it.
 
+## Continuing A Submitted Attempt
+
+Implement the explicit `ServerActivityPlugin.attemptContinuation` handler to restore saved learner state when a grader reopens the last submission. Use its supplied parameterized transaction interface for plugin-owned SQL so plugin restoration, core lifecycle, grades, and audit evidence commit together. Preserve immutable execution artifacts, return only student-safe response state for the core draft, and archive mutable completion data through the handler's audit result. Core reuses the same attempt number and start and applies current assignment policy. See [Submission continuation](../SUBMISSION_CONTINUATION.md) for the full contract and supported workflows.
+
 ## AI Feedback And AI-Assisted Grading
 
 AI assessment uses an explicit core/plugin boundary:

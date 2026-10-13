@@ -14,3 +14,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Released final grades are challengeable through core only when the effective summative assignment setting permits it; challenge review must reuse the Parsons **Review and grade** surface and audited grade paths.
 - Gradebook attempt review and grading consume core course capabilities: explicit course teachers/admins work course-wide, while section teachers/TAs are restricted to their assigned groups. Authoring and grade release remain course-management operations.
 - Teacher authoring uses the shared guarded draft and `EditActionBar`.
+
+- [Submission continuation](../../../docs/SUBMISSION_CONTINUATION.md): Restores the submitted arrangement on its existing plugin attempt, reopens it, and clears completion/evaluation state after archiving prior state/results. Existing interaction events are retained; ordinary resubmission reuses the core attempt. Restore through the host transaction; reopening preserves the original start and applies current exceptions.

@@ -880,6 +880,10 @@ export const frMessages = {
       loadError: "Impossible de charger le cours."
     },
     courseDetail: {
+      reopenSubmission: "Rouvrir la dernière remise",
+      reopenSubmissionConfirm: "Rouvrir la tentative {number} de {name} ? Les réponses enregistrées seront modifiables et la note de cette remise sera retirée. L’heure de début initiale est conservée et les paramètres et exceptions actuels s’appliquent, y compris toute prolongation accordée depuis la remise. La réouverture n’ajoute ni temps ni tentative. Les échéances dépassées restent applicables.",
+      submissionReopened: "La dernière remise a été rouverte.",
+
       liveSettingsTitle: "Des étudiants répondent à cette activité",
       liveSettingsWarning: "Des étudiants répondent actuellement à cette activité. Ces paramètres seront appliqués aux travaux non remis dans les 30 secondes. Annulez pour conserver les paramètres actuels.",
       liveSettingsMessage: "Message aux étudiants (facultatif)",

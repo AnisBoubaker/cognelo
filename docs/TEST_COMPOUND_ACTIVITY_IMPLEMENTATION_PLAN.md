@@ -290,6 +290,8 @@ Adding a future activity plugin to Tests therefore requires capability declarati
 
 ## Attempt Lifecycle
 
+Teacher [submission continuation](SUBMISSION_CONTINUATION.md) reopens the latest completed parent and all child response states atomically. Original start times, composition, and manifest remain unchanged; current assignment settings and exceptions determine the resumed deadline. Prior child grading evidence is audited before clearing current scores/feedback and the submission claim. This explicit continuation permits returning to this sitting even for a no-resume Test.
+
 One parent `ActivityAttempt` represents one Test sitting.
 
 Suggested lifecycle:

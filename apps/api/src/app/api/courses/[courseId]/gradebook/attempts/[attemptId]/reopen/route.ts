@@ -1,0 +1,14 @@
+import { reopenActivitySubmission } from "@cognelo/core";
+import { handleRoute, json, options, requireUser } from "@/lib/http";
+
+type Params = { params: Promise<{ courseId: string; attemptId: string }> };
+
+export function OPTIONS() { return options(); }
+
+export async function POST(_request: Request, { params }: Params) {
+  return handleRoute(async () => {
+    const user = await requireUser();
+    const { courseId, attemptId } = await params;
+    return json({ result: await reopenActivitySubmission(user, courseId, attemptId) });
+  });
+}

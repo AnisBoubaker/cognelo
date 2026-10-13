@@ -880,6 +880,10 @@ export const enMessages = {
       loadError: "Unable to load course."
     },
     courseDetail: {
+      reopenSubmission: "Reopen last submission",
+      reopenSubmissionConfirm: "Reopen attempt {number} for {name}? Their saved answers will become editable and this submission’s grade will be withdrawn. The original start time is kept, and current settings and exceptions apply, including any time extensions made since submission. Reopening does not add time or another attempt. Expired deadlines still apply.",
+      submissionReopened: "The last submission has been reopened.",
+
       liveSettingsTitle: "Students are answering",
       liveSettingsWarning: "Students are currently answering this activity. These settings will apply to all unsubmitted work within 30 seconds. Cancel to keep the current settings.",
       liveSettingsMessage: "Message to students (optional)",

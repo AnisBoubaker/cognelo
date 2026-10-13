@@ -28,3 +28,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Monaco assets are first-party for SEB compatibility, with the controlled plain-text fallback retained.
 - The student template projection drops whitespace-only hidden boundaries. Monaco cursor and selection limits must be derived from the current model rather than the previous React value so empty answers accept their first keystroke and select-all clears only student code.
 - Monaco/basic code editors, rendered code, and Markdown code spans/fences inherit the shared non-translation policy; never extend that opt-out to the surrounding instructional prose.
+
+- [Submission continuation](../../../docs/SUBMISSION_CONTINUATION.md): Restores source code from the exact learner-owned execution to the core response draft without changing the immutable execution. The next ordinary submission creates fresh execution evidence on the same core attempt. Restore through the host transaction; reopening preserves the original start and applies current exceptions.

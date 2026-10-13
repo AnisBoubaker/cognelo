@@ -234,6 +234,23 @@ describe("gradebook attempt services", () => {
     await expect(getActivityAttemptAvailability(studentUser, input)).resolves.toMatchObject({ canStart: false, reason: "ATTEMPT_LIMIT_REACHED", maxAttempts: 2 });
   });
 
+  it("reuses an untimed reopened attempt without rewriting its original authored snapshot", async () => {
+    mockPrisma.activityAttempt.findMany.mockResolvedValue([{
+      id: "reopened-attempt", pluginAttemptRef: "old-artifact", activityConfigFingerprint: "original-config", testRevisionId: "original-revision",
+      metadata: { continuation: { reopenedAt: "2026-10-12T10:00:00Z" } }
+    }]);
+    await startActivityAttempt(studentUser, {
+      courseId: "course-1", groupId: "group-1", activityId: "activity-1", pluginKey: "mcq", pluginVersion: "0.1.0",
+      pluginAttemptRef: "new-artifact", activityConfigFingerprint: "later-config", testRevisionId: "later-revision"
+    });
+    expect(mockPrisma.activityAttempt.update).toHaveBeenCalledWith({
+      where: { id: "reopened-attempt" },
+      data: expect.objectContaining({ pluginAttemptRef: "new-artifact", activityConfigFingerprint: "original-config", testRevisionId: "original-revision" })
+    });
+    expect(tx.activityAttempt.create).not.toHaveBeenCalled();
+    expect(mockPrisma.activityAttempt.count).not.toHaveBeenCalled();
+  });
+
   it("reuses the active timed attempt when the activity plugin creates its submission", async () => {
     mockPrisma.activityAttempt.findMany.mockResolvedValue([{
       id: "timed-attempt-1",

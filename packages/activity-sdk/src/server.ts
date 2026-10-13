@@ -299,6 +299,21 @@ export type PluginHostCapabilityHandler<TResult = unknown> = () => Promise<TResu
 
 export type ServerActivityPlugin = {
   key: string;
+  /** Restores learner-owned state inside the host's atomic reopening transaction.
+   * SQL remains owned by the plugin; the SDK has no dependency on a Prisma client. */
+  attemptContinuation?: {
+    activityTypeKeys: readonly string[];
+    reopen: (input: {
+      activityId: string;
+      userId: string | null;
+      pluginAttemptRef: string | null;
+      metadata: Record<string, unknown>;
+      transaction: {
+        query: <T = unknown>(query: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
+        execute: (query: TemplateStringsArray, ...values: unknown[]) => Promise<number>;
+      };
+    }) => Promise<{ responseState?: Record<string, unknown>; audit?: Record<string, unknown> }>;
+  };
   hostCapabilities?: Readonly<Record<string, PluginHostCapabilityHandler>>;
   routes?: readonly PluginRouteDefinition[];
   grading?: {
@@ -475,6 +490,12 @@ export function resolvePluginGradingHandler(activityTypeKey: string) {
   return currentServerPlugins().find((plugin) =>
     plugin.grading?.gradeAttempt && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
   )?.grading?.gradeAttempt ?? null;
+}
+
+export function resolveAttemptContinuationHandler(activityTypeKey: string) {
+  return currentServerPlugins().find((plugin) =>
+    plugin.attemptContinuation?.activityTypeKeys.includes(activityTypeKey)
+  )?.attemptContinuation?.reopen ?? null;
 }
 
 export function resolvePluginStudentGradeReportHandler(activityTypeKey: string) {
