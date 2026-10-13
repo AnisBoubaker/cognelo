@@ -22,6 +22,8 @@ export const enMessages = {
     "removedTarget": "Removed team or student"
   },
     studentGroupings: {
+      "created": "Grouping created.",
+      "saved": "Grouping saved.",
       "manualMethod": "Manual",
       "useManual": "Use manual assignment",
       "studentVisibility": "Student visibility",

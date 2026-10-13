@@ -22,6 +22,8 @@ export const arMessages = {
     "removedTarget": "تمت إزالة الفريق أو الطالب"
   },
     studentGroupings: {
+      "created": "تم إنشاء التجميع.",
+      "saved": "تم حفظ التجميع.",
       "manualMethod": "يدوي",
       "studentChangesAllowed": "يمكن للطلاب تغيير فرقهم خلال فترة الاختيار وحتى الموعد النهائي.",
       "studentChangesLocked": "لا يمكن للطلاب تغيير فرقهم بعد تأكيد اختيارهم.",

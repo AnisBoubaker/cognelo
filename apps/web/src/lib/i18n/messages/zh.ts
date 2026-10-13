@@ -22,6 +22,8 @@ export const zhMessages = {
     "removedTarget": "团队或学生已移除"
   },
     studentGroupings: {
+      "created": "分组已创建。",
+      "saved": "分组已保存。",
       "manualMethod": "手动",
       "useManual": "使用手动分配",
       "studentVisibility": "学生可见性",
