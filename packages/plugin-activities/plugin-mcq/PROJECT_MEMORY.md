@@ -2,6 +2,8 @@
 
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
+- Preserve choices when live prompts/keys change; result and history APIs must enforce core grade release before returning summative scores. See [the reference](docs/REFERENCE.md#live-authoring-and-grade-visibility).
+
 - The compound Test answer-review check must inspect response presence only, never correctness or grading evidence; automatically persisted initial state is not a new answer. See [the reference](docs/REFERENCE.md) for this plugin’s criteria.
 
 - Preserve the single text-first source; do not replace it with a click-heavy form builder.

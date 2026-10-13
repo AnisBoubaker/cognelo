@@ -89,7 +89,8 @@ const dbMocks = vi.hoisted(() => {
 });
 
 const coreMocks = vi.hoisted(() => ({
-  assertActivityAuthoringMutable: vi.fn(),
+  authoringSql: vi.fn(),
+  withActivityAuthoringChange: vi.fn(),
   assertCanManageActivityBank: vi.fn(),
   assertCanManageCourse: vi.fn(),
   AppError: class AppError extends Error {
@@ -174,6 +175,7 @@ const testsInput = {
 describe("web design exercise test persistence", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    coreMocks.withActivityAuthoringChange.mockImplementation(async (_user, _course, _activity, _input, mutate) => mutate({ $executeRaw: coreMocks.authoringSql, $queryRaw: async () => [] }));
   });
 
   it("lists course and bank tests with their reference bundles", async () => {
@@ -196,26 +198,14 @@ describe("web design exercise test persistence", () => {
       input: testsInput
     });
 
-    expect(dbMocks.transaction.pluginWebDesignExerciseTest.deleteMany).toHaveBeenCalledWith({
-      where: { activityId: "activity-1" }
-    });
-    expect(dbMocks.transaction.pluginWebDesignExerciseTest.createMany).toHaveBeenCalledWith({
-      data: [
-        expect.objectContaining({ id: "sample-1", activityId: "activity-1", kind: "sample", orderIndex: 0 }),
-        expect.objectContaining({ id: "hidden-1", activityId: "activity-1", kind: "hidden", orderIndex: 1 })
-      ]
-    });
-    expect(dbMocks.transaction.pluginWebDesignExerciseReferenceBundle.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { activityId: "activity-1" },
-        create: expect.objectContaining({
-          activityId: "activity-1",
-          validationSummary: expect.objectContaining({
-            expectedResult: expect.objectContaining({ imageDataUrl: "data:image/png;base64,abc" })
-          })
-        })
-      })
-    );
+    const statements = coreMocks.authoringSql.mock.calls;
+    expect(statements).toHaveLength(5);
+    expect(statements[0][0].join("?")).toContain('DELETE FROM "PluginWebDesignExerciseTest"');
+    expect(statements[1]).toContain("sample-1");
+    expect(statements[2]).toContain("hidden-1");
+    expect(statements[4][0].join("?")).toContain('INSERT INTO "PluginWebDesignExerciseAuthoringRevision"');
+    expect(coreMocks.withActivityAuthoringChange).toHaveBeenCalledWith(expect.anything(), "course-1", "activity-1", expect.anything(), expect.any(Function), expect.objectContaining({ eventType: "activity_private_content_updated" }));
+
   });
 
   it("replaces bank tests without writing course-scoped rows", async () => {

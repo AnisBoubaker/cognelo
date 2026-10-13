@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import type { CurrentUser } from "@cognelo/contracts";
-import { assertActivityAuthoringMutable, assertCanManageActivityBank, assertCanManageCourse, AppError } from "@cognelo/core";
+import { withActivityAuthoringChange, assertCanManageActivityBank, assertCanManageCourse, AppError } from "@cognelo/core";
 import {
   normalizeWebDesignExerciseConfig,
   parseWebDesignExerciseConfig,
@@ -234,6 +235,7 @@ export async function deleteBankWebDesignExerciseData(params: { bankActivityId: 
 
 export async function deleteCourseWebDesignExerciseData(params: { activityId: string }) {
   await prisma.$transaction(async (transaction) => {
+    await transaction.pluginWebDesignExerciseAuthoringRevision.deleteMany({ where: { activityId: params.activityId } });
     const submissions = await transaction.pluginWebDesignExerciseSubmission.findMany({
       where: { activityId: params.activityId },
       select: { id: true }
@@ -257,7 +259,6 @@ export async function replaceWebDesignExerciseTests(params: {
   input: unknown;
 }) {
   await assertCanManageCourse(params.user, params.courseId);
-  await assertActivityAuthoringMutable(params.courseId, params.activityId);
   const input = webDesignExerciseTestsInputSchema.parse(params.input);
   const seenIds = new Set<string>();
   for (const test of input.tests) {
@@ -295,41 +296,27 @@ export async function replaceWebDesignExerciseTests(params: {
       : null
   };
 
-  await prisma.$transaction(async (transaction) => {
-    await transaction.pluginWebDesignExerciseTest.deleteMany({
-      where: { activityId: params.activityId }
-    });
-
-    if (input.tests.length) {
-      await transaction.pluginWebDesignExerciseTest.createMany({
-        data: input.tests.map((test, index) => ({
-          id: test.id,
-          activityId: params.activityId,
-          name: test.name,
-          kind: test.kind,
-          testCode: test.testCode,
-          orderIndex: index,
-          isEnabled: test.isEnabled,
-          weight: test.weight,
-          metadata: test.metadata as Prisma.InputJsonValue,
-          validationSummary: (validation.testSummaries.get(test.id) ?? buildSkippedValidationSummary(test.isEnabled)) as Prisma.InputJsonValue
-        }))
-      });
+  const next = { tests: input.tests, referenceFiles, activityConfig: params.activityConfig };
+  const privateChange: { before: unknown; after: unknown } = { before: null, after: next };
+  await withActivityAuthoringChange(params.user, params.courseId, params.activityId, params.input, async (tx) => {
+    const previousTests = await tx.$queryRaw<Record<string, unknown>[]>`SELECT * FROM "PluginWebDesignExerciseTest" WHERE "activityId" = ${params.activityId} ORDER BY "orderIndex", "createdAt"`;
+    const previousReferences = await tx.$queryRaw<Record<string, unknown>[]>`SELECT * FROM "PluginWebDesignExerciseReferenceBundle" WHERE "activityId" = ${params.activityId}`;
+    privateChange.before = { tests: previousTests, referenceBundle: previousReferences[0] ?? null };
+    await tx.$executeRaw`DELETE FROM "PluginWebDesignExerciseTest" WHERE "activityId" = ${params.activityId}`;
+    for (const [index, test] of input.tests.entries()) {
+      const summary = validation.testSummaries.get(test.id) ?? buildSkippedValidationSummary(test.isEnabled);
+      await tx.$executeRaw`INSERT INTO "PluginWebDesignExerciseTest"
+        ("id", "activityId", "name", "kind", "testCode", "orderIndex", "isEnabled", "weight", "metadata", "validationSummary", "createdAt", "updatedAt")
+        VALUES (${test.id}, ${params.activityId}, ${test.name}, ${test.kind}::"PluginWebDesignExerciseTestKind", ${test.testCode}, ${index}, ${test.isEnabled}, ${test.weight}, ${JSON.stringify(test.metadata)}::jsonb, ${JSON.stringify(summary)}::jsonb, NOW(), NOW())`;
     }
-
-    await transaction.pluginWebDesignExerciseReferenceBundle.upsert({
-      where: { activityId: params.activityId },
-      create: {
-        activityId: params.activityId,
-        files: referenceFiles as unknown as Prisma.InputJsonValue,
-        validationSummary: referenceSummary as Prisma.InputJsonValue
-      },
-      update: {
-        files: referenceFiles as unknown as Prisma.InputJsonValue,
-        validationSummary: referenceSummary as Prisma.InputJsonValue
-      }
-    });
-  });
+    await tx.$executeRaw`INSERT INTO "PluginWebDesignExerciseReferenceBundle"
+      ("id", "activityId", "files", "validationSummary", "createdAt", "updatedAt")
+      VALUES (${randomUUID()}, ${params.activityId}, ${JSON.stringify(referenceFiles)}::jsonb, ${JSON.stringify(referenceSummary)}::jsonb, NOW(), NOW())
+      ON CONFLICT ("activityId") DO UPDATE SET "files" = EXCLUDED."files", "validationSummary" = EXCLUDED."validationSummary", "updatedAt" = NOW()`;
+    await tx.$executeRaw`INSERT INTO "PluginWebDesignExerciseAuthoringRevision"
+      ("id", "activityId", "actorUserId", "previousValue", "nextValue", "createdAt")
+      VALUES (${randomUUID()}, ${params.activityId}, ${params.user.id}, ${JSON.stringify(privateChange.before)}::jsonb, ${JSON.stringify(next)}::jsonb, NOW())`;
+  }, { eventType: "activity_private_content_updated", privateChange });
 
   return listWebDesignExerciseTests({ activityId: params.activityId });
 }

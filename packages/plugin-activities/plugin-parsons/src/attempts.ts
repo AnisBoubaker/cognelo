@@ -1,6 +1,7 @@
 import { Prisma, type PluginParsonsAttempt, type PluginParsonsAttemptEvent, prisma } from "./db-client";
 import {
   createInitialParsonsAttemptState,
+  reconcileParsonsResponseState,
   getParsonsConfigFingerprint,
   parsonsAttemptEnsureInputSchema,
   parsonsAttemptStateSchema,
@@ -70,19 +71,12 @@ export async function ensureParsonsAttempt(params: {
       return toParsonsAttemptRecord(existing, state);
     }
 
-    await prisma.pluginParsonsAttempt.update({
+    const updatedState = parsonsAttemptStateSchema.parse(reconcileParsonsResponseState(null, config, state));
+    const updated = await prisma.pluginParsonsAttempt.update({
       where: { id: existing.id },
-      data: {
-        status: "abandoned",
-        completedAt: new Date(),
-        lastInteractionAt: new Date(),
-        resultSummary: {
-          ...(normalizeResultSummary(existing.resultSummary) as Prisma.InputJsonObject),
-          supersededByConfigChange: true,
-          configFingerprint: state.configFingerprint
-        }
-      }
+      data: { latestState: updatedState as Prisma.InputJsonValue, lastInteractionAt: new Date() }
     });
+    return toParsonsAttemptRecord(updated, updatedState);
   }
 
   const initialState = createInitialParsonsAttemptState(config);
@@ -141,11 +135,13 @@ export async function updateParsonsAttempt(params: {
   }
 
   const currentState = normalizeAttemptState(attempt.latestState, config);
-  const nextState = input.state ? parsonsAttemptStateSchema.parse(input.state) : currentState;
+  const nextState = parsonsAttemptStateSchema.parse(reconcileParsonsResponseState(null, config, input.state ?? currentState));
   const expectedFingerprint = getParsonsConfigFingerprint(config);
-  if (nextState.configFingerprint !== expectedFingerprint) {
-    return null;
-  }
+  // Evaluate the current authored solution on the server, including edits made
+  // since the student's last refresh. Client evaluation is never authoritative.
+  const evaluation = input.submit || input.event?.type === "check"
+    ? evaluateParsonsAttemptStateForConfig(nextState, config) : null;
+  if (evaluation) nextState.lastEvaluation = evaluation;
 
   const now = new Date();
   const currentSummary = normalizeResultSummary(attempt.resultSummary);
@@ -153,8 +149,8 @@ export async function updateParsonsAttempt(params: {
   const nextSummary = {
     ...currentSummary,
     configFingerprint: expectedFingerprint,
-    latestCorrect: input.result?.isCorrect ?? currentSummary.latestCorrect ?? false,
-    latestResult: input.result ?? currentSummary.latestResult ?? null,
+    latestCorrect: evaluation?.isCorrect ?? currentSummary.latestCorrect ?? false,
+    latestResult: evaluation ?? currentSummary.latestResult ?? null,
     lastEventType: input.event?.type ?? currentSummary.lastEventType ?? null,
     updatedAt: now.toISOString()
   };

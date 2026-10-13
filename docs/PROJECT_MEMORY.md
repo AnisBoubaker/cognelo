@@ -4,6 +4,8 @@ This file is intentionally short. It records only cross-cutting decisions that a
 
 ## Platform Invariants
 
+- [Live activity authoring](LIVE_ACTIVITY_AUTHORING.md): course questions and private tests remain editable during attempts with an active-student warning, optional message, and atomic audit. Learner responses survive refresh; submitted Tests use their final revision. Summative result/history APIs must enforce grade release, and missing automatic tests produce submitted-ungraded work rather than fabricated scores.
+
 - Course-content mutation refreshes must keep the existing tree mounted. Replacing it with a loading message collapses the page height and loses scroll position; reserve that loading state for initial loads and workspace navigation. See [Course content tree](COURSE_CONTENT_TREE_IMPLEMENTATION_PLAN.md#phase-7-unified-teacher-content-tree---complete).
 - Synthetic email recipients, including `cognelo.local`, are captured in the private local outbox at the shared delivery boundary, even when real SMTP/Graph is configured. Keep system-mail eligibility checks before capture; never fall back to a provider when capture fails. See [Email delivery](EMAIL_DELIVERY.md).
 - Keep `apps/api` and `apps/web` separate. Shared business rules belong in `packages/core`; shared schemas belong in `packages/contracts`.

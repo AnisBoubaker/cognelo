@@ -1,6 +1,7 @@
 export const codingExercisesDatabaseModule = {
   namespace: "plugin_coding_exercises",
   tables: [
+    "PluginCodingExerciseAuthoringRevision",
     "PluginCodingExerciseHiddenTest",
     "PluginCodingExerciseReferenceSolution",
     "PluginCodingExerciseExecution",
@@ -229,7 +230,14 @@ export const codingExercisesDatabaseModule = {
         `CREATE INDEX IF NOT EXISTS "PluginCodingExerciseTestEvaluation_executionId_status_createdAt_idx" ON "PluginCodingExerciseTestEvaluation"("executionId", "status", "createdAt")`,
         `CREATE INDEX IF NOT EXISTS "PluginCodingExerciseTestEvaluation_activityId_createdAt_idx" ON "PluginCodingExerciseTestEvaluation"("activityId", "createdAt")`
       ]
-    }
+    },
+    { id: "202610130010_authoring_revisions", statements: [
+      `CREATE TABLE IF NOT EXISTS "PluginCodingExerciseAuthoringRevision" (
+  "id" TEXT PRIMARY KEY, "activityId" TEXT NOT NULL, "actorUserId" TEXT NOT NULL,
+  "previousValue" JSONB NOT NULL, "nextValue" JSONB NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`,
+      `CREATE INDEX IF NOT EXISTS "PluginCodingExerciseAuthoringRevision_activityId_createdAt_idx" ON "PluginCodingExerciseAuthoringRevision" ("activityId", "createdAt")`
+    ] }
   ],
   notes: [
     "Only student-visible authoring fields live in the shared activity config.",

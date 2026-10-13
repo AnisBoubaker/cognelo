@@ -890,7 +890,9 @@ export const zhMessages = {
       submissionReopened: "最后一次提交已重新开放。",
 
       liveSettingsTitle: "学生正在作答",
-      liveSettingsWarning: "学生目前正在完成此活动。设置将在30秒内应用于尚未提交的作业。取消可保留当前设置。",
+      liveContentApply: "应用更改",
+      liveContentWarning: "学生正在作答此活动。您的更改将应用于他们正在进行的作答。您可以取消或应用更改，并在启用消息功能时发送可选通知。",
+    liveSettingsWarning: "学生目前正在完成此活动。设置将在30秒内应用于尚未提交的作业。取消可保留当前设置。",
       liveSettingsMessage: "给学生的消息（可选）",
       liveSettingsApply: "应用设置",
 

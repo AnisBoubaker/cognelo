@@ -891,7 +891,9 @@ export const frMessages = {
       submissionReopened: "La dernière remise a été rouverte.",
 
       liveSettingsTitle: "Des étudiants répondent à cette activité",
-      liveSettingsWarning: "Des étudiants répondent actuellement à cette activité. Ces paramètres seront appliqués aux travaux non remis dans les 30 secondes. Annulez pour conserver les paramètres actuels.",
+      liveContentApply: "Appliquer les modifications",
+      liveContentWarning: "Des étudiants répondent actuellement à cette activité. Vos modifications seront appliquées à leur travail en cours. Vous pouvez annuler ou appliquer les modifications, avec un message facultatif si la messagerie est activée.",
+    liveSettingsWarning: "Des étudiants répondent actuellement à cette activité. Ces paramètres seront appliqués aux travaux non remis dans les 30 secondes. Annulez pour conserver les paramètres actuels.",
       liveSettingsMessage: "Message aux étudiants (facultatif)",
       liveSettingsApply: "Appliquer les paramètres",
 

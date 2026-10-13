@@ -2,6 +2,8 @@
 
 Messaging is a core, course-activity setting. In **Course content → activity Settings → General**, **Enable activity messaging** controls staff broadcasts and the learner's Messages button, including compound Tests. It is off by default. The switch applies to every section; it is not a section, team, or individual exception.
 
+Authoring edits, including prompts and private test cases within a compound Test, use the same confirmation and optional notice. The edit and its notice/audit share a transaction; see [Live activity authoring](LIVE_ACTIVITY_AUTHORING.md).
+
 ## Persistence and live changes
 
 `Activity.metadata.allGroupsAssignment.messagingEnabled` stores the boolean. Missing values mean disabled. The course assignment-settings GET exposes `general.messagingEnabled`; the POST accepts the optional boolean and preserves the saved value when older callers omit it. No database migration is needed for this switch.

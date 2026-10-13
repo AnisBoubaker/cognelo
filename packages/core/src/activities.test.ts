@@ -64,6 +64,7 @@ vi.mock("@cognelo/activity-sdk", () => ({
   listActivityDefinitions: vi.fn()
 }));
 
+vi.mock("./activity-authoring-live", () => ({ withActivityAuthoringChange: vi.fn(async (_user, _course, _activity, _input, mutate) => mutate(tx)) }));
 vi.mock("./authorization", () => authMocks);
 vi.mock("./plugins", () => pluginMocks);
 
@@ -301,7 +302,7 @@ describe("activity services", () => {
     });
   });
 
-  it("locks contained child configuration after its Test has an attempt", async () => {
+  it("allows contained child corrections after its Test has an attempt", async () => {
     mockPrisma.activity.findFirst.mockResolvedValue({
       id: "child-activity-1",
       title: "Question set",
@@ -310,12 +311,13 @@ describe("activity services", () => {
       testItem: { test: { activityId: "test-activity-1" } }
     });
     mockPrisma.activityAttempt.count.mockResolvedValue(1);
+    tx.activity.update.mockResolvedValue({ id: "child-activity-1", title: "Question set", description: "", config: { source: "changed" } });
 
     await expect(
       updateActivity(teacherUser, "course-1", "child-activity-1", { config: { source: "changed" } })
-    ).rejects.toMatchObject({ status: 409, code: "TEST_STRUCTURE_LOCKED" });
+    ).resolves.toBeDefined();
 
-    expect(tx.activity.update).not.toHaveBeenCalled();
+    expect(tx.activity.update).toHaveBeenCalled();
   });
 
   it("deletes only course-local activity IDs that belong to the course", async () => {

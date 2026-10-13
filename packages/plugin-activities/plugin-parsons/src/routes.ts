@@ -1,3 +1,4 @@
+import { canShowStudentActivityGrade } from "@cognelo/core";
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import type { Prisma } from "@prisma/client";
 import {
@@ -12,7 +13,7 @@ import {
   submitActivityAttempt
 } from "@cognelo/core";
 import { prisma } from "@cognelo/db";
-import { ensureParsonsAttempt, findLatestParsonsAttempt, listParsonsGradebookAttempts, updateParsonsAttempt } from "./attempts";
+import { evaluateParsonsAttemptStateForConfig, ensureParsonsAttempt, findLatestParsonsAttempt, listParsonsGradebookAttempts, updateParsonsAttempt } from "./attempts";
 import {
   parsonsAttemptEnsureInputSchema,
   parsonsAttemptStateSchema,
@@ -94,7 +95,7 @@ export const parsonsAttemptRoute: PluginRouteDefinition = {
             status: "completed"
           });
           if (latestCompletedAttempt) {
-            return { attempt: latestCompletedAttempt, attemptAvailability: availability };
+            return { attempt: await studentAttempt(context, latestCompletedAttempt), attemptAvailability: availability };
           }
         }
       }
@@ -105,7 +106,7 @@ export const parsonsAttemptRoute: PluginRouteDefinition = {
         forceNew: input.forceNew
       });
 
-      return { attempt };
+      return { attempt: await studentAttempt(context, attempt) };
     },
     PATCH: async ({ context, readJson }) => {
       const input = parsonsAttemptUpdateInputSchema.parse(await readJson());
@@ -126,9 +127,6 @@ export const parsonsAttemptRoute: PluginRouteDefinition = {
       }
 
       if (recordsCoreAttempt && context.courseId && context.groupId) {
-        if (assessmentMode === "summative" && !input.result) {
-          throw new AppError(400, "PARSONS_SUBMISSION_RESULT_REQUIRED", "A Parsons submission requires a grading result.");
-        }
         const metadata = {
           mode: assessmentMode,
           submittedState: attempt.latestState
@@ -149,8 +147,9 @@ export const parsonsAttemptRoute: PluginRouteDefinition = {
           pluginAttemptRef: attempt.id,
           metadata
         });
-        if (assessmentMode === "summative" && input.result) {
-          const gradingResult = buildParsonsGradingResult(input.result);
+        if (assessmentMode === "summative") {
+          const evaluation = evaluateParsonsAttemptStateForConfig(attempt.latestState, parseParsonsConfig(context.activity.config));
+          const gradingResult = buildParsonsGradingResult(evaluation);
           await recordActivityAttemptGradingResult(context.user, {
             attemptId: submittedAttempt.id,
             rawScore: gradingResult.rawScore,
@@ -158,7 +157,7 @@ export const parsonsAttemptRoute: PluginRouteDefinition = {
             source: "auto",
             isPass: gradingResult.isPass,
             rawResult: {
-              evaluation: input.result,
+              evaluation,
               analyticsPayload: gradingResult.analyticsPayload
             } as Prisma.InputJsonValue,
             normalizedResult: gradingResult.metadata as Prisma.InputJsonValue
@@ -166,7 +165,7 @@ export const parsonsAttemptRoute: PluginRouteDefinition = {
         }
       }
 
-      return { attempt };
+      return { attempt: await studentAttempt(context, attempt) };
     }
   }
 };
@@ -225,19 +224,21 @@ export const parsonsStudentSubmissionsRoute: PluginRouteDefinition = {
         participantId: participant.id
       });
 
+      const showGrade = await canShowStudentActivityGrade(context);
       return {
         submissions: attempts.flatMap((attempt) => {
           const submittedState = submittedStatesByPluginAttempt.get(attempt.id);
           if (!submittedState) {
             return [];
           }
-          const evaluation = submittedState.lastEvaluation ?? null;
+          const evaluation = showGrade ? submittedState.lastEvaluation ?? null : null;
           const grade = evaluation ? buildParsonsGradingResult(evaluation) : null;
           return [{
             attempt: {
               ...attempt,
-              latestState: submittedState,
-              submittedState
+              latestState: { ...submittedState, lastEvaluation: evaluation },
+              submittedState: { ...submittedState, lastEvaluation: evaluation },
+              resultSummary: showGrade ? attempt.resultSummary : {}
             },
             grade: grade
               ? {
@@ -363,4 +364,8 @@ async function listSubmittedStatesByPluginAttempt(input: {
   });
 
   return statesByAttempt;
+}
+
+async function studentAttempt<T extends { latestState: { lastEvaluation?: unknown } }>(context: Parameters<typeof canShowStudentActivityGrade>[0], attempt: T): Promise<T> {
+  return await canShowStudentActivityGrade(context) ? attempt : { ...attempt, resultSummary: {}, latestState: { ...attempt.latestState, lastEvaluation: null } };
 }

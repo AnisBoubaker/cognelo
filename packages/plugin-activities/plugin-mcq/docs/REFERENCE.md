@@ -98,3 +98,10 @@ When changing this plugin, update this detailed reference, the package README if
 ## Reopening the last submission
 
 Restores the submitted choices to the core response draft; the ordinary submission path reuses the reopened core attempt. The shared [continuation service](../../../../docs/SUBMISSION_CONTINUATION.md) enforces latest-attempt and staff scope, archives prior evidence, preserves attempt identity and original start, and applies current General/section/team/student settings. Later extensions or individual exceptions therefore affect the resumed deadline without resetting it.
+
+
+## Live authoring and grade visibility
+
+The learner source/description updates in place without clearing selected answers. `reconcileMcqResponseState` matches surviving questions and choices by authored content, with positional correction fallback. Compound drafts also retain the configuration they answered. The server grades the current key at submission. Summative submission/history responses return no grade until release; previous-submission UI uses the same release gate.
+
+Shared confirmation, submitted-Test snapshots, and concurrency are documented in [Live activity authoring](../../../../docs/LIVE_ACTIVITY_AUTHORING.md).

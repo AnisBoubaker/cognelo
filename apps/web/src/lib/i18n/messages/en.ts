@@ -891,7 +891,9 @@ export const enMessages = {
       submissionReopened: "The last submission has been reopened.",
 
       liveSettingsTitle: "Students are answering",
-      liveSettingsWarning: "Students are currently answering this activity. These settings will apply to all unsubmitted work within 30 seconds. Cancel to keep the current settings.",
+      liveContentApply: "Apply changes",
+      liveContentWarning: "Students are currently answering this activity. Your changes will apply to their ongoing work. You can cancel or apply the changes, with an optional message when messaging is enabled.",
+    liveSettingsWarning: "Students are currently answering this activity. These settings will apply to all unsubmitted work within 30 seconds. Cancel to keep the current settings.",
       liveSettingsMessage: "Message to students (optional)",
       liveSettingsApply: "Apply settings",
 

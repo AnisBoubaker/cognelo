@@ -258,3 +258,10 @@ When changing this plugin, update this detailed reference, the package README if
 ## Reopening the last submission
 
 Restores source code from the exact learner-owned execution to the core response draft without changing the immutable execution. The next ordinary submission creates fresh execution evidence on the same core attempt. The shared [continuation service](../../../../docs/SUBMISSION_CONTINUATION.md) enforces latest-attempt and staff scope, archives prior evidence, preserves attempt identity and original start, and applies current General/section/team/student settings. Later extensions or individual exceptions therefore affect the resumed deadline without resetting it.
+
+
+## Live authoring and grade visibility
+
+Course prompt/config updates preserve learner code. Private saves use the core live-authoring transaction and append full before/after data to `PluginCodingExerciseAuthoringRevision`; core audits contain only hashes. Migration `202610130010_authoring_revisions` is registered in `src/db.ts`, including backup ownership, and deletion hooks remove revisions. Reference validation still applies. Zero enabled hidden tests produce a saved submission with `accepted: null`, `gradingPending: true`, and no automatic grade; compound submission proceeds with `gradingResult: null`. Summative submission and history APIs withhold execution outcomes, summaries, and diagnostics until release, while sample runs remain visible.
+
+Shared confirmation, submitted-Test snapshots, and concurrency are documented in [Live activity authoring](../../../../docs/LIVE_ACTIVITY_AUTHORING.md).

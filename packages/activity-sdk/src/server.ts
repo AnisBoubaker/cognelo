@@ -279,7 +279,8 @@ export type CompositeExecutionSubmissionHandler = (input: {
   payload: unknown;
 }) => Promise<{
   state: Record<string, unknown>;
-  gradingResult: PluginGradingResult;
+  /** Null preserves submitted work awaiting teacher/rubric grading. */
+  gradingResult: PluginGradingResult | null;
 }>;
 
 export type CompositeExecutionActionHandler = (input: {

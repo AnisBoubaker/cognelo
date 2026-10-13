@@ -166,3 +166,13 @@ model PluginCodingExerciseAiEvaluation {
   @@index([participantId, createdAt])
   @@index([status, createdAt])
 }
+
+model PluginCodingExerciseAuthoringRevision {
+  id String @id @default(cuid())
+  activityId String
+  actorUserId String
+  previousValue Json
+  nextValue Json
+  createdAt DateTime @default(now())
+  @@index([activityId, createdAt])
+}

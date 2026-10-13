@@ -1,3 +1,4 @@
+import { canShowStudentActivityGrade } from "@cognelo/core";
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import {
   AppError,
@@ -98,7 +99,7 @@ export const webDesignExerciseRunRoute: PluginRouteDefinition = {
         kind: "run"
       });
 
-      return { submissions };
+      return { submissions: await studentSubmissions(context, submissions) };
     },
     POST: async ({ context, readJson }) => {
       const input = webDesignExerciseRunInputSchema.parse(await readJson());
@@ -125,7 +126,7 @@ export const webDesignExerciseSubmitRoute: PluginRouteDefinition = {
         kind: "submit"
       });
 
-      return { submissions };
+      return { submissions: await studentSubmissions(context, submissions) };
     },
     POST: async ({ context, readJson }) => {
       const input = webDesignExerciseRunInputSchema.parse(await readJson());
@@ -178,7 +179,7 @@ export const webDesignExerciseSubmitRoute: PluginRouteDefinition = {
         await clearActivityResponseDraft(context.user, context.courseId, context.groupId, context.activity.id).catch(() => undefined);
       }
 
-      return { submission };
+      return { submission: (await studentSubmissions(context, [submission]))[0] };
     }
   }
 };
@@ -216,3 +217,10 @@ export const webDesignExerciseReviewAllRoute: PluginRouteDefinition = {
     }
   }
 };
+
+async function studentSubmissions(context: Parameters<typeof canShowStudentActivityGrade>[0], submissions: Awaited<ReturnType<typeof listRecentWebDesignExerciseSubmissions>>) {
+  const visible = await canShowStudentActivityGrade(context);
+  return submissions.map((submission) => submission.kind !== "submit" || visible ? submission : {
+    ...submission, status: "completed" as const, score: null, maxScore: null, message: null, resultSummary: { gradingWithheld: true }, testResults: []
+  });
+}

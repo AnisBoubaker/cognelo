@@ -161,6 +161,7 @@ type CodingExerciseClient = {
       activityConfig?: Record<string, unknown>;
       validateOnly?: boolean;
       validationReceipt?: CodingExerciseValidationReceipt;
+      confirmActiveStudents?: boolean;
     }
   ) => Promise<{
     tests: HiddenTest[];
@@ -425,7 +426,9 @@ export function CodingExerciseActivityView({
         })
       );
     }
-    setEditorCode(alignCodingExerciseStarterCodeToTemplate(nextConfig.starterCode, nextConfig.studentTemplateSource));
+    if (isNewActivity || canManage) {
+      setEditorCode(alignCodingExerciseStarterCodeToTemplate(nextConfig.starterCode, nextConfig.studentTemplateSource));
+    }
     setSelectedSampleTestId(sampleTests[0]?.id ?? personalizedTestId);
     setPersonalizedInput("");
     setWorkspaceEditorWidth(null);
@@ -803,7 +806,7 @@ export function CodingExerciseActivityView({
         validationReceipt = validationResult.validationReceipt;
       }
 
-      await onSave({
+      const savedActivity = await onSave({
         title,
         description,
         config: persistedActivityConfig
@@ -812,7 +815,8 @@ export function CodingExerciseActivityView({
       if (canManage && course?.id && codingClient) {
         const result = await codingClient.saveHiddenTests(course.id, activity.id, {
           ...hiddenTestsInput,
-          validationReceipt
+          validationReceipt,
+          confirmActiveStudents: (savedActivity as ActivityLike & { liveChangeConfirmed?: boolean }).liveChangeConfirmed
         });
         setHiddenTests(result.tests);
         setReferenceSolution(result.referenceSolution?.sourceCode ?? "");
@@ -835,6 +839,10 @@ export function CodingExerciseActivityView({
       notifications.success(t("saved"));
       setError("");
     } catch (err) {
+      if (isApiErrorLike(err) && err.code === "ACTION_CANCELLED") {
+        if (options?.rethrow) throw err;
+        return;
+      }
       if (isApiErrorLike(err) && err.code === "REFERENCE_SOLUTION_VALIDATION_FAILED") {
         const details = normalizeObject(err.details);
         const validationSummary = normalizeObject(details?.validationSummary);
@@ -2170,7 +2178,7 @@ export function CodingExerciseActivityView({
                       <button type="button" onClick={submitCode} disabled={!config.language || readOnly || workingAction === "submit" || !editorCode.trim()}>
                         {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
                       </button>
-                      {submitExecution && submitExecution.status !== "pending" ? (
+                      {submitExecution && submitExecution.status !== "pending" && canShowExecutionOutcome(submitExecution) ? (
                         <OutcomeMark passed={submitExecution.status === "completed"} locale={pluginLocale} />
                       ) : null}
                     </div>
@@ -2341,10 +2349,10 @@ export function CodingExerciseActivityView({
                     <h2 id="coding-submission-confirmation-title" style={{ margin: 0 }}>
                       {t("submissionCompleteTitle")}
                     </h2>
-                    <OutcomeMark
+                    {canShowExecutionOutcome(submissionConfirmation.execution) ? <OutcomeMark
                       passed={submissionConfirmation.execution.status === "completed"}
                       locale={pluginLocale}
-                    />
+                    /> : null}
                   </div>
                   <p className="muted">{t("submissionRecordedMessage")}</p>
                   {submissionConfirmation.aiFeedback?.feedback ? (
@@ -2419,9 +2427,9 @@ function CodingAttemptHistoryList({
               </time>
               {attempt.submission.status === "pending" ? (
                 <span className="muted">{formatCodingExercisesMessage(locale, "statusPending")}</span>
-              ) : (
+              ) : canShowExecutionOutcome(attempt.submission) ? (
                 <OutcomeMark passed={attempt.submission.status === "completed"} locale={locale} />
-              )}
+              ) : null}
             </summary>
             <div className="stack coding-exercise-attempt-content">
               <div className="stack stack-tight">
@@ -2897,7 +2905,7 @@ function ExecutionCard({
 }) {
   const testSummary = execution.resultSummary?.tests;
   const tests = Array.isArray(testSummary) ? testSummary : [];
-  const outputCompared = execution.resultSummary?.outputCompared !== false;
+  const outputCompared = canShowExecutionOutcome(execution) && execution.resultSummary?.outputCompared !== false;
   return (
     <section className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 16 }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
@@ -2994,4 +3002,8 @@ function OutcomeMark({ passed, locale }: { passed: boolean; locale: CodingExerci
       {passed ? "✓" : "✕"}
     </span>
   );
+}
+
+function canShowExecutionOutcome(execution: CodingExecution) {
+  return execution.resultSummary?.gradingWithheld !== true && execution.resultSummary?.gradingPending !== true;
 }

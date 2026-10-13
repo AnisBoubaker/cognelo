@@ -5,6 +5,7 @@ import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import { CodeEditor, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, ProgressDialog, RichTextEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   parseMcqSource,
+  reconcileMcqResponseState,
   type McqChoice,
   type McqQuestion,
   type ParsedMcq
@@ -330,8 +331,12 @@ export function McqActivityView({
   const isStudentSession = !canManage && Boolean(submissionClient);
   const isSummativeStudentSession = isStudentSession && activity.assignment?.metadata?.assessmentMode === "summative";
   const activityConfigKey = useMemo(() => JSON.stringify(activity.config ?? {}), [activity.config]);
+  const previousActivityRef = useRef<ActivityLike | null>(null);
 
   useEffect(() => {
+    const previousActivity = previousActivityRef.current;
+    previousActivityRef.current = activity;
+    const preserveResponse = !canManage && previousActivity?.id === activity.id;
     setTitle(activity.title);
     setDescription(activity.description);
     setSource(String(activity.config?.source ?? fallbackConfig.source));
@@ -341,6 +346,10 @@ export function McqActivityView({
     setAiFeedbackInstructions(String(activity.config?.aiFeedbackInstructions ?? fallbackConfig.aiFeedbackInstructions));
     setAiFeedback(null);
     setSavedSnapshot(snapshotFromActivity(activity));
+    if (preserveResponse) {
+      setStudentAnswers((answers) => reconcileMcqResponseState(previousActivity?.config, activity.config, { answers }).answers);
+      return;
+    }
     setStudentAnswers({});
     setSubmitted(false);
     setError("");
@@ -521,6 +530,7 @@ export function McqActivityView({
       });
       notifications.success(copy.saved);
     } catch (err) {
+      if (err && typeof err === "object" && "code" in err && err.code === "ACTION_CANCELLED") throw err;
       notifications.error(err instanceof Error ? err.message : copy.saveError);
       setError("");
       throw err;
@@ -897,7 +907,7 @@ export function McqActivityView({
         <section className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 18 }}>
           <div className="row" style={{ justifyContent: "space-between" }}>
             <h2 style={{ margin: 0 }}>{copy.latestSubmission}</h2>
-            {selectedSubmissionReview.grade ? (
+            {selectedSubmissionReview.grade && (!isSummativeStudentSession || showCorrectAnswers) ? (
               <span className="participant-status is-graded">
                 {copy.latestGrade}:{" "}
                 {formatPoints(formatDisplayGradeScore(selectedSubmissionReview.grade, releasedMaxScore))} /{" "}
@@ -922,7 +932,7 @@ export function McqActivityView({
             parsedMcq={parsedMcq}
             studentAnswers={selectedSubmissionReview.answers}
             submitted
-            showFeedback
+            showFeedback={!isSummativeStudentSession || showCorrectAnswers}
             score={null}
             onSubmit={() => undefined}
             onReset={() => undefined}

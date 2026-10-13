@@ -2,6 +2,8 @@
 
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
+- Keep learner files through live prompt changes; private edits use plugin-owned revisions within the core audit transaction. Enforce release at submission/history APIs, including diagnostic and test-result fields. See [the reference](docs/REFERENCE.md#live-authoring-and-grade-visibility).
+
 - The compound Test answer-review check must inspect response presence only, never correctness or grading evidence; automatically persisted initial state is not a new answer. See [the reference](docs/REFERENCE.md) for this plugin’s criteria.
 
 - Keep this plugin separate from Programming Exercises: browser preview and Playwright grading have different trust and runtime boundaries from Judge0.

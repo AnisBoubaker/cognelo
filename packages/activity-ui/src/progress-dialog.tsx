@@ -1,4 +1,5 @@
 "use client";
+import { useSharedDialogOpen } from "./dialog-provider";
 
 import React, { type ReactNode, useEffect, useId, useRef } from "react";
 
@@ -19,7 +20,7 @@ export type ProgressDialogProps = {
 };
 
 export function ProgressDialog({
-  open,
+  open: requestedOpen,
   title,
   progressLabel,
   eyebrow,
@@ -32,6 +33,8 @@ export function ProgressDialog({
   onClose
 }: ProgressDialogProps) {
   const titleId = useId();
+  const sharedDialogOpen = useSharedDialogOpen();
+  const open = requestedOpen && !sharedDialogOpen;
   const messageId = useId();
   const dialogRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);

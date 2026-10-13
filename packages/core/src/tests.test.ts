@@ -26,6 +26,7 @@ const plugins = vi.hoisted(() => ({ ensureCoreActivityTypes: vi.fn() }));
 const activities = vi.hoisted(() => ({ createActivity: vi.fn() }));
 
 vi.mock("@cognelo/db", () => ({ prisma: db, Prisma: {} }));
+vi.mock("./activity-authoring-live", () => ({ withActivityAuthoringChange: vi.fn(async (_user, _course, _activity, _input, mutate) => mutate({ ...tx, testItem: db.testItem })) }));
 vi.mock("./authorization", () => authorization);
 vi.mock("./plugins", () => plugins);
 vi.mock("./activities", () => activities);
@@ -126,14 +127,12 @@ describe("Test authoring services", () => {
     }));
   });
 
-  it("locks Test structure after the first student attempt starts", async () => {
+  it("allows audited Test item changes after the first student attempt starts", async () => {
     db.activityAttempt.count.mockResolvedValue(1);
-
-    await expect(
-      updateTestItem(teacher, "course-1", "test-activity-1", "item-1", { pointsPossible: 20 })
-    ).rejects.toMatchObject({ status: 409, code: "TEST_STRUCTURE_LOCKED" });
-
-    expect(db.testItem.update).not.toHaveBeenCalled();
+    db.testItem.findFirst.mockResolvedValue({ id: "item-1" });
+    db.testItem.update.mockResolvedValue({ id: "item-1", pointsPossible: 20 });
+    await expect(updateTestItem(teacher, "course-1", "test-activity-1", "item-1", { pointsPossible: 20 }))
+      .resolves.toMatchObject({ pointsPossible: 20 });
   });
 
   it("duplicates the shell and every contained activity as an editable draft", async () => {

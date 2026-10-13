@@ -226,7 +226,7 @@ describe("Parsons server plugin grading contract", () => {
       },
       payload: state
     })).resolves.toMatchObject({
-      state: { ...state, lastEvaluation: { isCorrect: true } },
+      state: { ...state, lastEvaluation: null },
       gradingResult: { rawScore: 1, rawMaxScore: 1, isPass: true }
     });
   });

@@ -1443,6 +1443,27 @@ function notifyUnauthorized() {
   }
 }
 
+type LiveChangeConfirmation = (canNotifyStudents: boolean) => Promise<string | null>;
+let liveChangeConfirmation: LiveChangeConfirmation | null = null;
+export function setLiveChangeConfirmation(handler: LiveChangeConfirmation | null) { liveChangeConfirmation = handler; }
+
+async function requestAuthoring<T>(path: string, init?: RequestInit): Promise<T> {
+  try { return await request<T>(path, init); }
+  catch (error) {
+    if (!(error instanceof ApiError) || error.code !== "ACTIVITY_SETTINGS_ACTIVE_STUDENTS" || !liveChangeConfirmation) throw error;
+    const message = await liveChangeConfirmation((error.details as { canNotifyStudents?: boolean })?.canNotifyStudents === true);
+    if (message === null) throw new ApiError("", { code: "ACTION_CANCELLED" });
+    const result = await request<T>(path, { ...init, body: JSON.stringify({
+      ...JSON.parse(typeof init?.body === "string" ? init.body : "{}"), confirmActiveStudents: true, studentMessage: message
+    }) });
+    // A plugin's coordinated public/private save shares the same teacher confirmation.
+    if (result && typeof result === "object" && "activity" in result) {
+      (result.activity as Activity & { liveChangeConfirmed?: boolean }).liveChangeConfirmed = true;
+    }
+    return result;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   assertStudentViewRequestIsSafe(path, init);
   const response = await fetch(`${API_URL}/api${path}`, {
@@ -2164,7 +2185,7 @@ export const api = {
       validationReceipt?: CodingExerciseValidationReceipt;
     }
   ) =>
-    request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null; validationReceipt?: CodingExerciseValidationReceipt }>(
+    requestAuthoring<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null; validationReceipt?: CodingExerciseValidationReceipt }>(
       `/courses/${courseId}/activities/${activityId}/coding-exercises/hidden-tests`,
       {
         method: "PUT",
@@ -2313,7 +2334,7 @@ export const api = {
       tests: Array<Omit<WebDesignExerciseTest, "orderIndex" | "createdAt" | "updatedAt" | "validationSummary">>;
     }
   ) =>
-    request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
+    requestAuthoring<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
       `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/tests`,
       {
         method: "PUT",
@@ -2400,7 +2421,7 @@ export const api = {
     description?: string;
     lifecycle?: "draft" | "published" | "archived";
     settings?: Partial<CourseTestSettings>;
-  }) => request<{ test: CourseTest }>(`/courses/${courseId}/activities/${activityId}/test`, { method: "PATCH", body: JSON.stringify(input) }),
+  }) => requestAuthoring<{ test: CourseTest }>(`/courses/${courseId}/activities/${activityId}/test`, { method: "PATCH", body: JSON.stringify(input) }),
   duplicateTest: (courseId: string, activityId: string, input: { title?: string; contentItemId?: string } = {}) =>
     request<{ test: CourseTest }>(`/courses/${courseId}/activities/${activityId}/test/duplicate`, {
       method: "POST",
@@ -2412,11 +2433,11 @@ export const api = {
       body: JSON.stringify(input)
     }),
   createTestItem: (courseId: string, activityId: string, input: Record<string, unknown>) =>
-    request<{ item: CourseTestItem }>(`/courses/${courseId}/activities/${activityId}/test/items`, { method: "POST", body: JSON.stringify(input) }),
+    requestAuthoring<{ item: CourseTestItem }>(`/courses/${courseId}/activities/${activityId}/test/items`, { method: "POST", body: JSON.stringify(input) }),
   updateTestItem: (courseId: string, activityId: string, itemId: string, input: Partial<Pick<CourseTestItem, "position" | "pointsPossible" | "isRequired" | "metadata">>) =>
-    request<{ item: CourseTestItem }>(`/courses/${courseId}/activities/${activityId}/test/items/${itemId}`, { method: "PATCH", body: JSON.stringify(input) }),
+    requestAuthoring<{ item: CourseTestItem }>(`/courses/${courseId}/activities/${activityId}/test/items/${itemId}`, { method: "PATCH", body: JSON.stringify(input) }),
   deleteTestItem: (courseId: string, activityId: string, itemId: string) =>
-    request<{ ok: true }>(`/courses/${courseId}/activities/${activityId}/test/items/${itemId}`, { method: "DELETE" }),
+    requestAuthoring<{ ok: true }>(`/courses/${courseId}/activities/${activityId}/test/items/${itemId}`, { method: "DELETE", body: "{}" }),
   testRuntime: (courseId: string, groupId: string, activityId: string, view: "attempt" | "previous" = "attempt", sessionId = "") =>
     request<{ runtime: CourseTestRuntime }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/test?view=${view}&sessionId=${encodeURIComponent(sessionId)}`
@@ -2437,10 +2458,11 @@ export const api = {
     testItemId: string,
     parentAttemptId: string,
     state: Record<string, unknown>,
-    sessionId: string
+    sessionId: string,
+    configSnapshot?: Record<string, unknown>
   ) => request<{ itemAttempt: TestItemRuntimeAttempt }>(
     `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/test/items/${testItemId}`,
-    { method: "PUT", body: JSON.stringify({ parentAttemptId, state, sessionId }) }
+    { method: "PUT", body: JSON.stringify({ parentAttemptId, state, sessionId, configSnapshot }) }
   ),
   executeTestItemAction: <TResult>(
     courseId: string,
@@ -2554,7 +2576,7 @@ export const api = {
       `/courses/${courseId}/content/${contentItemId}/deletion-impact`
     ),
   updateActivity: (courseId: string, activityId: string, input: ActivityUpdate) =>
-    request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}`, {
+    requestAuthoring<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}`, {
       method: "PATCH",
       body: JSON.stringify(input)
     }),

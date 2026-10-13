@@ -75,6 +75,8 @@ Run the independent authoring-recovery, bank-synchronization, course-loading, st
 npm run test:e2e -- --grep @regression
 ```
 
+`live-test-content.spec.ts` adds prompt/answer-key edits during an active Test, preserved answers, cancellation/notices, composition history, standalone prompt refresh, and release/re-hide API checks. Its coding cases cover test-free submission and live private-test corrections with audit evidence, and require Judge0.
+
 These focused tests require the normal migrated/seeded database, API, and web app, but no AI provider, Judge0, or web-design runner. Each test provisions its own disposable course/section scenario (with bank/MCQ content where needed) through public APIs and runs lifecycle-aware cleanup, so failures do not skip later scenarios in a serial chain. The bank/course fixture creates both shared course placement and group assignment, which are distinct content scopes.
 
 Grouping scenarios also cover the automatic-assignment dialog, individual capacities and the apply-all shortcut, unassigned-only redistribution and insufficient slots, the Smart placeholder, student choice dates and permissions, names-only My teams cards, explicit confirmation, deadline expiry on an open page, concurrent last-slot claims, and stale teacher saves after student choices. They cover course-language default team names, editable-name persistence and collision avoidance, balanced random assignment with cancel/save, independent team assignments, section boundaries, concurrency, pending enrollments, failed-draft recovery, teacher/TA/student permissions, and enrollment/section deletion cascades.

@@ -236,17 +236,16 @@ describe("coding exercise executions", () => {
     ];
   });
 
-  it("rejects blank learner source before runtime lookup, persistence, or Judge0 execution", async () => {
+  it("keeps a submission without enabled hidden tests for later grading", async () => {
+    dbMocks.hiddenTests = [];
+    const execution = await submitCodingExercise({ activityId: "activity-1", userId: "student-1", activityConfig, input: { sourceCode: "print(1)" } });
+    expect(execution).toMatchObject({ status: "completed", resultSummary: { testCount: 0, totalWeight: 0, accepted: null, gradingPending: true } });
+    expect(judge0Mocks.runJudge0Submission).not.toHaveBeenCalled();
+  });
+
+  it("rejects blank practice runs before runtime lookup, persistence, or Judge0 execution", async () => {
     await expect(
       runCodingExercise({
-        activityId: "activity-1",
-        userId: "student-1",
-        activityConfig,
-        input: { sourceCode: " \n\t" }
-      })
-    ).rejects.toMatchObject({ name: "ZodError" });
-    await expect(
-      submitCodingExercise({
         activityId: "activity-1",
         userId: "student-1",
         activityConfig,

@@ -1,3 +1,4 @@
+import { canShowStudentActivityGrade } from "@cognelo/core";
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import {
   AppError,
@@ -213,7 +214,7 @@ export const codingExerciseRunRoute: PluginRouteDefinition = {
         userId: context.user.id
       });
 
-      return { executions };
+      return { executions: await studentExecutions(context, executions) };
     },
     POST: async ({ context, readJson }) => {
       const input = codingExerciseRunInputSchema.parse(await readJson());
@@ -240,7 +241,7 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
         userId: context.user.id
       });
 
-      return { executions: executions.filter((execution) => execution.kind === "submit") };
+      return { executions: await studentExecutions(context, executions.filter((execution) => execution.kind === "submit")) };
     },
     POST: async ({ context, readJson }) => {
       const input = codingExerciseSubmitInputSchema.parse(await readJson());
@@ -300,10 +301,10 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
       if (assessmentMode === "summative" && submittedCoreAttemptId) {
         const earnedWeight = numberValue(execution.resultSummary.earnedWeight);
         const totalWeight = numberValue(execution.resultSummary.totalWeight);
-        if (earnedWeight === null || totalWeight === null || totalWeight <= 0) {
+        if (earnedWeight === null || totalWeight === null || totalWeight < 0) {
           throw new AppError(409, "CODING_EXERCISE_RESULT_INVALID", "The coding exercise did not return a valid weighted result.");
         }
-        if (!aiFeedbackSetup.effective || !aiFeedbackSetup.config.gradingEnabled) {
+        if (totalWeight > 0 && (!aiFeedbackSetup.effective || !aiFeedbackSetup.config.gradingEnabled)) {
           await recordActivityAttemptGradingResult(context.user, {
             attemptId: submittedCoreAttemptId,
             rawScore: earnedWeight,
@@ -349,7 +350,7 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
       }
 
       return {
-        execution,
+        execution: (await studentExecutions(context, [execution]))[0],
         aiFeedback,
         aiFeedbackError,
         availability: await getCodingExerciseAttemptAvailability({
@@ -387,6 +388,7 @@ export const codingExerciseHistoryRoute: PluginRouteDefinition = {
         activityId: context.activity.id,
         userId: context.user.id
       });
+      const showGrade = await canShowStudentActivityGrade(context);
       const showAiFeedback = assignmentUsesAutomaticAiFeedback(context.activity.assignment?.metadata);
       const feedbackByExecutionId = showAiFeedback
         ? await listLatestFormativeAiFeedbackByExecutionId(
@@ -398,6 +400,7 @@ export const codingExerciseHistoryRoute: PluginRouteDefinition = {
         currentRuns: history.currentRuns,
         attempts: history.attempts.map((attempt) => ({
           ...attempt,
+          submission: showGrade ? attempt.submission : hideSubmissionGrade(attempt.submission),
           aiFeedback: feedbackByExecutionId.get(attempt.submission.id) ?? null
         })),
         availability: await getCodingExerciseAttemptAvailability({
@@ -632,3 +635,13 @@ export const codingExerciseGenerateRubricRoute: PluginRouteDefinition = {
     }
   }
 };
+
+async function studentExecutions(context: Parameters<typeof canShowStudentActivityGrade>[0], executions: Awaited<ReturnType<typeof listRecentCodingExerciseExecutions>>) {
+  const visible = await canShowStudentActivityGrade(context);
+  return executions.map((execution) => execution.kind === "submit" && !visible ? hideSubmissionGrade(execution) : execution);
+}
+function hideSubmissionGrade<T extends { status: string; resultSummary: unknown }>(execution: T): T {
+  return { ...execution, status: "completed", resultSummary: { gradingWithheld: true },
+    judge0Token: null, stdout: null, stderr: null, compileOutput: null, message: null,
+    judge0StatusId: null, judge0StatusLabel: null, timeSeconds: null, memoryKb: null };
+}

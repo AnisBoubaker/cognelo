@@ -98,6 +98,10 @@ export type ActivityProvider =
 export type ActivityCreationScope = "bank" | "course";
 
 export type ActivityDefinition = {
+  /** Preserve response identity when authored questions change during an attempt. Pure and student-safe. */
+  reconcileResponseState?: (previousConfig: unknown, nextConfig: unknown, state: Record<string, unknown>) => Record<string, unknown>;
+  /** Strip grading evidence from learner draft/history payloads. Grades use the release-controlled channel. */
+  studentResponseState?: (state: Record<string, unknown>) => Record<string, unknown>;
   key: string;
   name: string;
   description: string;

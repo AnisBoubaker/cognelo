@@ -8,6 +8,7 @@ import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
 import {
   api,
+  ApiError,
   type Activity,
   type ActivityBank,
   type ActivityDefinition,
@@ -119,6 +120,7 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
       }
       return true;
     } catch (reason) {
+      if (reason instanceof ApiError && reason.code === "ACTION_CANCELLED") return false;
       notifications.error(reason instanceof Error ? reason.message : "The test could not be updated.");
       return false;
     } finally {
@@ -458,6 +460,10 @@ function TestStudentRuntime({
   const [sessionId] = useState(() => globalThis.crypto?.randomUUID?.() ?? `test-session-${Date.now()}-${Math.random()}`);
   const autoSubmittedAttemptRef = useRef<string | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const runtimeRef = useRef(runtime);
+  const selectedIndexRef = useRef(selectedIndex);
+  runtimeRef.current = runtime;
+  selectedIndexRef.current = selectedIndex;
 
   const applyRuntime = useCallback((nextRuntime: CourseTestRuntime) => {
     setRuntime(nextRuntime);
@@ -493,13 +499,28 @@ function TestStudentRuntime({
       if (refreshing) return;
       refreshing = true;
       try {
+        await saveQueueRef.current;
         const { runtime: next } = await api.testRuntime(courseId, groupId, activity.id, studentViewMode, sessionId);
         if (cancelled) return;
-        // Keep item objects stable: polling must never replace unsaved child responses.
+        await saveQueueRef.current;
+        const previous = runtimeRef.current;
+        const selectedId = previous?.test.items[selectedIndexRef.current]?.id;
+        const selectedPosition = next.test.items.findIndex((item) => item.id === selectedId);
+        if (JSON.stringify(previous?.test.items.map((item) => [item.id, item.activity.config, item.activity.description])) !==
+          JSON.stringify(next.test.items.map((item) => [item.id, item.activity.config, item.activity.description]))) {
+          setReviewAnswers(null);
+          setShowSubmitConfirmation(false);
+        }
+        // Keep unchanged children mounted; changed content reloads its persisted response.
         setRuntime((current) => current && current.attempt?.id === next.attempt?.id && current.attempt?.lifecycle === next.attempt?.lifecycle ? {
-          ...current, test: { ...current.test, settings: next.test.settings },
+          ...current, test: { ...next.test, items: next.test.items.map((item) => {
+            const previous = current.test.items.find((candidate) => candidate.id === item.id);
+            return previous && JSON.stringify(previous.activity) === JSON.stringify(item.activity) && previous.pointsPossible === item.pointsPossible
+              ? previous : item;
+          }) },
           timing: next.timing, availability: next.availability, resume: next.resume
         } : next);
+        setSelectedIndex((index) => selectedPosition >= 0 ? selectedPosition : Math.min(index, Math.max(0, next.test.items.length - 1)));
         onNewAttemptAvailabilityChange?.(next.attempt?.lifecycle === "started" || next.availability.canStart);
         if (!next.timing.isExpired) autoSubmittedAttemptRef.current = null;
       } catch { /* Access changes are handled by the assigned activity host. */ }
@@ -567,7 +588,7 @@ function TestStudentRuntime({
       save: async (state) => {
         setPendingSaveCount((current) => current + 1);
         const save = saveQueueRef.current.then(async () => {
-          await api.saveTestItemState(courseId, groupId, activity.id, testItemId, parentAttemptId, state, sessionId);
+          await api.saveTestItemState(courseId, groupId, activity.id, testItemId, parentAttemptId, state, sessionId, selectedRuntimeItem.activity.config);
         });
         saveQueueRef.current = save.catch(() => undefined);
         try {
@@ -590,7 +611,7 @@ function TestStudentRuntime({
         );
       }
     };
-  }, [activity.id, courseId, groupId, runtime?.attempt?.id, selectedRuntimeItem?.id, selectedRuntimeItem?.itemAttempt?.id, sessionId, studentPreview]);
+  }, [activity.id, courseId, groupId, runtime?.attempt?.id, selectedRuntimeItem?.id, selectedRuntimeItem?.activity.config, selectedRuntimeItem?.itemAttempt?.id, sessionId, studentPreview]);
 
   async function startTest() {
     setBusy(true);
@@ -873,7 +894,7 @@ function TestStudentRuntime({
           </section>
 
           {selectedItem ? (
-            <section className="section stack" key={selectedItem.id}>
+            <section className="section stack" key={`${selectedItem.id}:${JSON.stringify(selectedItem.activity.config)}:${selectedItem.activity.description}`}>
               <div>
                 <p className="eyebrow">{t("courseDetail.testActivityPosition", { current: selectedIndex + 1, total: runtime.test.items.length })}</p>
                 <h2>{selectedItem.activity.title}</h2>

@@ -52,6 +52,8 @@ Teachers can [reopen the last submission](../../../docs/SUBMISSION_CONTINUATION.
 
 Compound Test submission includes a final answer review with plugin-owned response checks; it reports whether work was answered without revealing correctness. See the [detailed reference](docs/REFERENCE.md).
 
+Live course-question edits preserve active responses and use the shared warning/audit workflow; summative outcomes remain hidden until grade release. Exercises without enabled hidden tests still submit and await grading. See [Live authoring and grade visibility](docs/REFERENCE.md#live-authoring-and-grade-visibility).
+
 ## Read By Topic
 
 - [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)

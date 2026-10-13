@@ -2,6 +2,8 @@
 
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
+- No enabled hidden tests must not block submission or manufacture a grade. Private live edits are audited in plugin revisions, and summative execution/history outcomes are release-gated on the server. See [the reference](docs/REFERENCE.md#live-authoring-and-grade-visibility).
+
 - The compound Test answer-review check must inspect response presence only, never correctness or grading evidence; automatically persisted initial state is not a new answer. See [the reference](docs/REFERENCE.md) for this plugin’s criteria.
 
 - Public activity config is student-visible. Reference solutions, full templates, hidden tests, rubrics, and raw evaluation artifacts must remain private.

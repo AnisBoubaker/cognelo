@@ -48,6 +48,7 @@ Open these only when changing or reviewing the named area:
 - [Student groupings and teams](STUDENT_GROUPINGS.md)
 - [Activity assignment exceptions and live settings](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)
 - [Activity messaging](ACTIVITY_MESSAGING.md)
+- [Live question edits, audit, and grade privacy](LIVE_ACTIVITY_AUTHORING.md)
 - [Student model](STUDENT_MODEL_IMPLEMENTATION_PLAN.md)
 - [Student view](STUDENT_VIEW_IMPLEMENTATION_PLAN.md)
 - [Compound Test activity](TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md)

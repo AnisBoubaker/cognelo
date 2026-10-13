@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   AppError,
   getTestItemExecutionContext,
+  projectStudentTestItemState,
   saveTestItemAttemptState
 } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
@@ -13,7 +14,8 @@ type Params = { params: Promise<{ courseId: string; groupId: string; activityId:
 const stateInputSchema = z.object({
   parentAttemptId: z.string().min(1),
   sessionId: z.string().min(1).max(200),
-  state: z.record(z.unknown())
+  state: z.record(z.unknown()),
+  configSnapshot: z.record(z.unknown()).optional()
 });
 
 export function OPTIONS() {
@@ -40,7 +42,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       { allowCompletedParent: true, sessionId: searchParams.get("sessionId") }
     );
     return json({
-      itemAttempt: context.itemAttempt ? serializeTestItemAttempt(context.itemAttempt) : null
+      itemAttempt: context.itemAttempt ? serializeTestItemAttempt(context.itemAttempt, context.item.activity.activityType.key) : null
     });
   });
 }
@@ -59,9 +61,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
       input.parentAttemptId,
       testItemId,
       input.state,
-      { sessionId: input.sessionId }
+      { sessionId: input.sessionId, configSnapshot: input.configSnapshot }
     );
-    return json({ itemAttempt: serializeTestItemAttempt(itemAttempt) });
+    const context = await getTestItemExecutionContext(user, courseId, groupId, activityId, input.parentAttemptId, testItemId,
+      { allowCompletedParent: true, allowExpiredParent: true, allowResumePolicyBypass: true });
+    return json({ itemAttempt: serializeTestItemAttempt(itemAttempt, context.item.activity.activityType.key) });
   });
 }
 
@@ -79,15 +83,15 @@ function serializeTestItemAttempt(itemAttempt: {
   result: unknown;
   submittedAt: Date | null;
   gradedAt: Date | null;
-}) {
+}, activityTypeKey: string) {
   return {
     id: itemAttempt.id,
     lifecycle: itemAttempt.lifecycle,
-    rawScore: itemAttempt.rawScore,
-    rawMaxScore: itemAttempt.rawMaxScore,
-    normalizedScore: itemAttempt.normalizedScore,
-    normalizedMaxScore: itemAttempt.normalizedMaxScore,
-    state: asRecord(asRecord(itemAttempt.result).state),
+    rawScore: null,
+    rawMaxScore: null,
+    normalizedScore: null,
+    normalizedMaxScore: null,
+    state: projectStudentTestItemState(activityTypeKey, asRecord(asRecord(itemAttempt.result).state)),
     submittedAt: itemAttempt.submittedAt,
     gradedAt: itemAttempt.gradedAt
   };

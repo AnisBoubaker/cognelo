@@ -17,7 +17,7 @@ import {
   type ParsonsGroup,
   type ParsonsPrecedenceRule
 } from "../parsons";
-import { buildParsonsAttemptState, createInitialParsonsAttemptState, type ParsonsAttemptEvaluation } from "../attempt-types";
+import { buildParsonsAttemptState, createInitialParsonsAttemptState, reconcileParsonsResponseState, type ParsonsAttemptEvaluation } from "../attempt-types";
 
 type ActivityLike = {
   id: string;
@@ -183,8 +183,11 @@ export function ParsonsActivityView({
   const isReadOnlyStudentAttempt = (isInstrumentedStudentSession && attempt === null)
     || (isSummativeStudentSession && attempt?.status === "completed");
   const activityConfigKey = useMemo(() => JSON.stringify(activity.config ?? {}), [activity.config]);
+  const previousActivityRef = useRef<ActivityLike | null>(null);
 
   useEffect(() => {
+    const previousActivity = previousActivityRef.current;
+    previousActivityRef.current = activity;
     const config = parseParsonsConfig(activity.config);
     setTitle(activity.title);
     setDescription(activity.description);
@@ -195,6 +198,14 @@ export function ParsonsActivityView({
     setGroups(config.groups);
     setPrecedenceRules(config.precedenceRules);
     setSavedSnapshot(parsonsSnapshotFromActivity(activity));
+    if (!canManage && previousActivity?.id === activity.id) {
+      if (attemptRef.current) {
+        const reconciled = reconcileParsonsResponseState(previousActivity.config, activity.config, attemptRef.current.latestState);
+        setBlocks(reconciled.blocks as ParsonsBlock[]);
+        setFeedback("");
+      }
+      return;
+    }
     setSelectedLines([]);
     setSelectedGroupId(null);
     setPrecedenceDraft(null);
@@ -366,6 +377,7 @@ export function ParsonsActivityView({
       setSelectedBlockId(null);
       notifications.success(t("parsons.saved"));
     } catch (err) {
+      if (err && typeof err === "object" && "code" in err && err.code === "ACTION_CANCELLED") throw err;
       notifications.error(err instanceof Error ? err.message : t("parsons.saveError"));
       setError("");
       throw err;
@@ -387,7 +399,7 @@ export function ParsonsActivityView({
 
   async function saveParsonsProblem(event: FormEvent) {
     event.preventDefault();
-    await saveParsonsChanges();
+    await saveParsonsChanges().catch(() => undefined);
   }
 
   function requestParsonsGeneration() {
