@@ -36,15 +36,37 @@ const user = {
 };
 
 const subject = { title: "Programming", description: "Python basics" };
+const testsInput = {
+  user, subject, description: "Echo a number", prompt: "Read a number and print it.",
+  language: "python", locale: "en" as const, referenceSolution: "print(input())",
+  templateSource: "{{ STUDENT_CODE }}", templateVisibleLineNumbers: [],
+  visibleTestCount: 1, hiddenTestCount: 2
+};
+const mixedTests = {
+  sampleTests: [{ id: "sample-good", title: "Print one", input: "1", output: "1" }],
+  hiddenTests: [
+    { id: "hidden-good", name: "Print two", stdin: "2", expectedOutput: "2", weight: 3 },
+    { id: "hidden-bad", name: "Print three", stdin: "3", expectedOutput: "3" }
+  ]
+};
+type ValidationInput = Parameters<typeof import("./executions").validateReferenceSolutionAgainstHiddenTests>[0];
+function validationFor(input: ValidationInput, failedIds: string[] = []) {
+  const result = (id: string, name: string, weight: number) => ({
+    id, name, weight, passed: !failedIds.includes(id),
+    statusLabel: failedIds.includes(id) ? "Compilation Error" : "Accepted",
+    validationFingerprint: `validated-${id}`
+  });
+  return {
+    accepted: ![...input.sampleTests, ...input.hiddenTests].some((test) => failedIds.includes(test.id)),
+    sampleTests: { tests: input.sampleTests.map((test) => result(test.id, test.title, 1)) },
+    hiddenTests: { tests: input.hiddenTests.map((test) => result(test.id, test.name, test.weight)) }
+  };
+}
 
 describe("coding exercise AI generation", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.validateReferenceSolutionAgainstHiddenTests.mockResolvedValue({
-      accepted: true,
-      sampleTests: { tests: [] },
-      hiddenTests: { tests: [] }
-    });
+    vi.resetAllMocks();
+    mocks.validateReferenceSolutionAgainstHiddenTests.mockImplementation((input: ValidationInput) => validationFor(input));
   });
 
   it("retries prompt generation after invalid text", async () => {
@@ -190,7 +212,7 @@ describe("coding exercise AI generation", () => {
     expect(mocks.generateQuestionAuthoringText.mock.calls[1]?.[1]?.userPrompt).toContain(
       "Generate exactly 2 hidden tests; received 1."
     );
-    expect(mocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(1);
+    expect(mocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(2);
   });
 
   it("retains the complete immutable exercise context when execution validation retries tests", async () => {
@@ -274,9 +296,9 @@ describe("coding exercise AI generation", () => {
     expect(generated).toMatchObject({
       attempts: 2,
       sampleTests: [{ title: "Factorial -3 should give 0" }],
-      hiddenTests: [{ name: "Factorial 6 should give 720" }]
+      hiddenTests: [{ name: "Negative case" }]
     });
-    expect(mocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(1);
+    expect(mocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(2);
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain(
       "title/name of at most 50 characters"
     );
@@ -365,7 +387,7 @@ describe("coding exercise AI generation", () => {
     ).rejects.toMatchObject({ status: 422, code: "CODING_EXERCISE_TEST_GENERATION_INVALID" });
   });
 
-  it("retries generated tests with empty contains-lines output before calling Judge0", async () => {
+  it("skips malformed output while validating the other tests and retries the missing case", async () => {
     mocks.generateQuestionAuthoringText
       .mockResolvedValueOnce(JSON.stringify({
         sampleTests: [{
@@ -417,7 +439,10 @@ describe("coding exercise AI generation", () => {
       sampleTests: [{ output: "0" }]
     });
 
-    expect(mocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(1);
+    expect(mocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(2);
+    expect(mocks.validateReferenceSolutionAgainstHiddenTests.mock.calls[0]?.[0]).toMatchObject({
+      sampleTests: [], hiddenTests: [{ id: "hidden-1" }]
+    });
     const correctionPrompt = mocks.generateQuestionAuthoringText.mock.calls[1]?.[1]?.userPrompt ?? "";
     expect(correctionPrompt).toContain("Contains lines requires at least one non-empty expected line.");
     expect(correctionPrompt).toContain("assertions alone are insufficient");
@@ -448,6 +473,82 @@ describe("coding exercise AI generation", () => {
       hiddenTestCount: 1
     })).rejects.toMatchObject({ status: 422, code: "REFERENCE_SOLUTION_COMPILATION_FAILED" });
     expect(mocks.generateQuestionAuthoringText).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps passing visible and hidden tests when one harness still fails after every retry", async () => {
+    mocks.generateQuestionAuthoringText.mockResolvedValue(JSON.stringify(mixedTests));
+    mocks.validateReferenceSolutionAgainstHiddenTests.mockImplementation((input: ValidationInput) => validationFor(input, ["hidden-bad"]));
+
+    const result = await generateCodingExerciseTests(testsInput);
+    expect(result).toMatchObject({
+      status: "warning", attempts: 3,
+      sampleTests: [{ id: "sample-good" }], hiddenTests: [{ id: "hidden-good" }],
+      validationSummary: {
+        accepted: true,
+        sampleTests: { testCount: 1, passedCount: 1 },
+        hiddenTests: { testCount: 1, passedCount: 1, earnedWeight: 3, totalWeight: 3 }
+      }
+    });
+    expect(mocks.generateQuestionAuthoringText).toHaveBeenCalledTimes(3);
+    expect(mocks.validateReferenceSolutionAgainstHiddenTests.mock.calls[1]?.[0].previousValidationSummary).toMatchObject({
+      hiddenTests: { tests: [{ id: "hidden-good", passed: true, validationFingerprint: "validated-hidden-good" }] }
+    });
+    expect(mocks.generateQuestionAuthoringText.mock.calls[1]?.[1].userPrompt).toContain("already passed and must be kept unchanged");
+  });
+
+  it("retains earlier successes even when corrections modify or omit them", async () => {
+    mocks.generateQuestionAuthoringText
+      .mockResolvedValueOnce(JSON.stringify(mixedTests))
+      .mockResolvedValueOnce(JSON.stringify({
+        sampleTests: [{ ...mixedTests.sampleTests[0], output: "incorrect replacement" }],
+        hiddenTests: [mixedTests.hiddenTests[1]]
+      }));
+    mocks.validateReferenceSolutionAgainstHiddenTests
+      .mockImplementationOnce((input: ValidationInput) => validationFor(input, ["hidden-bad"]))
+      .mockImplementation((input: ValidationInput) => validationFor(input));
+
+    const result = await generateCodingExerciseTests(testsInput);
+    expect(result).toMatchObject({
+      attempts: 2, status: "ok",
+      sampleTests: [{ id: "sample-good", output: "1" }],
+      hiddenTests: [{ id: "hidden-good", expectedOutput: "2" }, { id: "hidden-bad", expectedOutput: "3" }]
+    });
+    expect(mocks.validateReferenceSolutionAgainstHiddenTests.mock.calls[1]?.[0].sampleTests[0].output).toBe("1");
+  });
+
+  it.each(["invalid JSON", "impossible", "provider failure"])("preserves validated tests after a later %s", async (failure) => {
+    mocks.generateQuestionAuthoringText.mockResolvedValueOnce(JSON.stringify(mixedTests));
+    if (failure === "provider failure") mocks.generateQuestionAuthoringText.mockRejectedValue(new Error("Provider unavailable"));
+    else mocks.generateQuestionAuthoringText.mockResolvedValue(failure === "impossible"
+      ? JSON.stringify({ status: "error", message: "The remaining test cannot be generated." }) : "invalid JSON");
+    mocks.validateReferenceSolutionAgainstHiddenTests.mockImplementation((input: ValidationInput) => validationFor(input, ["hidden-bad"]));
+
+    await expect(generateCodingExerciseTests(testsInput)).resolves.toMatchObject({
+      status: "warning", sampleTests: [{ id: "sample-good" }], hiddenTests: [{ id: "hidden-good" }]
+    });
+  });
+
+  it("keeps valid cases when another generated case is malformed, without sending it to Judge0", async () => {
+    mocks.generateQuestionAuthoringText.mockResolvedValue(JSON.stringify({
+      ...mixedTests,
+      hiddenTests: [mixedTests.hiddenTests[0], { ...mixedTests.hiddenTests[1], name: "x".repeat(51) }]
+    }));
+
+    await expect(generateCodingExerciseTests(testsInput)).resolves.toMatchObject({
+      status: "warning", sampleTests: [{ id: "sample-good" }], hiddenTests: [{ id: "hidden-good" }]
+    });
+    for (const [input] of mocks.validateReferenceSolutionAgainstHiddenTests.mock.calls) {
+      expect(input.hiddenTests.map((test: { id: string }) => test.id)).toEqual(["hidden-good"]);
+    }
+  });
+
+  it("keeps the exact-count requirement for automatic bank variations", async () => {
+    mocks.generateQuestionAuthoringText.mockResolvedValue(JSON.stringify(mixedTests));
+    mocks.validateReferenceSolutionAgainstHiddenTests.mockImplementation((input: ValidationInput) => validationFor(input, ["hidden-bad"]));
+
+    await expect(generateCodingExerciseTests({ ...testsInput, requireCompleteSuite: true })).rejects.toMatchObject({
+      code: "CODING_EXERCISE_TEST_GENERATION_INVALID"
+    });
   });
 
   it("generates a weighted rubric from the title, prompt, and reference solution", async () => {

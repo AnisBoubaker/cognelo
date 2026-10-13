@@ -96,6 +96,7 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
             templateVisibleLineNumbers: candidateSolution.templateVisibleLineNumbers,
             visibleTestCount,
             hiddenTestCount,
+            requireCompleteSuite: true,
             knowledge: input.knowledge
           })
         : null;

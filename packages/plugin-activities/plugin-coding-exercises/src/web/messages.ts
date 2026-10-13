@@ -40,6 +40,7 @@ type MessageKey =
   | "generateTests"
   | "generatingTests"
   | "generatedTests"
+  | "generatedTestsPartial"
   | "generateTestsPromptRequired"
   | "generateTestsReferenceRequired"
   | "generateTestsError"
@@ -242,6 +243,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     generateTests: "Generate test cases automatically",
     generatingTests: "Generating test cases...",
     generatedTests: "Test cases generated.",
+    generatedTestsPartial: "Kept {visible} of {requestedVisible} visible tests and {hidden} of {requestedHidden} hidden tests that passed validation. The remaining tests could not be generated or validated. Review the retained tests before saving.",
     generateTestsPromptRequired: "Add a prompt before generating test cases.",
     generateTestsReferenceRequired: "Add or generate a reference solution before generating test cases.",
     generateTestsError: "Unable to generate valid test cases right now.",
@@ -441,6 +443,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     generateTests: "Generer les cas de test automatiquement",
     generatingTests: "Generation des cas de test...",
     generatedTests: "Cas de test generes.",
+    generatedTestsPartial: "{visible} tests visibles sur {requestedVisible} et {hidden} tests cachés sur {requestedHidden} ont été validés et conservés. Les autres tests n’ont pas pu être générés ou validés. Vérifiez les tests conservés avant d’enregistrer.",
     generateTestsPromptRequired: "Ajoutez une consigne avant de generer les cas de test.",
     generateTestsReferenceRequired: "Ajoutez ou generez une solution de reference avant de generer les cas de test.",
     generateTestsError: "Impossible de generer des cas de test valides pour le moment.",
@@ -640,6 +643,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     generateTests: "自动生成测试用例",
     generatingTests: "正在生成测试用例...",
     generatedTests: "测试用例已生成。",
+    generatedTestsPartial: "已保留通过验证的 {visible}/{requestedVisible} 个可见测试和 {hidden}/{requestedHidden} 个隐藏测试。其余测试未能生成或通过验证。请在保存前检查已保留的测试。",
     generateTestsPromptRequired: "请先添加题目再生成测试用例。",
     generateTestsReferenceRequired: "请先添加或生成参考答案，再生成测试用例。",
     generateTestsError: "暂时无法生成有效测试用例。",

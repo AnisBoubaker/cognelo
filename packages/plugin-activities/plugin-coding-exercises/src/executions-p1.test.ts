@@ -687,6 +687,40 @@ describe("coding exercise executions", () => {
     expect(judge0Mocks.runJudge0Submission).toHaveBeenCalledTimes(2);
   });
 
+  it("retains other generation results after an execution failure while ordinary validation still throws", async () => {
+    const validationInput: Parameters<typeof validateReferenceSolutionAgainstHiddenTests>[0] = {
+      activityConfig,
+      sourceCode: "print(input())",
+      sampleTests: ["1", "2", "3"].map((value) => ({
+        id: `sample-${value}`, title: `Echo ${value}`, input: value, output: value,
+        testCode: "", outputMatchMode: "exact", containsLinesOrderMatters: false
+      })),
+      hiddenTests: [{
+        id: "hidden-1", name: "Echo four", stdin: "4", expectedOutput: "4", testCode: "",
+        outputMatchMode: "exact", containsLinesOrderMatters: false, isEnabled: true, weight: 2, orderIndex: 0
+      }],
+      privateConfig: { hiddenSupportCode: "", templateSource: "{{ STUDENT_CODE }}", templatePrefix: "", templateSuffix: "", templateVisibleLineNumbers: [], aiFeedback: { enabled: false, gradingEnabled: false, instructions: "", testWeightPercent: 60, aiWeightPercent: 40, criteria: [] } }
+    };
+    const executionError = new Error("Runner unavailable");
+    judge0Mocks.runJudge0Submission
+      .mockResolvedValueOnce({ stdout: "1", status: { id: 3, description: "Accepted" } })
+      .mockRejectedValueOnce(executionError)
+      .mockResolvedValueOnce({ stdout: "3", status: { id: 3, description: "Accepted" } })
+      .mockResolvedValueOnce({ stdout: "4", status: { id: 3, description: "Accepted" } });
+
+    await expect(validateReferenceSolutionAgainstHiddenTests({ ...validationInput, allowPartialResults: true })).resolves.toMatchObject({
+      accepted: false,
+      sampleTests: {
+        passedCount: 2,
+        tests: [{ passed: true }, { passed: false, statusLabel: "Execution unavailable" }, { passed: true }]
+      },
+      hiddenTests: { passedCount: 1 }
+    });
+    expect(judge0Mocks.runJudge0Submission).toHaveBeenCalledTimes(4);
+    judge0Mocks.runJudge0Submission.mockRejectedValueOnce(executionError);
+    await expect(validateReferenceSolutionAgainstHiddenTests(validationInput)).rejects.toBe(executionError);
+  });
+
   it("bounds reference-validation output before it can be saved in the validation summary", async () => {
     const hugeOutput = "x".repeat(100_000);
     judge0Mocks.runJudge0Submission.mockResolvedValueOnce({
