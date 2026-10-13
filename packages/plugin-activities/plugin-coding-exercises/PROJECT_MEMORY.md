@@ -2,6 +2,8 @@
 
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
+- The compound Test answer-review check must inspect response presence only, never correctness or grading evidence; automatically persisted initial state is not a new answer. See [the reference](docs/REFERENCE.md) for this plugin’s criteria.
+
 - Public activity config is student-visible. Reference solutions, full templates, hidden tests, rubrics, and raw evaluation artifacts must remain private.
 - Judge0 is server-only and all source/input/output fields cross its boundary as Base64. Status 13 is an infrastructure failure, never a learner result or consumed attempt.
 - Judge0 endpoint, auth header/token, enablement, and per-process/thread flag are admin-managed core runner settings. Plugins must resolve the service through core rather than read runner environment variables; core currently selects the first enabled runner and preserves the boundary for later round-robin pools.

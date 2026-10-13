@@ -41,6 +41,7 @@ import { TestManualGradingPanel } from "@/components/test-manual-grading-panel";
 import { useActivityEditorGradingPortalTarget } from "@/components/activity-editor-tabs";
 import { createStandaloneActivityDraftHost } from "@/lib/activity-response-draft-host";
 import { createStudentPreviewStateHost } from "@/lib/student-preview-state-host";
+import { isTestItemAnswered } from "@/lib/test-item-answer-status";
 import type { Locale } from "@/lib/i18n";
 import {
   itemScorePercentage,
@@ -690,7 +691,7 @@ function McqTestItemRenderer({ executionHost, runtime, item }: TestItemRendererP
       const answers = asStudentAnswers(savedState?.answers);
       const completed = itemAttempt?.lifecycle === "submitted" || itemAttempt?.lifecycle === "graded";
       return {
-        submission: itemAttempt ? { answers, lifecycle: itemAttempt.lifecycle } : null,
+        submission: itemAttempt || savedState ? { answers, lifecycle: itemAttempt?.lifecycle ?? "started" } : null,
         // A compound Test exposes one released parent grade. Child scores remain
         // private here and are shown only through the released Test breakdown.
         grade: null,
@@ -803,7 +804,7 @@ function ParsonsTestItemRenderer({ courseId, executionHost, item, locale, runtim
       if (!parsed.success && !completed) {
         // Persist the shuffled arrangement immediately. Otherwise an untouched
         // item could be graded from a newly randomized arrangement at submit.
-        await executionHost.save(latestState);
+        await executionHost.save({ ...latestState, hasAnswer: false });
       }
       return {
         id: attemptId,
@@ -817,8 +818,11 @@ function ParsonsTestItemRenderer({ courseId, executionHost, item, locale, runtim
     return {
       ensureAttempt: async () => ({ attempt: await currentAttempt(), attemptAvailability: { canStart: !completed, reason: null } }),
       listSubmissions: async () => ({ submissions: completed ? [{ attempt: await currentAttempt(), grade: null }] : [] }),
-      updateAttempt: async (_activityId: string, _courseId: string, input: { state?: unknown }) => {
-        if (input.state) await executionHost.save(input.state as Record<string, unknown>);
+      updateAttempt: async (_activityId: string, _courseId: string, input: { state?: unknown; event?: { type: string } }) => {
+        if (input.state) await executionHost.save({
+          ...input.state as Record<string, unknown>,
+          hasAnswer: input.event?.type !== "reset"
+        });
         return { attempt: await currentAttempt() };
       }
     };
@@ -1193,6 +1197,7 @@ function TestActivityRenderer(props: ActivityRendererProps<typeof TestActivityVi
   return (
     <TestActivityView
       {...props}
+      isItemAnswered={isTestItemAnswered}
       renderStudentItem={(context) => {
         const Renderer = testItemRenderers[context.item.activity.activityType.key];
         return Renderer ? (

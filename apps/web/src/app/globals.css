@@ -1598,6 +1598,62 @@ a.card:hover,
   gap: 8px;
 }
 
+.test-submission-review {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.test-review-summary {
+  background: var(--surface-2);
+  border-radius: 12px;
+  font-weight: 700;
+  margin: 0;
+  padding: 16px 20px;
+}
+
+.test-review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.test-review-item {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 18px 0;
+}
+
+.test-review-number {
+  align-items: center;
+  background: var(--surface-2);
+  border-radius: 50%;
+  display: inline-flex;
+  font-weight: 700;
+  height: 32px;
+  justify-content: center;
+  min-width: 32px;
+}
+
+.test-review-title {
+  flex: 1 1 160px;
+  overflow-wrap: anywhere;
+}
+
+.test-review-item .metadata-badge {
+  font-size: 13px;
+  text-transform: none;
+}
+
+@media (max-width: 640px) {
+  .assigned-activity-page > .hero-panel-compact {
+    flex-direction: column;
+    overflow-wrap: anywhere;
+  }
+}
+
 .section-actions .section-action-icon-button {
   height: 46px;
   min-height: 46px;

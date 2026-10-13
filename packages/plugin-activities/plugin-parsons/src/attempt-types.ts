@@ -24,6 +24,8 @@ export const parsonsAttemptEvaluationSchema = z.object({
 export const parsonsAttemptStateSchema = z.object({
   configFingerprint: z.string().min(1).max(64),
   blocks: z.array(parsonsBlockSchema),
+  // Test review metadata survives grading/reopening but never affects evaluation.
+  hasAnswer: z.boolean().optional(),
   selectedBlockId: z.string().min(1).max(160).nullable().optional(),
   lastEvaluation: parsonsAttemptEvaluationSchema.nullable().optional()
 });
@@ -54,6 +56,11 @@ export type ParsonsAttemptState = z.infer<typeof parsonsAttemptStateSchema>;
 export type ParsonsAttemptEnsureInput = z.infer<typeof parsonsAttemptEnsureInputSchema>;
 export type ParsonsAttemptUpdateInput = z.input<typeof parsonsAttemptUpdateInputSchema>;
 export type ParsonsAttemptEventType = z.infer<typeof parsonsAttemptEventTypeSchema>;
+
+export function hasParsonsAnswer(_config: Record<string, unknown>, state: Record<string, unknown> | null) {
+  // Older Test drafts predate this marker; retain their saved arrangement as a response.
+  return state?.hasAnswer === true || (state?.hasAnswer === undefined && Array.isArray(state?.blocks) && state.blocks.length > 0);
+}
 
 export function createInitialParsonsAttemptState(config: ParsonsConfig): ParsonsAttemptState {
   return {

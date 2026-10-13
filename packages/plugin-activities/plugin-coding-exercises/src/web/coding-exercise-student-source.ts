@@ -25,6 +25,11 @@ export function getCodingExerciseInitialStudentSource(activityConfig: Record<str
   return alignCodingExerciseStarterCodeToTemplate(config.starterCode, config.studentTemplateSource);
 }
 
+export function hasCodingExerciseAnswer(config: Record<string, unknown>, state: Record<string, unknown> | null) {
+  const source = typeof state?.sourceCode === "string" ? state.sourceCode.trim() : "";
+  return source.length > 0 && source !== getCodingExerciseInitialStudentSource(config).trim();
+}
+
 export function normalizeCodingExerciseConfigForDisplay(config: CodingExerciseConfig): CodingExerciseConfig {
   if (!config.studentTemplateSource.trim() && config.starterCode.includes(codingExerciseTemplateInsertionToken)) {
     return {

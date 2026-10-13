@@ -36,6 +36,17 @@ export type ParsedMcq = {
 
 export type McqAnswerState = Record<string, string[]>;
 
+/** Response completeness only; never consult the answer key. */
+export function hasMcqAnswer(config: Record<string, unknown>, state: Record<string, unknown> | null) {
+  const answers = state?.answers;
+  if (!answers || typeof answers !== "object" || Array.isArray(answers)) return false;
+  const { questions } = parseMcqSource(String(config.source ?? ""), String(config.defaultCodeLanguage ?? "none"));
+  return questions.length > 0 && questions.every((question) => {
+    const selected = (answers as Record<string, unknown>)[question.id];
+    return Array.isArray(selected) && selected.some((id) => question.choices.some((choice) => choice.id === id));
+  });
+}
+
 export type McqQuestionGrade = {
   questionId: string;
   selectedChoiceIds: string[];

@@ -6,6 +6,8 @@ Platform-wide architecture belongs in the root [README.md](../../../../README.md
 
 ## Purpose
 
+The compound Test answer review uses `hasWebDesignExerciseAnswer` to identify a nonempty change in an editable student file compared with the starter bundle. Untouched or cleared files do not count; file correctness and runner outcomes are never consulted.
+
 `@cognelo/plugin-web-design-coding-exercises` provides the `web-design-coding-exercise` activity type.
 
 Teachers can define a private HTML/CSS/JavaScript solution bundle and a separate student starter bundle. Activity-bank authoring stores the reusable source version; assigning that bank activity to a course creates a course-local copy. Students work only from the copied starter bundle in Monaco editor tabs and see their own result immediately in a sandboxed iframe.

@@ -24,6 +24,19 @@ export const webDesignExerciseConfigSchema = z.object({
 
 export type WebDesignExerciseConfig = z.infer<typeof webDesignExerciseConfigSchema>;
 
+export function hasWebDesignExerciseAnswer(config: Record<string, unknown>, state: Record<string, unknown> | null) {
+  if (!Array.isArray(state?.files)) return false;
+  const starterFiles = parseWebDesignExerciseConfig(config).files;
+  return state.files.some((value: unknown) => {
+    const parsed = webDesignExerciseFileSchema.safeParse(value);
+    if (!parsed.success) return false;
+    const file = parsed.data;
+    const starter = starterFiles.find((candidate) => candidate.id === file.id);
+    return starter?.isEditable !== false && file.starterCode.trim().length > 0
+      && file.starterCode.trim() !== (starter?.starterCode ?? "").trim();
+  });
+}
+
 export const webDesignExerciseTestKindSchema = z.enum(["sample", "hidden"]);
 
 export type WebDesignExerciseTestKind = z.infer<typeof webDesignExerciseTestKindSchema>;

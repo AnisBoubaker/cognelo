@@ -2,6 +2,8 @@
 
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
+- The compound Test answer-review check must inspect response presence only, never correctness or grading evidence; automatically persisted initial state is not a new answer. See [the reference](docs/REFERENCE.md) for this plugin’s criteria.
+
 - Preserve the single text-first source; do not replace it with a click-heavy form builder.
 - Question prompts and choices use the shared sanitized Markdown renderer for inline content and GFM tables, including responsive images from Cognelo or web URLs; structural `##` and task-list markers remain owned by the MCQ parser.
 - Question and section boundaries are grammar-significant. Plain trailing text remains part of the preceding choice unless `#` or `---` starts a section.

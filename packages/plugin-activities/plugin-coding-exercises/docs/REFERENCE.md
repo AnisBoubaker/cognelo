@@ -6,6 +6,8 @@ Platform-wide orientation belongs in the root [README.md](../../../../README.md)
 
 ## Purpose
 
+The compound Test answer review uses `hasCodingExerciseAnswer` to compare nonempty saved student source against the same normalized, template-aligned starter used by the editor. Untouched or cleared source is unanswered; changed code counts without execution or correctness checks.
+
 `@cognelo/plugin-coding-exercises` provides the `coding-exercise` activity type.
 
 Teachers will be able to:

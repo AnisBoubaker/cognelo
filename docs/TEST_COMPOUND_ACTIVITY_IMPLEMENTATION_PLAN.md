@@ -275,7 +275,7 @@ The authoring picker remains the shared, provider-neutral activity picker and ma
 
 Plugin UI should receive a host adapter rather than hardcode standalone submission routes. The adapter supplies operations such as load, start, save, submit, and obtain grading result. The existing standalone adapter continues using assigned-activity routes; the Test adapter writes a `TestItemAttempt` under the parent attempt.
 
-Inside a Test, child student renderers receive only the state-loading and autosave portion of that host. They must not display or invoke an individual activity submission. The single **Submit Test** action submits every child from its saved state through the registered server adapters, persists each item result, and only then finalizes the parent attempt.
+Inside a Test, child student renderers receive only the state-loading and autosave portion of that host. They must not display or invoke an individual activity submission. The final **Submit for grading** confirmation submits every child from its saved state through the registered server adapters, persists each item result, and only then finalizes the parent attempt.
 
 MCQ is the first integration because its grading is deterministic and it has no plugin-owned submission tables. Other plugins opt in one at a time.
 
@@ -386,13 +386,17 @@ The Test opens as one assigned activity. The shell provides:
 - progress and item navigation;
 - one embedded child activity at a time, or a continuous layout when configured;
 - save/resume state;
-- final submission confirmation;
+- a final answer-review screen followed by an explicit submission confirmation;
 - read-only submitted state;
 - released overall grade and permitted item feedback.
 
 When a new attempt is blocked by grade release, the due date, or the attempt limit, the student Test shell remains visible with a disabled start action and a localized explanation. The assigned-activity tab shell must not hide the Test renderer merely because attempt availability is false.
 
 No child activity should expose standalone submit, attempt-limit, grade-release, or assignment controls.
+
+Manual submission is a separate final step: **Submit the test** appears only on the last exercise, in place of **Next activity**, and opens a review screen within the same mounted attempt/session. It lists every exercise in attempt order with only **Answered** or **Not answered**, never grades, correctness, answer keys, or test outcomes. The review reads persisted responses after pending saves drain. Students can return to any exercise or cancel the final confirmation without submitting. **Submit for grading** opens the shared confirmation dialog, explicitly warning that submission is final and answers can no longer be modified. Unanswered exercises do not block submission. The timer and live-settings polling remain active on the review screen and in the confirmation dialog; deadline expiry and no-resume finalization still submit automatically without requiring these manual steps. Teacher Student view uses the same screens with browser-scoped state.
+
+Response presence is plugin-owned and registered beside the embedded renderers in `apps/web/src/lib/test-item-answer-status.ts`. MCQs require a selected choice for each question, regardless of correctness. Coding and web-design exercises require nonempty student code differing from their starter. Parsons saves a response marker on move/indent, clears it on reset, and leaves initial shuffled arrangements unanswered; pre-marker drafts retain their saved arrangement as an answer because historical interaction cannot be reconstructed. These checks never invoke a grader.
 
 Starting an attempt and final submission also use the shared blocking, indeterminate progress dialog. Final submission may dispatch several child graders, so the confirmation remains underneath a non-dismissible progress surface until the server returns the completed runtime.
 
@@ -516,7 +520,7 @@ Implemented in Phase 5:
 - [x] Enforce the resume policy and protect final submission with a database-backed concurrency claim.
 - [x] Add accessibility, localization, route/service end-to-end, and full-suite coverage.
 
-The first Phase 6 slice adds Parsons without introducing Parsons-specific fields into the Test schema or orchestration. The embedded renderer persists the initial randomized block arrangement, autosaves subsequent moves through the shared execution host, and suppresses the child submit action. The one **Submit Test** operation evaluates the saved arrangement through the server adapter. Teacher review uses plugin-registered individual and aggregate renderers.
+The first Phase 6 slice adds Parsons without introducing Parsons-specific fields into the Test schema or orchestration. The embedded renderer persists the initial randomized block arrangement, autosaves subsequent moves through the shared execution host, and suppresses the child submit action. The final **Submit for grading** operation evaluates the saved arrangement through the server adapter. Teacher review uses plugin-registered individual and aggregate renderers.
 
 Timed attempts now expose a server-derived deadline in the Test runtime. Child reads and writes reject expired attempts, while final submission is explicitly allowed to grade the last saved state after expiry. The student shell displays a live localized countdown in fixed `hh:mm:ss` format (shared with standalone activities, with hours always shown) directly below the account selector at the top of the page; as the header scrolls away, the countdown follows it upward and remains pinned to the viewport's top-right corner. The selector temporarily hides it while its menu is open. The pill is dark blue normally, dark orange below one sixth of the original duration, and dark red for the final minute. At zero, the shell automatically follows the normal whole-Test submission path once pending saves have drained. Repeating the same final-submit request returns the already-completed runtime instead of producing an active-attempt error.
 
@@ -564,6 +568,6 @@ Each phase requires:
 - Phase 1 foundation implemented.
 - Phase 2 authoring and ownership implemented: dedicated Test creation, settings, local/bank child composition, reorder/remove/edit flows, containment filters, and lifecycle-safe deletion.
 - Phase 3 assignment and content integration implemented: Test is enabled through its dedicated creation flow, assignments are summative-only, direct and settings-dialog materialization reuse the existing content and gradebook paths, later groups remain unassigned, and contained children cannot be assigned or placed independently.
-- Phase 4 execution and the first MCQ adapter are implemented. Students receive a dedicated Test start/resume and navigation shell rather than the teacher authoring form. Core persists one parent attempt plus generic per-item attempts. MCQ answers autosave without an individual submit button; **Submit Test** dispatches every child through capability/handler/renderer registries designed for additional plugins and then submits the parent once.
+- Phase 4 execution and the first MCQ adapter are implemented. Students receive a dedicated Test start/resume and navigation shell rather than the teacher authoring form. Core persists one parent attempt plus generic per-item attempts. MCQ answers autosave without an individual submit button; **Submit for grading** dispatches every child through capability/handler/renderer registries designed for additional plugins and then submits the parent once.
 - Phase 5 grading and review are implemented: parent aggregation, normal gradebook/release/audit integration, Test breakdowns, item-level manual adjustment with parent recomputation, parent override preservation, Test regrading, individual attempt review, and extensible aggregate review.
 - Phase 6 is implemented. MCQ, Parsons, coding exercise, and web-design coding exercise use plugin-owned composite execution/review adapters; Test attempts use immutable revisions; duplication copies generic and plugin-owned data; deadlines and no-resume rules are server-enforced; final submission is idempotent and concurrency-safe; and the student shell includes localized, accessible timing, navigation, save, submission, and blocking long-operation progress states.
