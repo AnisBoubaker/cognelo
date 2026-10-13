@@ -51,10 +51,12 @@ type MessageKey =
   | "testCountLimit"
   | "cancelTestGeneration"
   | "confirmTestGeneration"
-  | "replaceTestsTitle"
+  | "testGenerationMode"
+  | "addGeneratedTests"
+  | "replaceGeneratedTests"
+  | "addTestsMessage"
   | "replaceTestsMessage"
-  | "keepCurrentTests"
-  | "replaceCurrentTests"
+  | "testGenerationCapacity"
   | "starterCode"
   | "referenceSolution"
   | "referenceSolutionHelp"
@@ -251,13 +253,15 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     generateTestsDialogMessage: "Choose how many visible and hidden tests to generate. Generated tests use Contains lines output matching.",
     visibleTestCount: "Visible tests",
     hiddenTestCount: "Hidden tests",
-    testCountLimit: "Choose between 1 and 15 tests of each kind.",
+    testCountLimit: "Choose 0 to 15 tests of each kind, with at least one test in total.",
     cancelTestGeneration: "Cancel",
     confirmTestGeneration: "Generate tests",
-    replaceTestsTitle: "Replace existing test cases?",
-    replaceTestsMessage: "Generating test cases will replace existing visible sample tests and hidden tests.",
-    keepCurrentTests: "Keep current tests",
-    replaceCurrentTests: "Replace tests",
+    testGenerationMode: "Existing tests",
+    addGeneratedTests: "Add to existing tests",
+    replaceGeneratedTests: "Replace all tests",
+    addTestsMessage: "Keep all existing tests and share their full contents with the AI to generate complementary cases. A count of 0 leaves that kind unchanged.",
+    replaceTestsMessage: "Replace all existing visible and hidden tests. A count of 0 removes all tests of that kind.",
+    testGenerationCapacity: "You can add up to {visible} visible tests and {hidden} hidden tests in this request.",
     starterCode: "Starter code",
     referenceSolution: "Reference solution",
     referenceSolutionHelp: "Teacher-only answer key. Hidden tests are validated against this code before they are saved.",
@@ -451,13 +455,15 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     generateTestsDialogMessage: "Choisissez le nombre de tests visibles et cachés à générer. Les tests générés utilisent la comparaison « Contient les lignes ».",
     visibleTestCount: "Tests visibles",
     hiddenTestCount: "Tests cachés",
-    testCountLimit: "Choisissez entre 1 et 15 tests de chaque type.",
+    testCountLimit: "Choisissez de 0 à 15 tests de chaque type, avec au moins un test au total.",
     cancelTestGeneration: "Annuler",
     confirmTestGeneration: "Générer les tests",
-    replaceTestsTitle: "Remplacer les cas de test existants?",
-    replaceTestsMessage: "La generation remplacera les tests d'exemple visibles et les tests caches existants.",
-    keepCurrentTests: "Conserver les tests",
-    replaceCurrentTests: "Remplacer les tests",
+    testGenerationMode: "Tests existants",
+    addGeneratedTests: "Ajouter aux tests existants",
+    replaceGeneratedTests: "Remplacer tous les tests",
+    addTestsMessage: "Conserver les tests existants et fournir leur contenu complet à l’IA pour générer des cas complémentaires. Un nombre de 0 laisse les tests de ce type inchangés.",
+    replaceTestsMessage: "Remplacer tous les tests visibles et cachés existants. Un nombre de 0 supprime tous les tests de ce type.",
+    testGenerationCapacity: "Vous pouvez ajouter jusqu’à {visible} tests visibles et {hidden} tests cachés dans cette demande.",
     starterCode: "Code de départ",
     referenceSolution: "Solution de référence",
     referenceSolutionHelp: "Corrigé réservé à l'enseignant. Les tests cachés sont validés avec ce code avant l'enregistrement.",
@@ -651,13 +657,15 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     generateTestsDialogMessage: "选择要生成的可见测试和隐藏测试数量。生成的测试使用“包含指定行”输出匹配。",
     visibleTestCount: "可见测试",
     hiddenTestCount: "隐藏测试",
-    testCountLimit: "每种测试请选择 1 到 15 个。",
+    testCountLimit: "每种测试可选择 0 到 15 个，但总数必须至少为 1 个。",
     cancelTestGeneration: "取消",
     confirmTestGeneration: "生成测试",
-    replaceTestsTitle: "替换现有测试用例？",
-    replaceTestsMessage: "生成测试用例会替换现有可见示例测试和隐藏测试。",
-    keepCurrentTests: "保留当前测试",
-    replaceCurrentTests: "替换测试",
+    testGenerationMode: "现有测试",
+    addGeneratedTests: "添加到现有测试",
+    replaceGeneratedTests: "替换所有测试",
+    addTestsMessage: "保留现有测试，并将完整内容提供给 AI 以生成补充测试。数量为 0 时，该类型的测试保持不变。",
+    replaceTestsMessage: "替换所有现有的可见测试和隐藏测试。数量为 0 时，将删除该类型的所有测试。",
+    testGenerationCapacity: "本次请求最多可添加 {visible} 个可见测试和 {hidden} 个隐藏测试。",
     starterCode: "起始代码",
     referenceSolution: "参考答案",
     referenceSolutionHelp: "仅教师可见的答案。隐藏测试会先用这段代码验证，再保存。",

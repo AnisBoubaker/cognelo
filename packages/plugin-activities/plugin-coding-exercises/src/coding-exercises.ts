@@ -5,6 +5,7 @@ export const codingExerciseTestInsertionToken = "{{ TEST_CODE }}";
 export const codingExerciseDefaultVisibleTestCount = 3;
 export const codingExerciseDefaultHiddenTestCount = 8;
 export const codingExerciseMaxGeneratedTestCount = 15;
+export const codingExerciseMaxHiddenTestCount = 50;
 
 export const codingExerciseExecutionModeSchema = z.literal("template");
 
@@ -126,7 +127,7 @@ export const codingExercisePrivateConfigSchema = z.object({
 export type CodingExercisePrivateConfig = z.infer<typeof codingExercisePrivateConfigSchema>;
 
 export const codingExerciseHiddenTestsInputSchema = z.object({
-  tests: z.array(codingExerciseHiddenTestSchema).max(50),
+  tests: z.array(codingExerciseHiddenTestSchema).max(codingExerciseMaxHiddenTestCount),
   sampleTests: z.array(sampleTestSchema).max(codingExerciseMaxGeneratedTestCount).default([]),
   referenceSolution: z.string().max(60000).default(""),
   privateConfig: codingExercisePrivateConfigSchema.default({}),

@@ -6,6 +6,7 @@ import {
   codingExerciseDefaultVisibleTestCount,
   codingExerciseHiddenTestSchema,
   codingExerciseMaxGeneratedTestCount,
+  codingExerciseMaxHiddenTestCount,
   codingExerciseTestInsertionToken,
   codingExerciseTemplateInsertionToken,
   parseCodingExercisePrivateConfig,
@@ -20,6 +21,12 @@ type SubjectContext = {
 };
 
 type GenerationLocale = "en" | "fr" | "zh" | "ar";
+
+const existingTestsSchema = z.object({
+  sampleTests: z.array(sampleTestSchema).max(codingExerciseMaxGeneratedTestCount),
+  hiddenTests: z.array(codingExerciseHiddenTestSchema).max(codingExerciseMaxHiddenTestCount)
+});
+type ExistingTests = z.infer<typeof existingTestsSchema>;
 
 export const codingExercisePromptGenerationInputSchema = z.object({
   description: z.string().min(10).max(4000),
@@ -44,9 +51,13 @@ export const codingExerciseTestsGenerationInputSchema = z.object({
   referenceSolution: z.string().min(1).max(60000),
   templateSource: z.string().min(1).max(120000),
   templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([]),
-  visibleTestCount: z.number().int().min(1).max(codingExerciseMaxGeneratedTestCount).default(codingExerciseDefaultVisibleTestCount),
-  hiddenTestCount: z.number().int().min(1).max(codingExerciseMaxGeneratedTestCount).default(codingExerciseDefaultHiddenTestCount),
+  visibleTestCount: z.number().int().min(0).max(codingExerciseMaxGeneratedTestCount).default(codingExerciseDefaultVisibleTestCount),
+  hiddenTestCount: z.number().int().min(0).max(codingExerciseMaxGeneratedTestCount).default(codingExerciseDefaultHiddenTestCount),
+  existingTests: existingTestsSchema.optional(),
   knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
+}).refine((input) => input.visibleTestCount + input.hiddenTestCount > 0, {
+  message: "Request at least one visible or hidden test.",
+  path: ["visibleTestCount"]
 });
 
 export const codingExerciseRubricGenerationInputSchema = z.object({
@@ -344,6 +355,7 @@ export async function generateCodingExerciseTests(input: {
   templateVisibleLineNumbers: number[];
   visibleTestCount?: number;
   hiddenTestCount?: number;
+  existingTests?: ExistingTests;
   knowledge?: ActivityGenerationKnowledge;
   requireCompleteSuite?: boolean;
 }) {
@@ -406,6 +418,7 @@ export async function generateCodingExerciseTests(input: {
       templateVisibleLineNumbers: input.templateVisibleLineNumbers,
       visibleTestCount,
       hiddenTestCount,
+      existingTests: input.existingTests,
       retained
     }).catch((error: unknown) => {
       if (!retained || input.requireCompleteSuite) throw error;
@@ -609,6 +622,7 @@ function buildTestsGenerationSystemPrompt(input: {
   subject: SubjectContext;
   visibleTestCount: number;
   hiddenTestCount: number;
+  existingTests?: ExistingTests;
   knowledge?: ActivityGenerationKnowledge;
 }) {
   return [
@@ -644,7 +658,13 @@ function buildTestsGenerationSystemPrompt(input: {
     "- Generate enough hidden tests to cover normal cases, edge cases, and common mistakes.",
     "- Every visible and hidden test must use outputMatchMode contains_lines with containsLinesOrderMatters false. Do not use exact or regex matching.",
     "- Every output/expectedOutput must contain at least one non-empty line. Empty or whitespace-only expected output is invalid for contains_lines matching.",
-    "- Hidden tests may intentionally reproduce the same test case as a visible test with different input values. This is useful for detecting solutions that hard-code the visible examples, so do not reject that overlap as duplication.",
+    ...(input.existingTests ? [
+      "- This is an ADD operation. The supplied existing visible and hidden tests are read-only context, not part of your response or the requested NEW test counts.",
+      "- Review the full existing cases, including inputs, expected outputs, harness code, matchers, weights, and disabled tests. Generate complementary cases covering behavior, boundaries, or failure modes not already covered.",
+      "- Do not repeat or generate similar variants of any existing test, including across visible/hidden kinds. Merely changing its title, ID, or input values is not new coverage. Do not rewrite, rename, or return existing tests."
+    ] : [
+      "- Hidden tests may intentionally reproduce the same test case as a visible test with different input values. This is useful for detecting solutions that hard-code the visible examples, so do not reject that overlap as duplication."
+    ]),
     `- Give every test a concise, descriptive title/name of at most ${maxGeneratedTestNameLength} characters. State the behavior and expected result when practical, for example "Factorial -3 should give 0" instead of a generic label such as "Negative case".`,
     "- IDs must be stable, lowercase, and unique.",
     "- The reference solution must pass every generated sample and hidden test.",
@@ -721,6 +741,7 @@ function buildTestsInitialPrompt(input: {
   templateSource: string;
   visibleTestCount: number;
   hiddenTestCount: number;
+  existingTests?: ExistingTests;
 }) {
   return [
     `Generate exactly ${input.visibleTestCount} visible tests and ${input.hiddenTestCount} hidden tests from the complete context below.`,
@@ -744,7 +765,15 @@ function buildTestsInitialPrompt(input: {
     "Template source:",
     "<template_source>",
     input.templateSource,
-    "</template_source>"
+    "</template_source>",
+    ...(input.existingTests ? [
+      "",
+      "Complete existing tests (read-only; do not return these or similar cases):",
+      "<existing_tests>",
+      JSON.stringify(input.existingTests, null, 2),
+      "</existing_tests>",
+      "Return only the requested NEW tests that add coverage beyond this existing suite."
+    ] : [])
   ].join("\n");
 }
 
@@ -811,6 +840,7 @@ async function validateGeneratedTests(input: {
   templateVisibleLineNumbers: number[];
   visibleTestCount: number;
   hiddenTestCount: number;
+  existingTests?: ExistingTests;
   retained?: ValidatedGeneratedTests;
 }) {
   const parsed = generatedTestsEnvelopeSchema.safeParse(input.payload);
@@ -854,6 +884,15 @@ async function validateGeneratedTests(input: {
   const retainedIds = new Set([
     ...input.retained?.tests.sampleTests ?? [], ...input.retained?.tests.hiddenTests ?? []
   ].map((test) => test.id));
+  const existingCases = new Set([
+    ...input.existingTests?.sampleTests.map((test) => JSON.stringify([test.input, test.testCode])) ?? [],
+    ...input.existingTests?.hiddenTests.map((test) => JSON.stringify([test.stdin, test.testCode])) ?? []
+  ]);
+  const excludeExisting = <T extends { id: string; testCode: string }>(tests: T[], stdin: (test: T) => string) => tests.filter((test) => {
+    if (!existingCases.has(JSON.stringify([stdin(test), test.testCode]))) return true;
+    issues.push(`Test ${test.id} repeats the input and harness of an existing test. Generate a different case that adds new coverage.`);
+    return false;
+  });
   const usedIds = new Set(retainedIds);
   const mergeCandidates = <T extends { id: string }>(retained: T[], candidates: T[], limit: number, signature: (test: T) => string) => {
     const result = [...retained];
@@ -874,9 +913,9 @@ async function validateGeneratedTests(input: {
   let tests: GeneratedTests = {
     status: parsed.data.status,
     warningMessage: parsed.data.warningMessage,
-    sampleTests: mergeCandidates(input.retained?.tests.sampleTests ?? [], parseTests(parsed.data.sampleTests, generatedSampleTestSchema, "sampleTests", (test) => test.output), input.visibleTestCount,
+    sampleTests: mergeCandidates(input.retained?.tests.sampleTests ?? [], excludeExisting(parseTests(parsed.data.sampleTests, generatedSampleTestSchema, "sampleTests", (test) => test.output), (test) => test.input), input.visibleTestCount,
       (test) => JSON.stringify([test.input, test.output, test.testCode])),
-    hiddenTests: mergeCandidates(input.retained?.tests.hiddenTests ?? [], parseTests(parsed.data.hiddenTests, generatedHiddenTestSchema, "hiddenTests", (test) => test.expectedOutput), input.hiddenTestCount,
+    hiddenTests: mergeCandidates(input.retained?.tests.hiddenTests ?? [], excludeExisting(parseTests(parsed.data.hiddenTests, generatedHiddenTestSchema, "hiddenTests", (test) => test.expectedOutput), (test) => test.stdin), input.hiddenTestCount,
       (test) => JSON.stringify([test.stdin, test.expectedOutput, test.testCode]))
   };
   if (!tests.sampleTests.length && !tests.hiddenTests.length) return { issues };
@@ -1191,6 +1230,7 @@ function buildTestCorrectionPrompt(
     templateSource: string;
     visibleTestCount: number;
     hiddenTestCount: number;
+    existingTests?: ExistingTests;
   },
   previous: string,
   issues: string[],

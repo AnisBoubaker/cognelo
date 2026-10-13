@@ -150,7 +150,7 @@ describe("coding exercise AI generation", () => {
     ).resolves.toMatchObject({ status: "error", attempts: 1 });
   });
 
-  it("validates generated-test count defaults and the per-kind maximum", () => {
+  it("validates generated-test counts, allowing either kind to be zero but not both", () => {
     const baseInput = {
       description: "Return one",
       prompt: "Write a function that returns one.",
@@ -171,6 +171,80 @@ describe("coding exercise AI generation", () => {
     })).toMatchObject({ visibleTestCount: 15, hiddenTestCount: 15 });
     expect(() => codingExerciseTestsGenerationInputSchema.parse({ ...baseInput, visibleTestCount: 16 })).toThrow();
     expect(() => codingExerciseTestsGenerationInputSchema.parse({ ...baseInput, hiddenTestCount: 16 })).toThrow();
+    for (const counts of [{ visibleTestCount: 0, hiddenTestCount: 1 }, { visibleTestCount: 1, hiddenTestCount: 0 }]) {
+      expect(codingExerciseTestsGenerationInputSchema.parse({ ...baseInput, ...counts })).toMatchObject(counts);
+    }
+    expect(() => codingExerciseTestsGenerationInputSchema.parse({ ...baseInput, visibleTestCount: 0, hiddenTestCount: 0 })).toThrow();
+    for (const key of ["visibleTestCount", "hiddenTestCount"]) {
+      for (const invalid of [-1, 0.5, NaN]) {
+        expect(() => codingExerciseTestsGenerationInputSchema.parse({ ...baseInput, [key]: invalid })).toThrow();
+      }
+    }
+  });
+
+  it.each([
+    { visibleTestCount: 0, hiddenTestCount: 2 },
+    { visibleTestCount: 1, hiddenTestCount: 0 }
+  ])("generates a complete suite with counts $visibleTestCount/$hiddenTestCount", async (counts) => {
+    const payload = {
+      sampleTests: mixedTests.sampleTests.slice(0, counts.visibleTestCount),
+      hiddenTests: mixedTests.hiddenTests.slice(0, counts.hiddenTestCount)
+    };
+    mocks.generateQuestionAuthoringText.mockResolvedValue(JSON.stringify(payload));
+    const result = await generateCodingExerciseTests({ ...testsInput, ...counts });
+    expect(result.status).not.toBe("error");
+    if (result.status === "error") throw new Error(result.message);
+    expect(result.sampleTests).toHaveLength(counts.visibleTestCount);
+    expect(result.hiddenTests).toHaveLength(counts.hiddenTestCount);
+    expect(result.validationSummary.accepted).toBe(true);
+    expect(result.attempts).toBe(1);
+  });
+
+  it("includes complete existing tests in the initial prompt and every correction", async () => {
+    const existingTests = {
+      sampleTests: [{
+        id: "old-visible", title: "Existing callable sample", input: "original visible input\nsecond line", output: "old visible output",
+        testCode: "print(existing_example())", outputMatchMode: "exact" as const, containsLinesOrderMatters: true
+      }],
+      hiddenTests: [{
+        id: "old-hidden", name: "Existing callable hidden test", stdin: "original hidden input\nsecond line", expectedOutput: "old hidden output",
+        testCode: "print(hidden_example())", outputMatchMode: "regex" as const, containsLinesOrderMatters: false,
+        weight: 7, isEnabled: false
+      }]
+    };
+    expect(codingExerciseTestsGenerationInputSchema.parse({ ...testsInput, existingTests }).existingTests).toEqual(existingTests);
+    mocks.generateQuestionAuthoringText.mockResolvedValueOnce("invalid JSON").mockResolvedValueOnce(JSON.stringify(mixedTests));
+    const result = await generateCodingExerciseTests({ ...testsInput, existingTests });
+    expect(result.attempts).toBe(2);
+    for (const [, request] of mocks.generateQuestionAuthoringText.mock.calls) {
+      expect(request.userPrompt).toContain(JSON.stringify(existingTests, null, 2));
+      expect(request.systemPrompt).toContain("This is an ADD operation");
+      expect(request.systemPrompt).toContain("Do not repeat or generate similar variants of any existing test");
+      expect(request.systemPrompt).not.toContain("Hidden tests may intentionally reproduce");
+    }
+  });
+
+  it("rejects exact existing cases across visible/hidden kinds before executing and asks for new coverage", async () => {
+    const existingTests = codingExerciseTestsGenerationInputSchema.parse({
+      ...testsInput, existingTests: {
+        sampleTests: mixedTests.sampleTests,
+        hiddenTests: [mixedTests.hiddenTests[0]]
+      }
+    }).existingTests!;
+    mocks.generateQuestionAuthoringText
+      .mockResolvedValueOnce(JSON.stringify({
+        sampleTests: [{ id: "new-id-1", title: "Renamed hidden case", input: "2", output: "2" }],
+        hiddenTests: [{ id: "new-id-2", name: "Renamed visible case", stdin: "1", expectedOutput: "1" }]
+      }))
+      .mockResolvedValueOnce(JSON.stringify({
+        sampleTests: [{ id: "new-id-3", title: "Different visible", input: "-4", output: "-4" }],
+        hiddenTests: [{ id: "new-id-4", name: "Different hidden", stdin: "0", expectedOutput: "0" }]
+      }));
+    const result = await generateCodingExerciseTests({ ...testsInput, hiddenTestCount: 1, existingTests });
+    expect(result.attempts).toBe(2);
+    expect(mocks.validateReferenceSolutionAgainstHiddenTests).toHaveBeenCalledTimes(1);
+    expect(mocks.generateQuestionAuthoringText.mock.calls[1][1].userPrompt).toContain("repeats the input and harness of an existing test");
+    expect(mocks.generateQuestionAuthoringText.mock.calls[1][1].userPrompt).toContain(JSON.stringify(existingTests, null, 2));
   });
 
   it("retries when the model does not return the requested test counts", async () => {

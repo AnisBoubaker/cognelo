@@ -441,6 +441,29 @@ describe("coding exercise plugin routes", () => {
     expect(mocks.assertCanManageCourseOrViewGradebook).toHaveBeenCalledWith(context.user, "course-1");
   });
 
+  it("forwards complete existing test cases from the authoring draft to generation", async () => {
+    const existingTests = {
+      sampleTests: [{
+        id: "draft-visible", title: "Unsaved visible case", input: "1", output: "1", testCode: "print(check())",
+        outputMatchMode: "exact", containsLinesOrderMatters: true
+      }],
+      hiddenTests: [{
+        id: "draft-hidden", name: "Unsaved hidden case", stdin: "2", expectedOutput: "2", testCode: "print(other_check())",
+        outputMatchMode: "regex", containsLinesOrderMatters: false, isEnabled: false, weight: 9
+      }]
+    };
+    await codingExerciseGenerateTestsRoute.methods.POST?.({
+      request: new Request("http://test.local"), context,
+      readJson: async () => ({
+        prompt: "Read a number and print it.", language: "python", referenceSolution: "print(input())",
+        templateSource: "{{ STUDENT_CODE }}", visibleTestCount: 0, hiddenTestCount: 1, existingTests
+      })
+    });
+    expect(mocks.generateCodingExerciseTests).toHaveBeenCalledWith(expect.objectContaining({
+      existingTests, visibleTestCount: 0, hiddenTestCount: 1
+    }));
+  });
+
   it("generates prompt, solution, tests, and rubrics with subject context", async () => {
     await expect(
       codingExerciseGeneratePromptRoute.methods.POST?.({

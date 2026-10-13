@@ -14,6 +14,7 @@ import {
   codingExerciseDefaultHiddenTestCount,
   codingExerciseDefaultVisibleTestCount,
   codingExerciseMaxGeneratedTestCount,
+  codingExerciseMaxHiddenTestCount,
   codingExerciseTemplateRequiresTestCodeMarker,
   codingExerciseTemplateInsertionToken,
   getCodingExerciseAiFeedbackValidationMessages,
@@ -30,6 +31,7 @@ import {
   getCodingExerciseInitialStudentSource
 } from "./coding-exercise-student-source";
 import { formatCodingExercisesMessage, normalizeCodingExercisesLocale, type CodingExercisesLocale } from "./messages";
+import { applyGeneratedCodingExerciseTests, type TestGenerationMode } from "./coding-exercise-generated-tests";
 
 type ActivityLike = {
   id: string;
@@ -235,6 +237,7 @@ type CodingExerciseAiGenerationClient = {
     templateVisibleLineNumbers: number[];
     visibleTestCount: number;
     hiddenTestCount: number;
+    existingTests?: { sampleTests: SampleTest[]; hiddenTests: HiddenTest[] };
     knowledge: ActivityKnowledgeGenerationRequest;
   }) => Promise<
     | {
@@ -345,8 +348,9 @@ export function CodingExerciseActivityView({
   const [generatingTests, setGeneratingTests] = useState(false);
   const [generatingRubric, setGeneratingRubric] = useState(false);
   const [gradingSection, setGradingSection] = useState<"rubric" | "tests">("rubric");
-  const [replacementDialog, setReplacementDialog] = useState<"prompt" | "solution" | "rubric" | "tests" | null>(null);
+  const [replacementDialog, setReplacementDialog] = useState<"prompt" | "solution" | "rubric" | null>(null);
   const [testGenerationDialogOpen, setTestGenerationDialogOpen] = useState(false);
+  const [testGenerationMode, setTestGenerationMode] = useState<TestGenerationMode>("add");
   const [visibleTestGenerationCount, setVisibleTestGenerationCount] = useState(codingExerciseDefaultVisibleTestCount);
   const [hiddenTestGenerationCount, setHiddenTestGenerationCount] = useState(codingExerciseDefaultHiddenTestCount);
   const [error, setError] = useState("");
@@ -999,30 +1003,27 @@ export function CodingExerciseActivityView({
       notifications.error(t("generateTestsReferenceRequired"));
       return;
     }
-    if (hasExistingGeneratedTestContent(config, hiddenTests)) {
-      setReplacementDialog("tests");
-      return;
-    }
     openTestGenerationCountDialog();
   }
 
   function openTestGenerationCountDialog() {
-    setVisibleTestGenerationCount(codingExerciseDefaultVisibleTestCount);
-    setHiddenTestGenerationCount(codingExerciseDefaultHiddenTestCount);
+    setTestGenerationMode("add");
+    setVisibleTestGenerationCount(Math.min(codingExerciseDefaultVisibleTestCount, codingExerciseMaxGeneratedTestCount - visibleSampleTests.length));
+    setHiddenTestGenerationCount(Math.min(codingExerciseDefaultHiddenTestCount, codingExerciseMaxHiddenTestCount - hiddenTests.length));
     setReplacementDialog(null);
     setTestGenerationDialogOpen(true);
   }
 
   async function generateTests(input: {
-    visibleTestCount?: number;
-    hiddenTestCount?: number;
-  } = {}) {
-    if (!aiGenerationClient || !config.language) {
+    mode: TestGenerationMode;
+    visibleTestCount: number;
+    hiddenTestCount: number;
+  }) {
+    if (!aiGenerationClient || !config.language || !testGenerationCountsValid) {
       return;
     }
 
-    const visibleTestCount = input.visibleTestCount ?? codingExerciseDefaultVisibleTestCount;
-    const hiddenTestCount = input.hiddenTestCount ?? codingExerciseDefaultHiddenTestCount;
+    const { visibleTestCount, hiddenTestCount } = input;
     setGeneratingTests(true);
     setReplacementDialog(null);
     setTestGenerationDialogOpen(false);
@@ -1043,31 +1044,34 @@ export function CodingExerciseActivityView({
         templateVisibleLineNumbers: persistedPrivateConfig.templateVisibleLineNumbers,
         visibleTestCount,
         hiddenTestCount,
+        ...(input.mode === "add" ? { existingTests: { sampleTests: visibleSampleTests, hiddenTests } } : {}),
         knowledge: knowledgeGeneration.request
       });
       if (result.status === "error") {
         notifications.error(result.message);
         return;
       }
-      setConfig((current) => ({
-        ...current,
-        sampleTests: normalizeCodingExerciseSampleTests(result.sampleTests)
-      }));
-      const generatedAt = Date.now();
-      const generatedHiddenTests = result.hiddenTests.map((test, index) => ({
-        ...test,
-        outputMatchMode: "contains_lines" as const,
-        containsLinesOrderMatters: false,
-        id: `${test.id}-${generatedAt}-${index + 1}`.slice(0, 80),
-        orderIndex: index,
-        metadata: {},
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }));
-      setHiddenTests(generatedHiddenTests);
-      setReferenceValidationSummary(result.validationSummary);
-      setExpandedSampleTestIds(result.sampleTests.map((test) => test.id));
-      setExpandedHiddenTestIds(generatedHiddenTests.map((test) => test.id));
+      const generated = applyGeneratedCodingExerciseTests({
+        mode: input.mode,
+        currentSampleTests: visibleSampleTests,
+        currentHiddenTests: hiddenTests,
+        sampleTests: normalizeCodingExerciseSampleTests(result.sampleTests),
+        hiddenTests: result.hiddenTests.map((test) => ({
+          ...test,
+          outputMatchMode: "contains_lines" as const,
+          containsLinesOrderMatters: false
+        })),
+        validationSummary: result.validationSummary
+      });
+      setConfig((current) => ({ ...current, sampleTests: generated.sampleTests }));
+      setHiddenTests(generated.hiddenTests);
+      setReferenceValidationSummary(generated.validationSummary);
+      setExpandedSampleTestIds((current) => [
+        ...(input.mode === "add" ? current : []), ...generated.addedSampleTests.map((test) => test.id)
+      ]);
+      setExpandedHiddenTestIds((current) => [
+        ...(input.mode === "add" ? current : []), ...generated.addedHiddenTests.map((test) => test.id)
+      ]);
       knowledgeGeneration.applySelections(result.knowledgeConceptSelections);
       if (result.status === "warning" && result.warningMessage) {
         notifications.warning(result.warningMessage);
@@ -1232,10 +1236,7 @@ export function CodingExerciseActivityView({
     if (replacementDialog === "solution") {
       return t("generateSolution");
     }
-    if (replacementDialog === "rubric") {
-      return t("generateRubric");
-    }
-    return t("generateTests");
+    return t("generateRubric");
   }
 
   function getReplacementDialogTitle() {
@@ -1245,10 +1246,7 @@ export function CodingExerciseActivityView({
     if (replacementDialog === "solution") {
       return t("replaceSolutionTitle");
     }
-    if (replacementDialog === "rubric") {
-      return t("replaceRubricTitle");
-    }
-    return t("replaceTestsTitle");
+    return t("replaceRubricTitle");
   }
 
   function getReplacementDialogMessage() {
@@ -1258,10 +1256,7 @@ export function CodingExerciseActivityView({
     if (replacementDialog === "solution") {
       return t("replaceSolutionMessage");
     }
-    if (replacementDialog === "rubric") {
-      return t("replaceRubricMessage");
-    }
-    return t("replaceTestsMessage");
+    return t("replaceRubricMessage");
   }
 
   function getKeepReplacementLabel() {
@@ -1271,10 +1266,7 @@ export function CodingExerciseActivityView({
     if (replacementDialog === "solution") {
       return t("keepCurrentSolution");
     }
-    if (replacementDialog === "rubric") {
-      return t("keepCurrentRubric");
-    }
-    return t("keepCurrentTests");
+    return t("keepCurrentRubric");
   }
 
   function getReplaceReplacementLabel() {
@@ -1284,10 +1276,7 @@ export function CodingExerciseActivityView({
     if (replacementDialog === "solution") {
       return t("replaceCurrentSolution");
     }
-    if (replacementDialog === "rubric") {
-      return t("replaceCurrentRubric");
-    }
-    return t("replaceCurrentTests");
+    return t("replaceCurrentRubric");
   }
 
   function confirmReplacementGeneration() {
@@ -1303,7 +1292,6 @@ export function CodingExerciseActivityView({
       void generateRubric();
       return;
     }
-    openTestGenerationCountDialog();
   }
 
   function renderAuthoringGrading(content: ReactNode) {
@@ -1311,9 +1299,17 @@ export function CodingExerciseActivityView({
     return authoringGradingPortalTarget ? createPortal(content, authoringGradingPortalTarget) : null;
   }
 
+  const visibleTestGenerationLimit = testGenerationMode === "add"
+    ? codingExerciseMaxGeneratedTestCount - visibleSampleTests.length
+    : codingExerciseMaxGeneratedTestCount;
+  const hiddenTestGenerationLimit = testGenerationMode === "add"
+    ? Math.min(codingExerciseMaxGeneratedTestCount, codingExerciseMaxHiddenTestCount - hiddenTests.length)
+    : codingExerciseMaxGeneratedTestCount;
   const testGenerationCountsValid = [visibleTestGenerationCount, hiddenTestGenerationCount].every(
-    (count) => Number.isInteger(count) && count >= 1 && count <= codingExerciseMaxGeneratedTestCount
-  );
+    (count) => Number.isInteger(count) && count >= 0
+  ) && visibleTestGenerationCount <= visibleTestGenerationLimit
+    && hiddenTestGenerationCount <= hiddenTestGenerationLimit
+    && visibleTestGenerationCount + hiddenTestGenerationCount > 0;
   const longRunningTitle = generatingPrompt
     ? t("generatingPrompt")
     : generatingSolution
@@ -1455,13 +1451,28 @@ export function CodingExerciseActivityView({
                   <h2 id="coding-generation-tests-title">{t("generateTestsDialogTitle")}</h2>
                   <p className="muted" id="coding-generation-tests-description">{t("generateTestsDialogMessage")}</p>
                 </div>
+                <div className="field">
+                  <label htmlFor="coding-generation-test-mode">{t("testGenerationMode")}</label>
+                  <select
+                    id="coding-generation-test-mode"
+                    aria-describedby="coding-generation-test-mode-help"
+                    value={testGenerationMode}
+                    onChange={(event) => setTestGenerationMode(event.target.value as TestGenerationMode)}
+                  >
+                    <option value="add">{t("addGeneratedTests")}</option>
+                    <option value="replace">{t("replaceGeneratedTests")}</option>
+                  </select>
+                  <p className="muted" id="coding-generation-test-mode-help">
+                    {t(testGenerationMode === "add" ? "addTestsMessage" : "replaceTestsMessage")}
+                  </p>
+                </div>
                 <div className="form-grid two-columns">
                   <div className="field">
                     <label htmlFor="coding-generation-visible-test-count">{t("visibleTestCount")}</label>
                     <input
                       id="coding-generation-visible-test-count"
-                      max={codingExerciseMaxGeneratedTestCount}
-                      min={1}
+                      max={visibleTestGenerationLimit}
+                      min={0}
                       step={1}
                       type="number"
                       value={visibleTestGenerationCount}
@@ -1472,8 +1483,8 @@ export function CodingExerciseActivityView({
                     <label htmlFor="coding-generation-hidden-test-count">{t("hiddenTestCount")}</label>
                     <input
                       id="coding-generation-hidden-test-count"
-                      max={codingExerciseMaxGeneratedTestCount}
-                      min={1}
+                      max={hiddenTestGenerationLimit}
+                      min={0}
                       step={1}
                       type="number"
                       value={hiddenTestGenerationCount}
@@ -1482,6 +1493,11 @@ export function CodingExerciseActivityView({
                   </div>
                 </div>
                 <p className="muted">{t("testCountLimit")}</p>
+                {testGenerationMode === "add" ? (
+                  <p className="muted">{t("testGenerationCapacity", {
+                    visible: visibleTestGenerationLimit, hidden: hiddenTestGenerationLimit
+                  })}</p>
+                ) : null}
                 <div className="dialog-actions">
                   <button className="secondary" type="button" onClick={() => setTestGenerationDialogOpen(false)}>
                     {t("cancelTestGeneration")}
@@ -1490,6 +1506,7 @@ export function CodingExerciseActivityView({
                     disabled={!config.language || !testGenerationCountsValid}
                     type="button"
                     onClick={() => void generateTests({
+                      mode: testGenerationMode,
                       visibleTestCount: visibleTestGenerationCount,
                       hiddenTestCount: hiddenTestGenerationCount
                     })}
@@ -2635,11 +2652,6 @@ function hasExistingGeneratedSolutionContent(
       referenceSolution.trim() ||
       (templateSource && templateSource !== codingExerciseTemplateInsertionToken)
   );
-}
-
-function hasExistingGeneratedTestContent(config: CodingExerciseConfig, hiddenTests: HiddenTest[]) {
-  const normalizedSampleTests = normalizeCodingExerciseSampleTests(config.sampleTests);
-  return Boolean(normalizedSampleTests.length || hiddenTests.length);
 }
 
 function isApiErrorLike(value: unknown): value is { code?: string; details?: unknown } {
