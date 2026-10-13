@@ -1071,6 +1071,7 @@ export const arMessages = {
       testSubmittedLabel: "اختبار مُسلّم",
       testAttemptNumber: "المحاولة {number}",
       testActivityPosition: "النشاط {current} من {total}",
+      testItemWeight: "{percentage} من الاختبار",
       testActivitiesLabel: "أنشطة الاختبار",
       testRendererUnavailable: "لا تتوفر بعد واجهة اختبار لهذا النوع من الأنشطة.",
       testPreviousActivity: "النشاط السابق",
