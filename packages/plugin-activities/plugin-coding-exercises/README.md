@@ -50,6 +50,8 @@ After release, the learner's grading report presents the available automatic-tes
 
 Teachers can [reopen the last submission](../../../docs/SUBMISSION_CONTINUATION.md) so its saved answers can be continued using the original start and current effective settings.
 
+Compound Test submission includes a final answer review with plugin-owned response checks; it reports whether work was answered without revealing correctness. See the [detailed reference](docs/REFERENCE.md).
+
 ## Read By Topic
 
 - [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)

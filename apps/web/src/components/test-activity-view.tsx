@@ -43,6 +43,7 @@ type Props = {
   onNewAttemptAvailabilityChange?: (canStartNewAttempt: boolean) => void;
   onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
   renderStudentItem?: (context: TestStudentItemRendererContext) => ReactNode;
+  isItemAnswered?: (item: CourseTestRuntimeItem, state: Record<string, unknown> | null) => boolean;
   onSave?: unknown;
   t?: (key: string, vars?: Record<string, string | number>) => string;
   studentPreview?: { sessionId: string };
@@ -436,6 +437,7 @@ function TestStudentRuntime({
   onNewAttemptAvailabilityChange,
   onPreviousSubmissionsAvailabilityChange,
   renderStudentItem,
+  isItemAnswered,
   studentPreview,
   t = (key) => key
 }: Props & { groupId: string }) {
@@ -450,6 +452,8 @@ function TestStudentRuntime({
   const [pendingSaveCount, setPendingSaveCount] = useState(0);
   const [showStartConfirmation, setShowStartConfirmation] = useState(false);
   const [showSubmitConfirmation, setShowSubmitConfirmation] = useState(false);
+  const [reviewAnswers, setReviewAnswers] = useState<Record<string, boolean> | null>(null);
+  const reviewHeadingRef = useRef<HTMLHeadingElement>(null);
   const [clock, setClock] = useState(() => Date.now());
   const [sessionId] = useState(() => globalThis.crypto?.randomUUID?.() ?? `test-session-${Date.now()}-${Math.random()}`);
   const autoSubmittedAttemptRef = useRef<string | null>(null);
@@ -510,7 +514,16 @@ function TestStudentRuntime({
     setSelectedIndex(0);
     setFurthestVisitedIndex(0);
     setPendingSaveCount(0);
+    setReviewAnswers(null);
+    setShowSubmitConfirmation(false);
   }, [runtime?.attempt?.id, studentViewMode]);
+
+  useEffect(() => {
+    if (reviewAnswers) {
+      reviewHeadingRef.current?.focus();
+      reviewHeadingRef.current?.scrollIntoView({ block: "start" });
+    }
+  }, [reviewAnswers]);
 
   const selectedRuntimeItem = runtime?.test.items[selectedIndex] ?? null;
   const executionHost = useMemo<ActivityExecutionStateHost<Record<string, unknown>> | null>(() => {
@@ -609,8 +622,36 @@ function TestStudentRuntime({
     }
   }
 
+  async function openSubmissionReview() {
+    if (busy || !runtime?.attempt || runtime.attempt.lifecycle !== "started") return;
+    setBusy(true);
+    try {
+      await saveQueueRef.current;
+      // Read persisted answers after the save queue drains, without grading or
+      // replacing a mounted editor's state during ordinary policy polling.
+      const latest = studentPreview ? runtime : (await api.testRuntime(courseId, groupId, activity.id, studentViewMode, sessionId)).runtime;
+      const answers = await Promise.all(latest.test.items.map(async (item) => {
+        const state = studentPreview ? await createStudentPreviewStateHost<Record<string, unknown>>({
+          courseId, groupId, activityId: `${activity.id}:test-item:${item.id}`, sessionId: studentPreview.sessionId
+        }).load() : item.itemAttempt?.state ?? null;
+        return [item.id, isItemAnswered?.(item, state) ?? false] as const;
+      }));
+      applyRuntime(latest);
+      setReviewAnswers(Object.fromEntries(answers));
+    } catch (reason) {
+      notifications.error(reason instanceof Error ? reason.message : t("courseDetail.testReviewLoadError"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function returnToActivity(index: number) {
+    setSelectedIndex(index);
+    setReviewAnswers(null);
+  }
+
   async function finishTest(onlyIfExpired = false) {
-    if (!runtime?.attempt) return;
+    if (busy || !runtime?.attempt || runtime.attempt.lifecycle !== "started") return;
     if (pendingSaveCount > 0) {
       notifications.error(t("courseDetail.testWaitForSave"));
       return;
@@ -638,6 +679,7 @@ function TestStudentRuntime({
           timing: { ...runtime.timing, expiresAt: null, remainingSeconds: null, isExpired: false }
         });
         setShowSubmitConfirmation(false);
+        setReviewAnswers(null);
         notifications.success(t("courseDetail.testSubmitted"));
         onSubmitted?.();
         return;
@@ -649,6 +691,7 @@ function TestStudentRuntime({
         return;
       }
       setShowSubmitConfirmation(false);
+      setReviewAnswers(null);
       notifications.success(t("courseDetail.testSubmitted"));
       onSubmitted?.();
     } catch (reason) {
@@ -696,6 +739,7 @@ function TestStudentRuntime({
   const attemptStarted = runtime.attempt?.lifecycle === "started" && !runtime.resume.blocked;
   const selectedItem = selectedRuntimeItem;
   const isReadOnly = !attemptStarted;
+  const reviewing = reviewAnswers !== null && attemptStarted;
   const countdownTone = remainingSeconds === null
     ? null
     : getTestCountdownTone(remainingSeconds, runtime.timing.timeLimitMinutes);
@@ -760,82 +804,121 @@ function TestStudentRuntime({
           </div>
         </ActivityLiveControlPortal>
       ) : null}
-      <section className="section stack">
-        <div>
-          <p className="eyebrow">{isReadOnly ? t("courseDetail.testSubmittedLabel") : t("courseDetail.testAttemptNumber", { number: runtime.attempt.attemptNumber })}</p>
-          <h2>{runtime.test.activity.title}</h2>
-        </div>
-        <MarkdownRenderer markdown={runtime.test.activity.description} />
-        <div className="inline-panel">
-          <strong>{t("courseDetail.testActivityPosition", { current: Math.min(selectedIndex + 1, runtime.test.items.length), total: runtime.test.items.length })}</strong>
-        </div>
-        <div className="section-actions" aria-label={t("courseDetail.testActivitiesLabel")}>
-          {runtime.test.items.map((item, index) => {
-            const sequentiallyLocked = runtime.test.settings.navigationMode === "sequential" && index > furthestVisitedIndex;
-            return (
-              <button
-                aria-current={selectedIndex === index ? "step" : undefined}
-                className={selectedIndex === index ? "button" : "button secondary"}
-                disabled={sequentiallyLocked}
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  setSelectedIndex(index);
-                  setFurthestVisitedIndex((current) => Math.max(current, index));
-                }}
-              >
-                {index + 1}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {selectedItem ? (
-        <section className="section stack" key={selectedItem.id}>
+      {reviewing ? (
+        <section className="section stack test-submission-review" aria-labelledby="test-submission-review-heading">
           <div>
-            <p className="eyebrow">{t("courseDetail.testActivityPosition", { current: selectedIndex + 1, total: runtime.test.items.length })}</p>
-            <h2>{selectedItem.activity.title}</h2>
+            <p className="eyebrow">{runtime.test.activity.title}</p>
+            <h2 id="test-submission-review-heading" ref={reviewHeadingRef} tabIndex={-1}>{t("courseDetail.testReviewTitle")}</h2>
+            <p className="muted">{t("courseDetail.testReviewDescription")}</p>
           </div>
-          {runtime.resume.blocked ? (
-            <p className="muted">{t("courseDetail.testResumeDisabledSubmitting")}</p>
-          ) : renderStudentItem && executionHost ? renderStudentItem({
-            runtime,
-            item: selectedItem,
-            disabled: isReadOnly,
-            executionHost
-          }) : <p className="error">{t("courseDetail.testRendererUnavailable")}</p>}
+          <p className="test-review-summary">{t("courseDetail.testReviewCount", {
+            answered: runtime.test.items.filter((item) => reviewAnswers[item.id]).length,
+            total: runtime.test.items.length
+          })}</p>
+          <ol className="test-review-list">
+            {runtime.test.items.map((item, index) => (
+              <li className="test-review-item" key={item.id}>
+                <span className="test-review-number" aria-hidden="true">{index + 1}</span>
+                <strong className="test-review-title">{item.activity.title}</strong>
+                <span className={`metadata-badge${reviewAnswers[item.id] ? "" : " is-warning"}`}>
+                  {t(reviewAnswers[item.id] ? "courseDetail.testAnswered" : "courseDetail.testNotAnswered")}
+                </span>
+                <button className="button secondary" disabled={busy} type="button" onClick={() => returnToActivity(index)}
+                  aria-label={t("courseDetail.testReviewExercise", { title: item.activity.title })}>
+                  {t("courseDetail.testReviewAction")}
+                </button>
+              </li>
+            ))}
+          </ol>
+          <div className="section-actions">
+            <button className="button secondary" disabled={busy} type="button" onClick={() => returnToActivity(selectedIndex)}>
+              {t("courseDetail.testBackToAnswers")}
+            </button>
+            <button className="button" disabled={busy || pendingSaveCount > 0} type="button" onClick={() => setShowSubmitConfirmation(true)}>
+              {t("courseDetail.testSubmitForGrading")}
+            </button>
+          </div>
         </section>
-      ) : null}
+      ) : (
+        <>
+          <section className="section stack">
+            <div>
+              <p className="eyebrow">{isReadOnly ? t("courseDetail.testSubmittedLabel") : t("courseDetail.testAttemptNumber", { number: runtime.attempt.attemptNumber })}</p>
+              <h2>{runtime.test.activity.title}</h2>
+            </div>
+            <MarkdownRenderer markdown={runtime.test.activity.description} />
+            <div className="inline-panel">
+              <strong>{t("courseDetail.testActivityPosition", { current: Math.min(selectedIndex + 1, runtime.test.items.length), total: runtime.test.items.length })}</strong>
+            </div>
+            <div className="section-actions" aria-label={t("courseDetail.testActivitiesLabel")}>
+              {runtime.test.items.map((item, index) => {
+                const sequentiallyLocked = runtime.test.settings.navigationMode === "sequential" && index > furthestVisitedIndex;
+                return (
+                  <button
+                    aria-current={selectedIndex === index ? "step" : undefined}
+                    className={selectedIndex === index ? "button" : "button secondary"}
+                    disabled={sequentiallyLocked || busy || pendingSaveCount > 0}
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedIndex(index);
+                      setFurthestVisitedIndex((current) => Math.max(current, index));
+                    }}
+                  >
+                    {index + 1}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
 
-      <section className="section section-actions">
-        <button className="button secondary" disabled={selectedIndex === 0} type="button" onClick={() => setSelectedIndex((index) => Math.max(0, index - 1))}>
-          {t("courseDetail.testPreviousActivity")}
-        </button>
-        <button
-          className="button secondary"
-          disabled={selectedIndex >= runtime.test.items.length - 1}
-          type="button"
-          onClick={() => {
-            const nextIndex = Math.min(runtime.test.items.length - 1, selectedIndex + 1);
-            setSelectedIndex(nextIndex);
-            setFurthestVisitedIndex((current) => Math.max(current, nextIndex));
-          }}
-        >
-          {t("courseDetail.testNextActivity")}
-        </button>
-        {attemptStarted ? (
-          <button className="button" disabled={busy || pendingSaveCount > 0} type="button" onClick={() => setShowSubmitConfirmation(true)}>
-            {pendingSaveCount > 0 ? t("courseDetail.testSavingAnswers") : t("courseDetail.testSubmit")}
-          </button>
-        ) : null}
-      </section>
+          {selectedItem ? (
+            <section className="section stack" key={selectedItem.id}>
+              <div>
+                <p className="eyebrow">{t("courseDetail.testActivityPosition", { current: selectedIndex + 1, total: runtime.test.items.length })}</p>
+                <h2>{selectedItem.activity.title}</h2>
+              </div>
+              {runtime.resume.blocked ? (
+                <p className="muted">{t("courseDetail.testResumeDisabledSubmitting")}</p>
+              ) : renderStudentItem && executionHost ? renderStudentItem({
+                runtime,
+                item: selectedItem,
+                disabled: isReadOnly,
+                executionHost
+              }) : <p className="error">{t("courseDetail.testRendererUnavailable")}</p>}
+            </section>
+          ) : null}
+
+          <section className="section section-actions">
+            <button className="button secondary" disabled={selectedIndex === 0 || busy || pendingSaveCount > 0} type="button" onClick={() => setSelectedIndex((index) => Math.max(0, index - 1))}>
+              {t("courseDetail.testPreviousActivity")}
+            </button>
+            {selectedIndex < runtime.test.items.length - 1 ? <button
+              className="button secondary"
+              disabled={busy || pendingSaveCount > 0}
+              type="button"
+              onClick={() => {
+                const nextIndex = Math.min(runtime.test.items.length - 1, selectedIndex + 1);
+                setSelectedIndex(nextIndex);
+                setFurthestVisitedIndex((current) => Math.max(current, nextIndex));
+              }}
+            >
+              {t("courseDetail.testNextActivity")}
+            </button> : null}
+            {attemptStarted && selectedIndex === runtime.test.items.length - 1 ? (
+              <button className="button" disabled={busy || pendingSaveCount > 0} type="button" onClick={() => void openSubmissionReview()}>
+                {pendingSaveCount > 0 ? t("courseDetail.testSavingAnswers") : t("courseDetail.testSubmit")}
+              </button>
+            ) : null}
+          </section>
+        </>
+      )}
       <ConfirmationDialog
         open={showSubmitConfirmation}
-        eyebrow={t("courseDetail.testSubmit")}
+        eyebrow={t("courseDetail.testSubmitForGrading")}
         title={t("courseDetail.testSubmitConfirmTitle")}
         message={t("courseDetail.testSubmitConfirmMessage")}
-        confirmLabel={busy ? t("courseDetail.testSubmitting") : t("courseDetail.testSubmit")}
+        confirmLabel={busy ? t("courseDetail.testSubmitting") : t("courseDetail.testSubmitForGrading")}
         cancelLabel={t("courseDetail.testKeepWorking")}
         isConfirming={busy}
         onCancel={() => setShowSubmitConfirmation(false)}

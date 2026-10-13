@@ -101,8 +101,9 @@ test("reopens all compound Test answers and resubmits the same sitting", { tag: 
     await studentPage.getByRole("button", { name: "Start Test", exact: true }).click();
     await studentPage.getByRole("dialog", { name: "Start this Test now?" }).getByRole("button", { name: "Start Test", exact: true }).click();
     await studentPage.getByLabel("Four", { exact: true }).check();
-    await studentPage.getByRole("button", { name: "Submit Test", exact: true }).click();
-    await studentPage.getByRole("dialog").getByRole("button", { name: "Submit Test", exact: true }).click();
+    await studentPage.getByRole("button", { name: "Submit the test", exact: true }).click();
+    await studentPage.getByRole("button", { name: "Submit for grading", exact: true }).click();
+    await studentPage.getByRole("dialog").getByRole("button", { name: "Submit for grading", exact: true }).click();
     await expect(studentPage).toHaveURL(new RegExp(`/groups/${data.groupId}$`));
     const before = await prisma.activityAttempt.findFirstOrThrow({ where: { activityId }, include: { testItemAttempts: true } });
     const settingsPath = `/api/courses/${data.courseId}/activities/${activityId}/assign-all-groups`;
@@ -121,8 +122,9 @@ test("reopens all compound Test answers and resubmits the same sitting", { tag: 
     await studentPage.goto(path.replace("/api", ""));
     await expect(studentPage.getByLabel("Four", { exact: true })).toBeChecked();
     await studentPage.getByLabel("Five", { exact: true }).check();
-    await studentPage.getByRole("button", { name: "Submit Test", exact: true }).click();
-    await studentPage.getByRole("dialog").getByRole("button", { name: "Submit Test", exact: true }).click();
+    await studentPage.getByRole("button", { name: "Submit the test", exact: true }).click();
+    await studentPage.getByRole("button", { name: "Submit for grading", exact: true }).click();
+    await studentPage.getByRole("dialog").getByRole("button", { name: "Submit for grading", exact: true }).click();
     await expect(studentPage).toHaveURL(new RegExp(`/groups/${data.groupId}$`));
     expect(await prisma.activityAttempt.count({ where: { activityId } })).toBe(1);
     const after = await prisma.activityAttempt.findUniqueOrThrow({ where: { id: before.id }, include: { testItemAttempts: true } });

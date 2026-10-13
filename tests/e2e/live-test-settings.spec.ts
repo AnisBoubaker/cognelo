@@ -50,8 +50,9 @@ test("compound Test applies live exceptions and ignores stale automatic submissi
       parentAttemptId: initial.attempt!.id, sessionId: "stale-browser", onlyIfExpired: true
     } }));
     expect(staleSubmission.attempt!.lifecycle).toBe("started");
-    await studentPage.getByRole("button", { name: "Submit Test", exact: true }).click();
-    await studentPage.getByRole("dialog").getByRole("button", { name: "Submit Test", exact: true }).click();
+    await studentPage.getByRole("button", { name: "Submit the test", exact: true }).click();
+    await studentPage.getByRole("button", { name: "Submit for grading", exact: true }).click();
+    await studentPage.getByRole("dialog").getByRole("button", { name: "Submit for grading", exact: true }).click();
     await expect(studentPage).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));
     settings.general.timeLimitMinutes = 90;
     section.exceptions = [];

@@ -770,8 +770,9 @@ test.describe.serial("authoring and completing every activity type", () => {
     await studentPage.getByRole("button", { name: "Next activity" }).click();
     await parsonsStateInitialized;
     await expect(studentPage.getByRole("heading", { name: parsonsTitle, exact: true })).toBeVisible();
-    await studentPage.getByRole("button", { name: "Submit Test" }).click();
-    await studentPage.getByRole("dialog", { name: "Submit the entire Test?" }).getByRole("button", { name: "Submit Test" }).click();
+    await studentPage.getByRole("button", { name: "Submit the test" }).click();
+    await studentPage.getByRole("button", { name: "Submit for grading", exact: true }).click();
+    await studentPage.getByRole("dialog", { name: "Submit the entire Test?" }).getByRole("button", { name: "Submit for grading" }).click();
     await expect(studentPage).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));
     const testRow = studentPage
       .getByText(testTitle, { exact: true })

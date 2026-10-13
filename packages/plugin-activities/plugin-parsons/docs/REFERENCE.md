@@ -118,7 +118,11 @@ Summative submissions do not show correctness feedback during the activity. When
 
 ## UX Notes
 
+The compound Test adapter persists the optional `hasAnswer` field in generic item state: initialization/reset sets it false and a move/indent sets it true. The state schema preserves this marker through grading and reopening. `hasParsonsAnswer` reads it without evaluating order or indentation. Pre-marker drafts with saved blocks count as answered because their earlier interaction history is unavailable. The final review itself never checks correctness.
+
 Course Student view injects an ephemeral attempts client backed by browser session storage. Checks and submission use the pure evaluator and never create plugin attempts or movement/research events.
+
+Learner movement/reset controls stay disabled until the saved arrangement finishes loading, preventing initialization from overwriting an immediate edit or the final Test review from reading before that edit reaches its save queue.
 
 - student rows render in a compact editor-like style
 - syntax highlighting and line numbers come from shared `@cognelo/activity-ui`

@@ -178,7 +178,10 @@ export function ParsonsActivityView({
   const isInstrumentedStudentSession = Boolean(attemptsClient && course?.id && !canManage);
   const assessmentMode = activity.assignment?.metadata?.assessmentMode === "summative" ? "summative" : "formative";
   const isSummativeStudentSession = isInstrumentedStudentSession && assessmentMode === "summative";
-  const isReadOnlyStudentAttempt = isSummativeStudentSession && attempt?.status === "completed";
+  // Do not accept an edit before the saved arrangement is restored. Otherwise
+  // its asynchronous initialization can overtake the edit or the Test review.
+  const isReadOnlyStudentAttempt = (isInstrumentedStudentSession && attempt === null)
+    || (isSummativeStudentSession && attempt?.status === "completed");
   const activityConfigKey = useMemo(() => JSON.stringify(activity.config ?? {}), [activity.config]);
 
   useEffect(() => {

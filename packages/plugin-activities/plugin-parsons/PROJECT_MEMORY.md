@@ -2,6 +2,8 @@
 
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
+- The compound Test answer-review check must inspect response presence only, never correctness or grading evidence; automatically persisted initial state is not a new answer. Preserve the optional response marker through grading/reopening and disable learner edits until the saved arrangement has loaded. See [the reference](docs/REFERENCE.md) for this plugin’s criteria.
+
 - Groups are line ranges; strict/flexible grouping and precedence rules are part of generic activity config.
 - Order feedback counts minimally misplaced units instead of cascading every downstream displacement.
 - Learner attempts and move/indent/reset/check/submit events are plugin-owned; teacher previews remain ephemeral.

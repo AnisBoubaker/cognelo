@@ -171,6 +171,11 @@ test.describe.serial("timed Test countdown", () => {
     await expect(timer).toHaveClass(/test-countdown--critical/);
     await timer.evaluate((element) => element.getAnimations().forEach((animation) => animation.finish()));
     expect(await timer.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(153, 27, 27)");
+    await studentPage.getByRole("button", { name: "Submit the test", exact: true }).click();
+    await expect(studentPage.getByRole("region", { name: "Review your answers" })).toBeVisible();
+    await expect(timer).toBeVisible();
+    await studentPage.getByRole("button", { name: "Submit for grading", exact: true }).click();
+    await expect(studentPage.getByRole("dialog", { name: "Submit the entire Test?" })).toBeVisible();
     await prisma.activityAttempt.updateMany({
       where: { activityId: testActivityId, lifecycle: "started" },
       data: { startedAt: new Date(Date.now() - 31 * 60_000) }

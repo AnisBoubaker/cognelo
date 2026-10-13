@@ -437,7 +437,7 @@ export default function GroupActivityPage() {
 
   return (
     <AppShell>
-      <main className="page stack">
+      <main className="page stack assigned-activity-page">
         <section className="hero-panel hero-panel-compact">
           <div className="hero-meta">
             <p className="eyebrow">{localizedActivityName()}</p>
