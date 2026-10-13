@@ -1072,7 +1072,14 @@ export function CodingExerciseActivityView({
       if (result.status === "warning" && result.warningMessage) {
         notifications.warning(result.warningMessage);
       }
-      notifications.success(result.attempts > 1 ? `${t("generatedTests")} (${result.attempts})` : t("generatedTests"));
+      if (result.sampleTests.length < visibleTestCount || result.hiddenTests.length < hiddenTestCount) {
+        notifications.warning(t("generatedTestsPartial", {
+          visible: result.sampleTests.length, requestedVisible: visibleTestCount,
+          hidden: result.hiddenTests.length, requestedHidden: hiddenTestCount
+        }));
+      } else {
+        notifications.success(result.attempts > 1 ? `${t("generatedTests")} (${result.attempts})` : t("generatedTests"));
+      }
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : t("generateTestsError"));
     } finally {

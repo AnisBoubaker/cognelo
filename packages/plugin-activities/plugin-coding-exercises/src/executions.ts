@@ -775,6 +775,8 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
   hiddenTests: HiddenTestCase[];
   privateConfig: CodingExercisePrivateConfig;
   previousValidationSummary?: unknown;
+  // Generation may retain other passing cases; ordinary saves remain fail-closed.
+  allowPartialResults?: boolean;
 }) {
   const config = parseCodingExerciseConfig(params.activityConfig);
   const sampleTests = params.sampleTests.map((test) => withReferenceValidationFingerprint({
@@ -850,6 +852,7 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
       privateConfig: params.privateConfig,
       languageId: runtime.languageId,
       sourceCode: params.sourceCode,
+      allowPartialResults: params.allowPartialResults,
       cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5)
     };
     sampleExecutedResults = (await validateReferenceSolutionTestGroup({
@@ -995,6 +998,7 @@ async function validateReferenceSolutionTestGroup(params: {
   languageId: number;
   sourceCode: string;
   cpuTimeLimit: number;
+  allowPartialResults?: boolean;
 }) {
   if (!params.tests.length) {
     return {
@@ -1022,15 +1026,30 @@ async function validateReferenceSolutionTestGroup(params: {
       studentSourceCode: params.sourceCode,
       testCode: testCase.testCode
     });
-    const result = await runJudge0Submission({
-      languageId: params.languageId,
-      sourceCode: composedSourceCode,
-      stdin: testCase.stdin,
-      expectedOutput: getJudge0ExpectedOutput(testCase.expectedOutput, testCase),
-      cpuTimeLimit: params.cpuTimeLimit,
-      wallTimeLimit: 10,
-      memoryLimitKb: 128000
-    });
+    let result: Awaited<ReturnType<typeof runJudge0Submission>>;
+    try {
+      result = await runJudge0Submission({
+        languageId: params.languageId,
+        sourceCode: composedSourceCode,
+        stdin: testCase.stdin,
+        expectedOutput: getJudge0ExpectedOutput(testCase.expectedOutput, testCase),
+        cpuTimeLimit: params.cpuTimeLimit,
+        wallTimeLimit: 10,
+        memoryLimitKb: 128000
+      });
+    } catch (error) {
+      if (!params.allowPartialResults) throw error;
+      testResults.push({
+        id: testCase.id,
+        name: testCase.name,
+        passed: false,
+        weight: testCase.weight,
+        validationFingerprint: testCase.validationFingerprint,
+        statusLabel: "Execution unavailable",
+        message: "This generated test could not be validated because execution was unavailable."
+      });
+      continue;
+    }
 
     const comparison = evaluateJudge0Result(result, testCase.expectedOutput, testCase);
     const savedOutput = capJudge0Output(result);

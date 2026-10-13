@@ -107,6 +107,16 @@ const generatedTestsSchema = z
     }
   });
 
+const generatedTestsEnvelopeSchema = generatedTestsSchema.innerType().extend({
+  sampleTests: z.array(z.unknown()).max(codingExerciseMaxGeneratedTestCount),
+  hiddenTests: z.array(z.unknown()).max(codingExerciseMaxGeneratedTestCount)
+});
+type GeneratedTests = z.infer<typeof generatedTestsSchema>;
+type ValidatedGeneratedTests = {
+  tests: GeneratedTests;
+  validationSummary: Record<string, unknown>;
+};
+
 const generatedRubricSchema = z.object({
   criteria: z.array(z.object({
     title: z.string().trim().min(1).max(160),
@@ -335,6 +345,7 @@ export async function generateCodingExerciseTests(input: {
   visibleTestCount?: number;
   hiddenTestCount?: number;
   knowledge?: ActivityGenerationKnowledge;
+  requireCompleteSuite?: boolean;
 }) {
   const visibleTestCount = input.visibleTestCount ?? codingExerciseDefaultVisibleTestCount;
   const hiddenTestCount = input.hiddenTestCount ?? codingExerciseDefaultHiddenTestCount;
@@ -342,13 +353,27 @@ export async function generateCodingExerciseTests(input: {
   let userPrompt = buildTestsInitialPrompt({ ...input, visibleTestCount, hiddenTestCount });
   let lastPayload: unknown = null;
   let lastIssues: string[] = [];
+  let retained: ValidatedGeneratedTests | undefined;
+  const partialResult = (attempts: number) => ({
+    ...retained!.tests,
+    status: "warning" as const,
+    validationSummary: retained!.validationSummary,
+    attempts,
+    knowledgeConceptSelections: undefined
+  });
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
-    const raw = await generateQuestionAuthoringText(input.user, {
-      systemPrompt,
-      userPrompt,
-      maxOutputTokens: 9000
-    });
+    let raw: string;
+    try {
+      raw = await generateQuestionAuthoringText(input.user, {
+        systemPrompt,
+        userPrompt,
+        maxOutputTokens: 9000
+      });
+    } catch (error) {
+      if (retained && !input.requireCompleteSuite) return partialResult(attempt);
+      throw error;
+    }
     const parsed = parseGeneratedJson(raw);
     if (!parsed.ok) {
       lastPayload = raw;
@@ -356,13 +381,15 @@ export async function generateCodingExerciseTests(input: {
       userPrompt = buildTestCorrectionPrompt(
         { ...input, visibleTestCount, hiddenTestCount },
         raw,
-        lastIssues
+        lastIssues,
+        retained?.tests
       );
       continue;
     }
 
     const impossible = generatedImpossibleSchema.safeParse(parsed.value);
     if (impossible.success) {
+      if (retained && !input.requireCompleteSuite) return partialResult(attempt);
       return {
         status: "error" as const,
         message: impossible.data.message,
@@ -378,23 +405,30 @@ export async function generateCodingExerciseTests(input: {
       templateSource: input.templateSource,
       templateVisibleLineNumbers: input.templateVisibleLineNumbers,
       visibleTestCount,
-      hiddenTestCount
+      hiddenTestCount,
+      retained
+    }).catch((error: unknown) => {
+      if (!retained || input.requireCompleteSuite) throw error;
+      return { issues: ["Further test validation was unavailable."] };
     });
-    if (validation.fatalError) {
+    if ("fatalError" in validation && validation.fatalError) {
       throw new AppError(validation.fatalError.status, validation.fatalError.code, validation.fatalError.message, {
         issues: validation.issues
       });
     }
 
-    if (!validation.issues.length && validation.tests && validation.validationSummary) {
+    if ("tests" in validation && validation.tests && validation.validationSummary) {
+      retained = { tests: validation.tests, validationSummary: validation.validationSummary };
+    }
+    if (retained && retained.tests.sampleTests.length === visibleTestCount && retained.tests.hiddenTests.length === hiddenTestCount) {
       const knowledgeConceptSelections = await suggestActivityKnowledgeSelections({
         user: input.user,
         knowledge: input.knowledge ?? { mode: "ignore", concepts: [] },
-        generatedActivity: `${input.prompt}\n\n${input.referenceSolution}\n\n${JSON.stringify(validation.tests)}`
+        generatedActivity: `${input.prompt}\n\n${input.referenceSolution}\n\n${JSON.stringify(retained.tests)}`
       });
       return {
-        ...validation.tests,
-        validationSummary: validation.validationSummary,
+        ...retained.tests,
+        validationSummary: retained.validationSummary,
         attempts: attempt,
         knowledgeConceptSelections
       };
@@ -405,9 +439,12 @@ export async function generateCodingExerciseTests(input: {
     userPrompt = buildTestCorrectionPrompt(
       { ...input, visibleTestCount, hiddenTestCount },
       JSON.stringify(parsed.value, null, 2),
-      validation.issues
+      validation.issues,
+      retained?.tests
     );
   }
+
+  if (retained && !input.requireCompleteSuite) return partialResult(3);
 
   throw new AppError(422, "CODING_EXERCISE_TEST_GENERATION_INVALID", "The AI agent could not generate valid coding exercise tests.", {
     issues: lastIssues,
@@ -774,148 +811,148 @@ async function validateGeneratedTests(input: {
   templateVisibleLineNumbers: number[];
   visibleTestCount: number;
   hiddenTestCount: number;
+  retained?: ValidatedGeneratedTests;
 }) {
-  const parsed = generatedTestsSchema.safeParse(input.payload);
+  const parsed = generatedTestsEnvelopeSchema.safeParse(input.payload);
   if (!parsed.success) {
-    return {
-      issues: parsed.error.issues.map((issue) => `${issue.path.join(".") || "payload"}: ${issue.message}`)
-    };
+    return { issues: parsed.error.issues.map((issue) => `${issue.path.join(".") || "payload"}: ${issue.message}`) };
   }
+  const templateIssues = collectGeneratedTemplateShapeIssues(input.templateSource);
+  if (templateIssues.length) return { issues: templateIssues };
 
-  const tests = {
-    ...parsed.data,
-    sampleTests: parsed.data.sampleTests.map((test) => ({
-      ...test,
-      outputMatchMode: "contains_lines" as const,
-      containsLinesOrderMatters: false
-    })),
-    hiddenTests: parsed.data.hiddenTests.map((test) => ({
-      ...test,
-      outputMatchMode: "contains_lines" as const,
-      containsLinesOrderMatters: false
-    }))
-  };
   const issues: string[] = [];
-  if (tests.sampleTests.length !== input.visibleTestCount) {
-    issues.push(`Generate exactly ${input.visibleTestCount} visible sample tests; received ${tests.sampleTests.length}.`);
+  if (parsed.data.sampleTests.length !== input.visibleTestCount) {
+    issues.push(`Generate exactly ${input.visibleTestCount} visible sample tests; received ${parsed.data.sampleTests.length}.`);
   }
-  if (tests.hiddenTests.length !== input.hiddenTestCount) {
-    issues.push(`Generate exactly ${input.hiddenTestCount} hidden tests; received ${tests.hiddenTests.length}.`);
+  if (parsed.data.hiddenTests.length !== input.hiddenTestCount) {
+    issues.push(`Generate exactly ${input.hiddenTestCount} hidden tests; received ${parsed.data.hiddenTests.length}.`);
   }
-  const allTestIds = [...tests.sampleTests.map((test) => test.id), ...tests.hiddenTests.map((test) => test.id)];
-  const duplicateIds = allTestIds.filter((id, index) => allTestIds.indexOf(id) !== index);
-  if (duplicateIds.length) {
-    issues.push(`Test ids must be unique. Duplicates: ${[...new Set(duplicateIds)].join(", ")}.`);
-  }
-  issues.push(...collectGeneratedTemplateShapeIssues(input.templateSource));
-  const templateUsesTestCode = input.templateSource.includes(codingExerciseTestInsertionToken);
-  const allTests = [
-    ...tests.sampleTests.map((test) => ({ name: test.title || test.id, testCode: test.testCode })),
-    ...tests.hiddenTests.map((test) => ({ name: test.name || test.id, testCode: test.testCode }))
-  ];
-  const testsWithCode = allTests.filter((test) => test.testCode.trim().length > 0);
-  const testsWithoutCode = allTests.filter((test) => test.testCode.trim().length === 0);
-  if (templateUsesTestCode && testsWithoutCode.length) {
-    issues.push(
-      `When templateSource contains ${codingExerciseTestInsertionToken}, every sample and hidden test must include non-empty testCode. Missing: ${testsWithoutCode
-        .map((test) => test.name)
-        .join(", ")}.`
-    );
-  }
-  if (!templateUsesTestCode && testsWithCode.length) {
-    issues.push(
-      `When templateSource does not contain ${codingExerciseTestInsertionToken}, generated tests must leave testCode empty. Present: ${testsWithCode
-        .map((test) => test.name)
-        .join(", ")}.`
-    );
-  }
-  for (const test of tests.sampleTests) {
-    const outputMatcherIssue = validateCodingExerciseOutputMatcher(test.output, test);
-    if (outputMatcherIssue) {
-      issues.push(`Visible test ${JSON.stringify(test.title || test.id)} has invalid expected output: ${outputMatcherIssue}`);
+  const parseTests = <T extends { id: string; testCode: string }>(values: unknown[], schema: z.ZodType<T, z.ZodTypeDef, unknown>, kind: string, expectedOutput: (test: T) => string) =>
+    values.flatMap((value, index) => {
+      const result = schema.safeParse(value);
+      if (!result.success) {
+        issues.push(...result.error.issues.map((issue) => `${kind}.${index}.${issue.path.join(".")}: ${issue.message}`));
+        return [];
+      }
+      const test = { ...result.data, outputMatchMode: "contains_lines" as const, containsLinesOrderMatters: false };
+      const matcherIssue = validateCodingExerciseOutputMatcher(expectedOutput(test), test);
+      if (matcherIssue) {
+        issues.push(`${kind}.${index} has invalid expected output: ${matcherIssue}`);
+        return [];
+      }
+      if (Boolean(test.testCode.trim()) !== input.templateSource.includes(codingExerciseTestInsertionToken)) {
+        issues.push(`${kind}.${index}: testCode must be non-empty only when templateSource contains ${codingExerciseTestInsertionToken}.`);
+        return [];
+      }
+      if ("isEnabled" in test && !test.isEnabled) {
+        issues.push(`${kind}.${index}: generated hidden tests must be enabled for validation.`);
+        return [];
+      }
+      return [test];
+    });
+
+  const retainedIds = new Set([
+    ...input.retained?.tests.sampleTests ?? [], ...input.retained?.tests.hiddenTests ?? []
+  ].map((test) => test.id));
+  const usedIds = new Set(retainedIds);
+  const mergeCandidates = <T extends { id: string }>(retained: T[], candidates: T[], limit: number, signature: (test: T) => string) => {
+    const result = [...retained];
+    const retainedCases = new Set(retained.map(signature));
+    for (const test of candidates) {
+      // A correction cannot change or remove a test that already passed.
+      if (retainedIds.has(test.id) || retainedCases.has(signature(test))) continue;
+      if (usedIds.has(test.id)) {
+        issues.push(`Test ids must be unique. Duplicate: ${test.id}.`);
+        continue;
+      }
+      if (result.length >= limit) continue;
+      usedIds.add(test.id);
+      result.push(test);
     }
-  }
-  for (const test of tests.hiddenTests) {
-    const outputMatcherIssue = validateCodingExerciseOutputMatcher(test.expectedOutput, test);
-    if (outputMatcherIssue) {
-      issues.push(`Hidden test ${JSON.stringify(test.name || test.id)} has invalid expected output: ${outputMatcherIssue}`);
-    }
-  }
+    return result;
+  };
+  let tests: GeneratedTests = {
+    status: parsed.data.status,
+    warningMessage: parsed.data.warningMessage,
+    sampleTests: mergeCandidates(input.retained?.tests.sampleTests ?? [], parseTests(parsed.data.sampleTests, generatedSampleTestSchema, "sampleTests", (test) => test.output), input.visibleTestCount,
+      (test) => JSON.stringify([test.input, test.output, test.testCode])),
+    hiddenTests: mergeCandidates(input.retained?.tests.hiddenTests ?? [], parseTests(parsed.data.hiddenTests, generatedHiddenTestSchema, "hiddenTests", (test) => test.expectedOutput), input.hiddenTestCount,
+      (test) => JSON.stringify([test.stdin, test.expectedOutput, test.testCode]))
+  };
+  if (!tests.sampleTests.length && !tests.hiddenTests.length) return { issues };
 
   const privateConfig = parseCodingExercisePrivateConfig({
     templateSource: input.templateSource,
     templateVisibleLineNumbers: input.templateVisibleLineNumbers
   });
-
-  if (issues.length) {
-    return { issues };
-  }
-
-  const validationSummary = await validateReferenceSolutionAgainstHiddenTests({
+  const validate = (suite: GeneratedTests, previousValidationSummary?: unknown) => validateReferenceSolutionAgainstHiddenTests({
     activityConfig: {
       prompt: input.prompt,
       language: input.language,
       executionMode: "template",
       starterCode: "",
       studentTemplateSource: privateConfig.templateSource,
-      sampleTests: tests.sampleTests,
+      sampleTests: suite.sampleTests,
       maxEditorSeconds: 1800
     },
     sourceCode: input.referenceSolution,
-    sampleTests: tests.sampleTests,
-    hiddenTests: tests.hiddenTests.map((test, index) => ({
-      ...test,
-      orderIndex: index
-    })),
-    privateConfig
+    sampleTests: suite.sampleTests,
+    hiddenTests: suite.hiddenTests.map((test, index) => ({ ...test, orderIndex: index })),
+    privateConfig,
+    allowPartialResults: true,
+    previousValidationSummary
   });
+  let validationSummary = await validate(tests, input.retained?.validationSummary);
   const fatalError = getFatalReferenceValidationError(validationSummary);
-  if (fatalError) {
-    return { issues: collectValidationIssues(validationSummary), fatalError };
-  }
+  if (fatalError) return { issues: [...issues, ...collectValidationIssues(validationSummary)], fatalError };
 
   if (!validationSummary.accepted) {
     const repairedTests = repairTestExpectedOutputsFromValidation(tests, validationSummary);
     if (repairedTests) {
-      const repairedValidationSummary = await validateReferenceSolutionAgainstHiddenTests({
-        activityConfig: {
-          prompt: input.prompt,
-          language: input.language,
-          executionMode: "template",
-          starterCode: "",
-          studentTemplateSource: privateConfig.templateSource,
-          sampleTests: repairedTests.sampleTests,
-          maxEditorSeconds: 1800
-        },
-        sourceCode: input.referenceSolution,
-        sampleTests: repairedTests.sampleTests,
-        hiddenTests: repairedTests.hiddenTests.map((test, index) => ({
-          ...test,
-          orderIndex: index
-        })),
-        privateConfig
-      });
-
-      if (repairedValidationSummary.accepted) {
-        return {
-          tests: repairedTests,
-          validationSummary: repairedValidationSummary,
-          issues: []
-        };
+      try {
+        const repairedSummary = await validate(repairedTests, validationSummary);
+        tests = repairedTests;
+        validationSummary = repairedSummary;
+      } catch {
+        // Keep the original passing results if a correction cannot be executed.
+        issues.push("Expected-output correction could not be validated.");
       }
     }
   }
+  if (validationSummary.accepted) return { tests, validationSummary, issues };
 
-  if (!validationSummary.accepted) {
-    return {
-      issues: collectValidationIssues(validationSummary)
-    };
-  }
-
+  issues.push(...collectValidationIssues(validationSummary));
+  const sampleResults = getValidationTests(validationSummary.sampleTests).filter((test) => test.passed === true);
+  const hiddenResults = getValidationTests(validationSummary.hiddenTests).filter((test) => test.passed === true);
+  const sampleIds = new Set(sampleResults.map((test) => test.id));
+  const hiddenIds = new Set(hiddenResults.map((test) => test.id));
+  tests = {
+    ...tests,
+    sampleTests: tests.sampleTests.filter((test) => sampleIds.has(test.id)),
+    hiddenTests: tests.hiddenTests.filter((test) => hiddenIds.has(test.id))
+  };
+  if (!tests.sampleTests.length && !tests.hiddenTests.length) return { issues };
+  const passingGroup = (results: Array<Record<string, unknown>>) => ({
+    accepted: true,
+    testCount: results.length,
+    passedCount: results.length,
+    executedTestCount: 0,
+    reusedTestCount: results.length,
+    earnedWeight: results.reduce((sum, test) => sum + Number(test.weight ?? 1), 0),
+    totalWeight: results.reduce((sum, test) => sum + Number(test.weight ?? 1), 0),
+    tests: results
+  });
   return {
     tests,
-    validationSummary,
-    issues: []
+    validationSummary: {
+      ...validationSummary,
+      accepted: true,
+      sampleTests: passingGroup(sampleResults),
+      hiddenTests: passingGroup(hiddenResults),
+      executedTestCount: 0,
+      reusedTestCount: sampleResults.length + hiddenResults.length
+    },
+    issues
   };
 }
 
@@ -977,7 +1014,7 @@ function getFatalReferenceValidationError(validationSummary: Record<string, unkn
     ...getValidationTests(validationSummary.hiddenTests)
   ];
   const failed = results.filter((test) => test.passed === false);
-  if (!failed.length) return null;
+  if (!failed.length || failed.length !== results.length) return null;
   if (failed.every((test) => String(test.statusLabel ?? "").toLowerCase().includes("compilation error"))) {
     return {
       status: 422,
@@ -985,11 +1022,11 @@ function getFatalReferenceValidationError(validationSummary: Record<string, unkn
       message: "Judge0 could not compile the reviewed reference solution. Test generation cannot correct a compiler or sandbox failure; verify the reference solution and Judge0 runtime."
     };
   }
-  if (failed.every((test) => String(test.statusLabel ?? "").toLowerCase().includes("internal error"))) {
+  if (failed.every((test) => /internal error|execution unavailable/i.test(String(test.statusLabel ?? "")))) {
     return {
       status: 503,
       code: "JUDGE0_EXECUTION_UNAVAILABLE",
-      message: "Judge0 could not execute the reference solution because its sandbox returned an internal error. Check the Judge0 server and worker logs."
+      message: "Judge0 could not execute the reference solution. Check the Judge0 server and worker logs."
     };
   }
   return null;
@@ -1003,7 +1040,7 @@ function repairTestExpectedOutputsFromValidation(
   const hiddenResults = getValidationTests(validationSummary.hiddenTests);
   const failedResults = [...sampleResults, ...hiddenResults].filter((test) => test.passed === false);
 
-  if (!failedResults.length || failedResults.some((test) => !isWrongAnswerWithStdout(test))) {
+  if (!failedResults.some(isWrongAnswerWithStdout)) {
     return null;
   }
 
@@ -1060,7 +1097,8 @@ function getValidationTests(group: unknown) {
 function isWrongAnswerWithStdout(test: Record<string, unknown>) {
   const statusId = typeof test.statusId === "number" ? test.statusId : null;
   const statusLabel = typeof test.statusLabel === "string" ? test.statusLabel : "";
-  return (statusId === 4 || /wrong answer/i.test(statusLabel)) && typeof test.stdout === "string";
+  return (statusId === 4 || /wrong answer/i.test(statusLabel)) && typeof test.stdout === "string"
+    && test.stdout.trim().length > 0 && test.outputTruncated !== true;
 }
 
 function isMissingProvidedContextError(message: string) {
@@ -1155,7 +1193,8 @@ function buildTestCorrectionPrompt(
     hiddenTestCount: number;
   },
   previous: string,
-  issues: string[]
+  issues: string[],
+  retained?: GeneratedTests
 ) {
   return [
     "The previous JSON payload failed execution validation. Return the full corrected JSON payload only.",
@@ -1169,6 +1208,11 @@ function buildTestCorrectionPrompt(
     "",
     "Validation issues:",
     ...issues.map((issue) => `- ${issue}`),
+    ...(retained ? [
+      "",
+      "These tests already passed and must be kept unchanged, including their IDs. Correct or replace only the other cases to reach the requested counts:",
+      JSON.stringify(retained)
+    ] : []),
     "",
     "Complete immutable exercise context:",
     buildTestsInitialPrompt(input),
