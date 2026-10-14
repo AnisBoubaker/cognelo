@@ -3,9 +3,11 @@ import type { CurrentUser } from "@cognelo/contracts";
 import { applyAssignmentExceptions, resolveAssignmentExceptions } from "./activity-assignment-exceptions";
 
 const db = vi.hoisted(() => ({
+  $transaction: vi.fn(), $queryRaw: vi.fn(),
+  testSubmissionClaim: { findUnique: vi.fn() },
   courseGroupParticipant: { findFirst: vi.fn() },
   test: { findFirst: vi.fn() },
-  activityAttempt: { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+  activityAttempt: { findMany: vi.fn(), findFirst: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn() },
   testItemAttempt: { findUnique: vi.fn(), upsert: vi.fn(), update: vi.fn() },
   testRevision: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn() }
 }));
@@ -130,6 +132,9 @@ describe("compound Test execution", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-08-07T10:00:00.000Z"));
     vi.clearAllMocks();
+    db.$transaction.mockImplementation((run) => run(db));
+    db.activityAttempt.findUniqueOrThrow.mockResolvedValue(parentAttempt());
+    db.testSubmissionClaim.findUnique.mockResolvedValue(null);
     groups.getGroupAssignedActivity.mockResolvedValue({
       id: "assignment-1",
       activityType: { key: "test" },
@@ -278,6 +283,18 @@ describe("compound Test execution", () => {
       { answers: { "question-1": ["late-change"] } }
     )).resolves.toBe(gradedItemAttempt);
 
+    expect(db.testItemAttempt.upsert).not.toHaveBeenCalled();
+  });
+
+  it("does not write an autosave queued before recovery or a submission claim", async () => {
+    const saved = { id: "item-attempt-1", lifecycle: "started", result: { state: { sourceCode: "saved" } } };
+    db.activityAttempt.findFirst.mockResolvedValue(parentAttempt());
+    db.testItemAttempt.findUnique.mockResolvedValue(saved);
+    db.activityAttempt.findUniqueOrThrow.mockResolvedValue(parentAttempt({ lifecycle: "submitted" }));
+    await expect(saveTestItemAttemptState(student, "course-1", "group-1", "test-activity-1", "parent-attempt-1", "item-1", { sourceCode: "late" })).resolves.toEqual(saved);
+    db.activityAttempt.findUniqueOrThrow.mockResolvedValue(parentAttempt());
+    db.testSubmissionClaim.findUnique.mockResolvedValue({ status: "processing" });
+    await expect(saveTestItemAttemptState(student, "course-1", "group-1", "test-activity-1", "parent-attempt-1", "item-1", { sourceCode: "late" })).resolves.toEqual(saved);
     expect(db.testItemAttempt.upsert).not.toHaveBeenCalled();
   });
 

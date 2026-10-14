@@ -40,3 +40,5 @@ Teachers can opt into the shared [Solution tab](../../../docs/ACTIVITY_SOLUTIONS
 - Playwright-backed learner runs/submissions and teacher saves that validate tests or capture expected-result screenshots use the platform shared blocking, indeterminate progress dialog. Variation uses the host job's real progress.
 
 When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an invariant changed, and the relevant detailed section.
+
+Expired compound Test responses can be [recovered from teacher results](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#timeout-recovery) without running a grader. The teacher’s later automatic-grading action uses this plugin’s existing composite handler for recovered, ungraded children.

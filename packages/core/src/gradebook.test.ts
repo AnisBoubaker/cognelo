@@ -1,3 +1,5 @@
+import { recoverExpiredTestAttempts } from "./test-timeout-recovery";
+vi.mock("./test-timeout-recovery", () => ({ recoverExpiredTestAttempts: vi.fn().mockResolvedValue(0) }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
@@ -1197,6 +1199,15 @@ describe("gradebook attempt services", () => {
         groupId: { in: ["group-1"] }
       })
     }));
+    expect(recoverExpiredTestAttempts).toHaveBeenCalledWith({ courseId: "course-1", activityId: "activity-1", groupId: { in: ["group-1"] } }, teacherUser.id);
+  });
+
+  it("never recovers attempts when gradebook authorization fails", async () => {
+    authMocks.assertCanViewCourseGradebook.mockRejectedValueOnce(new Error("Forbidden"));
+    await expect(listCourseActivityInProgressAttempts(teacherUser, "course-1", "activity-1")).rejects.toThrow("Forbidden");
+    authMocks.assertCanViewCourseGradebook.mockRejectedValueOnce(new Error("Forbidden"));
+    await expect(getCourseGradebook(teacherUser, "course-1")).rejects.toThrow("Forbidden");
+    expect(recoverExpiredTestAttempts).not.toHaveBeenCalled();
   });
 
   it("backfills missing gradebook items from existing group activity assignments before listing", async () => {

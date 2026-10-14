@@ -22,3 +22,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Teacher authoring uses the shared guarded draft and `EditActionBar`.
 
 - [Submission continuation](../../../docs/SUBMISSION_CONTINUATION.md): Restores the submitted arrangement on its existing plugin attempt, reopens it, and clears completion/evaluation state after archiving prior state/results. Existing interaction events are retained; ordinary resubmission reuses the core attempt. Restore through the host transaction; reopening preserves the original start and applies current exceptions.
+
+- [Compound Test timeout recovery](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#timeout-recovery) preserves the saved response without a plugin execution or invented grade. Later teacher-triggered grading uses the existing composite handler and keeps its ordinary private-artifact and release boundaries.

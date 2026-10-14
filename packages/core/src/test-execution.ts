@@ -1,6 +1,8 @@
+import { applyAssignmentExceptions, exceptionsForParticipant, loadAssignmentExceptions } from "./activity-assignment-exceptions";
 import { lockTestAuthoring } from "./activity-authoring-live";
 import { createHash } from "node:crypto";
 import { getActivityDefinition, type ActivityGradingResult } from "@cognelo/activity-sdk";
+import { resolveCompositeExecutionSubmissionHandler } from "@cognelo/activity-sdk/server";
 import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import { AppError, forbidden, notFound } from "./errors";
@@ -14,6 +16,7 @@ import {
 import { assignmentAttemptExpiresAt, assignmentTimeLimitMinutes } from "./activity-assignment-policy";
 import { getGroupAssignedActivity } from "./groups";
 import { extractMediaAssetIds, reconcileMediaAssetReferences } from "./media-assets";
+import { assertActivityTypePluginEnabled } from "./plugins";
 
 const CORE_TEST_RUNTIME_KEY = "core:test";
 const CORE_TEST_RUNTIME_VERSION = "0.1.0";
@@ -186,17 +189,28 @@ export async function saveTestItemAttemptState(
   }
   assertTestAttemptWithinTime(context.parentAttempt, context.assignedActivity.assignment);
   assertTestAttemptResumePolicy(context.parentAttempt, options.sessionId, context.test.settings);
-  return prisma.testItemAttempt.upsert({
-    where: { parentAttemptId_testItemId: { parentAttemptId, testItemId } },
-    update: { result: { ...asRecord(context.itemAttempt?.result), state, configSnapshot: options.configSnapshot ?? context.item.activity.config } as Prisma.InputJsonValue },
-    create: {
-      parentAttemptId,
-      testItemId,
-      activityId: context.item.activityId,
-      lifecycle: "started",
-      result: { state, configSnapshot: options.configSnapshot ?? context.item.activity.config } as Prisma.InputJsonValue,
-      activityConfigFingerprint: fingerprint(context.item.activity.config)
+  return prisma.$transaction(async (tx) => {
+    // Serialize with expiry recovery so a queued autosave cannot alter submitted work.
+    await tx.$queryRaw`SELECT id FROM "ActivityAttempt" WHERE id = ${parentAttemptId} FOR UPDATE`;
+    const parent = await tx.activityAttempt.findUniqueOrThrow({ where: { id: parentAttemptId } });
+    const saved = await tx.testItemAttempt.findUnique({ where: { parentAttemptId_testItemId: { parentAttemptId, testItemId } } });
+    const claim = await tx.testSubmissionClaim.findUnique({ where: { parentAttemptId } });
+    if (parent.lifecycle !== "started" || (saved && saved.lifecycle !== "started") || claim?.status === "processing") {
+      if (saved) return saved;
+      throw notFound("Test item attempt");
     }
+    return tx.testItemAttempt.upsert({
+      where: { parentAttemptId_testItemId: { parentAttemptId, testItemId } },
+      update: { result: { ...asRecord(context.itemAttempt?.result), state, configSnapshot: options.configSnapshot ?? context.item.activity.config } as Prisma.InputJsonValue },
+      create: {
+        parentAttemptId,
+        testItemId,
+        activityId: context.item.activityId,
+        lifecycle: "started",
+        result: { state, configSnapshot: options.configSnapshot ?? context.item.activity.config } as Prisma.InputJsonValue,
+        activityConfigFingerprint: fingerprint(context.item.activity.config)
+      }
+    });
   });
 }
 
@@ -341,6 +355,7 @@ export async function claimTestAttemptSubmission(parentAttemptId: string) {
     await prisma.$transaction(async (tx) => {
       const attempt = await tx.activityAttempt.findUniqueOrThrow({ where: { id: parentAttemptId }, select: { activityId: true } });
       await lockTestAuthoring(tx, attempt.activityId);
+      await tx.$queryRaw`SELECT id FROM "ActivityAttempt" WHERE id = ${parentAttemptId} FOR UPDATE`;
       await tx.testSubmissionClaim.create({ data: { parentAttemptId, status: "processing" } });
     });
     return true;
@@ -358,6 +373,72 @@ export async function claimTestAttemptSubmission(parentAttemptId: string) {
   }
 }
 
+/** Internal recovery, independent of a learner session. Never runs a grader. */
+export async function recoverExpiredTestAttempt(
+  parentAttemptId: string,
+  options: { now?: Date; graceMilliseconds?: number; actorUserId?: string } = {}
+) {
+  const now = options.now ?? new Date();
+  return prisma.$transaction(async (tx) => {
+    const identity = await tx.activityAttempt.findUnique({ where: { id: parentAttemptId }, select: { activityId: true } });
+    if (!identity) return false;
+    await lockTestAuthoring(tx, identity.activityId);
+    await tx.$queryRaw`SELECT id FROM "ActivityAttempt" WHERE id = ${parentAttemptId} FOR UPDATE`;
+    const attempt = await tx.activityAttempt.findUnique({ where: { id: parentAttemptId }, include: {
+      groupActivity: true, testSubmissionClaim: true, testItemAttempts: true
+    } });
+    if (!attempt || attempt.pluginKey !== CORE_TEST_RUNTIME_KEY || attempt.lifecycle !== "started") return false;
+    const claim = attempt.testSubmissionClaim;
+    if (claim?.status === "processing" && claim.updatedAt.getTime() > now.getTime() - 30 * 60_000) return false;
+    const exceptions = await loadAssignmentExceptions([attempt.groupActivityId], tx);
+    const assignment = applyAssignmentExceptions(attempt.groupActivity, exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId));
+    const minutes = assignmentTimeLimitMinutes(assignment.metadata);
+    const deadline = assignmentAttemptExpiresAt(attempt.startedAt, minutes, assignment.availableUntil);
+    if (!deadline || deadline.getTime() + (options.graceMilliseconds ?? 30_000) > now.getTime()) return false;
+    const test = await tx.test.findFirst({ where: { activityId: attempt.activityId }, include: runtimeTestInclude });
+    if (!test) return false;
+    const revision = await ensureCurrentTestRevision({ test }, tx);
+    const items = orderedLiveItems(activeRuntimeItems(test.items), attempt.metadata, test.settings);
+    for (const item of items) {
+      const saved = attempt.testItemAttempts.find((entry) => entry.testItemId === item.id);
+      if (saved && saved.lifecycle !== "started") continue;
+      await tx.testItemAttempt.upsert({
+        where: { parentAttemptId_testItemId: { parentAttemptId, testItemId: item.id } },
+        update: { lifecycle: "submitted", submittedAt: deadline, normalizedMaxScore: item.pointsPossible },
+        create: {
+          parentAttemptId, testItemId: item.id, activityId: item.activityId,
+          lifecycle: "submitted", submittedAt: deadline, normalizedMaxScore: item.pointsPossible,
+          result: { state: {}, configSnapshot: item.activity.config } as Prisma.InputJsonValue
+        }
+      });
+    }
+    const recovery = { reason: "expired_test_recovery", recoveredAt: now.toISOString(), deadline: deadline.toISOString(), gradingPending: true };
+    const metadata = {
+      ...asRecord(attempt.metadata), timedOut: true, timeoutRecovery: recovery,
+      submittedTimeLimitMinutes: minutes, submittedAvailableUntil: assignment.availableUntil?.toISOString() ?? null,
+      submittedItemIds: items.map((item) => item.id),
+      submissionManifest: {
+        ...asRecord(asRecord(attempt.metadata).manifest), testRevisionId: revision.id, revisionNumber: revision.revisionNumber,
+        settings: withAssignmentTimeLimit(test.settings, assignment.metadata),
+        items: items.map((item) => ({ testItemId: item.id, activityId: item.activityId, activityTypeKey: item.activity.activityType.key,
+          title: item.activity.title, position: item.position, pointsPossible: item.pointsPossible, isRequired: item.isRequired }))
+      }
+    } as Prisma.InputJsonValue;
+    await tx.activityAttempt.update({ where: { id: parentAttemptId }, data: {
+      lifecycle: "submitted", submittedAt: deadline, durationSeconds: Math.max(0, Math.round((deadline.getTime() - attempt.startedAt.getTime()) / 1000)),
+      isLate: false, lateBySeconds: 0, pluginAttemptRef: parentAttemptId, testRevisionId: revision.id, metadata
+    } });
+    await tx.testSubmissionClaim.upsert({ where: { parentAttemptId }, create: { parentAttemptId, status: "completed" }, update: { status: "completed" } });
+    await tx.courseAuditEvent.create({ data: {
+      courseId: attempt.courseId, actorUserId: options.actorUserId ?? null, eventType: "test_timeout_recovered",
+      targetType: "ActivityAttempt", targetId: parentAttemptId,
+      previousValue: { lifecycle: attempt.lifecycle, submittedAt: null },
+      nextValue: { lifecycle: "submitted", submittedAt: deadline.toISOString() }, metadata: recovery
+    } });
+    return true;
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30_000 });
+}
+
 export async function completeTestAttemptSubmission(parentAttemptId: string) {
   await prisma.testSubmissionClaim.update({ where: { parentAttemptId }, data: { status: "completed" } });
 }
@@ -372,7 +453,66 @@ export async function regradeTestAttempt(
   parentAttemptId: string,
   reason?: string | null
 ) {
+  await gradeRecoveredTestResponses(user, courseId, parentAttemptId);
   return recordTestAttemptGrade(user, courseId, parentAttemptId, "regrade", reason);
+}
+
+/** Recovery preserves responses without a runner dependency. A teacher can grade them later. */
+async function gradeRecoveredTestResponses(user: CurrentUser, courseId: string, parentAttemptId: string) {
+  await getActivityAttemptRegradeContext(user, courseId, parentAttemptId);
+  const parent = await prisma.activityAttempt.findFirst({
+    where: { id: parentAttemptId, courseId, pluginKey: CORE_TEST_RUNTIME_KEY, lifecycle: "submitted" },
+    include: { user: true, testItemAttempts: { include: { activity: { include: { activityType: true } } } } }
+  });
+  if (!parent?.user || !asRecord(parent.metadata).timeoutRecovery) return;
+  const pending = parent.testItemAttempts.filter((item) => item.lifecycle === "submitted" && manifestItemIds(parent.metadata).has(item.testItemId));
+  if (!pending.length) return;
+  const claimed = await prisma.testSubmissionClaim.updateMany({
+    where: { parentAttemptId, OR: [{ status: "completed" }, { status: "processing", updatedAt: { lt: new Date(Date.now() - 30 * 60_000) } }] },
+    data: { status: "processing" }
+  });
+  if (!claimed.count) throw new AppError(409, "TEST_SUBMISSION_IN_PROGRESS", "This Test submission is already being processed.");
+  const learner: CurrentUser = { id: parent.user.id, email: parent.user.email, name: parent.user.name,
+    firstName: parent.user.firstName, lastName: parent.user.lastName, roles: ["student"] };
+  try {
+    for (const item of pending) {
+      const activityTypeKey = item.activity.activityType.key;
+      await assertActivityTypePluginEnabled(activityTypeKey);
+      const submit = resolveCompositeExecutionSubmissionHandler(activityTypeKey);
+      if (!submit) continue;
+      const result = await submit({ user: learner, courseId, groupId: parent.groupId, parentAttemptId,
+        testItemId: item.testItemId,
+        activity: { ...item.activity, config: asRecord(item.activity.config), metadata: asRecord(item.activity.metadata) },
+        payload: reconcileItemState(item.activity, item.result)
+      });
+      const grade = result.gradingResult;
+      if (grade && (!Number.isFinite(grade.rawScore) || !Number.isFinite(grade.rawMaxScore) || grade.rawMaxScore <= 0)) {
+        throw new AppError(422, "TEST_ITEM_GRADING_RESULT_INVALID", "The activity returned an invalid score.");
+      }
+      const points = manifestItems(parent.metadata).find((entry) => entry.testItemId === item.testItemId)?.pointsPossible ?? item.normalizedMaxScore ?? 0;
+      await prisma.$transaction(async (tx) => {
+        await lockTestAuthoring(tx, parent.activityId);
+        const current = await tx.activityAttempt.findUniqueOrThrow({ where: { id: parentAttemptId } });
+        if (current.lifecycle !== "submitted" || current.updatedAt.getTime() !== parent.updatedAt.getTime()) {
+          throw new AppError(409, "TEST_ATTEMPT_CHANGED", "The Test attempt changed while grading. Reload its results.");
+        }
+        const updated = await tx.testItemAttempt.update({ where: { id: item.id, updatedAt: item.updatedAt, lifecycle: "submitted" }, data: {
+          lifecycle: grade ? "graded" : "submitted", gradedAt: grade ? new Date() : null,
+          rawScore: grade?.rawScore ?? null, rawMaxScore: grade?.rawMaxScore ?? null,
+          normalizedScore: grade ? grade.rawScore / grade.rawMaxScore * points : null,
+          normalizedMaxScore: points,
+          result: { ...asRecord(item.result), state: result.state, configSnapshot: item.activity.config, analyticsPayload: grade?.analyticsPayload ?? {}, metadata: grade?.metadata ?? {} } as Prisma.InputJsonValue,
+          feedback: (grade?.feedback ?? {}) as Prisma.InputJsonValue
+        } });
+        await tx.courseAuditEvent.create({ data: {
+          courseId, actorUserId: user.id, eventType: "test_recovered_response_graded", targetType: "TestItemAttempt", targetId: item.id,
+          previousValue: { lifecycle: item.lifecycle, result: item.result, rawScore: item.rawScore, rawMaxScore: item.rawMaxScore } as Prisma.InputJsonValue,
+          nextValue: { lifecycle: updated.lifecycle, result: updated.result, rawScore: updated.rawScore, rawMaxScore: updated.rawMaxScore } as Prisma.InputJsonValue,
+          metadata: { parentAttemptId }
+        } });
+      });
+    }
+  } finally { await completeTestAttemptSubmission(parentAttemptId); }
 }
 
 export async function getTestAttemptReview(user: CurrentUser, courseId: string, parentAttemptId: string) {
@@ -766,7 +906,7 @@ function assertTestAttemptResumePolicy(attempt: { metadata: unknown }, sessionId
   }
 }
 
-async function ensureCurrentTestRevision(context: Awaited<ReturnType<typeof resolveTestRuntimeContext>>) {
+async function ensureCurrentTestRevision(context: Pick<Awaited<ReturnType<typeof resolveTestRuntimeContext>>, "test">, db: Prisma.TransactionClient | typeof prisma = prisma) {
   const snapshot = {
     title: context.test.activity.title,
     description: context.test.activity.description,
@@ -786,21 +926,21 @@ async function ensureCurrentTestRevision(context: Awaited<ReturnType<typeof reso
     }))
   };
   const revisionFingerprint = fingerprint(snapshot);
-  const existing = await prisma.testRevision.findUnique({
+  const existing = await db.testRevision.findUnique({
     where: { testId_fingerprint: { testId: context.test.id, fingerprint: revisionFingerprint } },
     include: { items: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } }
   });
   if (existing) {
-    await ensureTestRevisionMediaReferences(existing, snapshot);
+    await ensureTestRevisionMediaReferences(existing, snapshot, db);
     return existing;
   }
-  const latest = await prisma.testRevision.findFirst({
+  const latest = await db.testRevision.findFirst({
     where: { testId: context.test.id },
     orderBy: { revisionNumber: "desc" },
     select: { revisionNumber: true }
   });
   try {
-    const revision = await prisma.testRevision.create({
+    const revision = await db.testRevision.create({
       data: {
         testId: context.test.id,
         revisionNumber: (latest?.revisionNumber ?? 0) + 1,
@@ -818,16 +958,16 @@ async function ensureCurrentTestRevision(context: Awaited<ReturnType<typeof reso
       },
       include: { items: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } }
     });
-    await ensureTestRevisionMediaReferences(revision, snapshot);
+    await ensureTestRevisionMediaReferences(revision, snapshot, db);
     return revision;
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      const raced = await prisma.testRevision.findUnique({
+      const raced = await db.testRevision.findUnique({
         where: { testId_fingerprint: { testId: context.test.id, fingerprint: revisionFingerprint } },
         include: { items: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] } }
       });
       if (raced) {
-        await ensureTestRevisionMediaReferences(raced, snapshot);
+        await ensureTestRevisionMediaReferences(raced, snapshot, db);
         return raced;
       }
     }
@@ -841,10 +981,11 @@ async function ensureTestRevisionMediaReferences(
     description: string;
     settings: unknown;
     items: Array<{ description: string; config: unknown }>;
-  }
+  },
+  db: Prisma.TransactionClient | typeof prisma
 ) {
   if (!extractMediaAssetIds(snapshot).size) return;
-  await prisma.$transaction(async (tx) => {
+  const reconcile = async (tx: Prisma.TransactionClient) => {
     await reconcileMediaAssetReferences(tx, { testRevisionId: revision.id }, {
       description: snapshot.description,
       settings: snapshot.settings
@@ -857,7 +998,9 @@ async function ensureTestRevisionMediaReferences(
         config: item.config
       }, { trustedCopy: true });
     }
-  });
+  };
+  if ("$transaction" in db) await db.$transaction(reconcile);
+  else await reconcile(db);
 }
 
 function buildTestTiming(settingsValue: unknown, attempt: { lifecycle?: unknown; startedAt?: unknown } | null, availableUntil?: Date | null) {

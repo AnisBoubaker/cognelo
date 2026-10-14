@@ -144,6 +144,18 @@ describe("whole Test submission route", () => {
     await expect(response.json()).resolves.toEqual({ runtime: previousRuntime });
   });
 
+  it("rechecks a live extension after obtaining the submission claim", async () => {
+    mocks.readJson.mockResolvedValue({ parentAttemptId: "parent-attempt-1", sessionId: "session-1", onlyIfExpired: true });
+    const runtime = { attempt: { id: "parent-attempt-1", lifecycle: "started" }, timing: { isExpired: false }, test: { items: [] } };
+    mocks.getTestRuntime.mockResolvedValueOnce({ ...runtime, timing: { isExpired: true } }).mockResolvedValueOnce(runtime);
+    const response = await POST(new Request("http://test.local", { method: "POST" }) as never, {
+      params: Promise.resolve({ courseId: "course-1", groupId: "group-1", activityId: "test-activity-1" })
+    });
+    await expect(response.json()).resolves.toEqual({ runtime });
+    expect(mocks.releaseTestAttemptSubmission).toHaveBeenCalledWith("parent-attempt-1");
+    expect(mocks.handler).not.toHaveBeenCalled();
+  });
+
   it("rejects a concurrent final submission before dispatching child handlers", async () => {
     mocks.claimTestAttemptSubmission.mockResolvedValue(false);
 

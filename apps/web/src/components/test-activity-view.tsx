@@ -26,6 +26,7 @@ import type { Locale } from "@/lib/i18n";
 import { createStudentPreviewStateHost } from "@/lib/student-preview-state-host";
 import { formatRemainingTime, getTestCountdownTone, shouldAutoSubmitTestAttempt } from "@/lib/test-countdown";
 import { ActivityLiveControlPortal } from "@/components/activity-live-controls";
+import { useServerCountdown } from "@/lib/use-server-countdown";
 
 type Props = {
   activity: Activity;
@@ -462,7 +463,9 @@ function TestStudentRuntime({
   const [showSubmitConfirmation, setShowSubmitConfirmation] = useState(false);
   const [reviewAnswers, setReviewAnswers] = useState<Record<string, boolean> | null>(null);
   const reviewHeadingRef = useRef<HTMLHeadingElement>(null);
-  const [clock, setClock] = useState(() => Date.now());
+  const remainingSeconds = useServerCountdown(runtime?.timing);
+  const [autoSubmitRetry, setAutoSubmitRetry] = useState(0);
+  const autoSubmitRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [sessionId] = useState(() => globalThis.crypto?.randomUUID?.() ?? `test-session-${Date.now()}-${Math.random()}`);
   const autoSubmittedAttemptRef = useRef<string | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -528,14 +531,26 @@ function TestStudentRuntime({
         } : next);
         setSelectedIndex((index) => selectedPosition >= 0 ? selectedPosition : Math.min(index, Math.max(0, next.test.items.length - 1)));
         onNewAttemptAvailabilityChange?.(next.attempt?.lifecycle === "started" || next.availability.canStart);
-        if (!next.timing.isExpired) autoSubmittedAttemptRef.current = null;
+        onPreviousSubmissionsAvailabilityChange?.(next.hasPreviousSubmissions);
       } catch { /* Access changes are handled by the assigned activity host. */ }
       finally { refreshing = false; }
     }
     const interval = window.setInterval(() => void refreshPolicy(), 20_000);
     window.addEventListener("focus", refreshPolicy);
     return () => { cancelled = true; window.clearInterval(interval); window.removeEventListener("focus", refreshPolicy); };
-  }, [activity.id, courseId, groupId, sessionId, studentPreview, studentViewMode, onNewAttemptAvailabilityChange]);
+  }, [activity.id, courseId, groupId, sessionId, studentPreview, studentViewMode, onNewAttemptAvailabilityChange, onPreviousSubmissionsAvailabilityChange]);
+
+  useEffect(() => () => {
+    if (autoSubmitRetryTimer.current) clearTimeout(autoSubmitRetryTimer.current);
+  }, []);
+
+  function retryAutomaticSubmission() {
+    if (autoSubmitRetryTimer.current) clearTimeout(autoSubmitRetryTimer.current);
+    autoSubmitRetryTimer.current = setTimeout(() => {
+      autoSubmittedAttemptRef.current = null;
+      setAutoSubmitRetry((value) => value + 1);
+    }, 20_000);
+  }
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -714,7 +729,9 @@ function TestStudentRuntime({
       const result = await api.submitTestAttempt(courseId, groupId, activity.id, runtime.attempt.id, sessionId, onlyIfExpired);
       applyRuntime(result.runtime);
       if (result.runtime.attempt?.lifecycle === "started") {
-        autoSubmittedAttemptRef.current = null;
+        // A live extension or another submission can defer this request. Never
+        // retry in the render loop, even if the local countdown is still zero.
+        retryAutomaticSubmission();
         return;
       }
       setShowSubmitConfirmation(false);
@@ -723,22 +740,12 @@ function TestStudentRuntime({
       onSubmitted?.();
     } catch (reason) {
       notifications.error(reason instanceof Error ? reason.message : t("courseDetail.testSubmitError"));
+      if (autoSubmittedAttemptRef.current === runtime.attempt.id) retryAutomaticSubmission();
     } finally {
       setBusy(false);
       setLongRunningStudentAction(null);
     }
   }
-
-  useEffect(() => {
-    if (!runtime?.attempt || runtime.attempt.lifecycle !== "started" || !runtime.timing.expiresAt) return;
-    setClock(Date.now());
-    const interval = window.setInterval(() => setClock(Date.now()), 1000);
-    return () => window.clearInterval(interval);
-  }, [runtime?.attempt?.id, runtime?.attempt?.lifecycle, runtime?.timing.expiresAt]);
-
-  const remainingSeconds = runtime?.timing.expiresAt
-    ? Math.max(0, Math.ceil((new Date(runtime.timing.expiresAt).getTime() - clock) / 1000))
-    : null;
 
   useEffect(() => {
     if (shouldAutoSubmitTestAttempt({
@@ -757,7 +764,7 @@ function TestStudentRuntime({
         : "courseDetail.testTimeExpiredSubmitting"));
       void finishTest(!runtime.resume.blocked);
     }
-  }, [busy, pendingSaveCount, remainingSeconds, runtime?.attempt?.id, runtime?.attempt?.lifecycle, runtime?.resume.blocked, t]);
+  }, [autoSubmitRetry, busy, pendingSaveCount, remainingSeconds, runtime?.attempt?.id, runtime?.attempt?.lifecycle, runtime?.resume.blocked, t]);
 
   if (loading || !runtime) {
     return <section className="section"><p className="muted" role="status">{t("courseDetail.testLoading")}</p></section>;

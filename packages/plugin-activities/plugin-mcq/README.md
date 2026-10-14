@@ -40,3 +40,5 @@ Teachers can opt into the shared [Solution tab](../../../docs/ACTIVITY_SOLUTIONS
 - AI question generation and automatic formative model feedback use the shared blocking, indeterminate progress dialog; variation progress is supplied by the activity-bank background job.
 
 When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an invariant changed, and the relevant detailed section.
+
+Expired compound Test responses can be [recovered from teacher results](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#timeout-recovery) without running a grader. The teacher’s later automatic-grading action uses this plugin’s existing composite handler for recovered, ungraded children.

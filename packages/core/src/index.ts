@@ -33,4 +33,5 @@ export * from "./student-groupings";
 export * from "./student-team-choice";
 export * from "./tests";
 export * from "./test-execution";
+export * from "./test-timeout-recovery";
 export * from "./users";

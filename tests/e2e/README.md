@@ -77,6 +77,8 @@ Run the independent authoring-recovery, bank-synchronization, course-loading, st
 npm run test:e2e -- --grep @regression
 ```
 
+`test-timeout-recovery.spec.ts` covers browser clock skew, delayed retries after a live extension defers submission, recovery when teacher results/gradebook are read, effective exceptions and disabled timing, active/stale claims, preserved responses, idempotence, and teacher grading of recovered work. It requires no execution runner.
+
 `live-test-content.spec.ts` adds prompt/answer-key edits during an active Test, preserved answers, cancellation/notices, composition history, standalone prompt refresh, and release/re-hide API checks. Its coding cases cover test-free submission and live private-test corrections with audit evidence, and require Judge0.
 
 These focused tests require the normal migrated/seeded database, API, and web app, but no AI provider, Judge0, or web-design runner. Each test provisions its own disposable course/section scenario (with bank/MCQ content where needed) through public APIs and runs lifecycle-aware cleanup, so failures do not skip later scenarios in a serial chain. The bank/course fixture creates both shared course placement and group assignment, which are distinct content scopes.

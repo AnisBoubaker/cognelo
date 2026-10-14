@@ -36,3 +36,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Monaco/basic code editors, rendered code, and Markdown code spans/fences inherit the shared non-translation policy; never extend that opt-out to the surrounding instructional prose.
 
 - [Submission continuation](../../../docs/SUBMISSION_CONTINUATION.md): Restores source code from the exact learner-owned execution to the core response draft without changing the immutable execution. The next ordinary submission creates fresh execution evidence on the same core attempt. Restore through the host transaction; reopening preserves the original start and applies current exceptions.
+
+- [Compound Test timeout recovery](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#timeout-recovery) preserves the saved response without a plugin execution or invented grade. Later teacher-triggered grading uses the existing composite handler and keeps its ordinary private-artifact and release boundaries.

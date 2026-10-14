@@ -13,6 +13,7 @@ import { AppError, forbidden, notFound } from "./errors";
 import { gradeChallengeTargetForGrade } from "./grade-challenge-targets";
 import { assignmentAllowsGradeChallenges, assignmentTimeLimitMinutes } from "./activity-assignment-policy";
 import { applyAssignmentExceptions, applyGradebookExceptions, exceptionsForParticipant, loadAssignmentExceptions } from "./activity-assignment-exceptions";
+import { recoverExpiredTestAttempts } from "./test-timeout-recovery";
 
 type JsonInput = Prisma.InputJsonValue;
 export type ActivityAttemptAssessmentMode = "formative" | "summative";
@@ -1184,6 +1185,10 @@ export async function listCourseActivityInProgressAttempts(
     throw forbidden();
   }
 
+  await recoverExpiredTestAttempts({ courseId, activityId,
+    ...(groupId ? { groupId } : capabilities.gradingGroupIds !== null ? { groupId: { in: capabilities.gradingGroupIds } } : {})
+  }, user.id);
+
   const attempts = await prisma.activityAttempt.findMany({
     where: {
       courseId,
@@ -1323,6 +1328,10 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
   ) {
     throw forbidden();
   }
+  await recoverExpiredTestAttempts({ courseId,
+    ...(filters.activityId ? { activityId: filters.activityId } : {}),
+    ...(filters.groupId ? { groupId: filters.groupId } : capabilities.gradingGroupIds !== null ? { groupId: { in: capabilities.gradingGroupIds } } : {})
+  }, user.id);
   await ensureCourseGradebookItems(courseId);
   const statusFilter = filters.status ?? "all";
   const [unorderedItems, contentItems] = await Promise.all([
