@@ -6,7 +6,7 @@ import {
   type PluginAiFeedbackTeacherReviewContext,
   type PluginAiGradingBatchGuidance
 } from "@cognelo/activity-sdk/server";
-import { AppError, getActivityAttemptRegradeContext, getTeacherAttemptAiFeedbackReview, getTestAttemptReview, recordActivityAttemptAiFeedback, recordActivityAttemptGradingResult, recordAiFeedbackResearchEvent, recordTestItemAiFeedback, regradeTestAttempt, reviseTeacherAttemptAiFeedback } from "@cognelo/core";
+import { AppError, getActivityAttemptRegradeContext, getTeacherAttemptAiFeedbackReview, getTestAttemptReview, recordActivityAttemptAiFeedback, recordActivityAttemptGradingResult, recordAiFeedbackResearchEvent, recordTestItemAiFeedback, recalculateTestAttemptGrade, reviseTeacherAttemptAiFeedback } from "@cognelo/core";
 import type { Prisma } from "@cognelo/db";
 import { z } from "zod";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
@@ -203,7 +203,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       if (!evaluations.length) {
         throw new AppError(409, "TEST_AI_FEEDBACK_UNAVAILABLE", "No Test activity has effective AI feedback configuration.");
       }
-      const result = await regradeTestAttempt(user, courseId, attemptId, "AI feedback evaluation");
+      const result = await recalculateTestAttemptGrade(user, courseId, attemptId, "AI feedback evaluation");
       await recordAiFeedbackResearchEvent({
         eventType: "parent_grade_recomputed",
         courseId,

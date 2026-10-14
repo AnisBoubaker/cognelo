@@ -118,4 +118,10 @@ describe("programming exercise test-only regrading", () => {
     });
     await expect(regradeCodingExerciseAttempt(input())).resolves.toMatchObject({ rawScore: 40, rawMaxScore: 100 });
   });
+
+  it("uses the Test child's reviewed rubric without loading the parent as a programming attempt", async () => {
+    const result = await regradeCodingExerciseAttempt({ ...input(), coreAttemptId: "test-parent", feedback: { aiScore: 60, summary: "Child review" } });
+    expect(mocks.getReview).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ rawScore: 46, metadata: { aiScore: 60, studentFeedback: { summary: "Child review" } } });
+  });
 });

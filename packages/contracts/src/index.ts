@@ -1,4 +1,5 @@
 import { z } from "zod";
+export type { TestRegradeProgress, TestRegradeItemResult } from "./test-regrading";
 
 export const RoleKeySchema = z.enum(["admin", "course_manager", "teacher", "student"]);
 export type RoleKey = z.infer<typeof RoleKeySchema>;

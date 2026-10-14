@@ -62,6 +62,38 @@ export function options() {
   });
 }
 
+/** A single authenticated mutation with measured progress and a terminal result.
+ * Disconnecting the reader must not interrupt persistence halfway through a batch. */
+export function progressJson<TProgress>(run: (report: (progress: TProgress) => void) => Promise<unknown>) {
+  let closed = false;
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (event: unknown) => {
+        if (!closed) {
+          try { controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`)); }
+          catch { closed = true; }
+        }
+      };
+      const heartbeat = setInterval(() => send({ type: "heartbeat" }), 15_000);
+      try {
+        const response = await handleRoute(async () => json(await run((progress) => send({ type: "progress", progress }))));
+        const body = await response.json();
+        send(response.ok ? { type: "result", result: body } : { type: "error", error: body.error, status: response.status });
+      } finally {
+        clearInterval(heartbeat);
+        if (!closed) { closed = true; controller.close(); }
+      }
+    },
+    cancel() { closed = true; }
+  });
+  return new Response(stream, { headers: corsHeaders({ headers: {
+    "Content-Type": "application/x-ndjson; charset=utf-8",
+    "Cache-Control": "no-store, no-transform",
+    "X-Accel-Buffering": "no"
+  } }) });
+}
+
 export async function readJson(request: NextRequest) {
   try {
     return await request.json();

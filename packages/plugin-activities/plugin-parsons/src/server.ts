@@ -5,7 +5,7 @@ import { AppError } from "@cognelo/core";
 import { prisma } from "./db-client";
 import { buildParsonsGradingResult } from "./grading";
 import { parseParsonsConfig } from "./parsons";
-import { createInitialParsonsAttemptState, parsonsAttemptStateSchema } from "./attempt-types";
+import { createInitialParsonsAttemptState, parsonsAttemptStateSchema, reconcileParsonsResponseState } from "./attempt-types";
 import { parsonsAttemptRoute, parsonsGenerateRoute, parsonsGradebookAttemptsRoute, parsonsStudentSubmissionsRoute } from "./routes";
 import { evaluateParsonsAttemptStateForConfig } from "./attempts";
 import { createParsonsBankActivityVariation } from "./variation";
@@ -74,6 +74,14 @@ export const parsonsServerPlugin: ServerActivityPlugin = {
   },
   compositeExecution: {
     activityTypeKeys: ["parsons-problem"],
+    regrade: async ({ activity, payload, previousConfig }) => {
+      const state = payload as Record<string, unknown>;
+      const config = parseParsonsConfig(activity.config);
+      const reconciled = reconcileParsonsResponseState(previousConfig, config, state);
+      const parsed = parsonsAttemptStateSchema.safeParse(reconciled);
+      const evaluation = evaluateParsonsAttemptStateForConfig(parsed.success ? parsed.data : createInitialParsonsAttemptState(config), config);
+      return { state: { ...state, lastEvaluation: null }, gradingResult: buildParsonsGradingResult(evaluation) };
+    },
     submit: async ({ activity, payload }) => {
       const config = parseParsonsConfig(activity.config);
       const parsedState = parsonsAttemptStateSchema.safeParse(payload);

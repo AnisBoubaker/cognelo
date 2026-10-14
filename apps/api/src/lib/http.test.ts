@@ -9,13 +9,46 @@ vi.mock("@cognelo/config", () => ({
 }));
 
 const { AppError } = await import("@cognelo/core");
-const { AUTH_COOKIE, handleRoute, json, options, readJson, validateCsrfOrigin } = await import("./http");
+const { AUTH_COOKIE, handleRoute, json, options, progressJson, readJson, validateCsrfOrigin } = await import("./http");
 const { listActivityDefinitions } = await import("@cognelo/activity-sdk");
 const { listServerActivityPlugins } = await import("@cognelo/activity-sdk/server");
 const { listContentTypeDefinitions } = await import("@cognelo/content-type-sdk");
 const { listServerContentTypePlugins } = await import("@cognelo/content-type-sdk/server");
 
 describe("API HTTP helpers", () => {
+  it("streams measured progress before the final result with CORS and no buffering", async () => {
+    let finish!: () => void;
+    const gate = new Promise<void>(resolve => { finish = resolve; });
+    const response = progressJson<{ completed: number }>(async report => {
+      report({ completed: 1 });
+      await gate;
+      return { result: "graded" };
+    });
+    expect(response.headers.get("content-type")).toContain("application/x-ndjson");
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:3000");
+    const reader = response.body!.getReader();
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain('"completed":1');
+    finish();
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain('"result":"graded"');
+    expect((await reader.read()).done).toBe(true);
+  });
+
+  it("sanitizes unexpected streamed errors and finishes persistence after the reader disconnects", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const failed = progressJson(async () => { throw new Error("private grading details"); });
+      const body = await failed.text();
+      expect(body).toContain("INTERNAL_ERROR");
+      expect(body).not.toContain("private grading details");
+      let finish!: () => void;
+      const gate = new Promise<void>(resolve => { finish = resolve; });
+      const persisted = vi.fn();
+      const response = progressJson(async report => { await gate; report({ completed: 1 }); persisted(); return {}; });
+      await response.body!.cancel();
+      finish();
+      await vi.waitFor(() => expect(persisted).toHaveBeenCalledOnce());
+    } finally { log.mockRestore(); }
+  });
   it("loads the installed plugin composition in the route-handler module graph", () => {
     expect(listActivityDefinitions().map((definition) => definition.key).sort()).toEqual([
       "coding-exercise",

@@ -20,6 +20,8 @@ export async function regradeCodingExerciseAttempt(input: {
   coreAttemptId: string;
   executionId: string;
   activity: ServerActivityRecord;
+  /** Compound children keep reviewed rubric feedback on TestItemAttempt. */
+  feedback?: Record<string, unknown>;
 }): Promise<PluginGradingResult | PluginGradingDeferredResult> {
   const testRun = await regradeCodingExerciseTests({
     activityId: input.activityId,
@@ -35,7 +37,9 @@ export async function regradeCodingExerciseAttempt(input: {
   }
   const deterministicScore = Math.max(0, Math.min(100, earnedWeight / totalWeight * 100));
   const [review, latestEvaluation] = await Promise.all([
-    getTeacherAttemptAiFeedbackReview(input.user, input.courseId, input.coreAttemptId),
+    input.feedback !== undefined
+      ? Promise.resolve({ feedback: input.feedback })
+      : getTeacherAttemptAiFeedbackReview(input.user, input.courseId, input.coreAttemptId),
     prisma.pluginCodingExerciseAiEvaluation.findFirst({
       where: { activityId: input.activityId, executionId: input.executionId, status: "completed" },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }]
