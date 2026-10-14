@@ -52,6 +52,8 @@ export default function GradebookActivityResultsPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
   const [inProgressAttempts, setInProgressAttempts] = useState<CourseActivityInProgressAttempt[]>([]);
+  const inProgressAttemptsRef = useRef(inProgressAttempts);
+  inProgressAttemptsRef.current = inProgressAttempts;
   const [savingGradeKey, setSavingGradeKey] = useState<string | null>(null);
   const [progressOperation, setProgressOperation] = useState<{
     title: string;
@@ -127,14 +129,24 @@ export default function GradebookActivityResultsPage() {
   useEffect(() => {
     if (reportTab !== "students") return;
     let cancelled = false;
+    let refreshing = false;
     const refreshInProgressAttempts = async () => {
-      if (document.visibilityState !== "visible") return;
+      if (document.visibilityState !== "visible" || refreshing) return;
+      refreshing = true;
       try {
         const result = await api.courseActivityInProgressAttempts(courseId, activityId, groupId);
-        if (!cancelled) setInProgressAttempts(result.attempts);
+        if (cancelled) return;
+        const completed = inProgressAttemptsRef.current.some((previous) => !result.attempts.some((next) =>
+          next.participantId === previous.participantId && next.groupId === previous.groupId && next.attemptNumber === previous.attemptNumber
+        ));
+        setInProgressAttempts(result.attempts);
+        if (completed) {
+          const updated = await api.courseGradebook(courseId, { activityId, groupId });
+          if (!cancelled) setGradebook(updated.gradebook);
+        }
       } catch {
         // Keep the last successful live status; the full page load owns visible error reporting.
-      }
+      } finally { refreshing = false; }
     };
     void refreshInProgressAttempts();
     const intervalId = window.setInterval(() => void refreshInProgressAttempts(), 10_000);

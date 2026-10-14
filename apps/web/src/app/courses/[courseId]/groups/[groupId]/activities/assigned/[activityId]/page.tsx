@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useServerCountdown } from "@/lib/use-server-countdown";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -53,7 +54,7 @@ export default function GroupActivityPage() {
   const [error, setError] = useState("");
   const [timedRuntime, setTimedRuntime] = useState<TimedActivityRuntime | null>(null);
   const [timingStatus, setTimingStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [timedRemainingSeconds, setTimedRemainingSeconds] = useState<number | null>(null);
+  const timedRemainingSeconds = useServerCountdown(timedRuntime?.timing);
   const [timedAutoSubmitRequestId, setTimedAutoSubmitRequestId] = useState(0);
   const [startingTimedAttempt, setStartingTimedAttempt] = useState(false);
   const safeExamBrowserLaunchRequestRef = useRef(false);
@@ -99,7 +100,6 @@ export default function GroupActivityPage() {
     setChallengeExplanation("");
     setTimedRuntime(null);
     setTimingStatus("idle");
-    setTimedRemainingSeconds(null);
     setTimedAutoSubmitRequestId(0);
     autoSubmittedTimedAttemptRef.current = null;
   }, [activityId, courseId, groupId]);
@@ -107,8 +107,7 @@ export default function GroupActivityPage() {
   useEffect(() => {
     if (!hasStandaloneActivity || !isLearner) {
       setTimedRuntime(null);
-      setTimedRemainingSeconds(null);
-      setTimingStatus("idle");
+        setTimingStatus("idle");
       return;
     }
     let cancelled = false;
@@ -118,7 +117,6 @@ export default function GroupActivityPage() {
         if (cancelled) return;
         continuationVersionRef.current = runtime.attempt?.reopenedAt ?? null;
         setTimedRuntime(runtime);
-        setTimedRemainingSeconds(runtime.timing.remainingSeconds);
         setTimingStatus("ready");
       })
       .catch((loadError) => {
@@ -191,18 +189,6 @@ export default function GroupActivityPage() {
     window.addEventListener("focus", refreshPolicy);
     return () => { cancelled = true; window.clearInterval(interval); window.removeEventListener("focus", refreshPolicy); };
   }, [activityId, courseId, groupId, isLearner]);
-
-  useEffect(() => {
-    const expiresAt = timedRuntime?.timing.expiresAt;
-    if (!expiresAt) {
-      setTimedRemainingSeconds(timedRuntime?.timing.remainingSeconds ?? null);
-      return;
-    }
-    const update = () => setTimedRemainingSeconds(Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000)));
-    update();
-    const interval = window.setInterval(update, 1000);
-    return () => window.clearInterval(interval);
-  }, [timedRuntime?.timing.expiresAt, timedRuntime?.timing.remainingSeconds]);
 
   useEffect(() => {
     const attemptId = timedRuntime?.attempt?.id;
@@ -414,7 +400,6 @@ export default function GroupActivityPage() {
     try {
       const { runtime } = await api.startTimedActivityAttempt(courseId, groupId, activityId);
       setTimedRuntime(runtime);
-      setTimedRemainingSeconds(runtime.timing.remainingSeconds);
     } catch (startError) {
       setError(startError instanceof Error ? startError.message : t("groupPage.timedActivityStartError"));
     } finally {

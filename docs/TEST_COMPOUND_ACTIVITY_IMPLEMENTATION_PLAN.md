@@ -415,6 +415,18 @@ Live assignment policy and authored content both refresh within 20 seconds while
 
 Programming children with no enabled hidden tests return no automatic grade; they still submit, and the parent remains submitted pending grading instead of failing final submission. Summative runtime/history payloads withhold numeric results until release; generic child draft endpoints never expose evaluation evidence.
 
+## Timeout recovery
+
+Learner countdowns use the server's remaining seconds anchored to browser monotonic elapsed time (`performance.now()`), never the device wall clock. Every policy response refreshes that anchor, including live extensions and Until exceptions. Automatic submission deferred by the server, or interrupted by a request failure, waits at least 20 seconds before retrying. The server rechecks live expiry after claiming submission. Claim acquisition, autosaves, and recovery coordinate on the parent row so a queued save cannot change recovered responses.
+
+Opening or refreshing a teacher's Student results, in-progress feed, or gradebook checks started Tests in that reader's authorized course/section/activity scope. There is no cron job or scheduled recovery worker. Recovery resolves current General/section/team/student timing and the Until cap from the original start; untimed or extended attempts remain open. It allows 30 seconds after expiry for ordinary browser submission and skips a processing submission claim unless it is more than 30 minutes old.
+
+A serializable transaction locks the parent and Test authoring, freezes the current submission revision/manifest, preserves each saved response unchanged, creates empty submitted rows for never-opened exercises, and marks the parent submitted at its effective deadline. It records the actual recovery time separately in `timeoutRecovery` and an actor-attributed `test_timeout_recovered` course audit event. It creates no grade, changes no start time, and is idempotent. Serialization conflicts are retried on a subsequent results read. When an in-progress row disappears, the teacher UI reloads the detailed results once so recovered work appears as awaiting grading.
+
+For recovered Tests, **Rerun automatic grading** invokes the existing composite submission handler only for children still awaiting a grade, then recomputes the parent through the usual audited gradebook path. Runner failures or children without an automatic grade stay submitted for teacher review; successful child results survive retries. Each recovered-child grading operation retains the prior response/result in an audit event. This uses current child authoring, never generates AI feedback, and preserves grade-release gates. Ordinary already-graded Test regrading retains its existing aggregation behavior.
+
+Regression coverage is in `tests/e2e/test-timeout-recovery.spec.ts`, alongside the countdown, live-policy, and Until-date suites. It verifies wrong device clocks, deferred/retried submission, disconnected recovery from both results APIs, extensions/disabled timing/student exceptions, active/stale claims, preserved drafts and timestamps, idempotence, and later teacher-triggered grading.
+
 ## API and Service Boundaries
 
 Core service modules: `packages/core/src/tests.ts` for course authoring/execution and `packages/core/src/bank-tests.ts` for reusable Test ownership and bank/course deep-copy boundaries.

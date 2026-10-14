@@ -25,3 +25,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - The runner remains free of Cognelo application/database secrets and requires production hardening, isolation, and smoke coverage for screenshot cropping. An optional runner-specific request token may be stored encrypted by the application registry.
 
 - [Submission continuation](../../../docs/SUBMISSION_CONTINUATION.md): Restores files from the exact learner-owned submission to the core response draft without changing the immutable submitted bundle or test results. Ordinary resubmission attaches fresh evidence to the same core attempt. Restore through the host transaction; reopening preserves the original start and applies current exceptions.
+
+- [Compound Test timeout recovery](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#timeout-recovery) preserves the saved response without a plugin execution or invented grade. Later teacher-triggered grading uses the existing composite handler and keeps its ordinary private-artifact and release boundaries.

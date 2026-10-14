@@ -29,3 +29,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Teacher feedback and learner copy use mechanism-neutral wording.
 
 - [Submission continuation](../../../docs/SUBMISSION_CONTINUATION.md): Restores the submitted choices to the core response draft; the ordinary submission path reuses the reopened core attempt. Restore through the host transaction; reopening preserves the original start and applies current exceptions.
+
+- [Compound Test timeout recovery](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#timeout-recovery) preserves the saved response without a plugin execution or invented grade. Later teacher-triggered grading uses the existing composite handler and keeps its ordinary private-artifact and release boundaries.

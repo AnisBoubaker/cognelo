@@ -154,3 +154,7 @@ Shared confirmation, submitted-Test snapshots, and concurrency are documented in
 ## Explicit solution release
 
 This type supports the shared [Solution tab](../../../../docs/ACTIVITY_SOLUTIONS.md). Course settings must opt in; summative work additionally requires grade release. The learner first sees encouragement to try independently and must press **Show solution**. The same provider serves this type inside a Test under the parent switch. See the linked reference for formats, live revocation, API boundaries, and current-reference semantics.
+
+## Recovered Test responses
+
+The core [Test recovery lifecycle](../../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#timeout-recovery) may submit saved embedded responses without calling the plugin runner. These children remain ungraded. When the teacher requests automatic grading, core supplies the saved response and current authored activity to the existing composite submission handler under the learner’s identity, retains the original response/result in its audit, and recomputes the parent only when every child has a grade. No AI feedback is requested automatically. Standalone submission behavior is unchanged.

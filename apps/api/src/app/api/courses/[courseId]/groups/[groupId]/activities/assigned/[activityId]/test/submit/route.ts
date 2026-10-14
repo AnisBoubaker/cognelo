@@ -46,6 +46,10 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     try {
       runtime = await getTestRuntime(user, courseId, groupId, activityId, "attempt", input.sessionId);
+      if (input.onlyIfExpired && !runtime.timing.isExpired) {
+        await releaseTestAttemptSubmission(input.parentAttemptId);
+        return json({ runtime });
+      }
       for (const item of runtime.test.items) {
         if (item.itemAttempt?.lifecycle === "submitted" || item.itemAttempt?.lifecycle === "graded") {
           continue;
