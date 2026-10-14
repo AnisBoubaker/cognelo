@@ -6,7 +6,7 @@ import {
   listActivityCategories,
   type ActivityCategoryId
 } from "@cognelo/activity-sdk/categories";
-import { ActivityVersionDiffView, ConfirmationDialog, ContextMenu, ProgressDialog, useNotifications } from "@cognelo/activity-ui";
+import { ActivityVersionDiffView, ConfirmationDialog, ContextMenu, ProgressDialog, useBodyScrollLock, useNotifications } from "@cognelo/activity-ui";
 import type { ActivityVersionDiff } from "@cognelo/contracts";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -124,13 +124,12 @@ export default function ActivityBankDetailPage() {
     loadPage().catch((err) => setError(err instanceof Error ? err.message : t("activityBankDetail.loadError")));
   }, [loadPage, t]);
 
+  useBodyScrollLock(showActivityPicker || showConceptFilter);
+
   useEffect(() => {
     if (!showActivityPicker && !showConceptFilter) {
       return;
     }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -141,7 +140,6 @@ export default function ActivityBankDetailPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [showActivityPicker, showConceptFilter]);

@@ -1,5 +1,6 @@
 "use client";
 import { useSharedDialogOpen } from "./dialog-provider";
+import { useBodyScrollLock } from "./body-scroll-lock";
 
 import React, { type ReactNode, useEffect, useId, useRef } from "react";
 
@@ -48,13 +49,12 @@ export function ProgressDialog({
 
   statusRef.current = status;
   onCloseRef.current = onClose;
+  useBodyScrollLock(open);
 
   useEffect(() => {
     if (!open) return;
 
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     dialogRef.current?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -73,7 +73,6 @@ export function ProgressDialog({
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousOverflow;
       previousFocusRef.current?.focus();
     };
   }, [open]);

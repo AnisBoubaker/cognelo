@@ -12,6 +12,7 @@ import {
   useState
 } from "react";
 import { CodeEditor } from "./code-editor";
+import { useBodyScrollLock } from "./body-scroll-lock";
 import { useDialogs } from "./dialog-provider";
 import { EquationEditorDialog } from "./equation-editor-dialog";
 import { ImageEditorDialog } from "./image-editor-dialog";
@@ -427,14 +428,12 @@ export function RichTextEditor({
   const equationDialogOpeningRef = useRef(false);
   const resizeStartRef = useRef<{ height: number; y: number } | null>(null);
   const copy = editorCopy[locale] ?? editorCopy.en;
+  useBodyScrollLock(isFullScreen);
 
   useEffect(() => {
     if (!isFullScreen) {
       return;
     }
-    const previousBodyOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
     function handleEscape(event: globalThis.KeyboardEvent) {
       if (event.key === "Escape" && !equationDialog && !imageDialog && !tableDialogOpen) {
         event.preventDefault();
@@ -445,7 +444,6 @@ export function RichTextEditor({
     document.addEventListener("keydown", handleEscape);
     return () => {
       document.removeEventListener("keydown", handleEscape);
-      document.body.style.overflow = previousBodyOverflow;
     };
   }, [equationDialog, imageDialog, isFullScreen, tableDialogOpen]);
 
