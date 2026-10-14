@@ -12,7 +12,10 @@ import {
   generateCodingExerciseVariationMetadata
 } from "./generation";
 import { listBankCodingExerciseHiddenTests, replaceBankCodingExerciseHiddenTests } from "./hidden-tests";
+import { reviewCodingExerciseVariation, type CodingVariationReviewInput } from "./variation-quality";
 import { formatCodingExercisesMessage } from "./web/messages";
+
+type SolutionResult = Exclude<Awaited<ReturnType<typeof generateCodingExerciseSolution>>, { status: "error" }>;
 
 export const createCodingExerciseBankActivityVariation: BankActivityVariationHandler = async (input) => {
   const sourceConfig = parseCodingExerciseConfig(input.sourceActivity.config);
@@ -26,25 +29,34 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
     description: input.sourceActivity.description,
     instructions: input.instructions,
     prompt: sourceConfig.prompt,
-    referenceSolution: sourceReferenceSolution
+    referenceSolution: sourceReferenceSolution,
+    rubric: sourcePrivateConfig.aiFeedback
   });
-
-  await input.reportProgress({ fraction: 0.1, step: "prompt" });
-  const promptResult = await generateCodingExercisePrompt({
+  const generationContext = {
     user: input.user,
-    description: variationBrief,
     language: sourceConfig.language,
     locale: input.locale,
     subject: input.subject,
     knowledge: input.knowledge
+  };
+  const reviewContext = {
+    ...generationContext,
+    instructions: input.instructions,
+    source: {
+      description: input.sourceActivity.description,
+      prompt: sourceConfig.prompt,
+      referenceSolution: sourceReferenceSolution,
+      rubric: sourcePrivateConfig.aiFeedback
+    }
+  };
+  const initialCandidate = await generateReviewedVariation({
+    reviewContext, variationBrief, reportProgress: input.reportProgress
   });
-  if (promptResult.prompt.trim() === sourceConfig.prompt.trim()) {
-    throw new AppError(422, "CODING_EXERCISE_VARIATION_NOT_DISTINCT", "The AI agent repeated the original programming exercise prompt.");
-  }
-  await input.reportProgress({ fraction: 0.22, step: "prompt" });
+  const prompt = initialCandidate.prompt;
+  await input.reportProgress({ fraction: 0.34, step: "prompt" });
   const metadataResult = await generateCodingExerciseVariationMetadata({
     user: input.user,
-    prompt: promptResult.prompt,
+    prompt,
     originalTitle: input.sourceActivity.title,
     originalDescription: input.sourceActivity.description,
     language: sourceConfig.language,
@@ -54,39 +66,28 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
 
   const visibleTestCount = sourceConfig.sampleTests.length;
   const hiddenTestCount = sourcePrivate.tests.length;
-  type SolutionResult = Exclude<Awaited<ReturnType<typeof generateCodingExerciseSolution>>, { status: "error" }>;
   type TestsResult = Exclude<Awaited<ReturnType<typeof generateCodingExerciseTests>>, { status: "error" }>;
-  let solutionResult: SolutionResult | null = null;
+  let solutionResult: SolutionResult = initialCandidate.solution;
   let testsResult: TestsResult | null = null;
   let solutionBrief = variationBrief;
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     await input.reportProgress({ fraction: attempt === 1 ? 0.35 : 0.66, step: "solution" });
-    const candidateSolution = await generateCodingExerciseSolution({
-      user: input.user,
-      description: solutionBrief,
-      prompt: promptResult.prompt,
-      language: sourceConfig.language,
-      locale: input.locale,
-      subject: input.subject,
-      knowledge: input.knowledge
-    }).catch((error: unknown) => {
-      // A failed optional testability retry must not erase the earlier exercise.
-      if (solutionResult) return null;
-      throw error;
-    });
-    if (!candidateSolution) break;
-    if (candidateSolution.status === "error") {
-      if (solutionResult) break;
-      if (attempt < 2 && (visibleTestCount || hiddenTestCount)) {
-        solutionBrief = buildTestabilityRetryBrief(variationBrief, visibleTestCount, hiddenTestCount, [candidateSolution.message]);
-        continue;
+    let candidateSolution = initialCandidate.solution;
+    if (attempt > 1) {
+      // Optional testability retries must not replace a reviewed exercise with
+      // an unreviewed, cosmetic, or inconsistent candidate.
+      try {
+        const retry = await generateCodingExerciseSolution({ ...generationContext, description: solutionBrief, prompt });
+        if (retry.status === "error") break;
+        const issues = await reviewCodingExerciseVariation({
+          ...reviewContext, candidate: { prompt, referenceSolution: retry.referenceSolution, templateSource: retry.templateSource }
+        });
+        if (issues.length) break;
+        candidateSolution = retry;
+      } catch {
+        break;
       }
-      throw new AppError(422, "CODING_EXERCISE_VARIATION_SOLUTION_UNAVAILABLE", candidateSolution.message);
-    }
-    if (sourceReferenceSolution && candidateSolution.referenceSolution.trim() === sourceReferenceSolution.trim()) {
-      if (solutionResult) break;
-      throw new AppError(422, "CODING_EXERCISE_VARIATION_SOLUTION_NOT_DISTINCT", "The AI agent repeated the original programming exercise solution.");
     }
 
     solutionResult = candidateSolution;
@@ -96,7 +97,7 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
         ? await generateCodingExerciseTests({
             user: input.user,
             description: solutionBrief,
-            prompt: promptResult.prompt,
+            prompt,
             language: sourceConfig.language,
             locale: input.locale,
             subject: input.subject,
@@ -125,9 +126,6 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
       solutionBrief = buildTestabilityRetryBrief(variationBrief, visibleTestCount, hiddenTestCount, feedback);
     }
   }
-  if (!solutionResult) {
-    throw new AppError(422, "CODING_EXERCISE_VARIATION_SOLUTION_UNAVAILABLE", "The AI agent could not generate a reference solution that supports the required test suite.");
-  }
   if (testsResult && testSuitesMatch(sourceConfig.sampleTests, sourcePrivate.tests, testsResult.sampleTests, testsResult.hiddenTests)) {
     testsResult = null;
   }
@@ -147,7 +145,7 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
   }));
   const nextConfig = {
     ...sourceConfig,
-    prompt: promptResult.prompt,
+    prompt,
     starterCode: solutionResult.starterCode,
     studentTemplateSource: solutionResult.templateSource,
     sampleTests
@@ -210,6 +208,37 @@ export const createCodingExerciseBankActivityVariation: BankActivityVariationHan
   return { warnings };
 };
 
+async function generateReviewedVariation(input: {
+  reviewContext: Omit<CodingVariationReviewInput, "candidate">;
+  variationBrief: string;
+  reportProgress: Parameters<BankActivityVariationHandler>[0]["reportProgress"];
+}): Promise<{ prompt: string; solution: SolutionResult }> {
+  const { user, language, locale, subject, knowledge } = input.reviewContext;
+  const context = { user, language, locale, subject, knowledge };
+  let feedback = "";
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const description = [input.variationBrief, feedback].filter(Boolean).join("\n\n");
+    await input.reportProgress({ fraction: 0.1 + attempt * 0.08, step: "prompt" });
+    const { prompt } = await generateCodingExercisePrompt({ ...context, description });
+    await input.reportProgress({ fraction: 0.12 + attempt * 0.08, step: "solution" });
+    const solution = await generateCodingExerciseSolution({ ...context, description, prompt });
+    await input.reportProgress({ fraction: 0.14 + attempt * 0.08, step: "validating" });
+    const issues = solution.status === "error"
+      ? [solution.message]
+      : await reviewCodingExerciseVariation({
+          ...input.reviewContext,
+          candidate: { prompt, referenceSolution: solution.referenceSolution, templateSource: solution.templateSource }
+        });
+    if (solution.status !== "error" && !issues.length) return { prompt, solution };
+    feedback = [
+      "The previous candidate failed independent quality review. Generate a new prompt AND solution addressing every issue. Do not merely reword the rejected task.",
+      "Rejected student prompt:", prompt,
+      "Review feedback:", ...issues.map((issue) => `- ${issue}`)
+    ].join("\n");
+  }
+  throw new AppError(422, "CODING_EXERCISE_VARIATION_QUALITY_FAILED", formatCodingExercisesMessage(input.reviewContext.locale, "variationQualityFailed"));
+}
+
 function passingTestIds(value: unknown) {
   if (!value || typeof value !== "object" || !("tests" in value) || !Array.isArray(value.tests)) return null;
   return new Set(value.tests.flatMap((test: unknown) =>
@@ -238,25 +267,34 @@ function buildCodingVariationBrief(input: {
   instructions: string;
   prompt: string;
   referenceSolution: string;
+  rubric: unknown;
 }) {
   return [
     "Create a genuine variation of the programming exercise below.",
     "Preserve the same selected knowledge concepts, programming language, rubric applicability, difficulty, cognitive demand, and approximate amount of work.",
     "The rubric will be copied unchanged, so the new exercise must still be assessable with every original criterion.",
-    "Change the required reasoning or implementation path so the solution is slightly different.",
-    "Do not merely rename variables, numbers, or entities, and do not only move the same task into a different story.",
+    "Design a different problem that requires a substantive change to the student's reasoning and implementation: change the computation, decision rules, state to track, decomposition, or data processing.",
+    "Do not merely rename variables, change constants, translate/rephrase the prompt, reorder equivalent code, or move the same algorithm into a different story. Students must need to rethink the solution, not reskin it.",
+    "Mechanical changes such as reversing ascending/descending order, flipping comparison signs, or swapping one arithmetic operator are insufficient. For simulations, change what must be tracked or how a trial unfolds, not just the labels or direction of the same event.",
+    "Reject your own idea if the old solution can be reused by replacing just a condition, formula, or loop bound. For example, replacing the success predicate of the same fixed dice rolls with equality or a target sum is insufficient. Instead choose a different process (such as bounded repeated trials with a stopping rule) or a different state/data relationship, using only the same taught constructs and similar workload.",
+    "Choose a coherent new task at the same level using the same taught concepts; do not add advanced techniques just to make it different. Preserve required helper functions/APIs and other course constraints. Shared boilerplate is allowed.",
+    "Recompute every example, expected output, formula, probability, unit, and numerical claim for the new task. Never copy an old expected value after changing the event or conditions. Independently check favourable/total outcomes for probability tasks.",
+    "Keep required provided helper/scaffold code in language-tagged Markdown fences without revealing the new complete solution.",
     "",
     "Optional teacher instructions:",
     input.instructions || "None.",
     "",
     "Original activity description:",
-    input.description.slice(0, 1000),
+    input.description,
     "",
     "Original student prompt:",
-    input.prompt.slice(0, 6000),
+    input.prompt,
     "",
-    "Original reference solution (for complexity reference only):",
-    input.referenceSolution.slice(0, 2500)
+    "Complete original reference solution (compare reasoning and complexity; do not reproduce its algorithm):",
+    input.referenceSolution || "No reference solution provided; infer the required reasoning from the prompt.",
+    "",
+    "Original rubric and grading policy (preserved unchanged):",
+    JSON.stringify(input.rubric)
   ].join("\n");
 }
 
