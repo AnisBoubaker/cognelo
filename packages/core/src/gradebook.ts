@@ -361,7 +361,8 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
         ...(asJsonObject(attempt.metadata) ?? {}),
         ...(asJsonObject(input.metadata) ?? {}),
         // Preserve the original attempt/manifest; record final timing separately.
-        submittedTimeLimitMinutes: assignmentTimeLimitMinutes(effectiveAssignment.metadata)
+        submittedTimeLimitMinutes: assignmentTimeLimitMinutes(effectiveAssignment.metadata),
+        submittedAvailableUntil: effectiveAssignment.availableUntil?.toISOString() ?? null
       } as JsonInput
     }
   });
@@ -583,6 +584,7 @@ export async function reopenActivitySubmission(user: CurrentUser, courseId: stri
       }
       // Submission evidence is archived in the event before clearing completion state.
       delete metadata.submittedTimeLimitMinutes;
+      delete metadata.submittedAvailableUntil;
       delete metadata.teacherFeedback;
       delete metadata.timedOut;
       delete metadata.savedResponse;

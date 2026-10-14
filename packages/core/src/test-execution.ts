@@ -11,7 +11,7 @@ import {
   startActivityAttempt,
   submitActivityAttempt
 } from "./gradebook";
-import { assignmentTimeLimitMinutes } from "./activity-assignment-policy";
+import { assignmentAttemptExpiresAt, assignmentTimeLimitMinutes } from "./activity-assignment-policy";
 import { getGroupAssignedActivity } from "./groups";
 import { extractMediaAssetIds, reconcileMediaAssetReferences } from "./media-assets";
 
@@ -135,7 +135,7 @@ export async function getTestItemExecutionContext(
     parentAttemptId,
     options.allowCompletedParent === true
   );
-  if (!options.allowExpiredParent) assertTestAttemptWithinTime(parentAttempt, context.assignedActivity.assignment.metadata);
+  if (!options.allowExpiredParent) assertTestAttemptWithinTime(parentAttempt, context.assignedActivity.assignment);
   if (!options.allowResumePolicyBypass) assertTestAttemptResumePolicy(parentAttempt, options.sessionId, context.test.settings);
   const item = context.test.items.find((candidate) => candidate.id === testItemId);
   if (!item || (parentAttempt.lifecycle === "started" ? item.removedAt !== null && item.removedAt !== undefined : !manifestItemIds(parentAttempt.metadata).has(item.id))) {
@@ -184,7 +184,7 @@ export async function saveTestItemAttemptState(
     }
     throw notFound("Test item attempt");
   }
-  assertTestAttemptWithinTime(context.parentAttempt, context.assignedActivity.assignment.metadata);
+  assertTestAttemptWithinTime(context.parentAttempt, context.assignedActivity.assignment);
   assertTestAttemptResumePolicy(context.parentAttempt, options.sessionId, context.test.settings);
   return prisma.testItemAttempt.upsert({
     where: { parentAttemptId_testItemId: { parentAttemptId, testItemId } },
@@ -712,6 +712,13 @@ function buildTestRuntime(
   });
   const savedSettings = attempt && attempt.lifecycle !== "started" ? currentManifest(attempt.metadata).settings ?? context.test.settings : context.test.settings;
   const submittedMetadata = asRecord(attempt?.metadata);
+  // Submitted history must not acquire a deadline from later assignment edits.
+  // Older submissions have no Until snapshot and retain their original timing.
+  const availableUntil = !attempt || attempt.lifecycle === "started"
+    ? context.assignedActivity.assignment.availableUntil
+    : typeof submittedMetadata.submittedAvailableUntil === "string"
+      ? new Date(submittedMetadata.submittedAvailableUntil)
+      : null;
   const runtimeSettings = !attempt || attempt.lifecycle === "started"
     ? withAssignmentTimeLimit(savedSettings, context.assignedActivity.assignment.metadata)
     : Object.prototype.hasOwnProperty.call(submittedMetadata, "submittedTimeLimitMinutes")
@@ -742,7 +749,7 @@ function buildTestRuntime(
       submittedAt: attempt.submittedAt,
       gradedAt: attempt.gradedAt
     } : null,
-    timing: buildTestTiming(runtimeSettings, attempt),
+    timing: buildTestTiming(runtimeSettings, attempt, availableUntil),
     resume: { allowed: resumeAllowed, blocked: resumeBlocked },
     availability,
     hasPreviousSubmissions
@@ -853,11 +860,11 @@ async function ensureTestRevisionMediaReferences(
   });
 }
 
-function buildTestTiming(settingsValue: unknown, attempt: { lifecycle?: unknown; startedAt?: unknown } | null) {
+function buildTestTiming(settingsValue: unknown, attempt: { lifecycle?: unknown; startedAt?: unknown } | null, availableUntil?: Date | null) {
   const settings = asRecord(settingsValue);
   const timeLimitMinutes = typeof settings.timeLimitMinutes === "number" && settings.timeLimitMinutes > 0 ? settings.timeLimitMinutes : null;
   const startedAt = attempt?.startedAt instanceof Date ? attempt.startedAt : attempt?.startedAt ? new Date(String(attempt.startedAt)) : null;
-  const expiresAt = timeLimitMinutes && startedAt ? new Date(startedAt.getTime() + timeLimitMinutes * 60_000) : null;
+  const expiresAt = assignmentAttemptExpiresAt(startedAt, timeLimitMinutes, availableUntil);
   const remainingSeconds = expiresAt ? Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / 1000)) : null;
   return {
     timeLimitMinutes,
@@ -874,14 +881,12 @@ function withAssignmentTimeLimit(settingsValue: unknown, assignmentMetadata: unk
   };
 }
 
-function assertTestAttemptWithinTime(attempt: { metadata: unknown; startedAt: Date; lifecycle?: string }, assignmentMetadata: unknown) {
+function assertTestAttemptWithinTime(attempt: { metadata: unknown; startedAt: Date; lifecycle?: string }, assignment: { metadata: unknown; availableUntil?: Date | null }) {
   if (attempt.lifecycle && attempt.lifecycle !== "started") return;
-  const timeLimitMinutes = assignmentTimeLimitMinutes(assignmentMetadata);
-  if (!timeLimitMinutes) return;
-  const expiresAt = attempt.startedAt.getTime() + timeLimitMinutes * 60_000;
-  if (Date.now() >= expiresAt) {
+  const expiresAt = assignmentAttemptExpiresAt(attempt.startedAt, assignmentTimeLimitMinutes(assignment.metadata), assignment.availableUntil);
+  if (expiresAt && Date.now() >= expiresAt.getTime()) {
     throw new AppError(409, "TEST_TIME_LIMIT_EXPIRED", "The Test time limit has expired. Submit the Test to finish the attempt.", {
-      expiresAt: new Date(expiresAt).toISOString()
+      expiresAt: expiresAt.toISOString()
     });
   }
 }

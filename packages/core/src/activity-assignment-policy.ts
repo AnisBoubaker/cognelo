@@ -39,6 +39,13 @@ export function assignmentTimeLimitMinutes(value: unknown): number | null {
     : null;
 }
 
+/** Call after resolving General/section/team/student policy. Until caps timed work only. */
+export function assignmentAttemptExpiresAt(startedAt: Date | null, timeLimitMinutes: number | null, availableUntil?: Date | null): Date | null {
+  if (!startedAt || !timeLimitMinutes) return null;
+  const timeLimitEnd = startedAt.getTime() + timeLimitMinutes * 60_000;
+  return new Date(availableUntil ? Math.min(timeLimitEnd, availableUntil.getTime()) : timeLimitEnd);
+}
+
 export function withCourseActivityTimeLimitDefault(
   value: unknown,
   timeLimitMinutes: number | null | undefined

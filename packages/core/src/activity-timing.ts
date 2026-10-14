@@ -1,6 +1,6 @@
 import type { CurrentUser } from "@cognelo/contracts";
 import { prisma } from "@cognelo/db";
-import { assignmentTimeLimitMinutes } from "./activity-assignment-policy";
+import { assignmentAttemptExpiresAt, assignmentTimeLimitMinutes } from "./activity-assignment-policy";
 import {
   activityAttemptTimeLimitMinutes,
   getActivityAttemptAvailability,
@@ -20,9 +20,7 @@ export async function getTimedActivityRuntime(
   const context = await resolveTimedActivityContext(user, courseId, groupId, activityId);
   const activeAttempt = await findActiveAttempt(context.assignmentId, context.participantId);
   const timeLimitMinutes = assignmentTimeLimitMinutes(context.assignmentMetadata);
-  const expiresAt = activeAttempt && timeLimitMinutes
-    ? new Date(activeAttempt.startedAt.getTime() + timeLimitMinutes * 60_000)
-    : null;
+  const expiresAt = assignmentAttemptExpiresAt(activeAttempt?.startedAt ?? null, timeLimitMinutes, context.availableUntil);
   return {
     timeLimitMinutes,
     attempt: activeAttempt ? {
@@ -87,7 +85,8 @@ export async function finalizeExpiredTimedActivityAttempt(
     return getTimedActivityRuntime(user, courseId, groupId, activityId);
   }
   const timeLimitMinutes = assignmentTimeLimitMinutes(context.assignmentMetadata);
-  if (!timeLimitMinutes || Date.now() < activeAttempt.startedAt.getTime() + timeLimitMinutes * 60_000) {
+  const expiresAt = assignmentAttemptExpiresAt(activeAttempt.startedAt, timeLimitMinutes, context.availableUntil);
+  if (!expiresAt || Date.now() < expiresAt.getTime()) {
     throw new AppError(409, "ACTIVITY_TIME_LIMIT_ACTIVE", "The timed attempt has not expired.");
   }
   const draft = await prisma.activityResponseDraft.findUnique({
@@ -127,10 +126,11 @@ export async function assertTimedActivityWriteAllowed(
     return;
   }
   const timeLimitMinutes = assignmentTimeLimitMinutes(context.assignmentMetadata);
+  const expiresAt = assignmentAttemptExpiresAt(activeAttempt.startedAt, timeLimitMinutes, context.availableUntil);
   if (
     !options.allowExpiredAttempt &&
-    timeLimitMinutes &&
-    Date.now() >= activeAttempt.startedAt.getTime() + timeLimitMinutes * 60_000
+    expiresAt &&
+    Date.now() >= expiresAt.getTime()
   ) {
     throw new AppError(409, "ACTIVITY_TIME_LIMIT_EXPIRED", "The activity time limit has expired. Submit the saved response to finish the attempt.");
   }
@@ -156,6 +156,7 @@ async function resolveTimedActivityContext(
   return {
     assignmentId: activity.assignment.id,
     assignmentMetadata: activity.assignment.metadata,
+    availableUntil: activity.assignment.availableUntil,
     participantId: participant.id,
     activityTypeKey: activity.activityType.key,
     providerKind: activity.activityType.providerKind,

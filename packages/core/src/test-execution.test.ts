@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
+import { applyAssignmentExceptions, resolveAssignmentExceptions } from "./activity-assignment-exceptions";
 
 const db = vi.hoisted(() => ({
   courseGroupParticipant: { findFirst: vi.fn() },
@@ -361,14 +362,65 @@ describe("compound Test execution", () => {
       .resolves.toMatchObject({ parentAttempt: { lifecycle: "started" } });
   });
 
-  it("keeps submitted parent timing fixed after the effective assignment changes", async () => {
+  it.each(["section", "team", "student"])("caps the Test deadline and child writes at the effective %s Until", async (level) => {
+    const until = "2026-08-07T10:05:00.000Z";
+    const overrides = level === "section" ? {} : resolveAssignmentExceptions([{
+      groupActivityId: "assignment-1", teamId: level === "team" ? "team-1" : null,
+      participantId: level === "student" ? "participant-1" : null, priority: 0,
+      settings: { overrideFields: ["availableUntil"], availableUntil: until }
+    }]);
+    groups.getGroupAssignedActivity.mockResolvedValue({ activityType: { key: "test" }, assignment: applyAssignmentExceptions({
+      id: "assignment-1", metadata: { timeLimitMinutes: 25 }, availableUntil: level === "section" ? new Date(until) : null
+    }, overrides) });
+    db.activityAttempt.findMany.mockResolvedValue([parentAttempt({ testItemAttempts: [] })]);
+    db.activityAttempt.findFirst.mockResolvedValue(parentAttempt());
+    await expect(getTestRuntime(student, "course-1", "group-1", "test-activity-1")).resolves.toMatchObject({
+      timing: { expiresAt: until, remainingSeconds: 300, isExpired: false }
+    });
+    vi.setSystemTime(new Date(until));
+    await expect(getTestRuntime(student, "course-1", "group-1", "test-activity-1")).resolves.toMatchObject({ timing: { remainingSeconds: 0, isExpired: true } });
+    await expect(getTestItemExecutionContext(student, "course-1", "group-1", "test-activity-1", "parent-attempt-1", "item-1"))
+      .rejects.toMatchObject({ code: "TEST_TIME_LIMIT_EXPIRED" });
+    await expect(getTestItemExecutionContext(student, "course-1", "group-1", "test-activity-1", "parent-attempt-1", "item-1", { allowExpiredParent: true }))
+      .resolves.toMatchObject({ parentAttempt: { id: "parent-attempt-1" } });
+  });
+
+  it("applies a later or cleared Until to a reopened Test without extending past its duration", async () => {
+    const attempt = parentAttempt({ testItemAttempts: [], metadata: { continuation: { reopenedAt: "2026-08-07T10:01:00.000Z" } } });
+    db.activityAttempt.findMany.mockResolvedValue([attempt]);
+    db.activityAttempt.findFirst.mockResolvedValue(attempt);
+    vi.setSystemTime(new Date("2026-08-07T10:10:00.000Z"));
+    groups.getGroupAssignedActivity.mockResolvedValue({ activityType: { key: "test" }, assignment: {
+      id: "assignment-1", metadata: { timeLimitMinutes: 25 }, availableUntil: new Date("2026-08-07T10:05:00.000Z")
+    } });
+    await expect(getTestRuntime(student, "course-1", "group-1", "test-activity-1")).resolves.toMatchObject({ timing: { isExpired: true } });
+    await expect(getTestItemExecutionContext(student, "course-1", "group-1", "test-activity-1", "parent-attempt-1", "item-1"))
+      .rejects.toMatchObject({ code: "TEST_TIME_LIMIT_EXPIRED" });
+    for (const [until, expiresAt] of [
+      ["2026-08-07T10:15:00.000Z", "2026-08-07T10:15:00.000Z"],
+      ["2026-08-07T11:00:00.000Z", "2026-08-07T10:25:00.000Z"],
+      [null, "2026-08-07T10:25:00.000Z"]
+    ]) {
+      groups.getGroupAssignedActivity.mockResolvedValue({ activityType: { key: "test" }, assignment: {
+        id: "assignment-1", metadata: { timeLimitMinutes: 25 }, availableUntil: until ? new Date(until) : null
+      } });
+      await expect(getTestRuntime(student, "course-1", "group-1", "test-activity-1")).resolves.toMatchObject({ timing: { expiresAt, isExpired: false } });
+      await expect(getTestItemExecutionContext(student, "course-1", "group-1", "test-activity-1", "parent-attempt-1", "item-1"))
+        .resolves.toMatchObject({ parentAttempt: { startedAt: attempt.startedAt } });
+    }
+  });
+
+  it.each(["2026-08-07T10:03:00.000Z", null, undefined])("keeps submitted Until timing fixed (%s), including legacy history", async (submittedUntil) => {
+    groups.getGroupAssignedActivity.mockResolvedValue({ activityType: { key: "test" }, assignment: {
+      id: "assignment-1", metadata: { timeLimitMinutes: 60 }, availableUntil: new Date("2026-08-07T10:01:00.000Z")
+    } });
     db.activityAttempt.findMany.mockResolvedValue([parentAttempt({
       lifecycle: "submitted",
-      metadata: { submittedTimeLimitMinutes: 10, manifest: { settings: { timeLimitMinutes: 5 }, items: [{ testItemId: "item-1", activityId: "mcq-1" }] } },
+      metadata: { ...(submittedUntil !== undefined ? { submittedAvailableUntil: submittedUntil } : {}), submittedTimeLimitMinutes: 10, manifest: { settings: { timeLimitMinutes: 5 }, items: [{ testItemId: "item-1", activityId: "mcq-1" }] } },
       testItemAttempts: []
     })]);
     await expect(getTestRuntime(student, "course-1", "group-1", "test-activity-1", "previous"))
-      .resolves.toMatchObject({ timing: { timeLimitMinutes: 10, isExpired: false } });
+      .resolves.toMatchObject({ timing: { timeLimitMinutes: 10, expiresAt: submittedUntil ?? "2026-08-07T10:10:00.000Z", isExpired: false } });
   });
 
   it("blocks child access from a new browser session when resume is disabled", async () => {

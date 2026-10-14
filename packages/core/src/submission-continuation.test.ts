@@ -27,7 +27,7 @@ function attempt() {
     userId: "learner", activityId: "activity", gradebookItemId: "item", pluginKey: "mcq", pluginVersion: "0.1.0",
     pluginAttemptRef: "artifact", lifecycle: "graded", assessmentMode: "summative", startedAt, submittedAt,
     gradedAt: submittedAt, attemptNumber: 2, durationSeconds: 300, isLate: false, lateBySeconds: 0,
-    metadata: { timeLimitSnapshotMinutes: 30, submittedTimeLimitMinutes: 40, teacherFeedback: { summary: "Old grade" }, submittedAnswers: { q1: ["a"] } },
+    metadata: { timeLimitSnapshotMinutes: 30, submittedTimeLimitMinutes: 40, submittedAvailableUntil: "2026-10-12T10:10:00Z", teacherFeedback: { summary: "Old grade" }, submittedAnswers: { q1: ["a"] } },
     activity: { activityType: { key: "mcq" } }, groupActivity: { metadata: { assessmentMode: "summative" } },
     gradebookItem: { id: "item", gradeStrategy: "latest", pointsPossible: 10, gradesReleased: true }, testItemAttempts: []
   };
@@ -54,6 +54,7 @@ describe("submission continuation", () => {
     expect(result.attempt).toMatchObject({ id: "attempt", attemptNumber: 2, lifecycle: "started", startedAt, submittedAt: null, gradedAt: null, durationSeconds: null });
     expect(result.attempt.metadata).toMatchObject({ timeLimitSnapshotMinutes: 30, continuation: { reopenedByUserId: "teacher" } });
     expect(result.attempt.metadata).not.toHaveProperty("submittedTimeLimitMinutes");
+    expect(result.attempt.metadata).not.toHaveProperty("submittedAvailableUntil");
     expect(result.attempt.metadata).not.toHaveProperty("teacherFeedback");
     expect(mocks.tx.activityResponseDraft.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { state: { answers: { q1: ["a"] } } } }));
     expect(mocks.tx.grade.update).toHaveBeenCalledWith({ where: { id: "grade" }, data: { isActive: false } });
