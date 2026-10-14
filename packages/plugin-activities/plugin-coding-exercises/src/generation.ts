@@ -158,11 +158,12 @@ export async function generateCodingExercisePrompt(input: {
   knowledge?: ActivityGenerationKnowledge;
 }) {
   const systemPrompt = buildPromptGenerationSystemPrompt(input);
-  let userPrompt = [
+  const immutableContext = [
     "Generate only the student-facing coding exercise prompt.",
     "Teacher description:",
     input.description.trim()
   ].join("\n\n");
+  let userPrompt = immutableContext;
   let lastPrompt = "";
   let lastIssues: string[] = [];
 
@@ -182,7 +183,7 @@ export async function generateCodingExercisePrompt(input: {
 
     lastPrompt = prompt;
     lastIssues = issues;
-    userPrompt = buildCorrectionPrompt("prompt", prompt, issues);
+    userPrompt = [immutableContext, buildCorrectionPrompt("prompt", prompt, issues)].join("\n\n");
   }
 
   throw new AppError(422, "CODING_EXERCISE_PROMPT_GENERATION_INVALID", "The AI agent could not generate a valid coding exercise prompt.", {
@@ -541,13 +542,15 @@ export async function generateCodingExerciseRubric(input: {
 function buildPromptGenerationSystemPrompt(input: { language: string; locale: GenerationLocale; subject: SubjectContext; knowledge?: ActivityGenerationKnowledge }) {
   return [
     "You generate student-facing prompts for Cognelo coding exercises.",
-    "Return only the prompt text. Do not return JSON, Markdown fences, starter code, solutions, or tests.",
+    "Return only the student-facing prompt in Markdown. Do not wrap the entire response in a Markdown fence or return JSON, a reference solution, or generated tests.",
+    "Preserve any required helper or scaffold code supplied by the teacher inside language-tagged fenced code blocks. Do not escape code as prose or include a complete solution.",
     "The prompt must be clear enough for a student to implement the exercise.",
     "The prompt must be anchored in a concrete, realistic mini-scenario. Do not ask the student to invent the context or decide what the function is for.",
     "Define the executable contract precisely: required inputs or function signature, required return value or printed output, and applicable edge cases.",
     "Prefer domain examples that make the function useful: inventory, grades, temperatures, bank/account values, coordinates, counters, reservations, sensor readings, or small business rules.",
     "Avoid purely meta phrasing such as 'write a function that illustrates concept X' as the main task. Teach the concept through the scenario instead.",
     "When the teacher gives a difficulty level, match the scope and constraints to that difficulty.",
+    "Recompute examples, numerical results, probabilities, and units for the actual requested task; never carry over an expected result after changing its conditions.",
     "Do not reveal the reference solution.",
     `Programming language: ${input.language}.`,
     "The selected programming language is authoritative. If the teacher description or subject context mentions another language, adapt the exercise to the selected programming language.",

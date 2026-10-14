@@ -42,6 +42,7 @@ type MessageKey =
   | "generatedTests"
   | "generatedTestsPartial"
   | "variationTestsIncomplete"
+  | "variationQualityFailed"
   | "generateTestsPromptRequired"
   | "generateTestsReferenceRequired"
   | "generateTestsError"
@@ -246,6 +247,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     generateTests: "Generate test cases automatically",
     generatingTests: "Generating test cases...",
     generatedTests: "Test cases generated.",
+    variationQualityFailed: "The AI could not create a sufficiently different, consistent exercise after three attempts. Try again with a suggested change to the problem or reasoning.",
     variationTestsIncomplete: "Kept {visible} of {expectedVisible} visible tests and {hidden} of {expectedHidden} hidden tests. Some tests could not be generated or validated and were omitted. Review the reference solution, template, missing test coverage, and hidden-test weights before publishing.",
     generatedTestsPartial: "Kept {visible} of {requestedVisible} visible tests and {hidden} of {requestedHidden} hidden tests that passed validation. The remaining tests could not be generated or validated. Review the retained tests before saving.",
     generateTestsPromptRequired: "Add a prompt before generating test cases.",
@@ -449,6 +451,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     generateTests: "Generer les cas de test automatiquement",
     generatingTests: "Generation des cas de test...",
     generatedTests: "Cas de test generes.",
+    variationQualityFailed: "L’IA n’a pas pu créer un exercice suffisamment différent et cohérent après trois tentatives. Réessayez en suggérant un changement au problème ou au raisonnement.",
     variationTestsIncomplete: "{visible} tests visibles sur {expectedVisible} et {hidden} tests cachés sur {expectedHidden} ont été conservés. Les tests qui n’ont pas pu être générés ou validés ont été omis. Vérifiez la solution de référence, le gabarit, la couverture manquante et les pondérations des tests cachés avant de publier.",
     generatedTestsPartial: "{visible} tests visibles sur {requestedVisible} et {hidden} tests cachés sur {requestedHidden} ont été validés et conservés. Les autres tests n’ont pas pu être générés ou validés. Vérifiez les tests conservés avant d’enregistrer.",
     generateTestsPromptRequired: "Ajoutez une consigne avant de generer les cas de test.",
@@ -652,6 +655,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     generateTests: "自动生成测试用例",
     generatingTests: "正在生成测试用例...",
     generatedTests: "测试用例已生成。",
+    variationQualityFailed: "经过三次尝试，AI 仍未能创建具有实质差异且内容一致的练习。请建议对问题或解题思路进行修改后重试。",
     variationTestsIncomplete: "已保留 {expectedVisible} 个可见测试中的 {visible} 个，以及 {expectedHidden} 个隐藏测试中的 {hidden} 个。无法生成或验证的测试已被省略。发布前请检查参考解答、模板、缺失的测试覆盖范围和隐藏测试权重。",
     generatedTestsPartial: "已保留通过验证的 {visible}/{requestedVisible} 个可见测试和 {hidden}/{requestedHidden} 个隐藏测试。其余测试未能生成或通过验证。请在保存前检查已保留的测试。",
     generateTestsPromptRequired: "请先添加题目再生成测试用例。",

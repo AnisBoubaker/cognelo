@@ -83,6 +83,18 @@ describe("coding exercise AI generation", () => {
         subject
       })
     ).resolves.toMatchObject({ attempts: 2 });
+    expect(mocks.generateQuestionAuthoringText.mock.calls[1][1].userPrompt).toContain("Maximum value practice");
+  });
+
+  it("preserves required helper code fences in a generated prompt", async () => {
+    const prompt = "Estimez une probabilité avec cette fonction fournie :\n\n```c\nint nb_aleatoire(int min, int max);\n```\n\nAffichez le résultat en pourcentage.";
+    mocks.generateQuestionAuthoringText.mockResolvedValueOnce(prompt);
+    await expect(generateCodingExercisePrompt({
+      user, description: "Utiliser nb_aleatoire fourni en cours.", language: "c", locale: "fr", subject
+    })).resolves.toMatchObject({ prompt });
+    const system = mocks.generateQuestionAuthoringText.mock.calls[0][1].systemPrompt;
+    expect(system).toContain("language-tagged fenced code blocks");
+    expect(system).not.toContain("Do not return JSON, Markdown fences");
   });
 
   it("generates variation metadata that matches the new prompt instead of repeating the source", async () => {

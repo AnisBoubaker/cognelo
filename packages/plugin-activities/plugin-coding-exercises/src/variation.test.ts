@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   generateMetadata: vi.fn(),
   generateSolution: vi.fn(),
   generateTests: vi.fn(),
+  review: vi.fn(),
   listPrivate: vi.fn(),
   replacePrivate: vi.fn(),
   updateBankActivity: vi.fn()
@@ -26,6 +27,7 @@ vi.mock("./hidden-tests", () => ({
   listBankCodingExerciseHiddenTests: mocks.listPrivate,
   replaceBankCodingExerciseHiddenTests: mocks.replacePrivate
 }));
+vi.mock("./variation-quality", () => ({ reviewCodingExerciseVariation: mocks.review }));
 
 // Load the mocked error class first so concurrent mock-factory evaluation cannot
 // give the variation handler a different AppError constructor for instanceof.
@@ -35,6 +37,7 @@ const { createCodingExerciseBankActivityVariation } = await import("./variation"
 describe("coding exercise bank variations", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.review.mockResolvedValue([]);
     mocks.listPrivate.mockResolvedValue({
       tests: [{ id: "hidden-original", name: "Original", stdin: "1", expectedOutput: "2", testCode: "", isEnabled: true, weight: 7, outputMatchMode: "exact", containsLinesOrderMatters: false }],
       referenceSolution: {
@@ -110,6 +113,77 @@ describe("coding exercise bank variations", () => {
     });
     expect(privateSave.input.tests[0].weight).toBe(7);
     expect(reportProgress).toHaveBeenCalledWith({ fraction: 0.82, step: "validating" });
+  });
+
+  it.each([
+    "Only variable names and the story changed; the algorithm is identical.",
+    "Strictly increasing dice rolls yield 20/216 (9.26%), not 4/216 (1.85%).",
+    "The solution requires advanced concepts outside the original learning objectives."
+  ])("regenerates the whole candidate before generating tests: %s", async (issue) => {
+    mocks.generatePrompt.mockResolvedValueOnce({ prompt: "A renamed version of the original exercise." });
+    mocks.generateSolution.mockResolvedValueOnce({
+      status: "ok", referenceSolution: "value = int(input()); print(value + 1)",
+      templateSource: "{{ STUDENT_CODE }}", templateVisibleLineNumbers: [], starterCode: ""
+    });
+    mocks.review.mockResolvedValueOnce([issue]);
+    await createCodingExerciseBankActivityVariation(variationInput());
+    expect(mocks.generatePrompt).toHaveBeenCalledTimes(2);
+    expect(mocks.generateSolution).toHaveBeenCalledTimes(2);
+    expect(mocks.generatePrompt.mock.calls[1][0].description).toContain(issue);
+    expect(mocks.generateSolution.mock.calls[1][0].description).toContain(issue);
+    expect(mocks.generateTests).toHaveBeenCalledTimes(1);
+    expect(mocks.generateTests.mock.calls[0][0].referenceSolution).toBe("print(int(input()) * 2)");
+    expect(mocks.generateMetadata).toHaveBeenCalledTimes(1);
+    expect(mocks.generateMetadata.mock.calls[0][0].prompt).toContain("doubles");
+    expect(mocks.replacePrivate.mock.calls[0][0].input.referenceSolution).toBe("print(int(input()) * 2)");
+  });
+
+  it("fails after three rejected candidates without saving or treating rejection as missing tests", async () => {
+    mocks.review.mockResolvedValue(["Same algorithm with renamed variables."]);
+    await expect(createCodingExerciseBankActivityVariation(variationInput())).rejects.toMatchObject({
+      code: "CODING_EXERCISE_VARIATION_QUALITY_FAILED"
+    });
+    expect(mocks.generatePrompt).toHaveBeenCalledTimes(3);
+    expect(mocks.generateSolution).toHaveBeenCalledTimes(3);
+    expect(mocks.generateTests).not.toHaveBeenCalled();
+    expect(mocks.generateMetadata).not.toHaveBeenCalled();
+    expect(mocks.replacePrivate).not.toHaveBeenCalled();
+    expect(mocks.updateBankActivity).not.toHaveBeenCalled();
+  });
+
+  it("passes the complete source and rubric to generation and review without truncating the algorithm", async () => {
+    const original = await mocks.listPrivate();
+    const referenceSolution = "// required helper\n".repeat(200) + "original_algorithm_at_end();";
+    mocks.listPrivate.mockResolvedValue({ ...original, referenceSolution: { ...original.referenceSolution, sourceCode: referenceSolution } });
+    const input = variationInput();
+    input.sourceActivity.config.prompt = "Course constraints. ".repeat(400) + "Required helper: nb_aleatoire.";
+    await createCodingExerciseBankActivityVariation(input);
+    const brief = mocks.generatePrompt.mock.calls[0][0].description;
+    expect(brief).toContain(input.sourceActivity.config.prompt);
+    expect(brief).toContain(referenceSolution);
+    expect(brief).toContain("Correct algorithm");
+    expect(mocks.review.mock.calls[0][0]).toMatchObject({
+      source: { prompt: input.sourceActivity.config.prompt, referenceSolution, rubric: original.referenceSolution.privateConfig.aiFeedback },
+      knowledge: input.knowledge
+    });
+  });
+
+  it("retains the qualified solution when a testability retry fails quality review", async () => {
+    mocks.generateTests.mockRejectedValueOnce(new AppError(422, "CODING_EXERCISE_TEST_GENERATION_INVALID", "Tests failed."));
+    const initial = await mocks.generateSolution();
+    mocks.generateSolution.mockClear().mockResolvedValueOnce(initial).mockResolvedValueOnce({ ...initial, referenceSolution: "print(int(input()) + 1)" });
+    mocks.review.mockResolvedValueOnce([]).mockResolvedValueOnce(["Repeated original algorithm."]);
+    await expect(createCodingExerciseBankActivityVariation(variationInput())).resolves.toMatchObject({ warnings: [{ code: "CODING_EXERCISE_VARIATION_INCOMPLETE_TESTS" }] });
+    expect(mocks.review).toHaveBeenCalledTimes(2);
+    expect(mocks.generateTests).toHaveBeenCalledTimes(1);
+    expect(mocks.replacePrivate.mock.calls[0][0].input).toMatchObject({ referenceSolution: initial.referenceSolution, sampleTests: [], tests: [] });
+  });
+
+  it("does not save an unreviewed candidate when the reviewer is unavailable", async () => {
+    mocks.review.mockRejectedValueOnce(new Error("Reviewer unavailable."));
+    await expect(createCodingExerciseBankActivityVariation(variationInput())).rejects.toThrow("Reviewer unavailable.");
+    expect(mocks.replacePrivate).not.toHaveBeenCalled();
+    expect(mocks.updateBankActivity).not.toHaveBeenCalled();
   });
 
   it("omits a generated suite that repeats the source and keeps the new exercise with a review warning", async () => {
