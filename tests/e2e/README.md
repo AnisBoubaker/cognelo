@@ -67,6 +67,8 @@ The shared API delivery boundary captures `cognelo.local` and reserved example/t
 
 Outbox assertions require local access to the API’s storage. Use synthetic domains for overridden E2E account emails; ordinary domains retain real delivery behavior. See [Email delivery and test recipients](../../docs/EMAIL_DELIVERY.md) for exact matching, privacy, cleanup, and failure behavior.
 
+`activity-solutions.spec.ts` covers default-off solution settings, explicit learner reveal, live revocation, summative release/re-hide, compound Test solution providers, and repeatable-grade privacy.
+
 ## Focused regression checks
 
 Run the independent authoring-recovery, bank-synchronization, course-loading, student-grouping, activity-exception, and live compound-Test scenarios with:

@@ -1866,10 +1866,28 @@ describe("gradebook attempt services", () => {
       expect.objectContaining({
         where: {
           courseId: "course-1",
-          groupId: "group-1"
+          groupId: "group-1",
+          gradesReleased: true
         }
       })
     );
+  });
+
+  it.each(["unlimited", "until_due", "max_attempts"])("hides unreleased grades and feedback even for repeatable %s assignments", async (attemptLimitMode) => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1", status: "published", availableFrom: null, availableUntil: null });
+    mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue({ id: "participant-1", userId: "student-1", role: "student" });
+    mockPrisma.gradebookItem.findMany.mockResolvedValue([{
+      id: "item", groupActivityId: "assignment", gradesReleased: false, attemptLimitMode, maxAttempts: 3,
+      activity: { id: "activity-1", title: "Hidden", activityType: { key: "mcq" } },
+      groupActivity: { metadata: { assessmentMode: "summative" } },
+      grades: [{ source: "auto", normalizedScore: 100, normalizedMaxScore: 100 }],
+      attempts: [{ id: "attempt", attemptNumber: 1, lifecycle: "graded" }],
+      events: [{ eventType: "auto_graded", attemptId: "attempt", nextValue: {
+        attemptId: "attempt", attemptNumber: 1, rawScore: 1, rawMaxScore: 1, normalizedScore: 100, normalizedMaxScore: 100,
+        normalizedResult: { studentFeedback: { feedbackText: "Private feedback" } }
+      } }]
+    }]);
+    expect(await getStudentReleasedGrades(studentUser, "course-1", "group-1")).toEqual({ rows: [] });
   });
 
   it("does not return a released automatic grade when all submitted attempts were deleted", async () => {

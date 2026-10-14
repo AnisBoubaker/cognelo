@@ -867,6 +867,7 @@ function McqTestGradebookReview({ item }: { item: TestReviewItem }) {
       submissionClient={submissionClient}
       deferSubmission
       showCorrectAnswers
+      showAnswerKey
       studentViewMode="previous"
     />
   );

@@ -6,6 +6,8 @@ Teacher submission review and grading consume core grade capabilities: explicit 
 
 Student-triggered challenge generation uses explicit course staff question-authoring preferences in creator, owner, then teacher order. Unusable preferences are skipped without exposing credentials, and generation fails only when no usable configured fallback remains.
 
+Programming Homework does not advertise the [student solution capability](../../../docs/ACTIVITY_SOLUTIONS.md); it has no Release solution setting or Solution tab.
+
 ## Workflow
 
 ```text

@@ -7,6 +7,7 @@ import { flushSync } from "react-dom";
 import { CodingExerciseStudentGradeReport } from "@cognelo/plugin-coding-exercises";
 import { AppShell } from "@/components/app-shell";
 import { ActivityLiveControlPortal } from "@/components/activity-live-controls";
+import { ActivitySolutionPanel } from "@/components/activity-solution-panel";
 import { ActivityMessenger } from "@/components/activity-messenger";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
 import { useAuth } from "@/components/auth-provider";
@@ -39,6 +40,8 @@ export default function GroupActivityPage() {
   const canStartNewAttemptRef = useRef<boolean | null>(null);
   const continuationVersionRef = useRef<string | null>(null);
   const [hasPreviousSubmissions, setHasPreviousSubmissions] = useState<boolean | null>(null);
+  const [solutionAvailable, setSolutionAvailable] = useState(false);
+  const [showSolution, setShowSolution] = useState(false);
   const [selectedTab, setSelectedTab] = useState<"attempt" | "previous" | "deleted">("attempt");
   const [isActivityUnavailable, setIsActivityUnavailable] = useState(false);
   const [hasQuestionAuthoringAgent, setHasQuestionAuthoringAgent] = useState(false);
@@ -83,6 +86,8 @@ export default function GroupActivityPage() {
     setHasPreviousSubmissions(null);
     setIsActivityUnavailable(false);
     setSelectedTab("attempt");
+    setSolutionAvailable(false);
+    setShowSolution(false);
     setSafeExamBrowserLaunch(null);
     setIsSafeExamBrowserGateOpen(false);
     setIsPreparingSafeExamBrowser(false);
@@ -125,6 +130,10 @@ export default function GroupActivityPage() {
     return () => { cancelled = true; };
   }, [hasStandaloneActivity, activityId, courseId, groupId, isLearner, t]);
 
+  useEffect(() => {
+    if (!solutionAvailable || isActivityUnavailable || isSafeExamBrowserGateOpen) setShowSolution(false);
+  }, [solutionAvailable, isActivityUnavailable, isSafeExamBrowserGateOpen]);
+
   // Refresh content and policy in place; plugin editors preserve their active response.
   useEffect(() => {
     if (!isLearner) return;
@@ -142,9 +151,15 @@ export default function GroupActivityPage() {
           return;
         }
         setIsSafeExamBrowserGateOpen(false);
-        const { activity: latest } = await api.groupActivity(courseId, groupId, activityId);
+        const [{ activity: latest }, solutionStatus, gradesResult] = await Promise.all([
+          api.groupActivity(courseId, groupId, activityId),
+          api.activitySolutionAvailability(courseId, groupId, activityId),
+          api.studentGroupGrades(courseId, groupId)
+        ]);
         if (cancelled) return;
         setIsActivityUnavailable(false);
+        setSolutionAvailable(solutionStatus.available);
+        setReleasedGrade(gradesResult.grades.rows.find((row) => row.activityId === activityId && row.gradeKind === "final") ?? null);
         setActivity((current) => JSON.stringify(current) === JSON.stringify(latest) ? current : latest);
         if (latest.activityType.key !== "test") {
           const { runtime } = await api.timedActivityRuntime(courseId, groupId, activityId);
@@ -278,12 +293,14 @@ export default function GroupActivityPage() {
         setReleasedGrade(null);
         setDeletedSubmissions([]);
       } else {
-        const [gradesResult, submissionsResult] = await Promise.all([
+        const [gradesResult, submissionsResult, solutionStatus] = await Promise.all([
           api.studentGroupGrades(courseId, groupId),
-          api.studentActivitySubmissions(courseId, groupId, activityId)
+          api.studentActivitySubmissions(courseId, groupId, activityId),
+          api.activitySolutionAvailability(courseId, groupId, activityId)
         ]);
         const gradeRow = gradesResult.grades.rows.find((row) => row.activityId === activityId && row.score !== null) ?? null;
         setReleasedGrade(gradeRow);
+        setSolutionAvailable(solutionStatus.available);
         setDeletedSubmissions(submissionsResult.audit.deletedSubmissions);
       }
     }
@@ -502,42 +519,51 @@ export default function GroupActivityPage() {
           </section>
         ) : null}
 
-        {!isActivityUnavailable && (hasPreviousSubmissions === true || deletedSubmissions.length || canStartNewAttempt === false) ? (
+        {!isActivityUnavailable && (solutionAvailable || hasPreviousSubmissions === true || deletedSubmissions.length || canStartNewAttempt === false) ? (
           <div className="tab-strip" role="tablist" aria-label={activity?.title ?? t("common.loading")}>
             {canStartNewAttempt !== false ? (
               <button
-                aria-selected={selectedTab === "attempt"}
+                aria-selected={!showSolution && selectedTab === "attempt"}
                 className="tab-button"
                 role="tab"
                 type="button"
-                onClick={() => setSelectedTab("attempt")}
+                onClick={() => { setShowSolution(false); setSelectedTab("attempt"); }}
               >
                 {t("courseDetail.newAttemptTab")}
               </button>
             ) : null}
             {hasPreviousSubmissions === true ? (
               <button
-                aria-selected={selectedTab === "previous"}
+                aria-selected={!showSolution && selectedTab === "previous"}
                 className="tab-button"
                 role="tab"
                 type="button"
-                onClick={() => setSelectedTab("previous")}
+                onClick={() => { setShowSolution(false); setSelectedTab("previous"); }}
               >
                 {t("courseDetail.previousSubmissionsTitle")}
               </button>
             ) : null}
+            {solutionAvailable ? (
+              <button aria-selected={showSolution} className="tab-button" role="tab" type="button" onClick={() => setShowSolution(true)}>
+                {t("activitySolution.tab")}
+              </button>
+            ) : null}
             {deletedSubmissions.length ? (
               <button
-                aria-selected={selectedTab === "deleted"}
+                aria-selected={!showSolution && selectedTab === "deleted"}
                 className="tab-button"
                 role="tab"
                 type="button"
-                onClick={() => setSelectedTab("deleted")}
+                onClick={() => { setShowSolution(false); setSelectedTab("deleted"); }}
               >
                 {t("courseDetail.deletedSubmissionsTitle")}
               </button>
             ) : null}
           </div>
+        ) : null}
+
+        {!isActivityUnavailable && !isSafeExamBrowserGateOpen && solutionAvailable && showSolution ? (
+          <ActivitySolutionPanel courseId={courseId} groupId={groupId} activityId={activityId} />
         ) : null}
 
         {!isActivityUnavailable && isLearner && activity?.activityType.key !== "test" && timingStatus !== "ready" ? (
@@ -546,7 +572,7 @@ export default function GroupActivityPage() {
           </section>
         ) : null}
 
-        {!isActivityUnavailable && timingStatus === "ready" && timedRuntime?.timeLimitMinutes && !timedRuntime.attempt && selectedTab === "attempt" ? (
+        {!showSolution && !isActivityUnavailable && timingStatus === "ready" && timedRuntime?.timeLimitMinutes && !timedRuntime.attempt && selectedTab === "attempt" ? (
           <section className="section stack">
             <div>
               <p className="eyebrow">{t("groupPage.timedActivityEyebrow")}</p>
@@ -587,7 +613,7 @@ export default function GroupActivityPage() {
           groupId={groupId}
         />
 
-        <div hidden={isActivityUnavailable || Boolean(safeExamBrowserAccess?.requiresSafeExamBrowser && !safeExamBrowserAccess.accessGranted)}>
+        <div hidden={showSolution || isActivityUnavailable || Boolean(safeExamBrowserAccess?.requiresSafeExamBrowser && !safeExamBrowserAccess.accessGranted)}>
         {(!isLearner || activity?.activityType.key === "test" || timingStatus === "ready") && (!timedRuntime?.timeLimitMinutes || timedRuntime.attempt || selectedTab === "previous") && (
           (selectedTab === "attempt" && (
             canStartNewAttempt !== false || activity?.activityType.key === "test"
@@ -626,7 +652,7 @@ export default function GroupActivityPage() {
           )
         ) : null}
 
-        {!isActivityUnavailable && deletedSubmissions.length && selectedTab === "deleted" ? (
+        {!showSolution && !isActivityUnavailable && deletedSubmissions.length && selectedTab === "deleted" ? (
           <section className="section stack">
             <div>
               <p className="eyebrow">{t("courseDetail.deletedSubmissionsTitle")}</p>

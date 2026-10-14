@@ -11,6 +11,7 @@ const executionMocks = vi.hoisted(() => ({
   codingExerciseRunInputSchema: { parse: vi.fn((value) => value) },
   codingExerciseSubmitInputSchema: { parse: vi.fn((value) => value) },
   getCodingExercisePrivateConfig: vi.fn(),
+  getCodingExerciseReferenceSolution: vi.fn(),
   runCodingExercise: vi.fn(),
   runCodingExercisePreview: vi.fn(),
   submitCodingExercise: vi.fn(),
@@ -53,6 +54,17 @@ describe("coding exercises server plugin lifecycle hooks", () => {
     executionMocks.getCodingExercisePrivateConfig.mockResolvedValue({
       aiFeedback: { gradingEnabled: false }
     });
+  });
+
+  it("projects only reference source and language for an authorized solution reveal", async () => {
+    executionMocks.getCodingExerciseReferenceSolution.mockResolvedValue({
+      sourceCode: "print(42)", privateConfig: { templateCode: "private scaffold", aiFeedback: { instructions: "private rubric" } },
+      validationSummary: { tests: [{ expectedOutput: "hidden" }] }
+    });
+    await expect(codingExercisesServerPlugin.studentSolution!.getSolution({ ...testActivity("coding-exercise"), config: { language: "python" } }))
+      .resolves.toEqual({ blocks: [{ kind: "code", code: "print(42)", language: "python" }] });
+    executionMocks.getCodingExerciseReferenceSolution.mockResolvedValue(null);
+    await expect(codingExercisesServerPlugin.studentSolution!.getSolution(testActivity("coding-exercise"))).resolves.toBeNull();
   });
 
   it("copies bank-owned data when a coding exercise is assigned to a course", async () => {

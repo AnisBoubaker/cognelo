@@ -149,3 +149,8 @@ Restores the submitted arrangement on its existing plugin attempt, reopens it, a
 The learner prompt and rules refresh without replacing the current arrangement. Configuration changes reconcile existing blocks, update the same active attempt rather than abandon it, and append new lines. Standalone submission/check evaluation is computed on the server against the current solution; client-provided correctness is not authoritative. Summative attempt/history payloads remove evaluation until release, and `studentResponseState` always removes legacy embedded evaluation from composite drafts.
 
 Shared confirmation, submitted-Test snapshots, and concurrency are documented in [Live activity authoring](../../../../docs/LIVE_ACTIVITY_AUTHORING.md).
+
+
+## Explicit solution release
+
+This type supports the shared [Solution tab](../../../../docs/ACTIVITY_SOLUTIONS.md). Course settings must opt in; summative work additionally requires grade release. The learner first sees encouragement to try independently and must press **Show solution**. The same provider serves this type inside a Test under the parent switch. See the linked reference for formats, live revocation, API boundaries, and current-reference semantics.

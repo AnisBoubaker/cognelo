@@ -499,7 +499,7 @@ First plugin integration target:
 
 - Completed: add student grade view for released grades in the section/group workspace.
 - Completed: show released graded scores in the student assigned-activity list and on the assigned activity page itself.
-- Completed: hide unreleased single-attempt gradebook items from students. For repeatable summative items (`unlimited`, `until_due`, or `max_attempts > 1`), show the latest provisional normalized attempt result before release so it can guide another attempt.
+- Completed: hide every unreleased summative grade and its feedback, including repeatable items (`unlimited`, `until_due`, or `max_attempts > 1`). The learner Grades feed selects only released items; no provisional-result bypass remains. [Solution release](ACTIVITY_SOLUTIONS.md) is independent and default-off.
 - Completed: treat release as publication of the final grade selected by the configured grade strategy and prevent further attempts after release.
 - Completed: keep student grade responses limited to normalized summaries and plugin-supported reviews of the authenticated student’s own attempts, without raw plugin grading payloads or hidden Test details.
 - Completed: released Parsons grades include sanitized deterministic feedback and a grading breakdown, using the same order/indentation messages that formative checks show, without exposing raw plugin payloads or grading timestamps.

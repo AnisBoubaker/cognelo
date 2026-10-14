@@ -50,6 +50,7 @@ type McqActivityViewProps = {
   onNewAttemptAvailabilityChange?: (canStartNewAttempt: boolean) => void;
   onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
   showCorrectAnswers?: boolean;
+  showAnswerKey?: boolean;
   releasedMaxScore?: number;
   deferSubmission?: boolean;
   autosaveDelayMs?: number;
@@ -281,6 +282,7 @@ export function McqActivityView({
   onNewAttemptAvailabilityChange,
   onPreviousSubmissionsAvailabilityChange,
   showCorrectAnswers = false,
+  showAnswerKey = false,
   releasedMaxScore,
   deferSubmission = false,
   autosaveDelayMs = 500,
@@ -932,6 +934,7 @@ export function McqActivityView({
             parsedMcq={parsedMcq}
             studentAnswers={selectedSubmissionReview.answers}
             submitted
+            showAnswerKey={showAnswerKey}
             showFeedback={!isSummativeStudentSession || showCorrectAnswers}
             score={null}
             onSubmit={() => undefined}
@@ -964,6 +967,7 @@ export function McqActivityView({
             parsedMcq={parsedMcq}
             studentAnswers={studentAnswers}
             submitted={submitted}
+            showAnswerKey={showAnswerKey}
             showFeedback={(!isSummativeStudentSession && submitted) || (isSummativeStudentSession && submitted && showCorrectAnswers)}
             score={score}
             onSubmit={() => void requestSubmitMcqAnswers()}
@@ -1052,6 +1056,7 @@ function McqStudentView({
   studentAnswers,
   submitted,
   showFeedback,
+  showAnswerKey = true,
   score,
   onSubmit,
   onReset,
@@ -1076,6 +1081,7 @@ function McqStudentView({
   studentAnswers: StudentAnswerState;
   submitted: boolean;
   showFeedback: boolean;
+  showAnswerKey?: boolean;
   score: { correct: number; total: number } | null;
   onSubmit: () => void;
   onReset: () => void;
@@ -1122,6 +1128,7 @@ function McqStudentView({
               selected={selected}
               submitted={submitted}
               showFeedback={showFeedback}
+              showAnswerKey={showAnswerKey}
               questionLabel={questionLabel}
               correctLabel={correctLabel}
               incorrectLabel={incorrectLabel}
@@ -1162,6 +1169,7 @@ function McqQuestionCard({
   selected,
   submitted: _submitted,
   showFeedback,
+  showAnswerKey = true,
   questionLabel,
   correctLabel,
   incorrectLabel,
@@ -1177,6 +1185,7 @@ function McqQuestionCard({
   selected: string[];
   submitted: boolean;
   showFeedback: boolean;
+  showAnswerKey?: boolean;
   questionLabel: string;
   correctLabel: string;
   incorrectLabel: string;
@@ -1229,7 +1238,7 @@ function McqQuestionCard({
         {question.choices.map((choice) => {
           const checked = selected.includes(choice.id);
           const isCorrectChoice = choice.isCorrect;
-          const isMissedCorrectChoice = showFeedback && isCorrectChoice && !checked;
+          const isMissedCorrectChoice = showFeedback && showAnswerKey && isCorrectChoice && !checked;
           const isWrongSelectedChoice = showFeedback && checked && !isCorrectChoice;
           const isRightSelectedChoice = showFeedback && checked && isCorrectChoice;
           const pointImpact = showFeedback && (checked || isMissedCorrectChoice)

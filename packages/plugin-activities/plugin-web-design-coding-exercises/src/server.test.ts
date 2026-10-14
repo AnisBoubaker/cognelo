@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const solutionDb = vi.hoisted(() => ({ findUnique: vi.fn() }));
+vi.mock("./db-client", () => ({ prisma: { pluginWebDesignExerciseReferenceBundle: solutionDb } }));
+
 const testMocks = vi.hoisted(() => ({
   copyBankWebDesignExerciseData: vi.fn(),
   copyBankWebDesignExerciseTestsToCourseActivity: vi.fn(),
@@ -29,6 +32,15 @@ const { webDesignCodingExercisesServerPlugin } = await import("./server");
 describe("web design coding exercises server plugin lifecycle hooks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("projects reference files without private tests or validation details", async () => {
+    solutionDb.findUnique.mockResolvedValue({ files: [{ id: "html", path: "index.html", language: "html", starterCode: "<p>Answer</p>", isEditable: true, orderIndex: 0 }],
+      validationSummary: { secret: true }, tests: [{ testCode: "private assertion" }] });
+    await expect(webDesignCodingExercisesServerPlugin.studentSolution!.getSolution(testActivity("web-design-coding-exercise")))
+      .resolves.toEqual({ blocks: [{ kind: "code", code: "<p>Answer</p>", language: "html", title: "index.html" }] });
+    solutionDb.findUnique.mockResolvedValue(null);
+    await expect(webDesignCodingExercisesServerPlugin.studentSolution!.getSolution(testActivity("web-design-coding-exercise"))).resolves.toBeNull();
   });
 
   it("copies bank-owned tests when assigned to a course", async () => {

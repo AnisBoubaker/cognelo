@@ -57,9 +57,9 @@ For summative activities that permit another attempt, the **New attempt** tab st
 
 When the configured attempt limit is exhausted, reopening the activity shows submission history without a new-attempt form. The submission route independently rechecks availability and rejects any extra request, even if a client bypasses the UI.
 
-Before the teacher releases the final grade, this repeatable-assessment review shows the student each attempt’s provisional score and MCQ feedback so it can inform the next attempt. Grade release publishes the final grade selected by the gradebook strategy and closes further attempts; single-attempt summative results remain hidden until release.
+All summative scores and feedback remain hidden until the teacher releases grades, including repeatable assessments. Release publishes the grade selected by the gradebook strategy and closes further attempts. Learner answer review may mark selected answers but no longer reveals missed correct choices; the full key belongs to the separately enabled, explicit Solution tab.
 
-Submitted-answer review uses a green row for a missed correct choice so the correct answer remains visually recognizable, while retaining the orange exclamation icon that distinguishes it from a correctly selected answer.
+Teacher submitted-answer review uses a green row for a missed correct choice so the correct answer remains visually recognizable, while retaining the orange exclamation icon that distinguishes it from a correctly selected answer.
 
 MCQ declares composite-execution support for core Tests. The Test runtime embeds the existing MCQ student view through the web activity-renderer registry and autosaves answer state into a generic `TestItemAttempt`. Embedded MCQs have no individual Submit button: the Test's single final submission sends every saved MCQ state to the MCQ server adapter for deterministic grading. Core Test orchestration does not import MCQ schemas; future activity plugins opt in with their own capability plus server and web adapters.
 
@@ -105,3 +105,8 @@ Restores the submitted choices to the core response draft; the ordinary submissi
 The learner source/description updates in place without clearing selected answers. `reconcileMcqResponseState` matches surviving questions and choices by authored content, with positional correction fallback. Compound drafts also retain the configuration they answered. The server grades the current key at submission. Summative submission/history responses return no grade until release; previous-submission UI uses the same release gate.
 
 Shared confirmation, submitted-Test snapshots, and concurrency are documented in [Live activity authoring](../../../../docs/LIVE_ACTIVITY_AUTHORING.md).
+
+
+## Explicit solution release
+
+This type supports the shared [Solution tab](../../../../docs/ACTIVITY_SOLUTIONS.md). Course settings must opt in; summative work additionally requires grade release. The learner first sees encouragement to try independently and must press **Show solution**. The same provider serves this type inside a Test under the parent switch. See the linked reference for formats, live revocation, API boundaries, and current-reference semantics.

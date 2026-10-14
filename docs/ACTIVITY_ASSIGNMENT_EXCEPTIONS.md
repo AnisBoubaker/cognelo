@@ -22,6 +22,8 @@ Every section override is also available on an exception:
 
 The last six categories are summative-only. Switching to formative removes their override selections from both section and exception settings. Assessment mode remains General-only, and folder placement remains controlled by the content tree. Grade release, late grace, activity configuration, and Test child authoring are not exception fields because they are not section overrides in this dialog.
 
+[Release solution](ACTIVITY_SOLUTIONS.md) is General-only and shared by sections, like messaging. Summative solutions require the independent section grade release as well.
+
 Targets are section-local: exactly one team or student enrollment per exception, at most one exception per target per assignment. Team membership is resolved at use time, including memberships in hidden groupings. Moving into/out of a team changes live policy resolution without copying settings onto students. Pending student enrollments may receive exceptions; teachers and TAs cannot be student targets.
 
 ## Enforcement and academic history

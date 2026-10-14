@@ -1721,7 +1721,8 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
   const storedItems = await prisma.gradebookItem.findMany({
     where: {
       courseId,
-      groupId
+      groupId,
+      gradesReleased: true
     },
     include: {
       activity: {
@@ -1769,19 +1770,14 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
       const activeAttempts = item.attempts.filter((attempt) => attempt.lifecycle !== "deleted");
       const submittedAttempts = activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
       const effectiveGrade = submittedAttempts.length || grade?.source === "override" ? grade : null;
-      const submittedAttemptIds = new Set(submittedAttempts.map((attempt) => attempt.id));
-      const latestGrade = selectLatestGradeCandidate(
-        gradeCandidatesFromEvents(item.events ?? []).filter((candidate) => submittedAttemptIds.has(candidate.attemptId))
-      );
-      const latestGradeVisible = !item.gradesReleased && isRepeatableGradebookItem(item) && latestGrade !== null;
-      if (!item.gradesReleased && !latestGradeVisible) {
+      if (!item.gradesReleased) {
         return [];
       }
-      const displayedScore = item.gradesReleased ? effectiveGrade?.normalizedScore ?? null : latestGrade?.normalizedScore ?? null;
+      const displayedScore = effectiveGrade?.normalizedScore ?? null;
       if (displayedScore === null) {
         return [];
       }
-      const displayedMaxScore = item.gradesReleased ? effectiveGrade?.normalizedMaxScore ?? item.pointsPossible : latestGrade?.normalizedMaxScore ?? item.pointsPossible;
+      const displayedMaxScore = effectiveGrade?.normalizedMaxScore ?? item.pointsPossible;
       const status = getGradebookRowStatus(effectiveGrade, activeAttempts);
       const latestSubmittedAttempt = submittedAttempts[submittedAttempts.length - 1] ?? null;
       const challengeAttemptId = item.gradesReleased && effectiveGrade
@@ -1797,27 +1793,27 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
         activityTitle: item.titleSnapshot || item.activity.title,
         activityTypeKey: item.activity.activityType.key,
         activityTypeName: item.activity.activityType.name,
-        gradeKind: item.gradesReleased ? "final" : "latest",
+        gradeKind: "final" as const,
         status,
         score: displayedScore,
         maxScore: displayedMaxScore,
-        isPass: item.gradesReleased ? effectiveGrade?.isPass ?? null : latestGrade?.isPass ?? null,
-        latePenaltyApplied: item.gradesReleased ? effectiveGrade?.latePenaltyApplied ?? false : latestGrade?.latePenaltyApplied ?? false,
-        latePenaltyPercent: item.gradesReleased ? effectiveGrade?.latePenaltyPercent ?? null : latestGrade?.latePenaltyPercent ?? null,
-        feedback: item.gradesReleased ? sanitizeStudentGradeFeedback(effectiveGrade?.normalizedResult) : sanitizeStudentGradeFeedback(latestGrade?.normalizedResult),
-        selectedAttemptId: item.gradesReleased ? effectiveGrade?.selectedAttemptId ?? null : latestGrade?.attemptId ?? null,
+        isPass: effectiveGrade?.isPass ?? null,
+        latePenaltyApplied: effectiveGrade?.latePenaltyApplied ?? false,
+        latePenaltyPercent: effectiveGrade?.latePenaltyPercent ?? null,
+        feedback: sanitizeStudentGradeFeedback(effectiveGrade?.normalizedResult),
+        selectedAttemptId: effectiveGrade?.selectedAttemptId ?? null,
         challengeAttemptId,
         gradeChallengeTarget: gradeChallengeTarget
           ? { feedbackRef: gradeChallengeTarget.feedbackRef, feedbackVersion: gradeChallengeTarget.feedbackVersion }
           : null,
         gradeChallengesEnabled: assignmentAllowsGradeChallenges(item.groupActivity.metadata),
-        selectedAttemptNumber: item.gradesReleased ? effectiveGrade?.selectedAttempt?.attemptNumber ?? null : latestGrade?.attemptNumber ?? null,
+        selectedAttemptNumber: effectiveGrade?.selectedAttempt?.attemptNumber ?? null,
         attemptCount: activeAttempts.length,
         submittedAttemptCount: submittedAttempts.length,
         deletedSubmissions: deletedSubmissionAuditsForParticipant(item.events ?? [], participant.id),
         availableFrom: item.groupActivity.availableFrom?.toISOString() ?? null,
         availableUntil: item.groupActivity.availableUntil?.toISOString() ?? null,
-        gradedAt: item.gradesReleased ? effectiveGrade?.gradedAt.toISOString() ?? null : null
+        gradedAt: effectiveGrade?.gradedAt.toISOString() ?? null
       }];
     });
   return { rows };
@@ -2436,14 +2432,6 @@ function selectGradebookGrade(input: {
   }
 
   return [...candidates].sort((left, right) => right.attemptNumber - left.attemptNumber)[0];
-}
-
-function selectLatestGradeCandidate(candidates: GradedAttemptCandidate[]) {
-  return [...candidates].sort((left, right) => right.attemptNumber - left.attemptNumber)[0] ?? null;
-}
-
-function isRepeatableGradebookItem(item: { attemptLimitMode: string; maxAttempts: number | null }) {
-  return item.attemptLimitMode !== "max_attempts" || item.maxAttempts === null || item.maxAttempts > 1;
 }
 
 function buildWeightedAverageGrade(gradebookItem: GradebookItemPolicy, candidates: GradedAttemptCandidate[]): GradedAttemptCandidate {

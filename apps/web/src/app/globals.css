@@ -143,6 +143,40 @@ textarea {
   resize: vertical;
 }
 
+.activity-solution .markdown-renderer ul:has(> li > input[type="checkbox"]) {
+  padding-left: 0;
+}
+
+.activity-solution .markdown-renderer li:has(> input[type="checkbox"]) {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-block: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  list-style: none;
+}
+
+.activity-solution .markdown-renderer li:has(> input[type="checkbox"]:checked) {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(22, 163, 74, 0.3);
+}
+
+.activity-solution input[type="checkbox"] {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 3px 0 0;
+  padding: 0;
+}
+
+.activity-solution-item + .activity-solution-item {
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+
 input:focus,
 textarea:focus,
 select:focus,

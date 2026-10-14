@@ -566,6 +566,7 @@ describe("group services", () => {
               futureGroupsAssigned: false,
               assessmentMode: "formative",
               messagingEnabled: false,
+              releaseSolution: false,
               timeLimitMinutes: null,
               assignedGroupIds: ["group-1", "group-2"]
             }

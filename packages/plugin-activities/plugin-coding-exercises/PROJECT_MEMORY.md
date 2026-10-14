@@ -2,6 +2,8 @@
 
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
+- The [student solution contract](../../../docs/ACTIVITY_SOLUTIONS.md) is capability-driven and default-off. Core gates explicit reveals by current assignment access and the summative grade release; the plugin returns only displayable reference content, never grading internals.
+
 - No enabled hidden tests must not block submission or manufacture a grade. Private live edits are audited in plugin revisions, and summative execution/history outcomes are release-gated on the server. See [the reference](docs/REFERENCE.md#live-authoring-and-grade-visibility).
 
 - The compound Test answer-review check must inspect response presence only, never correctness or grading evidence; automatically persisted initial state is not a new answer. See [the reference](docs/REFERENCE.md) for this plugin’s criteria.

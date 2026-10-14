@@ -12,6 +12,13 @@ import { createParsonsBankActivityVariation } from "./variation";
 
 export const parsonsServerPlugin: ServerActivityPlugin = {
   key: "parsons",
+  studentSolution: {
+    activityTypeKeys: ["parsons-problem"],
+    getSolution: async (activity) => {
+      const config = parseParsonsConfig(activity.config);
+      return { blocks: [{ kind: "code", code: config.solution, language: config.language }] };
+    }
+  },
   attemptContinuation: {
     activityTypeKeys: ["parsons-problem"],
     reopen: async ({ activityId, userId, pluginAttemptRef, metadata, transaction }) => {

@@ -61,7 +61,7 @@ src/
 The coding-exercises plugin should keep a strict separation between:
 
 - public activity config that is safe to send to students
-- private plugin-owned grading data that must never be exposed to the browser
+- private plugin-owned grading data excluded from ordinary learner payloads; explicit solution release projects only reference source, never hidden tests, rubric instructions, or raw grading artifacts
 - remote code execution through Judge0, always initiated by Cognelo server routes
 
 The first implementation pass keeps only student-visible fields in `Activity.config`:
@@ -269,3 +269,8 @@ Restores source code from the exact learner-owned execution to the core response
 Course prompt/config updates preserve learner code. Private saves use the core live-authoring transaction and append full before/after data to `PluginCodingExerciseAuthoringRevision`; core audits contain only hashes. Migration `202610130010_authoring_revisions` is registered in `src/db.ts`, including backup ownership, and deletion hooks remove revisions. Reference validation still applies. Zero enabled hidden tests produce a saved submission with `accepted: null`, `gradingPending: true`, and no automatic grade; compound submission proceeds with `gradingResult: null`. Summative submission and history APIs withhold execution outcomes, summaries, and diagnostics until release, while sample runs remain visible.
 
 Shared confirmation, submitted-Test snapshots, and concurrency are documented in [Live activity authoring](../../../../docs/LIVE_ACTIVITY_AUTHORING.md).
+
+
+## Explicit solution release
+
+This type supports the shared [Solution tab](../../../../docs/ACTIVITY_SOLUTIONS.md). Course settings must opt in; summative work additionally requires grade release. The learner first sees encouragement to try independently and must press **Show solution**. The same provider serves this type inside a Test under the parent switch. See the linked reference for formats, live revocation, API boundaries, and current-reference semantics.

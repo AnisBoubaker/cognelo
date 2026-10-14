@@ -1,3 +1,5 @@
+import { prisma } from "./db-client";
+import { parseWebDesignExerciseConfig } from "./web-design-coding-exercises";
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import { webDesignExerciseExpectedResultRoute, webDesignExerciseReviewAllRoute, webDesignExerciseRunRoute, webDesignExerciseSubmitRoute, webDesignExerciseTestsRoute } from "./routes";
 import { copyBankWebDesignExerciseData, copyBankWebDesignExerciseTestsToCourseActivity, copyCourseWebDesignExerciseData, copyCourseWebDesignExerciseDataToBankActivity, deleteBankWebDesignExerciseData, deleteCourseWebDesignExerciseData } from "./tests";
@@ -7,6 +9,17 @@ import { createWebDesignBankActivityVariation } from "./variation";
 
 export const webDesignCodingExercisesServerPlugin: ServerActivityPlugin = {
   key: "web-design-coding-exercises",
+  studentSolution: {
+    activityTypeKeys: ["web-design-coding-exercise"],
+    getSolution: async (activity) => {
+      const reference = await prisma.pluginWebDesignExerciseReferenceBundle.findUnique({
+        where: { activityId: activity.id }, select: { files: true }
+      });
+      if (!reference) return null;
+      const config = parseWebDesignExerciseConfig({ ...activity.config, files: reference.files });
+      return { blocks: config.files.map((file) => ({ kind: "code" as const, code: file.starterCode, language: file.language, title: file.path })) };
+    }
+  },
   attemptContinuation: {
     activityTypeKeys: ["web-design-coding-exercise"],
     reopen: async ({ activityId, userId, pluginAttemptRef, metadata, transaction }) => {

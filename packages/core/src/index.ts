@@ -2,6 +2,7 @@ export * from "./student-grade-visibility";
 export * from "./activity-authoring-live";
 export * from "./activities";
 export * from "./activity-assignment-policy";
+export * from "./activity-solutions";
 export * from "./activity-response-drafts";
 export * from "./activity-timing";
 export * from "./activity-knowledge-generation";
