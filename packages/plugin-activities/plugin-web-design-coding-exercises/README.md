@@ -10,6 +10,8 @@ Compound Test submission includes a final answer review with plugin-owned respon
 
 Live course-question edits preserve active responses and use the shared warning/audit workflow; summative outcomes remain hidden until grade release. See [Live authoring and grade visibility](docs/REFERENCE.md#live-authoring-and-grade-visibility).
 
+Teachers can opt into the shared [Solution tab](../../../docs/ACTIVITY_SOLUTIONS.md) in course-content settings. Students explicitly reveal it; summative work also requires released grades. A compound Test uses its parent switch.
+
 ## Read By Topic
 
 - [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)

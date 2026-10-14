@@ -1,5 +1,5 @@
 import type { CurrentUser } from "@cognelo/contracts";
-import type { ActivityDefinition } from "./index";
+import type { ActivityDefinition, ActivitySolutionContent } from "./index";
 
 export type ServerActivityRecord = {
   id: string;
@@ -305,6 +305,11 @@ export type PluginHostCapabilityHandler<TResult = unknown> = () => Promise<TResu
 
 export type ServerActivityPlugin = {
   key: string;
+  studentSolution?: {
+    activityTypeKeys: readonly string[];
+    /** Called only after the host authorizes solution release. Never return grading secrets. */
+    getSolution: (activity: ServerActivityRecord) => Promise<ActivitySolutionContent | null>;
+  };
   /** Restores learner-owned state inside the host's atomic reopening transaction.
    * SQL remains owned by the plugin; the SDK has no dependency on a Prisma client. */
   attemptContinuation?: {
@@ -508,6 +513,12 @@ export function resolvePluginStudentGradeReportHandler(activityTypeKey: string) 
   return currentServerPlugins().find((plugin) =>
     plugin.studentGradeReport?.activityTypeKeys.includes(activityTypeKey)
   )?.studentGradeReport?.getReport ?? null;
+}
+
+export function resolvePluginStudentSolutionHandler(activityTypeKey: string) {
+  return currentServerPlugins().find((plugin) =>
+    plugin.studentSolution?.activityTypeKeys.includes(activityTypeKey)
+  )?.studentSolution?.getSolution ?? null;
 }
 
 export function resolvePluginGradeCompletionHandler(activityTypeKey: string) {

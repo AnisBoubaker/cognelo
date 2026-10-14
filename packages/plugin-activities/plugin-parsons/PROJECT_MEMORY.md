@@ -2,6 +2,8 @@
 
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
+- The [student solution contract](../../../docs/ACTIVITY_SOLUTIONS.md) is capability-driven and default-off. Core gates explicit reveals by current assignment access and the summative grade release; the plugin returns only displayable reference content, never grading internals.
+
 - Live corrections preserve the active attempt and arrangement; server evaluation uses the current solution. Never expose embedded summative evaluation before release, including legacy composite state. See [the reference](docs/REFERENCE.md#live-authoring-and-grade-visibility).
 
 - The compound Test answer-review check must inspect response presence only, never correctness or grading evidence; automatically persisted initial state is not a new answer. Preserve the optional response marker through grading/reopening and disable learner edits until the saved arrangement has loaded. See [the reference](docs/REFERENCE.md) for this plugin’s criteria.

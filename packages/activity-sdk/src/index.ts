@@ -34,6 +34,17 @@ export type ActivityGradingResult = {
   metadata?: Record<string, unknown>;
 };
 
+export type ActivitySolutionContent = {
+  blocks: Array<
+    | { kind: "markdown"; markdown: string }
+    | { kind: "code"; code: string; language: string; title?: string }
+  >;
+};
+
+export type ActivitySolution = {
+  activities: Array<{ id: string; title: string; content: ActivitySolutionContent }>;
+};
+
 export type ActivityExecutionContext =
   | {
       kind: "student_preview";
@@ -98,6 +109,8 @@ export type ActivityProvider =
 export type ActivityCreationScope = "bank" | "course";
 
 export type ActivityDefinition = {
+  /** Opt-in reference solution, served only through the host's release gate. */
+  supportsSolution?: boolean;
   /** Preserve response identity when authored questions change during an attempt. Pure and student-safe. */
   reconcileResponseState?: (previousConfig: unknown, nextConfig: unknown, state: Record<string, unknown>) => Record<string, unknown>;
   /** Strip grading evidence from learner draft/history payloads. Grades use the release-controlled channel. */
@@ -148,6 +161,7 @@ const pluginsByKey = new Map<string, ActivityPlugin>();
 const coreDefinitions: ActivityDefinition[] = [
   {
     key: "test",
+    supportsSolution: true,
     name: "Test",
     description: "A summative assessment composed of regular activities.",
     creationScopes: ["course", "bank"],

@@ -16,7 +16,7 @@ Standalone student file bundles autosave through the core `ActivityResponseDraft
 
 The course assignment policy may time a standalone web-design exercise in either assessment mode. Core owns the explicit start, live deadline, and countdown. Draft and learner-run writes stop after expiry, while the ordinary hidden-test submission route is declared as the finalization boundary. The renderer answers `TimedActivityAutoSubmit` by invoking that existing Playwright submission, which attaches the plugin result to the already-started timed core attempt and preserves normal draft cleanup and grading.
 
-Teachers can include `{{ EXPECTED_RESULT }}` in the prompt to show students a visual target, or `{{ EXPECTED_RESULT_CROPPED }}` to trim large plain background regions around that target. Cognelo replaces either token with a screenshot generated from the private solution bundle; the student browser receives only the image artifact, never the solution source files.
+Teachers can include `{{ EXPECTED_RESULT }}` in the prompt to show students a visual target, or `{{ EXPECTED_RESULT_CROPPED }}` to trim large plain background regions around that target. Cognelo replaces either token with a screenshot generated from the private solution bundle; this prompt endpoint returns only the image artifact. Reference source is available separately only through an explicitly enabled solution reveal.
 
 ## Package Contents
 
@@ -120,7 +120,7 @@ The submit flow is:
 6. the runner returns normalized test results
 7. Cognelo stores filtered results and returns them to the browser
 
-The student browser should never receive hidden tests or private solution/reference files. Teacher authoring loads the private reference bundle through teacher/admin-only plugin routes.
+Ordinary learner config, runs, submissions, and grading reports exclude hidden tests and reference files. Only the explicitly authorized Solution tab may receive the reference source; it never receives hidden tests. Teacher authoring loads the complete private reference bundle through teacher/admin-only plugin routes.
 
 When a teacher saves tests, Cognelo sends the private solution bundle plus all enabled tests to the runner first. If any enabled test fails, the save is rejected and the previous saved tests remain in place. Disabled tests are persisted without being executed and are marked as skipped in their validation summary.
 
@@ -158,3 +158,8 @@ Restores files from the exact learner-owned submission to the core response draf
 Live prompt/config refresh preserves the learner file bundle. Course private saves use the core live-authoring transaction and append full before/after data to `PluginWebDesignExerciseAuthoringRevision`; core audits retain only hashes. Migration `202610130010_authoring_revisions` is registered in `src/db.ts`, including backup ownership, and deletion hooks remove revisions. Existing reference validation remains mandatory. Summative submission/history APIs redact scores, test outcomes, summaries, and diagnostics before release; practice sample runs retain feedback.
 
 Shared confirmation, submitted-Test snapshots, and concurrency are documented in [Live activity authoring](../../../../docs/LIVE_ACTIVITY_AUTHORING.md).
+
+
+## Explicit solution release
+
+This type supports the shared [Solution tab](../../../../docs/ACTIVITY_SOLUTIONS.md). Course settings must opt in; summative work additionally requires grade release. The learner first sees encouragement to try independently and must press **Show solution**. The same provider serves this type inside a Test under the parent switch. See the linked reference for formats, live revocation, API boundaries, and current-reference semantics.

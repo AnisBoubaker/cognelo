@@ -48,6 +48,7 @@ type ExceptionDraft = AssignmentValueDraft & { key: string; teamId: string | nul
 type ActivitySettingsDraft = {
   assessmentMode: AssignedActivityAssessmentMode;
   messagingEnabled: boolean;
+  releaseSolution: boolean;
   contentParentId: string;
   general: AssignmentValueDraft;
   groups: GroupAssignmentDraft[];
@@ -188,6 +189,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
         enablePerGroupSettings: true,
         assessmentMode: draft.assessmentMode,
         messagingEnabled: draft.messagingEnabled,
+        releaseSolution: draft.releaseSolution,
         confirmSummativeToFormative: convertsSummativeToFormative,
         requireSafeExamBrowser: draft.assessmentMode === "summative" && draft.general.requireSafeExamBrowser,
         gradeChallengesEnabled: draft.assessmentMode === "summative" && draft.general.gradeChallengesEnabled,
@@ -346,6 +348,22 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                     </label>
                     <p className="muted" id={`activity-settings-messaging-help-${activity.id}`}>{t("activityMessenger.enabledHelp")}</p>
                   </div>
+                  {getActivityDefinition(activity.activityType.key)?.supportsSolution ? (
+                    <div>
+                      <label className="checkbox-row" htmlFor={`activity-settings-solution-${activity.id}`}>
+                        <input
+                          aria-describedby={`activity-settings-solution-help-${activity.id}`}
+                          checked={draft.releaseSolution}
+                          disabled={saving}
+                          id={`activity-settings-solution-${activity.id}`}
+                          type="checkbox"
+                          onChange={(event) => setDraft((current) => current ? { ...current, releaseSolution: event.target.checked } : current)}
+                        />
+                        {t("activitySolution.releaseLabel")}
+                      </label>
+                      <p className="muted" id={`activity-settings-solution-help-${activity.id}`}>{t("activitySolution.releaseHelp")}</p>
+                    </div>
+                  ) : null}
                   <label className="checkbox-row" htmlFor={`activity-settings-visible-${activity.id}`}>
                     <input
                       checked={draft.general.isVisible}
@@ -937,6 +955,7 @@ function buildDraft(settings: CourseActivityAssignmentSettings, isTest: boolean)
   return {
     assessmentMode,
     messagingEnabled: settings.general.messagingEnabled,
+    releaseSolution: settings.general.releaseSolution ?? false,
     contentParentId: settings.general.contentPlacement.parentId ?? "",
     general: assignmentValueDraft(settings.general),
     groups: settings.groups.map((group) => ({

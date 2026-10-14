@@ -2,6 +2,16 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const enMessages = {
+  activitySolution: {
+    "releaseLabel": "Release solution",
+    "releaseHelp": "Let students reveal the solution. For summative activities, grades must also be released. This applies to all sections and, for a Test, all supported exercises.",
+    "tab": "Solution",
+    "tryFirstTitle": "Try it yourself first",
+    "tryFirstHelp": "You will learn more by attempting the activity on your own. When you are ready, reveal the solution and compare it with your approach.",
+    "show": "Show solution",
+    "empty": "No solution has been provided yet.",
+    "loadError": "The solution could not be loaded. It may no longer be available. Please try again."
+},
   activityExceptions: {
     "title": "Team and student exceptions",
     "precedence": "Settings are inherited from General, then the section, then team exceptions. Student exceptions take precedence for each selected setting.",

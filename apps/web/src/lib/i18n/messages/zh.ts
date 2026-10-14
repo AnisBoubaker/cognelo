@@ -2,6 +2,16 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const zhMessages = {
+  activitySolution: {
+    "releaseLabel": "发布参考答案",
+    "releaseHelp": "允许学生查看参考答案。总结性活动还必须先发布成绩。此设置适用于所有班级，以及测验中所有支持此功能的练习。",
+    "tab": "参考答案",
+    "tryFirstTitle": "请先独立尝试",
+    "tryFirstHelp": "先独立完成活动有助于学习。准备好后，再查看参考答案并比较解题思路。",
+    "show": "显示参考答案",
+    "empty": "尚未提供参考答案。",
+    "loadError": "无法加载参考答案。它可能已不可用，请重试。"
+},
   activityExceptions: {
     "title": "团队与学生例外设置",
     "precedence": "设置依次继承自通用设置、班级设置和团队例外。学生个人例外对每个选定设置具有最高优先级。",

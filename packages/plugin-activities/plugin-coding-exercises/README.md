@@ -38,6 +38,8 @@ Every successful standalone code submission creates a core attempt tagged format
 
 After release, the learner's grading report presents the available automatic-test and rubric point contributions plus the final total, every graded code attempt, teacher comments, criterion scores and explanations, and each test's pass/fail outcome and weighted score. Components that do not contribute to the configured grade are omitted from the recap. The report is built by a release-gated plugin handler and never includes hidden inputs, expected outputs, private rubric instructions, or raw model artifacts.
 
+Teachers can opt into the shared [Solution tab](../../../docs/ACTIVITY_SOLUTIONS.md) in course-content settings. Students explicitly reveal it; summative work also requires released grades. A compound Test uses its parent switch.
+
 ## Boundaries
 
 - `Activity.config` contains only student-safe prompt, language, starter/template projection, visible tests, and editor settings.

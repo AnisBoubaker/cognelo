@@ -2,6 +2,16 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const frMessages = {
+  activitySolution: {
+    "releaseLabel": "Publier la solution",
+    "releaseHelp": "Permettre aux étudiants de consulter la solution. Pour les activités sommatives, les notes doivent également être publiées. Ce réglage s’applique à toutes les sections et, pour un test, à tous les exercices compatibles.",
+    "tab": "Solution",
+    "tryFirstTitle": "Essayez d’abord par vous-même",
+    "tryFirstHelp": "Vous apprendrez davantage en essayant de résoudre l’activité par vous-même. Lorsque vous êtes prêt, affichez la solution et comparez-la à votre démarche.",
+    "show": "Afficher la solution",
+    "empty": "Aucune solution n’a encore été fournie.",
+    "loadError": "Impossible de charger la solution. Elle n’est peut-être plus disponible. Veuillez réessayer."
+},
   activityExceptions: {
     "title": "Exceptions par équipe et par étudiant",
     "precedence": "Les paramètres sont hérités des réglages généraux, puis de la section, puis des exceptions d’équipe. Les exceptions individuelles sont prioritaires pour chaque paramètre sélectionné.",

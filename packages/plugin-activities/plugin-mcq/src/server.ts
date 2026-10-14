@@ -10,6 +10,10 @@ import { createMcqBankActivityVariation } from "./variation";
 
 export const mcqServerPlugin: ServerActivityPlugin = {
   key: "mcq",
+  studentSolution: {
+    activityTypeKeys: ["mcq"],
+    getSolution: async (activity) => ({ blocks: [{ kind: "markdown", markdown: String(activity.config?.source ?? "") }] })
+  },
   attemptContinuation: {
     activityTypeKeys: ["mcq"],
     reopen: async ({ metadata }) => metadata.timedOut && !metadata.submittedAnswers

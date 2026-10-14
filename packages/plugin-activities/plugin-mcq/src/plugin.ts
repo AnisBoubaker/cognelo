@@ -103,6 +103,7 @@ export const mcqPlugin: ActivityPlugin = {
       description: "Single-choice and multiple-choice activities authored in a text-first Markdown-like format.",
       defaultCategoryIds: ["generic", "all"],
       icon: "checklist",
+      supportsSolution: true,
       studentView: { mode: "interactive", execution: "plugin" },
       authoring: {
         supportsVariations: true

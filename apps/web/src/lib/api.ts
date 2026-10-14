@@ -646,6 +646,7 @@ export type ProgrammingLanguageOption = {
 };
 
 export type ActivityDefinition = {
+  supportsSolution?: boolean;
   key: string;
   name: string;
   description: string;
@@ -913,6 +914,7 @@ export type ActivityAssignmentGradebookSettings = {
 export type CourseActivityAssignmentSettings = {
   general: {
     messagingEnabled: boolean;
+    releaseSolution: boolean;
     availableFrom: string | null;
     availableUntil: string | null;
     timeLimitMinutes: number | null;
@@ -2056,6 +2058,10 @@ export const api = {
     request<{ activity: Activity }>(`/courses/${courseId}/activities/${activityId}`),
   groupActivity: (courseId: string, groupId: string, activityId: string) =>
     request<{ activity: Activity }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}`),
+  activitySolutionAvailability: (courseId: string, groupId: string, activityId: string) =>
+    request<{ available: boolean }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/solution`),
+  activitySolution: (courseId: string, groupId: string, activityId: string) =>
+    request<{ solution: import("@cognelo/activity-sdk").ActivitySolution }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/solution`, { method: "POST" }),
   studentPreviewWorkspace: (courseId: string, groupId: string) =>
     request<{ workspace: StudentPreviewWorkspace }>(`/courses/${courseId}/groups/${groupId}/student-preview`),
   studentPreviewActivity: (courseId: string, groupId: string, activityId: string) =>

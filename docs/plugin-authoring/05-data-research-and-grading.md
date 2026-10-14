@@ -44,6 +44,8 @@ Good rule:
 - if a researcher or administrator would use the value to group or analyze activities, it is probably `metadata`
 - if the value is private, such as hidden tests or reference solutions, it belongs in plugin-owned tables rather than public `config`
 
+A reference solution may be explicitly released through the [student solution contract](../ACTIVITY_SOLUTIONS.md): advertise `supportsSolution` and register a type-scoped `studentSolution.getSolution` server handler. Return only the intended Markdown/code, excluding hidden tests, rubric instructions, raw artifacts, and private validation metadata. Core checks the course switch, student enrollment/access, and summative grade release before invoking the handler; do not add reference source to ordinary learner config or grade reports to implement this feature.
+
 ## Plugin-Owned Tables
 
 When data gets larger, more detailed, or more activity-specific, create plugin-owned tables through a plugin-local Prisma schema and client.

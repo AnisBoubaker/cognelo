@@ -12,6 +12,7 @@ import {
 } from "./routes";
 import { copyBankCodingExerciseData, copyBankCodingExerciseDataToCourseActivity, copyCourseCodingExerciseData, copyCourseCodingExerciseDataToBankActivity, deleteBankCodingExerciseData, deleteCourseCodingExerciseData } from "./hidden-tests";
 import {
+  getCodingExerciseReferenceSolution,
   codingExerciseRunInputSchema,
   codingExerciseSubmitInputSchema,
   runCodingExercise,
@@ -40,6 +41,15 @@ export { listCodingExerciseProgrammingLanguages } from "./judge0";
 
 export const codingExercisesServerPlugin: ServerActivityPlugin = {
   key: "coding-exercises",
+  studentSolution: {
+    activityTypeKeys: ["coding-exercise"],
+    getSolution: async (activity) => {
+      const reference = await getCodingExerciseReferenceSolution({ activityId: activity.id });
+      return reference?.sourceCode.trim()
+        ? { blocks: [{ kind: "code", code: reference.sourceCode, language: String(activity.config?.language ?? "text") }] }
+        : null;
+    }
+  },
   attemptContinuation: {
     activityTypeKeys: ["coding-exercise"],
     reopen: async ({ activityId, userId, pluginAttemptRef, metadata, transaction }) => {
