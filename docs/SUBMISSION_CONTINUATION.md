@@ -6,7 +6,7 @@ From an activity's **Student results** tab or the equivalent detailed gradebook,
 
 Reopening returns the same core attempt to `started`, with the same ID, attempt number, original `startedAt`, authored version/fingerprint, and Test manifest. It does not grant another attempt, reset the start time, change assignment settings, or add time.
 
-The resumed work uses **current effective settings**, including edits made since submission: General → section → prioritized team → student, independently per field. For a timed attempt, the deadline is the original start plus the current effective limit. A general extension or a student-specific exception therefore applies immediately on reopening. An expired effective deadline remains expired; availability, visibility, and Safe Exam Browser requirements still apply normally. Subsequent settings changes continue to refresh within 20 seconds.
+The resumed work uses **current effective settings**, including edits made since submission: General → section → prioritized team → student, independently per field. For a timed attempt, the deadline is the earlier of the original start plus the current effective limit and the current effective Until date. The previous submission’s duration/Until snapshots are archived and cleared when reopening. A general extension or a student-specific exception therefore applies immediately on reopening. An expired effective deadline remains expired; availability, visibility, and Safe Exam Browser requirements still apply normally. Subsequent settings changes continue to refresh within 20 seconds.
 
 The action explicitly permits continuing this attempt even when its consumed attempt slot or previously released grade would otherwise block starting new work. The item-wide release setting and all other learners remain unchanged. A reopened Test permits resuming this sitting across browser sessions even when its authored `allowResume` setting is false; the manifest itself remains unchanged. Ordinary subsequent attempts retain the usual release and resume rules.
 
@@ -19,7 +19,7 @@ The action explicitly permits continuing this attempt even when its consumed att
 - A compound Test reopens all existing item attempts together, retains their response state and original starts, clears current item scores/feedback and its completed submission claim, and reruns ordinary child finalization on resubmission.
 - Core clears completion timestamps, duration, lateness, final timing metadata, and current teacher feedback. Original values, child results, plugin continuation evidence, the previous grade, and the staff actor are retained in an append-only `submission_reopened` GradeEvent.
 - The reopened submission stops contributing to grades. Core recomputes from remaining completed submissions under current grading policy, or deactivates the selected grade when none remain, including an overridden grade. Historical grade events remain available, but events before reopening cannot resurrect that submission's old result during later selection.
-- Resubmission uses the same attempt slot and calculates completion time, duration, lateness, grading, and submitted effective time limit afresh. As with any submitted work, its final timing then stays fixed until explicitly reopened again.
+- Resubmission uses the same attempt slot and calculates completion time, duration, lateness, grading, and submitted effective time limit and Until snapshot afresh. As with any submitted work, its final timing then stays fixed until explicitly reopened again.
 
 ## API and plugin boundary
 

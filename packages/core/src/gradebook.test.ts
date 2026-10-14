@@ -447,6 +447,7 @@ describe("gradebook attempt services", () => {
         timedAttempt: true,
         timeLimitSnapshotMinutes: 45,
         submittedTimeLimitMinutes: null,
+        submittedAvailableUntil: "2026-05-18T15:00:00.000Z",
         submittedAnswers: { "question-1": ["choice-1"] }
       }
     });
@@ -456,7 +457,7 @@ describe("gradebook attempt services", () => {
     const submitted = {
       id: "attempt-1", courseId: "course-1", participant, participantId: "participant-1",
       lifecycle: "submitted", submittedAt: new Date("2026-05-18T15:00:00.000Z"),
-      isLate: false, metadata: { submittedTimeLimitMinutes: 30 },
+      isLate: false, metadata: { submittedTimeLimitMinutes: 30, submittedAvailableUntil: "2026-05-18T15:30:00.000Z" },
       groupActivity: { metadata: { timeLimitMinutes: 60 }, availableUntil: new Date("2026-05-18T14:00:00.000Z") },
       gradebookItem: { lateGracePeriodMinutes: 0 }
     };

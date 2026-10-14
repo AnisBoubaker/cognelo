@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
+import { applyAssignmentExceptions, resolveAssignmentExceptions } from "./activity-assignment-exceptions";
 
 const db = vi.hoisted(() => ({
   activityAttempt: { findMany: vi.fn() },
@@ -92,10 +93,74 @@ describe("generic timed activity runtime", () => {
     }));
   });
 
+  it.each(["section", "team", "student"])("caps the countdown at the effective %s Until date", async (level) => {
+    const until = "2026-10-11T14:15:00.000Z";
+    const overrides = level === "section" ? {} : resolveAssignmentExceptions([{
+      groupActivityId: "assignment-1", teamId: level === "team" ? "team-1" : null,
+      participantId: level === "student" ? "participant-1" : null, priority: 0,
+      settings: { overrideFields: ["availableUntil"], availableUntil: until }
+    }]);
+    groups.getGroupAssignedActivity.mockResolvedValue({
+      activityType: { key: "mcq" },
+      assignment: applyAssignmentExceptions({ id: "assignment-1", metadata: { timeLimitMinutes: 30 }, availableUntil: level === "section" ? new Date(until) : null }, overrides)
+    });
+    db.activityAttempt.findMany.mockResolvedValue([activeAttempt]);
+    await expect(getTimedActivityRuntime(student, "course-1", "group-1", "activity-1")).resolves.toMatchObject({
+      timeLimitMinutes: 30, timing: { expiresAt: until, remainingSeconds: 300, isExpired: false }
+    });
+  });
+
+  it("updates the earlier deadline live without resetting the start when Until changes or is cleared", async () => {
+    db.activityAttempt.findMany.mockResolvedValue([activeAttempt]);
+    for (const [until, expiresAt] of [
+      ["2026-10-11T14:15:00.000Z", "2026-10-11T14:15:00.000Z"],
+      ["2026-10-11T14:25:00.000Z", "2026-10-11T14:25:00.000Z"],
+      ["2026-10-11T15:00:00.000Z", "2026-10-11T14:30:00.000Z"],
+      [null, "2026-10-11T14:30:00.000Z"]
+    ]) {
+      groups.getGroupAssignedActivity.mockResolvedValue({ activityType: { key: "mcq" }, assignment: {
+        id: "assignment-1", metadata: { timeLimitMinutes: 30 }, availableUntil: until ? new Date(until) : null
+      } });
+      await expect(getTimedActivityRuntime(student, "course-1", "group-1", "activity-1")).resolves.toMatchObject({
+        attempt: { id: activeAttempt.id, startedAt: activeAttempt.startedAt.toISOString() }, timing: { expiresAt }
+      });
+      await expect(finalizeExpiredTimedActivityAttempt(student, "course-1", "group-1", "activity-1")).rejects.toMatchObject({ code: "ACTIVITY_TIME_LIMIT_ACTIVE" });
+    }
+  });
+
+  it("expires exactly at Until, blocks further answers, and allows final submission with the saved draft", async () => {
+    groups.getGroupAssignedActivity.mockResolvedValue({ activityType: { key: "mcq" }, assignment: {
+      id: "assignment-1", metadata: { timeLimitMinutes: 30 }, availableUntil: new Date("2026-10-11T14:10:00.000Z")
+    } });
+    db.activityAttempt.findMany.mockResolvedValue([activeAttempt]);
+    db.activityResponseDraft.findUnique.mockResolvedValue({ state: { answers: { q1: ["a"] } } });
+    await expect(getTimedActivityRuntime(student, "course-1", "group-1", "activity-1")).resolves.toMatchObject({
+      timing: { expiresAt: "2026-10-11T14:10:00.000Z", remainingSeconds: 0, isExpired: true }
+    });
+    await expect(assertTimedActivityWriteAllowed(student, "course-1", "group-1", "activity-1")).rejects.toMatchObject({ code: "ACTIVITY_TIME_LIMIT_EXPIRED" });
+    await expect(assertTimedActivityWriteAllowed(student, "course-1", "group-1", "activity-1", { allowExpiredAttempt: true })).resolves.toBeUndefined();
+    await finalizeExpiredTimedActivityAttempt(student, "course-1", "group-1", "activity-1");
+    expect(gradebook.submitActivityAttempt).toHaveBeenCalledWith(student, expect.objectContaining({
+      attemptId: activeAttempt.id, metadata: expect.objectContaining({ timedOut: true, savedResponse: { answers: { q1: ["a"] } } })
+    }));
+  });
+
+  it("rejects a stale timeout after the teacher extends an already-expired Until date", async () => {
+    const assignment = { id: "assignment-1", metadata: { timeLimitMinutes: 30 }, availableUntil: new Date("2026-10-11T14:05:00.000Z") };
+    groups.getGroupAssignedActivity.mockResolvedValue({ activityType: { key: "mcq" }, assignment });
+    db.activityAttempt.findMany.mockResolvedValue([activeAttempt]);
+    await expect(getTimedActivityRuntime(student, "course-1", "group-1", "activity-1")).resolves.toMatchObject({ timing: { isExpired: true } });
+    assignment.availableUntil = new Date("2026-10-11T14:20:00.000Z");
+    await expect(getTimedActivityRuntime(student, "course-1", "group-1", "activity-1")).resolves.toMatchObject({ timing: { expiresAt: assignment.availableUntil.toISOString(), isExpired: false } });
+    await expect(assertTimedActivityWriteAllowed(student, "course-1", "group-1", "activity-1")).resolves.toBeUndefined();
+    await expect(finalizeExpiredTimedActivityAttempt(student, "course-1", "group-1", "activity-1")).rejects.toMatchObject({ code: "ACTIVITY_TIME_LIMIT_ACTIVE" });
+    expect(gradebook.submitActivityAttempt).not.toHaveBeenCalled();
+  });
+
   it("removes the running deadline when the assignment limit is disabled", async () => {
     groups.getGroupAssignedActivity.mockResolvedValue({
       activityType: { key: "mcq", providerKind: "plugin", providerKey: "mcq" },
-      assignment: { id: "assignment-1", metadata: { timeLimitMinutes: null } }
+      assignment: { id: "assignment-1", metadata: { timeLimitMinutes: null }, availableUntil: new Date("2026-10-11T14:05:00.000Z") }
     });
     db.activityAttempt.findMany.mockResolvedValue([activeAttempt]);
 

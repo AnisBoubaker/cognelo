@@ -37,7 +37,7 @@ The main MCQ source is written as text.
 
 The compound Test answer review marks an MCQ answered only when every question has at least one valid selected choice. `hasMcqAnswer` checks response presence without consulting correctness; a wrong choice counts exactly like a right one.
 
-Core applies [team and student assignment exceptions](../../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md) to access, timing, attempts, grading, and challenge policy. Plugin routes consume the resolved assignment and core grade services; unsubmitted attempt deadlines resolve the latest effective limit from the original start, and the host refreshes policy every 20 seconds. Submitted timing stays fixed.
+Core applies [team and student assignment exceptions](../../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md) to access, timing, attempts, grading, and challenge policy. Plugin routes consume the resolved assignment and core grade services; unsubmitted timed-attempt deadlines use the earlier of the original start plus the latest effective limit and the effective Until date, and the host refreshes policy every 20 seconds. Submitted timing stays fixed.
 
 Teacher Student view uses the same parser and deterministic answer-key grader but keeps answers in browser session storage. Its SDK preview handlers return an ephemeral submission/result and never call the core attempt or plugin AI-evaluation persistence paths.
 
