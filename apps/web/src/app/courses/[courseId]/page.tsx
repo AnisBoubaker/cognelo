@@ -1,6 +1,6 @@
 "use client";
 
-import { ContextMenu, MarkdownRenderer, ProgressDialog, useDialogs } from "@cognelo/activity-ui";
+import { ContextMenu, MarkdownRenderer, ProgressDialog, useBodyScrollLock, useDialogs } from "@cognelo/activity-ui";
 import { resolveLocalizedText, type ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -392,13 +392,12 @@ export default function CourseDetailPage() {
     }
   }, [courseId, router, studentRedirectGroupId]);
 
+  useBodyScrollLock(showActivityPicker);
+
   useEffect(() => {
     if (!showActivityPicker) {
       return;
     }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -408,7 +407,6 @@ export default function CourseDetailPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [showActivityPicker]);

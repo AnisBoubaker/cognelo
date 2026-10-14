@@ -1,8 +1,45 @@
-import { expect, test } from "./fixtures/bank-course";
+import { expect, ORIGINAL_SOURCE, test } from "./fixtures/bank-course";
 import { responseJson } from "./fixtures/activity-suite";
 import type { CourseContentItem } from "../../apps/web/src/lib/api";
 
 test.describe("independent course workspace loading", { tag: "@regression" }, () => {
+  test("restores scrolling after importing a bank activity and saving its settings", async ({ teacherPage: page, teacherApi, bankCourse: data }) => {
+    const title = `Scroll regression ${data.token}`;
+    await responseJson(await teacherApi.post(`/api/activity-banks/${data.activityBankId}/activities`, {
+      data: { activityTypeKey: "mcq", title, lifecycle: "published", config: { source: ORIGINAL_SOURCE }, metadata: {} }
+    }));
+    await Promise.all(Array.from({ length: 20 }, (_, position) => teacherApi.post(`/api/courses/${data.courseId}/content/folders`, {
+      data: { title: `Scroll week ${position + 1}`, position, isVisible: true }
+    }).then(responseJson)));
+    await page.goto(`/courses/${data.courseId}?tab=content`);
+    await page.getByRole("button", { name: "Content tree actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "New activity", exact: true }).click();
+    const picker = page.getByRole("dialog", { name: "Choose course element", exact: true });
+    await picker.getByLabel("Activity bank", { exact: true }).selectOption(data.activityBankId);
+    await picker.getByRole("button", { name: new RegExp(title) }).click();
+    await expect(picker).toBeHidden();
+    await expect(page.getByRole("dialog", { name: "Add activity", exact: true })).toBeHidden();
+    await expect(page.locator("body")).not.toHaveCSS("overflow", "hidden");
+
+    const actions = page.getByRole("button", { name: `Actions for ${title}`, exact: true });
+    await actions.scrollIntoViewIfNeeded();
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await actions.click();
+    await page.getByRole("menuitem", { name: "Settings", exact: true }).click();
+    const settings = page.getByRole("dialog", { name: title, exact: true });
+    await settings.getByLabel("Enable activity messaging").check();
+    await settings.getByRole("button", { name: "Save settings", exact: true }).click();
+    await expect(settings).toBeHidden();
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    const originalScroll = await page.evaluate(() => window.scrollY);
+    expect(originalScroll).toBeGreaterThan(400);
+    await page.mouse.move(500, 400);
+    await page.mouse.wheel(0, -400);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(originalScroll - 200);
+    await page.mouse.wheel(0, 400);
+    await expect.poll(async () => Math.abs(await page.evaluate(() => window.scrollY) - originalScroll)).toBeLessThan(5);
+  });
+
   for (const viewport of [{ name: "desktop", width: 1280, height: 800 }, { name: "mobile", width: 390, height: 844 }]) {
     test(`keeps the content position after settings and visibility changes on ${viewport.name}`, async ({ teacherPage: page, teacherApi, bankCourse: data }) => {
       await page.setViewportSize(viewport);
@@ -52,6 +89,12 @@ test.describe("independent course workspace loading", { tag: "@regression" }, ()
         await expect.poll(async () => Math.abs(await page.evaluate(() => window.scrollY) - originalScroll)).toBeLessThan(5);
         await expect(page.getByRole("button", { name: "Expand Week 1", exact: true })).toBeAttached();
         await expect(page.getByText("Collapsed child", { exact: true })).toBeHidden();
+        // A stable scroll position must not come from a leftover modal scroll lock.
+        await page.mouse.move(viewport.width / 2, viewport.height / 2);
+        await page.mouse.wheel(0, -400);
+        await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(originalScroll - 200);
+        await page.mouse.wheel(0, 400);
+        await expect.poll(async () => Math.abs(await page.evaluate(() => window.scrollY) - originalScroll)).toBeLessThan(5);
       } finally {
         releaseContent();
         await page.unrouteAll({ behavior: "wait" });

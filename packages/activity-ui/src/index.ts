@@ -1,4 +1,5 @@
 export * from "./code-editor";
+export { useBodyScrollLock } from "./body-scroll-lock";
 export * from "./activity-version-diff-view";
 export * from "./code-language";
 export * from "./code-renderer";
