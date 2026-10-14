@@ -7,6 +7,7 @@ import { z } from "zod";
 import { mcqFormativeFeedbackRoute, mcqGenerateRoute, mcqGradebookAttemptsRoute, mcqSubmissionRoute, submittedAnswersFromMetadata } from "./routes";
 import { evaluateMcqWithAi, reviseMcqAiFeedback } from "./ai-feedback";
 import { createMcqBankActivityVariation } from "./variation";
+import { reconcileMcqResponseState } from "./mcq";
 
 export const mcqServerPlugin: ServerActivityPlugin = {
   key: "mcq",
@@ -75,6 +76,11 @@ export const mcqServerPlugin: ServerActivityPlugin = {
   },
   compositeExecution: {
     activityTypeKeys: ["mcq"],
+    regrade: async ({ activity, payload, previousConfig }) => {
+      const state = payload as Record<string, unknown>;
+      const reconciled = reconcileMcqResponseState(previousConfig, activity.config, state);
+      return { state, gradingResult: buildMcqGradingResultFromConfig(activity.config, reconciled.answers) };
+    },
     submit: async ({ activity, payload }) => {
       const input = z.object({
         answers: z.record(z.array(z.string().min(1).max(120)).default([])).default({})

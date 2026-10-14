@@ -50,7 +50,7 @@ import type {
   UserPasswordChange,
   UserProfileUpdate
 } from "@cognelo/contracts";
-import type { ActivityVersionDiff } from "@cognelo/contracts";
+import type { ActivityVersionDiff, TestRegradeProgress, TestRegradeItemResult } from "@cognelo/contracts";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 
 export type { StudentGroupingDto, StudentGroupingStudent, MaterialKind, SubjectKnowledgeGraphDraft, SubjectProgrammingLanguage };
@@ -1466,7 +1466,7 @@ async function requestAuthoring<T>(path: string, init?: RequestInit): Promise<T>
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, onProgress?: (progress: TestRegradeProgress) => void): Promise<T> {
   assertStudentViewRequestIsSafe(path, init);
   const response = await fetch(`${API_URL}/api${path}`, {
     cache: "no-store",
@@ -1477,6 +1477,33 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...(init?.headers ?? {})
     }
   });
+
+  if (response.ok && response.headers.get("content-type")?.includes("application/x-ndjson")) {
+    if (!response.body) throw new ApiError("The grading response was interrupted. Refresh the results before retrying.");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffered = "";
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        buffered += decoder.decode(value, { stream: !done });
+        const lines = buffered.split("\n");
+        buffered = lines.pop() ?? "";
+        if (done && buffered.trim()) lines.push(buffered);
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+          if (event.type === "progress") onProgress?.(event.progress);
+          if (event.type === "result") return event.result as T;
+          if (event.type === "error") {
+            if (event.status === 401) notifyUnauthorized();
+            throw new ApiError(event.error?.message ?? "Grading failed.", { ...event.error, status: event.status });
+          }
+        }
+        if (done) throw new ApiError("The grading response was interrupted. Refresh the results before retrying.");
+      }
+    } finally { reader.releaseLock(); }
+  }
 
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -1891,13 +1918,14 @@ export const api = {
         body: JSON.stringify(input)
       }
     ),
-  regradeActivityAttempt: (courseId: string, attemptId: string, input?: { reason?: string | null }) =>
-    request<{ result: { attempt: GradebookMutationAttempt; grade: GradebookMutationGrade } | null; deferred?: string }>(
+  regradeActivityAttempt: (courseId: string, attemptId: string, input?: { reason?: string | null }, onProgress?: (progress: TestRegradeProgress) => void) =>
+    request<{ result: { attempt: GradebookMutationAttempt; grade: GradebookMutationGrade } | null; deferred?: string; items?: TestRegradeItemResult[] }>(
       `/courses/${courseId}/gradebook/attempts/${attemptId}/regrade`,
       {
         method: "POST",
+        ...(onProgress ? { headers: { Accept: "application/x-ndjson" } } : {}),
         body: JSON.stringify(input ?? {})
-      }
+      }, onProgress
     ),
   prepareActivityAiGradingBatch: (courseId: string, activityId: string, attemptIds: string[]) =>
     request<AiGradingBatchSetup>(`/courses/${courseId}/gradebook/activities/${activityId}/ai-grading-batch`, {

@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   getContext: vi.fn(),
   gradeAttempt: vi.fn(),
   recordGrade: vi.fn(),
+  regradeTest: vi.fn(),
+  stream: vi.fn(),
   readJson: vi.fn(),
   requireUser: vi.fn()
 }));
@@ -13,11 +15,12 @@ vi.mock("@cognelo/core", () => ({
   AppError: class AppError extends Error {},
   getActivityAttemptRegradeContext: mocks.getContext,
   recordActivityAttemptGradingResult: mocks.recordGrade,
-  regradeTestAttempt: vi.fn()
+  regradeTestAttempt: mocks.regradeTest
 }));
 vi.mock("@/lib/http", () => ({
   handleRoute: async (handler: () => Promise<Response>) => handler(),
   json: (data: unknown) => Response.json(data),
+  progressJson: mocks.stream,
   options: () => new Response(null, { status: 204 }),
   readJson: mocks.readJson,
   requireUser: mocks.requireUser
@@ -60,5 +63,22 @@ describe("teacher regrade route", () => {
       reason: "Corrected tests",
       normalizedResult: { studentFeedback: { summary: "Preserved" } }
     }));
+  });
+
+  it("streams the Test batch only after authorization and keeps JSON callers compatible", async () => {
+    mocks.getContext.mockResolvedValue({ activityTypeKey: "test" });
+    const outcome = { result: { grade: { id: "grade" } }, items: [{ status: "graded" }] };
+    mocks.regradeTest.mockResolvedValue(outcome);
+    const report = vi.fn();
+    mocks.stream.mockImplementation(async run => Response.json(await run(report)));
+    const streamed = await POST(new Request("http://test.local", { method: "POST", headers: { Accept: "application/x-ndjson" } }) as never, params);
+    await expect(streamed.json()).resolves.toEqual(outcome);
+    expect(mocks.regradeTest).toHaveBeenCalledWith({ id: "teacher-1" }, "course-1", "attempt-1", "Corrected tests", report);
+    const plain = await POST(new Request("http://test.local", { method: "POST" }) as never, params);
+    await expect(plain.json()).resolves.toEqual(outcome);
+    expect(mocks.stream).toHaveBeenCalledTimes(1);
+    mocks.getContext.mockRejectedValueOnce(new Error("Forbidden"));
+    await expect(POST(new Request("http://test.local", { method: "POST", headers: { Accept: "application/x-ndjson" } }) as never, params)).rejects.toThrow("Forbidden");
+    expect(mocks.stream).toHaveBeenCalledTimes(1);
   });
 });

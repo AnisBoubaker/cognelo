@@ -293,6 +293,14 @@ export type CompositeExecutionActionHandler = (input: {
   payload: unknown;
 }) => Promise<unknown>;
 
+/** Reuses immutable submission evidence when a plugin has a dedicated rerun path.
+ * user is the learner; actor is the authorized teacher requesting the regrade. */
+export type CompositeExecutionRegradingHandler = (input: Parameters<CompositeExecutionSubmissionHandler>[0] & {
+  actor: CurrentUser;
+  feedback: Record<string, unknown>;
+  previousConfig: unknown;
+}) => ReturnType<CompositeExecutionSubmissionHandler>;
+
 export type StudentPreviewExecutionHandler = (input: {
   user: CurrentUser;
   courseId: string;
@@ -346,6 +354,7 @@ export type ServerActivityPlugin = {
   compositeExecution?: {
     activityTypeKeys: readonly string[];
     submit: CompositeExecutionSubmissionHandler;
+    regrade?: CompositeExecutionRegradingHandler;
     actions?: Readonly<Record<string, CompositeExecutionActionHandler>>;
   };
   /** Stateless execution only. Handlers registered here must not write learner,
@@ -549,6 +558,12 @@ export function resolveCompositeExecutionSubmissionHandler(activityTypeKey: stri
   return currentServerPlugins().find((plugin) =>
     plugin.compositeExecution?.activityTypeKeys.includes(activityTypeKey)
   )?.compositeExecution?.submit ?? null;
+}
+
+export function resolveCompositeExecutionRegradingHandler(activityTypeKey: string) {
+  return [...serverPluginsByKey.values()].find((plugin) =>
+    plugin.compositeExecution?.activityTypeKeys.includes(activityTypeKey)
+  )?.compositeExecution?.regrade ?? null;
 }
 
 export function resolveCompositeExecutionActionHandler(activityTypeKey: string, action: string) {

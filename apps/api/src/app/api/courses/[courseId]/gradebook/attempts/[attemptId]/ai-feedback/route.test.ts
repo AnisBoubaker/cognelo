@@ -25,7 +25,7 @@ vi.mock("@cognelo/core", () => ({
   recordActivityAttemptGradingResult: mocks.recordGrading,
   recordAiFeedbackResearchEvent: mocks.recordResearch,
   recordTestItemAiFeedback: vi.fn(),
-  regradeTestAttempt: vi.fn(),
+  recalculateTestAttemptGrade: vi.fn(),
   reviseTeacherAttemptAiFeedback: mocks.reviseCoreFeedback
 }));
 vi.mock("@/lib/http", () => ({

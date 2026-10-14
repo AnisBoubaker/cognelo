@@ -12,6 +12,33 @@ describe("web API client", () => {
     vi.unstubAllGlobals();
   });
 
+  it("reads Test progress across split UTF-8 chunks and returns the final result", async () => {
+    const encoded = new TextEncoder().encode([
+      JSON.stringify({ type: "heartbeat" }),
+      JSON.stringify({ type: "progress", progress: { completed: 1, total: 3, activityTitle: "Épreuve" } }),
+      JSON.stringify({ type: "result", result: { result: { grade: { id: "grade" } } } })
+    ].join("\n") + "\n");
+    const stream = new ReadableStream<Uint8Array>({ start(controller) {
+      for (const byte of encoded) controller.enqueue(Uint8Array.of(byte));
+      controller.close();
+    } });
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(stream, { headers: { "content-type": "application/x-ndjson" } }));
+    const onProgress = vi.fn();
+    await expect(api.regradeActivityAttempt("course", "attempt", {}, onProgress)).resolves.toEqual({ result: { grade: { id: "grade" } } });
+    expect(onProgress).toHaveBeenCalledExactlyOnceWith({ completed: 1, total: 3, activityTitle: "Épreuve" });
+    expect(fetch).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ headers: expect.objectContaining({ Accept: "application/x-ndjson" }), credentials: "include" }));
+  });
+
+  it("reports streamed errors and never treats a truncated batch as successful", async () => {
+    for (const [body, expected] of [
+      ['{"type":"error","status":409,"error":{"code":"TEST_ATTEMPT_CHANGED","message":"Reload results"}}\n', "Reload results"],
+      ['{"type":"progress","progress":{"completed":1,"total":3}}\n', "interrupted"]
+    ]) {
+      vi.mocked(fetch).mockResolvedValueOnce(new Response(body, { headers: { "content-type": "application/x-ndjson" } }));
+      await expect(api.regradeActivityAttempt("course", "attempt", {}, vi.fn())).rejects.toThrow(expected);
+    }
+  });
+
   it("adds JSON headers, credentials, and parses JSON responses", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ user: { id: "user-1" } }), {

@@ -2,7 +2,6 @@ import { applyAssignmentExceptions, exceptionsForParticipant, loadAssignmentExce
 import { lockTestAuthoring } from "./activity-authoring-live";
 import { createHash } from "node:crypto";
 import { getActivityDefinition, type ActivityGradingResult } from "@cognelo/activity-sdk";
-import { resolveCompositeExecutionSubmissionHandler } from "@cognelo/activity-sdk/server";
 import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import { AppError, forbidden, notFound } from "./errors";
@@ -16,7 +15,6 @@ import {
 import { assignmentAttemptExpiresAt, assignmentTimeLimitMinutes } from "./activity-assignment-policy";
 import { getGroupAssignedActivity } from "./groups";
 import { extractMediaAssetIds, reconcileMediaAssetReferences } from "./media-assets";
-import { assertActivityTypePluginEnabled } from "./plugins";
 
 const CORE_TEST_RUNTIME_KEY = "core:test";
 const CORE_TEST_RUNTIME_VERSION = "0.1.0";
@@ -447,72 +445,12 @@ export async function releaseTestAttemptSubmission(parentAttemptId: string) {
   await prisma.testSubmissionClaim.deleteMany({ where: { parentAttemptId, status: "processing" } });
 }
 
-export async function regradeTestAttempt(
-  user: CurrentUser,
-  courseId: string,
-  parentAttemptId: string,
-  reason?: string | null
+/** Recompute only: AI/manual child grading must not rerun deterministic graders. */
+export async function recalculateTestAttemptGrade(
+  user: CurrentUser, courseId: string, parentAttemptId: string, reason?: string | null
 ) {
-  await gradeRecoveredTestResponses(user, courseId, parentAttemptId);
-  return recordTestAttemptGrade(user, courseId, parentAttemptId, "regrade", reason);
-}
-
-/** Recovery preserves responses without a runner dependency. A teacher can grade them later. */
-async function gradeRecoveredTestResponses(user: CurrentUser, courseId: string, parentAttemptId: string) {
   await getActivityAttemptRegradeContext(user, courseId, parentAttemptId);
-  const parent = await prisma.activityAttempt.findFirst({
-    where: { id: parentAttemptId, courseId, pluginKey: CORE_TEST_RUNTIME_KEY, lifecycle: "submitted" },
-    include: { user: true, testItemAttempts: { include: { activity: { include: { activityType: true } } } } }
-  });
-  if (!parent?.user || !asRecord(parent.metadata).timeoutRecovery) return;
-  const pending = parent.testItemAttempts.filter((item) => item.lifecycle === "submitted" && manifestItemIds(parent.metadata).has(item.testItemId));
-  if (!pending.length) return;
-  const claimed = await prisma.testSubmissionClaim.updateMany({
-    where: { parentAttemptId, OR: [{ status: "completed" }, { status: "processing", updatedAt: { lt: new Date(Date.now() - 30 * 60_000) } }] },
-    data: { status: "processing" }
-  });
-  if (!claimed.count) throw new AppError(409, "TEST_SUBMISSION_IN_PROGRESS", "This Test submission is already being processed.");
-  const learner: CurrentUser = { id: parent.user.id, email: parent.user.email, name: parent.user.name,
-    firstName: parent.user.firstName, lastName: parent.user.lastName, roles: ["student"] };
-  try {
-    for (const item of pending) {
-      const activityTypeKey = item.activity.activityType.key;
-      await assertActivityTypePluginEnabled(activityTypeKey);
-      const submit = resolveCompositeExecutionSubmissionHandler(activityTypeKey);
-      if (!submit) continue;
-      const result = await submit({ user: learner, courseId, groupId: parent.groupId, parentAttemptId,
-        testItemId: item.testItemId,
-        activity: { ...item.activity, config: asRecord(item.activity.config), metadata: asRecord(item.activity.metadata) },
-        payload: reconcileItemState(item.activity, item.result)
-      });
-      const grade = result.gradingResult;
-      if (grade && (!Number.isFinite(grade.rawScore) || !Number.isFinite(grade.rawMaxScore) || grade.rawMaxScore <= 0)) {
-        throw new AppError(422, "TEST_ITEM_GRADING_RESULT_INVALID", "The activity returned an invalid score.");
-      }
-      const points = manifestItems(parent.metadata).find((entry) => entry.testItemId === item.testItemId)?.pointsPossible ?? item.normalizedMaxScore ?? 0;
-      await prisma.$transaction(async (tx) => {
-        await lockTestAuthoring(tx, parent.activityId);
-        const current = await tx.activityAttempt.findUniqueOrThrow({ where: { id: parentAttemptId } });
-        if (current.lifecycle !== "submitted" || current.updatedAt.getTime() !== parent.updatedAt.getTime()) {
-          throw new AppError(409, "TEST_ATTEMPT_CHANGED", "The Test attempt changed while grading. Reload its results.");
-        }
-        const updated = await tx.testItemAttempt.update({ where: { id: item.id, updatedAt: item.updatedAt, lifecycle: "submitted" }, data: {
-          lifecycle: grade ? "graded" : "submitted", gradedAt: grade ? new Date() : null,
-          rawScore: grade?.rawScore ?? null, rawMaxScore: grade?.rawMaxScore ?? null,
-          normalizedScore: grade ? grade.rawScore / grade.rawMaxScore * points : null,
-          normalizedMaxScore: points,
-          result: { ...asRecord(item.result), state: result.state, configSnapshot: item.activity.config, analyticsPayload: grade?.analyticsPayload ?? {}, metadata: grade?.metadata ?? {} } as Prisma.InputJsonValue,
-          feedback: (grade?.feedback ?? {}) as Prisma.InputJsonValue
-        } });
-        await tx.courseAuditEvent.create({ data: {
-          courseId, actorUserId: user.id, eventType: "test_recovered_response_graded", targetType: "TestItemAttempt", targetId: item.id,
-          previousValue: { lifecycle: item.lifecycle, result: item.result, rawScore: item.rawScore, rawMaxScore: item.rawMaxScore } as Prisma.InputJsonValue,
-          nextValue: { lifecycle: updated.lifecycle, result: updated.result, rawScore: updated.rawScore, rawMaxScore: updated.rawMaxScore } as Prisma.InputJsonValue,
-          metadata: { parentAttemptId }
-        } });
-      });
-    }
-  } finally { await completeTestAttemptSubmission(parentAttemptId); }
+  return recordTestAttemptGrade(user, courseId, parentAttemptId, "regrade", reason);
 }
 
 export async function getTestAttemptReview(user: CurrentUser, courseId: string, parentAttemptId: string) {

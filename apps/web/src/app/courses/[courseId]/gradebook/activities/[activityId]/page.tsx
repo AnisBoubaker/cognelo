@@ -60,6 +60,7 @@ export default function GradebookActivityResultsPage() {
     message?: string;
     completed?: number;
     total?: number;
+    progress?: number;
   } | null>(null);
   const [aiGradingBatchDialog, setAiGradingBatchDialog] = useState<{
     loading: boolean;
@@ -401,9 +402,15 @@ export default function GradebookActivityResultsPage() {
       message: row.participantName
     });
     try {
-      const result = await api.regradeActivityAttempt(courseId, attempt.id, { reason: t("courseDetail.regradeReason") });
+      const result = await api.regradeActivityAttempt(courseId, attempt.id, { reason: t("courseDetail.regradeReason") }, (progress) => {
+        setProgressOperation((current) => current ? { ...current, ...progress,
+          message: `${row.participantName} · ${progress.activityTitle ?? t("courseDetail.regradeCalculatingTotal")}` } : current);
+      });
       await refresh();
       if (result.result) applyUpdatedGrade(row, result.result.grade, result.result.attempt);
+      else if (result.items) notifications.warning(t("courseDetail.testRegradeIncomplete", {
+        activities: result.items.filter((item) => item.status !== "graded").map((item) => `${item.title}: ${item.message ?? ""}`).join("; ")
+      }));
       else notifications.success(t("courseDetail.regradeAwaitingRubric"));
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : t("courseDetail.regradeError"));
@@ -755,21 +762,36 @@ export default function GradebookActivityResultsPage() {
       let graded = 0;
       let pending = 0;
       let failed = 0;
+      const issues: string[] = [];
       for (const [index, row] of rowsWithAttempts.entries()) {
         const attempt = selectedSubmittedAttempt(row);
         if (attempt) {
           try {
-            const response = await api.regradeActivityAttempt(courseId, attempt.id, { reason: t("courseDetail.regradeReason") });
+            const response = await api.regradeActivityAttempt(courseId, attempt.id, { reason: t("courseDetail.regradeReason") }, (progress) => {
+              setProgressOperation((current) => current ? { ...current,
+                progress: ((index + progress.completed / progress.total) / rowsWithAttempts.length) * 100,
+                message: `${row.participantName} · ${progress.activityTitle ?? t("courseDetail.regradeCalculatingTotal")}`
+              } : current);
+            });
             if (response.result) graded += 1;
-            else pending += 1;
+            else {
+              if (response.items?.some((item) => item.status === "failed")) failed += 1;
+              else pending += 1;
+              for (const item of response.items ?? []) {
+                if (item.status !== "graded") issues.push(`${row.participantName}: ${item.title}`);
+              }
+            }
           } catch {
             failed += 1;
           }
         }
-        setProgressOperation((current) => current ? { ...current, completed: index + 1 } : current);
+        setProgressOperation((current) => current ? { ...current, completed: index + 1,
+          progress: (index + 1) / rowsWithAttempts.length * 100 } : current);
       }
       await refresh();
-      notifications.success(t("courseDetail.regradeBatchSummary", { graded, pending, failed }));
+      const summary = t("courseDetail.regradeBatchSummary", { graded, pending, failed });
+      if (pending || failed) notifications.warning(`${summary}${issues.length ? ` ${issues.join("; ")}` : ""}`);
+      else notifications.success(summary);
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : t("courseDetail.regradeError"));
     } finally {
@@ -958,9 +980,9 @@ export default function GradebookActivityResultsPage() {
           eyebrow={t("courseDetail.gradebookEyebrow")}
           title={progressOperation?.title ?? t("common.loading")}
           message={progressOperation?.message}
-          progress={progressOperation?.total
+          progress={progressOperation?.progress ?? (progressOperation?.total
             ? ((progressOperation.completed ?? 0) / progressOperation.total) * 100
-            : null}
+            : null)}
           progressLabel={t("common.operationProgress")}
           progressSummary={progressOperation?.total
             ? t("courseDetail.batchActionProgress", {

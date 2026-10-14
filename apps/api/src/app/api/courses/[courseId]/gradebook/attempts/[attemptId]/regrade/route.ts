@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { resolvePluginGradingHandler } from "@cognelo/activity-sdk/server";
 import { AppError, getActivityAttemptRegradeContext, recordActivityAttemptGradingResult, regradeTestAttempt } from "@cognelo/core";
 import type { Prisma } from "@cognelo/db";
-import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
+import type { TestRegradeProgress } from "@cognelo/contracts";
+import { handleRoute, json, options, progressJson, readJson, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; attemptId: string }> };
 
@@ -18,7 +19,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     const reason = typeof body.reason === "string" ? body.reason : null;
     const context = await getActivityAttemptRegradeContext(user, courseId, attemptId);
     if (context.activityTypeKey === "test") {
-      return json({ result: await regradeTestAttempt(user, courseId, attemptId, reason) });
+      if (request.headers.get("accept")?.includes("application/x-ndjson")) {
+        return progressJson<TestRegradeProgress>((report) => regradeTestAttempt(user, courseId, attemptId, reason, report));
+      }
+      return json(await regradeTestAttempt(user, courseId, attemptId, reason));
     }
     const gradeAttempt = resolvePluginGradingHandler(context.activityTypeKey);
 

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useDialogs, useNotifications } from "@cognelo/activity-ui";
+import { ProgressDialog, useDialogs, useNotifications } from "@cognelo/activity-ui";
+import type { TestRegradeProgress } from "@cognelo/contracts";
 import { createCodingHomeworkGraderClient, type CodingHomeworkGradebookAttemptRecord } from "@cognelo/plugin-coding-homework-grader";
 import { createMcqClient, type McqSubmission } from "@cognelo/plugin-mcq";
 import { createParsonsClient, type ParsonsGradebookAttemptRecord } from "@cognelo/plugin-parsons";
@@ -71,6 +72,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
   const [manualReview, setManualReview] = useState<ManualReviewState | null>(null);
   const [feedbackReview, setFeedbackReview] = useState<FeedbackReviewState | null>(null);
   const [savingAction, setSavingAction] = useState<"delete" | "override" | "regrade" | null>(null);
+  const [regradeProgress, setRegradeProgress] = useState<TestRegradeProgress | null>(null);
   const loadReviewRef = useRef<() => void>(() => undefined);
   const loadedReviewIdentityRef = useRef<string | null>(null);
   loadReviewRef.current = () => {
@@ -342,14 +344,19 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
     }
     if (!await dialogs.confirm({ message: t("courseDetail.regradeConfirm", { name: row.participantName }) })) return;
     setSavingAction("regrade");
+    setRegradeProgress(null);
     try {
-      const result = await api.regradeActivityAttempt(courseId, reference.coreAttemptId, { reason: t("courseDetail.regradeReason") });
+      const result = await api.regradeActivityAttempt(courseId, reference.coreAttemptId, { reason: t("courseDetail.regradeReason") }, setRegradeProgress);
       await onSaved?.();
-      if (!result.result) notifications.success(t("courseDetail.regradeAwaitingRubric"));
+      if (!result.result && result.items) notifications.warning(t("courseDetail.testRegradeIncomplete", {
+        activities: result.items.filter((item) => item.status !== "graded").map((item) => `${item.title}: ${item.message ?? ""}`).join("; ")
+      }));
+      else if (!result.result) notifications.success(t("courseDetail.regradeAwaitingRubric"));
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : t("courseDetail.regradeError"));
     } finally {
       setSavingAction(null);
+      setRegradeProgress(null);
     }
   }
 
@@ -417,6 +424,13 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
     <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) void close();
     }}>
+      <ProgressDialog open={savingAction === "regrade"} title={t("courseDetail.regradeRunning")}
+        message={regradeProgress ? regradeProgress.activityTitle ?? t("courseDetail.regradeCalculatingTotal") : row.participantName}
+        progress={regradeProgress ? regradeProgress.completed / regradeProgress.total * 100 : null}
+        progressLabel={t("common.operationProgress")}
+        progressSummary={regradeProgress ? t("courseDetail.batchActionProgress", {
+          completed: regradeProgress.completed, total: regradeProgress.total
+        }) : undefined} />
       {useFeedbackReview ? feedbackReview ? (
           <AiFeedbackReviewPanel
           row={row}

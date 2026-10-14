@@ -230,6 +230,38 @@ describe("Parsons server plugin grading contract", () => {
       gradingResult: { rawScore: 1, rawMaxScore: 1, isPass: true }
     });
   });
+
+  it("regrades a Test response against the corrected solution without rewriting submitted blocks", async () => {
+    const state = parsonsState([
+      parsonsBlock({ id: "block-1", text: "first", sourceIndex: 0, physicalLineIndex: 0 }),
+      parsonsBlock({ id: "block-2", text: "second", sourceIndex: 1, physicalLineIndex: 1 })
+    ]);
+    const originalState = structuredClone(state);
+    const user = {
+      id: "student-1", email: "student@example.test", name: "Sam Student",
+      firstName: "Sam", lastName: "Student", roles: ["student"] as ["student"]
+    };
+    const previousConfig = {
+      solution: "first\nsecond", language: "python", stripIndentation: false, groups: [], precedenceRules: []
+    };
+    const result = await parsonsServerPlugin.compositeExecution?.regrade?.({
+      user,
+      actor: { ...user, id: "teacher-1", roles: ["teacher"] },
+      feedback: {}, previousConfig,
+      courseId: "course-1", groupId: "group-1", parentAttemptId: "parent-attempt-1", testItemId: "item-1",
+      activity: {
+        id: "activity-1", title: "Parsons", description: "", lifecycle: "published",
+        config: { ...previousConfig, solution: "second\nfirst" },
+        activityType: { key: "parsons-problem", name: "Parsons problem", description: "" }
+      },
+      payload: state
+    });
+    expect(result).toMatchObject({
+      state: originalState,
+      gradingResult: { rawScore: 0.3, rawMaxScore: 1, isPass: false }
+    });
+    expect(state).toEqual(originalState);
+  });
 });
 
 function parsonsState(blocks: ReturnType<typeof parsonsBlock>[]) {

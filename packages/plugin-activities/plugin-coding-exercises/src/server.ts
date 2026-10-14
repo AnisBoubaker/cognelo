@@ -36,6 +36,7 @@ import { getCodingExerciseStudentGradeReport } from "./student-grade-report";
 import { getCodingExerciseGradeCompletions } from "./grade-completion";
 import { createCodingExerciseBankActivityVariation } from "./variation";
 import { listCodingExerciseProgrammingLanguages } from "./judge0";
+import { prisma } from "./db-client";
 
 export { listCodingExerciseProgrammingLanguages } from "./judge0";
 
@@ -164,6 +165,28 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
   },
   compositeExecution: {
     activityTypeKeys: ["coding-exercise"],
+    regrade: async (input) => {
+      const state = input.payload as Record<string, unknown>;
+      if (typeof state.executionId !== "string") {
+        return codingExercisesServerPlugin.compositeExecution!.submit(input);
+      }
+      const execution = await prisma.pluginCodingExerciseExecution.findFirst({
+        where: { id: state.executionId, activityId: input.activity.id, userId: input.user.id, kind: "submit" }
+      });
+      if (!execution || execution.sourceCode !== state.sourceCode) {
+        throw new AppError(409, "CODING_EXERCISE_EXECUTION_NOT_FOUND", "The saved response does not match the original submission.");
+      }
+      const grading = await regradeCodingExerciseAttempt({
+        user: input.actor, courseId: input.courseId, groupId: input.groupId,
+        activityId: input.activity.id, coreAttemptId: input.parentAttemptId,
+        executionId: execution.id, activity: input.activity,
+        feedback: (input.feedback.aiFeedback ?? {}) as Record<string, unknown>
+      });
+      return { state, gradingResult: "deferred" in grading ? null : {
+        ...grading,
+        feedback: Object.keys(grading.feedback ?? {}).length ? { aiFeedback: grading.feedback } : {}
+      } };
+    },
     actions: {
       run: async ({ activity, payload, user }) => ({
         execution: await runCodingExercise({

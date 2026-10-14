@@ -357,6 +357,18 @@ Manual-grading behavior:
 - a teacher may override the final parent grade through the normal gradebook override flow;
 - item feedback remains hidden until the parent Test gradebook item is released.
 
+### Teacher automatic regrading
+
+**Rerun automatic grading** reevaluates every child in the selected submitted/graded attempt's frozen manifest against current child authoring, then recalculates the weighted Test total. It does not add questions created after submission or change the attempt's original points, answers, start, submission time, or grade-release state. The learner owns execution evidence; the requesting teacher owns the grading audit. **Rerun automatic grading for all** applies the identical batch to each selected student submission in the report's section scope.
+
+Core claims the parent under the Test-authoring and attempt locks, rejects an active concurrent submission/regrade, and checks optimistic attempt/child versions before saving. Each child rerun appends a `test_item_regraded` course audit with the previous result, feedback, and score. Successful children survive later failures. Missing automatic grades and runner failures are reported per exercise; remaining exercises and students still run. An incomplete batch leaves the previous parent total unchanged and identifies the work requiring review, rather than aggregating a mixture of old and new scores. A later explicit retry reruns all children again.
+
+Plugins may register `compositeExecution.regrade` to retain immutable submission references and use their ordinary append-only rerun artifacts. Otherwise core invokes the existing composite submit handler from the saved learner response. Programming Exercises rerun current hidden tests on the original execution, reuse reviewed rubric feedback and current component weights, and never request AI. Recovered responses without an execution first use ordinary composite submission. MCQ and Parsons reconcile changed authoring only for evaluation and retain the original answer state and response-config snapshot; Web Design writes fresh runner evidence without changing the saved files. Existing teacher feedback is retained.
+
+The regrade POST remains JSON-compatible and streams NDJSON when the caller accepts `application/x-ndjson`. Progress events contain completed/total steps and the current activity title; the final step calculates the parent total. A terminal result includes per-child outcomes. The shared blocking progress dialog consumes these events for individual actions, review dialogs, and the whole-class batch, combining child progress with completed students. Heartbeats keep long runner operations active; cancellation of the response reader does not cancel grading persistence. An interrupted stream is reported as an error and is never retried automatically. Authentication, section scope, CSRF, and release gates remain unchanged.
+
+AI feedback and manual child grading call the separate aggregate-only operation, so saving those grades cannot rerun deterministic tests or overwrite their freshly calculated rubric grades. Regression coverage is in `tests/e2e/test-regrading.spec.ts` and the core, plugin, HTTP-stream, and browser-client unit suites.
+
 ## Authoring UX
 
 The course content picker receives an explicit **Test** action separate from installable plugin activities.
@@ -423,7 +435,7 @@ Opening or refreshing a teacher's Student results, in-progress feed, or gradeboo
 
 A serializable transaction locks the parent and Test authoring, freezes the current submission revision/manifest, preserves each saved response unchanged, creates empty submitted rows for never-opened exercises, and marks the parent submitted at its effective deadline. It records the actual recovery time separately in `timeoutRecovery` and an actor-attributed `test_timeout_recovered` course audit event. It creates no grade, changes no start time, and is idempotent. Serialization conflicts are retried on a subsequent results read. When an in-progress row disappears, the teacher UI reloads the detailed results once so recovered work appears as awaiting grading.
 
-For recovered Tests, **Rerun automatic grading** invokes the existing composite submission handler only for children still awaiting a grade, then recomputes the parent through the usual audited gradebook path. Runner failures or children without an automatic grade stay submitted for teacher review; successful child results survive retries. Each recovered-child grading operation retains the prior response/result in an audit event. This uses current child authoring, never generates AI feedback, and preserves grade-release gates. Ordinary already-graded Test regrading retains its existing aggregation behavior.
+Recovered Tests use the same [teacher automatic regrading](#teacher-automatic-regrading) batch as ordinary submitted Tests. Saved responses without runner artifacts first create them through their existing composite handler; all children are evaluated and the parent is recomputed only when every child has a new grade. No AI feedback is generated automatically.
 
 Regression coverage is in `tests/e2e/test-timeout-recovery.spec.ts`, alongside the countdown, live-policy, and Until-date suites. It verifies wrong device clocks, deferred/retried submission, disconnected recovery from both results APIs, extensions/disabled timing/student exceptions, active/stale claims, preserved drafts and timestamps, idempotence, and later teacher-triggered grading.
 

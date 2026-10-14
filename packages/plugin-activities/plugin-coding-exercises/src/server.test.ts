@@ -27,11 +27,13 @@ const aiFeedbackMocks = vi.hoisted(() => ({
   snapshotCodingExerciseAiFeedbackConfig: vi.fn(),
   updateCodingExerciseAiGradingInstructions: vi.fn()
 }));
+const regradeMocks = vi.hoisted(() => ({ findExecution: vi.fn(), regrade: vi.fn() }));
 
 vi.mock("./hidden-tests", () => hiddenTestMocks);
 vi.mock("./executions", () => executionMocks);
 vi.mock("./ai-feedback", () => aiFeedbackMocks);
-vi.mock("./regrading", () => ({ regradeCodingExerciseAttempt: vi.fn() }));
+vi.mock("./regrading", () => ({ regradeCodingExerciseAttempt: regradeMocks.regrade }));
+vi.mock("./db-client", () => ({ prisma: { pluginCodingExerciseExecution: { findFirst: regradeMocks.findExecution } } }));
 vi.mock("./routes", () => ({
   codingExerciseGeneratePromptRoute: { path: "generate-prompt", methods: {} },
   codingExerciseGenerateRubricRoute: { path: "generate-rubric", methods: {} },
@@ -54,6 +56,24 @@ describe("coding exercises server plugin lifecycle hooks", () => {
     executionMocks.getCodingExercisePrivateConfig.mockResolvedValue({
       aiFeedback: { gradingEnabled: false }
     });
+  });
+
+  it("regrades the original Test execution with the teacher actor and child rubric feedback", async () => {
+    const user = { id: "learner", email: "learner@example.test", name: null, firstName: null, lastName: null, roles: ["student" as const] };
+    const actor = { ...user, id: "teacher", roles: ["teacher" as const] };
+    const state = { executionId: "original", sourceCode: "print(2)" };
+    regradeMocks.findExecution.mockResolvedValue({ id: "original", sourceCode: state.sourceCode });
+    regradeMocks.regrade.mockResolvedValue({ rawScore: 80, rawMaxScore: 100, feedback: { summary: "Keep the rubric", aiScore: 70 } });
+    const input = { user, actor, courseId: "course", groupId: "section", parentAttemptId: "parent", testItemId: "item",
+      activity: testActivity("coding-exercise"), payload: state, previousConfig: {}, feedback: { aiFeedback: { aiScore: 70 } } };
+    const result = await codingExercisesServerPlugin.compositeExecution!.regrade!(input);
+    expect(regradeMocks.findExecution).toHaveBeenCalledWith({ where: { id: "original", activityId: input.activity.id, userId: "learner", kind: "submit" } });
+    expect(regradeMocks.regrade).toHaveBeenCalledWith(expect.objectContaining({ user: actor, executionId: "original", coreAttemptId: "parent", feedback: { aiScore: 70 } }));
+    expect(result).toMatchObject({ state, gradingResult: { rawScore: 80, feedback: { aiFeedback: { summary: "Keep the rubric" } } } });
+    expect(executionMocks.submitCodingExercise).not.toHaveBeenCalled();
+    regradeMocks.findExecution.mockResolvedValue(null);
+    await expect(codingExercisesServerPlugin.compositeExecution!.regrade!(input)).rejects.toMatchObject({ code: "CODING_EXERCISE_EXECUTION_NOT_FOUND" });
+    expect(regradeMocks.regrade).toHaveBeenCalledTimes(1);
   });
 
   it("projects only reference source and language for an authorized solution reveal", async () => {
