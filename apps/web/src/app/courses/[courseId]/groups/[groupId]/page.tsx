@@ -42,6 +42,7 @@ import {
 import { ContentTypeIcon as MaterialTypeIcon } from "@/lib/content-type-renderers";
 import { useI18n } from "@/lib/i18n";
 import { assignmentRequiresSafeExamBrowser } from "@/lib/safe-exam-browser";
+import { useCourseContentFolders } from "@/lib/use-course-content-folders";
 
 type ContentDropPlacement = "after" | "before" | "inside";
 type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
@@ -79,7 +80,9 @@ export default function CourseGroupPage() {
   const [draggingContentItemId, setDraggingContentItemId] = useState<string | null>(null);
   const [dragPreview, setDragPreview] = useState<{ title: string; x: number; y: number } | null>(null);
   const [contentDropTarget, setContentDropTarget] = useState<ContentDropTarget | null>(null);
-  const [collapsedContentFolderIds, setCollapsedContentFolderIds] = useState<Set<string>>(new Set());
+  const { collapsedFolderIds: collapsedContentFolderIds, toggleFolder: toggleContentFolder } = useCourseContentFolders({
+    courseId, groupId, userId: user?.id, scope: "teacher", contentItems
+  });
   const [assignActivityId, setAssignActivityId] = useState("");
   const [assignParentId, setAssignParentId] = useState("");
   const [assignIsVisible, setAssignIsVisible] = useState(true);
@@ -550,18 +553,6 @@ export default function CourseGroupPage() {
   function contentItemMaterialMimeType(item: CourseContentItem) {
     const mimeType = item.contentResourceId ? contentResourceById.get(item.contentResourceId)?.metadata?.mimeType : null;
     return typeof mimeType === "string" ? mimeType : null;
-  }
-
-  function toggleContentFolder(folderId: string) {
-    setCollapsedContentFolderIds((current) => {
-      const next = new Set(current);
-      if (next.has(folderId)) {
-        next.delete(folderId);
-      } else {
-        next.add(folderId);
-      }
-      return next;
-    });
   }
 
   function contentItemHref(item: CourseContentItem) {

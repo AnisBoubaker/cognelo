@@ -455,7 +455,7 @@ This preserves the documented student-first, section-first navigation model.
   - `apps/api/src/app/api/courses/[courseId]/groups/[groupId]/content/route.test.ts`
 - The seed content tree lives in the outer composition script `scripts/db-seed.ts`.
 - Activity creation and assignment now accept optional `contentPlacement` in shared contracts.
-- Student accordion state for first-level folders is stored in browser `localStorage`, keyed per course/group, and pruned defensively after content loads.
+- Teacher and student folder expansion at every depth is stored in browser `localStorage`, scoped per user/course/group/view, with a sliding four-hour expiry (see Phase 7).
 - Verification completed after Phase 1:
   - `npx prisma validate --schema packages/db/prisma/schema.prisma`
   - `npm run db:migrate:all`
@@ -547,6 +547,10 @@ Implemented scope: the course activity picker is now a course-element picker. It
 
 Mutation refreshes keep the current content tree mounted while fetching updated data. Activity/material settings saves, visibility changes, and folder edits therefore preserve the document height, scroll position, and collapsed-folder state. Only initial loading and workspace navigation request the blocking content loading state; replacing a long tree with a short loading message during a save makes the browser clamp the scroll position. Desktop/mobile E2E checks hold a real refresh pending and verify the position during and after saving, saved-setting persistence, visibility updates, and collapsed-folder retention.
 
+Folder expansion is shared through `useCourseContentFolders`. All folders, including nested folders and newly loaded folders, default to collapsed. Open folder IDs are stored with a version and expiry in browser `localStorage`, isolated by authenticated user, course, section (or course perspective), and teacher/learner/preview view. Opening Content again before expiry or expanding/collapsing folders starts a fresh four-hour window; for example, returning after three hours retains the open folders for another four hours. Data refreshes do not renew this window. After four idle hours the mounted tree collapses and the expired stored preference is removed; returning after expiry also starts fully collapsed. Expand all/Collapse all use the same persistence. Invalid or old untimed preferences fall back to collapsed, unavailable storage leaves controls usable in memory, and missing folder IDs are ignored and pruned on the next folder interaction rather than against a loading tree. Learner folder-tab navigation still selects a root folder; its nested expandable folders follow this same policy.
+
+Folder preference regressions live in `tests/e2e/course-folders.spec.ts` (nested defaults/restoration, renewal after three hours, expiry, bulk controls, section/learner isolation, and blocked storage) and `apps/web/src/lib/course-content-folders.test.ts` (expiry boundaries and defensive parsing). `course-loading.spec.ts` verifies that both open and closed folders survive settings and visibility saves while desktop/mobile scrolling remains usable.
+
 Dialog scroll locks are shared through `@cognelo/activity-ui`'s `useBodyScrollLock`. Each open owner acquires a lock; only the last cleanup restores the body's original overflow. In particular, adding a bank activity closes the picker before its progress dialog finishes the content refresh. Independently restoring each dialog's saved overflow can leave `hidden` on the body after both close, making subsequent settings saves appear to freeze the page until reload. The browser regression checks actual wheel scrolling after import and settings save, plus scrolling in both directions after ordinary desktop/mobile settings saves; retaining a scroll position alone is insufficient evidence.
 
 Scroll-preservation verification (2026-10-12): the desktop regression reproduced the disappearing tree before the fix. Afterward, all 14 tests in `course-loading.spec.ts`, `activity-settings.spec.ts`, and `content-resources.spec.ts` passed, along with all 1,204 unit tests, web typechecking, strict typechecking of the changed E2E specification, and lint on the changed TypeScript files. Root navigation/architecture and the MCQ fixture documentation were reviewed; the fix changes only host refresh behavior, with no plugin contract or persistence changes.
@@ -576,10 +580,10 @@ Implemented scope: learner group workspaces now open on a unified Content tab in
 
 Student accordion behavior:
 
-- first-level folders are collapsed the first time a learner opens the group workspace
+- all expandable folders are collapsed on the first visit or after the saved preference expires
 - multiple first-level folders may be open at once
-- open/closed state is persisted in browser `localStorage` with a course/group-specific key
-- saved folder IDs are parsed defensively and pruned only after the current content tree has loaded, so removed or moved folders cannot break the page
+- open/closed state at every depth uses the shared per-user/course/group/view preference and sliding four-hour expiry described in Phase 7
+- saved folder IDs are parsed defensively; absent IDs never affect rendering, and data loading cannot erase remembered open folders
 - first-level accordion headers intentionally show only the folder title and chevron; nested folders retain the normal folder-row treatment
 - the student content heading is intentionally reduced to a single localized "Course content" label
 - content labels are localized across the supported locale bundles

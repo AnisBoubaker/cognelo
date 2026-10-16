@@ -49,6 +49,7 @@ import { defaultDuplicateActivityTitle } from "@/lib/activity-bank-titles";
 import { activityCreationConfig } from "@/lib/activity-creation-defaults";
 import { useI18n } from "@/lib/i18n";
 import { resolveCourseWorkspaceTab } from "@/lib/navigation";
+import { useCourseContentFolders } from "@/lib/use-course-content-folders";
 
 type ContentDropPlacement = "after" | "before" | "inside";
 type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
@@ -109,7 +110,6 @@ export default function CourseDetailPage() {
   const [draggingContentItemId, setDraggingContentItemId] = useState<string | null>(null);
   const [dragPreview, setDragPreview] = useState<{ title: string; x: number; y: number } | null>(null);
   const [contentDropTarget, setContentDropTarget] = useState<ContentDropTarget | null>(null);
-  const [collapsedContentFolderIds, setCollapsedContentFolderIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [materialActionError, setMaterialActionError] = useState("");
   const [contentContextMenu, setContentContextMenu] = useState<ContentContextMenu | null>(null);
@@ -134,6 +134,16 @@ export default function CourseDetailPage() {
   const initializedGroupSelectionCourseIdRef = useRef<string | null>(null);
   const refreshRequestIdRef = useRef(0);
   const requestedContentGroupId = searchParams.get("view") === "group" ? searchParams.get("groupId") : null;
+  const {
+    collapsedFolderIds: collapsedContentFolderIds,
+    toggleFolder: toggleContentFolder,
+    openFolder: openContentFolder,
+    expandAllFolders,
+    collapseAllFolders
+  } = useCourseContentFolders({
+    courseId, groupId: requestedContentGroupId, userId: user?.id, scope: "teacher", contentItems,
+    active: activeCourseTab === "content"
+  });
   const canViewSubjectCatalog = Boolean(user?.roles.some((userRole) =>
     userRole === "admin" || userRole === "course_manager" || userRole === "teacher"
   ));
@@ -538,11 +548,7 @@ export default function CourseDetailPage() {
         ...siblings.map((item, index) => api.updateContentItem(courseId, item.id, { position: index + 1 }))
       ]);
       if (parentId) {
-        setCollapsedContentFolderIds((current) => {
-          const next = new Set(current);
-          next.delete(parentId);
-          return next;
-        });
+        openContentFolder(parentId);
       }
       startEditingFolder({ ...result.contentItem, titleSnapshot: title }, true);
       await refresh();
@@ -764,12 +770,12 @@ export default function CourseDetailPage() {
   }
 
   function expandAllContentFolders() {
-    setCollapsedContentFolderIds(new Set());
+    expandAllFolders();
     setContentHeaderMenuOpen(false);
   }
 
   function collapseAllContentFolders() {
-    setCollapsedContentFolderIds(new Set(contentFolderOptions.map(({ item }) => item.id)));
+    collapseAllFolders();
     setContentHeaderMenuOpen(false);
   }
 
@@ -1343,18 +1349,6 @@ export default function CourseDetailPage() {
   function contentItemMaterialMimeType(item: CourseContentItem) {
     const mimeType = item.contentResourceId ? contentResourceById.get(item.contentResourceId)?.metadata?.mimeType : null;
     return typeof mimeType === "string" ? mimeType : null;
-  }
-
-  function toggleContentFolder(folderId: string) {
-    setCollapsedContentFolderIds((current) => {
-      const next = new Set(current);
-      if (next.has(folderId)) {
-        next.delete(folderId);
-      } else {
-        next.add(folderId);
-      }
-      return next;
-    });
   }
 
   return (

@@ -54,11 +54,13 @@ test.describe("independent course workspace loading", { tag: "@regression" }, ()
       }));
       const { contentItems } = await responseJson<{ contentItems: CourseContentItem[] }>(await teacherApi.get(contentPath));
       const activityItem = contentItems.find((item) => item.activityId === data.activityId && !item.groupId)!;
-      await responseJson(await teacherApi.patch(`${contentPath}/${activityItem.id}`, { data: { position: 21 } }));
+      await responseJson(await teacherApi.patch(`${contentPath}/${activityItem.id}`, { data: { parentId: folders.at(-1)!.contentItem.id, position: 21 } }));
 
       await page.goto(`/courses/${data.courseId}?tab=content`);
+      await page.getByRole("button", { name: "Expand Week 1", exact: true }).click();
       await page.getByRole("button", { name: "Collapse Week 1", exact: true }).click();
       await expect(page.getByText("Collapsed child", { exact: true })).toBeHidden();
+      await page.getByRole("button", { name: "Expand Week 20", exact: true }).click();
       const actions = page.getByRole("button", { name: `Actions for ${data.title}`, exact: true });
       await actions.scrollIntoViewIfNeeded();
       const originalScroll = await page.evaluate(() => window.scrollY);
@@ -88,6 +90,7 @@ test.describe("independent course workspace loading", { tag: "@regression" }, ()
         await expect(settings).toBeHidden();
         await expect.poll(async () => Math.abs(await page.evaluate(() => window.scrollY) - originalScroll)).toBeLessThan(5);
         await expect(page.getByRole("button", { name: "Expand Week 1", exact: true })).toBeAttached();
+        await expect(page.getByRole("button", { name: "Collapse Week 20", exact: true })).toBeAttached();
         await expect(page.getByText("Collapsed child", { exact: true })).toBeHidden();
         // A stable scroll position must not come from a leftover modal scroll lock.
         await page.mouse.move(viewport.width / 2, viewport.height / 2);
@@ -104,12 +107,18 @@ test.describe("independent course workspace loading", { tag: "@regression" }, ()
       await page.getByRole("menuitem", { name: "Settings", exact: true }).click();
       await expect(settings.getByLabel("Time limit (minutes)", { exact: true })).toHaveValue("45");
       await settings.getByRole("button", { name: "Cancel", exact: true }).last().click();
+      await expect(settings).toBeHidden();
       const lastFolder = folders.at(-1)!.contentItem;
-      await page.getByRole("button", { name: `Actions for ${lastFolder.titleSnapshot}`, exact: true }).click();
+      const folderActions = page.getByRole("button", { name: `Actions for ${lastFolder.titleSnapshot}`, exact: true });
+      await folderActions.scrollIntoViewIfNeeded();
+      // Context menus close on scroll; let the browser finish positioning first.
+      await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+      await folderActions.click();
       await page.getByRole("menuitem", { name: "Hidden", exact: true }).click();
       await expect(page.locator(`[data-content-item-id="${lastFolder.id}"]`)).toHaveClass(/is-hidden-content/);
       await expect.poll(async () => Math.abs(await page.evaluate(() => window.scrollY) - originalScroll)).toBeLessThan(5);
       await expect(page.getByRole("button", { name: "Expand Week 1", exact: true })).toBeAttached();
+      await expect(page.getByRole("button", { name: "Collapse Week 20", exact: true })).toBeAttached();
     });
   }
 

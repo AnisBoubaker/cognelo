@@ -323,6 +323,7 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
       await folderWarning.getByRole("button", { name: "Close", exact: true }).click();
       await expect(page.getByText(folderTitle, { exact: true })).toBeVisible();
 
+      await page.getByRole("button", { name: `Expand ${folderTitle}`, exact: true }).click();
       await page.getByRole("button", { name: `Actions for ${activityTitle}` }).click();
       await page.getByRole("menuitem", { name: "Remove", exact: true }).click();
       const attemptWarning = page.getByRole("dialog", { name: "This activity has recorded attempts" });

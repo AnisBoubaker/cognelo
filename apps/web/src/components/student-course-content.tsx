@@ -2,8 +2,9 @@
 
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useMemo } from "react";
 import { ActivityTypeIcon, AppIcon, FolderContentIcon } from "@/components/app-icon";
+import { useAuth } from "@/components/auth-provider";
 import { SettingsSectionNav } from "@/components/settings-nav";
 import {
   api,
@@ -19,6 +20,7 @@ import {
 import { ContentTypeIcon as MaterialTypeIcon } from "@/lib/content-type-renderers";
 import { normalizeStudentFolderTabDepth, resolveStudentContentLayout } from "@/lib/course-settings";
 import type { Locale } from "@/lib/i18n";
+import { useCourseContentFolders } from "@/lib/use-course-content-folders";
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
 type CourseActivity = {
@@ -72,9 +74,10 @@ export function StudentCourseContent({
   studentGrades?: StudentReleasedGrades | null;
   storageScope?: "learner" | "preview";
 }) {
-  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(new Set());
-  const [openRootFolderIds, setOpenRootFolderIds] = useState<Set<string>>(new Set());
-  const [accordionStateLoaded, setAccordionStateLoaded] = useState(false);
+  const { user } = useAuth();
+  const { collapsedFolderIds, toggleFolder } = useCourseContentFolders({
+    courseId, groupId, userId: user?.id, scope: storageScope, contentItems
+  });
   const now = Date.now();
   const studentContentItems = useMemo(
     () => contentItems.filter((item) => item.kind !== "activity" || Boolean(item.courseGroupActivityId)),
@@ -86,11 +89,8 @@ export function StudentCourseContent({
   );
   const rootFolders = rootContentItems.filter((item) => item.kind === "folder");
   const rootLooseItems = rootContentItems.filter((item) => item.kind !== "folder");
-  const rootFolderIds = rootFolders.map((item) => item.id);
-  const rootFolderIdSignature = rootFolderIds.join("|");
   const selectedRootFolder = rootFolders.find((item) => item.id === selectedFolderId) ?? rootFolders[0] ?? null;
   const layout = resolveStudentContentLayout(courseMetadata);
-  const storageKey = `cognelo:course:${courseId}:group:${groupId}:student-content-accordion${storageScope === "preview" ? ":preview" : ""}`;
   const courseMaterialById = new Map(courseMaterials.map((material) => [material.id, material]));
   const groupMaterialById = new Map(groupMaterials.map((material) => [material.id, material]));
   const contentResourceById = new Map(contentResources.map((resource) => [resource.id, resource]));
@@ -100,41 +100,6 @@ export function StudentCourseContent({
   const releasedGradeByActivityId = new Map(
     (studentGrades?.rows ?? []).filter((row) => row.score !== null).map((row) => [row.activityId, row])
   );
-
-  useEffect(() => {
-    setAccordionStateLoaded(false);
-    try {
-      const storedValue = window.localStorage.getItem(storageKey);
-      const parsedValue = storedValue ? JSON.parse(storedValue) : [];
-      setOpenRootFolderIds(new Set(Array.isArray(parsedValue) ? parsedValue.filter((value): value is string => typeof value === "string") : []));
-    } catch {
-      setOpenRootFolderIds(new Set());
-    } finally {
-      setAccordionStateLoaded(true);
-    }
-  }, [storageKey]);
-
-  useEffect(() => {
-    if (!accordionStateLoaded || !contentReady) return;
-    const validFolderIds = new Set(rootFolderIdSignature ? rootFolderIdSignature.split("|") : []);
-    setOpenRootFolderIds((current) => {
-      const next = new Set([...current].filter((folderId) => validFolderIds.has(folderId)));
-      return setsAreEqual(current, next) ? current : next;
-    });
-  }, [accordionStateLoaded, contentReady, rootFolderIdSignature]);
-
-  useEffect(() => {
-    if (!accordionStateLoaded || !contentReady) return;
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify([...openRootFolderIds]));
-    } catch {
-      // The content remains usable when browser storage is unavailable.
-    }
-  }, [accordionStateLoaded, contentReady, openRootFolderIds, storageKey]);
-
-  function toggleFolder(folderId: string) {
-    setCollapsedFolderIds((current) => toggleSetValue(current, folderId));
-  }
 
   function titleFor(item: CourseContentItem) {
     if (item.contentResourceId) return contentResourceById.get(item.contentResourceId)?.title ?? item.titleSnapshot ?? t("courseDetail.untitledMaterial");
@@ -186,7 +151,7 @@ export function StudentCourseContent({
     const title = titleFor(item);
     const href = hrefFor(item);
     const isRootAccordionFolder = Boolean(options.isRootAccordionFolder);
-    const isCollapsed = isRootAccordionFolder ? !openRootFolderIds.has(item.id) : collapsedFolderIds.has(item.id);
+    const isCollapsed = collapsedFolderIds.has(item.id);
     const material = item.materialId ? courseMaterialById.get(item.materialId) ?? groupMaterialById.get(item.materialId) : null;
     const materialIsDownloadable = material ? legacyMaterialHasStoredFile(material) : false;
     const contentResource = item.contentResourceId ? contentResourceById.get(item.contentResourceId) : null;
@@ -245,7 +210,7 @@ export function StudentCourseContent({
                 aria-expanded={!isCollapsed}
                 className="student-accordion-title-button"
                 type="button"
-                onClick={() => setOpenRootFolderIds((current) => toggleSetValue(current, item.id))}
+                onClick={() => toggleFolder(item.id)}
               >
                 {title}
               </button>
@@ -340,11 +305,11 @@ export function StudentCourseContent({
     <div className="table-list">
       {rootContentItems.map((item) => {
         if (item.kind !== "folder") return renderRow(item, 0);
-        const childRows = openRootFolderIds.has(item.id)
+        const childRows = !collapsedFolderIds.has(item.id)
           ? flattenContentItemsFromParent(studentContentItems, item.id, collapsedFolderIds, 1)
           : [];
         return (
-          <div className={`student-accordion-section ${openRootFolderIds.has(item.id) ? "is-open" : ""}`} key={item.id}>
+          <div className={`student-accordion-section ${!collapsedFolderIds.has(item.id) ? "is-open" : ""}`} key={item.id}>
             {renderRow(item, 0, { isRootAccordionFolder: true })}
             {childRows.length ? <div className="student-accordion-panel">{childRows.map(({ item: child, depth }) => renderRow(child, depth))}</div> : null}
           </div>
@@ -395,17 +360,6 @@ function flattenContentItemsFromParent(contentItems: CourseContentItem[], parent
   }
   walk(parentId, startingDepth);
   return rows;
-}
-
-function toggleSetValue(current: Set<string>, value: string) {
-  const next = new Set(current);
-  if (next.has(value)) next.delete(value);
-  else next.add(value);
-  return next;
-}
-
-function setsAreEqual(left: Set<string>, right: Set<string>) {
-  return left.size === right.size && [...left].every((value) => right.has(value));
 }
 
 function getAvailabilityStatus(availableFrom: string | null | undefined, availableUntil: string | null | undefined, now: number) {

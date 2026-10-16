@@ -34,6 +34,7 @@ test.describe.serial("course content resources and folders", () => {
 
     await teacherPage.goto(`/courses/${data.courseId}?tab=content`);
     await createAndRenameRootFolder(teacherPage, folderTitle);
+    await teacherPage.getByRole("button", { name: `Expand ${folderTitle}`, exact: true }).click();
 
     await openCourseElementPicker(teacherPage);
     const picker = teacherPage.getByRole("dialog", { name: "Choose course element" });
@@ -143,6 +144,7 @@ test.describe.serial("course content resources and folders", () => {
   test("moves content with the shared drag handle and keeps the saved order after reload", async ({ teacherPage: page }) => {
     if (!data) throw new Error("The content-resource suite was not provisioned.");
     await page.goto(`/courses/${data.courseId}?tab=content`);
+    await page.getByRole("button", { name: `Expand ${folderTitle}`, exact: true }).click();
     const source = page.getByRole("button", { name: `Drag ${githubTitle}` });
     const target = page.locator(`[data-content-item-id]`).filter({ hasText: folderTitle }).first();
     const sourceBox = await source.boundingBox();
