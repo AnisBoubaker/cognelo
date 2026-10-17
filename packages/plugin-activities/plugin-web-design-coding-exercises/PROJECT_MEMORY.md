@@ -8,6 +8,7 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
 - The compound Test answer-review check must inspect response presence only, never correctness or grading evidence; automatically persisted initial state is not a new answer. See [the reference](docs/REFERENCE.md) for this plugin’s criteria.
 
+- Reuse the shared Monaco loader; its asset paths must be absolute and same-origin for blob-worker module fetches. Do not add plugin-local worker URLs.
 - Keep this plugin separate from Programming Exercises: browser preview and Playwright grading have different trust and runtime boundaries from Judge0.
 - Student starter files are public config; solution files, tests, screenshots, and grading artifacts are private plugin data.
 - The learner browser may run only its own bundle in a sandboxed iframe. Graded execution goes through Cognelo to the external Playwright runner. Browser modal APIs are allowed only inside that learner-authored preview; Cognelo teacher UI uses the platform shared dialog provider.

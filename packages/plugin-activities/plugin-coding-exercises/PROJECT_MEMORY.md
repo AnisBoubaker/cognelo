@@ -31,7 +31,7 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - The released learner grading report is plugin-owned and release-gated. It includes all active submitted/graded code attempts and their latest saved test evaluations, sanitized teacher comments/rubric explanations, conditional automatic-test/rubric contributions, and the final total; it must not expose hidden inputs, expected outputs, private rubric instructions, reference solutions, or raw model artifacts.
 - Rubric and learner feedback generation use the Subject teaching language, not the viewer locale.
 - New course and bank exercises, including local Test children, inherit the optional single-language Subject default selected from the configured Judge0 runtimes. Missing and multiple-language Subject values deliberately create an exercise with no language; saving, generation, validation, and execution are blocked until the author chooses one. Existing and copied exercises retain their saved language.
-- Monaco assets are first-party for SEB compatibility, with the controlled plain-text fallback retained.
+- Monaco assets use the shared absolute, first-party URL configuration for blob-worker loading and SEB compatibility, with the controlled plain-text fallback retained.
 - The student template projection drops whitespace-only hidden boundaries. Monaco cursor and selection limits must be derived from the current model rather than the previous React value so empty answers accept their first keystroke and select-all clears only student code.
 - Monaco/basic code editors, rendered code, and Markdown code spans/fences inherit the shared non-translation policy; never extend that opt-out to the surrounding instructional prose.
 

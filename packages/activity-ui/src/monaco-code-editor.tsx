@@ -11,7 +11,12 @@ import {
 } from "./monaco-code-editor-value";
 
 let hasRegisteredCogneloTheme = false;
-loader.config({ paths: { vs: "/_vendor/monaco/vs" } });
+if (typeof window !== "undefined") {
+  // Monaco bootstraps language workers from blob URLs. Their fetches cannot
+  // resolve a root-relative asset path against that base. Use the site's
+  // absolute origin (without any URL credentials) before initializing Monaco.
+  loader.config({ paths: { vs: new URL("/_vendor/monaco/vs", window.location.origin).href } });
+}
 
 type MonacoCodeEditorProps = {
   value: string;

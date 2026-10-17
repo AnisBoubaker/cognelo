@@ -71,6 +71,8 @@ Outbox assertions require local access to the API’s storage. Use synthetic dom
 
 `workspace-layout.spec.ts` checks desktop/mobile page identity, navigation and action retention, and horizontal containment across list/detail pages, course and bank authoring, learner/preview workspaces, results/manual grading, and all account-setting sections after hero removal.
 
+`monaco-workers.spec.ts` exercises the actual HTML/CSS formatting workers and JavaScript diagnostics, including teacher inspection of an expired Web Design assignment. It requires no grading runner; editor rendering by itself does not prove worker initialization succeeded.
+
 ## Focused regression checks
 
 Run the independent authoring-recovery, bank-synchronization, course-loading, student-grouping, activity-exception, and live compound-Test scenarios with:

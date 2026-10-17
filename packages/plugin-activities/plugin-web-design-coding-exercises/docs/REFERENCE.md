@@ -78,6 +78,8 @@ Reusable bank Tests dispatch that same lifecycle per owned web-design child. A c
 
 ## Authoring UX
 
+Code fields use the shared first-party Monaco loader. See [frontend decisions](../../../../docs/reference/PLATFORM_DECISIONS.md#frontend-platform-decisions) for the absolute-URL worker requirement. The `monaco-workers.spec.ts` browser regression executes HTML/CSS formatting and JavaScript diagnostics for learner use and teacher inspection of an expired assignment without running a grader.
+
 The teacher authoring UI is tabbed, but it still behaves as one guarded form. Keep it registered with `useUnsavedChangesGuard` from `@cognelo/activity-ui`, and register any future web-design authoring/settings panels with the same dirty/save/discard pattern. Test removal uses the shared promise-based dialog provider rather than a native browser confirmation; browser modal APIs remain available only to learner-authored code in the sandboxed preview.
 
 Saving the combined authoring draft is a long-running operation whenever it validates enabled tests or captures an expected-result screenshot. It and learner Playwright run/submit requests use the shared blocking progress dialog with an indeterminate bar. Activity-bank variations instead expose the host background job's measured progress.
