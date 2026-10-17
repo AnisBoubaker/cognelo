@@ -64,11 +64,13 @@ export default function StudentViewActivityPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <StudentPreviewBanner groupTitle={workspace?.group.title} onReset={resetPreview} t={t} />
-        <section className="hero-panel hero-panel-compact">
-          <div className="hero-meta"><p className="eyebrow">{activity?.activityType.name ?? t("common.loading")}</p><h1>{activity?.title ?? t("common.loading")}</h1><p className="muted">{workspace ? `${workspace.course.title} · ${workspace.group.title}` : ""}</p></div>
-          <div className="hero-actions"><Link className="button secondary" href={backHref}>{t("groupPage.backToCourse")}</Link></div>
-        </section>
+        <StudentPreviewBanner
+          activityTitle={activity?.title}
+          groupTitle={workspace ? `${workspace.course.title} · ${workspace.group.title}` : undefined}
+          actions={<Link className="button secondary" href={backHref}>{t("groupPage.backToCourse")}</Link>}
+          onReset={resetPreview}
+          t={t}
+        />
         {error ? <p className="error">{error}</p> : null}
         {activity?.assignment?.metadata?.requireSafeExamBrowser === true ? <p className="inline-panel">{t("studentView.safeExamBrowserNotice")}</p> : null}
         {activity && studentViewMode === "read_only" ? (

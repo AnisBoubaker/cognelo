@@ -5,15 +5,15 @@ test.describe("localization, keyboard access, and responsive layout", () => {
     await page.goto("/subjects");
     await page.getByRole("button", { name: "Open account menu" }).click();
     await page.getByLabel("Language").selectOption("fr");
-    await expect(page.getByRole("heading", { name: "Matières", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Matières disponibles", exact: true })).toBeVisible();
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Matières", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Matières disponibles", exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Cours", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Espace des cours", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Créer un cours", exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Ouvrir le menu du compte" }).click();
     await page.getByLabel("Langue").selectOption("en");
-    await expect(page.getByRole("heading", { name: "Course workspace", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Create course", exact: true })).toBeVisible();
   });
 
   test("opens and dismisses content menus entirely from the keyboard", async ({ teacherPage: page }) => {

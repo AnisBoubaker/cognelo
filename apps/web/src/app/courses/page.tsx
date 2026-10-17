@@ -26,18 +26,13 @@ export default function CoursesPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel row hero-actions">
-          <div className="hero-meta">
-            <p className="eyebrow">{t("courses.eyebrow")}</p>
-            <h1>{t("courses.title")}</h1>
-          </div>
-          {canCreateCourses ? (
-            <Link className="button" href="/courses/new">
-              {t("courses.create")}
-            </Link>
-          ) : null}
-        </section>
+        <h1 className="sr-only">{t("courses.title")}</h1>
         {error ? <p className="error">{error}</p> : null}
+        {canCreateCourses ? (
+          <div className="section-actions">
+            <Link className="button" href="/courses/new">{t("courses.create")}</Link>
+          </div>
+        ) : null}
         <section className="grid">
           {courses.map((course) => (
             <Link
@@ -52,7 +47,9 @@ export default function CoursesPage() {
                   : `/courses/${course.id}/groups/${course.groups?.[0]?.id ?? ""}`
               }
             >
-              <span className="eyebrow">{t(`status.${course.status}`)}</span>
+              {user?.roles.includes("admin") || course.memberships?.some((membership) => membership.userId === user?.id && membership.role !== "student") ? (
+                <span className="eyebrow">{t(`status.${course.status}`)}</span>
+              ) : null}
               <h2>{course.title}</h2>
               {course.subject ? <p className="muted">{course.subject.title}</p> : null}
               {course.description ? (

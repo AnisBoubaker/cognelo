@@ -439,22 +439,6 @@ export default function GroupActivityPage() {
   return (
     <AppShell>
       <main className="page stack assigned-activity-page">
-        <section className="hero-panel hero-panel-compact">
-          <div className="hero-meta">
-            <p className="eyebrow">{localizedActivityName()}</p>
-            <h1>{activity?.title ?? safeExamBrowserAccess?.title ?? t("common.loading")}</h1>
-            <p className="muted">
-              {group ? group.title : t("common.loading")}
-              {course ? ` · ${course.title}` : ""}
-            </p>
-          </div>
-          <div className="hero-actions">
-            <Link className="button secondary" href={`/courses/${courseId}/groups/${groupId}`}>
-              {t("groupPage.backToCourse")}
-            </Link>
-          </div>
-        </section>
-
         {error ? <p className="error">{error}</p> : null}
 
         {isActivityUnavailable ? (
@@ -504,48 +488,62 @@ export default function GroupActivityPage() {
           </section>
         ) : null}
 
-        {!isActivityUnavailable && (solutionAvailable || hasPreviousSubmissions === true || deletedSubmissions.length || canStartNewAttempt === false) ? (
-          <div className="tab-strip" role="tablist" aria-label={activity?.title ?? t("common.loading")}>
-            {canStartNewAttempt !== false ? (
-              <button
-                aria-selected={!showSolution && selectedTab === "attempt"}
-                className="tab-button"
-                role="tab"
-                type="button"
-                onClick={() => { setShowSolution(false); setSelectedTab("attempt"); }}
-              >
-                {t("courseDetail.newAttemptTab")}
-              </button>
-            ) : null}
-            {hasPreviousSubmissions === true ? (
-              <button
-                aria-selected={!showSolution && selectedTab === "previous"}
-                className="tab-button"
-                role="tab"
-                type="button"
-                onClick={() => { setShowSolution(false); setSelectedTab("previous"); }}
-              >
-                {t("courseDetail.previousSubmissionsTitle")}
-              </button>
-            ) : null}
-            {solutionAvailable ? (
-              <button aria-selected={showSolution} className="tab-button" role="tab" type="button" onClick={() => setShowSolution(true)}>
-                {t("activitySolution.tab")}
-              </button>
-            ) : null}
-            {deletedSubmissions.length ? (
-              <button
-                aria-selected={!showSolution && selectedTab === "deleted"}
-                className="tab-button"
-                role="tab"
-                type="button"
-                onClick={() => { setShowSolution(false); setSelectedTab("deleted"); }}
-              >
-                {t("courseDetail.deletedSubmissionsTitle")}
-              </button>
-            ) : null}
+        <div className="workspace-tab-toolbar activity-navigation">
+          {!isActivityUnavailable && (solutionAvailable || hasPreviousSubmissions === true || deletedSubmissions.length || canStartNewAttempt === false) ? (
+            <div className="tab-strip" role="tablist" aria-label={activity?.title ?? t("common.loading")}>
+              {canStartNewAttempt !== false ? (
+                <button
+                  aria-selected={!showSolution && selectedTab === "attempt"}
+                  className="tab-button"
+                  role="tab"
+                  type="button"
+                  onClick={() => { setShowSolution(false); setSelectedTab("attempt"); }}
+                >
+                  {t("courseDetail.newAttemptTab")}
+                </button>
+              ) : null}
+              {hasPreviousSubmissions === true ? (
+                <button
+                  aria-selected={!showSolution && selectedTab === "previous"}
+                  className="tab-button"
+                  role="tab"
+                  type="button"
+                  onClick={() => { setShowSolution(false); setSelectedTab("previous"); }}
+                >
+                  {t("courseDetail.previousSubmissionsTitle")}
+                </button>
+              ) : null}
+              {solutionAvailable ? (
+                <button aria-selected={showSolution} className="tab-button" role="tab" type="button" onClick={() => setShowSolution(true)}>
+                  {t("activitySolution.tab")}
+                </button>
+              ) : null}
+              {deletedSubmissions.length ? (
+                <button
+                  aria-selected={!showSolution && selectedTab === "deleted"}
+                  className="tab-button"
+                  role="tab"
+                  type="button"
+                  onClick={() => { setShowSolution(false); setSelectedTab("deleted"); }}
+                >
+                  {t("courseDetail.deletedSubmissionsTitle")}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="workspace-context">
+            <h1>{activity?.title ?? safeExamBrowserAccess?.title ?? t("common.loading")}</h1>
+            <p className="muted">
+              {localizedActivityName()} · {group ? group.title : t("common.loading")}
+              {course ? ` · ${course.title}` : ""}
+            </p>
           </div>
-        ) : null}
+          <div className="section-actions">
+            <Link className="button secondary" href={`/courses/${courseId}/groups/${groupId}`}>
+              {t("groupPage.backToCourse")}
+            </Link>
+          </div>
+                </div>
 
         {!isActivityUnavailable && !isSafeExamBrowserGateOpen && solutionAvailable && showSolution ? (
           <ActivitySolutionPanel courseId={courseId} groupId={groupId} activityId={activityId} />

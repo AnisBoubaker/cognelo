@@ -103,11 +103,10 @@ export default function ActivityBanksPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel hero-panel-compact"><div className="hero-meta"><p className="eyebrow">{t("activityBanks.eyebrow")}</p><h1>{t("nav.activityBanks")}</h1><p className="muted">{t("activityBanks.subtitle")}</p></div></section>
         {error ? <p className="error">{error}</p> : null}
 
         <section className="section stack">
-          <div className="section-heading"><div><p className="eyebrow">{t("activityBanks.listEyebrow")}</p><h2>{t("activityBanks.listTitle")}</h2></div><button type="button" onClick={openCreate}>{t("activityBanks.addTitle")}</button></div>
+          <div className="section-heading"><div><p className="eyebrow">{t("activityBanks.listEyebrow")}</p><h1 className="content-title">{t("activityBanks.listTitle")}</h1></div><button type="button" onClick={openCreate}>{t("activityBanks.addTitle")}</button></div>
           {activityBanks.length ? (
             <div className="table-list activity-bank-list">
               {activityBanks.map((bank) => (

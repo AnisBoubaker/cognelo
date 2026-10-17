@@ -629,13 +629,13 @@ export default function CourseDetailPage() {
     return (
       <AppShell>
         <main className="page stack">
-          <section className="hero-panel hero-panel-compact">
-            <div className="hero-meta">
+          <section className="section stack">
+            <div className="stack">
               <p className="eyebrow">{t("courseDetail.groupsEyebrow")}</p>
               <h1>{course.title}</h1>
               <p className="muted">{t("courseDetail.noAvailableGroups")}</p>
             </div>
-            <div className="hero-actions">
+            <div className="section-actions">
               <Link className="button secondary" href="/courses">
                 {t("courseDetail.backToCourses")}
               </Link>
@@ -1356,22 +1356,13 @@ export default function CourseDetailPage() {
       <main className="page stack">
         {course ? (
           <>
-            <section className="hero-panel hero-panel-compact">
-              <div className="hero-meta">
-                <p className="eyebrow">{t(`status.${course.status}`)}</p>
-                <h1>{course.title}</h1>
-                {course.description ? (
-                  <MarkdownRenderer markdown={course.description} className="muted" compact />
-                ) : (
-                  <p className="muted">{t("common.noDescription")}</p>
-                )}
-              </div>
-            </section>
             {error ? <p className="error">{error}</p> : null}
             <WorkspaceTabs
               ariaLabel={t("courseDetail.workspaceTabs")}
               initialTab={activeCourseTab}
-              toolbar={activeCourseTab !== "groupings" ? (
+              toolbar={<>
+                {activeCourseTab !== "content" ? <h1 className="workspace-context">{course.title}</h1> : null}
+                {activeCourseTab !== "groupings" ? (
                 <div className="course-view-selector" role="group" aria-label={t("courseDetail.contentViewSelectorLabel")}>
                   <Link
                     aria-current={contentViewSelectorMode === "course" ? "page" : undefined}
@@ -1424,6 +1415,7 @@ export default function CourseDetailPage() {
                   ) : null}
                 </div>
               ) : null}
+              </>}
               tabs={[
                 {
                   href: `/courses/${courseId}?tab=content`,
@@ -1433,9 +1425,12 @@ export default function CourseDetailPage() {
                     <section className="section stack">
                       <div className="section-heading">
                         <div>
-                          <p className="eyebrow">{t("courseDetail.contentEyebrow")}</p>
-                          <h2>{contentGroup ? t("courseDetail.groupContentTitle", { group: contentGroup.title }) : t("courseDetail.contentTitle")}</h2>
-                          <p className="muted">{contentGroup ? t("courseDetail.groupContentText") : t("courseDetail.contentText")}</p>
+                          <div className="row">
+                            <h1 className="content-title">{course.title}</h1>
+                            <span className="metadata-badge">{t(`status.${course.status}`)}</span>
+                          </div>
+                          {contentGroup ? <p className="muted">{contentGroup.title}</p> : null}
+                          {course.description ? <MarkdownRenderer markdown={course.description} className="muted" compact /> : null}
                         </div>
                         <div className="section-actions content-header-actions">
                           <button

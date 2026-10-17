@@ -69,6 +69,8 @@ Outbox assertions require local access to the API’s storage. Use synthetic dom
 
 `activity-solutions.spec.ts` covers default-off solution settings, explicit learner reveal, live revocation, summative release/re-hide, compound Test solution providers, and repeatable-grade privacy.
 
+`workspace-layout.spec.ts` checks desktop/mobile page identity, navigation and action retention, and horizontal containment across list/detail pages, course and bank authoring, learner/preview workspaces, results/manual grading, and all account-setting sections after hero removal.
+
 ## Focused regression checks
 
 Run the independent authoring-recovery, bank-synchronization, course-loading, student-grouping, activity-exception, and live compound-Test scenarios with:

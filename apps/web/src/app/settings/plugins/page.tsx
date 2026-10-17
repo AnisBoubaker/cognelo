@@ -213,14 +213,6 @@ export default function PluginSettingsPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel hero-panel-compact">
-          <div className="hero-meta">
-            <p className="eyebrow">{t("settings.eyebrow")}</p>
-            <h1>{t("settings.title")}</h1>
-            <p className="muted">{t("settings.subtitle")}</p>
-          </div>
-        </section>
-
         <div className="settings-layout">
           <SettingsNav />
 
@@ -228,7 +220,7 @@ export default function PluginSettingsPage() {
             <div className="section-heading">
               <div>
                 <p className="eyebrow">{t("settings.pluginsEyebrow")}</p>
-                <h2>{t("settings.pluginsTitle")}</h2>
+                <h1 className="content-title">{t("settings.pluginsTitle")}</h1>
               </div>
             </div>
 

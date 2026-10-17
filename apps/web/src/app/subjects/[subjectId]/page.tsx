@@ -27,35 +27,6 @@ export default function SubjectDetailPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel hero-panel-compact">
-          <div className="hero-meta">
-            <p className="eyebrow">{t("subjectDetail.eyebrow")}</p>
-            <h1>{subject?.title ?? t("subjectDetail.fallbackTitle")}</h1>
-            {subject ? (
-              <p className="muted">
-                {t("subjects.teachingLanguageSummary", { language: t(`locale.${subject.teachingLanguage}`) })}
-                {subject.programmingLanguage
-                  ? ` · ${t("subjects.programmingLanguageSummary", {
-                      language: subject.programmingLanguage === subjectMultipleProgrammingLanguages
-                        ? t("subjects.programmingLanguageMultiple")
-                        : subjectProgrammingLanguageLabel(subject.programmingLanguage)
-                    })}`
-                  : ""}
-              </p>
-            ) : null}
-          </div>
-          {subject ? (
-            <div className="hero-actions">
-              <Link className="button secondary" href="/subjects">
-                {t("common.back")}
-              </Link>
-              <Link className="button" href={`/subjects/${subject.id}/edit`}>
-                {t("common.edit")}
-              </Link>
-            </div>
-          ) : null}
-        </section>
-
         {error ? <p className="error">{error}</p> : null}
 
         {subject ? (
@@ -63,10 +34,32 @@ export default function SubjectDetailPage() {
           <section className="split">
             <div className="section stack">
               <div className="section-heading">
-                <div>
-                  <p className="eyebrow">{t("subjectDetail.activityBanksEyebrow")}</p>
-                  <h2>{t("subjectDetail.activityBanksTitle")}</h2>
+                <div className="content-context">
+                  <p className="eyebrow">{t("subjectDetail.activityBanksTitle")}</p>
+                  <h1 className="content-title">{subject?.title ?? t("subjectDetail.fallbackTitle")}</h1>
+                  {subject ? (
+                    <p className="muted">
+                      {t("subjects.teachingLanguageSummary", { language: t(`locale.${subject.teachingLanguage}`) })}
+                      {subject.programmingLanguage
+                        ? ` · ${t("subjects.programmingLanguageSummary", {
+                            language: subject.programmingLanguage === subjectMultipleProgrammingLanguages
+                              ? t("subjects.programmingLanguageMultiple")
+                              : subjectProgrammingLanguageLabel(subject.programmingLanguage)
+                          })}`
+                        : ""}
+                    </p>
+                  ) : null}
                 </div>
+                {subject ? (
+                  <div className="section-actions">
+                    <Link className="button secondary" href="/subjects">
+                      {t("common.back")}
+                    </Link>
+                    <Link className="button" href={`/subjects/${subject.id}/edit`}>
+                      {t("common.edit")}
+                    </Link>
+                  </div>
+                ) : null}
               </div>
               {subject.activityBanks?.length ? (
                 <div className="table-list">

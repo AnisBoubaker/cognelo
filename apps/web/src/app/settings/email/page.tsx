@@ -157,14 +157,6 @@ export default function EmailSettingsPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel hero-panel-compact">
-          <div className="hero-meta">
-            <p className="eyebrow">{t("settings.eyebrow")}</p>
-            <h1>{t("settings.title")}</h1>
-            <p className="muted">{t("settings.subtitle")}</p>
-          </div>
-        </section>
-
         <div className="settings-layout">
           <SettingsNav />
           <div className="stack">
@@ -172,7 +164,7 @@ export default function EmailSettingsPage() {
               <div className="section-heading">
                 <div>
                   <p className="eyebrow">{t("settings.emailDeliveryEyebrow")}</p>
-                  <h2>{t("settings.emailDeliveryTitle")}</h2>
+                  <h1 className="content-title">{t("settings.emailDeliveryTitle")}</h1>
                 </div>
               </div>
 

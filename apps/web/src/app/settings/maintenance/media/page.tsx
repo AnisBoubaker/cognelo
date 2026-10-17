@@ -64,21 +64,13 @@ export default function MediaMaintenancePage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel hero-panel-compact">
-          <div className="hero-meta">
-            <p className="eyebrow">{t("settings.maintenanceEyebrow")}</p>
-            <h1>{t("settings.maintenanceTitle")}</h1>
-            <p className="muted">{t("settings.maintenanceSubtitle")}</p>
-          </div>
-        </section>
-
         <div className="settings-layout">
           <MaintenanceNav />
           <section className="section stack">
             <div className="section-heading">
               <div>
                 <p className="eyebrow">{t("settings.maintenanceMediaEyebrow")}</p>
-                <h2>{t("settings.maintenanceMediaTitle")}</h2>
+                <h1 className="content-title">{t("settings.maintenanceMediaTitle")}</h1>
                 <p className="muted">{t("settings.maintenanceMediaText")}</p>
               </div>
               {isAdmin ? (

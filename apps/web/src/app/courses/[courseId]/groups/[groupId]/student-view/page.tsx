@@ -67,17 +67,6 @@ export default function StudentViewPage() {
         <StudentPreviewBanner groupTitle={workspace?.group.title} onReset={resetPreview} t={t} />
         {workspace ? (
           <>
-            <section className="hero-panel hero-panel-compact">
-              <div className="hero-meta">
-                <p className="eyebrow">
-                  {t("groupPage.eyebrow")} · {workspace.group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}
-                </p>
-                <h1>{workspace.course.title}: {workspace.group.title}</h1>
-                {workspace.group.availableFrom || workspace.group.availableUntil ? (
-                  <p className="muted">{formatAvailabilityWindow(workspace.group.availableFrom, workspace.group.availableUntil, t)}</p>
-                ) : null}
-              </div>
-            </section>
             {!workspace.isAvailable ? (
               <section className="section stack">
                 <h2>{t("studentView.groupUnavailableTitle")}</h2>
@@ -85,7 +74,10 @@ export default function StudentViewPage() {
               </section>
             ) : (
               <section className="section stack">
-                <div><h2>{t("courseDetail.contentEyebrow")}</h2></div>
+                <div>
+                  <h1 className="content-title">{workspace.course.title}: {workspace.group.title}</h1>
+                  {workspace.group.availableFrom || workspace.group.availableUntil ? <p className="muted">{formatAvailabilityWindow(workspace.group.availableFrom, workspace.group.availableUntil, t)}</p> : null}
+                </div>
                 <StudentCourseContent
                   activityDefinitions={activityDefinitions}
                   activityHref={(activityId) => `/courses/${courseId}/groups/${groupId}/student-view/activities/${activityId}?previewSession=${encodeURIComponent(sessionId)}`}

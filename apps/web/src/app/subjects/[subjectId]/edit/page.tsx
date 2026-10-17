@@ -141,25 +141,20 @@ export default function EditSubjectPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel hero-panel-compact subject-edit-hero">
-          <div className="hero-meta">
-            <p className="eyebrow">{t("editSubject.eyebrow")}</p>
-            <h1>{subject?.title ?? t("editSubject.fallbackTitle")}</h1>
-            <p className="muted">{t("editSubject.pageHelp")}</p>
-          </div>
-        </section>
-
         {error ? <p className="error">{error}</p> : null}
 
         {subject ? (
           <>
-            <div className="tab-strip" role="tablist" aria-label={t("editSubject.tabsLabel")}>
-              <button type="button" role="tab" aria-selected={activeTab === "information"} aria-controls="subject-information-panel" onClick={() => setActiveTab("information")}>
-                {t("editSubject.informationTab")}
-              </button>
-              <button type="button" role="tab" aria-selected={activeTab === "knowledge-graph"} aria-controls="subject-knowledge-graph-panel" onClick={() => setActiveTab("knowledge-graph")}>
-                {t("editSubject.knowledgeGraphTab")}
-              </button>
+            <div className="workspace-tab-toolbar">
+              <div className="tab-strip" role="tablist" aria-label={t("editSubject.tabsLabel")}>
+                <button type="button" role="tab" aria-selected={activeTab === "information"} aria-controls="subject-information-panel" onClick={() => setActiveTab("information")}>
+                  {t("editSubject.informationTab")}
+                </button>
+                <button type="button" role="tab" aria-selected={activeTab === "knowledge-graph"} aria-controls="subject-knowledge-graph-panel" onClick={() => setActiveTab("knowledge-graph")}>
+                  {t("editSubject.knowledgeGraphTab")}
+                </button>
+              </div>
+              <h1 className="workspace-context">{subject.title}</h1>
             </div>
 
             <section className="section stack subject-details-section subject-editor-tab-panel" id="subject-information-panel" role="tabpanel" hidden={activeTab !== "information"}>

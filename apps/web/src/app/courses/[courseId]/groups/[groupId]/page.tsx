@@ -268,23 +268,15 @@ export default function CourseGroupPage() {
     return (
       <AppShell>
         <main className="page stack">
-          <section className="hero-panel hero-panel-compact">
-            <div className="hero-meta">
-              <p className="eyebrow">
-                {t("groupPage.eyebrow")} · {group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}
-              </p>
-              <h1>
-                {course.title}: {group.title}
-              </h1>
-              {group.availableFrom || group.availableUntil ? (
-                <p className="muted">{formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</p>
-              ) : null}
-            </div>
-          </section>
-
           {error ? <p className="error">{error}</p> : null}
 
           <WorkspaceTabs
+            toolbar={
+              <div className="workspace-context">
+                <h1>{course.title}: {group.title}</h1>
+                {group.availableFrom || group.availableUntil ? <p className="muted">{formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</p> : null}
+              </div>
+            }
             ariaLabel={t("groupPage.workspaceTabs")}
             initialTab={["grades", "my-teams"].includes(searchParams.get("tab") ?? "") ? searchParams.get("tab")! : "content"}
             tabs={[
@@ -293,10 +285,6 @@ export default function CourseGroupPage() {
                 label: t("courseDetail.contentTab"),
                 render: () => (
                   <section className="section stack">
-                    <div>
-                      <h2>{t("courseDetail.contentEyebrow")}</h2>
-                    </div>
-
                     <StudentCourseContent
                       activityDefinitions={activityDefinitions}
                       activityHref={(activityId) => `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}`}
@@ -1093,32 +1081,18 @@ export default function CourseGroupPage() {
       <main className="page stack">
         {group && course ? (
           <>
-            <section className="hero-panel hero-panel-compact">
-              <div className="hero-meta">
-                <p className="eyebrow">{t("groupPage.eyebrow")} · {group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}</p>
-                <h1>{course.title}: {group.title}</h1>
-                {group.availableFrom || group.availableUntil ? (
-                  <p className="muted">{formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</p>
-                ) : null}
-              </div>
-              {canManage ? (
-                <div className="hero-actions">
-                  <Link className="button secondary" href={`/courses/${courseId}`}>
-                    {t("groupPage.backToCourse")}
-                  </Link>
-                </div>
-              ) : canManageRoster ? (
-                <div className="hero-actions">
-                  <Link className="button secondary" href={`/courses/${courseId}/groups/${groupId}/student-view`} rel="noopener" target="_blank">
-                    {t("courseDetail.studentView")}
-                  </Link>
-                </div>
-              ) : null}
-            </section>
 
             {error ? <p className="error">{error}</p> : null}
 
             <WorkspaceTabs
+            toolbar={
+              <div className="workspace-context">
+                <h1>{course.title}: {group.title}</h1>
+                <span className="muted">{group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}</span>
+                {canManageRoster ? <Link className="button secondary" href={`/courses/${courseId}/groups/${groupId}/student-view`} rel="noopener" target="_blank">{t("courseDetail.studentView")}</Link> : null}
+                {group.availableFrom || group.availableUntil ? <span className="muted"> · {formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</span> : null}
+              </div>
+            }
               ariaLabel={t("groupPage.workspaceTabs")}
               initialTab={searchParams.get("tab") ?? "content"}
               tabs={[
@@ -1413,14 +1387,6 @@ export default function CourseGroupPage() {
                   label: t("courseDetail.contentTab"),
                   render: () => (
                     <section className="section stack">
-                      <div className="section-heading">
-                        <div>
-                          <p className="eyebrow">{t("courseDetail.contentEyebrow")}</p>
-                          <h2>{t("courseDetail.contentTitle")}</h2>
-                          <p className="muted">{t("courseDetail.contentText")}</p>
-                        </div>
-                      </div>
-
                       {visibleContentItems.length ? (
                         <div className="table-list">
                           <div

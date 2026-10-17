@@ -176,29 +176,28 @@ export default function BankActivityAuthoringPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel hero-panel-compact">
-          <div className="hero-meta">
-            <p className="eyebrow">{bank?.title ?? t("nav.activityBanks")}</p>
-            <h1>{activity?.title ?? t("common.loading")}</h1>
-            <p className="muted">
-              {activity ? activityTypeLabel(activity.activityType.key) : ""}
-              {activity ? ` · ${t(`activityLifecycle.${activity.lifecycle}`)}` : ""}
-              {activity?.currentVersion ? ` · v${activity.currentVersion.versionNumber}` : ""}
-            </p>
-            {activity?.lifecycle === "draft" && activity.currentVersion ? <p className="muted">{t("bankActivityPage.unpublishedChanges", { version: activity.currentVersion.versionNumber })}</p> : null}
-          </div>
-          <div className="hero-actions">
-            <Link className="button secondary" href={searchParams.get("testBankActivityId")
-              ? `/activity-banks/${activityBankId}/activities/${searchParams.get("testBankActivityId")}`
-              : `/activity-banks/${activityBankId}`}>
-              {t("bankActivityPage.backToBank")}
-            </Link>
-          </div>
-        </section>
-
         {error ? <p className="error">{error}</p> : null}
 
         <section className="section stack">
+          <div className="section-heading">
+            <div className="content-context">
+              <p className="eyebrow">{bank?.title ?? t("nav.activityBanks")}</p>
+              <h1 className="content-title">{activity?.title ?? t("common.loading")}</h1>
+              <p className="muted">
+                {activity ? activityTypeLabel(activity.activityType.key) : ""}
+                {activity ? ` · ${t(`activityLifecycle.${activity.lifecycle}`)}` : ""}
+                {activity?.currentVersion ? ` · v${activity.currentVersion.versionNumber}` : ""}
+              </p>
+              {activity?.lifecycle === "draft" && activity.currentVersion ? <p className="muted">{t("bankActivityPage.unpublishedChanges", { version: activity.currentVersion.versionNumber })}</p> : null}
+            </div>
+            <div className="section-actions">
+              <Link className="button secondary" href={searchParams.get("testBankActivityId")
+                ? `/activity-banks/${activityBankId}/activities/${searchParams.get("testBankActivityId")}`
+                : `/activity-banks/${activityBankId}`}>
+                {t("bankActivityPage.backToBank")}
+              </Link>
+            </div>
+          </div>
           <p className="muted">
             {t("bankActivityPage.versionNote")}
           </p>

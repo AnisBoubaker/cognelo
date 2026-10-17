@@ -7,6 +7,7 @@ import type { SubjectKnowledgeConcept, SubjectKnowledgePrerequisite } from "@/li
 
 type ActivityEditorTabsProps = {
   children: React.ReactNode;
+  toolbar?: React.ReactNode;
   concepts: SubjectKnowledgeConcept[];
   prerequisites: SubjectKnowledgePrerequisite[];
   selectedConcepts: ActivityKnowledgeConceptSelection[];
@@ -69,7 +70,7 @@ function ConceptCheckbox({ checked, partial, label, onChange }: { checked: boole
   return <input ref={ref} type="checkbox" checked={checked} aria-label={label} onChange={(event) => onChange(event.target.checked)} />;
 }
 
-export function ActivityEditorTabs({ children, concepts, prerequisites, selectedConcepts, onSaveConcepts, onConceptDraftChange, t, locale, showGradingTab = false }: ActivityEditorTabsProps) {
+export function ActivityEditorTabs({ children, toolbar, concepts, prerequisites, selectedConcepts, onSaveConcepts, onConceptDraftChange, t, locale, showGradingTab = false }: ActivityEditorTabsProps) {
   const notifications = useNotifications();
   const unsavedActions = useUnsavedChangesActions();
   const [activeTab, setActiveTab] = useState<"activity" | "concepts" | "grading">("activity");
@@ -245,16 +246,19 @@ export function ActivityEditorTabs({ children, concepts, prerequisites, selected
       applySelections: (selections) => { if (selections) setDraftSelections(selections); }
     }}>
     <div className="stack">
-      <div className="tab-strip" role="tablist" aria-label={t("activityConcepts.tabsLabel")}>
-        <button type="button" role="tab" aria-selected={activeTab === "activity"} onClick={() => setActiveTab("activity")}>{t("activityConcepts.activityTab")}</button>
-        <button type="button" role="tab" aria-selected={activeTab === "concepts"} onClick={() => setActiveTab("concepts")}>
-          {t("activityConcepts.conceptsTab")}{savedSelections.length ? ` (${savedSelections.length})` : ""}
-        </button>
-        {showGradingTab ? (
-          <button type="button" role="tab" aria-selected={activeTab === "grading"} onClick={() => setActiveTab("grading")}>
-            {t("activityConcepts.gradingTab")}
+      <div className="workspace-tab-toolbar">
+        <div className="tab-strip" role="tablist" aria-label={t("activityConcepts.tabsLabel")}>
+          <button type="button" role="tab" aria-selected={activeTab === "activity"} onClick={() => setActiveTab("activity")}>{t("activityConcepts.activityTab")}</button>
+          <button type="button" role="tab" aria-selected={activeTab === "concepts"} onClick={() => setActiveTab("concepts")}>
+            {t("activityConcepts.conceptsTab")}{savedSelections.length ? ` (${savedSelections.length})` : ""}
           </button>
-        ) : null}
+          {showGradingTab ? (
+            <button type="button" role="tab" aria-selected={activeTab === "grading"} onClick={() => setActiveTab("grading")}>
+              {t("activityConcepts.gradingTab")}
+            </button>
+          ) : null}
+        </div>
+        {toolbar ? <div className="workspace-tab-trailing">{toolbar}</div> : null}
       </div>
 
       <div role="tabpanel" hidden={activeTab !== "activity"}>{children}</div>

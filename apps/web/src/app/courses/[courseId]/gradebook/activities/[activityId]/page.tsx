@@ -825,37 +825,35 @@ export default function GradebookActivityResultsPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel hero-panel-compact">
-          <div className="hero-meta">
-            <p className="eyebrow">{t("courseDetail.gradebookEyebrow")}</p>
-            <h1>{activityTitle}</h1>
-            <p className="muted">
-              {course?.title ?? t("common.loading")}
-              {groupTitle ? ` · ${groupTitle}` : ""}
-            </p>
-          </div>
-          <div className="hero-actions">
-            {canMessageStudents ? (
-              <button className="button secondary" type="button" onClick={() => setShowActivityMessenger(true)}>
-                <AppIcon name="messages" />
-                {t("activityMessenger.messageStudents")}
-              </button>
-            ) : null}
-            {canManageCourse ? (
-              <Link className="button primary" href={`/courses/${courseId}/activities/${activityId}`}>
-                {t("courseDetail.editActivityTitle")}
-              </Link>
-            ) : null}
-            <button className="button secondary" disabled={!course || !gradebook} type="button" onClick={() => setShowGradeExport(true)}>
-              {t("courseDetail.exportGrades")}
-            </button>
-            <Link className="button secondary" href={backHref}>
-              {backLabel}
-            </Link>
-          </div>
-        </section>
-
         <section className="section stack">
+          <div className="section-heading content-context">
+            <div className="workspace-context">
+              <h1>{activityTitle}</h1>
+              <p className="muted">
+                {course?.title ?? t("common.loading")}
+                {groupTitle ? ` · ${groupTitle}` : ""}
+              </p>
+            </div>
+            <div className="section-actions">
+              {canMessageStudents ? (
+                <button className="button secondary" type="button" onClick={() => setShowActivityMessenger(true)}>
+                  <AppIcon name="messages" />
+                  {t("activityMessenger.messageStudents")}
+                </button>
+              ) : null}
+              {canManageCourse ? (
+                <Link className="button primary" href={`/courses/${courseId}/activities/${activityId}`}>
+                  {t("courseDetail.editActivityTitle")}
+                </Link>
+              ) : null}
+              <button className="button secondary" disabled={!course || !gradebook} type="button" onClick={() => setShowGradeExport(true)}>
+                {t("courseDetail.exportGrades")}
+              </button>
+              <Link className="button secondary" href={backHref}>
+                {backLabel}
+              </Link>
+            </div>
+          </div>
           <div className="tab-strip" role="tablist" aria-label={t("courseDetail.activityReportsTabsLabel")}>
             <button
               aria-selected={reportTab === "overview"}

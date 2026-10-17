@@ -74,26 +74,27 @@ export default function ActivityPage() {
     return localized?.name ?? definition?.name ?? activity.activityType.name;
   }
 
+  const activityContext = (
+    <div className="row activity-editor-context">
+      <div className="workspace-context">
+        <h1>{activity?.title ?? t("common.loading")}</h1>
+        <span className="muted">{course?.title} · {localizedActivityName()}</span>
+      </div>
+      <Link className="button secondary" href={testActivityId ? `/courses/${courseId}/activities/${testActivityId}` : `/courses/${courseId}`}>
+        {testActivityId ? "Back to Test" : t("parsons.backToCourse")}
+      </Link>
+    </div>
+  );
+
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel hero-panel-compact">
-          <div className="hero-meta">
-            <p className="eyebrow">{localizedActivityName()}</p>
-            <h1>{activity?.title ?? t("common.loading")}</h1>
-            <p className="muted">{course ? `${t("parsons.inCourse", { title: course.title })}` : t("common.loading")}</p>
-          </div>
-          <div className="hero-actions">
-            <Link className="button secondary" href={testActivityId ? `/courses/${courseId}/activities/${testActivityId}` : `/courses/${courseId}`}>
-              {testActivityId ? "Back to Test" : t("parsons.backToCourse")}
-            </Link>
-          </div>
-        </section>
-
         {error ? <p className="error">{error}</p> : null}
 
+        {!canManage ? activityContext : null}
         {activity && ActivityRenderer && canManage ? (
           <ActivityEditorTabs
+            toolbar={activityContext}
             concepts={course?.subject?.knowledgeConcepts ?? []}
             prerequisites={course?.subject?.knowledgePrerequisites ?? []}
             selectedConcepts={activity.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills, selectedSkillIds: link.selectedSkillIds, selectedMisconceptions: link.selectedMisconceptions, selectedMisconceptionIds: link.selectedMisconceptionIds })) ?? []}
@@ -127,6 +128,7 @@ export default function ActivityPage() {
           />
         ) : activity && canManage ? (
           <ActivityEditorTabs
+            toolbar={activityContext}
             concepts={course?.subject?.knowledgeConcepts ?? []}
             prerequisites={course?.subject?.knowledgePrerequisites ?? []}
             selectedConcepts={activity.knowledgeConcepts?.map((link) => ({ conceptId: link.conceptId, selectsAllSkills: link.selectsAllSkills, selectedSkills: link.selectedSkills, selectedSkillIds: link.selectedSkillIds, selectedMisconceptions: link.selectedMisconceptions, selectedMisconceptionIds: link.selectedMisconceptionIds })) ?? []}

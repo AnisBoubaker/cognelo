@@ -711,26 +711,17 @@ export default function ActivityBankDetailPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel hero-panel-compact">
-          <div className="hero-meta">
-            <p className="eyebrow">{bank?.subject?.title ?? t("nav.activityBanks")}</p>
-            <h1>{bank?.title ?? t("common.loading")}</h1>
-            {bank?.description ? <p className="muted">{bank.description}</p> : null}
-          </div>
-          <Link className="button secondary" href="/activity-banks">
-            {t("activityBankDetail.backToBanks")}
-          </Link>
-        </section>
-
         {error ? <p className="error">{error}</p> : null}
 
         <section className="section stack">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">{t("activityBankDetail.activitiesEyebrow")}</p>
-              <h2>{t("activityBankDetail.activitiesTitle")}</h2>
+              <h1 className="content-title">{bank?.title ?? t("common.loading")}</h1>
+              {bank?.subject ? <p className="muted">{bank.subject.title}</p> : null}
+              {bank?.description ? <p className="muted">{bank.description}</p> : null}
             </div>
             <div className="section-actions activity-bank-tree-actions">
+              <Link className="button secondary" href="/activity-banks">{t("activityBankDetail.backToBanks")}</Link>
               <button className="secondary" type="button" onClick={openConceptFilter}>
                 {selectedConceptIds.size
                   ? t("activityBankDetail.filtersActive", { count: selectedConceptIds.size })

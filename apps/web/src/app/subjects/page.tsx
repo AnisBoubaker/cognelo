@@ -56,21 +56,13 @@ export default function SubjectsPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel hero-panel-compact">
-          <div className="hero-meta">
-            <p className="eyebrow">{t("subjects.eyebrow")}</p>
-            <h1>{t("nav.subjects")}</h1>
-            <p className="muted">{t("subjects.subtitle")}</p>
-          </div>
-        </section>
-
         {error ? <p className="error">{error}</p> : null}
 
         <section className="section stack">
           <div className="section-heading">
             <div>
               <p className="eyebrow">{t("subjects.listEyebrow")}</p>
-              <h2>{t("subjects.listTitle")}</h2>
+              <h1 className="content-title">{t("subjects.listTitle")}</h1>
             </div>
             <button className="secondary" type="button" onClick={() => {
               setShowCreateForm((current) => {
@@ -122,7 +114,7 @@ export default function SubjectsPage() {
                 </select>
                 <p className="muted">{t("subjects.programmingLanguageHelp")}</p>
               </div>
-              <div className="hero-actions">
+              <div className="row">
                 <button type="submit" disabled={saving}>
                   {saving ? t("common.saving") : t("common.create")}
                 </button>

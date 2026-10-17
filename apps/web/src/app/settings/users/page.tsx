@@ -194,11 +194,10 @@ export default function UserSettingsPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel hero-panel-compact"><div className="hero-meta"><p className="eyebrow">{t("settings.eyebrow")}</p><h1>{t("settings.title")}</h1><p className="muted">{t("settings.subtitle")}</p></div></section>
         <div className="settings-layout">
           <SettingsNav />
           <section className="section stack">
-            <div className="section-heading"><div><p className="eyebrow">{t("settings.usersEyebrow")}</p><h2>{t("settings.usersTitle")}</h2></div>{isAdmin ? <button type="button" onClick={openCreate}>{t("settings.addUser")}</button> : null}</div>
+            <div className="section-heading"><div><p className="eyebrow">{t("settings.usersEyebrow")}</p><h1 className="content-title">{t("settings.usersTitle")}</h1></div>{isAdmin ? <button type="button" onClick={openCreate}>{t("settings.addUser")}</button> : null}</div>
             {!isAdmin ? <p className="muted">{t("settings.usersAdminOnly")}</p> : (
               <>
                 <form className="form inline-panel user-filter-form" onSubmit={applyFilters}>

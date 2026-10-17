@@ -374,29 +374,15 @@ export default function ManualActivityGradingPage() {
   return (
     <AppShell>
       <main className="page stack">
-        <section className="hero-panel hero-panel-compact">
-          <div className="hero-meta">
-            <p className="eyebrow">{t("courseDetail.gradeAllManually")}</p>
-            <h1>{activityTitle}</h1>
-            <p className="muted">
-              {course?.title ?? t("common.loading")}
-              {groupTitle ? ` · ${groupTitle}` : ""}
-            </p>
-          </div>
-          <div className="hero-actions">
-            <Link className="button secondary" href={resultsHref}>
-              {t("courseDetail.detailedResults")}
-            </Link>
-          </div>
-        </section>
-
         <section className="section stack">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">{t("courseDetail.studentResultsTitle")}</p>
-              <h2>{t("courseDetail.manualGradingPagePosition", { current: pageIndex + 1, total: pageCount })}</h2>
+              <h1 className="content-title">{activityTitle}</h1>
+              <p className="muted">{course?.title}{groupTitle ? ` · ${groupTitle}` : ""}</p>
+              <p>{t("courseDetail.manualGradingPagePosition", { current: pageIndex + 1, total: pageCount })}</p>
             </div>
             <div className="row wrap">
+              <Link className="button secondary" href={resultsHref}>{t("courseDetail.detailedResults")}</Link>
               <button className="button secondary" disabled={saving || pageIndex === 0} type="button" onClick={() => void goToPage(pageIndex - 1)}>
                 {t("courseDetail.previousSubmission")}
               </button>
