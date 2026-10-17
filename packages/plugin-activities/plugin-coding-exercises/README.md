@@ -8,7 +8,7 @@ Student and teacher code surfaces opt out of browser translation and writing ass
 
 Student template protection omits whitespace-only hidden boundaries, keeps the cursor within the live editable region, and lets select-all clear the student answer without removing protected scaffold code.
 
-The learner test runner contains and wraps execution output even when a program emits a very long line without spaces, so output cannot widen the responsive editor/test layout or push the runner off-screen.
+The learner test runner contains and wraps execution output even when a program emits a very long line without spaces, so output cannot widen the responsive editor/test layout or push the runner off-screen. Submission history is accessible before a timed start; deleted source remains visible with its reason in [retained history](../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md#submission-deletion).
 
 The activity definition declares interactive, plugin-executed Student view support. Teacher Student view reuses the learner editor and real Judge0 validation through stateless preview handlers. Preview source stays in browser session storage and no execution, attempt, grade, or analytics row is written.
 
@@ -57,6 +57,8 @@ Compound Test submission includes a final answer review with plugin-owned respon
 Live course-question edits preserve active responses and use the shared warning/audit workflow; summative outcomes remain hidden until grade release. Exercises without enabled hidden tests still submit and await grading. See [Live authoring and grade visibility](docs/REFERENCE.md#live-authoring-and-grade-visibility).
 
 ## Read By Topic
+
+- [Shared submission deletion and retained student history](../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md#submission-deletion)
 
 - [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)
 

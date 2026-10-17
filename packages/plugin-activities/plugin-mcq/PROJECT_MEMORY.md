@@ -2,6 +2,7 @@
 
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
+- Never autosave current answers from `studentViewMode="previous"`; history may mount before the explicit timed start.
 - The [student solution contract](../../../docs/ACTIVITY_SOLUTIONS.md) is capability-driven and default-off. Core gates explicit reveals by current assignment access and the summative grade release; the plugin returns only displayable reference content, never grading internals.
 
 - Preserve choices when live prompts/keys change; result and history APIs must enforce core grade release before returning summative scores. See [the reference](docs/REFERENCE.md#live-authoring-and-grade-visibility).

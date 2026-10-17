@@ -14,6 +14,7 @@ import { ActivityReviewAllPanel, toActivityReviewResponse, type ActivityReviewRe
 import { codingRubricResultsFromFeedback, type CodingRubricCriterion } from "@/lib/activity-review-all";
 import { ReviewAndGradeDialog } from "@/components/review-and-grade-dialog";
 import { GradebookExportDialog } from "@/components/gradebook-export-dialog";
+import { DeleteSubmissionDialog } from "@/components/delete-submission-dialog";
 import {
   api,
   apiRequest,
@@ -32,6 +33,7 @@ import {
   renderTestReviewAllItem
 } from "@/lib/activity-renderers";
 import { getGradebookActivityActions } from "@/lib/gradebook-actions";
+import { deletableSubmissions } from "@/lib/submission-deletion";
 import { excludeAiGradingTemplateTargets } from "@/lib/ai-grading-batch";
 import { type Locale, useI18n } from "@/lib/i18n";
 import { latestCompletedTestAttempt, type TestReviewAllSubmission } from "@/lib/test-review-all";
@@ -73,6 +75,7 @@ export default function GradebookActivityResultsPage() {
     error: string;
   } | null>(null);
   const [reviewAndGradeRow, setReviewAndGradeRow] = useState<CourseGradebookRow | null>(null);
+  const [submissionDeletionRow, setSubmissionDeletionRow] = useState<CourseGradebookRow | null>(null);
   const [showGradeExport, setShowGradeExport] = useState(false);
   const [showActivityMessenger, setShowActivityMessenger] = useState(false);
   const [messagingEnabled, setMessagingEnabled] = useState(false);
@@ -959,6 +962,7 @@ export default function GradebookActivityResultsPage() {
                   locale={locale}
                   savingGradeKey={savingGradeKey}
                   onReviewAndGrade={openReviewAndGrade}
+                  onDeleteSubmission={setSubmissionDeletionRow}
                   onReopenSubmission={reopenSubmission}
                   onRegrade={regradeRow}
                   onGenerateAiFeedback={generateAiFeedbackForRow}
@@ -1087,6 +1091,14 @@ export default function GradebookActivityResultsPage() {
           </div>
         ) : null}
 
+        {submissionDeletionRow ? (
+          <DeleteSubmissionDialog
+            courseId={courseId}
+            row={submissionDeletionRow}
+            onClose={() => setSubmissionDeletionRow(null)}
+            onDeleted={refresh}
+          />
+        ) : null}
         {reviewAndGradeRow ? (
           <ReviewAndGradeDialog
             courseId={courseId}
@@ -1256,6 +1268,7 @@ function GradebookStudentRow({
   locale,
   savingGradeKey,
   onReviewAndGrade,
+  onDeleteSubmission,
   onReopenSubmission,
   onRegrade,
   onGenerateAiFeedback,
@@ -1266,6 +1279,7 @@ function GradebookStudentRow({
   locale: Locale;
   savingGradeKey: string | null;
   onReviewAndGrade: (row: CourseGradebookRow) => Promise<void>;
+  onDeleteSubmission: (row: CourseGradebookRow) => void;
   onReopenSubmission: (row: CourseGradebookRow) => Promise<void>;
   onRegrade: (row: CourseGradebookRow) => Promise<void>;
   onGenerateAiFeedback: (row: CourseGradebookRow) => Promise<void>;
@@ -1278,7 +1292,8 @@ function GradebookStudentRow({
   const canAssessWithAi = row.assessmentMode === "summative" && activityActions.canAssessWithAi;
   const canRerunAutomaticGrading = row.assessmentMode === "summative" && activityActions.canRerunAutomaticGrading;
   const canReopen = row.supportsSubmissionContinuation === true && Boolean(latestReopenableAttempt(row)) && !inProgressAttempt;
-  const hasActions = canReopen || canAssessWithAi || canRerunAutomaticGrading || activityActions.canReviewAndGrade;
+  const canDeleteSubmission = deletableSubmissions(row).length > 0;
+  const hasActions = canDeleteSubmission || canReopen || canAssessWithAi || canRerunAutomaticGrading || activityActions.canReviewAndGrade;
 
   function closeActionMenu() {
     setActionMenuAnchor(null);
@@ -1391,6 +1406,14 @@ function GradebookStudentRow({
                 >
                   <AppIcon name="edit" />
                   <span>{t(row.assessmentMode === "formative" ? "courseDetail.inspectAttempts" : "courseDetail.reviewAndGrade")}</span>
+                </button>
+              ) : null}
+              {canDeleteSubmission ? (
+                <button className="content-context-menu-item is-danger" role="menuitem" type="button"
+                  disabled={savingGradeKey !== null}
+                  onClick={() => { closeActionMenu(); onDeleteSubmission(row); }}>
+                  <AppIcon name="remove" />
+                  <span>{t("courseDetail.deleteSubmission")}</span>
                 </button>
               ) : null}
             </ContextMenu>

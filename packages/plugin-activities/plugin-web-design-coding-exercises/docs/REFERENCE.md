@@ -39,6 +39,8 @@ src/
 
 ## Architecture Boundary
 
+Core submission metadata retains `submittedFiles`. The shared Deleted submissions view renders those student files and the teacher’s reason without exposing reference files or grade snapshots; existing deletion snapshots need no backfill.
+
 The plugin separates:
 
 - public activity config that is safe to send to students

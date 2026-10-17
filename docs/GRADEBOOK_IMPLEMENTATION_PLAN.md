@@ -32,6 +32,7 @@ It is intentionally a planning artifact. Implementation should proceed iterative
   - `started`
   - `submitted`
   - `graded`
+  - `deleted` (retained, excluded from active grading and counts)
 - Only activities/plugins that opt in support attempts.
 - Attempt policy is teacher-configurable per assigned activity:
   - unlimited attempts
@@ -44,6 +45,20 @@ It is intentionally a planning artifact. Implementation should proceed iterative
   - weighted average
 - Weighted average uses equal attempt weight.
 - For weighted-average grading, teachers may choose to drop the lowest attempt when there is more than one attempt.
+
+### Submission deletion
+
+**Student results**, whether entered from course Content or the detailed Gradebook, exposes **Delete submission** in each student's three-dot action menu. This is a core operation independent of plugin grading/feedback renderers, so it also covers MCQ, Programming Exercises, Web Design, and compound Tests. The dialog defaults to the newest submitted/graded attempt in the assignment's current assessment mode and offers a selector when there are several, including older submissions and current-mode formative submissions. Ongoing and already-deleted attempts are excluded; no action appears for a student who never submitted.
+
+The teacher must enter a nonblank reason (maximum 1,000 characters) and confirm the exact student/submission. Cancel writes nothing. The same requirement applies to deletion buttons retained in older manual-review panels; there is no automatic fallback reason. The existing DELETE endpoint rechecks course/section grading scope and rejects unfinished attempts, blank reasons, and already-deleted attempts.
+
+Deletion is a soft deletion of the core `ActivityAttempt`: its identity, answers/references, timing, compound child records, and history remain stored. The `submission_deleted` grade event retains the actor, reason, original attempt and grade snapshots. Existing plugin deletion hooks remain responsible for their own retained-record bookkeeping. Active counts and attempt-derived grades are recomputed as before; explicit teacher override grades are preserved. Students continue to see the record and reason under **Deleted submissions**. Raw grade snapshots remain private in staff/audit records rather than being returned through learner deletion history, so deletion cannot disclose an unreleased grade.
+
+Deleted code is rendered from the retained learner snapshots already stored in the audit: `submittedSourceCode` for Programming Exercises, `submittedFiles` for Web Design, and `submittedState.blocks` for Parsons. This also repairs display of existing deletions without rewriting records. The viewer uses the protected shared code renderer, distinguishes empty code from missing data, and never substitutes a reference solution. Missing-data copy does not claim that a deletion is old; non-code activities do not show an irrelevant code warning.
+
+For renderers with a dedicated read-only history mode (Coding, MCQ, Parsons, and Tests), the host initializes **Previous submissions** visibility from the authorized submission audit before the start gate mounts an answering editor. Opening history must not create/ensure an attempt, initialize an answer draft, or start the timer. MCQ pauses autosave in history; Coding skips initial draft creation there; Parsons loads submitted records without ensuring a live attempt. Returning to **New attempt** preserves the explicit start gate. Coding history excludes executions referenced by deleted core attempts while retaining those executions and their audit snapshots. `submission-history-before-start.spec.ts` checks all four renderers and verifies no activity writes occur until an explicit new start.
+
+Regression coverage lives in `submission-deletion.spec.ts`: mandatory/whitespace reasons, cancellation, student denial, unfinished-attempt rejection, the four previously missing activity types, exact older-attempt selection, formative deletion, retained compound answers, and student-visible reasons. The Web Design case uses the local execution runner to create a real submitted artifact.
 
 ### Grades
 
@@ -467,7 +482,7 @@ First plugin integration target:
 - Completed: authorized graders opening an activity from course content enter the same detailed-results workspace with inline **Class overview** and **Student results** tabs; content-origin navigation defaults to Class overview and the header retains a permission-gated **Edit activity** action. Designers without gradebook access still open the editor, and learner/group-projection activity URLs are unchanged.
 - Completed: while **Student results** is visible, a lightweight activity/group feed updates current-mode attempts in progress every ten seconds and shows the attempt number plus localized start time without repeatedly downloading the full detailed gradebook.
 - Completed: group each student's capability-driven grading and inspection actions under the shared accessible three-dot contextual menu while keeping whole-activity batch actions visible above the table.
-- Completed: per-student dialogs open on the newest current-mode submission and fetch only that plugin/Test payload initially. Navigating backward fetches each older attempt on demand; older and formative attempts are inspection-only.
+- Completed: per-student dialogs open on the newest current-mode submission and fetch only that plugin/Test payload initially. Navigating backward fetches each older attempt on demand; older and formative attempts are read-only for grading. Administrative submission deletion is available separately through the shared row action and requires a reason.
 - Completed: detailed activity results page lists per-student results and supports a Parsons "See answer" overlay with previous/next submission navigation and an "Include attempts" option for non-submission attempts/events.
 - Completed: add filters:
   - group

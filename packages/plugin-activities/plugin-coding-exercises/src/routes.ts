@@ -245,7 +245,7 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
     },
     POST: async ({ context, readJson }) => {
       const input = codingExerciseSubmitInputSchema.parse(await readJson());
-      const existingHistory = await listCodingExerciseAttemptHistory({
+      const existingHistory = await listActiveCodingExerciseHistory({
         activityId: context.activity.id,
         userId: context.user.id
       });
@@ -384,7 +384,7 @@ export const codingExerciseHistoryRoute: PluginRouteDefinition = {
   activityTypeKeys: ["coding-exercise"],
   methods: {
     GET: async ({ context }) => {
-      const history = await listCodingExerciseAttemptHistory({
+      const history = await listActiveCodingExerciseHistory({
         activityId: context.activity.id,
         userId: context.user.id
       });
@@ -411,6 +411,18 @@ export const codingExerciseHistoryRoute: PluginRouteDefinition = {
     }
   }
 };
+
+async function listActiveCodingExerciseHistory(input: { activityId: string; userId: string }) {
+  const [history, deletedAttempts] = await Promise.all([
+    listCodingExerciseAttemptHistory(input),
+    prisma.activityAttempt.findMany({
+      where: { ...input, pluginKey: "coding-exercises", lifecycle: "deleted", pluginAttemptRef: { not: null } },
+      select: { pluginAttemptRef: true }
+    })
+  ]);
+  const deletedRefs = new Set(deletedAttempts.map((attempt) => attempt.pluginAttemptRef));
+  return { ...history, attempts: history.attempts.filter((attempt) => !deletedRefs.has(attempt.submission.id)) };
+}
 
 async function listLatestFormativeAiFeedbackByExecutionId(activityId: string, executionIds: string[]) {
   const byExecutionId = new Map<string, ReturnType<typeof toAttemptAiFeedback>>();

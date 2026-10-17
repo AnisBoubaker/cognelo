@@ -74,4 +74,13 @@ describe("gradebook attempt deletion route", () => {
       deletedAt: "2026-06-19T10:00:00.000Z"
     });
   });
+
+  it.each(["", "   "])("rejects the empty reason %j before deleting anything", async (reason) => {
+    mocks.readJson.mockResolvedValueOnce({ reason });
+    await expect(DELETE(new Request("http://test.local", { method: "DELETE" }) as never, {
+      params: Promise.resolve({ courseId: "course-1", attemptId: "attempt-1" })
+    })).rejects.toThrow();
+    expect(mocks.deleteActivitySubmission).not.toHaveBeenCalled();
+    expect(mocks.runActivityAttemptDeletedHooks).not.toHaveBeenCalled();
+  });
 });

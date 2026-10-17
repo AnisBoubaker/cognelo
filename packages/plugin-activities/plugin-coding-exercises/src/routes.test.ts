@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   runCodingExercise: vi.fn(),
   submitCodingExercise: vi.fn(),
   prisma: {
+    activityAttempt: { findMany: vi.fn() },
     course: { findUnique: vi.fn() },
     courseGroupParticipant: { findMany: vi.fn() },
     pluginCodingExerciseAiEvaluation: { findMany: vi.fn() },
@@ -126,6 +127,7 @@ describe("coding exercise plugin routes", () => {
       feedback: { summary: "Good work" }
     });
     mocks.listRecentCodingExerciseExecutions.mockResolvedValue([{ id: "run-1", kind: "run" }, { id: "submit-1", kind: "submit" }]);
+    mocks.prisma.activityAttempt.findMany.mockResolvedValue([]);
     mocks.listCodingExerciseAttemptHistory.mockResolvedValue({
       currentRuns: [{ id: "run-current", kind: "run" }],
       attempts: [{ submission: { id: "submit-1", kind: "submit" }, runs: [{ id: "run-1", kind: "run" }] }]
@@ -157,6 +159,16 @@ describe("coding exercise plugin routes", () => {
     mocks.generateCodingExerciseRubric.mockResolvedValue({ criteria: [] });
     mocks.generateCodingExerciseSolution.mockResolvedValue({ referenceSolution: "print(1)" });
     mocks.generateCodingExerciseTests.mockResolvedValue({ hiddenTests: [] });
+  });
+
+  it("keeps deleted executions out of normal student history without removing their stored records", async () => {
+    mocks.prisma.activityAttempt.findMany.mockResolvedValueOnce([{ pluginAttemptRef: "submit-1" }]);
+    const result = await codingExerciseHistoryRoute.methods.GET?.({ request: new Request("http://test.local"), context, readJson: async () => ({}) });
+    expect(result).toMatchObject({ currentRuns: [{ id: "run-current" }], attempts: [] });
+    expect(mocks.prisma.activityAttempt.findMany).toHaveBeenCalledWith({
+      where: { activityId: "activity-1", userId: "teacher-1", pluginKey: "coding-exercises", lifecycle: "deleted", pluginAttemptRef: { not: null } },
+      select: { pluginAttemptRef: true }
+    });
   });
 
   it("lists current-attempt rubric evaluations for the teacher class overview", async () => {

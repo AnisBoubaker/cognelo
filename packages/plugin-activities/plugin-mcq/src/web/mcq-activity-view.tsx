@@ -469,7 +469,7 @@ export function McqActivityView({
   const selectedSubmissionReview = submissionReviews.find((review) => review.id === selectedSubmissionId) ?? submissionReviews[0] ?? null;
 
   useEffect(() => {
-    if (!isStudentSession || !submissionClient?.save || !submissionStatusReady || submitted) {
+    if (!isStudentSession || studentViewMode !== "attempt" || !submissionClient?.save || !submissionStatusReady || submitted) {
       return;
     }
     const save = () => {
@@ -483,7 +483,7 @@ export function McqActivityView({
     }
     const timeout = window.setTimeout(save, autosaveDelayMs);
     return () => window.clearTimeout(timeout);
-  }, [activity.id, autosaveDelayMs, copy.submitError, isStudentSession, notifications, studentAnswers, submissionClient, submissionStatusReady, submitted]);
+  }, [activity.id, autosaveDelayMs, copy.submitError, isStudentSession, notifications, studentAnswers, submissionClient, submissionStatusReady, studentViewMode, submitted]);
 
   const discardChanges = useCallback(() => {
     setTitle(savedSnapshot.title);

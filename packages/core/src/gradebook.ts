@@ -666,6 +666,9 @@ export async function deleteActivitySubmission(user: CurrentUser, courseId: stri
   if (attempt.lifecycle === "deleted") {
     throw new AppError(400, "SUBMISSION_ALREADY_DELETED", "This submission has already been deleted.");
   }
+  if (attempt.lifecycle !== "submitted" && attempt.lifecycle !== "graded") {
+    throw new AppError(409, "SUBMISSION_NOT_SUBMITTED", "Only a submitted attempt can be deleted. Refresh the results and try again.");
+  }
 
   const exceptions = await loadAssignmentExceptions([attempt.groupActivityId]);
   const effectiveItem = applyGradebookExceptions(attempt.gradebookItem, exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId));
@@ -1477,7 +1480,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         lateAttemptCount: currentModeAttempts.filter((attempt) => attempt.isLate).length,
         submittedAttemptCount: currentModeSubmittedAttempts.length,
         needsGradingCount: summativeAttempts.filter((attempt) => attempt.lifecycle === "submitted").length,
-        deletedSubmissions: deletedSubmissionAuditsForParticipant(item.events, participant.id),
+        deletedSubmissions: deletedSubmissionAuditsForParticipant(item.events, participant.id, true),
         attempts: activeAttempts.map((attempt) => ({
           id: attempt.id,
           attemptNumber: attempt.attemptNumber,
@@ -1819,7 +1822,7 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
         selectedAttemptNumber: effectiveGrade?.selectedAttempt?.attemptNumber ?? null,
         attemptCount: activeAttempts.length,
         submittedAttemptCount: submittedAttempts.length,
-        deletedSubmissions: deletedSubmissionAuditsForParticipant(item.events ?? [], participant.id),
+        deletedSubmissions: deletedSubmissionAuditsForParticipant(item.events ?? [], participant.id, false),
         availableFrom: item.groupActivity.availableFrom?.toISOString() ?? null,
         availableUntil: item.groupActivity.availableUntil?.toISOString() ?? null,
         gradedAt: effectiveGrade?.gradedAt.toISOString() ?? null
@@ -1919,7 +1922,7 @@ export async function getStudentActivitySubmissionAudit(user: CurrentUser, cours
 
   return {
     submittedAttemptCount: activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded").length,
-    deletedSubmissions: item ? deletedSubmissionAuditsForParticipant(item.events, participant.id) : []
+    deletedSubmissions: item ? deletedSubmissionAuditsForParticipant(item.events, participant.id, false) : []
   };
 }
 
@@ -2246,7 +2249,8 @@ function deletedSubmissionAuditsForParticipant(
     createdAt: Date;
     actor?: { id: string; name: string | null; email: string } | null;
   }> = [],
-  participantId: string
+  participantId: string,
+  includeGradeSnapshot = false
 ): DeletedSubmissionAudit[] {
   return events
     .filter((event) => event.participantId === participantId && (event.eventType === undefined || event.eventType === "submission_deleted"))
@@ -2272,7 +2276,9 @@ function deletedSubmissionAuditsForParticipant(
         pluginKey: typeof attempt.pluginKey === "string" ? attempt.pluginKey : null,
         pluginAttemptRef: typeof attempt.pluginAttemptRef === "string" ? attempt.pluginAttemptRef : null,
         metadata: asJsonObject(attempt.metadata) ?? {},
-        gradeSnapshot: grade
+        // Preserve the original grade in staff/audit records, never expose the
+        // raw snapshot through learner deletion history (even before release).
+        gradeSnapshot: includeGradeSnapshot ? grade : null
       };
     });
 }

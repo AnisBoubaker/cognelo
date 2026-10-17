@@ -2,6 +2,7 @@
 
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
+- Keep `submittedFiles` in the core submission snapshot. Deleted history renders these retained learner files as code, never by substituting the private reference bundle.
 - The [student solution contract](../../../docs/ACTIVITY_SOLUTIONS.md) is capability-driven and default-off. Core gates explicit reveals by current assignment access and the summative grade release; the plugin returns only displayable reference content, never grading internals.
 
 - Keep learner files through live prompt changes; private edits use plugin-owned revisions within the core audit transaction. Enforce release at submission/history APIs, including diagnostic and test-result fields. See [the reference](docs/REFERENCE.md#live-authoring-and-grade-visibility).

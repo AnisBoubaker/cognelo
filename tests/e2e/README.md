@@ -73,6 +73,10 @@ Outbox assertions require local access to the API’s storage. Use synthetic dom
 
 `monaco-workers.spec.ts` exercises the actual HTML/CSS formatting workers and JavaScript diagnostics, including teacher inspection of an expired Web Design assignment. It requires no grading runner; editor rendering by itself does not prove worker initialization succeeded.
 
+`submission-deletion.spec.ts` covers the shared teacher action for MCQ, coding, Web Design, and compound Tests, mandatory reasons/cancellation, preserved records and student history, older/formative submissions, and permission/state rejection. Its Web Design scenario requires the local runner to create a real submission.
+
+`submission-history-before-start.spec.ts` verifies Coding, MCQ, Parsons, and Test history before a new timed start, including no draft writes or attempt creation during inspection. Deletion regressions also verify retained coding source after reload and Web Design file display.
+
 ## Focused regression checks
 
 Run the independent authoring-recovery, bank-synchronization, course-loading, student-grouping, activity-exception, and live compound-Test scenarios with:

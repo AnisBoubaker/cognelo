@@ -171,6 +171,8 @@ export function ParsonsActivityView({
   const [attempt, setAttempt] = useState<ParsonsAttemptLike | null>(null);
   const [previousSubmissions, setPreviousSubmissions] = useState<ParsonsSubmissionReview[]>([]);
   const attemptRef = useRef<ParsonsAttemptLike | null>(null);
+  const studentViewModeRef = useRef(studentViewMode);
+  studentViewModeRef.current = studentViewMode;
   const blocksRef = useRef<ParsonsBlock[]>([]);
   const selectedBlockIdRef = useRef<string | null>(null);
 
@@ -247,6 +249,20 @@ export function ParsonsActivityView({
 
     let cancelled = false;
     setError("");
+
+    if (studentViewModeRef.current === "previous") {
+      // Inspecting history must not ensure/create an answering attempt.
+      void (attemptsClient.listSubmissions?.(activity.id, course.id) ?? Promise.resolve({ submissions: [] }))
+        .then((result) => {
+          if (cancelled) return;
+          setPreviousSubmissions(result.submissions);
+          onPreviousSubmissionsAvailabilityChange?.(result.submissions.length > 0);
+        })
+        .catch((err) => {
+          if (!cancelled) setError(err instanceof Error ? err.message : t("parsons.attemptLoadError"));
+        });
+      return () => { cancelled = true; };
+    }
 
     Promise.all([
       attemptsClient.ensureAttempt(activity.id, course.id),

@@ -1371,6 +1371,10 @@ export const activityRenderers = {
   "web-design-coding-exercise": WebDesignCodingExerciseActivityRenderer
 } as const;
 
+// These renderers implement a separate read-only `studentViewMode="previous"`.
+// Do not open an ordinary editor through the history tab for other activity types.
+export const studentSubmissionHistoryTypes: ReadonlySet<string> = new Set(["test", "coding-exercise", "mcq", "parsons-problem"]);
+
 /**
  * Explicit fail-closed registry for the Student view route. Never fall back to
  * activityRenderers here: every entry must deliberately adapt writes to the

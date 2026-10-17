@@ -81,6 +81,7 @@ const {
   getActivityAttemptAvailability,
   getCourseGradebook,
   getStudentReleasedGrades,
+  getStudentActivitySubmissionAudit,
   listCourseActivityInProgressAttempts,
   deleteActivitySubmission,
   overrideGradebookGrade,
@@ -1299,6 +1300,40 @@ describe("gradebook attempt services", () => {
         titleSnapshot: "Existing activity"
       }
     });
+  });
+
+  it("rejects deletion of an ongoing attempt without changing it", async () => {
+    mockPrisma.activityAttempt.findFirst.mockResolvedValueOnce({ id: "attempt-open", groupId: "group-1", lifecycle: "started" });
+    await expect(deleteActivitySubmission(teacherUser, "course-1", { attemptId: "attempt-open", reason: "Wrong file" }))
+      .rejects.toMatchObject({ code: "SUBMISSION_NOT_SUBMITTED" });
+    expect(tx.activityAttempt.update).not.toHaveBeenCalled();
+    expect(tx.gradeEvent.create).not.toHaveBeenCalled();
+  });
+
+  it("requires a nonblank deletion reason", async () => {
+    await expect(deleteActivitySubmission(teacherUser, "course-1", { attemptId: "attempt-1", reason: "   " }))
+      .rejects.toMatchObject({ code: "SUBMISSION_DELETE_REASON_REQUIRED" });
+    expect(mockPrisma.activityAttempt.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("keeps the student's deleted-submission history and reason without exposing the raw grade", async () => {
+    mockPrisma.courseGroup.findFirst.mockResolvedValueOnce({ id: "group-1", status: "published", availableFrom: null, availableUntil: null });
+    mockPrisma.courseGroupParticipant.findFirst.mockResolvedValueOnce({ id: "participant-1" }).mockResolvedValueOnce({ id: "participant-1" });
+    const submittedState = { blocks: [{ id: "line-1", displayText: "student answer", currentIndent: 0 }] };
+    mockPrisma.gradebookItem.findFirst.mockResolvedValueOnce({
+      attempts: [{ lifecycle: "deleted" }],
+      events: [{
+        id: "deletion-event", participantId: "participant-1", attemptId: "attempt-1", eventType: "submission_deleted",
+        reason: "Incorrect upload", createdAt: testNow, actor: { id: "teacher-1", name: "Teacher", email: "teacher@example.test" },
+        previousValue: { grade: { normalizedScore: 75, normalizedResult: { hiddenEvidence: true } } },
+        nextValue: { attempt: { attemptNumber: 1, lifecycle: "deleted", submittedAt: testNow.toISOString(), metadata: { submittedState } } }
+      }]
+    });
+    const audit = await getStudentActivitySubmissionAudit(studentUser, "course-1", "group-1", "activity-1");
+    expect(audit.submittedAttemptCount).toBe(0);
+    expect(audit.deletedSubmissions).toEqual([expect.objectContaining({
+      attemptId: "attempt-1", reason: "Incorrect upload", lifecycle: "deleted", gradeSnapshot: null, metadata: { submittedState }
+    })]);
   });
 
   it("soft-deletes a submission with an audit event and removes the selected grade", async () => {

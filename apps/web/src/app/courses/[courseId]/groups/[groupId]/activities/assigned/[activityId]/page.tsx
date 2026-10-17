@@ -1,5 +1,6 @@
 "use client";
 
+import { CodeRenderer } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useServerCountdown } from "@/lib/use-server-countdown";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -15,7 +16,8 @@ import { useAuth } from "@/components/auth-provider";
 import { api, ApiError, Activity, ActivityDefinition, Course, CourseGroup, DeletedSubmissionAudit, GradeChallenge, SafeExamBrowserAccess, SafeExamBrowserLaunch, StudentGradeFeedback, StudentReleasedGradeRow, TimedActivityRuntime } from "@/lib/api";
 import { getGradeChallengeReferences, type GradeChallengeReference } from "@/lib/grade-challenges";
 import { useI18n } from "@/lib/i18n";
-import { activityRenderers } from "@/lib/activity-renderers";
+import { activityRenderers, studentSubmissionHistoryTypes } from "@/lib/activity-renderers";
+import { deletedSubmissionCode, deletedSubmissionFiles } from "@/lib/deleted-submission-code";
 import { readSafeExamBrowserProof } from "@/lib/safe-exam-browser";
 import { formatRemainingTime, getTestCountdownTone } from "@/lib/test-countdown";
 
@@ -288,6 +290,10 @@ export default function GroupActivityPage() {
         setReleasedGrade(gradeRow);
         setSolutionAvailable(solutionStatus.available);
         setDeletedSubmissions(submissionsResult.audit.deletedSubmissions);
+        if (studentSubmissionHistoryTypes.has(activityResult.activity.activityType.key)) {
+          // History must be discoverable before the start gate mounts an editor.
+          setHasPreviousSubmissions(submissionsResult.audit.submittedAttemptCount > 0);
+        }
       }
     }
 
@@ -728,12 +734,19 @@ function DeletedSubmissionSolution({
   deletion: DeletedSubmissionAudit;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
-  const code = formatDeletedParsonsCode(deletion);
+  const code = deletedSubmissionCode(deletion.metadata);
+  const files = deletedSubmissionFiles(deletion.metadata);
+  if (code === null && !files.length && !["coding-exercises", "parsons", "web-design-coding-exercises"].includes(deletion.pluginKey ?? "")) return null;
 
   return (
     <div className="stack stack-tight">
       <strong>{t("courseDetail.deletedSubmissionSolution")}</strong>
-      {code ? <pre className="code-block">{code}</pre> : <p className="muted">{t("courseDetail.deletedSubmissionSolutionUnavailable")}</p>}
+      {files.length ? files.map((file, index) => <div className="stack stack-tight" key={`${file.path}-${index}`}>
+        <strong>{file.path}</strong>
+        <CodeRenderer code={file.code} language={file.language} />
+      </div>) : code === null ? <p className="muted">{t("courseDetail.deletedSubmissionSolutionUnavailable")}</p>
+        : code.length === 0 ? <p className="muted">{t("courseDetail.deletedSubmissionCodeEmpty")}</p>
+        : <CodeRenderer code={code} />}
     </div>
   );
 }
@@ -1024,41 +1037,4 @@ function formatDeletedSubmissionRecord(deletion: DeletedSubmissionAudit) {
     deletion.pluginAttemptRef ? `ref ${deletion.pluginAttemptRef}` : null
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : JSON.stringify(deletion.metadata);
-}
-
-type DeletedParsonsBlock = {
-  id: string;
-  displayText: string;
-  currentIndent: number;
-};
-
-function formatDeletedParsonsCode(deletion: DeletedSubmissionAudit) {
-  const blocks = getDeletedParsonsBlocks(deletion);
-  if (!blocks.length) {
-    return "";
-  }
-  return blocks.map((block) => `${"  ".repeat(Math.max(0, block.currentIndent))}${block.displayText}`).join("\n");
-}
-
-function getDeletedParsonsBlocks(deletion: DeletedSubmissionAudit): DeletedParsonsBlock[] {
-  const submittedState = asRecord(deletion.metadata.submittedState);
-  const blocks = Array.isArray(submittedState?.blocks) ? submittedState.blocks : [];
-  return blocks
-    .flatMap((block, index) => {
-      const record = asRecord(block);
-      if (!record || typeof record.displayText !== "string") {
-        return [];
-      }
-      return [
-        {
-          id: typeof record.id === "string" ? record.id : `block-${index}`,
-          displayText: record.displayText,
-          currentIndent: typeof record.currentIndent === "number" ? record.currentIndent : 0
-        }
-      ];
-    });
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }

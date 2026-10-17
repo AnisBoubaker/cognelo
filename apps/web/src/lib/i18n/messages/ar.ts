@@ -847,6 +847,16 @@ export const arMessages = {
       pluginsAdminOnly: "إعدادات الإضافات متاحة للمديرين."
     },
     courseDetail: {
+      deleteSubmission: "حذف التسليم",
+      deleteSubmissionPrompt: "أدخل سبب حذف هذا التسليم. سيظهر السبب للطالب.",
+      deleteSubmissionConfirm: "هل تريد حذف التسليم رقم {number} للطالب {name}؟",
+      deleteSubmissionUnavailable: "لا توجد محاولة مسلّمة يمكن حذفها.",
+      deleteSubmissionError: "تعذّر حذف هذا التسليم.",
+      deleteSubmissionSelect: "التسليم",
+      deleteSubmissionOption: "التسليم رقم {number} · {date}",
+      deleteSubmissionHistoryNotice: "يُحتفظ بالتسليم وسبب الحذف في سجل التسليمات المحذوفة لدى الطالب.",
+      submissionDeleted: "تم حذف التسليم.",
+
       reopenSubmission: "إعادة فتح آخر تسليم",
       reopenSubmissionConfirm: "إعادة فتح المحاولة {number} للطالب {name}؟ ستصبح الإجابات المحفوظة قابلة للتعديل وستُسحب درجة هذا التسليم. يُحفظ وقت البدء الأصلي وتُطبَّق الإعدادات والاستثناءات الحالية، بما فيها أي تمديد مُنح منذ التسليم. إعادة الفتح لا تضيف وقتاً أو محاولة أخرى. تظل المواعيد المنتهية سارية.",
       submissionReopened: "أُعيد فتح آخر تسليم.",
@@ -1163,8 +1173,9 @@ export const arMessages = {
       deletedSubmissionActor: "حذفه {name}",
       deletedSubmissionReason: "السبب: {reason}",
       deletedSubmissionWhat: "سجل التسليم",
-      deletedSubmissionSolution: "الحل المحذوف",
-      deletedSubmissionSolutionUnavailable: "لقطة الكود المسلمة غير متاحة لهذا الحذف القديم.",
+      deletedSubmissionSolution: "الكود المُسلَّم",
+      deletedSubmissionSolutionUnavailable: "الكود المُسلَّم غير متاح لهذا السجل.",
+      deletedSubmissionCodeEmpty: "كان الكود المُسلَّم فارغًا.",
       groupTitle: "عنوان المجموعة",
       groupTitlePlaceholder: "الشعبة أ",
       createGroup: "إنشاء مجموعة",

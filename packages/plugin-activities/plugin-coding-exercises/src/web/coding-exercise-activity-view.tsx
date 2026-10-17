@@ -322,6 +322,8 @@ export function CodingExerciseActivityView({
     language: string;
   } | null>(null);
   const previousActivityIdRef = useRef(activity.id);
+  const studentViewModeRef = useRef(studentViewMode);
+  studentViewModeRef.current = studentViewMode;
   const lastTimedAutoSubmitRequestRef = useRef(0);
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);
@@ -510,7 +512,7 @@ export function CodingExerciseActivityView({
         const sourceCode = typeof saved?.sourceCode === "string" ? saved.sourceCode : initialSourceCode;
         if (cancelled) return;
         setEditorCode(sourceCode);
-        if (typeof saved?.sourceCode !== "string" && !readOnly) {
+        if (typeof saved?.sourceCode !== "string" && !readOnly && studentViewModeRef.current !== "previous") {
           await executionStateHost.save({ sourceCode });
         }
       })

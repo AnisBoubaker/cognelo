@@ -373,10 +373,12 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
     const reason = await dialogs.prompt({
       title: t("courseDetail.deleteSubmission"),
       inputLabel: t("courseDetail.deleteSubmissionPrompt"),
+      required: true,
       maxLength: 1000
     });
     if (reason === null) return;
-    const normalizedReason = reason.trim() || t("courseDetail.deleteSubmissionReasonFallback");
+    const normalizedReason = reason.trim();
+    if (!normalizedReason) return;
     if (!await dialogs.confirm({
       title: t("courseDetail.deleteSubmission"),
       message: t("courseDetail.deleteSubmissionConfirm", { name: row.participantName, number: coreAttempt.attemptNumber }),
