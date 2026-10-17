@@ -17,12 +17,13 @@ test.describe("student submission and teacher grading", () => {
     if (!data) throw new Error("Learning-flow data was not provisioned.");
 
     await teacherPage.goto(`/courses/${data.courseId}?tab=participants`);
-    await expect(teacherPage.getByRole("heading", { name: data.courseTitle })).toBeVisible();
+    await expect(teacherPage.locator(".course-workspace-header h1")).toContainText(data.courseTitle);
+    await expect(teacherPage.getByRole("heading", { name: "Course staff", level: 2, exact: true })).toBeVisible();
     await expect(teacherPage.getByRole("heading", { name: data.groupTitle })).toBeVisible();
 
     await studentPage.goto("/courses");
     await studentPage.getByRole("link", { name: new RegExp(data.courseTitle) }).click();
-    await expect(studentPage.getByRole("heading", { name: `${data.courseTitle}: ${data.groupTitle}` })).toBeVisible();
+    await expect(studentPage.getByText(`${data.courseTitle}: ${data.groupTitle}`, { exact: true })).toBeVisible();
     await studentPage.getByRole("link", { name: data.activityTitle, exact: true }).click();
     await expect(studentPage).toHaveURL(new RegExp(
       `/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${data.activityId}$`

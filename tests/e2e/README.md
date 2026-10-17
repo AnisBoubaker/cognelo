@@ -69,7 +69,7 @@ Outbox assertions require local access to the API’s storage. Use synthetic dom
 
 `activity-solutions.spec.ts` covers default-off solution settings, explicit learner reveal, live revocation, summative release/re-hide, compound Test solution providers, and repeatable-grade privacy.
 
-`workspace-layout.spec.ts` checks desktop/mobile page identity, navigation and action retention, and horizontal containment across list/detail pages, course and bank authoring, learner/preview workspaces, results/manual grading, and all account-setting sections after hero removal.
+`workspace-layout.spec.ts` checks desktop/mobile page identity, navigation and action retention, and horizontal containment across list/detail pages, course and bank authoring, learner/preview workspaces, results/manual grading, and all account-setting sections after hero removal. Teacher course workspaces show one thin “Subject title - Course title” header above all tabs, with no repeated course identity in the content panels or tab toolbar. The Course/Group perspective controls appear only on Content, including after switching away from a selected group perspective and returning. Learner section headings and Student view previews show the subject title followed by the course/section titles, without section availability dates, including across the learner workspace tabs.
 
 `monaco-workers.spec.ts` exercises the actual HTML/CSS formatting workers and JavaScript diagnostics, including teacher inspection of an expired Web Design assignment. It requires no grading runner; editor rendering by itself does not prove worker initialization succeeded.
 
@@ -102,6 +102,8 @@ Only deliberate save/session failures and content/gradebook latency are intercep
 The broader suite still runs only the configured Chromium project. Useful next additions include the remaining synchronization branches (restore-original and both-copies-changed), compound-Test resume/navigation boundaries, and Firefox/WebKit coverage if those browsers become supported test targets.
 
 Playwright transpiles the specs without type-checking them, and the root `npm run typecheck` currently omits `tests/e2e`. A dedicated E2E TypeScript gate is another useful follow-up; existing specs need type corrections before that gate can pass across the entire suite.
+
+`participant-lifecycle.spec.ts` also covers initially collapsed group folders, exclusive expansion, keyboard toggling, reload reset, desktop/mobile layout, and participant add/remove/CSV/transfer workflows within the expanded roster and shared group actions menu. `teacher-authoring.spec.ts` verifies that a newly created group opens for setup.
 
 ## Handling product failures
 

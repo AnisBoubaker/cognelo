@@ -75,8 +75,8 @@ export default function StudentViewPage() {
             ) : (
               <section className="section stack">
                 <div>
-                  <h1 className="content-title">{workspace.course.title}: {workspace.group.title}</h1>
-                  {workspace.group.availableFrom || workspace.group.availableUntil ? <p className="muted">{formatAvailabilityWindow(workspace.group.availableFrom, workspace.group.availableUntil, t)}</p> : null}
+                  <h1 className="content-title">{workspace.course.subject?.title ?? `${workspace.course.title}: ${workspace.group.title}`}</h1>
+                  {workspace.course.subject ? <p className="muted">{workspace.course.title}: {workspace.group.title}</p> : null}
                 </div>
                 <StudentCourseContent
                   activityDefinitions={activityDefinitions}
@@ -108,26 +108,4 @@ export default function StudentViewPage() {
 
 function studentViewUrl(courseId: string, groupId: string, sessionId: string) {
   return `/courses/${courseId}/groups/${groupId}/student-view?previewSession=${encodeURIComponent(sessionId)}`;
-}
-
-function formatAvailabilityWindow(
-  availableFrom: string | null | undefined,
-  availableUntil: string | null | undefined,
-  t: (key: string, vars?: Record<string, string | number>) => string
-) {
-  const format = (value: string) => {
-    const date = new Date(value);
-    const isMidnight = date.getHours() === 0
-      && date.getMinutes() === 0
-      && date.getSeconds() === 0
-      && date.getMilliseconds() === 0;
-    return new Intl.DateTimeFormat(undefined, isMidnight
-      ? { year: "numeric", month: "short", day: "numeric" }
-      : { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: false, hourCycle: "h23" }
-    ).format(date);
-  };
-  if (availableFrom && availableUntil) return t("groupPage.availableWindow", { from: format(availableFrom), until: format(availableUntil) });
-  if (availableFrom) return t("groupPage.availableAfter", { from: format(availableFrom) });
-  if (availableUntil) return t("groupPage.availableBefore", { until: format(availableUntil) });
-  return t("groupPage.availableAlways");
 }

@@ -255,7 +255,7 @@ test.describe("section groupings and teams", { tag: "@regression" }, () => {
         expect((await restricted.patch(`${path}/${grouping.id}`, { data: { ...grouping, title: "Denied" } })).status()).toBe(403);
         expect((await restricted.delete(`${path}/${grouping.id}`, { data: { revision: 1 } })).status()).toBe(403);
         await page.goto(`/courses/${data.courseId}/groups/${data.groupId}`);
-        await expect(page.getByRole("heading", { level: 1 })).toContainText(data.courseTitle);
+        await expect(page.getByText(`${data.courseTitle}: ${data.groupTitle}`, { exact: true })).toBeVisible();
         await expect(page.getByRole("tab", { name: "Groupings", exact: true })).toBeHidden();
       }
       await setSeedStudentParticipantRole(data, "teacher");

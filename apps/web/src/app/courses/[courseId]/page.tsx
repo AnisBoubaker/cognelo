@@ -1,6 +1,6 @@
 "use client";
 
-import { ContextMenu, MarkdownRenderer, ProgressDialog, useBodyScrollLock, useDialogs } from "@cognelo/activity-ui";
+import { ContextMenu, ProgressDialog, useBodyScrollLock, useDialogs } from "@cognelo/activity-ui";
 import { resolveLocalizedText, type ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -19,7 +19,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
 import { ActivitySettingsDialog } from "@/components/activity-settings-dialog";
-import { ActivityTypeIcon, AppIcon, FolderContentIcon as SharedFolderContentIcon } from "@/components/app-icon";
+import { ActivityTypeIcon, AppIcon, DisclosureIndicator, FolderContentIcon as SharedFolderContentIcon } from "@/components/app-icon";
 import { useAuth } from "@/components/auth-provider";
 import { CourseSettingsPanel, type CourseSettingsSection } from "@/components/course-settings-panel";
 import { CourseParticipantsPanel } from "@/components/course-participants-panel";
@@ -1357,12 +1357,17 @@ export default function CourseDetailPage() {
         {course ? (
           <>
             {error ? <p className="error">{error}</p> : null}
+            <header className="course-workspace-header">
+              <h1>
+                {course.subject ? <><span className="course-workspace-subject">{course.subject.title}</span>{" - "}</> : null}
+                <span>{course.title}</span>
+              </h1>
+              <span className="metadata-badge">{t(`status.${course.status}`)}</span>
+            </header>
             <WorkspaceTabs
               ariaLabel={t("courseDetail.workspaceTabs")}
               initialTab={activeCourseTab}
-              toolbar={<>
-                {activeCourseTab !== "content" ? <h1 className="workspace-context">{course.title}</h1> : null}
-                {activeCourseTab !== "groupings" ? (
+              toolbar={activeCourseTab === "content" ? (
                 <div className="course-view-selector" role="group" aria-label={t("courseDetail.contentViewSelectorLabel")}>
                   <Link
                     aria-current={contentViewSelectorMode === "course" ? "page" : undefined}
@@ -1415,7 +1420,6 @@ export default function CourseDetailPage() {
                   ) : null}
                 </div>
               ) : null}
-              </>}
               tabs={[
                 {
                   href: `/courses/${courseId}?tab=content`,
@@ -1424,14 +1428,7 @@ export default function CourseDetailPage() {
                   render: () => (
                     <section className="section stack">
                       <div className="section-heading">
-                        <div>
-                          <div className="row">
-                            <h1 className="content-title">{course.title}</h1>
-                            <span className="metadata-badge">{t(`status.${course.status}`)}</span>
-                          </div>
-                          {contentGroup ? <p className="muted">{contentGroup.title}</p> : null}
-                          {course.description ? <MarkdownRenderer markdown={course.description} className="muted" compact /> : null}
-                        </div>
+                        <h2>{t("courseDetail.contentTab")}{contentGroup ? `: ${contentGroup.title}` : ""}</h2>
                         <div className="section-actions content-header-actions">
                           <button
                             aria-expanded={contentHeaderMenuOpen}
@@ -1980,7 +1977,7 @@ export default function CourseDetailPage() {
                                     type="button"
                                     onClick={() => toggleGradebookActivity(activity.activityId)}
                                   >
-                                    {expandedGradebookActivityIds.has(activity.activityId) ? "▾" : "▸"}
+                                    <DisclosureIndicator expanded={expandedGradebookActivityIds.has(activity.activityId)} />
                                   </button>
                                   <div className="table-main table-main-stack">
                                     <strong>{activity.activityTitle}</strong>

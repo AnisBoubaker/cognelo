@@ -36,7 +36,7 @@ test.describe("teacher authoring and course setup", () => {
     await page.getByLabel("Description").fill("Disposable E2E course.");
     await page.getByLabel("Status").selectOption("published");
     await page.getByRole("button", { name: "Create course" }).click();
-    await expect(page.getByRole("heading", { name: courseTitle })).toBeVisible();
+    await expect(page.getByRole("heading", { name: `${subjectTitle} - ${courseTitle}`, level: 1, exact: true })).toBeVisible();
 
     await page.getByRole("tab", { name: "Participants" }).click();
     await page.getByRole("button", { name: "Create group" }).click();
@@ -44,6 +44,7 @@ test.describe("teacher authoring and course setup", () => {
     await groupDialog.getByLabel("Group title").fill(groupTitle);
     await groupDialog.getByRole("button", { name: "Save" }).click();
     await expect(page.getByRole("heading", { name: groupTitle })).toBeVisible();
+    await expect(page.getByRole("button", { name: groupTitle, exact: true })).toHaveAttribute("aria-expanded", "true");
 
     await page.getByRole("button", { name: "Add participant" }).click();
     const participantDialog = page.getByRole("dialog", { name: "Add a participant" });

@@ -1,8 +1,8 @@
 "use client";
 
-import { ConfirmationDialog, ProgressDialog, useDialogs } from "@cognelo/activity-ui";
+import { ConfirmationDialog, ContextMenu, ProgressDialog, useDialogs } from "@cognelo/activity-ui";
 import { ChangeEvent, FocusEvent, FormEvent, useEffect, useState } from "react";
-import { AppIcon } from "@/components/app-icon";
+import { AppIcon, DisclosureIndicator } from "@/components/app-icon";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import {
   api,
@@ -70,6 +70,8 @@ export function CourseParticipantsPanel({
   const { t } = useI18n();
   const dialogs = useDialogs();
   const [groupDetails, setGroupDetails] = useState<Record<string, CourseGroup>>({});
+  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
+  const [groupMenu, setGroupMenu] = useState<{ groupId: string; anchor: HTMLButtonElement } | null>(null);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [editor, setEditor] = useState<GroupEditor | null>(null);
   const [participantEditor, setParticipantEditor] = useState<ParticipantEditor | null>(null);
@@ -131,7 +133,8 @@ export function CourseParticipantsPanel({
           availableUntil: toIsoOrNull(editor.availableUntil)
         });
       } else {
-        await api.createGroup(courseId, { title: editor.title });
+        const { group } = await api.createGroup(courseId, { title: editor.title });
+        setExpandedGroupId(group.id);
       }
       setEditor(null);
       await onChanged();
@@ -352,66 +355,108 @@ export function CourseParticipantsPanel({
           {groups.map((group) => {
             const detail = groupDetails[group.id] ?? group;
             const participants = detail.participants ?? [];
+            const isExpanded = expandedGroupId === group.id;
+            const toggleId = `participant-group-toggle-${group.id}`;
+            const panelId = `participant-group-panel-${group.id}`;
             return (
-              <section className="participant-group-card stack" key={group.id}>
+              <section className={`participant-group-card${isExpanded ? " is-open" : ""}`} key={group.id}>
                 <div className="participant-group-heading">
-                  <div>
-                    <div className="participant-group-title-row">
-                      <h3>{detail.title}</h3>
-                      <span className={`participant-status ${detail.status === "published" ? "is-linked" : "is-pending"}`}>
-                        {detail.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}
+                  <h3 className="participant-group-summary" aria-label={detail.title}>
+                    <button
+                      aria-controls={panelId}
+                      aria-describedby={`${toggleId}-status ${toggleId}-meta`}
+                      aria-expanded={isExpanded}
+                      aria-label={detail.title}
+                      className="participant-group-toggle"
+                      id={toggleId}
+                      onClick={() => setExpandedGroupId((current) => current === group.id ? null : group.id)}
+                      type="button"
+                    >
+                      <DisclosureIndicator expanded={isExpanded} />
+                      <span className="participant-group-icon"><AppIcon name={isExpanded ? "folderOpen" : "folder"} size={22} stroke={1.8} /></span>
+                      <span className="participant-group-labels">
+                        <span className="participant-group-title-row">
+                          <span className="participant-group-name">{detail.title}</span>
+                          <span id={`${toggleId}-status`} className={`participant-group-status ${detail.status === "published" ? "is-published" : "is-draft"}`}>
+                            {detail.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}
+                          </span>
+                        </span>
+                        <span className="participant-group-meta" id={`${toggleId}-meta`}>
+                          <span className="participant-group-count"><AppIcon name="participants" size={14} />{t("courseDetail.participantCount", { count: participants.length })}</span>
+                          <span>{formatAvailabilityWindow(detail.availableFrom, detail.availableUntil, t)}</span>
+                        </span>
                       </span>
-                    </div>
-                    <p className="muted">
-                      {t("courseDetail.participantCount", { count: participants.length })} · {formatAvailabilityWindow(detail.availableFrom, detail.availableUntil, t)}
-                    </p>
-                  </div>
-                  <div className="row participant-group-actions">
-                    <button className="secondary" type="button" onClick={() => openParticipantEditor(detail)}>
-                      <AppIcon name="add" />
-                      <span>{t("groupPage.addParticipant")}</span>
                     </button>
-                    <button className="secondary" type="button" onClick={() => openParticipantImport(detail)}>
-                      <AppIcon name="upload" />
-                      <span>{t("groupPage.importParticipants")}</span>
-                    </button>
-                    <button className="secondary icon-button" type="button" title={t("courseDetail.editGroup")} onClick={() => openEditGroup(detail)}>
+                  </h3>
+                  <button
+                    aria-expanded={groupMenu?.groupId === group.id}
+                    aria-haspopup="menu"
+                    aria-label={`${detail.title}: ${t("courseDetail.actionsHeader")}`}
+                    className="participant-group-menu-button"
+                    onClick={(event) => setGroupMenu(groupMenu?.groupId === group.id ? null : { groupId: group.id, anchor: event.currentTarget })}
+                    type="button"
+                  >
+                    <AppIcon name="more" />
+                  </button>
+                  <ContextMenu
+                    anchor={groupMenu?.groupId === group.id ? groupMenu.anchor : null}
+                    className="content-context-menu"
+                    onClose={() => setGroupMenu(null)}
+                    open={groupMenu?.groupId === group.id}
+                  >
+                    <button className="content-context-menu-item" role="menuitem" type="button" onClick={() => { setGroupMenu(null); openEditGroup(detail); }}>
                       <AppIcon name="edit" />
+                      <span>{t("courseDetail.editGroup")}</span>
                     </button>
-                    <button className="danger icon-button" disabled={groups.length <= 1} type="button" title={groups.length <= 1 ? t("courseDetail.deleteLastGroupHelp") : t("courseDetail.deleteGroupAction")} onClick={() => void openGroupDelete(detail)}>
+                    <button className="content-context-menu-item is-danger" disabled={groups.length <= 1} role="menuitem" type="button" title={groups.length <= 1 ? t("courseDetail.deleteLastGroupHelp") : undefined} onClick={() => { setGroupMenu(null); void openGroupDelete(detail); }}>
                       <AppIcon name="remove" />
+                      <span>{t("courseDetail.deleteGroupAction")}</span>
                     </button>
-                  </div>
+                  </ContextMenu>
                 </div>
 
-                {participants.length ? (
-                  <div className="table-list">
-                    <div className="table-row table-row-participants table-head" aria-hidden="true">
-                      <span>{t("groupPage.participantNameHeader")}</span>
-                      <span>{t("groupPage.participantRoleHeader")}</span>
-                      <span>{t("groupPage.participantEmailHeader")}</span>
-                      <span>{t("groupPage.participantExternalIdHeader")}</span>
-                      <span>{t("groupPage.participantStatusHeader")}</span>
-                      <span>{t("courseDetail.actionsHeader")}</span>
+                <div aria-labelledby={toggleId} className="participant-group-panel" hidden={!isExpanded} id={panelId} role="region">
+                  {isExpanded ? <div className="stack">
+                    <div className="row">
+                      <button className="secondary" type="button" onClick={() => openParticipantEditor(detail)}>
+                        <AppIcon name="add" />
+                        <span>{t("groupPage.addParticipant")}</span>
+                      </button>
+                      <button className="secondary" type="button" onClick={() => openParticipantImport(detail)}>
+                        <AppIcon name="upload" />
+                        <span>{t("groupPage.importParticipants")}</span>
+                      </button>
                     </div>
-                    {participants.map((participant) => (
-                      <div className="table-row table-row-participants" key={participant.id}>
-                        <strong>{participant.firstName} {participant.lastName}</strong>
-                        <span className={`participant-role participant-role-${participant.role}`}>{t(`groupPage.participantRole${capitalize(participant.role)}`)}</span>
-                        <span className="table-meta">{participant.email}</span>
-                        <span className="table-meta">{participant.externalId || t("groupPage.noExternalId")}</span>
-                        <span className={`participant-status ${participant.userId ? "is-linked" : "is-pending"}`}>
-                          {participant.userId ? t("groupPage.participantStatusLinked") : t("groupPage.participantStatusPending")}
-                        </span>
-                        <div className="table-actions">
-                          <button aria-label={t("groupPage.removeParticipant")} className="danger icon-button" disabled={removingParticipantId === participant.id || participant.userId === currentUserId} title={participant.userId === currentUserId ? t("groupPage.removeSelfBlocked") : t("groupPage.removeParticipant")} type="button" onClick={() => void removeParticipant(detail, participant)}>
-                            <AppIcon name="remove" />
-                          </button>
+                    {participants.length ? (
+                      <div className="table-list">
+                        <div className="table-row table-row-participants table-head" aria-hidden="true">
+                          <span>{t("groupPage.participantNameHeader")}</span>
+                          <span>{t("groupPage.participantRoleHeader")}</span>
+                          <span>{t("groupPage.participantEmailHeader")}</span>
+                          <span>{t("groupPage.participantExternalIdHeader")}</span>
+                          <span>{t("groupPage.participantStatusHeader")}</span>
+                          <span>{t("courseDetail.actionsHeader")}</span>
                         </div>
+                        {participants.map((participant) => (
+                          <div className="table-row table-row-participants" key={participant.id}>
+                            <strong>{participant.firstName} {participant.lastName}</strong>
+                            <span className={`participant-role participant-role-${participant.role}`}>{t(`groupPage.participantRole${capitalize(participant.role)}`)}</span>
+                            <span className="table-meta">{participant.email}</span>
+                            <span className="table-meta">{participant.externalId || t("groupPage.noExternalId")}</span>
+                            <span className={`participant-status ${participant.userId ? "is-linked" : "is-pending"}`}>
+                              {participant.userId ? t("groupPage.participantStatusLinked") : t("groupPage.participantStatusPending")}
+                            </span>
+                            <div className="table-actions">
+                              <button aria-label={t("groupPage.removeParticipant")} className="danger icon-button" disabled={removingParticipantId === participant.id || participant.userId === currentUserId} title={participant.userId === currentUserId ? t("groupPage.removeSelfBlocked") : t("groupPage.removeParticipant")} type="button" onClick={() => void removeParticipant(detail, participant)}>
+                                <AppIcon name="remove" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                ) : loadingGroups ? <p className="muted">{t("common.loading")}</p> : <p className="muted">{t("groupPage.noParticipants")}</p>}
+                    ) : loadingGroups ? <p className="muted">{t("common.loading")}</p> : <p className="muted">{t("groupPage.noParticipants")}</p>}
+                  </div> : null}
+                </div>
               </section>
             );
           })}

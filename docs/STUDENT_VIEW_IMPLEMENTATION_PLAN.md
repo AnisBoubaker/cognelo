@@ -7,7 +7,7 @@ Implemented for course/group content and the learner renderers used by MCQ, Pars
 ## Product behavior
 
 - In a course's group content perspective, **Student view** opens a separate browser window. Section teachers receive the same action for their assigned group.
-- The preview contains the student-visible content projection for that group and never includes the Grades tab.
+- The preview contains the student-visible content projection for that group and never includes the Grades tab. Its heading matches the learner workspace: the subject title followed by “Course title: Section name”, without publication status or section availability dates. The workspace API includes only the subject title for this context.
 - The preview and the real learner course page use the same `StudentCourseContent` component for folder tabs/accordions, activity badges, availability locks, icons, and material links. Preview-specific code supplies only alternate activity URLs and omits learner-specific grades/submission badges.
 - Group publication and availability, content visibility (including hidden ancestors and group overrides), and activity availability are enforced as learner rules even though the authenticated actor remains a teacher.
 - A persistent banner identifies the selected group and states that work is not saved. **Reset preview** clears the browser session state. Safe Exam Browser requirements are explained but do not block preview because no academic record can be created.

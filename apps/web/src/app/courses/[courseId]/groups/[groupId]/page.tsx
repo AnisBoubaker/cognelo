@@ -273,8 +273,8 @@ export default function CourseGroupPage() {
           <WorkspaceTabs
             toolbar={
               <div className="workspace-context">
-                <h1>{course.title}: {group.title}</h1>
-                {group.availableFrom || group.availableUntil ? <p className="muted">{formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</p> : null}
+                <h1>{course.subject?.title ?? `${course.title}: ${group.title}`}</h1>
+                {course.subject ? <p className="muted">{course.title}: {group.title}</p> : null}
               </div>
             }
             ariaLabel={t("groupPage.workspaceTabs")}

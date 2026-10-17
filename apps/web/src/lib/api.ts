@@ -824,7 +824,9 @@ export type CourseTestRuntime = {
 };
 
 export type StudentPreviewWorkspace = {
-  course: Pick<Course, "id" | "title" | "description" | "status" | "metadata" | "materials">;
+  course: Pick<Course, "id" | "title" | "description" | "status" | "metadata" | "materials"> & {
+    subject: Pick<Subject, "title"> | null;
+  };
   group: Pick<CourseGroup, "id" | "title" | "status" | "availableFrom" | "availableUntil" | "materials" | "activities">;
   contentItems: CourseContentItem[];
   isAvailable: boolean;

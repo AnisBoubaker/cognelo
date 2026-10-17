@@ -11,7 +11,10 @@ export async function getStudentPreviewWorkspace(user: CurrentUser, courseId: st
   const [course, group] = await Promise.all([
     prisma.course.findUnique({
       where: { id: courseId },
-      select: { id: true, title: true, description: true, status: true, metadata: true, materials: true }
+      select: {
+        id: true, title: true, description: true, status: true, metadata: true, materials: true,
+        subject: { select: { title: true } }
+      }
     }),
     prisma.courseGroup.findFirst({
       where: { id: groupId, courseId },

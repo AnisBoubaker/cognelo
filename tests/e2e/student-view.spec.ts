@@ -205,7 +205,7 @@ test.describe.serial("teacher Student view", () => {
       teacherPage.waitForEvent("popup"),
       teacherPage.getByRole("link", { name: "Student view", exact: true }).click()
     ]);
-    await expect(preview.getByRole("heading", { name: `${data.courseTitle}: ${data.groupTitle}`, exact: true })).toBeVisible();
+    await expect(preview.getByText(`${data.courseTitle}: ${data.groupTitle}`, { exact: true })).toBeVisible();
     const downloadPromise = preview.waitForEvent("download");
     await preview.getByRole("link", { name: fileTitle, exact: true }).click();
     const download = await downloadPromise;

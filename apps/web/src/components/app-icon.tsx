@@ -98,6 +98,10 @@ export function AppIcon({ name, size = 18, stroke = 2 }: { name: AppIconName; si
   return <Icon aria-hidden="true" size={size} stroke={stroke} />;
 }
 
+export function DisclosureIndicator({ expanded }: { expanded: boolean }) {
+  return <span className="disclosure-indicator" aria-hidden="true">{expanded ? "▾" : "▸"}</span>;
+}
+
 const activityIcons = {
   "browser-code": IconBrowser,
   checklist: IconChecklist,

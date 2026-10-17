@@ -52,7 +52,7 @@ test.describe.serial("global and course role boundaries", () => {
   test("students see learner course and settings surfaces without authoring actions", async ({ studentPage: page }) => {
     if (!data) throw new Error("The activity suite was not provisioned.");
     await page.goto(`/courses/${data.courseId}/groups/${data.groupId}`);
-    await expect(page.getByRole("heading", { name: `${data.courseTitle}: ${data.groupTitle}` })).toBeVisible();
+    await expect(page.getByText(`${data.courseTitle}: ${data.groupTitle}`, { exact: true })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Content" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Grades" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Activities" })).toHaveCount(0);

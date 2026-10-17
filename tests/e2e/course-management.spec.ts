@@ -404,6 +404,7 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     if (!data) throw new Error("The activity suite was not provisioned.");
     const email = `e2e-pending-ta-${data.token}@example.invalid`;
     await page.goto(`/courses/${data.courseId}?tab=participants`);
+    await page.getByRole("button", { name: data.groupTitle, exact: true }).click();
     await page.getByRole("button", { name: "Add participant" }).click();
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Email").blur();
@@ -430,7 +431,8 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     if (!data) throw new Error("The activity suite was not provisioned.");
     const temporaryTitle = `${data.groupTitle} updated`;
     await page.goto(`/courses/${data.courseId}?tab=participants`);
-    await page.getByTitle("Edit group").click();
+    await page.getByRole("button", { name: `${data.groupTitle}: Actions`, exact: true }).click();
+    await page.getByRole("menuitem", { name: "Edit group", exact: true }).click();
     let editor = page.getByRole("dialog", { name: "Edit group" });
     await editor.getByLabel("Group title").fill(temporaryTitle);
     await editor.getByLabel("Status").selectOption("draft");
@@ -440,7 +442,8 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     await expect(editor).toBeHidden();
     await expect(page.getByRole("heading", { name: temporaryTitle })).toBeVisible();
 
-    await page.getByTitle("Edit group").click();
+    await page.getByRole("button", { name: `${temporaryTitle}: Actions`, exact: true }).click();
+    await page.getByRole("menuitem", { name: "Edit group", exact: true }).click();
     editor = page.getByRole("dialog", { name: "Edit group" });
     await editor.getByLabel("Group title").fill(data.groupTitle);
     await editor.getByLabel("Status").selectOption("published");

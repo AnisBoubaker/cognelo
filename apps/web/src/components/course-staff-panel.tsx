@@ -76,7 +76,6 @@ export function CourseStaffPanel({
     <section className="section stack">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">{t("courseDetail.courseStaffEyebrow")}</p>
           <h2>{t("courseDetail.courseStaffTitle")}</h2>
           <p className="muted">{t("courseDetail.courseStaffText")}</p>
         </div>

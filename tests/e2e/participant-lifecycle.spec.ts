@@ -34,11 +34,56 @@ test.describe.serial("participant import and group lifecycle", () => {
     await removeActivitySuite(data);
   });
 
+  for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "mobile", width: 390, height: 844 }]) {
+    test(`opens only one participant group folder at a time on ${viewport.name}`, async ({ teacherPage: page }, testInfo) => {
+      if (!data) throw new Error("The participant lifecycle suite was not provisioned.");
+      await page.setViewportSize(viewport);
+      await page.goto(`/courses/${data.courseId}?tab=participants`);
+      const original = groupCard(page, data.groupTitle);
+      const destination = groupCard(page, destinationGroupTitle);
+      const originalToggle = original.getByRole("button", { name: data.groupTitle, exact: true });
+      const destinationToggle = destination.getByRole("button", { name: destinationGroupTitle, exact: true });
+      await expect(originalToggle).toHaveAttribute("aria-expanded", "false");
+      await expect(destinationToggle).toHaveAttribute("aria-expanded", "false");
+      await expect(page.getByRole("button", { name: "Add participant", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Import CSV", exact: true })).toHaveCount(0);
+      await expect(page.locator(".table-row-participants")).toHaveCount(0);
+
+      await originalToggle.click();
+      await expect(originalToggle).toHaveAttribute("aria-expanded", "true");
+      await expect(original.getByText(credentialsFor("student").email, { exact: true })).toBeVisible();
+      await expect(original.getByRole("button", { name: "Add participant", exact: true })).toBeVisible();
+      await expect(original.getByRole("button", { name: "Import CSV", exact: true })).toBeVisible();
+      await expect(page.locator(".participant-group-panel:visible")).toHaveCount(1);
+
+      await destinationToggle.focus();
+      await page.keyboard.press("Enter");
+      await expect(originalToggle).toHaveAttribute("aria-expanded", "false");
+      await expect(destinationToggle).toHaveAttribute("aria-expanded", "true");
+      await expect(original.locator(".participant-group-panel")).toBeHidden();
+      await expect(destination.getByRole("button", { name: "Add participant", exact: true })).toBeVisible();
+      await expect(page.locator(".participant-group-panel:visible")).toHaveCount(1);
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+      await destination.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: testInfo.outputPath("participant-folders.png") });
+
+      await destinationToggle.focus();
+      await page.keyboard.press("Space");
+      await expect(destinationToggle).toHaveAttribute("aria-expanded", "false");
+      await expect(page.locator(".participant-group-panel:visible")).toHaveCount(0);
+      await originalToggle.click();
+      await page.reload();
+      await expect(originalToggle).toHaveAttribute("aria-expanded", "false");
+      await expect(destinationToggle).toHaveAttribute("aria-expanded", "false");
+    });
+  }
+
   test("matches an existing account instead of asking for duplicate identity data", async ({ teacherPage: page }) => {
     test.setTimeout(120_000);
     if (!data) throw new Error("The participant lifecycle suite was not provisioned.");
     await page.goto(`/courses/${data.courseId}?tab=participants`);
     const group = groupCard(page, destinationGroupTitle);
+    await group.getByRole("button", { name: destinationGroupTitle, exact: true }).click();
     await group.getByRole("button", { name: "Add participant", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Add a participant" });
     await dialog.getByLabel("Email").fill(credentialsFor("admin").email);
@@ -66,6 +111,7 @@ test.describe.serial("participant import and group lifecycle", () => {
     const firstEmail = `csv-one-${data.token}@example.invalid`;
     await page.goto(`/courses/${data.courseId}?tab=participants`);
     const group = groupCard(page, destinationGroupTitle);
+    await group.getByRole("button", { name: destinationGroupTitle, exact: true }).click();
     await group.getByRole("button", { name: "Import CSV", exact: true }).click();
     let dialog = page.getByRole("dialog", { name: "Import students from CSV" });
     await dialog.getByLabel("CSV file").setInputFiles({
@@ -122,16 +168,18 @@ test.describe.serial("participant import and group lifecycle", () => {
 
     await teacherPage.goto(`/courses/${data.courseId}?tab=participants`);
     const originalGroup = groupCard(teacherPage, data.groupTitle);
-    await originalGroup.getByTitle("Delete", { exact: true }).click();
+    await originalGroup.getByRole("button", { name: `${data.groupTitle}: Actions`, exact: true }).click();
+    await teacherPage.getByRole("menuitem", { name: "Delete", exact: true }).click();
     const deletion = teacherPage.getByRole("dialog", { name: "Delete group" });
     await deletion.getByText("Move participants to another group", { exact: true }).click();
     await deletion.getByLabel("Destination group").selectOption(destinationGroupId);
     await deletion.getByRole("button", { name: "Continue" }).click();
     await expect(originalGroup).toHaveCount(0);
+    await groupCard(teacherPage, destinationGroupTitle).getByRole("button", { name: destinationGroupTitle, exact: true }).click();
     await expect(groupCard(teacherPage, destinationGroupTitle).getByText(credentialsFor("student").email, { exact: true })).toBeVisible();
 
     await studentPage.goto(`/courses/${data.courseId}/groups/${destinationGroupId}`);
-    await expect(studentPage.getByRole("heading", { name: `${data.courseTitle}: ${destinationGroupTitle}` })).toBeVisible();
+    await expect(studentPage.getByText(`${data.courseTitle}: ${destinationGroupTitle}`, { exact: true })).toBeVisible();
     await expect(studentPage.getByText("No content items yet.", { exact: true })).toBeVisible();
   });
 });
