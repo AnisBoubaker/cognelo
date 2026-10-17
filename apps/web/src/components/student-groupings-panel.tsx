@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { EditActionBar, getEditActionBarCopy, useDialogs, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { ContextMenu, EditActionBar, getEditActionBarCopy, useDialogs, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { SubjectTeachingLanguage } from "@cognelo/contracts";
 import { api, ApiError, type CourseGroup, type StudentGroupingDto, type StudentGroupingStudent } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import { AppIcon } from "@/components/app-icon";
+import { AppIcon, DisclosureIndicator } from "@/components/app-icon";
 import { nextStudentTeamName } from "@/lib/student-groupings";
 
 import { StudentAssignmentDialog, type StudentGroupingDraft as Draft } from "./student-assignment-dialog";
@@ -26,25 +26,27 @@ export function CourseStudentGroupingsPanel({ courseId, groups, teachingLanguage
   const [selectedId, setSelectedId] = useState(initialGroupId ?? groups[0]?.id ?? "");
   const [editing, setEditing] = useState(false);
   const groupId = groups.some((group) => group.id === selectedId) ? selectedId : groups[0]?.id;
+  const sectionSelector = <div className="field student-groupings-section-picker">
+    <label htmlFor="groupings-section">{t("studentGroupings.section")}</label>
+    <select id="groupings-section" value={groupId ?? ""} disabled={editing || !groups.length} onChange={(event) => setSelectedId(event.target.value)}>
+      {groups.map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}
+    </select>
+  </div>;
   return <div className="stack student-groupings-workspace">
-    <div className="field student-groupings-section-picker">
-      <label htmlFor="groupings-section">{t("studentGroupings.section")}</label>
-      <select id="groupings-section" value={groupId ?? ""} disabled={editing || !groups.length} onChange={(event) => setSelectedId(event.target.value)}>
-        {groups.map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}
-      </select>
-    </div>
-    {groupId ? <StudentGroupingsPanel key={groupId} courseId={courseId} groupId={groupId} teachingLanguage={teachingLanguage} onEditingChange={setEditing} /> : <p>{t("studentGroupings.noSections")}</p>}
+    {groupId ? <StudentGroupingsPanel key={groupId} courseId={courseId} groupId={groupId} teachingLanguage={teachingLanguage} onEditingChange={setEditing} sectionSelector={sectionSelector} /> : <>{sectionSelector}<p>{t("studentGroupings.noSections")}</p></>}
   </div>;
 }
 
-export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onEditingChange }: {
-  courseId: string; groupId: string; teachingLanguage: SubjectTeachingLanguage; onEditingChange?: (editing: boolean) => void;
+export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onEditingChange, sectionSelector }: {
+  courseId: string; groupId: string; teachingLanguage: SubjectTeachingLanguage; onEditingChange?: (editing: boolean) => void; sectionSelector?: ReactNode;
 }) {
   const { locale, t } = useI18n();
   const dialogs = useDialogs();
   const notifications = useNotifications();
   const copy = getEditActionBarCopy(locale);
   const [groupings, setGroupings] = useState<StudentGroupingDto[]>([]);
+  const [expandedGroupingId, setExpandedGroupingId] = useState<string | null>(null);
+  const [groupingMenu, setGroupingMenu] = useState<{ groupingId: string; anchor: HTMLButtonElement } | null>(null);
   const [students, setStudents] = useState<StudentGroupingStudent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -89,6 +91,7 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
         : await api.createStudentGrouping(courseId, groupId, input);
       setGroupings((current) => [...current.filter((grouping) => grouping.id !== result.grouping.id), result.grouping]);
       setSaved(result.grouping); setDraft(draftFrom(result.grouping));
+      setExpandedGroupingId(result.grouping.id);
       notifications.success(t(saved ? "studentGroupings.saved" : "studentGroupings.created"));
     } catch (caught) {
       setError(errorMessage(caught));
@@ -102,6 +105,7 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
     setEditing(false); setError("");
   }
   function edit(grouping: StudentGroupingDto | null) {
+    if (grouping) setExpandedGroupingId(grouping.id);
     setSaved(grouping); setDraft(grouping ? draftFrom(grouping) : emptyDraft());
     setSearch(""); setUnassignedOnly(false); setError(""); setEditing(true);
   }
@@ -147,7 +151,7 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
 
   return <section className="stack student-groupings">
     <div className="section-heading student-groupings-heading">
-      <div><h2>{t("studentGroupings.title")}</h2><p className="muted">{t("studentGroupings.help")}</p></div>
+      {sectionSelector}
       {editing ? <button type="button" className="secondary" disabled={busy} onClick={() => void close()}>{t("common.close")}</button>
         : <button type="button" disabled={loading || busy} onClick={() => edit(null)}><AppIcon name="add" />{t("studentGroupings.create")}</button>}
     </div>
@@ -198,33 +202,55 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
         </div>
       </fieldset>
       <EditActionBar isDirty={isDirty} isSaving={busy} savedLabel={copy.saved} unsavedLabel={copy.unsaved} saveLabel={t(saved ? "studentGroupings.save" : "studentGroupings.create")} savingLabel={copy.saving} cancelLabel={copy.cancel} onCancel={reset} form="student-grouping-form" saveDisabled={!draft.title.trim() || draft.teams.some((team) => !team.title.trim() || !Number.isInteger(team.capacity) || team.capacity < team.participantIds.length || team.capacity > 5000)} />
-    </form> : groupings.length ? [...groupings].sort((a, b) => a.title.localeCompare(b.title)).map((grouping) => <article className="student-grouping-card" key={grouping.id} aria-label={grouping.title}>
-      <header className="student-grouping-card-header">
-        <div className="student-grouping-card-title"><h3>{grouping.title}</h3>{grouping.description ? <p className="muted">{grouping.description}</p> : null}</div>
-        <div className="student-grouping-card-actions">
-          <button className="secondary" type="button" disabled={busy} onClick={() => edit(grouping)}><AppIcon name="edit" />{t("common.edit")}</button>
-          <button className="secondary icon-button student-grouping-remove" type="button" aria-label={t("common.remove")} title={t("common.remove")} disabled={busy} onClick={() => void remove(grouping)}><AppIcon name="remove" /></button>
+    </form> : groupings.length ? <div className="participant-group-list student-grouping-list">{[...groupings].sort((a, b) => a.title.localeCompare(b.title)).map((grouping) => {
+      const expanded = expandedGroupingId === grouping.id;
+      const toggleId = `grouping-toggle-${grouping.id}`;
+      const panelId = `grouping-details-${grouping.id}`;
+      return <article className={`participant-group-card${expanded ? " is-open" : ""}`} key={grouping.id} aria-label={grouping.title}>
+        <header className="participant-group-heading">
+          <h3 className="participant-group-summary" aria-label={grouping.title}>
+            <button className="participant-group-toggle" type="button" id={toggleId} aria-label={grouping.title} aria-describedby={`${toggleId}-summary`} aria-controls={panelId} aria-expanded={expanded} onClick={() => setExpandedGroupingId((current) => current === grouping.id ? null : grouping.id)}>
+              <DisclosureIndicator expanded={expanded} />
+              <span className="participant-group-icon"><AppIcon name={expanded ? "folderOpen" : "folder"} size={22} stroke={1.8} /></span>
+              <span className="participant-group-labels">
+                <span className="participant-group-name">{grouping.title}</span>
+                <span className="participant-group-meta" id={`${toggleId}-summary`}>
+                  <span>{t("studentGroupings.teams")}: {grouping.teams.length}</span>
+                  <span>{t("studentGroupings.assignmentSummary", { method: methodLabel(grouping.assignmentMethod) })}</span>
+                  <span className={grouping.visibleToStudents ? undefined : "student-grouping-hidden-note"}>{t(grouping.visibleToStudents ? "studentGroupings.visibleToStudents" : "studentGroupings.hiddenFromStudents")}</span>
+                </span>
+              </span>
+            </button>
+          </h3>
+          <button className="participant-group-menu-button" type="button" aria-haspopup="menu" aria-expanded={groupingMenu?.groupingId === grouping.id} aria-label={`${grouping.title}: ${t("courseDetail.actionsHeader")}`} disabled={busy} onClick={(event) => setGroupingMenu(groupingMenu?.groupingId === grouping.id ? null : { groupingId: grouping.id, anchor: event.currentTarget })}>
+            <AppIcon name="more" />
+          </button>
+          <ContextMenu anchor={groupingMenu?.groupingId === grouping.id ? groupingMenu.anchor : null} open={groupingMenu?.groupingId === grouping.id} onClose={() => setGroupingMenu(null)} className="content-context-menu">
+            <button className="content-context-menu-item" role="menuitem" type="button" disabled={busy} onClick={() => { setGroupingMenu(null); edit(grouping); }}><AppIcon name="edit" />{t("common.edit")}</button>
+            <button className="content-context-menu-item is-danger" role="menuitem" type="button" disabled={busy} onClick={() => { setGroupingMenu(null); void remove(grouping); }}><AppIcon name="remove" />{t("common.remove")}</button>
+          </ContextMenu>
+        </header>
+        <div className="student-grouping-details" role="region" id={panelId} aria-labelledby={toggleId} hidden={!expanded}>
+          {expanded ? <>
+            {grouping.description || grouping.studentChoiceEnabled ? <div className="student-grouping-policy">
+              {grouping.description ? <p className="muted">{grouping.description}</p> : null}
+              {choiceSummary(grouping)}
+            </div> : null}
+            <div className="student-team-cards">{grouping.teams.map((team) => <section key={team.id} className="student-team-card" aria-label={team.title}>
+              <h4>{team.title} <span className="student-team-count">({team.participantIds.length})</span></h4>
+              {team.participantIds.length ? <ul className="student-team-members" role="list">{team.participantIds.map((id) => {
+                const name = names.get(id) ?? t("studentGroupings.unavailableStudent");
+                return <li key={id}><span className="student-team-avatar" aria-hidden="true">{studentInitials(name)}</span><span>{name}</span></li>;
+              })}</ul> : <p className="student-team-empty muted">{t("studentGroupings.emptyTeam")}</p>}
+            </section>)}</div>
+            {!grouping.teams.length ? <p className="student-grouping-no-teams muted">{t("studentGroupings.noTeams")}</p> : null}
+            <footer className="student-grouping-card-footer">
+              <span className="student-grouping-unassigned"><AppIcon name="participants" size={16} />{t("studentGroupings.unassignedCount", { count: students.length - grouping.teams.reduce((count, team) => count + team.participantIds.length, 0) })}</span>
+            </footer>
+          </> : null}
         </div>
-      </header>
-      <div className="student-grouping-policy">
-        <div className="student-grouping-badges">
-          <span className="student-grouping-badge">{t("studentGroupings.assignmentSummary", { method: methodLabel(grouping.assignmentMethod) })}</span>
-          <span className={`student-grouping-badge${grouping.visibleToStudents ? "" : " is-hidden"}`}>{t(grouping.visibleToStudents ? "studentGroupings.visibleToStudents" : "studentGroupings.hiddenFromStudents")}</span>
-        </div>
-        {choiceSummary(grouping)}
-      </div>
-      <div className="student-team-cards">{grouping.teams.map((team) => <section key={team.id} className="student-team-card" aria-label={team.title}>
-        <h4>{team.title} <span className="student-team-count">({team.participantIds.length})</span></h4>
-        {team.participantIds.length ? <ul className="student-team-members" role="list">{team.participantIds.map((id) => {
-          const name = names.get(id) ?? t("studentGroupings.unavailableStudent");
-          return <li key={id}><span className="student-team-avatar" aria-hidden="true">{studentInitials(name)}</span><span>{name}</span></li>;
-        })}</ul> : <p className="student-team-empty muted">{t("studentGroupings.emptyTeam")}</p>}
-      </section>)}</div>
-      {!grouping.teams.length ? <p className="student-grouping-no-teams muted">{t("studentGroupings.noTeams")}</p> : null}
-      <footer className="student-grouping-card-footer">
-        <span className="student-grouping-unassigned"><AppIcon name="participants" size={16} />{t("studentGroupings.unassignedCount", { count: students.length - grouping.teams.reduce((count, team) => count + team.participantIds.length, 0) })}</span>
-      </footer>
-    </article>) : <p className="muted">{t("studentGroupings.empty")}</p>}
+      </article>;
+    })}</div> : <p className="muted">{t("studentGroupings.empty")}</p>}
     {assignmentDialogOpen ? <StudentAssignmentDialog draft={draft} studentIds={students.map((student) => student.id)} onClose={() => setAssignmentDialogOpen(false)} onApply={(updated) => { setDraft(updated); setSearch(""); setUnassignedOnly(false); setAssignmentDialogOpen(false); }} /> : null}
   </section>;
 }

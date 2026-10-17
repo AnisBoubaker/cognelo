@@ -28,6 +28,60 @@ const pathFor = (data: Scenario, sectionId = data.groupId) => `/api/courses/${da
 const studentLabel = (student: StudentGroupingStudent) => new RegExp(student.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 
 test.describe("section groupings and teams", { tag: "@regression" }, () => {
+  for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "mobile", width: 390, height: 844 }]) {
+    test(`uses a compact selector and exclusive grouping folders on ${viewport.name}`, async ({ teacherPage: page, groupingsData: data }, testInfo) => {
+      const api = await createAuthenticatedApi("teacher");
+      try {
+        for (const title of ["Lab partners", "Project teams"]) {
+          await responseJson(await api.post(pathFor(data), { data: {
+            title, description: `${title} description`, assignmentMethod: "random", visibleToStudents: false,
+            teams: [{ title: "Blue", participantIds: [data.students[0]!.id] }, { title: "Green", participantIds: [] }]
+          } }));
+        }
+        await page.setViewportSize(viewport);
+        await page.goto(`/courses/${data.courseId}?tab=groupings`);
+        const selector = page.getByLabel("Section", { exact: true });
+        await selector.selectOption(data.groupId);
+        await expect(page.getByRole("heading", { name: "Groupings", exact: true })).toHaveCount(0);
+        const toolbar = page.locator(".student-groupings-heading");
+        await expect(toolbar.getByLabel("Section", { exact: true })).toBeVisible();
+        await expect(toolbar.getByRole("button", { name: "Create grouping", exact: true })).toBeVisible();
+        const labs = page.getByRole("article", { name: "Lab partners", exact: true });
+        const projects = page.getByRole("article", { name: "Project teams", exact: true });
+        const labToggle = labs.getByRole("button", { name: "Lab partners", exact: true });
+        const projectToggle = projects.getByRole("button", { name: "Project teams", exact: true });
+        await expect(labToggle).toHaveAttribute("aria-expanded", "false");
+        await expect(projectToggle).toHaveAttribute("aria-expanded", "false");
+        await expect(page.locator(".student-team-cards")).toHaveCount(0);
+        await expect(labs.getByText("Assignment: Random", { exact: true })).toBeVisible();
+        await expect(labs.getByText("Hidden from students", { exact: true })).toBeVisible();
+        await labToggle.click();
+        await expect(labs.getByRole("heading", { name: "Blue (1)", exact: true })).toBeVisible();
+        await expect(labs.getByText("Lab partners description", { exact: true })).toBeVisible();
+        await projectToggle.focus();
+        await page.keyboard.press("Enter");
+        await expect(labToggle).toHaveAttribute("aria-expanded", "false");
+        await expect(projectToggle).toHaveAttribute("aria-expanded", "true");
+        await expect(page.locator(".student-grouping-details:visible")).toHaveCount(1);
+        await expect(projects.getByRole("heading", { name: "Blue (1)", exact: true })).toBeVisible();
+        await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+        await page.screenshot({ path: testInfo.outputPath("groupings.png") });
+        await page.keyboard.press("Space");
+        await expect(projectToggle).toHaveAttribute("aria-expanded", "false");
+        await labToggle.click();
+        await selector.selectOption(data.otherSectionId);
+        await expect(labs).toHaveCount(0);
+        await selector.selectOption(data.groupId);
+        await expect(labToggle).toHaveAttribute("aria-expanded", "false");
+        await labToggle.click();
+        await page.reload();
+        await selector.selectOption(data.groupId);
+        await expect(labToggle).toHaveAttribute("aria-expanded", "false");
+        await expect(projectToggle).toHaveAttribute("aria-expanded", "false");
+      } finally { await api.dispose(); }
+    });
+  }
+
   test("creates independent groupings, edits teams, persists assignments, and removes without unenrolling", async ({ teacherPage: page, groupingsData: data }) => {
     const api = await createAuthenticatedApi("teacher");
     const [first, second] = data.students;
@@ -51,6 +105,7 @@ test.describe("section groupings and teams", { tag: "@regression" }, () => {
       await expect(page.getByText("Everything is saved.", { exact: true })).toBeVisible();
       const original = (await responseJson<{ groupings: StudentGroupingDto[] }>(await api.get(pathFor(data)))).groupings[0]!;
       await page.getByRole("button", { name: "Close", exact: true }).click();
+      await expect(page.getByRole("button", { name: "Project teams", exact: true })).toHaveAttribute("aria-expanded", "true");
       await page.getByRole("button", { name: "Create grouping", exact: true }).click();
       await page.getByLabel("Grouping name").fill("Lab teams");
       await page.getByRole("button", { name: "Add team", exact: true }).click();
@@ -63,8 +118,10 @@ test.describe("section groupings and teams", { tag: "@regression" }, () => {
       await page.reload();
       await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
       const projects = page.getByRole("article", { name: "Project teams", exact: true });
+      await projects.getByRole("button", { name: "Project teams", exact: true }).click();
       await expect(projects.getByRole("heading", { name: "Blue (1)" })).toBeVisible();
-      await projects.getByRole("button", { name: "Edit", exact: true }).click();
+      await projects.getByRole("button", { name: "Project teams: Actions", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
       await page.getByLabel("Team 1 name").fill("Red");
       await page.getByLabel(studentLabel(first!)).selectOption({ label: "Green" });
       await page.getByRole("button", { name: "Save grouping", exact: true }).click();
@@ -76,7 +133,8 @@ test.describe("section groupings and teams", { tag: "@regression" }, () => {
       await page.getByRole("button", { name: "Save grouping", exact: true }).click();
       await expect(page.getByText("Everything is saved.", { exact: true })).toBeVisible();
       await page.getByRole("button", { name: "Close", exact: true }).click();
-      await projects.getByRole("button", { name: "Remove", exact: true }).click();
+      await projects.getByRole("button", { name: "Project teams: Actions", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Remove", exact: true }).click();
       await confirmSharedDialog(page, "Remove");
       await expect(projects).toBeHidden();
       await expect(page.getByRole("article", { name: "Lab teams" })).toBeVisible();
@@ -112,6 +170,7 @@ test.describe("section groupings and teams", { tag: "@regression" }, () => {
       await page.reload();
       await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
       const grouping = page.getByRole("article", { name: "Travail en équipe", exact: true });
+      await grouping.getByRole("button", { name: "Travail en équipe", exact: true }).click();
       await expect(grouping.getByRole("heading", { name: "Les explorateurs (0)" })).toBeVisible();
       await expect(grouping.getByRole("heading", { name: "Équipe 3 (0)" })).toBeVisible();
     } finally { await api.dispose(); }
@@ -138,7 +197,8 @@ test.describe("section groupings and teams", { tag: "@regression" }, () => {
       const randomize = page.getByRole("button", { name: "Automatic assign", exact: true });
       await expect(randomize).toBeDisabled();
       await page.getByRole("button", { name: "Close", exact: true }).click();
-      await page.getByRole("article", { name: "Random teams", exact: true }).getByRole("button", { name: "Edit", exact: true }).click();
+      await page.getByRole("button", { name: "Random teams: Actions", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
       await page.getByLabel("Search students").fill(students[0]!.email);
       await page.getByLabel("Show unassigned students only").check();
       await randomize.click();
@@ -162,6 +222,7 @@ test.describe("section groupings and teams", { tag: "@regression" }, () => {
       await expect(page.getByText("Everything is saved.", { exact: true })).toBeVisible();
       await page.reload();
       await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
+      await page.getByRole("button", { name: "Random teams", exact: true }).click();
       await expect(page.getByRole("article", { name: "Random teams", exact: true }).getByText("Unassigned students: 0", { exact: true })).toBeVisible();
       stored = (await responseJson<{ groupings: StudentGroupingDto[] }>(await api.get(pathFor(data)))).groupings;
       const saved = stored.find((item) => item.id === grouping.id)!;
@@ -214,7 +275,8 @@ test.describe("section groupings and teams", { tag: "@regression" }, () => {
       await page.setViewportSize({ width: 390, height: 844 });
       await page.goto(`/courses/${data.courseId}?tab=groupings`);
       await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
-      await page.getByRole("article", { name: "Projects" }).getByRole("button", { name: "Edit", exact: true }).click();
+      await page.getByRole("button", { name: "Projects: Actions", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
       await page.getByLabel("Grouping name").fill("My draft");
       await page.route(`**${path}/${grouping.id}`, (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: { code: "TEMPORARY_FAILURE", message: "Temporary test failure" } }) }), { times: 1 });
       await page.getByRole("button", { name: "Save grouping", exact: true }).click();

@@ -40,7 +40,8 @@ test.describe("automatic assignment and student team choices", { tag: "@regressi
       } }));
       await page.goto(`/courses/${data.courseId}?tab=groupings`);
       await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
-      await page.getByRole("article", { name: "Assignment options" }).getByRole("button", { name: "Edit", exact: true }).click();
+      await page.getByRole("button", { name: "Assignment options: Actions", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
       await expect(page.getByRole("region", { name: "Assignment method", exact: true }).getByText("Manual", { exact: true })).toBeVisible();
       await page.getByRole("button", { name: "Automatic assign", exact: true }).click();
       const dialog = page.getByRole("dialog", { name: "Automatic assign", exact: true });
@@ -64,7 +65,8 @@ test.describe("automatic assignment and student team choices", { tag: "@regressi
       await page.reload();
       await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
       await expect(page.getByRole("article", { name: "Assignment options" }).getByText("Assignment: Random", { exact: true })).toBeVisible();
-      await page.getByRole("article", { name: "Assignment options" }).getByRole("button", { name: "Edit", exact: true }).click();
+      await page.getByRole("button", { name: "Assignment options: Actions", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
       await page.getByRole("button", { name: "Automatic assign", exact: true }).click();
       await dialog.getByLabel("Let students choose", { exact: true }).check();
       await dialog.getByLabel("Slots per team", { exact: true }).fill("3");
@@ -100,7 +102,8 @@ test.describe("automatic assignment and student team choices", { tag: "@regressi
       expect(saved.teams.map((team) => team.capacity)).toEqual([2, 3]);
       await page.reload();
       await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
-      await page.getByRole("article", { name: "Assignment options" }).getByRole("button", { name: "Edit", exact: true }).click();
+      await page.getByRole("button", { name: "Assignment options: Actions", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
       await page.getByRole("button", { name: "Automatic assign", exact: true }).click();
       await expect(dialog.getByLabel("Let students choose", { exact: true })).toBeChecked();
       await expect(dialog.getByLabel("Choose until", { exact: true })).toHaveValue("2027-10-31");
@@ -231,9 +234,11 @@ test.describe("automatic assignment and student team choices", { tag: "@regressi
       const card = page.getByRole("article", { name: "Private arrangements", exact: true });
       await expect(card.getByText("Hidden from students", { exact: true })).toBeVisible();
       await expect(card.getByText("Assignment: Let students choose", { exact: true })).toBeVisible();
+      await card.getByRole("button", { name: "Private arrangements", exact: true }).click();
       await expect(card).toContainText("Student choice is paused while this grouping is hidden.");
       await card.screenshot({ path: test.info().outputPath("grouping-policy-desktop.png") });
-      await card.getByRole("button", { name: "Edit", exact: true }).click();
+      await card.getByRole("button", { name: "Private arrangements: Actions", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
       const visible = page.getByLabel("Show grouping to students", { exact: true });
       const method = page.getByRole("region", { name: "Assignment method", exact: true });
       await expect(visible).not.toBeChecked();
@@ -255,7 +260,8 @@ test.describe("automatic assignment and student team choices", { tag: "@regressi
       // Reload after the learner changes teams, so the teacher saves the latest revision.
       await page.reload();
       await page.getByLabel("Section", { exact: true }).selectOption(data.groupId);
-      await card.getByRole("button", { name: "Edit", exact: true }).click();
+      await card.getByRole("button", { name: "Private arrangements: Actions", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
       await visible.uncheck();
       await page.getByRole("button", { name: "Save grouping", exact: true }).click();
       await expect(page.getByText("Everything is saved.", { exact: true })).toBeVisible();
