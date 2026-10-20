@@ -27,12 +27,14 @@ describe("duplicateCourseContentItem", () => {
     const resource = { id: "resource-1", courseId: "course-1", groupId: null, contentTypeKey: "text", pluginKey: "text-content", title: "Notes", metadata: { body: "Hello" } };
     mockPrisma.courseContentItem.findFirst.mockResolvedValue({ id: "content-1", parentId: "folder-1", isVisible: false, metadata: { accent: "blue" }, contentResource: resource, material: null });
     mockPrisma.courseContentItem.count.mockResolvedValue(3);
-    duplicateHandler.mockResolvedValue({ title: "Notes (copy)", metadata: { body: "Hello" } });
+    const afterPersist = vi.fn();
+    duplicateHandler.mockResolvedValue({ title: "Notes (copy)", metadata: { body: "Hello" }, afterPersist });
     transaction.courseContentResource.create.mockResolvedValue({ id: "resource-2" });
     transaction.courseContentItem.create.mockResolvedValue({ id: "content-2" });
 
     await duplicateCourseContentItem(admin, "course-1", "content-1", { title: "Notes (copy)" });
     expect(duplicateHandler).toHaveBeenCalledWith(expect.objectContaining({ title: "Notes (copy)", resource: expect.objectContaining({ id: "resource-1" }) }));
     expect(transaction.courseContentItem.create).toHaveBeenCalledWith({ data: expect.objectContaining({ parentId: "folder-1", position: 3, isVisible: false, contentResourceId: "resource-2" }) });
+    expect(afterPersist).toHaveBeenCalledWith(expect.objectContaining({ resource: expect.objectContaining({ id: "resource-2" }), transaction: { query: expect.any(Function), execute: expect.any(Function) } }));
   });
 });

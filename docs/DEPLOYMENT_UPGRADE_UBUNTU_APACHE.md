@@ -347,7 +347,7 @@ When release notes introduce rich-text media, set `MEDIA_STORAGE_ROOT="./storage
 
 ## 5. Run migrations and activate the release
 
-With both services still stopped, run all core and plugin migrations from the new release:
+With both services still stopped, run all core and plugin migrations from the new release. The combined command applies both activity-plugin and content-type-plugin manifest migrations, including new private tables for already activated plugins (such as Link internal summaries):
 
 ```bash
 sudo -u instance1 /bin/bash -c '

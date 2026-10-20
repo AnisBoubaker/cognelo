@@ -1,16 +1,8 @@
 import { createAuthenticatedApi, expect, test, confirmSharedDialog } from "./fixtures/auth";
 import { provisionActivitySuite, removeActivitySuite, responseJson } from "./fixtures/activity-suite";
+import { ensureContentTypePluginEnabled } from "./fixtures/content-plugins";
 
-test.beforeAll(async () => {
-  const admin = await createAuthenticatedApi("admin");
-  try {
-    const { plugins } = await responseJson<{ plugins: Array<{ key: string; isActivated: boolean; isEnabled: boolean }> }>(await admin.get("/api/content-type-plugins"));
-    const plugin = plugins.find((entry) => entry.key === "link-content");
-    expect(plugin).toBeTruthy();
-    if (!plugin!.isActivated) await responseJson(await admin.patch("/api/content-type-plugins/link-content", { data: { action: "activate" } }));
-    if (!plugin!.isEnabled) await responseJson(await admin.patch("/api/content-type-plugins/link-content", { data: { isEnabled: true } }));
-  } finally { await admin.dispose(); }
-});
+test.beforeAll(() => ensureContentTypePluginEnabled("link-content"));
 
 test("creates, edits, duplicates, and opens a described course link with its saved target", async ({ teacherPage: page, studentPage }, testInfo) => {
   test.setTimeout(120_000);

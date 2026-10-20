@@ -53,7 +53,18 @@ export type ContentTypeCreateResult = {
   title: string;
   metadata?: Record<string, unknown>;
   pluginResourceId?: string | null;
+  afterPersist?: ContentTypePersistHandler;
 };
+
+/** Runs within the host transaction after the public resource row is persisted.
+ * Plugins own their private SQL; private payloads must never enter public metadata. */
+export type ContentTypePersistHandler = (input: {
+  resource: ServerContentResourceRecord;
+  transaction: {
+    query: <T = unknown>(query: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
+    execute: (query: TemplateStringsArray, ...values: unknown[]) => Promise<number>;
+  };
+}) => Promise<void>;
 
 export type ContentTypeCreateHandler = (input: {
   user: CurrentUser;
@@ -66,6 +77,7 @@ export type ContentTypeCreateHandler = (input: {
 export type ContentTypeUpdateResult = {
   title?: string;
   metadata?: Record<string, unknown>;
+  afterPersist?: ContentTypePersistHandler;
 };
 
 export type ContentTypeUpdateHandler = (input: {
@@ -83,7 +95,7 @@ export type ContentTypeDuplicateHandler = (input: {
   user: CurrentUser;
   resource: ServerContentResourceRecord;
   title: string;
-}) => Promise<{ title: string; metadata?: Record<string, unknown> }>;
+}) => Promise<ContentTypeCreateResult>;
 
 export type ContentTypeOpenAction = {
   kind: "download" | "external_url" | "plugin_route" | "viewer" | "none";

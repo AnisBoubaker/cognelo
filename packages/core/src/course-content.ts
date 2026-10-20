@@ -5,6 +5,8 @@ import {
   type ContentEmbeddingDiagnostic,
   type ContentEmbeddingDocumentsResult,
   type ContentEmbeddingSource,
+  type ContentTypeCreateResult,
+  type ContentTypePersistHandler,
   type ContentVectorIndexResult,
   type ContentVectorSearchMatch
 } from "@cognelo/content-type-sdk/server";
@@ -239,7 +241,7 @@ export async function duplicateCourseContentItem(user: CurrentUser, courseId: st
   if (!source || (!source.contentResource && !source.material)) throw notFound("Course content item");
   const position = await prisma.courseContentItem.count({ where: { courseId, groupId: null, parentId: source.parentId } });
 
-  let resourceCopy: { title: string; metadata?: Record<string, unknown> } | null = null;
+  let resourceCopy: ContentTypeCreateResult | null = null;
   if (source.contentResource) {
     const plugin = getServerContentTypePlugin(source.contentResource.pluginKey);
     if (!plugin?.handlers?.duplicate) {
@@ -288,6 +290,9 @@ export async function duplicateCourseContentItem(user: CurrentUser, courseId: st
       materialId: material?.id,
       metadata: source.metadata as Prisma.InputJsonValue
     } });
+    if (contentResource && resourceCopy?.afterPersist) {
+      await runContentTypePersist(resourceCopy.afterPersist, transaction, contentResource);
+    }
     return { contentItem, contentResource, material };
   });
 }
@@ -366,6 +371,7 @@ export async function createPluginContentResource(user: CurrentUser, courseId: s
         metadata: toJson(input.itemMetadata)
       }
     });
+    if (result.afterPersist) await runContentTypePersist(result.afterPersist, transaction, resource);
     return { resource, contentItem };
   });
 }
@@ -385,6 +391,19 @@ export async function updatePluginContentResource(
     throw new AppError(400, "CONTENT_TYPE_UPDATE_UNAVAILABLE", "This content type does not support generic updates yet.");
   }
   const result = await update({ user, resource: toServerResourceRecord(resource), payload: input.payload ?? {} });
+  if (result.afterPersist) {
+    return prisma.$transaction(async (transaction) => {
+      const updated = await transaction.courseContentResource.update({
+        where: { id: resource.id },
+        data: {
+          ...(result.title !== undefined ? { title: assertTitle(result.title) } : {}),
+          ...(result.metadata !== undefined ? { metadata: toJson(result.metadata) } : {})
+        }
+      });
+      await runContentTypePersist(result.afterPersist!, transaction, updated);
+      return updated;
+    });
+  }
   return updateContentResource(
     user,
     courseId,
@@ -1145,6 +1164,16 @@ async function getVisibleContentResourceIds(courseId: string, groupId: string | 
       .filter((item) => item.contentResourceId && item.effectiveVisibility === "visible")
       .map((item) => item.contentResourceId as string)
   );
+}
+
+async function runContentTypePersist(handler: ContentTypePersistHandler, transaction: Prisma.TransactionClient, resource: Parameters<typeof toServerResourceRecord>[0]) {
+  await handler({
+    resource: toServerResourceRecord(resource),
+    transaction: {
+      query: <T = unknown>(query: TemplateStringsArray, ...values: unknown[]) => transaction.$queryRaw<T>(query, ...values),
+      execute: (query, ...values) => transaction.$executeRaw(query, ...values)
+    }
+  });
 }
 
 function toServerResourceRecord(resource: {

@@ -1,11 +1,12 @@
 import type { ContentTypePlugin } from "@cognelo/content-type-sdk";
+import { linkContentDatabaseModule } from "./db";
 
 export const linkContentPlugin: ContentTypePlugin = {
   key: "link-content",
   packageName: "@cognelo/plugin-link-content",
   name: "Link content",
   version: "0.1.0",
-  db: { namespace: "plugin_link_content", tables: [], notes: ["Link metadata is stored in CourseContentResource."] },
+  db: linkContentDatabaseModule,
   contentTypes: [{
     key: "link",
     label: { default: "Link", i18n: { fr: "Lien", zh: "链接", ar: "رابط" } },

@@ -81,6 +81,8 @@ Outbox assertions require local access to the API’s storage. Use synthetic dom
 
 `link-content.spec.ts` activates/enables the local Link plugin and verifies settings, the default new-tab target and same-tab override, description placement on desktop/mobile, teacher preview, duplication, unsafe-URL rejection, authorization, visibility, and removal. External destinations are synthetic browser-intercepted pages; the content APIs and persistence are real.
 
+`link-summary.spec.ts` verifies the internal summary draft, default/custom word limit, explicit Save, failure preservation, mobile controls, private endpoint authorization, absence from learner metadata, duplicate isolation, and private-row cleanup. Only the generated AI response/error is simulated in the browser; persistence and access checks use real services. Server tests prove HTTP 200 gating, network restrictions, no AI call after failed fetches, and course-language/word-limit enforcement. Run `npm run db:migrate:all` first to create the private Link settings table.
+
 ## Focused regression checks
 
 Run the independent authoring-recovery, bank-synchronization, course-loading, student-grouping, activity-exception, and live compound-Test scenarios with:

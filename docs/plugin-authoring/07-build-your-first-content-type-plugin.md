@@ -178,6 +178,8 @@ Lifecycle behavior:
 - disabled but active plugins may still serve existing resources
 - inactive/unavailable plugins are blocked at dispatch and render as unavailable in existing content rows
 
+Create/update/duplicate handlers may return an `afterPersist` callback for private records. Core invokes it after the generic resource row is written, inside the same transaction, with the resulting resource ID and neutral tagged-template SQL query/execute methods. Do not perform network or AI work inside this callback, and do not put private fields in public metadata. The Link plugin uses it for private teacher summaries and generation preferences.
+
 ## 7. When To Add Plugin-Owned Tables
 
 Use generic `CourseContentResource.metadata` for small, safe, student-visible metadata.

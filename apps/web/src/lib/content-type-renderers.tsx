@@ -5,7 +5,7 @@ import { FileContentSettingsForm } from "@cognelo/plugin-file-content";
 import { GithubRepoSettingsForm } from "@cognelo/plugin-github-repo";
 import { TextContentSettingsForm } from "@cognelo/plugin-text-content";
 import { getLinkContentPresentation, LinkContentSettingsForm } from "@cognelo/plugin-link-content";
-import type { CourseContentItem, CourseContentResource } from "./api";
+import { api, type CourseContentItem, type CourseContentResource } from "./api";
 export { ContentTypeIcon } from "../components/app-icon";
 
 export type ContentTypeSettingsState = {
@@ -36,7 +36,8 @@ export type ContentTypeRenderer = (context: ContentTypeRendererContext) => React
 
 const contentTypeRenderers: Record<string, ContentTypeRenderer> = {};
 const contentTypeSettingsRenderers: Record<string, ContentTypeRenderer> = {
-  "link-content-settings": (context) => context.settings ? <LinkContentSettingsForm
+  "link-content-settings": (context) => context.settings && context.resource ? <LinkContentSettingsForm
+    resourceId={context.resource.id}
     title={context.settings.title}
     url={context.settings.url}
     metadata={context.settings.metadata}
@@ -46,6 +47,8 @@ const contentTypeSettingsRenderers: Record<string, ContentTypeRenderer> = {
     onUrlChange={context.settings.onUrlChange}
     onMetadataChange={context.settings.onMetadataChange}
     onSubmit={context.settings.onSubmit}
+    loadInternalSettings={async () => (await api.contentResourcePluginRequest<{ settings: { internalSummary: string; maxWords: number } }>(context.resource!, ["summary"])).settings}
+    generateInternalSummary={(url, maxWords) => api.contentResourcePluginRequest<{ summary: string; wordCount: number; maxWords: number }>(context.resource!, ["summary"], { method: "POST", payload: { url, maxWords } })}
     t={context.t}
   /> : null,
   "file-content-settings": (context) =>

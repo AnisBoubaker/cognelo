@@ -2538,6 +2538,11 @@ export const api = {
     request<{ contentTypes: ContentTypeDefinition[]; activeContentTypes?: ContentTypeDefinition[] }>(`/courses/${courseId}/content-types`),
   courseContentResources: (courseId: string) =>
     request<{ resources: CourseContentResource[] }>(`/courses/${courseId}/content-resources`),
+  contentResourcePluginRequest: <T>(resource: Pick<CourseContentResource, "id" | "courseId" | "groupId">, path: string[], input: { method?: "GET" | "POST"; payload?: unknown } = {}) =>
+    request<T>(`/courses/${resource.courseId}${resource.groupId ? `/groups/${resource.groupId}` : ""}/content-resources/${resource.id}/${path.map(encodeURIComponent).join("/")}`, {
+      method: input.method ?? "GET",
+      ...(input.payload !== undefined ? { body: JSON.stringify(input.payload) } : {})
+    }),
   createCourseContentResource: (
     courseId: string,
     input: {

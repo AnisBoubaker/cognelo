@@ -168,6 +168,8 @@ No course table rewrite is required.
 
 Content type plugins are the sibling system for non-activity course content. Their contracts/registry API live in `packages/content-type-sdk`, their installed composition lives in `packages/plugin-registry`, and implementations live under `packages/plugin-content-types/*`.
 
+Content create/update/duplicate results may return an `afterPersist` callback. The host invokes it after writing the public row, within the same database transaction, supplying only neutral tagged-template query/execute methods. This lets plugins save or copy private records atomically without adding private fields to generic resource metadata or concrete table knowledge to core.
+
 Core owns:
 
 - `CourseContentItem` for folder placement, ordering, nesting, and visibility

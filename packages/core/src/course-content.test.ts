@@ -4,6 +4,8 @@ import type { CurrentUser } from "@cognelo/contracts";
 const mockPrisma = vi.hoisted(() => ({
   activityAssignmentException: { findMany: vi.fn() },
   $transaction: vi.fn(),
+  $executeRaw: vi.fn(),
+  $queryRaw: vi.fn(),
   activity: {
     deleteMany: vi.fn(),
     findFirst: vi.fn()
@@ -228,10 +230,12 @@ describe("course content services", () => {
   });
 
   it("creates plugin-backed content resources through the active content type plugin", async () => {
+    const afterPersist = vi.fn();
     mockPrisma.courseContentItem.findFirst.mockResolvedValue({ id: "folder-1" });
     serverContentTypePlugin.handlers.create.mockResolvedValue({
       title: "Examples",
-      metadata: { url: "https://github.com/org/repo" }
+      metadata: { url: "https://github.com/org/repo" },
+      afterPersist
     });
     mockPrisma.courseContentResource.create.mockResolvedValue({ id: "resource-1", title: "Examples" });
     mockPrisma.courseContentItem.create.mockResolvedValue({ id: "content-item-1" });
@@ -248,6 +252,8 @@ describe("course content services", () => {
     });
 
     expect(pluginMocks.assertContentTypePluginEnabled).toHaveBeenCalledWith("github-repo");
+    expect(afterPersist).toHaveBeenCalledWith(expect.objectContaining({ resource: expect.objectContaining({ id: "resource-1" }) }));
+    expect(mockPrisma.courseContentResource.create.mock.invocationCallOrder[0]).toBeLessThan(afterPersist.mock.invocationCallOrder[0]!);
     expect(serverContentTypePlugin.handlers.create).toHaveBeenCalledWith({
       user: teacherUser,
       courseId: "course-1",
@@ -925,5 +931,22 @@ describe("course content services", () => {
       code: "ACTIVITY_CONTENT_DELETE_REQUIRES_ACTIVITY_DELETE"
     });
     expect(mockPrisma.courseContentItem.delete).not.toHaveBeenCalled();
+  });
+
+  it("runs private content persistence within the public update transaction and propagates failure", async () => {
+    const resource = { id: "resource-private", courseId: "course-1", groupId: null, contentTypeKey: "github-repo", pluginKey: "github-repo-content", title: "Public title", metadata: {} };
+    mockPrisma.courseContentResource.findFirst.mockResolvedValue(resource);
+    mockPrisma.courseContentResource.update.mockResolvedValue({ ...resource, title: "Changed title" });
+    const afterPersist = vi.fn(async ({ resource: saved, transaction }: Parameters<import("@cognelo/content-type-sdk/server").ContentTypePersistHandler>[0]) => {
+      expect(mockPrisma.courseContentResource.update).toHaveBeenCalled();
+      await transaction.execute`SELECT ${saved.id}`;
+    });
+    serverContentTypePlugin.handlers.update.mockResolvedValue({ title: "Changed title", metadata: {}, afterPersist });
+    await expect(updatePluginContentResource(teacherUser, "course-1", resource.id, { payload: {} })).resolves.toMatchObject({ title: "Changed title", metadata: {} });
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(afterPersist).toHaveBeenCalledWith(expect.objectContaining({ resource: expect.objectContaining({ id: resource.id }) }));
+    expect(mockPrisma.$executeRaw.mock.calls[0]?.slice(1)).toEqual([resource.id]);
+    afterPersist.mockRejectedValueOnce(new Error("Private persistence failed"));
+    await expect(updatePluginContentResource(teacherUser, "course-1", resource.id, { payload: {} })).rejects.toThrow("Private persistence failed");
   });
 });
