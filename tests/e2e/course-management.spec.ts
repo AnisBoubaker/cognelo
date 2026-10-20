@@ -1,3 +1,4 @@
+import { openGradebookActions } from "./fixtures/gradebook-ui";
 import { readFile } from "node:fs/promises";
 import { strFromU8, unzipSync } from "fflate";
 import { confirmSharedDialog, createAuthenticatedApi, expect, test } from "./fixtures/auth";
@@ -190,7 +191,7 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     });
     await page.goto(`/courses/${data.courseId}?tab=gradebook`);
     await gradebookSummaryLoaded;
-    await expect(page.getByRole("heading", { name: "Course gradebook" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Course gradebook", exact: true })).toBeVisible();
     expect(contentRequests).toEqual([]);
     const gradebook = page.getByRole("tabpanel", { name: "Gradebook" });
     await gradebook.getByLabel("Group", { exact: true }).selectOption(data.groupId);
@@ -199,7 +200,7 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     const exportLink = page.getByRole("link", { name: "Export CSV" });
     await expect(exportLink).toHaveAttribute("href", /activityId=.*status=graded/);
 
-    await page.getByRole("button", { name: "Export grades", exact: true }).first().click();
+    await (await openGradebookActions(page, activityTitle)).getByRole("menuitem", { name: "Export grades", exact: true }).click();
     let exportDialog = page.getByRole("dialog", { name: "Export activity grades" });
     await expect(exportDialog.getByLabel("Format")).toHaveValue("csv");
     await expect(exportDialog.getByLabel("File name")).toHaveValue(
@@ -216,7 +217,7 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     expect(csv).toContain("email,first name,last name,grade\r\n");
     expect(csv).toContain("student@cognelo.local,Sam,Student,25\r\n");
 
-    await page.getByRole("button", { name: "Export grades", exact: true }).first().click();
+    await (await openGradebookActions(page, activityTitle)).getByRole("menuitem", { name: "Export grades", exact: true }).click();
     exportDialog = page.getByRole("dialog", { name: "Export activity grades" });
     await exportDialog.getByLabel("Format").selectOption("xlsx");
     await exportDialog.getByLabel("File name").fill(`E2E grades ${data.token}`);
@@ -234,14 +235,14 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     expect(worksheet).toContain("student@cognelo.local");
     expect(worksheet).toContain("<v>25</v>");
 
-    await page.getByRole("button", { name: "Release", exact: true }).click();
+    await (await openGradebookActions(page, activityTitle)).getByRole("menuitem", { name: "Release", exact: true }).click();
     await confirmSharedDialog(page);
-    await expect(page.getByRole("button", { name: "Hide", exact: true })).toBeVisible();
+    await expect(page.getByText("Released", { exact: true })).toBeVisible();
 
-    await page.getByRole("button", { name: "Hide", exact: true }).click();
+    await (await openGradebookActions(page, activityTitle)).getByRole("menuitem", { name: "Hide", exact: true }).click();
     await confirmSharedDialog(page);
-    await expect(page.getByRole("button", { name: "Release", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Release", exact: true }).click();
+    await expect(page.getByText("Not released", { exact: true })).toBeVisible();
+    await (await openGradebookActions(page, activityTitle)).getByRole("menuitem", { name: "Release", exact: true }).click();
     await confirmSharedDialog(page);
 
     await page.goto(`/courses/${data.courseId}?tab=content`);

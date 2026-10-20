@@ -105,6 +105,8 @@ Playwright transpiles the specs without type-checking them, and the root `npm ru
 
 `participant-lifecycle.spec.ts` also covers initially collapsed group folders, exclusive expansion, keyboard toggling, reload reset, desktop/mobile layout, and participant add/remove/CSV/transfer workflows within the expanded roster and shared group actions menu. `teacher-authoring.spec.ts` verifies that a newly created group opens for setup.
 
+The compact course gradebook keeps filters, inline totals, linked activity/group titles, grading progress, and release status visible, with secondary actions in a row menu. Workspace layout checks cover desktop/mobile expansion and group navigation; course-management, learning-flow, grade-challenge, and partial-grade scenarios exercise menu-based export/release/hide and the release readiness guard.
+
 ## Handling product failures
 
 An E2E run is observational unless the task explicitly asks for product fixes. When a browser test exposes an application defect, preserve the evidence, document expected and observed behavior, and open or link a GitHub issue; do not change product code as part of the run. A stable known defect may use Playwright's expected-failure annotation only when it includes the issue URL, so the intended behavior remains executable and an unexpected recovery is reported. Test-code mistakes and fixture defects may still be corrected to let the requested product paths execute.

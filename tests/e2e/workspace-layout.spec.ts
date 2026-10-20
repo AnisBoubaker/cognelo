@@ -57,6 +57,19 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
       await expect(contentPerspective).toHaveCount(0);
       await expect(page.locator(".workspace-tab-trailing")).toHaveCount(0);
       await expect(page.locator(".course-workspace-header h1")).toHaveText(`${data.subjectTitle} - ${data.courseTitle}`);
+      if (tab === "Gradebook") {
+        const gradebook = page.getByRole("region", { name: "Course gradebook", exact: true });
+        await expect(gradebook.getByRole("heading", { name: "Course gradebook", exact: true })).toHaveCount(0);
+        await expect(gradebook.getByRole("link", { name: data.title, exact: true })).toHaveAttribute("href", `/courses/${data.courseId}/gradebook/activities/${data.activityId}`);
+        await expect(gradebook.getByText("No submissions", { exact: true })).toBeVisible();
+        await expect(gradebook.getByRole("button", { name: "Export grades", exact: true })).toHaveCount(0);
+        await page.screenshot({ path: testInfo.outputPath("gradebook.png"), fullPage: true });
+        await gradebook.getByRole("button", { name: `Expand ${data.title}`, exact: true }).click();
+        await expect(gradebook.getByRole("link", { name: data.groupTitle, exact: true })).toHaveAttribute("href", `/courses/${data.courseId}/gradebook/activities/${data.activityId}?groupId=${data.groupId}`);
+        await gradebook.getByRole("button", { name: `${data.groupTitle}: Actions`, exact: true }).click();
+        await expect(page.getByRole("menuitem", { name: "Export grades", exact: true })).toBeVisible();
+        await page.keyboard.press("Escape");
+      }
       await expectFitsViewport(page);
     }
     await page.getByRole("tab", { name: "Content", exact: true }).click();

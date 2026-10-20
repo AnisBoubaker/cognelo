@@ -4829,6 +4829,175 @@ button:hover > .disclosure-indicator {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.course-gradebook-overview .gradebook-filters {
+  align-items: end;
+  gap: 12px;
+  grid-template-columns: minmax(140px, 1fr) minmax(180px, 1.5fr) minmax(140px, 1fr) auto;
+}
+
+.course-gradebook-overview .gradebook-filters label {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.course-gradebook-overview .gradebook-filters select {
+  min-height: 38px;
+  font-size: 0.875rem;
+}
+
+.gradebook-csv-export {
+  gap: 6px;
+  min-height: 38px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.gradebook-compact-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding-block: 2px;
+}
+
+.gradebook-compact-stat {
+  align-items: baseline;
+  display: flex;
+  font-size: 0.85rem;
+  gap: 6px;
+}
+
+.gradebook-compact-stat strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.course-gradebook-overview .gradebook-table {
+  box-shadow: none;
+}
+
+.course-gradebook-overview .table-row-gradebook-activity,
+.course-gradebook-overview .table-row-gradebook-group-summary {
+  align-items: center;
+  gap: 20px;
+  grid-template-columns: minmax(220px, 1fr) minmax(350px, 0.85fr) 36px;
+  min-height: 72px;
+  padding: 14px 16px;
+}
+
+.course-gradebook-overview .table-head {
+  background: var(--surface-2);
+  font-size: 0.7rem;
+  min-height: 38px;
+  padding-block: 10px;
+}
+
+.course-gradebook-overview .table-row-gradebook-group-summary {
+  background: var(--surface-2);
+  padding-inline-start: 58px;
+}
+
+.gradebook-row-metrics {
+  align-items: center;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(130px, 1fr) minmax(95px, 0.85fr) minmax(105px, 0.85fr);
+  min-width: 0;
+}
+
+.gradebook-results-link {
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.gradebook-results-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.gradebook-grading-progress {
+  display: grid;
+  font-size: 0.875rem;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.gradebook-incomplete-note {
+  color: #805719;
+  font-size: 0.75rem;
+}
+
+.gradebook-mean {
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.gradebook-metric-label {
+  display: none;
+}
+
+.gradebook-release-state {
+  border-radius: 5px;
+  color: var(--muted);
+  background: var(--surface-3);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  padding: 3px 8px;
+  width: fit-content;
+}
+
+.gradebook-release-state.is-released {
+  background: #e9f6f2;
+  color: #247865;
+}
+
+.gradebook-release-state.is-partial {
+  background: #fff4df;
+  color: #805719;
+}
+
+@media (max-width: 1000px) {
+  .course-gradebook-overview .gradebook-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gradebook-csv-export {
+    justify-self: end;
+  }
+
+  .course-gradebook-overview .table-head {
+    display: none;
+  }
+
+  .course-gradebook-overview .table-row-gradebook-activity,
+  .course-gradebook-overview .table-row-gradebook-group-summary {
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr) 36px;
+  }
+
+  .course-gradebook-overview .table-row-gradebook-group-summary {
+    padding-inline-start: 28px;
+  }
+
+  .gradebook-row-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .gradebook-row-menu {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .gradebook-metric-label {
+    display: inline;
+  }
+}
+
 .participant-role {
   border: 1px solid var(--line);
   border-radius: 999px;

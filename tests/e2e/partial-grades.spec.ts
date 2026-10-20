@@ -1,3 +1,4 @@
+import { openGradebookActions } from "./fixtures/gradebook-ui";
 import { readFile } from "node:fs/promises";
 import { prisma } from "@cognelo/db";
 import { confirmSharedDialog, expect, test } from "./fixtures/auth";
@@ -115,9 +116,10 @@ test.describe("partial grade safeguards", () => {
 
     await page.goto(`/courses/${courseId}?tab=gradebook`);
     const activityRow = page.locator(".table-row-gradebook-activity").filter({ hasText: "C exercise: Median of three integers" }).first();
-    const release = activityRow.getByRole("button", { name: "Release", exact: true });
+    const release = (await openGradebookActions(page, "C exercise: Median of three integers")).getByRole("menuitem", { name: "Release", exact: true });
     await expect(release).toBeDisabled();
-    await expect(activityRow).toContainText(/Complete \d+ submitted grade\(s\) before release\./);
+    await expect(release).toHaveAttribute("title", /Complete \d+ submitted grade\(s\) before release\./);
+    await expect(activityRow).toContainText(/\d+ incomplete/);
   });
 });
 
@@ -136,10 +138,10 @@ test.describe("grade release without a submission", () => {
     if (!data) throw new Error("The no-submission fixture was not provisioned.");
     await page.goto(`/courses/${data.courseId}?tab=gradebook`);
     const activityRow = page.locator(".table-row-gradebook-activity").filter({ hasText: data.activityTitle }).first();
-    const release = activityRow.getByRole("button", { name: "Release", exact: true });
+    const release = (await openGradebookActions(page, data.activityTitle)).getByRole("menuitem", { name: "Release", exact: true });
     await expect(release).toBeEnabled();
     await release.click();
     await confirmSharedDialog(page);
-    await expect(activityRow.getByRole("button", { name: "Hide", exact: true })).toBeVisible();
+    await expect(activityRow.getByText("Released", { exact: true })).toBeVisible();
   });
 });

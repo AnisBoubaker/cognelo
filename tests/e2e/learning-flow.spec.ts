@@ -1,3 +1,4 @@
+import { openGradebookActions } from "./fixtures/gradebook-ui";
 import type { Request } from "@playwright/test";
 import { confirmSharedDialog, credentialsFor, expect, test } from "./fixtures/auth";
 import { provisionLearningFlow, removeLearningFlow, type LearningFlowData } from "./fixtures/learning-flow";
@@ -66,11 +67,11 @@ test.describe("student submission and teacher grading", () => {
     await reviewDialog.getByRole("button", { name: "Close" }).click();
 
     await teacherPage.goto(`/courses/${data.courseId}?tab=gradebook`);
-    await expect(teacherPage.getByRole("heading", { name: "Course gradebook" })).toBeVisible();
+    await expect(teacherPage.getByRole("region", { name: "Course gradebook", exact: true })).toBeVisible();
     await expect(teacherPage.getByRole("button", { name: `Expand ${data.activityTitle}` })).toBeVisible();
-    await teacherPage.getByRole("button", { name: "Release", exact: true }).click();
+    await (await openGradebookActions(teacherPage, data.activityTitle)).getByRole("menuitem", { name: "Release", exact: true }).click();
     await confirmSharedDialog(teacherPage);
-    await expect(teacherPage.getByRole("button", { name: "Hide", exact: true })).toBeVisible();
+    await expect(teacherPage.getByText("Released", { exact: true })).toBeVisible();
 
     await studentPage.goto(`/courses/${data.courseId}/groups/${data.groupId}?tab=grades`);
     await expect(studentPage.getByRole("heading", { name: "Grades", exact: true })).toBeVisible();

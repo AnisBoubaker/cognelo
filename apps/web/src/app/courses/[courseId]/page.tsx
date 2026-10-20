@@ -19,13 +19,14 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
 import { ActivitySettingsDialog } from "@/components/activity-settings-dialog";
-import { ActivityTypeIcon, AppIcon, DisclosureIndicator, FolderContentIcon as SharedFolderContentIcon } from "@/components/app-icon";
+import { ActivityTypeIcon, AppIcon, FolderContentIcon as SharedFolderContentIcon } from "@/components/app-icon";
 import { useAuth } from "@/components/auth-provider";
 import { CourseSettingsPanel, type CourseSettingsSection } from "@/components/course-settings-panel";
 import { CourseParticipantsPanel } from "@/components/course-participants-panel";
 import { CourseStudentGroupingsPanel } from "@/components/student-groupings-panel";
 import { CourseStaffPanel } from "@/components/course-staff-panel";
 import { CourseGradeChallengesPanel } from "@/components/course-grade-challenges-panel";
+import { GradebookSummaryRow } from "@/components/gradebook-summary-row";
 import { GradebookExportDialog, type GradebookExportTarget } from "@/components/gradebook-export-dialog";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
 import {
@@ -1873,28 +1874,8 @@ export default function CourseDetailPage() {
                   id: "gradebook",
                   label: t("courseDetail.gradebookTab"),
                   render: () => (
-                    <section className="section stack">
-                      <div className="section-heading">
-                        <div>
-                          <p className="eyebrow">{t("courseDetail.gradebookEyebrow")}</p>
-                          <h2>{t("courseDetail.gradebookTitle")}</h2>
-                        </div>
-                        <a
-                          className="button secondary"
-                          href={api.courseGradebookCsvUrl(courseId, {
-                            groupId: gradebookGroupId || undefined,
-                            activityId: gradebookActivityId || undefined,
-                            status: gradebookStatus
-                          })}
-                        >
-                          {t("courseDetail.exportCsv")}
-                        </a>
-                      </div>
-
-                      {gradebookLoading ? (
-                        <p className="muted">{t("common.loading")}</p>
-                      ) : <>
-                      <div className="form inline-panel gradebook-filters">
+                    <section className="section stack course-gradebook-overview" aria-label={t("courseDetail.gradebookTitle")}>
+                      <div className="gradebook-filters">
                         <div className="field">
                           <label htmlFor="gradebook-group-filter">{t("courseDetail.groupFilter")}</label>
                           <select id="gradebook-group-filter" value={gradebookGroupId} onChange={(event) => setGradebookGroupId(event.target.value)}>
@@ -1935,22 +1916,28 @@ export default function CourseDetailPage() {
                             <option value="graded">{t("courseDetail.gradebookStatusGraded")}</option>
                           </select>
                         </div>
+                        <a className="button secondary gradebook-csv-export" href={api.courseGradebookCsvUrl(courseId, {
+                          groupId: gradebookGroupId || undefined,
+                          activityId: gradebookActivityId || undefined,
+                          status: gradebookStatus
+                        })}><AppIcon name="download" />{t("courseDetail.exportCsv")}</a>
                       </div>
 
-                      <div className="gradebook-summary-bar">
-                        <div className="gradebook-summary-card">
+                      {gradebookLoading ? <p className="muted">{t("common.loading")}</p> : <>
+                      <div className="gradebook-compact-stats">
+                        <div className="gradebook-compact-stat">
                           <span className="table-meta-note muted">{t("courseDetail.activitiesHeader")}</span>
                           <strong>{gradebookOverview.activityCount}</strong>
                         </div>
-                        <div className="gradebook-summary-card">
+                        <div className="gradebook-compact-stat">
                           <span className="table-meta-note muted">{t("courseDetail.submissionsHeader")}</span>
                           <strong>{gradebookOverview.submissionCount}</strong>
                         </div>
-                        <div className="gradebook-summary-card">
+                        <div className="gradebook-compact-stat">
                           <span className="table-meta-note muted">{t("courseDetail.gradedHeader")}</span>
                           <strong>{gradebookOverview.gradedCount}</strong>
                         </div>
-                        <div className="gradebook-summary-card">
+                        <div className="gradebook-compact-stat">
                           <span className="table-meta-note muted">{t("courseDetail.meanGradeHeader")}</span>
                           <strong>{formatMeanGrade(gradebookOverview.meanScore, gradebookOverview.meanMaxScore)}</strong>
                         </div>
@@ -1960,132 +1947,54 @@ export default function CourseDetailPage() {
                         <div className="table-list gradebook-table">
                           <div className="table-row table-row-gradebook-activity table-head" aria-hidden="true">
                             <span>{t("courseDetail.activityHeader")}</span>
-                            <span>{t("courseDetail.submissionsHeader")}</span>
-                            <span>{t("courseDetail.gradedHeader")}</span>
-                            <span>{t("courseDetail.meanGradeHeader")}</span>
-                            <span>{t("courseDetail.releaseHeader")}</span>
-                            <span>{t("courseDetail.actionsHeader")}</span>
+                            <div className="gradebook-row-metrics">
+                              <span>{t("courseDetail.gradingProgressLabel")}</span>
+                              <span>{t("courseDetail.meanGradeHeader")}</span>
+                              <span>{t("courseDetail.releaseHeader")}</span>
+                            </div>
+                            <span />
                           </div>
                           {gradebookActivities.map((activity) => (
                             <div className="table-group" key={activity.activityId}>
-                              <div className="table-row table-row-gradebook-activity">
-                                <div className="gradebook-activity-cell">
-                                  <button
-                                    aria-expanded={expandedGradebookActivityIds.has(activity.activityId)}
-                                    aria-label={t("courseDetail.expandActivity", { title: activity.activityTitle })}
-                                    className="gradebook-expander"
-                                    type="button"
-                                    onClick={() => toggleGradebookActivity(activity.activityId)}
-                                  >
-                                    <DisclosureIndicator expanded={expandedGradebookActivityIds.has(activity.activityId)} />
-                                  </button>
-                                  <div className="table-main table-main-stack">
-                                    <strong>{activity.activityTitle}</strong>
-                                    <span className="table-meta-note muted">{activity.activityTypeName}</span>
-                                  </div>
-                                </div>
-                                <span className="gradebook-number">{activity.submissionCount}</span>
-                                <span className="gradebook-number">{activity.gradedCount}</span>
-                                <strong className="gradebook-number">{formatMeanGrade(activity.meanScore, activity.meanMaxScore)}</strong>
-                                <div className="table-actions">
-                                  {activity.assessmentMode === "summative" ? <button
-                                    className="button secondary"
-                                    disabled={
-                                      savingReleaseItemId === activity.gradebookItemIds.join(":")
-                                      || (!activity.allGradesReleased && activity.incompleteGradeCount > 0)
-                                    }
-                                    title={!activity.allGradesReleased && activity.incompleteGradeCount > 0
-                                      ? t("courseDetail.releaseGradesBlocked", { count: activity.incompleteGradeCount })
-                                      : undefined}
-                                    type="button"
-                                    onClick={() =>
-                                      setGradebookItemsRelease(activity.gradebookItemIds, !activity.allGradesReleased, activity.activityTitle)
-                                    }
-                                  >
-                                    {activity.allGradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
-                                  </button> : null}
-                                  {activity.assessmentMode === "summative" && !activity.allGradesReleased && activity.incompleteGradeCount > 0 ? (
-                                    <span className="grade-release-blocked-note">
-                                      {t("courseDetail.releaseGradesBlocked", { count: activity.incompleteGradeCount })}
-                                    </span>
-                                  ) : null}
-                                </div>
-                                <div className="table-actions">
-                                  <button
-                                    className="button secondary"
-                                    type="button"
-                                    onClick={() => setGradebookExportTarget({
-                                      courseId,
-                                      courseTitle: course?.title ?? t("courseDetail.courseView"),
-                                      activityId: activity.activityId,
-                                      activityTitle: activity.activityTitle,
-                                      groupId: gradebookGroupId || undefined,
-                                      groupName: sortedGradebookGroups.find((group) => group.id === gradebookGroupId)?.title
-                                        ?? t("courseDetail.allGroups")
-                                    })}
-                                  >
-                                    {t("courseDetail.exportGrades")}
-                                  </button>
-                                  <Link className="button secondary" href={`/courses/${courseId}/gradebook/activities/${activity.activityId}`}>
-                                    {t("courseDetail.detailedResults")}
-                                  </Link>
-                                </div>
-                              </div>
+                              <GradebookSummaryRow
+                                title={activity.activityTitle}
+                                subtitle={activity.activityTypeName}
+                                href={`/courses/${courseId}/gradebook/activities/${activity.activityId}`}
+                                submissions={activity.submissionCount}
+                                graded={activity.gradedCount}
+                                meanGrade={formatMeanGrade(activity.meanScore, activity.meanMaxScore)}
+                                releaseState={activity.assessmentMode !== "summative" ? null : activity.allGradesReleased ? "released" : activity.groups.some((group) => group.gradesReleased) ? "partial" : "hidden"}
+                                incompleteGrades={activity.incompleteGradeCount}
+                                releasePending={savingReleaseItemId === activity.gradebookItemIds.join(":")}
+                                onRelease={() => void setGradebookItemsRelease(activity.gradebookItemIds, !activity.allGradesReleased, activity.activityTitle)}
+                                onExport={() => setGradebookExportTarget({
+                                  courseId, courseTitle: course.title, activityId: activity.activityId, activityTitle: activity.activityTitle,
+                                  groupId: gradebookGroupId || undefined,
+                                  groupName: sortedGradebookGroups.find((group) => group.id === gradebookGroupId)?.title ?? t("courseDetail.allGroups")
+                                })}
+                                expanded={expandedGradebookActivityIds.has(activity.activityId)}
+                                onToggle={() => toggleGradebookActivity(activity.activityId)}
+                              />
                               {expandedGradebookActivityIds.has(activity.activityId) ? (
                                 <div className="gradebook-subtable">
                                   {activity.groups.map((group) => (
-                                    <div className="table-row table-row-gradebook-group-summary" key={`${activity.activityId}-${group.groupId}`}>
-                                      <div className="table-main table-main-stack">
-                                        <strong>{group.groupTitle}</strong>
-                                        <span className="table-meta-note muted">{t("courseDetail.studentCount", { count: group.studentCount })}</span>
-                                      </div>
-                                      <span className="gradebook-number">{group.submissionCount}</span>
-                                      <span className="gradebook-number">{group.gradedCount}</span>
-                                      <strong className="gradebook-number">{formatMeanGrade(group.meanScore, group.meanMaxScore)}</strong>
-                                      <div className="table-actions">
-                                        {group.assessmentMode === "summative" ? <button
-                                          className="button secondary"
-                                          disabled={
-                                            savingReleaseItemId === group.gradebookItemId
-                                            || (!group.gradesReleased && group.incompleteGradeCount > 0)
-                                          }
-                                          title={!group.gradesReleased && group.incompleteGradeCount > 0
-                                            ? t("courseDetail.releaseGradesBlocked", { count: group.incompleteGradeCount })
-                                            : undefined}
-                                          type="button"
-                                          onClick={() => setGradebookRelease(group.gradebookItemId, !group.gradesReleased, `${activity.activityTitle} - ${group.groupTitle}`)}
-                                        >
-                                          {group.gradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
-                                        </button> : null}
-                                        {group.assessmentMode === "summative" && !group.gradesReleased && group.incompleteGradeCount > 0 ? (
-                                          <span className="grade-release-blocked-note">
-                                            {t("courseDetail.releaseGradesBlocked", { count: group.incompleteGradeCount })}
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                      <div className="table-actions">
-                                        <button
-                                          className="button secondary"
-                                          type="button"
-                                          onClick={() => setGradebookExportTarget({
-                                            courseId,
-                                            courseTitle: course?.title ?? t("courseDetail.courseView"),
-                                            activityId: activity.activityId,
-                                            activityTitle: activity.activityTitle,
-                                            groupId: group.groupId,
-                                            groupName: group.groupTitle
-                                          })}
-                                        >
-                                          {t("courseDetail.exportGrades")}
-                                        </button>
-                                        <Link
-                                          className="button secondary"
-                                          href={`/courses/${courseId}/gradebook/activities/${activity.activityId}?groupId=${group.groupId}`}
-                                        >
-                                          {t("courseDetail.detailedResults")}
-                                        </Link>
-                                      </div>
-                                    </div>
+                                    <GradebookSummaryRow
+                                      key={`${activity.activityId}-${group.groupId}`}
+                                      title={group.groupTitle}
+                                      subtitle={t("courseDetail.studentCount", { count: group.studentCount })}
+                                      href={`/courses/${courseId}/gradebook/activities/${activity.activityId}?groupId=${group.groupId}`}
+                                      submissions={group.submissionCount}
+                                      graded={group.gradedCount}
+                                      meanGrade={formatMeanGrade(group.meanScore, group.meanMaxScore)}
+                                      releaseState={group.assessmentMode !== "summative" ? null : group.gradesReleased ? "released" : "hidden"}
+                                      incompleteGrades={group.incompleteGradeCount}
+                                      releasePending={savingReleaseItemId === group.gradebookItemId}
+                                      onRelease={() => void setGradebookRelease(group.gradebookItemId, !group.gradesReleased, `${activity.activityTitle} - ${group.groupTitle}`)}
+                                      onExport={() => setGradebookExportTarget({
+                                        courseId, courseTitle: course.title, activityId: activity.activityId, activityTitle: activity.activityTitle,
+                                        groupId: group.groupId, groupName: group.groupTitle
+                                      })}
+                                    />
                                   ))}
                                 </div>
                               ) : null}

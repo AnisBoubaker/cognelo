@@ -1,3 +1,4 @@
+import { openGradebookActions } from "./fixtures/gradebook-ui";
 import { prisma } from "@cognelo/db";
 import type { Page } from "@playwright/test";
 import { confirmSharedDialog, createAuthenticatedApi, expect, test } from "./fixtures/auth";
@@ -30,7 +31,7 @@ test.describe("student grade challenges", () => {
     if (!data) throw new Error("The grade-challenge fixture was not provisioned.");
 
     await teacherPage.goto(`/courses/${data.courseId}?tab=gradebook`);
-    await teacherPage.getByRole("button", { name: "Release", exact: true }).click();
+    await (await openGradebookActions(teacherPage, data.activityTitle)).getByRole("menuitem", { name: "Release", exact: true }).click();
     await confirmSharedDialog(teacherPage);
 
     const firstExplanation = "The selected answer is correct, so please review this released grade.";
