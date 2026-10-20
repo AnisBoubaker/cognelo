@@ -34,7 +34,7 @@ describe("text content plugin", () => {
         contentTypeKey: "text",
         payload: { title: "Note", body: "Hello" }
       })
-    ).resolves.toEqual({ title: "Note", metadata: { body: "Hello", format: "markdown" } });
+    ).resolves.toEqual({ title: "Note", metadata: { body: "Hello", format: "markdown", displayMode: "inline", openInNewTab: false } });
 
     await expect(
       textContentServerPlugin.handlers?.getEmbeddingSource?.({
@@ -111,5 +111,28 @@ describe("text content plugin", () => {
       title: "Functions"
     });
     expect(dbMocks.courseContentResource.update).toHaveBeenCalled();
+  });
+});
+
+import { getTextContentPresentation, readTextContent, textPayloadSchema } from "./shared";
+
+describe("text material presentation", () => {
+  it("displays older notes inline and opens page views in the same tab unless requested", () => {
+    expect(readTextContent({ body: "Old note" })).toEqual({ body: "Old note", displayMode: "inline", openInNewTab: false });
+    expect(getTextContentPresentation({ displayMode: "page" })).toMatchObject({ displayMode: "page", target: "_self" });
+    expect(getTextContentPresentation({ displayMode: "page", openInNewTab: true })).toMatchObject({ target: "_blank" });
+    expect(getTextContentPresentation({ displayMode: "modal", openInNewTab: true })).toMatchObject({ displayMode: "modal", target: "_self" });
+    expect(textPayloadSchema.safeParse({ displayMode: "iframe" }).success).toBe(false);
+    expect(textPayloadSchema.safeParse({ openInNewTab: "true" }).success).toBe(false);
+    expect(textPayloadSchema.safeParse({ body: "x".repeat(20001) }).success).toBe(false);
+  });
+
+  it("changes display settings without replacing authored Markdown and duplicates independently", async () => {
+    const user = { id: "u", email: "u@example.test", name: null, firstName: null, lastName: null, roles: ["teacher" as const] };
+    const resource = { id: "r", courseId: "c", contentTypeKey: "text", pluginKey: "text-content", title: "Note", metadata: { body: "![Diagram](/api/media-assets/image123/content)\n\n$x^2$", format: "markdown", embeddingIndex: { derived: true } } };
+    const updated = await textContentServerPlugin.handlers!.update!({ user, resource, payload: { displayMode: "page", openInNewTab: true } });
+    expect(updated.metadata).toMatchObject({ ...resource.metadata, displayMode: "page", openInNewTab: true });
+    const copy = await textContentServerPlugin.handlers!.duplicate!({ user, resource: { ...resource, metadata: updated.metadata }, title: "Copy" });
+    expect(copy.metadata).toEqual({ body: resource.metadata.body, format: "markdown", displayMode: "page", openInNewTab: true });
   });
 });

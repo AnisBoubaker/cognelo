@@ -5,7 +5,8 @@ import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import { canManageCourse, isAdmin, isCourseManager, isTeacher } from "./authorization";
 import { AppError, forbidden, notFound } from "./errors";
-import { assignmentRequiresSafeExamBrowser, getGroupAssignedActivity } from "./groups";
+import { getContentResourceForPluginRoute } from "./course-content";
+import { assertCanViewGroup, assignmentRequiresSafeExamBrowser, getGroupAssignedActivity } from "./groups";
 
 export const MAX_MEDIA_IMAGE_BYTES = 10 * 1024 * 1024;
 export const MEDIA_ASSET_STAGING_HOURS = 24;
@@ -20,7 +21,8 @@ type MediaReferenceOwner =
   | { activityVersionId: string }
   | { activityId: string }
   | { testRevisionId: string }
-  | { testRevisionItemId: string };
+  | { testRevisionItemId: string }
+  | { contentResourceId: string };
 
 type MediaReferenceOptions = {
   actorId?: string;
@@ -148,6 +150,25 @@ async function canDeliverActiveAsset(
     return true;
   }
 
+  for (const reference of asset.references) {
+    const resource = reference.contentResource;
+    if (!resource) continue;
+    if (await canManageCourse(user, resource.courseId)) return true;
+    const groups = await prisma.courseGroup.findMany({
+      where: { courseId: resource.courseId, ...(resource.groupId ? { id: resource.groupId } : {}), participants: { some: { userId: user.id } } },
+      select: { id: true }
+    });
+    for (const group of groups) {
+      try {
+        await assertCanViewGroup(user, resource.courseId, group.id);
+        await getContentResourceForPluginRoute(user, resource.courseId, resource.id, { groupId: group.id, enforceVisibility: true });
+        return true;
+      } catch {
+        // A different enrolled section may still expose this resource.
+      }
+    }
+  }
+
   const courseActivities = new Map<string, Set<string>>();
   for (const reference of asset.references) {
     const activityContext = reference.activity
@@ -201,6 +222,7 @@ async function loadAssetForDelivery(assetId: string) {
       blob: true,
       references: {
         include: {
+          contentResource: { select: { id: true, courseId: true, groupId: true } },
           activity: { select: { id: true, courseId: true } },
           testRevision: { select: { test: { select: { activityId: true, courseId: true } } } },
           testRevisionItem: { select: { revision: { select: { test: { select: { activityId: true, courseId: true } } } } } }

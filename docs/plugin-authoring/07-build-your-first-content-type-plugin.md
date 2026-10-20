@@ -150,6 +150,10 @@ The settings form should edit fields that your server `update` handler understan
 
 For resource rows requiring configurable navigation or a description, declare an optional `presentationRendererKey` and register a resolver in `content-type-renderers.tsx`. It returns the SDK `ContentResourcePresentation` (`href`, optional `_blank`/`_self` target, and optional plain-text description). Keep metadata interpretation and URL validation in the plugin; host rows consume only this generic projection. Server `resolveOpenAction` can return the same target hint. The Link plugin shares one validated projection between both paths.
 
+For full-page authoring, declare `editorRendererKey` and register the editor adapter alongside the settings adapter. Declare `rendererKey` for the read-only body renderer. Optional presentation `displayMode` (`inline`, `page`, or `modal`) uses the generic reader shell; page URLs carry the learner's section, and previews carry a return-context flag. See the [Text plugin reference](../../packages/plugin-content-types/plugin-text/docs/REFERENCE.md).
+
+Declare `markdownFields` for top-level metadata fields containing managed image references. Core reconciles those fields transactionally when resources are created, saved, or duplicated; plugins must not activate media themselves or expose private filesystem paths. The generic update accepts optional `isVisible`, validates it, and atomically updates the placement along with authored content. Direct reader APIs require course management or an accessible section and visible resource.
+
 ## 5. Register The Plugin
 
 Register the shared definition in:

@@ -1,5 +1,6 @@
 "use client";
 
+import { ContentResourceInline, ContentResourceModalTitle } from "./content-resource-display";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
 import { type CSSProperties, useMemo } from "react";
@@ -131,7 +132,7 @@ export function StudentCourseContent({
       const resource = contentResourceById.get(item.contentResourceId);
       const definition = resource ? contentTypeByKey.get(resource.contentTypeKey) : null;
       if (!resource || !definition) return null;
-      const presentation = resolveContentResourcePresentation(definition, resource);
+      const presentation = resolveContentResourcePresentation(definition, resource, { groupId, preview: storageScope === "preview" });
       if (presentation) return presentation.href;
       if (definition.embeddingSource === "file_upload" && typeof resource.metadata?.storedName === "string") {
         return withDownloadVersion(api.groupContentResourceDownloadUrl(courseId, groupId, resource.id), resource);
@@ -157,7 +158,8 @@ export function StudentCourseContent({
     const material = item.materialId ? courseMaterialById.get(item.materialId) ?? groupMaterialById.get(item.materialId) : null;
     const materialIsDownloadable = material ? legacyMaterialHasStoredFile(material) : false;
     const contentResource = item.contentResourceId ? contentResourceById.get(item.contentResourceId) : null;
-    const contentPresentation = resolveContentResourcePresentation(contentResource ? contentTypeByKey.get(contentResource.contentTypeKey) : null, contentResource);
+    const contentDefinition = contentResource ? contentTypeByKey.get(contentResource.contentTypeKey) : null;
+    const contentPresentation = resolveContentResourcePresentation(contentDefinition, contentResource, { groupId, preview: storageScope === "preview" });
     const contentResourceIsFile = contentResource
       ? contentTypeByKey.get(contentResource.contentTypeKey)?.embeddingSource === "file_upload"
       : false;
@@ -218,7 +220,7 @@ export function StudentCourseContent({
               >
                 {title}
               </button>
-            ) : href && isOpenable && (material || contentResource) ? (
+            ) : contentPresentation?.displayMode === "modal" ? <ContentResourceModalTitle resource={contentResource} definition={contentDefinition} title={title} /> : href && isOpenable && (material || contentResource) ? (
               <a
                 href={href}
                 rel={materialTarget === "_blank" ? "noopener noreferrer" : undefined}
@@ -228,6 +230,7 @@ export function StudentCourseContent({
               </a>
             ) : href && isOpenable ? <Link href={href}>{title}</Link> : title}
           </strong>
+          <ContentResourceInline resource={contentResource} definition={contentDefinition} />
           {contentPresentation?.description ? <p className="content-resource-description">{contentPresentation.description}</p> : null}
           {hasBadges ? (
             <span className="metadata-badges">

@@ -45,7 +45,7 @@ import {
   GradebookStatus,
   Subject
 } from "@/lib/api";
-import { ContentTypeIcon as MaterialTypeIcon, resolveContentResourcePresentation, resolveContentTypeSettingsRenderer } from "@/lib/content-type-renderers";
+import { ContentTypeIcon as MaterialTypeIcon, contentResourceEditorHref, resolveContentResourcePresentation, resolveContentTypeSettingsRenderer } from "@/lib/content-type-renderers";
 import { defaultDuplicateActivityTitle } from "@/lib/activity-bank-titles";
 import { activityCreationConfig } from "@/lib/activity-creation-defaults";
 import { useI18n } from "@/lib/i18n";
@@ -105,6 +105,7 @@ export default function CourseDetailPage() {
   const [settingsContentItemId, setSettingsContentItemId] = useState<string | null>(null);
   const [settingsMaterialTitle, setSettingsMaterialTitle] = useState("");
   const [settingsMaterialUrl, setSettingsMaterialUrl] = useState("");
+  const [settingsMaterialVisible, setSettingsMaterialVisible] = useState(true);
   const [settingsMaterialBody, setSettingsMaterialBody] = useState("");
   const [settingsMaterialMetadata, setSettingsMaterialMetadata] = useState<Record<string, unknown> | null>(null);
   const [settingsMaterialFile, setSettingsMaterialFile] = useState<File | null>(null);
@@ -572,6 +573,11 @@ export default function CourseDetailPage() {
         parentId: pickerParentId || null,
         isVisible: pickerIsVisible
       });
+      if (definition.editorRendererKey) {
+        setShowActivityPicker(false);
+        router.push(contentResourceEditorHref(result.resource));
+        return;
+      }
       setSettingsContentItemId(result.contentItem.id);
       setSettingsMaterialTitle(title);
       setSettingsMaterialMetadata(null);
@@ -1011,6 +1017,7 @@ export default function CourseDetailPage() {
   }
 
   function openContentSettings(item: CourseContentItem) {
+    setSettingsMaterialVisible(item.isVisible);
     setSettingsContentItemId(item.id);
     setSettingsError("");
     setSettingsMaterialMetadata(null);
@@ -1070,8 +1077,9 @@ export default function CourseDetailPage() {
         await api.updateCourseContentResource(courseId, resource.id, {
           payload: {
             title: settingsMaterialTitle,
-            body: settingsMaterialBody
-          }
+            ...(settingsMaterialMetadata ?? {})
+          },
+          isVisible: settingsMaterialVisible
         });
       } else {
         await api.updateCourseContentResource(courseId, resource.id, {
@@ -1332,6 +1340,7 @@ export default function CourseDetailPage() {
       if (!definition) {
         return null;
       }
+      if (definition.editorRendererKey) return contentResourceEditorHref(resource);
       const presentation = resolveContentResourcePresentation(definition, resource);
       if (presentation) return presentation.href;
       if (definition.embeddingSource === "file_upload" && typeof resource.metadata?.storedName === "string") {
@@ -1534,7 +1543,7 @@ export default function CourseDetailPage() {
                             const contentResourceIsUnavailable = Boolean(contentResource && !contentResourceDefinition);
                             const contentResourceIsFile = contentResourceDefinition?.embeddingSource === "file_upload";
                             const contentPresentation = resolveContentResourcePresentation(contentResourceDefinition, contentResource);
-                            const contentResourceTarget = contentPresentation?.target ?? (contentResourceIsFile ? undefined : "_blank");
+                            const contentResourceTarget = contentResourceDefinition?.editorRendererKey ? "_self" : contentPresentation?.target ?? (contentResourceIsFile ? undefined : "_blank");
                             const assignment = item.courseGroupActivityId ? groupAssignmentById.get(item.courseGroupActivityId) : null;
                             const activity = assignment?.activity ?? (item.activityId ? courseActivityById.get(item.activityId) : null);
                             const allGroupsRule = activity ? getAllGroupsAssignmentRule(activity) : null;
@@ -1796,6 +1805,11 @@ export default function CourseDetailPage() {
                                         <MaterialActionIcon name="duplicate" />
                                         <span>{t("courseDetail.duplicateActivity")}</span>
                                       </button>
+                                    ) : null}
+                                    {contentResource && contentResourceDefinition?.editorRendererKey ? (
+                                      <Link className="content-context-menu-item" href={contentResourceEditorHref(contentResource)} role="menuitem" onClick={() => setContentContextMenu(null)}>
+                                        <MaterialActionIcon name="edit" /><span>{t("common.edit")}</span>
+                                      </Link>
                                     ) : null}
                                     {!contentGroup ? <button
                                       className="content-context-menu-item"
@@ -2149,6 +2163,8 @@ export default function CourseDetailPage() {
                         title: settingsMaterialTitle,
                         url: settingsMaterialUrl,
                         body: settingsMaterialBody,
+                        isVisible: settingsMaterialVisible,
+                        onVisibilityChange: setSettingsMaterialVisible,
                         metadata: settingsMaterialMetadata ?? settingsContentResource.metadata ?? {},
                         detail: contentResourceDetail(settingsContentResource),
                         error: settingsError,

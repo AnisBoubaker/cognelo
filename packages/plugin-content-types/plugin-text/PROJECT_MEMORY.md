@@ -1,9 +1,9 @@
 # Text Content Plugin Memory
 
-- Plugin key: `text-content`.
-- Content type key: `text`.
-- Body content is stored in generic resource metadata as `{ body, format: "markdown" }`.
-- The server plugin implements `getEmbeddingDocuments` and returns the Markdown body as a generic extracted document. Activity plugins should consume this through core dispatchers, not by reading text metadata directly.
-- The server plugin implements `indexEmbeddingDocuments` and `searchEmbeddingDocuments`. The current dev index is stored in resource metadata under `embeddingIndex`; future pgvector/plugin-owned table storage should stay behind those handlers.
-- No plugin-owned table is used yet; revisions/rendered variants can add plugin-owned persistence later.
-- The server `duplicate` handler copies text metadata but removes `embeddingIndex` so a copied resource rebuilds derived search state under its own ID.
+- Plugin key `text-content`; content type key `text`. No plugin-owned table.
+- Persist authored Markdown in `metadata.body` with `format: "markdown"`. The dedicated editor reuses shared `RichTextEditor`; student views use sanitized `MarkdownRenderer`.
+- Missing `displayMode` means `inline`. `page` and `modal` are alternatives. `openInNewTab` defaults to false and only affects page mode. The modal is 80vw wide.
+- Declare `markdownFields: ["body"]`; core transactionally retains uploaded images on resource saves/copies. Never bypass media ownership and section visibility checks.
+- Embedding extraction uses only the Markdown body. The deterministic development vector index remains `metadata.embeddingIndex`; duplication removes it for independent rebuilding.
+- Editor and reader navigation reuse the activity header action layout and shared “Back to course” translation; do not introduce local wording or alignment.
+- Keep host integration generic through renderer, editor, settings, and presentation registry keys. See [reference](docs/REFERENCE.md) and [media lifecycle](../../../docs/MEDIA_ASSETS.md).

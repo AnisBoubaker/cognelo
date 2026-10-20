@@ -42,11 +42,13 @@ test.describe.serial("course content resources and folders", () => {
     await picker.getByRole("tab", { name: "Material", exact: true }).click();
     await picker.getByRole("button", { name: /^Text(?:\s|$)/ }).click();
 
-    const settings = teacherPage.getByRole("dialog").filter({ has: teacherPage.getByRole("button", { name: "Save material" }) });
-    await settings.getByLabel("Title", { exact: true }).fill(textTitle);
-    await settings.getByLabel("Content", { exact: true }).fill("## Nested notes\n\nVisible only while the parent folder is visible.");
-    await settings.getByRole("button", { name: "Save material" }).click();
-    await expect(settings).toBeHidden();
+    await expect(teacherPage).toHaveURL(/\/materials\/[^/]+\/edit$/);
+    await teacherPage.getByLabel("Title", { exact: true }).fill(textTitle);
+    await teacherPage.getByRole("tab", { name: "Markdown", exact: true }).click();
+    await teacherPage.getByRole("textbox", { name: "Content", exact: true }).fill("## Nested notes\n\nVisible only while the parent folder is visible.");
+    await teacherPage.getByRole("button", { name: "Save material", exact: true }).click();
+    await expect(teacherPage.getByText("Text material saved.", { exact: true })).toBeVisible();
+    await teacherPage.getByRole("link", { name: "Back to course", exact: true }).click();
     await expect(teacherPage.getByText(textTitle, { exact: true })).toBeVisible();
 
     await teacherPage.getByRole("button", { name: `Actions for ${textTitle}` }).click();

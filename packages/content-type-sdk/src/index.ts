@@ -15,6 +15,7 @@ export type ContentResourcePresentation = {
   href: string | null;
   target?: "_blank" | "_self";
   description?: string;
+  displayMode?: "inline" | "page" | "modal";
 };
 
 export type ContentTypeDefinition = {
@@ -26,6 +27,9 @@ export type ContentTypeDefinition = {
   createMode: ContentTypeCreateMode;
   embeddingSource: ContentEmbeddingSourceKind;
   rendererKey?: string;
+  editorRendererKey?: string;
+  /** Top-level metadata fields containing authored Markdown and managed media. */
+  markdownFields?: readonly string[];
   settingsRendererKey?: string;
   presentationRendererKey?: string;
 };

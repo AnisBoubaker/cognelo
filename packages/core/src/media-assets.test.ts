@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const db = vi.hoisted(() => ({
   $transaction: vi.fn(),
   courseGroupActivity: { findMany: vi.fn() },
+  courseGroup: { findMany: vi.fn() },
   mediaAsset: { count: vi.fn(), create: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
   mediaAssetReference: { findMany: vi.fn(), createMany: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
   mediaBlob: { deleteMany: vi.fn(), upsert: vi.fn() }
@@ -17,6 +18,7 @@ const authorization = vi.hoisted(() => ({
   isTeacher: vi.fn()
 }));
 const groups = vi.hoisted(() => ({
+  assertCanViewGroup: vi.fn(),
   assignmentRequiresSafeExamBrowser: vi.fn(),
   getGroupAssignedActivity: vi.fn()
 }));
@@ -24,6 +26,8 @@ const groups = vi.hoisted(() => ({
 vi.mock("@cognelo/db", () => ({ prisma: db, Prisma: {} }));
 vi.mock("./authorization", () => authorization);
 vi.mock("./groups", () => groups);
+const content = vi.hoisted(() => ({ getContentResourceForPluginRoute: vi.fn() }));
+vi.mock("./course-content", () => content);
 
 import { collectMediaGarbage, extractMediaAssetIds, getMediaAssetForDelivery, getMediaMaintenanceOverview, reconcileMediaAssetReferences, uploadMediaImage } from "./media-assets";
 
@@ -116,6 +120,26 @@ describe("media asset references", () => {
       status: 400
     });
     expect(db.mediaBlob.upsert).not.toHaveBeenCalled();
+  });
+
+  it("delivers material images only through an accessible section and visible resource", async () => {
+    db.mediaAsset.findUnique.mockResolvedValue({
+      id: "material-image", status: "active", createdById: "teacher-2", originalName: "diagram.png",
+      blob: { storageKey: "blobs/sha256/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", mimeType: "image/png" },
+      references: [{ contentResource: { id: "resource-1", courseId: "course-1", groupId: null } }]
+    });
+    db.courseGroup.findMany.mockResolvedValue([{ id: "group-1" }]);
+    groups.assertCanViewGroup.mockResolvedValue({});
+    content.getContentResourceForPluginRoute.mockRejectedValue(new Error("Hidden in section"));
+    const student = { id: "student-1", roles: ["student"] } as never;
+    await expect(getMediaAssetForDelivery(student, "material-image")).rejects.toMatchObject({ status: 403 });
+    await mkdir(path.join(storageRoot, "blobs/sha256/aa/aa"), { recursive: true });
+    await writeFile(path.join(storageRoot, "blobs/sha256/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), "image");
+    content.getContentResourceForPluginRoute.mockResolvedValue({ id: "resource-1" });
+    await expect(getMediaAssetForDelivery(student, "material-image")).resolves.toMatchObject({ mimeType: "image/png" });
+    expect(content.getContentResourceForPluginRoute).toHaveBeenCalledWith(student, "course-1", "resource-1", { groupId: "group-1", enforceVisibility: true });
+    groups.assertCanViewGroup.mockRejectedValue(new Error("Section closed"));
+    await expect(getMediaAssetForDelivery(student, "material-image")).rejects.toMatchObject({ status: 403 });
   });
 
   it("requires an active Safe Exam Browser session before delivering protected activity media", async () => {

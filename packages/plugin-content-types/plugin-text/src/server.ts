@@ -1,13 +1,7 @@
-import { z } from "zod";
+import { textPayloadSchema } from "./shared";
 import type { ContentEmbeddingDocumentsResult, ServerContentResourceRecord, ServerContentTypePlugin } from "@cognelo/content-type-sdk/server";
 import { buildContentVectorIndex, searchContentVectorIndex, type ContentVectorIndex } from "@cognelo/content-type-sdk/vector";
 import { Prisma, prisma } from "@cognelo/db";
-
-const textPayloadSchema = z.object({
-  title: z.string().trim().min(1).max(180).optional(),
-  body: z.string().max(20000).optional(),
-  format: z.literal("markdown").optional()
-});
 
 function bodyFrom(metadata: Record<string, unknown> | undefined) {
   return typeof metadata?.body === "string" ? metadata.body : "";
@@ -28,7 +22,9 @@ export const textContentServerPlugin: ServerContentTypePlugin = {
         title: parsed.title ?? "Text note",
         metadata: {
           body: parsed.body ?? "",
-          format: "markdown"
+          format: "markdown",
+          displayMode: parsed.displayMode ?? "inline",
+          openInNewTab: parsed.openInNewTab ?? false
         }
       };
     },
@@ -39,7 +35,9 @@ export const textContentServerPlugin: ServerContentTypePlugin = {
         metadata: {
           ...(input.resource.metadata ?? {}),
           ...(parsed.body !== undefined ? { body: parsed.body } : {}),
-          format: "markdown"
+          format: "markdown",
+          ...(parsed.displayMode !== undefined ? { displayMode: parsed.displayMode } : {}),
+          ...(parsed.openInNewTab !== undefined ? { openInNewTab: parsed.openInNewTab } : {})
         }
       };
     },

@@ -25,14 +25,15 @@ New uploads are `staged` for 24 hours and are visible only to their creator or a
 - mutable `BankActivity`;
 - immutable `ActivityVersion`;
 - course-local `Activity`;
-- immutable `TestRevision`; or
-- immutable `TestRevisionItem`.
+- immutable `TestRevision`;
+- immutable `TestRevisionItem`; or
+- `CourseContentResource` for plugin-declared Markdown fields.
 
-References are field-keyed and currently reconcile Markdown in descriptions plus activity configuration. Copy and synchronization operations create new logical references to the existing asset. Test attempts preserve references from their immutable revision snapshots. Deleting or replacing one occurrence therefore cannot remove bytes that another bank version, course copy, or attempt still needs.
+References are field-keyed and reconcile Markdown in descriptions, activity configuration, and content plugins’ declared `markdownFields` (Text declares `body`). Content-resource creates, saves, and duplicates reconcile in the resource transaction; resource deletion cascades references. Copy and synchronization operations create new logical references to the existing asset. Test attempts preserve references from their immutable revision snapshots. Deleting or replacing one occurrence therefore cannot remove bytes that another bank version, course copy, or attempt still needs.
 
 The canonical stored Markdown URL is `/api/media-assets/<asset-id>/content`. Optional display sizing stays inside standard Markdown image syntax by appending a URI fragment: `#cognelo-size=px:320`, `#cognelo-size=original:50:1280`, or `#cognelo-size=container:60`. The original-percentage form stores the intrinsic pixel width as its final number so the renderer can reproduce the requested scale without loading a second copy or depending on container size. URI fragments are never sent to the media API. The shared renderer validates the numeric bounds, converts recognized fragments into width-only sizing, and always derives height automatically to preserve the image's aspect ratio; unknown or malformed fragments receive normal unsized rendering.
 
-The API serves the underlying asset only to an authorized authenticated user. Students must still pass the normal assignment publication and content-visibility checks; teachers and course managers use the corresponding subject, bank, or course permissions. The web development server proxies this API path so the stored URL remains environment-independent.
+The API serves the underlying asset only to an authorized authenticated user. Students must still pass the normal assignment publication and content-visibility checks; teachers and course managers use the corresponding subject, bank, or course permissions. For material images, the student must have an accessible section with an active plugin and a visible resource, including ancestor and section overrides. The web development server proxies this API path so the stored URL remains environment-independent.
 
 ## Garbage collection
 

@@ -16,9 +16,16 @@ export const textContentPlugin: ContentTypePlugin = {
       icon: "text",
       createMode: "shell",
       embeddingSource: "text_body",
-      settingsRendererKey: "text-content-settings"
+      settingsRendererKey: "text-content-settings",
+      editorRendererKey: "text-content-editor",
+      rendererKey: "text-content-viewer",
+      presentationRendererKey: "text-content-presentation",
+      markdownFields: ["body"]
     }
   ]
 };
 
 export { TextContentSettingsForm, type TextContentSettingsFormProps } from "./settings";
+
+export { TextContentEditor, TextContentViewer } from "./editor";
+export { getTextContentPresentation, readTextContent } from "./shared";

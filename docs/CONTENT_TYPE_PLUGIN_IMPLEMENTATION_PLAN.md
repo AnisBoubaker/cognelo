@@ -144,7 +144,10 @@ type ContentTypeDefinition = {
   createMode: "shell" | "upload" | "custom";
   embeddingSource: "external_url" | "file_upload" | "text_body" | "none" | "custom";
   rendererKey?: string;
+  editorRendererKey?: string;
   settingsRendererKey?: string;
+  presentationRendererKey?: string;
+  markdownFields?: readonly string[];
 };
 ```
 
@@ -403,7 +406,7 @@ packages/plugin-content-types/plugin-text
 Owned behavior:
 
 - picker definition and icon
-- title and text editor settings form
+- dedicated title/Markdown editor and display/visibility settings
 - text validation/sanitization policy
 - display renderer
 - embedding source descriptor for text body
@@ -421,7 +424,7 @@ model TextContentResource {
 }
 ```
 
-Open decision: decide whether text content should be Markdown-only initially or support a richer editor contract.
+Decision: persist Markdown and edit it using the shared full visual/Markdown editor. Text settings select inline (default), separate-page, or 80vw modal display; separate-page new-tab behavior defaults off.
 
 ## Implementation Phases
 
@@ -613,7 +616,7 @@ Verification:
 - API create/update tests
 - `npm test`
 
-Implemented scope: added `packages/plugin-content-types/plugin-text` with the `text-content` plugin and `text` content type. The plugin owns Text picker metadata, localized labels, default title, shell create mode, text settings editor, server create/update behavior, viewer/open-action declaration, and text embedding source extraction from generic metadata. Text content currently stores Markdown body data in `CourseContentResource.metadata` with `format: "markdown"`; no plugin-owned tables were needed for the current phase. The content type SDK, server registry, web renderer registry, TypeScript aliases, Vitest aliases, and package dependencies now wire the plugin. The course picker now creates plugin-backed Text resources, the course settings dialog renders the plugin-owned text editor, and seed data now creates representative Text resources as `CourseContentResource` rows and points the content tree at those resources.
+Implemented scope: added `packages/plugin-content-types/plugin-text` with the `text-content` plugin and `text` content type. The plugin owns Text picker metadata, localized labels, default title, shell create mode, dedicated visual/Markdown editor, display settings, server create/update behavior, viewer/open-action declaration, and text embedding source extraction from generic metadata. Text content currently stores Markdown body data in `CourseContentResource.metadata` with `format: "markdown"`; no plugin-owned tables were needed for the current phase. The content type SDK, server registry, web renderer registry, TypeScript aliases, Vitest aliases, and package dependencies now wire the plugin. The course picker now creates plugin-backed Text resources, the course settings dialog renders plugin-owned visibility/presentation controls and links to the dedicated editor, and seed data now creates representative Text resources as `CourseContentResource` rows and points the content tree at those resources.
 
 Verification completed after Phase 7:
 
@@ -853,5 +856,9 @@ Document:
 - Should plugin activation/admin UI be one page with sections or separate activity/content plugin pages?
 - Should content type labels be exported as localized strings or locale keys plus plugin locale bundles?
 - Should file storage remain local for MVP or move behind a storage adapter as part of the file plugin conversion?
-- Should text content be Markdown-only initially?
+- Text persistence remains Markdown; the editor supports both visual and source modes.
 - How should unavailable content type plugins render existing content rows?
+
+### Text authoring and presentation — implemented
+
+Text now uses dedicated authoring and reader routes, full shared editor controls, inline/page/modal presentation, and shared save/unsaved/notification behavior. The neutral SDK adds `editorRendererKey`, `markdownFields`, and presentation `displayMode`; core retains material image references and authorizes section readers. Details and verification belong to the [Text material reference](../packages/plugin-content-types/plugin-text/docs/REFERENCE.md).

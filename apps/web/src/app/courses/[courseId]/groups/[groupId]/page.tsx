@@ -7,6 +7,7 @@ import type { AssignedActivityAssessmentMode } from "@cognelo/contracts";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import { CodingExerciseStudentGradeReport } from "@cognelo/plugin-coding-exercises";
 import Link from "next/link";
+import { ContentResourceInline, ContentResourceModalTitle } from "@/components/content-resource-display";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { CSSProperties, FocusEvent, FormEvent, PointerEvent, useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
@@ -563,7 +564,7 @@ export default function CourseGroupPage() {
       if (!definition) {
         return null;
       }
-      const presentation = resolveContentResourcePresentation(definition, resource);
+      const presentation = resolveContentResourcePresentation(definition, resource, { groupId });
       if (presentation) return presentation.href;
       if (definition.embeddingSource === "file_upload" && typeof resource.metadata?.storedName === "string") {
         return withDownloadVersion(api.groupContentResourceDownloadUrl(courseId, groupId, resource.id), resource);
@@ -1406,7 +1407,7 @@ export default function CourseGroupPage() {
                             const contentResourceDefinition = contentResource ? contentTypeByKey.get(contentResource.contentTypeKey) ?? null : null;
                             const contentResourceIsUnavailable = Boolean(contentResource && !contentResourceDefinition);
                             const contentResourceIsFile = contentResourceDefinition?.embeddingSource === "file_upload";
-                            const contentPresentation = resolveContentResourcePresentation(contentResourceDefinition, contentResource);
+                            const contentPresentation = resolveContentResourcePresentation(contentResourceDefinition, contentResource, { groupId });
                             const contentResourceTarget = contentPresentation?.target ?? (contentResourceIsFile ? undefined : "_blank");
                             const isCollapsed = collapsedContentFolderIds.has(item.id);
                             const assignment = item.courseGroupActivityId ? assignmentById.get(item.courseGroupActivityId) : null;
@@ -1499,7 +1500,7 @@ export default function CourseGroupPage() {
                                     </span>
                                   )}
                                   <strong>
-                                    {href && contentResource ? (
+                                    {contentPresentation?.displayMode === "modal" ? <ContentResourceModalTitle resource={contentResource} definition={contentResourceDefinition} title={title} /> : href && contentResource ? (
                                       <a href={href} rel={contentResourceTarget === "_blank" ? "noopener noreferrer" : undefined} target={contentResourceTarget}>
                                         {title}
                                       </a>
@@ -1509,6 +1510,7 @@ export default function CourseGroupPage() {
                                       title
                                     )}
                                   </strong>
+                                  <ContentResourceInline resource={contentResource} definition={contentResourceDefinition} />
                                   {contentPresentation?.description ? <p className="content-resource-description">{contentPresentation.description}</p> : null}
                                   {metadataBadges.length ? <span className="metadata-badges">{metadataBadges}</span> : null}
                                 </div>

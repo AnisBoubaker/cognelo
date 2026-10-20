@@ -1,3 +1,6 @@
+import { z } from "zod";
+import { reconcileMediaAssetReferences } from "./media-assets";
+import { assertCanViewGroup } from "./groups";
 import { Prisma, prisma } from "@cognelo/db";
 import { getContentTypePluginForType } from "@cognelo/content-type-sdk";
 import {
@@ -69,6 +72,7 @@ type CreatePluginContentResourceInput = ContentScope & {
 
 type UpdatePluginContentResourceInput = {
   payload?: unknown;
+  isVisible?: boolean;
 };
 
 type CreateActivityContentItemInput = ContentScope & {
@@ -290,6 +294,7 @@ export async function duplicateCourseContentItem(user: CurrentUser, courseId: st
       materialId: material?.id,
       metadata: source.metadata as Prisma.InputJsonValue
     } });
+    if (contentResource) await reconcileContentResourceMedia(transaction, contentResource, user.id, true);
     if (contentResource && resourceCopy?.afterPersist) {
       await runContentTypePersist(resourceCopy.afterPersist, transaction, contentResource);
     }
@@ -371,6 +376,7 @@ export async function createPluginContentResource(user: CurrentUser, courseId: s
         metadata: toJson(input.itemMetadata)
       }
     });
+    await reconcileContentResourceMedia(transaction, resource, user.id);
     if (result.afterPersist) await runContentTypePersist(result.afterPersist, transaction, resource);
     return { resource, contentItem };
   });
@@ -391,7 +397,8 @@ export async function updatePluginContentResource(
     throw new AppError(400, "CONTENT_TYPE_UPDATE_UNAVAILABLE", "This content type does not support generic updates yet.");
   }
   const result = await update({ user, resource: toServerResourceRecord(resource), payload: input.payload ?? {} });
-  if (result.afterPersist) {
+  const isVisible = z.boolean().optional().parse(input.isVisible);
+  if (result.afterPersist || contentResourceMarkdownFields(resource.contentTypeKey).length || isVisible !== undefined) {
     return prisma.$transaction(async (transaction) => {
       const updated = await transaction.courseContentResource.update({
         where: { id: resource.id },
@@ -400,7 +407,12 @@ export async function updatePluginContentResource(
           ...(result.metadata !== undefined ? { metadata: toJson(result.metadata) } : {})
         }
       });
-      await runContentTypePersist(result.afterPersist!, transaction, updated);
+      await reconcileContentResourceMedia(transaction, updated, user.id);
+      await transaction.courseContentItem.updateMany({
+        where: { contentResourceId: resource.id },
+        data: { titleSnapshot: updated.title, ...(isVisible !== undefined ? { isVisible } : {}) }
+      });
+      if (result.afterPersist) await runContentTypePersist(result.afterPersist, transaction, updated);
       return updated;
     });
   }
@@ -559,6 +571,16 @@ export async function searchContentResourceEmbeddingDocuments(
     diagnostics,
     matches: matches.sort((left, right) => right.score - left.score || left.documentId.localeCompare(right.documentId)).slice(0, limit)
   };
+}
+
+/** Reader/editor page data. Learners must use their section so overrides cannot be bypassed. */
+export async function getContentResourcePage(user: CurrentUser, courseId: string, resourceId: string, scope: ContentScope = {}) {
+  const canManage = await canManageCourse(user, courseId);
+  if (scope.groupId) await assertCanViewGroup(user, courseId, scope.groupId);
+  else await assertCanManageCourse(user, courseId);
+  const resource = await getContentResourceForPluginRoute(user, courseId, resourceId, scope);
+  const contentItem = await prisma.courseContentItem.findFirst({ where: { contentResourceId: resource.id } });
+  return { resource, contentItem, canManage };
 }
 
 export async function getContentResourceForPluginRoute(
@@ -1164,6 +1186,17 @@ async function getVisibleContentResourceIds(courseId: string, groupId: string | 
       .filter((item) => item.contentResourceId && item.effectiveVisibility === "visible")
       .map((item) => item.contentResourceId as string)
   );
+}
+
+function contentResourceMarkdownFields(contentTypeKey: string) {
+  return getContentTypePluginForType(contentTypeKey)?.contentTypes?.find((type) => type.key === contentTypeKey)?.markdownFields ?? [];
+}
+
+async function reconcileContentResourceMedia(transaction: Prisma.TransactionClient, resource: { id: string; contentTypeKey: string; metadata: unknown }, actorId: string, trustedCopy = false) {
+  const fields = contentResourceMarkdownFields(resource.contentTypeKey);
+  if (!fields.length) return;
+  const metadata = resource.metadata as Record<string, unknown> | null;
+  await reconcileMediaAssetReferences(transaction, { contentResourceId: resource.id }, Object.fromEntries(fields.map((field) => [field, metadata?.[field]])), { actorId, trustedCopy });
 }
 
 async function runContentTypePersist(handler: ContentTypePersistHandler, transaction: Prisma.TransactionClient, resource: Parameters<typeof toServerResourceRecord>[0]) {

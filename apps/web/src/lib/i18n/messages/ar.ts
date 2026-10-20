@@ -1438,6 +1438,7 @@ export const arMessages = {
       }
     },
     groupPage: {
+      backToCourse: "العودة إلى المقرر",
       workspaceTabs: "مساحة المجموعة",
       activitiesTab: "الأنشطة",
       materialsTab: "المواد",

@@ -1408,7 +1408,7 @@ async function assertGroupBelongsToCourse(courseId: string, groupId: string) {
   return group;
 }
 
-async function assertCanViewGroup(user: CurrentUser, courseId: string, groupId: string) {
+export async function assertCanViewGroup(user: CurrentUser, courseId: string, groupId: string) {
   await assertCanViewCourse(user, courseId);
   const group = await assertGroupBelongsToCourse(courseId, groupId);
 

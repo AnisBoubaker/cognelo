@@ -2538,6 +2538,8 @@ export const api = {
     request<{ contentTypes: ContentTypeDefinition[]; activeContentTypes?: ContentTypeDefinition[] }>(`/courses/${courseId}/content-types`),
   courseContentResources: (courseId: string) =>
     request<{ resources: CourseContentResource[] }>(`/courses/${courseId}/content-resources`),
+  contentResourcePage: (courseId: string, resourceId: string, groupId?: string) =>
+    request<{ resource: CourseContentResource; contentItem: CourseContentItem | null; canManage: boolean }>(`/courses/${courseId}${groupId ? `/groups/${groupId}` : ""}/content-resources/${resourceId}`),
   contentResourcePluginRequest: <T>(resource: Pick<CourseContentResource, "id" | "courseId" | "groupId">, path: string[], input: { method?: "GET" | "POST"; payload?: unknown } = {}) =>
     request<T>(`/courses/${resource.courseId}${resource.groupId ? `/groups/${resource.groupId}` : ""}/content-resources/${resource.id}/${path.map(encodeURIComponent).join("/")}`, {
       method: input.method ?? "GET",
@@ -2563,6 +2565,7 @@ export const api = {
     resourceId: string,
     input: {
       payload?: unknown;
+      isVisible?: boolean;
     }
   ) =>
     request<{ resource: CourseContentResource }>(`/courses/${courseId}/content-resources/${resourceId}`, {

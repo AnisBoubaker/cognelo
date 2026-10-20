@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { deletePluginContentResource, updatePluginContentResource } from "@cognelo/core";
+import { getContentResourcePage, deletePluginContentResource, updatePluginContentResource } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; groupId: string; resourceId: string }> };
@@ -21,5 +21,13 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { courseId, groupId, resourceId } = await params;
     return json(await deletePluginContentResource(user, courseId, resourceId, { groupId }));
+  });
+}
+
+export async function GET(_request: NextRequest, { params }: Params) {
+  return handleRoute(async () => {
+    const user = await requireUser();
+    const { courseId, resourceId, groupId } = await params;
+    return json(await getContentResourcePage(user, courseId, resourceId, { groupId }));
   });
 }

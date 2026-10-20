@@ -1155,6 +1155,7 @@ model MediaAssetReference {
   activityId         String?
   testRevisionId     String?
   testRevisionItemId String?
+  contentResourceId  String?
   createdAt          DateTime          @default(now())
   asset              MediaAsset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
   subject            Subject?          @relation(fields: [subjectId], references: [id], onDelete: Cascade)
@@ -1164,6 +1165,10 @@ model MediaAssetReference {
   testRevision       TestRevision?     @relation(fields: [testRevisionId], references: [id], onDelete: Cascade)
   testRevisionItem   TestRevisionItem? @relation(fields: [testRevisionItemId], references: [id], onDelete: Cascade)
 
+  contentResource    CourseContentResource? @relation(fields: [contentResourceId], references: [id], onDelete: Cascade)
+
+  @@unique([contentResourceId, fieldKey, assetId])
+  @@index([contentResourceId])
   @@unique([subjectId, fieldKey, assetId])
   @@unique([bankActivityId, fieldKey, assetId])
   @@unique([activityVersionId, fieldKey, assetId])
@@ -1210,6 +1215,7 @@ model CourseContentResource {
   course         Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
   group          CourseGroup?        @relation(fields: [groupId], references: [id], onDelete: Cascade)
   contentItems   CourseContentItem[]
+  mediaReferences MediaAssetReference[]
 
   @@index([courseId, groupId])
   @@index([contentTypeKey])

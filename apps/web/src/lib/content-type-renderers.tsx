@@ -3,7 +3,7 @@ import type { ContentPluginLocale, ContentResourcePresentation, ContentTypeDefin
 import "@cognelo/plugin-registry/content";
 import { FileContentSettingsForm } from "@cognelo/plugin-file-content";
 import { GithubRepoSettingsForm } from "@cognelo/plugin-github-repo";
-import { TextContentSettingsForm } from "@cognelo/plugin-text-content";
+import { TextContentEditor, TextContentViewer, getTextContentPresentation, TextContentSettingsForm } from "@cognelo/plugin-text-content";
 import { getLinkContentPresentation, LinkContentSettingsForm } from "@cognelo/plugin-link-content";
 import { api, type CourseContentItem, type CourseContentResource } from "./api";
 export { ContentTypeIcon } from "../components/app-icon";
@@ -13,6 +13,8 @@ export type ContentTypeSettingsState = {
   url: string;
   body: string;
   metadata: Record<string, unknown>;
+  isVisible?: boolean;
+  onVisibilityChange?: (visible: boolean) => void;
   detail?: string;
   error?: string;
   onTitleChange: (title: string) => void;
@@ -29,12 +31,21 @@ export type ContentTypeRendererContext = {
   resource?: CourseContentResource | null;
   locale: ContentPluginLocale;
   settings?: ContentTypeSettingsState;
+  editor?: { isVisible: boolean; onSave: (payload: Record<string, unknown>, visible: boolean) => Promise<void> };
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
 export type ContentTypeRenderer = (context: ContentTypeRendererContext) => ReactNode;
 
-const contentTypeRenderers: Record<string, ContentTypeRenderer> = {};
+const contentTypeRenderers: Record<string, ContentTypeRenderer> = {
+  "text-content-viewer": ({ resource }) => resource ? <TextContentViewer metadata={resource.metadata ?? {}} /> : null
+};
+const contentTypeEditors: Record<string, ContentTypeRenderer> = {
+  "text-content-editor": ({ resource, locale, editor }) => resource && editor ? <TextContentEditor title={resource.title} metadata={resource.metadata ?? {}} locale={locale} isVisible={editor.isVisible} onSave={editor.onSave} /> : null
+};
+export function resolveContentTypeEditor(key?: string) { return key ? contentTypeEditors[key] ?? null : null; }
+export function contentResourceEditorHref(resource: CourseContentResource) { return `/courses/${resource.courseId}/materials/${resource.id}/edit`; }
+
 const contentTypeSettingsRenderers: Record<string, ContentTypeRenderer> = {
   "link-content-settings": (context) => context.settings && context.resource ? <LinkContentSettingsForm
     resourceId={context.resource.id}
@@ -78,25 +89,33 @@ const contentTypeSettingsRenderers: Record<string, ContentTypeRenderer> = {
   "text-content-settings": (context) =>
     context.settings ? (
       <TextContentSettingsForm
-        title={context.settings.title}
-        body={context.settings.body}
+        metadata={context.settings.metadata}
+        locale={context.locale}
+        isVisible={context.settings.isVisible ?? true}
+        onVisibilityChange={context.settings.onVisibilityChange ?? (() => {})}
+        onMetadataChange={context.settings.onMetadataChange}
+        editorHref={context.resource ? contentResourceEditorHref(context.resource) : undefined}
         error={context.settings.error}
-        onTitleChange={context.settings.onTitleChange}
-        onBodyChange={context.settings.onBodyChange}
         onSubmit={context.settings.onSubmit}
-        t={context.t}
       />
     ) : null
 };
 
 const contentPresentations: Record<string, (resource: CourseContentResource) => ContentResourcePresentation> = {
+  "text-content-presentation": (resource) => getTextContentPresentation(resource.metadata),
   "link-content-presentation": (resource) => getLinkContentPresentation(resource.metadata)
 };
 
-export function resolveContentResourcePresentation(definition: ContentTypeDefinition | null | undefined, resource: CourseContentResource | null | undefined) {
-  return resource && definition?.presentationRendererKey
-    ? contentPresentations[definition.presentationRendererKey]?.(resource) ?? null
-    : null;
+export function resolveContentResourcePresentation(definition: ContentTypeDefinition | null | undefined, resource: CourseContentResource | null | undefined, context: { groupId?: string; preview?: boolean } = {}) {
+  const presentation = resource && definition?.presentationRendererKey ? contentPresentations[definition.presentationRendererKey]?.(resource) ?? null : null;
+  if (resource && presentation?.displayMode === "page") {
+    const params = new URLSearchParams();
+    const groupId = context.groupId ?? resource.groupId;
+    if (groupId) params.set("groupId", groupId);
+    if (context.preview) params.set("preview", "1");
+    return { ...presentation, href: `/courses/${resource.courseId}/materials/${resource.id}${params.size ? `?${params}` : ""}` };
+  }
+  return presentation;
 }
 
 export function resolveContentTypeRenderer(rendererKey: string | null | undefined) {

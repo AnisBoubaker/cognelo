@@ -6572,3 +6572,20 @@ button:hover > .disclosure-indicator {
   .student-grouping-settings { grid-template-columns: minmax(0, 1fr); }
   .student-grouping-policy { padding-inline: 1rem; }
 }
+
+/* Authored material uses the shared Markdown renderer in each display mode. */
+.text-material-editor-fields { border: 0; padding: 0; margin: 0; display: grid; gap: 24px; min-width: 0; }
+.text-material-settings { border-top: 1px solid var(--border); padding-top: 16px; }
+.text-material-settings summary { cursor: pointer; font-weight: 700; margin-bottom: 16px; }
+.content-resource-body { grid-column: 3 / -1; min-width: 0; font-weight: 400; margin-top: 12px; }
+.student-folder-tab-panel .content-resource-body { grid-column: 2 / -1; }
+.content-resource-body .markdown-renderer > :first-child { margin-top: 0; }
+.content-resource-title-button { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: inherit; font: inherit; text-align: start; }
+.content-resource-title-button:hover { background: none; text-decoration: underline; transform: none; }
+.content-resource-dialog { box-sizing: border-box; width: 80vw; max-width: 80vw; max-height: 85dvh; margin: auto; padding: 24px; border: 1px solid var(--border); border-radius: 16px; color: var(--text); background: var(--surface, white); overflow: auto; }
+.content-resource-dialog::backdrop { background: rgb(15 23 42 / 45%); }
+.content-resource-dialog-header { justify-content: space-between; align-items: start; gap: 16px; margin-bottom: 24px; }
+.content-resource-dialog-header h2 { margin: 0; overflow-wrap: anywhere; }
+.content-resource-dialog-header button { flex-shrink: 0; }
+.content-resource-body .markdown-renderer, .text-material-page .markdown-renderer, .content-resource-dialog .markdown-renderer { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .content-resource-dialog { padding: 16px; } }
