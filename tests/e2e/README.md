@@ -77,6 +77,8 @@ Outbox assertions require local access to the API’s storage. Use synthetic dom
 
 `submission-history-before-start.spec.ts` verifies Coding, MCQ, Parsons, and Test history before a new timed start, including no draft writes or attempt creation during inspection. Deletion regressions also verify retained coding source after reload and Web Design file display.
 
+`coding-run-history.spec.ts` uses real Judge0 runs in standalone exercises and embedded Test questions to verify the latest result, the reveal/hide link, desktop/mobile placement, keyboard access, collapse after a new run, and standalone history persistence after reload. It requires the configured Judge0 runner.
+
 ## Focused regression checks
 
 Run the independent authoring-recovery, bank-synchronization, course-loading, student-grouping, activity-exception, and live compound-Test scenarios with:

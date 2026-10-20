@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ActivityExecutionStateHost, TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import { CodeEditor, CodeRenderer, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, ProgressDialog, RichTextEditor, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
@@ -2322,20 +2322,7 @@ export function CodingExerciseActivityView({
                 </div>
               </div>
 
-              {recentRuns.length ? (
-                <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
-                  <h3>{t("recentRuns")}</h3>
-                  {recentRuns.map((execution) => (
-                    <ExecutionCard
-                      key={execution.id}
-                      execution={execution}
-                      title={new Date(execution.createdAt).toLocaleString(pluginLocale)}
-                      compact
-                      locale={pluginLocale}
-                    />
-                  ))}
-                </section>
-              ) : null}
+              <CodingRunHistory key={activity.id} executions={recentRuns} locale={pluginLocale} />
             </>
           )}
           {submissionConfirmation ? (
@@ -2405,6 +2392,34 @@ export function CodingExerciseActivityView({
       />
     </section>
   );
+}
+
+function CodingRunHistory({ executions, locale }: { executions: CodingExecution[]; locale: CodingExercisesLocale }) {
+  const historyId = useId();
+  const [expandedForRunId, setExpandedForRunId] = useState<string | null>(null);
+  const latest = executions[0];
+  if (!latest) return null;
+  const previousRuns = executions.slice(1);
+  const expanded = expandedForRunId === latest.id;
+
+  return <section className="stack coding-exercise-run-history">
+    <h3>{formatCodingExercisesMessage(locale, "latestRun")}</h3>
+    <ExecutionCard execution={latest} title={new Date(latest.createdAt).toLocaleString(locale)} compact locale={locale} />
+    {previousRuns.length ? <>
+      <button
+        type="button"
+        className="coding-exercise-history-toggle"
+        aria-expanded={expanded}
+        aria-controls={historyId}
+        onClick={() => setExpandedForRunId(expanded ? null : latest.id)}
+      >{formatCodingExercisesMessage(locale, expanded ? "hidePreviousRuns" : "showPreviousRuns", { count: previousRuns.length })}</button>
+      <div id={historyId} hidden={!expanded}>
+        {expanded ? <div className="stack">
+          {previousRuns.map((execution) => <ExecutionCard key={execution.id} execution={execution} title={new Date(execution.createdAt).toLocaleString(locale)} compact locale={locale} />)}
+        </div> : null}
+      </div>
+    </> : null}
+  </section>;
 }
 
 function CodingAttemptHistoryList({

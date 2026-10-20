@@ -140,6 +140,9 @@ type MessageKey =
   | "submitting"
   | "latestSampleRun"
   | "latestSubmission"
+  | "latestRun"
+  | "showPreviousRuns"
+  | "hidePreviousRuns"
   | "recentRuns"
   | "recentSubmissions"
   | "attemptNumber"
@@ -347,6 +350,9 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     submitting: "Submitting...",
     latestSampleRun: "Latest sample run",
     latestSubmission: "Latest submission",
+    latestRun: "Latest run",
+    showPreviousRuns: "Show all previous runs ({count})",
+    hidePreviousRuns: "Hide previous runs",
     recentRuns: "Recent runs",
     recentSubmissions: "Recent submissions",
     attemptNumber: "Attempt {number}",
@@ -551,6 +557,9 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     submitting: "Soumission...",
     latestSampleRun: "Dernière exécution d'exemple",
     latestSubmission: "Dernière soumission",
+    latestRun: "Dernière exécution",
+    showPreviousRuns: "Afficher toutes les exécutions précédentes ({count})",
+    hidePreviousRuns: "Masquer les exécutions précédentes",
     recentRuns: "Exécutions récentes",
     recentSubmissions: "Soumissions récentes",
     attemptNumber: "Tentative {number}",
@@ -755,6 +764,9 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     submitting: "提交中...",
     latestSampleRun: "最近一次示例运行",
     latestSubmission: "最近一次提交",
+    latestRun: "最近一次运行",
+    showPreviousRuns: "显示所有之前的运行（{count}）",
+    hidePreviousRuns: "隐藏之前的运行",
     recentRuns: "最近运行",
     recentSubmissions: "最近提交",
     attemptNumber: "第 {number} 次尝试",

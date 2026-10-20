@@ -5497,6 +5497,31 @@ button:hover > .disclosure-indicator {
   gap: 12px;
 }
 
+.coding-exercise-run-history {
+  border-block-start: 1px solid var(--line);
+  padding-block-start: 20px;
+}
+
+.coding-exercise-history-toggle {
+  align-self: start;
+  justify-self: start;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--accent);
+  min-height: 32px;
+  padding: 4px 0;
+  text-align: start;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.coding-exercise-history-toggle:hover {
+  box-shadow: none;
+  color: var(--brand-ink);
+  transform: none;
+}
+
 .coding-exercise-attempt-accordion {
   border: 1px solid rgba(13, 27, 71, 0.1);
   border-radius: 12px;

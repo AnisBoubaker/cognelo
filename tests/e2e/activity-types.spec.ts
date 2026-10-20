@@ -499,7 +499,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await runTest.click();
     await expect(testRunner.getByRole("img", { name: "Passed" })).toBeVisible({ timeout: 60_000 });
     await expect(testRunner.getByLabel("Test output")).toContainText("Hello, Ada!");
-    const currentRuns = studentPage.getByRole("heading", { name: "Recent runs" }).locator("..");
+    const currentRuns = studentPage.getByRole("heading", { name: "Latest run" }).locator("..");
     await expect(currentRuns).toContainText("Input");
     await expect(currentRuns).toContainText("Ada");
     await expect(currentRuns).toContainText("Hello, Ada!");
@@ -527,7 +527,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await firstConfirmation.getByRole("button", { name: "OK" }).click();
 
     await expect(studentPage.getByRole("tab", { name: "New attempt" })).toBeVisible();
-    await expect(studentPage.getByRole("heading", { name: "Recent runs" })).toHaveCount(0);
+    await expect(studentPage.getByRole("heading", { name: "Latest run" })).toHaveCount(0);
     const resetEditor = studentPage.getByRole("textbox", { name: title, exact: true })
       .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' monaco-code-editor ')][1]")
       .locator(".view-lines");
