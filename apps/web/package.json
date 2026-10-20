@@ -22,6 +22,7 @@
     "@cognelo/plugin-coding-homework-grader": "0.1.0",
     "@cognelo/plugin-file-content": "0.1.0",
     "@cognelo/plugin-github-repo": "0.1.0",
+    "@cognelo/plugin-link-content": "0.1.0",
     "@cognelo/plugin-registry": "0.1.0",
     "@cognelo/plugin-text-content": "0.1.0",
     "@cognelo/plugin-mcq": "0.1.0",

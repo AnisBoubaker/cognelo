@@ -402,6 +402,10 @@ Plugins that store private authoring/grading data can participate in the copy st
 
 Plugin-owned tables are documented in the owning plugin package rather than in the platform README.
 
+### Link course content
+
+The Material picker includes **Link** when the Link content plugin is activated and enabled. Settings provide link text, an HTTP(S) URL, optional plain-text description, and an **Open in a new tab** checkbox enabled by default. The description appears underneath the title in teacher, section staff, learner, and Student view content rows. Title links and open actions share the saved target; duplicate preserves all four fields. Validation, metadata, settings, and presentation are owned by [the Link plugin](../../packages/plugin-content-types/plugin-link/README.md); generic course visibility and authorization remain unchanged. No database migration is required; existing installations activate and enable the new plugin through Settings → Plugins, while development seeding enables installed content plugins.
+
 ## Seed Accounts
 
 All seeded accounts use `Password123!`.

@@ -773,6 +773,10 @@ Verification:
 - `rg` check for stale `packages/plugins` paths
 - `npm run typecheck`
 
+## Link Content — Implemented
+
+The `plugin-link` package adds the `link` type with editable link text, validated HTTP(S) URL, optional description, and default-on new-tab behavior. It uses generic resource metadata and declares no tables. A neutral optional `presentationRendererKey` lets the frontend composition registry project href, target, and plain-text description without adding concrete type branches to course pages. The settings adapter passes generic metadata and change callbacks for plugin-owned fields; server open actions also support an optional target. Teacher, section staff, learner, and preview rows consume the same presentation. See [Link content](../packages/plugin-content-types/plugin-link/README.md) for lifecycle and validation.
+
 ## Testing Plan
 
 SDK tests should cover:

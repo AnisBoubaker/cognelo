@@ -11,6 +11,12 @@ export type ContentEmbeddingSourceKind = "external_url" | "file_upload" | "text_
 
 export type ContentTypeCreateMode = "shell" | "upload" | "custom";
 
+export type ContentResourcePresentation = {
+  href: string | null;
+  target?: "_blank" | "_self";
+  description?: string;
+};
+
 export type ContentTypeDefinition = {
   key: string;
   label: LocalizedText;
@@ -21,6 +27,7 @@ export type ContentTypeDefinition = {
   embeddingSource: ContentEmbeddingSourceKind;
   rendererKey?: string;
   settingsRendererKey?: string;
+  presentationRendererKey?: string;
 };
 
 export type PluginDatabaseModule = {

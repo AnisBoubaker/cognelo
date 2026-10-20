@@ -186,6 +186,8 @@ Content type plugins own:
 - storage details and plugin-owned tables when generic metadata is not enough
 - `getEmbeddingSource` handlers for future indexing
 
+Content definitions may declare a `presentationRendererKey` for a frontend registry resolver that projects safe href, target, and plain-text description from plugin-owned metadata. Settings adapters receive generic metadata state/change callbacks for plugin-owned fields. This keeps link-specific interpretation in the plugin and composition registry rather than course pages or core services; `ContentTypeOpenAction.target` supplies the equivalent server navigation hint.
+
 Enabled content type plugins can be selected for new content resources. Active but disabled plugins can still serve existing resources. Inactive or unavailable plugins are blocked at dispatch and existing content rows render as unavailable.
 
 The current content type plugins are:
@@ -193,6 +195,7 @@ The current content type plugins are:
 - `packages/plugin-content-types/plugin-github-repo`
 - `packages/plugin-content-types/plugin-file`
 - `packages/plugin-content-types/plugin-text`
+- `packages/plugin-content-types/plugin-link`
 
 Embedding readiness is deliberately generic. Core exposes `getContentResourceEmbeddingSource`, which dispatches to the owning content type plugin and returns one of:
 

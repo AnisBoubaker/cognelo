@@ -51,10 +51,11 @@ describe("installed plugin composition", () => {
     expect(listContentTypePlugins().map((plugin) => plugin.key)).toEqual([
       "github-repo-content",
       "file-content",
-      "text-content"
+      "text-content",
+      "link-content"
     ]);
     expect(listServerContentTypePlugins().map((plugin) => plugin.key)).toEqual(listContentTypePlugins().map((plugin) => plugin.key));
-    expect(listContentTypeDefinitions().map((definition) => definition.key)).toEqual(["github-repo", "file", "text"]);
+    expect(listContentTypeDefinitions().map((definition) => definition.key)).toEqual(["github-repo", "file", "text", "link"]);
   });
 
   it("keeps installed Student view contracts complete on both client and server", () => {

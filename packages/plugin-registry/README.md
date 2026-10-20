@@ -13,3 +13,5 @@ Available entry points:
 - `@cognelo/plugin-registry/server`
 
 Add installed plugins here, not in `activity-sdk`, `content-type-sdk`, `core`, or `db`. `npm run architecture:check` enforces the dependency direction.
+
+The shipped content registry includes GitHub repositories, files, text, and described web links. Link content declares no tables and uses the ordinary activation/enablement lifecycle.

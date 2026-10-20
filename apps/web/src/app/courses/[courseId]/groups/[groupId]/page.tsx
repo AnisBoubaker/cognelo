@@ -39,7 +39,7 @@ import {
   StudentGradeFeedback,
   StudentReleasedGrades
 } from "@/lib/api";
-import { ContentTypeIcon as MaterialTypeIcon } from "@/lib/content-type-renderers";
+import { ContentTypeIcon as MaterialTypeIcon, resolveContentResourcePresentation } from "@/lib/content-type-renderers";
 import { useI18n } from "@/lib/i18n";
 import { assignmentRequiresSafeExamBrowser } from "@/lib/safe-exam-browser";
 import { useCourseContentFolders } from "@/lib/use-course-content-folders";
@@ -563,6 +563,8 @@ export default function CourseGroupPage() {
       if (!definition) {
         return null;
       }
+      const presentation = resolveContentResourcePresentation(definition, resource);
+      if (presentation) return presentation.href;
       if (definition.embeddingSource === "file_upload" && typeof resource.metadata?.storedName === "string") {
         return withDownloadVersion(api.groupContentResourceDownloadUrl(courseId, groupId, resource.id), resource);
       }
@@ -1404,6 +1406,8 @@ export default function CourseGroupPage() {
                             const contentResourceDefinition = contentResource ? contentTypeByKey.get(contentResource.contentTypeKey) ?? null : null;
                             const contentResourceIsUnavailable = Boolean(contentResource && !contentResourceDefinition);
                             const contentResourceIsFile = contentResourceDefinition?.embeddingSource === "file_upload";
+                            const contentPresentation = resolveContentResourcePresentation(contentResourceDefinition, contentResource);
+                            const contentResourceTarget = contentPresentation?.target ?? (contentResourceIsFile ? undefined : "_blank");
                             const isCollapsed = collapsedContentFolderIds.has(item.id);
                             const assignment = item.courseGroupActivityId ? assignmentById.get(item.courseGroupActivityId) : null;
                             const courseActivity = item.activityId ? courseActivityById.get(item.activityId) : null;
@@ -1496,7 +1500,7 @@ export default function CourseGroupPage() {
                                   )}
                                   <strong>
                                     {href && contentResource ? (
-                                      <a href={href} rel={contentResourceIsFile ? undefined : "noreferrer"} target={contentResourceIsFile ? undefined : "_blank"}>
+                                      <a href={href} rel={contentResourceTarget === "_blank" ? "noopener noreferrer" : undefined} target={contentResourceTarget}>
                                         {title}
                                       </a>
                                     ) : href ? (
@@ -1505,6 +1509,7 @@ export default function CourseGroupPage() {
                                       title
                                     )}
                                   </strong>
+                                  {contentPresentation?.description ? <p className="content-resource-description">{contentPresentation.description}</p> : null}
                                   {metadataBadges.length ? <span className="metadata-badges">{metadataBadges}</span> : null}
                                 </div>
                                 <div className="table-actions content-row-actions">
@@ -1514,8 +1519,8 @@ export default function CourseGroupPage() {
                                         aria-label={t(contentResourceIsFile ? "courseDetail.downloadMaterial" : "courseDetail.openContentItem", { title })}
                                         className="button secondary icon-button"
                                         href={href}
-                                        rel={contentResourceIsFile ? undefined : "noreferrer"}
-                                        target={contentResourceIsFile ? undefined : "_blank"}
+                                        rel={contentResourceTarget === "_blank" ? "noopener noreferrer" : undefined}
+                                        target={contentResourceTarget}
                                         title={t(contentResourceIsFile ? "common.download" : "common.open")}
                                       >
                                         <MaterialActionIcon name={contentResourceIsFile ? "download" : "open"} />

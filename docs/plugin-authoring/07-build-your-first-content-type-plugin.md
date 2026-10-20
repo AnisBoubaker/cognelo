@@ -2,7 +2,7 @@
 
 Back to the [handbook index](README.md)
 
-This tutorial builds a small content type plugin named **Reference link**. It lets a teacher add a title and URL to the course Content tree. The same pattern scales to richer content types such as uploaded files, Markdown notes, repository sync, video providers, or LTI resources.
+This tutorial builds a small content type plugin named **Reference link**. It lets a teacher add a title and URL to the course Content tree. The production [Link content plugin](../../packages/plugin-content-types/plugin-link/README.md) implements this use case with HTTP(S)-only validation, descriptions, and configurable browser targets; this tutorial remains a minimal example. The same pattern scales to richer content types such as uploaded files, Markdown notes, repository sync, video providers, or LTI resources.
 
 Content type plugins are not activity plugins. They do not create `Activity`, attempts, submissions, or grades. They own non-activity course content behavior behind generic `CourseContentResource` rows.
 
@@ -146,7 +146,9 @@ Use existing settings forms as models:
 - [packages/plugin-content-types/plugin-text/src/settings.tsx](../../packages/plugin-content-types/plugin-text/src/settings.tsx)
 - [packages/plugin-content-types/plugin-file/src/settings.tsx](../../packages/plugin-content-types/plugin-file/src/settings.tsx)
 
-The settings form should edit fields that your server `update` handler understands, such as `title` and `url`.
+The settings form should edit fields that your server `update` handler understands, such as `title` and `url`. The host settings state also provides `metadata` and `onMetadataChange` so the registry adapter can pass plugin-owned fields without adding type-specific host branches.
+
+For resource rows requiring configurable navigation or a description, declare an optional `presentationRendererKey` and register a resolver in `content-type-renderers.tsx`. It returns the SDK `ContentResourcePresentation` (`href`, optional `_blank`/`_self` target, and optional plain-text description). Keep metadata interpretation and URL validation in the plugin; host rows consume only this generic projection. Server `resolveOpenAction` can return the same target hint. The Link plugin shares one validated projection between both paths.
 
 ## 5. Register The Plugin
 

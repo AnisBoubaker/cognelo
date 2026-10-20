@@ -28,6 +28,8 @@
       "@cognelo/plugin-file-content/server": ["packages/plugin-content-types/plugin-file/src/server.ts"],
       "@cognelo/plugin-github-repo": ["packages/plugin-content-types/plugin-github-repo/src/index.ts"],
       "@cognelo/plugin-github-repo/server": ["packages/plugin-content-types/plugin-github-repo/src/server.ts"],
+      "@cognelo/plugin-link-content": ["packages/plugin-content-types/plugin-link/src/index.ts"],
+      "@cognelo/plugin-link-content/server": ["packages/plugin-content-types/plugin-link/src/server.ts"],
       "@cognelo/plugin-text-content": ["packages/plugin-content-types/plugin-text/src/index.ts"],
       "@cognelo/plugin-text-content/server": ["packages/plugin-content-types/plugin-text/src/server.ts"],
       "@cognelo/activity-ui": ["packages/activity-ui/src/index.ts"],

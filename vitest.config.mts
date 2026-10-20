@@ -19,6 +19,8 @@ export default defineConfig({
       "@cognelo/plugin-file-content": new URL("./packages/plugin-content-types/plugin-file/src/index.ts", import.meta.url).pathname,
       "@cognelo/plugin-github-repo/server": new URL("./packages/plugin-content-types/plugin-github-repo/src/server.ts", import.meta.url).pathname,
       "@cognelo/plugin-github-repo": new URL("./packages/plugin-content-types/plugin-github-repo/src/index.ts", import.meta.url).pathname,
+      "@cognelo/plugin-link-content/server": new URL("./packages/plugin-content-types/plugin-link/src/server.ts", import.meta.url).pathname,
+      "@cognelo/plugin-link-content": new URL("./packages/plugin-content-types/plugin-link/src/index.ts", import.meta.url).pathname,
       "@cognelo/plugin-text-content/server": new URL("./packages/plugin-content-types/plugin-text/src/server.ts", import.meta.url).pathname,
       "@cognelo/plugin-text-content": new URL("./packages/plugin-content-types/plugin-text/src/index.ts", import.meta.url).pathname,
       "@cognelo/contracts": new URL("./packages/contracts/src/index.ts", import.meta.url).pathname,

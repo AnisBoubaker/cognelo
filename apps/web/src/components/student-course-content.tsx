@@ -17,7 +17,7 @@ import {
   type CourseMaterial,
   type StudentReleasedGrades
 } from "@/lib/api";
-import { ContentTypeIcon as MaterialTypeIcon } from "@/lib/content-type-renderers";
+import { ContentTypeIcon as MaterialTypeIcon, resolveContentResourcePresentation } from "@/lib/content-type-renderers";
 import { normalizeStudentFolderTabDepth, resolveStudentContentLayout } from "@/lib/course-settings";
 import type { Locale } from "@/lib/i18n";
 import { useCourseContentFolders } from "@/lib/use-course-content-folders";
@@ -131,6 +131,8 @@ export function StudentCourseContent({
       const resource = contentResourceById.get(item.contentResourceId);
       const definition = resource ? contentTypeByKey.get(resource.contentTypeKey) : null;
       if (!resource || !definition) return null;
+      const presentation = resolveContentResourcePresentation(definition, resource);
+      if (presentation) return presentation.href;
       if (definition.embeddingSource === "file_upload" && typeof resource.metadata?.storedName === "string") {
         return withDownloadVersion(api.groupContentResourceDownloadUrl(courseId, groupId, resource.id), resource);
       }
@@ -155,10 +157,12 @@ export function StudentCourseContent({
     const material = item.materialId ? courseMaterialById.get(item.materialId) ?? groupMaterialById.get(item.materialId) : null;
     const materialIsDownloadable = material ? legacyMaterialHasStoredFile(material) : false;
     const contentResource = item.contentResourceId ? contentResourceById.get(item.contentResourceId) : null;
+    const contentPresentation = resolveContentResourcePresentation(contentResource ? contentTypeByKey.get(contentResource.contentTypeKey) : null, contentResource);
     const contentResourceIsFile = contentResource
       ? contentTypeByKey.get(contentResource.contentTypeKey)?.embeddingSource === "file_upload"
       : false;
     const assignment = item.courseGroupActivityId ? assignmentById.get(item.courseGroupActivityId) : null;
+    const materialTarget = material ? (materialIsDownloadable ? undefined : "_blank") : contentPresentation?.target ?? (contentResourceIsFile ? undefined : "_blank");
     const courseActivity = item.activityId ? courseActivityById.get(item.activityId) : null;
     const activityTypeKey = assignment?.activity.activityType.key ?? courseActivity?.activityType.key ?? null;
     const activityLabel = activityTypeKey ? activityName(activityTypeKey) : null;
@@ -217,13 +221,14 @@ export function StudentCourseContent({
             ) : href && isOpenable && (material || contentResource) ? (
               <a
                 href={href}
-                rel={material ? (materialIsDownloadable ? undefined : "noreferrer") : (contentResourceIsFile ? undefined : "noreferrer")}
-                target={material ? (materialIsDownloadable ? undefined : "_blank") : (contentResourceIsFile ? undefined : "_blank")}
+                rel={materialTarget === "_blank" ? "noopener noreferrer" : undefined}
+                target={materialTarget}
               >
                 {title}
               </a>
             ) : href && isOpenable ? <Link href={href}>{title}</Link> : title}
           </strong>
+          {contentPresentation?.description ? <p className="content-resource-description">{contentPresentation.description}</p> : null}
           {hasBadges ? (
             <span className="metadata-badges">
               {activityLabel ? <span className="metadata-badge is-activity-type">{activityLabel}</span> : null}
@@ -247,8 +252,8 @@ export function StudentCourseContent({
                   aria-label={t((material ? materialIsDownloadable : contentResourceIsFile) ? "courseDetail.downloadMaterial" : "courseDetail.openMaterial", { title })}
                   className="button secondary icon-button"
                   href={href}
-                  rel={(material ? materialIsDownloadable : contentResourceIsFile) ? undefined : "noreferrer"}
-                  target={(material ? materialIsDownloadable : contentResourceIsFile) ? undefined : "_blank"}
+                  rel={materialTarget === "_blank" ? "noopener noreferrer" : undefined}
+                  target={materialTarget}
                   title={t((material ? materialIsDownloadable : contentResourceIsFile) ? "common.download" : "common.open")}
                 >
                   <AppIcon name={(material ? materialIsDownloadable : contentResourceIsFile) ? "download" : "open"} />

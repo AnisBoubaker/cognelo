@@ -88,6 +88,7 @@ export type ContentTypeDuplicateHandler = (input: {
 export type ContentTypeOpenAction = {
   kind: "download" | "external_url" | "plugin_route" | "viewer" | "none";
   href?: string;
+  target?: "_blank" | "_self";
   routePath?: string[];
   metadata?: Record<string, unknown>;
 };

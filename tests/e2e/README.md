@@ -79,6 +79,8 @@ Outbox assertions require local access to the API’s storage. Use synthetic dom
 
 `coding-run-history.spec.ts` uses real Judge0 runs in standalone exercises and embedded Test questions to verify the latest result, the reveal/hide link, desktop/mobile placement, keyboard access, collapse after a new run, and standalone history persistence after reload. It requires the configured Judge0 runner.
 
+`link-content.spec.ts` activates/enables the local Link plugin and verifies settings, the default new-tab target and same-tab override, description placement on desktop/mobile, teacher preview, duplication, unsafe-URL rejection, authorization, visibility, and removal. External destinations are synthetic browser-intercepted pages; the content APIs and persistence are real.
+
 ## Focused regression checks
 
 Run the independent authoring-recovery, bank-synchronization, course-loading, student-grouping, activity-exception, and live compound-Test scenarios with:

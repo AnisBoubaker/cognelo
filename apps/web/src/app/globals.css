@@ -2928,6 +2928,7 @@ a.card:hover,
 
 .table-row-content-tree strong,
 .table-row-content-tree .content-title-input,
+.table-row-content-tree .content-resource-description,
 .table-row-content-tree .metadata-badges {
   grid-column: 3;
 }
@@ -2939,6 +2940,18 @@ a.card:hover,
 
 .table-row-content-tree .metadata-badges {
   grid-row: 2;
+}
+
+.content-resource-description {
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.table-main-stack:has(.content-resource-description) .metadata-badges {
+  grid-row: 3;
 }
 
 .folder-content-icon {
@@ -3068,6 +3081,7 @@ a.card:hover,
 }
 
 .student-folder-tab-panel .table-row-content-tree strong,
+.student-folder-tab-panel .table-row-content-tree .content-resource-description,
 .student-folder-tab-panel .table-row-content-tree .metadata-badges {
   grid-column: 2;
 }

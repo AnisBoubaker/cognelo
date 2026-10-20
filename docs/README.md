@@ -32,7 +32,7 @@ Activity plugin entry points:
 - [Web Design Coding Exercises](../packages/plugin-activities/plugin-web-design-coding-exercises/README.md)
 - [Placeholder](../packages/plugin-activities/plugin-placeholder/README.md)
 
-Content-type plugin entry points live under `packages/plugin-content-types/`; their documents are already small and topic-specific.
+Content-type plugin entry points live under `packages/plugin-content-types/`; their documents are already small and topic-specific. See [Link content](../packages/plugin-content-types/plugin-link/README.md) for described web links and configurable new-tab navigation.
 
 ## Feature Designs And Implementation State
 

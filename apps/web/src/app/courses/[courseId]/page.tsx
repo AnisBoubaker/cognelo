@@ -45,7 +45,7 @@ import {
   GradebookStatus,
   Subject
 } from "@/lib/api";
-import { ContentTypeIcon as MaterialTypeIcon, resolveContentTypeSettingsRenderer } from "@/lib/content-type-renderers";
+import { ContentTypeIcon as MaterialTypeIcon, resolveContentResourcePresentation, resolveContentTypeSettingsRenderer } from "@/lib/content-type-renderers";
 import { defaultDuplicateActivityTitle } from "@/lib/activity-bank-titles";
 import { activityCreationConfig } from "@/lib/activity-creation-defaults";
 import { useI18n } from "@/lib/i18n";
@@ -106,6 +106,7 @@ export default function CourseDetailPage() {
   const [settingsMaterialTitle, setSettingsMaterialTitle] = useState("");
   const [settingsMaterialUrl, setSettingsMaterialUrl] = useState("");
   const [settingsMaterialBody, setSettingsMaterialBody] = useState("");
+  const [settingsMaterialMetadata, setSettingsMaterialMetadata] = useState<Record<string, unknown> | null>(null);
   const [settingsMaterialFile, setSettingsMaterialFile] = useState<File | null>(null);
   const [settingsError, setSettingsError] = useState("");
   const [draggingContentItemId, setDraggingContentItemId] = useState<string | null>(null);
@@ -573,6 +574,7 @@ export default function CourseDetailPage() {
       });
       setSettingsContentItemId(result.contentItem.id);
       setSettingsMaterialTitle(title);
+      setSettingsMaterialMetadata(null);
       setSettingsMaterialUrl("");
       setSettingsMaterialBody("");
       setSettingsMaterialFile(null);
@@ -1011,6 +1013,7 @@ export default function CourseDetailPage() {
   function openContentSettings(item: CourseContentItem) {
     setSettingsContentItemId(item.id);
     setSettingsError("");
+    setSettingsMaterialMetadata(null);
     if (item.activityId) {
       return;
     }
@@ -1073,6 +1076,7 @@ export default function CourseDetailPage() {
       } else {
         await api.updateCourseContentResource(courseId, resource.id, {
           payload: {
+            ...(settingsMaterialMetadata ?? {}),
             title: settingsMaterialTitle,
             url: settingsMaterialUrl || undefined
           }
@@ -1328,6 +1332,8 @@ export default function CourseDetailPage() {
       if (!definition) {
         return null;
       }
+      const presentation = resolveContentResourcePresentation(definition, resource);
+      if (presentation) return presentation.href;
       if (definition.embeddingSource === "file_upload" && typeof resource.metadata?.storedName === "string") {
         const downloadUrl = contentGroup
           ? api.groupContentResourceDownloadUrl(courseId, contentGroup.id, resource.id)
@@ -1527,6 +1533,8 @@ export default function CourseDetailPage() {
                             const contentResourceDefinition = contentResource ? contentTypeByKey.get(contentResource.contentTypeKey) ?? null : null;
                             const contentResourceIsUnavailable = Boolean(contentResource && !contentResourceDefinition);
                             const contentResourceIsFile = contentResourceDefinition?.embeddingSource === "file_upload";
+                            const contentPresentation = resolveContentResourcePresentation(contentResourceDefinition, contentResource);
+                            const contentResourceTarget = contentPresentation?.target ?? (contentResourceIsFile ? undefined : "_blank");
                             const assignment = item.courseGroupActivityId ? groupAssignmentById.get(item.courseGroupActivityId) : null;
                             const activity = assignment?.activity ?? (item.activityId ? courseActivityById.get(item.activityId) : null);
                             const allGroupsRule = activity ? getAllGroupsAssignmentRule(activity) : null;
@@ -1607,7 +1615,7 @@ export default function CourseDetailPage() {
                                           {title}
                                         </a>
                                       ) : href && contentResource ? (
-                                        <a href={href} rel={contentResourceIsFile ? undefined : "noreferrer"} target={contentResourceIsFile ? undefined : "_blank"}>
+                                        <a href={href} rel={contentResourceTarget === "_blank" ? "noopener noreferrer" : undefined} target={contentResourceTarget}>
                                           {title}
                                         </a>
                                       ) : href ? (
@@ -1617,6 +1625,7 @@ export default function CourseDetailPage() {
                                       )}
                                     </strong>
                                   )}
+                                  {contentPresentation?.description ? <p className="content-resource-description">{contentPresentation.description}</p> : null}
                                   {activity || contentResourceIsUnavailable ? (
                                     <span className="metadata-badges">
                                       {activityLabel ? <span className="metadata-badge is-activity-type">{activityLabel}</span> : null}
@@ -1689,9 +1698,9 @@ export default function CourseDetailPage() {
                                         <a
                                           className="content-context-menu-item"
                                           href={href}
-                                          rel={contentResourceIsFile ? undefined : "noreferrer"}
+                                          rel={contentResourceTarget === "_blank" ? "noopener noreferrer" : undefined}
                                           role="menuitem"
-                                          target={contentResourceIsFile ? undefined : "_blank"}
+                                          target={contentResourceTarget}
                                           onClick={() => setContentContextMenu(null)}
                                         >
                                           <MaterialActionIcon name={contentResourceIsFile ? "download" : "open"} />
@@ -2140,11 +2149,13 @@ export default function CourseDetailPage() {
                         title: settingsMaterialTitle,
                         url: settingsMaterialUrl,
                         body: settingsMaterialBody,
+                        metadata: settingsMaterialMetadata ?? settingsContentResource.metadata ?? {},
                         detail: contentResourceDetail(settingsContentResource),
                         error: settingsError,
                         onTitleChange: setSettingsMaterialTitle,
                         onUrlChange: setSettingsMaterialUrl,
                         onBodyChange: setSettingsMaterialBody,
+                        onMetadataChange: setSettingsMaterialMetadata,
                         onFileChange: setSettingsMaterialFile,
                         onSubmit: saveContentResourceSettings
                       },
