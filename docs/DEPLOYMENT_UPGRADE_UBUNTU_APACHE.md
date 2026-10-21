@@ -542,3 +542,7 @@ Never remove `/srv/cognelo/instance1/shared`, its `.env`, or its `storage` direc
 - [ ] API health passes before web starts.
 - [ ] Public health and smoke tests pass.
 - [ ] Old worktree and database dump remain available through the acceptance period.
+
+### Instance timezone migration
+
+When upgrading to a release containing `202610210001_application_timezone`, the combined migration command adds the instance setting with a `UTC` default. After startup, an administrator should select the intended timezone under **Settings → Date and time** before users resume scheduling. Existing UTC deadlines and attempts are not shifted. Open browser pages must reload to adopt the new display zone. Keep the host clock synchronized; no OS timezone change is needed. See [application time](APPLICATION_TIME.md).

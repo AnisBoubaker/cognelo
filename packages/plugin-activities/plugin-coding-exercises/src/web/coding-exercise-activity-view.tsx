@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
+
+
 import { type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ActivityExecutionStateHost, TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
@@ -2395,6 +2398,7 @@ export function CodingExerciseActivityView({
 }
 
 function CodingRunHistory({ executions, locale }: { executions: CodingExecution[]; locale: CodingExercisesLocale }) {
+  const { timeZone } = useApplicationTime();
   const historyId = useId();
   const [expandedForRunId, setExpandedForRunId] = useState<string | null>(null);
   const latest = executions[0];
@@ -2404,7 +2408,7 @@ function CodingRunHistory({ executions, locale }: { executions: CodingExecution[
 
   return <section className="stack coding-exercise-run-history">
     <h3>{formatCodingExercisesMessage(locale, "latestRun")}</h3>
-    <ExecutionCard execution={latest} title={new Date(latest.createdAt).toLocaleString(locale)} compact locale={locale} />
+    <ExecutionCard execution={latest} title={formatZonedDateTime(new Date(latest.createdAt), timeZone, locale, { dateStyle: "medium", timeStyle: "medium" })} compact locale={locale} />
     {previousRuns.length ? <>
       <button
         type="button"
@@ -2415,7 +2419,7 @@ function CodingRunHistory({ executions, locale }: { executions: CodingExecution[
       >{formatCodingExercisesMessage(locale, expanded ? "hidePreviousRuns" : "showPreviousRuns", { count: previousRuns.length })}</button>
       <div id={historyId} hidden={!expanded}>
         {expanded ? <div className="stack">
-          {previousRuns.map((execution) => <ExecutionCard key={execution.id} execution={execution} title={new Date(execution.createdAt).toLocaleString(locale)} compact locale={locale} />)}
+          {previousRuns.map((execution) => <ExecutionCard key={execution.id} execution={execution} title={formatZonedDateTime(new Date(execution.createdAt), timeZone, locale, { dateStyle: "medium", timeStyle: "medium" })} compact locale={locale} />)}
         </div> : null}
       </div>
     </> : null}
@@ -2431,6 +2435,7 @@ function CodingAttemptHistoryList({
   language: string;
   locale: CodingExercisesLocale;
 }) {
+  const { timeZone } = useApplicationTime();
   return (
     <section className="stack coding-exercise-attempt-history">
       {attempts.map((attempt, index) => {
@@ -2440,7 +2445,7 @@ function CodingAttemptHistoryList({
             <summary>
               <span>{formatCodingExercisesMessage(locale, "attemptNumber", { number: attemptNumber })}</span>
               <time dateTime={attempt.submission.createdAt}>
-                {new Date(attempt.submission.createdAt).toLocaleString(locale)}
+                {formatZonedDateTime(new Date(attempt.submission.createdAt), timeZone, locale, { dateStyle: "medium", timeStyle: "medium" })}
               </time>
               {attempt.submission.status === "pending" ? (
                 <span className="muted">{formatCodingExercisesMessage(locale, "statusPending")}</span>

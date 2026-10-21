@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime, isZonedMidnight } from "@cognelo/activity-ui";
+
+
 import { ContextMenu, ProgressDialog, useBodyScrollLock, useDialogs } from "@cognelo/activity-ui";
 import { resolveLocalizedText, type ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
@@ -62,6 +65,7 @@ type BankSyncAction = "retrieve_original" | "retrieve_latest" | "publish_to_bank
 const contentDragActivationDistance = 8;
 
 export default function CourseDetailPage() {
+  const { timeZone } = useApplicationTime();
   const params = useParams<{ courseId: string }>();
   const courseId = params.courseId;
   const router = useRouter();
@@ -1651,7 +1655,7 @@ export default function CourseDetailPage() {
                                             : allGroupsRule.assignedGroupIds.length === sortedCourseGroups.length)
                                             ? t("courseDetail.assignedToAllGroups")
                                             : t("courseDetail.assignedToGroupsCount", { count: allGroupsRule.assignedGroupIds?.length ?? 0 })} ·{" "}
-                                          {formatAvailabilityWindow(allGroupsRule.availableFrom, allGroupsRule.availableUntil, t)}
+                                          {formatAvailabilityWindow(allGroupsRule.availableFrom, allGroupsRule.availableUntil, t, timeZone)}
                                         </span>
                                       ) : null}
                                     </span>
@@ -2326,7 +2330,7 @@ function formatBytes(bytes: number) {
 function formatAvailabilityWindow(
   availableFrom: string | null | undefined,
   availableUntil: string | null | undefined,
-  t: (key: string, vars?: Record<string, string | number>) => string
+  t: (key: string, vars?: Record<string, string | number>) => string, timeZone: string = "UTC"
 ) {
   if (!availableFrom && !availableUntil) {
     return t("groupPage.availableAlways");
@@ -2334,35 +2338,31 @@ function formatAvailabilityWindow(
 
   if (availableFrom && availableUntil) {
     return t("groupPage.availableWindow", {
-      from: formatAvailabilityValue(availableFrom),
-      until: formatAvailabilityValue(availableUntil)
+      from: formatAvailabilityValue(availableFrom, timeZone),
+      until: formatAvailabilityValue(availableUntil, timeZone)
     });
   }
 
   if (availableFrom) {
-    return t("groupPage.availableAfter", { from: formatAvailabilityValue(availableFrom) });
+    return t("groupPage.availableAfter", { from: formatAvailabilityValue(availableFrom, timeZone) });
   }
 
-  return t("groupPage.availableBefore", { until: formatAvailabilityValue(availableUntil as string) });
+  return t("groupPage.availableBefore", { until: formatAvailabilityValue(availableUntil as string, timeZone) });
 }
 
-function formatAvailabilityValue(value: string) {
+function formatAvailabilityValue(value: string, timeZone: string = "UTC") {
   const date = new Date(value);
-  const isMidnight =
-    date.getHours() === 0 &&
-    date.getMinutes() === 0 &&
-    date.getSeconds() === 0 &&
-    date.getMilliseconds() === 0;
+  const isMidnight = isZonedMidnight(date, timeZone);
 
   if (isMidnight) {
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat(undefined, { timeZone,
       year: "numeric",
       month: "short",
       day: "numeric"
     }).format(date);
   }
 
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(undefined, { timeZone,
     year: "numeric",
     month: "short",
     day: "numeric",

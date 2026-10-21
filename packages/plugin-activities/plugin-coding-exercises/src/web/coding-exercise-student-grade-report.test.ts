@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
-vi.mock("@cognelo/activity-ui", () => ({
+vi.mock("@cognelo/activity-ui", async (original) => ({
+  ...await original<typeof import("@cognelo/activity-ui")>(),
   CodeRenderer: ({ code }: { code: string }) => React.createElement("pre", null, code)
 }));
 
@@ -114,4 +115,15 @@ describe("coding exercise learner grading report", () => {
     expect(html).toContain("Rubric");
     expect(html).toContain("85 / 100");
   });
+});
+
+
+it("renders submission times in the instance timezone", async () => {
+  const { ApplicationTimeProvider } = await import("@cognelo/activity-ui");
+  const html = renderToStaticMarkup(React.createElement(ApplicationTimeProvider, {
+    value: { timeZone: "America/Toronto", now: () => 0 }
+  }, React.createElement(CodingExerciseStudentGradeReport, { score: 70, maxScore: 100, locale: "en", report, feedback: null })));
+
+  expect(html).toContain("8:00:00");
+  expect(html).not.toContain("12:00:00 PM");
 });

@@ -1,5 +1,10 @@
 "use client";
 
+import { toZonedDateTimeInput, fromZonedDateTimeInput } from "@cognelo/activity-ui";
+
+import { useApplicationTime, isZonedMidnight } from "@cognelo/activity-ui";
+
+
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import "@cognelo/plugin-registry/activity";
 import { MarkdownRenderer, useDialogs } from "@cognelo/activity-ui";
@@ -51,6 +56,7 @@ type ContentDropTarget = { id: string; type: "root" } | { id: string; placement:
 const contentDragActivationDistance = 8;
 
 export default function CourseGroupPage() {
+  const { timeZone, now: serverNow } = useApplicationTime();
   const params = useParams<{ courseId: string; groupId: string }>();
   const { courseId, groupId } = params;
   const router = useRouter();
@@ -149,8 +155,8 @@ export default function CourseGroupPage() {
     setGroup(groupResult.group);
     setGroupTitle(groupResult.group.title);
     setGroupStatus(groupResult.group.status);
-    setGroupAvailableFrom(toDateTimeLocalValue(groupResult.group.availableFrom));
-    setGroupAvailableUntil(toDateTimeLocalValue(groupResult.group.availableUntil));
+    setGroupAvailableFrom(toDateTimeLocalValue(groupResult.group.availableFrom, timeZone));
+    setGroupAvailableUntil(toDateTimeLocalValue(groupResult.group.availableUntil, timeZone));
     setActivityTypes(typeResult.activityTypes);
     setActivityDefinitions(typeResult.registeredDefinitions);
     const userCanManage = Boolean(courseResult.course.permissions?.canManageCourse);
@@ -190,7 +196,7 @@ export default function CourseGroupPage() {
             .filter(
               (assignment) =>
                 !assignmentRequiresSafeExamBrowser(assignment.metadata) &&
-                (!assignment.availableFrom || new Date(assignment.availableFrom).getTime() <= Date.now())
+                (!assignment.availableFrom || new Date(assignment.availableFrom).getTime() <= serverNow())
             )
             .map(async (assignment) => ({
               activityId: assignment.activity.id,
@@ -207,7 +213,7 @@ export default function CourseGroupPage() {
         )
       );
     }
-  }, [courseId, gradebookActivityId, gradebookStatus, groupId]);
+  }, [courseId, gradebookActivityId, gradebookStatus, groupId, serverNow, timeZone]);
 
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("groupPage.loadError")));
@@ -433,8 +439,8 @@ export default function CourseGroupPage() {
       await api.updateGroup(courseId, groupId, {
         title: groupTitle,
         status: groupStatus,
-        availableFrom: toIsoOrNull(groupAvailableFrom),
-        availableUntil: toIsoOrNull(groupAvailableUntil)
+        availableFrom: toIsoOrNull(groupAvailableFrom, timeZone),
+        availableUntil: toIsoOrNull(groupAvailableUntil, timeZone)
       });
       await refresh();
     } catch (err) {
@@ -471,8 +477,8 @@ export default function CourseGroupPage() {
     try {
       await api.assignGroupActivity(courseId, groupId, {
         activityId: assignActivityId,
-        availableFrom: toIsoOrNull(assignAvailableFrom),
-        availableUntil: toIsoOrNull(assignAvailableUntil),
+        availableFrom: toIsoOrNull(assignAvailableFrom, timeZone),
+        availableUntil: toIsoOrNull(assignAvailableUntil, timeZone),
         config: {},
         metadata: {
           assessmentMode: effectiveAssignAssessmentMode,
@@ -859,8 +865,8 @@ export default function CourseGroupPage() {
     setAssignmentError("");
     try {
       const input = {
-        availableFrom: toIsoOrNull(availableFrom),
-        availableUntil: toIsoOrNull(availableUntil)
+        availableFrom: toIsoOrNull(availableFrom, timeZone),
+        availableUntil: toIsoOrNull(availableUntil, timeZone)
       };
       try {
         await api.updateGroupActivityAssignment(courseId, groupId, assignmentId, input);
@@ -1093,7 +1099,7 @@ export default function CourseGroupPage() {
                 <h1>{course.title}: {group.title}</h1>
                 <span className="muted">{group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}</span>
                 {canManageRoster ? <Link className="button secondary" href={`/courses/${courseId}/groups/${groupId}/student-view`} rel="noopener" target="_blank">{t("courseDetail.studentView")}</Link> : null}
-                {group.availableFrom || group.availableUntil ? <span className="muted"> · {formatAvailabilityWindow(group.availableFrom, group.availableUntil, t)}</span> : null}
+                {group.availableFrom || group.availableUntil ? <span className="muted"> · {formatAvailabilityWindow(group.availableFrom, group.availableUntil, t, timeZone)}</span> : null}
               </div>
             }
               ariaLabel={t("groupPage.workspaceTabs")}
@@ -1423,7 +1429,7 @@ export default function CourseGroupPage() {
                                   ? t("groupPage.assessmentModeFormative")
                                   : null;
                             const availabilityLabel = assignment
-                              ? formatAvailabilityWindow(assignment.availableFrom, assignment.availableUntil, t)
+                              ? formatAvailabilityWindow(assignment.availableFrom, assignment.availableUntil, t, timeZone)
                               : null;
                             const metadataBadges = [
                               activityLabel ? <span className="metadata-badge is-activity-type" key="activity-type">{activityLabel}</span> : null,
@@ -1975,16 +1981,17 @@ function GroupActivityCard({
   onSave: (assignmentId: string, availableFrom: string, availableUntil: string) => Promise<void>;
   onRemove: (assignmentId: string, title: string) => Promise<void>;
 }) {
-  const [availableFrom, setAvailableFrom] = useState(toDateTimeLocalValue(assignment.availableFrom));
-  const [availableUntil, setAvailableUntil] = useState(toDateTimeLocalValue(assignment.availableUntil));
+  const { timeZone } = useApplicationTime();
+  const [availableFrom, setAvailableFrom] = useState(toDateTimeLocalValue(assignment.availableFrom, timeZone));
+  const [availableUntil, setAvailableUntil] = useState(toDateTimeLocalValue(assignment.availableUntil, timeZone));
   const isCourseWideAssignment = assignment.metadata?.assignmentScope === "course_all_groups";
   const canEditAvailability = canManage && (!isCourseWideAssignment || assignment.metadata?.enablePerGroupSettings !== false);
   const canRemoveLocally = canManage && !isCourseWideAssignment;
 
   useEffect(() => {
-    setAvailableFrom(toDateTimeLocalValue(assignment.availableFrom));
-    setAvailableUntil(toDateTimeLocalValue(assignment.availableUntil));
-  }, [assignment.availableFrom, assignment.availableUntil]);
+    setAvailableFrom(toDateTimeLocalValue(assignment.availableFrom, timeZone));
+    setAvailableUntil(toDateTimeLocalValue(assignment.availableUntil, timeZone));
+  }, [assignment.availableFrom, assignment.availableUntil, timeZone]);
 
   return (
     <div
@@ -2086,9 +2093,7 @@ function GroupActivityCard({
   );
 }
 
-function toIsoOrNull(value: string) {
-  return value ? new Date(value).toISOString() : null;
-}
+function toIsoOrNull(value: string, timeZone: string = "UTC") { return fromZonedDateTimeInput(value, timeZone); }
 
 function withDownloadVersion(url: string, material: CourseMaterial | CourseGroupMaterial | CourseContentResource) {
   const version =
@@ -2104,20 +2109,12 @@ function legacyMaterialHasStoredFile(material: CourseMaterial | CourseGroupMater
   return typeof material.metadata?.storedName === "string";
 }
 
-function toDateTimeLocalValue(value?: string | null) {
-  if (!value) {
-    return "";
-  }
-
-  const date = new Date(value);
-  const pad = (part: number) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
+function toDateTimeLocalValue(value?: string | null, timeZone: string = "UTC") { return toZonedDateTimeInput(value, timeZone); }
 
 function formatAvailabilityWindow(
   availableFrom: string | null | undefined,
   availableUntil: string | null | undefined,
-  t: (key: string, vars?: Record<string, string | number>) => string
+  t: (key: string, vars?: Record<string, string | number>) => string, timeZone: string = "UTC"
 ) {
   if (!availableFrom && !availableUntil) {
     return t("groupPage.availableAlways");
@@ -2125,35 +2122,31 @@ function formatAvailabilityWindow(
 
   if (availableFrom && availableUntil) {
     return t("groupPage.availableWindow", {
-      from: formatAvailabilityValue(availableFrom),
-      until: formatAvailabilityValue(availableUntil)
+      from: formatAvailabilityValue(availableFrom, timeZone),
+      until: formatAvailabilityValue(availableUntil, timeZone)
     });
   }
 
   if (availableFrom) {
-    return t("groupPage.availableAfter", { from: formatAvailabilityValue(availableFrom) });
+    return t("groupPage.availableAfter", { from: formatAvailabilityValue(availableFrom, timeZone) });
   }
 
-  return t("groupPage.availableBefore", { until: formatAvailabilityValue(availableUntil as string) });
+  return t("groupPage.availableBefore", { until: formatAvailabilityValue(availableUntil as string, timeZone) });
 }
 
-function formatAvailabilityValue(value: string) {
+function formatAvailabilityValue(value: string, timeZone: string = "UTC") {
   const date = new Date(value);
-  const isMidnight =
-    date.getHours() === 0 &&
-    date.getMinutes() === 0 &&
-    date.getSeconds() === 0 &&
-    date.getMilliseconds() === 0;
+  const isMidnight = isZonedMidnight(date, timeZone);
 
   if (isMidnight) {
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat(undefined, { timeZone,
       year: "numeric",
       month: "short",
       day: "numeric"
     }).format(date);
   }
 
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(undefined, { timeZone,
     year: "numeric",
     month: "short",
     day: "numeric",

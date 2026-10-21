@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime } from "@cognelo/activity-ui";
+
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityLiveControlPortal } from "@/components/activity-live-controls";
 import { AppIcon } from "@/components/app-icon";
@@ -17,6 +20,7 @@ export function ActivityMessenger({
   activityId: string;
   enabled: boolean;
 }) {
+  const { timeZone } = useApplicationTime();
   const { locale, t } = useI18n();
   const [conversation, setConversation] = useState<LearnerActivityConversation | null>(null);
   const [open, setOpen] = useState(false);
@@ -109,7 +113,7 @@ export function ActivityMessenger({
                 <article className={`activity-message activity-message--${message.senderKind}`} key={message.id}>
                   <div className="activity-message-meta">
                     <strong>{message.senderName}</strong>
-                    <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt, locale)}</time>
+                    <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt, locale, timeZone)}</time>
                   </div>
                   <p>{message.body}</p>
                 </article>
@@ -124,8 +128,8 @@ export function ActivityMessenger({
   );
 }
 
-function formatMessageTime(value: string, locale: string) {
-  return new Intl.DateTimeFormat(locale, {
+function formatMessageTime(value: string, locale: string, timeZone: string = "UTC") {
+  return new Intl.DateTimeFormat(locale, { timeZone,
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(value));

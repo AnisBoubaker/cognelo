@@ -2,9 +2,10 @@ export function defaultGradeExportFileName(
   courseTitle: string,
   groupName: string,
   activityTitle: string,
-  shownAt: Date
+  shownAt: Date,
+  timeZone = "UTC"
 ) {
-  return [courseTitle, groupName, activityTitle, formatGradeExportTimestamp(shownAt)]
+  return [courseTitle, groupName, activityTitle, formatGradeExportTimestamp(shownAt, timeZone)]
     .map(sanitizeGradeExportFileNamePart)
     .filter(Boolean)
     .join("-")
@@ -12,16 +13,11 @@ export function defaultGradeExportFileName(
     .replace(/[. ]+$/g, "");
 }
 
-export function formatGradeExportTimestamp(value: Date) {
-  return [
-    String(value.getFullYear()).padStart(4, "0"),
-    String(value.getMonth() + 1).padStart(2, "0"),
-    String(value.getDate()).padStart(2, "0")
-  ].join("-") + `-${[
-    String(value.getHours()).padStart(2, "0"),
-    String(value.getMinutes()).padStart(2, "0"),
-    String(value.getSeconds()).padStart(2, "0")
-  ].join("")}`;
+export function formatGradeExportTimestamp(value: Date, timeZone = "UTC") {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
+  }).formatToParts(value).map((part) => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}-${parts.hour}${parts.minute}${parts.second}`;
 }
 
 export function sanitizeGradeExportFileNamePart(value: string) {

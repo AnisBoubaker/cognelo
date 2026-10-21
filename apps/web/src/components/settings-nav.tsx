@@ -25,6 +25,7 @@ export function SettingsNav() {
   const visibleItems = user?.roles.includes("admin")
     ? [
         ...settingsItems,
+        { href: "/settings/time", labelKey: "timeSettings.title", textKey: "timeSettings.navText" },
         { href: "/settings/users", labelKey: "settings.usersNav", textKey: "settings.usersNavText" },
         { href: "/settings/email", labelKey: "settings.emailDeliveryNav", textKey: "settings.emailDeliveryNavText" },
         { href: "/settings/runners", labelKey: "settings.runnersNav", textKey: "settings.runnersNavText" },

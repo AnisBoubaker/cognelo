@@ -1,5 +1,8 @@
 "use client";
 
+import { useServerNow, useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
+
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MyStudentGroupingDto } from "@cognelo/contracts";
 import { api, ApiError } from "@/lib/api";
@@ -40,18 +43,16 @@ export function MyTeamsPanel({ courseId, groupId }: { courseId: string; groupId:
 }
 
 function MyGrouping({ grouping, courseId, groupId, reload }: { grouping: MyStudentGroupingDto; courseId: string; groupId: string; reload: () => Promise<void> }) {
+  const { timeZone } = useApplicationTime();
   const { t, locale } = useI18n();
   const [selected, setSelected] = useState(grouping.ownTeamId ?? "");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [now, setNow] = useState(Date.now);
+  const now = useServerNow();
   const submitting = useRef(false);
   useEffect(() => { setSelected(grouping.ownTeamId ?? ""); }, [grouping.ownTeamId]);
-  useEffect(() => {
-    const interval = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(interval);
-  }, []);
+
   const choiceEnabled = grouping.choiceState !== "disabled";
   const closed = choiceEnabled && grouping.choiceClosesAt && now >= Date.parse(grouping.choiceClosesAt);
   const state = closed ? "closed" : grouping.choiceState;
@@ -59,7 +60,7 @@ function MyGrouping({ grouping, courseId, groupId, reload }: { grouping: MyStude
   const displayedSelection = open ? selected : grouping.ownTeamId;
   const selectedTeam = grouping.teams.find((team) => team.id === selected);
   const canConfirm = open && selectedTeam && selected !== grouping.ownTeamId && selectedTeam.members.length < selectedTeam.capacity;
-  const date = (value: string) => new Date(value).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
+  const date = (value: string) => formatZonedDateTime(new Date(value), timeZone, locale, { dateStyle: "medium", timeStyle: "short" });
 
   async function confirm() {
     if (!canConfirm || submitting.current) return;

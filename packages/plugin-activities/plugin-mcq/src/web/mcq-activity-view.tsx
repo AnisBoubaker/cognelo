@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime } from "@cognelo/activity-ui";
+
+
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import { CodeEditor, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, ProgressDialog, RichTextEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
@@ -289,6 +292,7 @@ export function McqActivityView({
   timedAutoSubmit,
   aiGenerationClient
 }: McqActivityViewProps) {
+  const { timeZone } = useApplicationTime();
   const copyLocale = locale === "ar" ? "en" : locale;
   const copy = copyByLocale[copyLocale] ?? copyByLocale.en;
   const actionCopy = getEditActionBarCopy(locale);
@@ -923,7 +927,7 @@ export function McqActivityView({
               <select id="mcq-submission-history" value={selectedSubmissionReview.id} onChange={(event) => setSelectedSubmissionId(event.target.value)}>
                 {submissionReviews.map((review) => (
                   <option key={review.id} value={review.id}>
-                    {formatSubmissionTimestamp(review.submittedAt, locale)} · {copy.attempt} {review.attemptNumber}
+                    {formatSubmissionTimestamp(review.submittedAt, locale, timeZone)} · {copy.attempt} {review.attemptNumber}
                   </option>
                 ))}
               </select>
@@ -1479,11 +1483,11 @@ function formatSubmissionAvailability(
   });
 }
 
-function formatSubmissionTimestamp(value: string | null, locale: "en" | "fr" | "zh" | "ar") {
+function formatSubmissionTimestamp(value: string | null, locale: "en" | "fr" | "zh" | "ar", timeZone: string = "UTC") {
   if (!value) {
     return "—";
   }
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 function formatCopy(message: string, vars: Record<string, string | number>) {

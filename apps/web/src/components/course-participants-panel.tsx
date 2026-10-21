@@ -1,5 +1,10 @@
 "use client";
 
+import { toZonedDateTimeInput, fromZonedDateTimeInput } from "@cognelo/activity-ui";
+
+import { useApplicationTime } from "@cognelo/activity-ui";
+
+
 import { ConfirmationDialog, ContextMenu, ProgressDialog, useDialogs } from "@cognelo/activity-ui";
 import { ChangeEvent, FocusEvent, FormEvent, useEffect, useState } from "react";
 import { AppIcon, DisclosureIndicator } from "@/components/app-icon";
@@ -67,6 +72,7 @@ export function CourseParticipantsPanel({
   groups: CourseGroup[];
   onChanged: () => Promise<void>;
 }) {
+  const { timeZone } = useApplicationTime();
   const { t } = useI18n();
   const dialogs = useDialogs();
   const [groupDetails, setGroupDetails] = useState<Record<string, CourseGroup>>({});
@@ -114,8 +120,8 @@ export function CourseParticipantsPanel({
       groupId: group.id,
       title: detail.title,
       status: detail.status,
-      availableFrom: toDateTimeLocalValue(detail.availableFrom),
-      availableUntil: toDateTimeLocalValue(detail.availableUntil)
+      availableFrom: toDateTimeLocalValue(detail.availableFrom, timeZone),
+      availableUntil: toDateTimeLocalValue(detail.availableUntil, timeZone)
     });
   }
 
@@ -129,8 +135,8 @@ export function CourseParticipantsPanel({
         await api.updateGroup(courseId, editor.groupId, {
           title: editor.title,
           status: editor.status,
-          availableFrom: toIsoOrNull(editor.availableFrom),
-          availableUntil: toIsoOrNull(editor.availableUntil)
+          availableFrom: toIsoOrNull(editor.availableFrom, timeZone),
+          availableUntil: toIsoOrNull(editor.availableUntil, timeZone)
         });
       } else {
         const { group } = await api.createGroup(courseId, { title: editor.title });
@@ -383,7 +389,7 @@ export function CourseParticipantsPanel({
                         </span>
                         <span className="participant-group-meta" id={`${toggleId}-meta`}>
                           <span className="participant-group-count"><AppIcon name="participants" size={14} />{t("courseDetail.participantCount", { count: participants.length })}</span>
-                          <span>{formatAvailabilityWindow(detail.availableFrom, detail.availableUntil, t)}</span>
+                          <span>{formatAvailabilityWindow(detail.availableFrom, detail.availableUntil, t, timeZone)}</span>
                         </span>
                       </span>
                     </button>
@@ -593,20 +599,13 @@ function capitalize(value: string) {
   return `${value.slice(0, 1).toUpperCase()}${value.slice(1)}`;
 }
 
-function toDateTimeLocalValue(value?: string | null) {
-  if (!value) return "";
-  const date = new Date(value);
-  const pad = (part: number) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
+function toDateTimeLocalValue(value?: string | null, timeZone: string = "UTC") { return toZonedDateTimeInput(value, timeZone); }
 
-function toIsoOrNull(value: string) {
-  return value ? new Date(value).toISOString() : null;
-}
+function toIsoOrNull(value: string, timeZone: string = "UTC") { return fromZonedDateTimeInput(value, timeZone); }
 
-function formatAvailabilityWindow(from: string | null | undefined, until: string | null | undefined, t: (key: string, vars?: Record<string, string | number>) => string) {
+function formatAvailabilityWindow(from: string | null | undefined, until: string | null | undefined, t: (key: string, vars?: Record<string, string | number>) => string, timeZone: string = "UTC") {
   if (!from && !until) return t("groupPage.availableAlways");
-  const format = (value: string) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  const format = (value: string) => new Intl.DateTimeFormat(undefined, { timeZone, dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
   if (from && until) return t("groupPage.availableWindow", { from: format(from), until: format(until) });
   if (from) return t("groupPage.availableAfter", { from: format(from) });
   return t("groupPage.availableBefore", { until: format(until as string) });

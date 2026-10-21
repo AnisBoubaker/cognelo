@@ -132,3 +132,5 @@ The implemented section-scoped staff model, resolved policy decisions, and admin
 - `text-content.spec.ts`: full-page text authoring, uploaded images, tables/formulas, inline/page/modal presentation, page targets, modal focus/scroll restoration, section visibility and reader/image authorization, plus media retention across duplication.
 
 Link-summary coverage also checks the default-off same-domain checkbox, its generation payload and source report, private persistence, duplication, and disabling it independently on the original. Crawling itself is validated by server tests; browser tests mock AI generation.
+
+- `application-time.spec.ts`: admin-only timezone updates, Toronto scheduling in a Tokyo browser, unchanged stored instants, and Test start/deadline enforcement under forward/backward browser-clock manipulation. The test restores the prior instance timezone and uses disposable course data.

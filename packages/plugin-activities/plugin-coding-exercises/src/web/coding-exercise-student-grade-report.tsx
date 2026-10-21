@@ -1,3 +1,4 @@
+import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
 import { CodeRenderer } from "@cognelo/activity-ui";
 import { formatCodingExercisesMessage, normalizeCodingExercisesLocale } from "./messages";
 
@@ -44,6 +45,7 @@ export type CodingExerciseStudentGradeReportProps = {
 };
 
 export function CodingExerciseStudentGradeReport({ score, maxScore, feedback, report, locale }: CodingExerciseStudentGradeReportProps) {
+  const { timeZone } = useApplicationTime();
   const pluginLocale = normalizeCodingExercisesLocale(locale);
   const t = (key: Parameters<typeof formatCodingExercisesMessage>[1], values?: Record<string, string | number>) =>
     formatCodingExercisesMessage(pluginLocale, key, values);
@@ -127,7 +129,7 @@ export function CodingExerciseStudentGradeReport({ score, maxScore, feedback, re
             <details className="coding-exercise-attempt-accordion" key={attempt.attemptId} open={parsedReport.attempts.length === 1}>
               <summary>
                 <span>{t("attemptNumber", { number: attempt.attemptNumber })}</span>
-                <time dateTime={attempt.submittedAt}>{new Date(attempt.submittedAt).toLocaleString(pluginLocale)}</time>
+                <time dateTime={attempt.submittedAt}>{formatZonedDateTime(new Date(attempt.submittedAt), timeZone, pluginLocale, { dateStyle: "medium", timeStyle: "medium" })}</time>
                 {attempt.isSelected ? <span className="metadata-badge">{t("selectedForFinalGrade")}</span> : <span />}
               </summary>
               <div className="stack coding-exercise-attempt-content">

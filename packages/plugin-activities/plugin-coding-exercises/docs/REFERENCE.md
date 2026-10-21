@@ -281,3 +281,7 @@ This type supports the shared [Solution tab](../../../../docs/ACTIVITY_SOLUTIONS
 The core [Test regrading batch](../../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-automatic-regrading) reevaluates every submitted child against current grading rules, including previously graded work. Individual and whole-class actions show measured progress. Saved answers, original timing, submitted composition/point weights, and grade-release state remain fixed. Each successful rerun is audited; an individual failure does not stop later exercises, and an incomplete batch leaves the parent total unchanged. Recovery may initially preserve responses without a grade or runner artifact; later teacher regrading uses the same batch. No AI feedback is requested automatically. Standalone behavior is unchanged.
 
 The plugin registers `compositeExecution.regrade` to verify learner/activity/source ownership, retain the original execution ID, append a test evaluation, and compose current test/rubric weights with the Test child’s reviewed feedback. Missing rubric evidence defers the child grade while keeping the new deterministic evidence. A recovered response with no execution uses ordinary composite submission first.
+
+### Timestamp display
+
+Submission, review, and other dated UI records use the shared administrator-configured instance timezone. Stored instants remain UTC; plugin UI must not infer a timezone from the learner device. See [Application time](../../../../docs/APPLICATION_TIME.md) for the shared context and clock/security contract.

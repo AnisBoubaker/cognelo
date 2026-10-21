@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
+
+
 import { CodeRenderer } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useServerCountdown } from "@/lib/use-server-countdown";
@@ -705,6 +708,7 @@ function DeletedSubmissionList({
   deletedSubmissions: DeletedSubmissionAudit[];
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
+  const { timeZone } = useApplicationTime();
   return (
     <div className="stack stack-tight">
       {deletedSubmissions.map((deletion) => (
@@ -712,13 +716,13 @@ function DeletedSubmissionList({
           <strong>
             {t("courseDetail.deletedSubmissionSummary", {
               number: deletion.attemptNumber ?? "-",
-              date: formatDateTime(deletion.deletedAt)
+              date: formatDateTime(deletion.deletedAt, timeZone)
             })}
           </strong>
           {deletion.actor ? <p className="muted">{t("courseDetail.deletedSubmissionActor", { name: deletion.actor.name ?? deletion.actor.email })}</p> : null}
           {deletion.reason ? <p className="muted">{t("courseDetail.deletedSubmissionReason", { reason: deletion.reason })}</p> : null}
           <p className="muted">
-            {t("courseDetail.deletedSubmissionWhat")}: {formatDeletedSubmissionRecord(deletion)}
+            {t("courseDetail.deletedSubmissionWhat")}: {formatDeletedSubmissionRecord(deletion, timeZone)}
           </p>
           <DeletedSubmissionSolution deletion={deletion} t={t} />
         </div>
@@ -1025,14 +1029,14 @@ function formatGradeNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString();
+function formatDateTime(value: string, timeZone: string = "UTC") {
+  return formatZonedDateTime(new Date(value), timeZone, undefined, { dateStyle: "medium", timeStyle: "medium" });
 }
 
-function formatDeletedSubmissionRecord(deletion: DeletedSubmissionAudit) {
+function formatDeletedSubmissionRecord(deletion: DeletedSubmissionAudit, timeZone: string = "UTC") {
   const parts = [
-    deletion.submittedAt ? `submitted ${formatDateTime(deletion.submittedAt)}` : null,
-    deletion.gradedAt ? `graded ${formatDateTime(deletion.gradedAt)}` : null,
+    deletion.submittedAt ? `submitted ${formatDateTime(deletion.submittedAt, timeZone)}` : null,
+    deletion.gradedAt ? `graded ${formatDateTime(deletion.gradedAt, timeZone)}` : null,
     deletion.pluginKey,
     deletion.pluginAttemptRef ? `ref ${deletion.pluginAttemptRef}` : null
   ].filter(Boolean);

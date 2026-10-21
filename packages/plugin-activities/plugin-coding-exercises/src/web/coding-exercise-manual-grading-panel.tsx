@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
+
+
 import { CodingExerciseAiFeedbackReview } from "./coding-exercise-ai-feedback-review";
 
 type CodingExerciseReviewAttempt = {
@@ -41,6 +44,7 @@ export function CodingExerciseManualGradingPanel({
   onSelectAttemptIndex,
   t
 }: CodingExerciseManualGradingPanelProps) {
+  const { timeZone } = useApplicationTime();
   const feedback = selectedAttempt?.aiFeedback?.feedback ?? null;
   return (
     <section className="dialog-panel answer-overlay test-review-overlay stack" role="dialog" aria-modal="true">
@@ -71,7 +75,7 @@ export function CodingExerciseManualGradingPanel({
         <div className="stack">
           <div className="answer-meta">
             <strong>{t("courseDetail.submissionAnswerLabel", { id: String(selectedIndex + 1) })}</strong>
-            <time className="muted" dateTime={selectedAttempt.createdAt}>{new Date(selectedAttempt.createdAt).toLocaleString()}</time>
+            <time className="muted" dateTime={selectedAttempt.createdAt}>{formatZonedDateTime(new Date(selectedAttempt.createdAt), timeZone, undefined, { dateStyle: "medium", timeStyle: "medium" })}</time>
           </div>
           <CodingExerciseAiFeedbackReview
             feedback={feedback ?? {}}

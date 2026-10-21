@@ -1,4 +1,5 @@
 "use client";
+import { useApplicationTime } from "@cognelo/activity-ui";
 
 import { FormEvent, useState } from "react";
 import { AppIcon } from "@/components/app-icon";
@@ -17,12 +18,14 @@ export type GradebookExportTarget = {
 
 export function GradebookExportDialog({ target, onClose }: { target: GradebookExportTarget; onClose: () => void }) {
   const { t } = useI18n();
+  const { timeZone, now } = useApplicationTime();
   const [format, setFormat] = useState<"csv" | "xlsx">("csv");
   const [fileName, setFileName] = useState(() => defaultGradeExportFileName(
     target.courseTitle,
     target.groupName,
     target.activityTitle,
-    new Date()
+    new Date(now()),
+    timeZone
   ));
 
   function submit(event: FormEvent<HTMLFormElement>) {

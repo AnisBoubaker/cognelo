@@ -2,6 +2,16 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const zhMessages = {
+  timeSettings: {
+    "title": "日期和时间",
+    "navText": "实例时区与日程安排",
+    "zone": "时区",
+    "help": "所有日期、时间和日程安排均使用此时区。活动访问和截止时间由服务器时钟控制。",
+    "reloadHelp": "已打开的页面重新加载后使用新时区。现有日程对应的实际时刻不会改变。",
+    "saved": "时区已保存。",
+    "loadError": "无法加载服务器时间和时区，请重试。",
+    "adminOnly": "只有管理员可以更改实例时区。"
+},
   activitySolution: {
     "releaseLabel": "发布参考答案",
     "releaseHelp": "允许学生查看参考答案。总结性活动还必须先发布成绩。此设置适用于所有班级，以及测验中所有支持此功能的练习。",

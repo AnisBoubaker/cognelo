@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime } from "@cognelo/activity-ui";
+
+
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1285,6 +1288,7 @@ function GradebookStudentRow({
   onGenerateAiFeedback: (row: CourseGradebookRow) => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
+  const { timeZone } = useApplicationTime();
   const rowHasSubmittedAttempt = hasSubmittedAttempt(row);
   const activityActions = getGradebookActivityActions(row.activityTypeKey);
   const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLButtonElement | null>(null);
@@ -1328,7 +1332,7 @@ function GradebookStudentRow({
             </span>
             <span className="table-meta-note muted">
               {t("courseDetail.attemptStartedAt", {
-                date: formatAttemptStartedAt(inProgressAttempt.startedAt, locale)
+                date: formatAttemptStartedAt(inProgressAttempt.startedAt, locale, timeZone)
               })}
             </span>
           </div>
@@ -1424,10 +1428,10 @@ function GradebookStudentRow({
   );
 }
 
-function formatAttemptStartedAt(value: string, locale: Locale) {
+function formatAttemptStartedAt(value: string, locale: Locale, timeZone: string = "UTC") {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  return new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
 function normalizeCodingTestResults(value: unknown): Array<{ testId: string; name: string; passed: boolean }> {

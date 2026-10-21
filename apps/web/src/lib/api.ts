@@ -1537,6 +1537,9 @@ export function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  applicationTime: () => request<{ timeZone: string; serverNow: string }>("/application-time"),
+  applicationTimeSettings: () => request<{ timeZone: string; serverNow: string; timeZones: string[] }>("/settings/time"),
+  updateApplicationTimeSettings: (timeZone: string) => request<{ timeZone: string; serverNow: string }>("/settings/time", { method: "PUT", body: JSON.stringify({ timeZone }) }),
   login: (email: string, password: string) =>
     request<{ user: CurrentUser }>("/auth/login", {
       method: "POST",

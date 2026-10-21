@@ -2,6 +2,16 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const enMessages = {
+  timeSettings: {
+    "title": "Date and time",
+    "navText": "Instance timezone and scheduling",
+    "zone": "Timezone",
+    "help": "All dates, times, and scheduling use this timezone. Activity access and deadlines are enforced using the server clock.",
+    "reloadHelp": "Open pages use the new timezone after reloading. Existing scheduled instants do not move.",
+    "saved": "Timezone saved.",
+    "loadError": "Unable to load the server time and timezone. Please retry.",
+    "adminOnly": "Only administrators can change the instance timezone."
+},
   activitySolution: {
     "releaseLabel": "Release solution",
     "releaseHelp": "Let students reveal the solution. For summative activities, grades must also be released. This applies to all sections and, for a Test, all supported exercises.",

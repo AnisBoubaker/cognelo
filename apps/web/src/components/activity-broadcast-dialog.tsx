@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime } from "@cognelo/activity-ui";
+
+
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AppIcon } from "@/components/app-icon";
 import { api, type ActivityMessagingOverview } from "@/lib/api";
@@ -17,6 +20,7 @@ export function ActivityBroadcastDialog({
   groupId?: string;
   onClose: () => void;
 }) {
+  const { timeZone } = useApplicationTime();
   const { locale, t } = useI18n();
   const notifications = useNotifications();
   const [overview, setOverview] = useState<ActivityMessagingOverview | null>(null);
@@ -117,7 +121,7 @@ export function ActivityBroadcastDialog({
             <article className="activity-broadcast-history-item" key={broadcast.id}>
               <div className="activity-message-meta">
                 <strong>{broadcast.senderName}</strong>
-                <time dateTime={broadcast.createdAt}>{formatMessageTime(broadcast.createdAt, locale)}</time>
+                <time dateTime={broadcast.createdAt}>{formatMessageTime(broadcast.createdAt, locale, timeZone)}</time>
               </div>
               <p>{broadcast.body}</p>
               <small className="muted">
@@ -134,8 +138,8 @@ export function ActivityBroadcastDialog({
   );
 }
 
-function formatMessageTime(value: string, locale: string) {
-  return new Intl.DateTimeFormat(locale, {
+function formatMessageTime(value: string, locale: string, timeZone: string = "UTC") {
+  return new Intl.DateTimeFormat(locale, { timeZone,
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(value));

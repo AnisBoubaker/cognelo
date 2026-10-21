@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime } from "@cognelo/activity-ui";
+
+
 import { type FormEvent, useEffect, useState } from "react";
 import type { ParsonsAttemptState } from "../attempt-types";
 
@@ -71,6 +74,7 @@ export function ParsonsManualGradingPanel({
   onDeleteSubmission,
   t
 }: ParsonsManualGradingPanelProps) {
+  const { timeZone } = useApplicationTime();
   const [score, setScore] = useState(row.score === null ? "" : formatGradeNumber(row.score));
   const [reason, setReason] = useState("");
   const [formError, setFormError] = useState("");
@@ -147,7 +151,7 @@ export function ParsonsManualGradingPanel({
 
           <div className="answer-meta">
             <strong>{attemptLabel(selectedAttempt, t)}</strong>
-            <span className="muted">{formatDateTime(selectedAttempt.completedAt ?? selectedAttempt.lastInteractionAt)}</span>
+            <span className="muted">{formatDateTime(selectedAttempt.completedAt ?? selectedAttempt.lastInteractionAt, timeZone)}</span>
           </div>
 
           <div className="parsons-answer-lines">
@@ -209,7 +213,7 @@ export function ParsonsManualGradingPanel({
             {selectedAttempt.events.map((event) => (
               <div className="table-row table-row-simple" key={event.id}>
                 <strong>{event.type}</strong>
-                <span className="table-meta muted">{formatDateTime(event.createdAt)}</span>
+                <span className="table-meta muted">{formatDateTime(event.createdAt, timeZone)}</span>
               </div>
             ))}
           </div>
@@ -230,8 +234,8 @@ function formatGradeNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
+function formatDateTime(value: string, timeZone: string = "UTC") {
+  return new Intl.DateTimeFormat(undefined, { timeZone,
     year: "numeric",
     month: "short",
     day: "numeric",

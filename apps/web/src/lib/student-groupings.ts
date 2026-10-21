@@ -1,3 +1,4 @@
+import { toZonedDateTimeInput } from "@cognelo/activity-ui";
 import type { SubjectTeachingLanguage } from "@cognelo/contracts";
 import { translateMessage } from "./i18n";
 
@@ -32,9 +33,6 @@ export function randomlyAssignStudents<T extends { participantIds: string[]; cap
   return result;
 }
 
-export function toTeamChoiceLocalDate(value: string | null) {
-  if (!value) return "";
-  const date = new Date(value);
-  const pad = (part: number) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+export function toTeamChoiceLocalDate(value: string | null, timeZone = "UTC") {
+  return toZonedDateTimeInput(value, timeZone);
 }

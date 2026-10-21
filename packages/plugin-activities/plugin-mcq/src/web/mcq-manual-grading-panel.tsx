@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime } from "@cognelo/activity-ui";
+
+
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useNotifications } from "@cognelo/activity-ui";
 import { parseMcqSource, scoreSelectedChoices } from "../mcq";
@@ -64,6 +67,7 @@ export function McqManualGradingPanel({
   onDeleteSubmission,
   t
 }: McqManualGradingPanelProps) {
+  const { timeZone } = useApplicationTime();
   const notifications = useNotifications();
   const [questionScores, setQuestionScores] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
@@ -136,7 +140,7 @@ export function McqManualGradingPanel({
           </div>
           <div className="answer-meta">
             <strong>{t("courseDetail.submissionAnswerLabel", { id: String(selectedAttempt.attemptNumber) })}</strong>
-            <span className="muted">{selectedAttempt.submittedAt ? formatDateTime(selectedAttempt.submittedAt, locale) : ""}</span>
+            <span className="muted">{selectedAttempt.submittedAt ? formatDateTime(selectedAttempt.submittedAt, locale, timeZone) : ""}</span>
           </div>
           <div className="stack">
             {answers.map((answer, index) => (
@@ -289,8 +293,8 @@ function formatGradeNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-function formatDateTime(value: string, locale: McqLocale) {
-  return new Intl.DateTimeFormat(locale, {
+function formatDateTime(value: string, locale: McqLocale, timeZone: string = "UTC") {
+  return new Intl.DateTimeFormat(locale, { timeZone,
     year: "numeric",
     month: "short",
     day: "numeric",

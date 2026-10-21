@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
+
+
 import { useEffect, useState } from "react";
 import { useNotifications } from "@cognelo/activity-ui";
 import { AppShell } from "@/components/app-shell";
@@ -14,6 +17,7 @@ type PluginInstallation = ActivityPluginInstallation | ContentTypePluginInstalla
 type PluginSettingsTab = "activity" | "content";
 
 export default function PluginSettingsPage() {
+  const { timeZone } = useApplicationTime();
   const { user } = useAuth();
   const { t } = useI18n();
   const notifications = useNotifications();
@@ -191,7 +195,7 @@ export default function PluginSettingsPage() {
                           <option value="">{t("settings.pluginNoBackup")}</option>
                           {plugin.tableBackups.map((backup) => (
                             <option key={backup.id} value={backup.id}>
-                              {backup.pluginVersion} · {new Date(backup.createdAt).toLocaleString()}
+                              {backup.pluginVersion} · {formatZonedDateTime(new Date(backup.createdAt), timeZone, undefined, { dateStyle: "medium", timeStyle: "medium" })}
                             </option>
                           ))}
                         </select>

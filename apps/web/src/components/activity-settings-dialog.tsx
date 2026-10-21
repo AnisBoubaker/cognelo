@@ -1,5 +1,7 @@
 "use client";
 
+import { toZonedDateTimeInput, fromZonedDateTimeInput, useApplicationTime } from "@cognelo/activity-ui";
+
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import "@cognelo/plugin-registry/activity";
 import type { ActivityAssignmentOverrideField, AssignedActivityAssessmentMode } from "@cognelo/contracts";
@@ -71,6 +73,7 @@ const summativeOverrideFields = new Set<ActivityAssignmentOverrideField>([
 ]);
 
 export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }: ActivitySettingsDialogProps) {
+  const { timeZone } = useApplicationTime();
   const { t } = useI18n();
   const dialogs = useDialogs();
   const [activeTab, setActiveTab] = useState<ActivitySettingsTab>("general");
@@ -90,7 +93,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
     api.courseActivityAssignmentSettings(courseId, activity.id)
       .then(({ settings }) => {
         if (cancelled) return;
-        const nextDraft = buildDraft(settings, isTest);
+        const nextDraft = buildDraft(settings, isTest, timeZone);
         setDraft(nextDraft);
         setSavedAssessmentMode(nextDraft.assessmentMode);
         setSelectedGroupId(nextDraft.groups[0]?.groupId ?? "");
@@ -106,7 +109,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
     return () => {
       cancelled = true;
     };
-  }, [activity.id, courseId, isTest, t]);
+  }, [activity.id, courseId, isTest, t, timeZone]);
 
   const selectedGroup = useMemo(
     () => draft?.groups.find((group) => group.groupId === selectedGroupId) ?? draft?.groups[0] ?? null,
@@ -183,8 +186,8 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
         ? undefined
         : (field: ActivityAssignmentOverrideField) => !summativeOverrideFields.has(field);
       const input = {
-        availableFrom: toIsoOrNull(draft.general.availableFrom),
-        availableUntil: toIsoOrNull(draft.general.availableUntil),
+        availableFrom: toIsoOrNull(draft.general.availableFrom, timeZone),
+        availableUntil: toIsoOrNull(draft.general.availableUntil, timeZone),
         timeLimitMinutes: buildTimeLimitMinutes(draft.general),
         enablePerGroupSettings: true,
         assessmentMode: draft.assessmentMode,
@@ -206,7 +209,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
           exceptions: group.assigned ? group.exceptions.map((exception) => ({
             teamId: exception.teamId, participantId: exception.participantId,
             overrideFields: exception.overrideFields.filter((field) => allowedGroupFields ? allowedGroupFields(field) : true),
-            availableFrom: toIsoOrNull(exception.availableFrom), availableUntil: toIsoOrNull(exception.availableUntil),
+            availableFrom: toIsoOrNull(exception.availableFrom, timeZone), availableUntil: toIsoOrNull(exception.availableUntil, timeZone),
             timeLimitMinutes: buildTimeLimitMinutes(exception), requireSafeExamBrowser: exception.requireSafeExamBrowser,
             gradeChallengesEnabled: exception.gradeChallengesEnabled, gradebookSettings: buildGradebookSettings(exception),
             contentPlacement: { isVisible: exception.isVisible, metadata: {} }
@@ -214,8 +217,8 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
           overrideFields: group.assigned
             ? group.overrideFields.filter((field) => allowedGroupFields ? allowedGroupFields(field) : true)
             : [],
-          availableFrom: toIsoOrNull(group.availableFrom),
-          availableUntil: toIsoOrNull(group.availableUntil),
+          availableFrom: toIsoOrNull(group.availableFrom, timeZone),
+          availableUntil: toIsoOrNull(group.availableUntil, timeZone),
           timeLimitMinutes: buildTimeLimitMinutes(group),
           requireSafeExamBrowser: draft.assessmentMode === "summative" && group.requireSafeExamBrowser,
           gradeChallengesEnabled: draft.assessmentMode === "summative" && group.gradeChallengesEnabled,
@@ -950,16 +953,16 @@ function OverrideField({
   );
 }
 
-function buildDraft(settings: CourseActivityAssignmentSettings, isTest: boolean): ActivitySettingsDraft {
+function buildDraft(settings: CourseActivityAssignmentSettings, isTest: boolean, timeZone: string = "UTC"): ActivitySettingsDraft {
   const assessmentMode = isTest ? "summative" : settings.general.assessmentMode;
   return {
     assessmentMode,
     messagingEnabled: settings.general.messagingEnabled,
     releaseSolution: settings.general.releaseSolution ?? false,
     contentParentId: settings.general.contentPlacement.parentId ?? "",
-    general: assignmentValueDraft(settings.general),
+    general: assignmentValueDraft(settings.general, timeZone),
     groups: settings.groups.map((group) => ({
-      ...assignmentValueDraft(group),
+      ...assignmentValueDraft(group, timeZone),
       groupId: group.groupId,
       title: group.title,
       assigned: group.assigned,
@@ -976,7 +979,7 @@ function buildDraft(settings: CourseActivityAssignmentSettings, isTest: boolean)
           gradeChallengesEnabled: exception.gradeChallengesEnabled ?? false,
           gradebookSettings: { ...group.gradebookSettings, ...exception.gradebookSettings },
           contentPlacement: { ...group.contentPlacement, ...exception.contentPlacement }
-        }),
+        }, timeZone),
         key: exception.teamId ? `team-${exception.teamId}` : `student-${exception.participantId}`,
         teamId: exception.teamId ?? null, participantId: exception.participantId ?? null,
         overrideFields: exception.overrideFields
@@ -996,10 +999,10 @@ function assignmentValueDraft(value: {
   gradeChallengesEnabled: boolean;
   gradebookSettings: ActivityAssignmentGradebookSettings;
   contentPlacement: { parentId: string | null; isVisible: boolean };
-}): AssignmentValueDraft {
+}, timeZone: string = "UTC"): AssignmentValueDraft {
   return {
-    availableFrom: toDateTimeLocalValue(value.availableFrom),
-    availableUntil: toDateTimeLocalValue(value.availableUntil),
+    availableFrom: toDateTimeLocalValue(value.availableFrom, timeZone),
+    availableUntil: toDateTimeLocalValue(value.availableUntil, timeZone),
     timeLimitEnabled: value.timeLimitMinutes !== null,
     timeLimitMinutes: String(value.timeLimitMinutes ?? 60),
     isVisible: value.contentPlacement.isVisible,
@@ -1113,16 +1116,6 @@ function nonNegativeNumber(value: string, fallback: number) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-function toDateTimeLocalValue(value: string | null | undefined) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return offsetDate.toISOString().slice(0, 16);
-}
+function toDateTimeLocalValue(value: string | null | undefined, timeZone: string = "UTC") { return toZonedDateTimeInput(value, timeZone); }
 
-function toIsoOrNull(value: string) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
+function toIsoOrNull(value: string, timeZone: string = "UTC") { return fromZonedDateTimeInput(value, timeZone); }

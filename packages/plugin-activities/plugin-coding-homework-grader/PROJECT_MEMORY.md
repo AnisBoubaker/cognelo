@@ -19,3 +19,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Plugin authoring uses one guarded draft; independently persisted uploads and processing actions are outside its saved-status claim.
 
 - [Submission continuation](../../../docs/SUBMISSION_CONTINUATION.md): Reopens the existing challenge answers while retaining the uploaded ZIP and generated questions. Prior mutable completion evidence is audited; final answers submit through the same core attempt without regenerating questions. Restore through the host transaction; reopening preserves the original start and applies current exceptions.
+
+- Display timestamps through the shared application-time context and explicit-zone formatters; the browser timezone is not a user preference. See [Application time](../../../docs/APPLICATION_TIME.md).

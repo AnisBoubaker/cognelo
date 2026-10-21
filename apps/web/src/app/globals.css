@@ -6589,3 +6589,5 @@ button:hover > .disclosure-indicator {
 .content-resource-dialog-header button { flex-shrink: 0; }
 .content-resource-body .markdown-renderer, .text-material-page .markdown-renderer, .content-resource-dialog .markdown-renderer { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .content-resource-dialog { padding: 16px; } }
+
+.date-time-zone-label { grid-column: 1 / -1; }

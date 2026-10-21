@@ -4,6 +4,8 @@ This file is intentionally short. It records only cross-cutting decisions that a
 
 ## Platform Invariants
 
+- [Application time](APPLICATION_TIME.md): administrators choose one instance timezone for display and scheduling. Persist UTC instants; use shared explicit-zone formatters/converters, never browser timezone defaults. Availability and deadlines remain server-clock decisions. Client availability displays use a server-synchronized monotonic clock; open date forms retain their loaded timezone until reload.
+
 - [Student solutions](ACTIVITY_SOLUTIONS.md) are opt-in per course activity, shared by sections, with one switch for a whole Test. Summative solution access additionally requires grade release. The learner must explicitly reveal the solution; private reference source is projected by the owning plugin, never added to ordinary coding/Web Design config or grading reports. Grade feeds must not expose provisional results for repeatable summative assignments.
 
 - [Live activity authoring](LIVE_ACTIVITY_AUTHORING.md): course questions and private tests remain editable during attempts with an active-student warning, optional message, and atomic audit. Learner responses survive refresh; submitted Tests use their final revision. Summative result/history APIs must enforce grade release, and missing automatic tests produce submitted-ungraded work rather than fabricated scores.

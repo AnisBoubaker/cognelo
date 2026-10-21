@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime } from "./application-time";
+
+
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 type NotificationVariant = "success" | "error" | "info" | "warning";
@@ -180,8 +183,8 @@ function getCurrentDocumentLocale() {
   return "en";
 }
 
-function formatNotificationTime(value: Date, locale: string) {
-  return new Intl.DateTimeFormat(locale || "en", {
+function formatNotificationTime(value: Date, locale: string, timeZone: string = "UTC") {
+  return new Intl.DateTimeFormat(locale || "en", { timeZone,
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit"
@@ -189,6 +192,7 @@ function formatNotificationTime(value: Date, locale: string) {
 }
 
 export function NotificationProvider({ children, labels }: { children: ReactNode; labels: NotificationLabels }) {
+  const { timeZone, now } = useApplicationTime();
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [history, setHistory] = useState<NotificationRecord[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -295,7 +299,7 @@ export function NotificationProvider({ children, labels }: { children: ReactNode
     const variant = input.variant ?? "info";
     const notification: NotificationRecord = {
       ...input,
-      createdAt: new Date(),
+      createdAt: new Date(now()),
       id,
       variant
     };
@@ -307,7 +311,7 @@ export function NotificationProvider({ children, labels }: { children: ReactNode
       const timerId = setTimeout(() => dismiss(id), durationMs);
       timerIdsRef.current.set(id, timerId);
     }
-  }, [dismiss]);
+  }, [dismiss, now]);
 
   const value = useMemo<NotificationsContextValue>(
     () => ({
@@ -375,7 +379,7 @@ export function NotificationProvider({ children, labels }: { children: ReactNode
                         <div style={metaStyle}>
                           <span style={{ ...badgeStyle, background: accentColor }}>{labels[notification.variant]}</span>
                           <time dateTime={notification.createdAt.toISOString()} style={timeStyle}>
-                            {formatNotificationTime(notification.createdAt, locale)}
+                            {formatNotificationTime(notification.createdAt, locale, timeZone)}
                           </time>
                         </div>
                       </div>

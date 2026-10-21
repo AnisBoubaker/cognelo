@@ -2,6 +2,16 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const frMessages = {
+  timeSettings: {
+    "title": "Date et heure",
+    "navText": "Fuseau horaire et planification",
+    "zone": "Fuseau horaire",
+    "help": "Les dates, heures et horaires utilisent ce fuseau. Le serveur contrôle l’accès aux activités et les échéances avec sa propre horloge.",
+    "reloadHelp": "Les pages ouvertes utilisent le nouveau fuseau après rechargement. Les instants déjà planifiés ne sont pas déplacés.",
+    "saved": "Fuseau horaire enregistré.",
+    "loadError": "Impossible de charger l’heure et le fuseau du serveur. Veuillez réessayer.",
+    "adminOnly": "Seuls les administrateurs peuvent modifier le fuseau horaire de l’instance."
+},
   activitySolution: {
     "releaseLabel": "Publier la solution",
     "releaseHelp": "Permettre aux étudiants de consulter la solution. Pour les activités sommatives, les notes doivent également être publiées. Ce réglage s’applique à toutes les sections et, pour un test, à tous les exercices compatibles.",

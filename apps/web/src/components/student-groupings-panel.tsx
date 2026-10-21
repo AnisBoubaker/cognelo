@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
+
+
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ContextMenu, EditActionBar, getEditActionBarCopy, useDialogs, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { SubjectTeachingLanguage } from "@cognelo/contracts";
@@ -40,6 +43,7 @@ export function CourseStudentGroupingsPanel({ courseId, groups, teachingLanguage
 export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onEditingChange, sectionSelector }: {
   courseId: string; groupId: string; teachingLanguage: SubjectTeachingLanguage; onEditingChange?: (editing: boolean) => void; sectionSelector?: ReactNode;
 }) {
+  const { timeZone } = useApplicationTime();
   const { locale, t } = useI18n();
   const dialogs = useDialogs();
   const notifications = useNotifications();
@@ -141,7 +145,7 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
 
   const methodLabel = (method: Draft["assignmentMethod"]) => t(`studentGroupings.${method === "student_choice" ? "studentChoiceMethod" : method === "random" ? "randomMethod" : "manualMethod"}`);
   const formatChoiceDate = (value: string | null, fallback: string) => value
-    ? new Date(value).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : t(`studentGroupings.${fallback}`);
+    ? formatZonedDateTime(new Date(value), timeZone, locale, { dateStyle: "medium", timeStyle: "short" }) : t(`studentGroupings.${fallback}`);
   const choiceSummary = (value: Draft | StudentGroupingDto) => value.studentChoiceEnabled ? <div className="student-grouping-choice-summary">
     <span>{t("studentGroupings.choiceFrom")}: <strong>{formatChoiceDate(value.choiceOpensAt, "immediately")}</strong></span>
     <span>{t("studentGroupings.choiceUntil")}: <strong>{formatChoiceDate(value.choiceClosesAt, "noDeadline")}</strong></span>

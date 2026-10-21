@@ -48,3 +48,5 @@ Load only the topic relevant to the change.
 - Bank and course authoring rows are independent and synchronized through explicit hooks.
 
 When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an invariant changed, and the relevant detailed section or implementation plan.
+
+Displayed submission and review timestamps use the shared [administrator-configured instance timezone](../../../docs/APPLICATION_TIME.md).

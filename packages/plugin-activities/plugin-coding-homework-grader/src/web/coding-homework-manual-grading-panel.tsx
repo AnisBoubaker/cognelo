@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime } from "@cognelo/activity-ui";
+
+
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import type { CodingHomeworkGradebookAttemptRecord } from "./client";
 
@@ -55,6 +58,7 @@ export function CodingHomeworkManualGradingPanel({
   onDeleteSubmission,
   t
 }: CodingHomeworkManualGradingPanelProps) {
+  const { timeZone } = useApplicationTime();
   const [score, setScore] = useState(row.score === null ? "" : formatGradeNumber(row.score));
   const [feedback, setFeedback] = useState("");
   const [formError, setFormError] = useState("");
@@ -125,7 +129,7 @@ export function CodingHomeworkManualGradingPanel({
 
           <div className="answer-meta">
             <strong>{attemptLabel(selectedAttempt, t)}</strong>
-            <span className="muted">{selectedAttempt.submittedAt ? formatDateTime(selectedAttempt.submittedAt) : ""}</span>
+            <span className="muted">{selectedAttempt.submittedAt ? formatDateTime(selectedAttempt.submittedAt, timeZone) : ""}</span>
           </div>
 
           <div className="table-list">
@@ -233,8 +237,8 @@ function formatGradeNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
+function formatDateTime(value: string, timeZone: string = "UTC") {
+  return new Intl.DateTimeFormat(undefined, { timeZone,
     year: "numeric",
     month: "short",
     day: "numeric",

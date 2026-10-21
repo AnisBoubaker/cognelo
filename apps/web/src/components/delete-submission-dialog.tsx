@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
+
+
 import { useId, useState } from "react";
 import { ConfirmationDialog, useBodyScrollLock, useNotifications } from "@cognelo/activity-ui";
 import { api, type CourseGradebookRow } from "@/lib/api";
@@ -12,6 +15,7 @@ export function DeleteSubmissionDialog({ courseId, row, onClose, onDeleted }: {
   onClose: () => void;
   onDeleted: () => Promise<void>;
 }) {
+  const { timeZone } = useApplicationTime();
   const { locale, t } = useI18n();
   const notifications = useNotifications();
   const id = useId();
@@ -64,7 +68,7 @@ export function DeleteSubmissionDialog({ courseId, row, onClose, onDeleted }: {
                 {attempts.map((attempt) => <option key={attempt.id} value={attempt.id}>
                   {t("courseDetail.deleteSubmissionOption", {
                     number: attempt.attemptNumber,
-                    date: new Date(attempt.submittedAt ?? attempt.startedAt).toLocaleString(locale)
+                    date: formatZonedDateTime(new Date(attempt.submittedAt ?? attempt.startedAt), timeZone, locale, { dateStyle: "medium", timeStyle: "medium" })
                   })}
                 </option>)}
               </select>

@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime } from "@cognelo/activity-ui";
+
+
 import {
   activityDefinitionBelongsToCategory,
   activityDefinitionCreatesCategory,
@@ -56,6 +59,7 @@ const activityCategories = listActivityCategories();
 type I18nTranslate = ReturnType<typeof useI18n>["t"];
 
 export default function ActivityBankDetailPage() {
+  const { timeZone } = useApplicationTime();
   const params = useParams<{ activityBankId: string }>();
   const router = useRouter();
   const activityBankId = params.activityBankId;
@@ -1099,10 +1103,10 @@ export default function ActivityBankDetailPage() {
               </div>
               <div className="grid compact-form-grid version-comparison-controls">
                 <div className="field"><label htmlFor="version-diff-from">{t("bankActivityPage.versionDiffFrom")}</label><select id="version-diff-from" value={fromVersionId} onChange={(event) => { setFromVersionId(event.target.value); setVersionDiff(null); }}>
-                  {comparingActivity.versions?.map((version) => <option key={version.id} value={version.id}>{versionOptionLabel(version.versionNumber, version.createdAt, locale)}</option>)}
+                  {comparingActivity.versions?.map((version) => <option key={version.id} value={version.id}>{versionOptionLabel(version.versionNumber, version.createdAt, locale, timeZone)}</option>)}
                 </select></div>
                 <div className="field"><label htmlFor="version-diff-to">{t("bankActivityPage.versionDiffTo")}</label><select id="version-diff-to" value={toVersionId} onChange={(event) => { setToVersionId(event.target.value); setVersionDiff(null); }}>
-                  {comparingActivity.versions?.map((version) => <option key={version.id} value={version.id}>{versionOptionLabel(version.versionNumber, version.createdAt, locale)}</option>)}
+                  {comparingActivity.versions?.map((version) => <option key={version.id} value={version.id}>{versionOptionLabel(version.versionNumber, version.createdAt, locale, timeZone)}</option>)}
                 </select></div>
               </div>
               {fromVersionId === toVersionId ? <p className="error">{t("bankActivityPage.versionDiffChooseDifferent")}</p> : null}
@@ -1324,8 +1328,8 @@ function getCourseCountFromDeleteError(details: unknown) {
   return 0;
 }
 
-function versionOptionLabel(versionNumber: number, createdAt: string, locale: string) {
-  return `v${versionNumber} · ${new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(createdAt))}`;
+function versionOptionLabel(versionNumber: number, createdAt: string, locale: string, timeZone: string = "UTC") {
+  return `v${versionNumber} · ${new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "medium", timeStyle: "short" }).format(new Date(createdAt))}`;
 }
 
 function versionDiffLabels(t: I18nTranslate) {

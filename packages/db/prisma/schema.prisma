@@ -189,6 +189,7 @@ model User {
   gradeEvents                        GradeEvent[]                  @relation("GradeEventActor")
   courseAuditEvents                  CourseAuditEvent[]            @relation("CourseAuditEventActor")
   updatedEmailDeliveryConfigurations EmailDeliveryConfiguration[]  @relation("EmailDeliveryConfigurationUpdater")
+  updatedApplicationSettings         ApplicationSettings[]
   updatedExecutionRunners            ExecutionRunner[]             @relation("ExecutionRunnerUpdater")
   emailVerificationChallenge         EmailVerificationChallenge?
   mediaAssets                        MediaAsset[]                  @relation("MediaAssetCreator")
@@ -1628,4 +1629,12 @@ model GradeChallenge {
   @@index([attemptId])
   @@index([participantId, createdAt])
   @@index([resolvedByUserId])
+}
+
+model ApplicationSettings {
+  id          String   @id @default("instance")
+  timeZone    String   @default("UTC")
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+  updatedBy   User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
 }

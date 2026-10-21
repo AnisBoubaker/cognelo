@@ -1,4 +1,5 @@
 "use client";
+import { useApplicationTime, fromZonedDateTimeInput } from "@cognelo/activity-ui";
 
 import { useState } from "react";
 import { ConfirmationDialog } from "@cognelo/activity-ui";
@@ -15,24 +16,25 @@ export function StudentAssignmentDialog({ draft, studentIds, onApply, onClose }:
   draft: StudentGroupingDraft; studentIds: string[]; onApply: (draft: StudentGroupingDraft) => void; onClose: () => void;
 }) {
   const { t } = useI18n();
+  const { timeZone } = useApplicationTime();
   const [mode, setMode] = useState<"random" | "student">(draft.studentChoiceEnabled ? "student" : "random");
   const [scope, setScope] = useState<"unassigned" | "all">("unassigned");
   const [teams, setTeams] = useState(draft.teams.map((team) => ({ ...team })));
   const [bulkCapacity, setBulkCapacity] = useState(draft.teams[0]?.capacity ?? 4);
-  const [opensAt, setOpensAt] = useState(toTeamChoiceLocalDate(draft.choiceOpensAt));
-  const [closesAt, setClosesAt] = useState(toTeamChoiceLocalDate(draft.choiceClosesAt));
+  const [opensAt, setOpensAt] = useState(toTeamChoiceLocalDate(draft.choiceOpensAt, timeZone));
+  const [closesAt, setClosesAt] = useState(toTeamChoiceLocalDate(draft.choiceClosesAt, timeZone));
   const [allowChanges, setAllowChanges] = useState(draft.allowChoiceChanges);
   const validCapacity = (value: number) => Number.isInteger(value) && value >= 0 && value <= 5000;
   const exceedsCapacity = (mode === "student" || scope === "unassigned") && teams.some((team) => team.participantIds.length > team.capacity);
-  const invalidDates = Boolean(opensAt && closesAt && new Date(opensAt) >= new Date(closesAt));
+  const invalidDates = Boolean(opensAt && closesAt && opensAt >= closesAt);
   const invalid = !teams.length || teams.some((team) => !validCapacity(team.capacity)) || exceedsCapacity || (mode === "student" && invalidDates);
 
   function apply() {
     if (invalid) return;
     onApply({
       ...draft, assignmentMethod: mode === "student" ? "student_choice" : "random", studentChoiceEnabled: mode === "student", allowChoiceChanges: mode === "student" && allowChanges,
-      choiceOpensAt: mode === "student" && opensAt ? new Date(opensAt).toISOString() : null,
-      choiceClosesAt: mode === "student" && closesAt ? new Date(closesAt).toISOString() : null,
+      choiceOpensAt: mode === "student" && opensAt ? fromZonedDateTimeInput(opensAt, timeZone) : null,
+      choiceClosesAt: mode === "student" && closesAt ? fromZonedDateTimeInput(closesAt, timeZone) : null,
       teams: mode === "random" ? randomlyAssignStudents(teams, studentIds, scope) : teams
     });
   }

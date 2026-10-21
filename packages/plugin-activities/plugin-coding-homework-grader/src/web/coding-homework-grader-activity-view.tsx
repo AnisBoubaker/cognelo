@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
+
+
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import {
@@ -153,6 +156,7 @@ export function CodingHomeworkGraderActivityView({
   onSubmitted,
   timedAutoSubmit
 }: CodingHomeworkGraderActivityViewProps) {
+  const { timeZone } = useApplicationTime();
   const copy: CodingHomeworkCopy = codingHomeworkMessages[locale] ?? codingHomeworkMessages.en;
   const actionCopy = getEditActionBarCopy(locale);
   const notifications = useNotifications();
@@ -1029,7 +1033,7 @@ export function CodingHomeworkGraderActivityView({
           ) : null}
           {documentationPreview?.latestSnapshot ? (
             <p className="muted">
-              {copy.latestSnapshot}: {new Date(documentationPreview.latestSnapshot.createdAt).toLocaleString()}
+              {copy.latestSnapshot}: {formatZonedDateTime(new Date(documentationPreview.latestSnapshot.createdAt), timeZone, undefined, { dateStyle: "medium", timeStyle: "medium" })}
               {extractionDocumentCount(documentationPreview.latestSnapshot.metadata) !== null
                 ? ` · ${formatMessage(copy.documentCount, { count: extractionDocumentCount(documentationPreview.latestSnapshot.metadata) as number })}`
                 : ""}
@@ -1143,6 +1147,7 @@ function SubmissionPanel({
   submissionResult: CodingHomeworkSubmissionResult | null;
   submitting: boolean;
 }) {
+  const { timeZone } = useApplicationTime();
   const currentSubmissionStatus = latestSubmission?.submission.status ?? submissionResult?.submission.status ?? null;
   const status = submissionResult && !submissionResult.summary.isValid
       ? copy.submissionInvalid
@@ -1184,7 +1189,7 @@ function SubmissionPanel({
       {currentSubmissionStatus === "failed" && latestSubmission?.submission.processingError ? <p className="muted">{latestSubmission.submission.processingError}</p> : null}
       {latestSubmission ? (
         <p className="muted">
-          {copy.latestSubmission}: {new Date(latestSubmission.submission.createdAt).toLocaleString()}
+          {copy.latestSubmission}: {formatZonedDateTime(new Date(latestSubmission.submission.createdAt), timeZone, undefined, { dateStyle: "medium", timeStyle: "medium" })}
         </p>
       ) : null}
       {fileCount ? (

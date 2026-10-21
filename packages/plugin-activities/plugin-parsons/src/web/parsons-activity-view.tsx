@@ -1,5 +1,8 @@
 "use client";
 
+import { useApplicationTime } from "@cognelo/activity-ui";
+
+
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import { CodeEditor, CodeRenderer, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, ProgressDialog, codeLanguageOptions, getEditActionBarCopy, normalizeCodeLanguage, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
@@ -143,6 +146,7 @@ export function ParsonsActivityView({
   locale = "en",
   aiGenerationClient
 }: ParsonsActivityViewProps) {
+  const { timeZone } = useApplicationTime();
   const actionCopy = getEditActionBarCopy(locale);
   const notifications = useNotifications();
   const knowledgeGeneration = useActivityKnowledgeGeneration();
@@ -992,7 +996,7 @@ export function ParsonsActivityView({
             {previousSubmissions.map((submission) => (
               <article className="inline-panel stack" key={submission.attempt.id}>
                 <div className="row" style={{ justifyContent: "space-between" }}>
-                  <strong>{t("parsons.submissionDateLabel", { date: formatSubmissionDate(submission.attempt.completedAt ?? submission.attempt.lastInteractionAt) })}</strong>
+                  <strong>{t("parsons.submissionDateLabel", { date: formatSubmissionDate(submission.attempt.completedAt ?? submission.attempt.lastInteractionAt, timeZone) })}</strong>
                   {submission.grade ? (
                     <span className="participant-status is-graded">
                       {t("parsons.submissionGrade")}: {formatPoints(submission.grade.normalizedScore)} / {formatPoints(submission.grade.normalizedMaxScore)}
@@ -1223,8 +1227,8 @@ function formatPoints(value: number) {
   return value.toFixed(2).replace(/\.?0+$/, "");
 }
 
-function formatSubmissionDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
+function formatSubmissionDate(value: string, timeZone: string = "UTC") {
+  return new Intl.DateTimeFormat(undefined, { timeZone,
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(value));

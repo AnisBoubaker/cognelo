@@ -1,5 +1,8 @@
 "use client";
 
+import { useServerNow, useApplicationTime, isZonedMidnight } from "@cognelo/activity-ui";
+
+
 import { ContentResourceInline, ContentResourceModalTitle } from "./content-resource-display";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import Link from "next/link";
@@ -75,11 +78,12 @@ export function StudentCourseContent({
   studentGrades?: StudentReleasedGrades | null;
   storageScope?: "learner" | "preview";
 }) {
+  const { timeZone } = useApplicationTime();
   const { user } = useAuth();
   const { collapsedFolderIds, toggleFolder } = useCourseContentFolders({
     courseId, groupId, userId: user?.id, scope: storageScope, contentItems
   });
-  const now = Date.now();
+  const now = useServerNow();
   const studentContentItems = useMemo(
     () => contentItems.filter((item) => item.kind !== "activity" || Boolean(item.courseGroupActivityId)),
     [contentItems]
@@ -235,7 +239,7 @@ export function StudentCourseContent({
           {hasBadges ? (
             <span className="metadata-badges">
               {activityLabel ? <span className="metadata-badge is-activity-type">{activityLabel}</span> : null}
-              {assignment ? <span className="metadata-badge">{formatAvailabilityWindow(assignment.availableFrom, assignment.availableUntil, t)}</span> : null}
+              {assignment ? <span className="metadata-badge">{formatAvailabilityWindow(assignment.availableFrom, assignment.availableUntil, t, timeZone)}</span> : null}
               {availability === "upcoming" ? <span className="participant-status is-missing">{t("groupPage.activityUpcoming")}</span> : null}
               {availability === "expired" ? <span className="participant-status is-late">{t("groupPage.activityExpired")}</span> : null}
               {isSubmitted ? <span className="participant-status is-submitted">{t("courseDetail.gradebookStatus.submitted")}</span> : null}
@@ -376,22 +380,19 @@ function getAvailabilityStatus(availableFrom: string | null | undefined, availab
   return "available" as const;
 }
 
-function formatAvailabilityWindow(availableFrom: string | null | undefined, availableUntil: string | null | undefined, t: Translate) {
+function formatAvailabilityWindow(availableFrom: string | null | undefined, availableUntil: string | null | undefined, t: Translate, timeZone: string = "UTC") {
   if (!availableFrom && !availableUntil) return t("groupPage.availableAlways");
-  if (availableFrom && availableUntil) return t("groupPage.availableWindow", { from: formatAvailabilityValue(availableFrom), until: formatAvailabilityValue(availableUntil) });
-  if (availableFrom) return t("groupPage.availableAfter", { from: formatAvailabilityValue(availableFrom) });
-  return t("groupPage.availableBefore", { until: formatAvailabilityValue(availableUntil as string) });
+  if (availableFrom && availableUntil) return t("groupPage.availableWindow", { from: formatAvailabilityValue(availableFrom, timeZone), until: formatAvailabilityValue(availableUntil, timeZone) });
+  if (availableFrom) return t("groupPage.availableAfter", { from: formatAvailabilityValue(availableFrom, timeZone) });
+  return t("groupPage.availableBefore", { until: formatAvailabilityValue(availableUntil as string, timeZone) });
 }
 
-function formatAvailabilityValue(value: string) {
+function formatAvailabilityValue(value: string, timeZone: string = "UTC") {
   const date = new Date(value);
-  const isMidnight = date.getHours() === 0
-    && date.getMinutes() === 0
-    && date.getSeconds() === 0
-    && date.getMilliseconds() === 0;
-  return new Intl.DateTimeFormat(undefined, isMidnight
+  const isMidnight = isZonedMidnight(date, timeZone);
+  return new Intl.DateTimeFormat(undefined, { ...(isMidnight
     ? { year: "numeric", month: "short", day: "numeric" }
-    : { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: false, hourCycle: "h23" }
+    : { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: false, hourCycle: "h23" }), timeZone }
   ).format(date);
 }
 
