@@ -43,3 +43,7 @@ Before handing off, explicitly review every affected root or plugin README, proj
 ## Perform atomic commits
 
 Before starting a new task, evaluate whether this is a totally new feature or one thats is unrelated to the one that preceded it. If so, consider the last feature or task complete and validated and do an automatic commit.
+
+## Deployment privacy
+
+Keep actual deployment hostnames, IPs, account/database names, inventories, and environment-specific incident or rehearsal evidence out of tracked files, commit messages, and public release notes. Use reserved example domains and generic instance identifiers in public runbooks. Keep operator inventory outside the checkout; the local untracked .git/info/cognelo-operations pointer may identify its location for authorized operations.

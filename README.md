@@ -83,6 +83,8 @@ See [Browser user flows](tests/e2e/README.md) for service prerequisites and envi
 - [Upgrade and rollback](docs/DEPLOYMENT_UPGRADE_UBUNTU_APACHE.md)
 - [Release notes template](docs/RELEASE_NOTES_TEMPLATE.md)
 
+Public deployment guides use reserved example domains and generic instance identifiers. Keep the real infrastructure inventory in private operator notes outside Git.
+
 Production changes must follow the backup, production-clone migration rehearsal, approval, smoke-test, and rollback gates in those runbooks.
 
 ## Documentation Rule

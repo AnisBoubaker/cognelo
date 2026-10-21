@@ -17,3 +17,7 @@ packages/plugin-activities/*/src/generated
 storage
 /tmp/
 /apps/web/public/_vendor/monaco/
+
+# Local operator-only notes must never be published.
+/private-operations/
+/.private/
