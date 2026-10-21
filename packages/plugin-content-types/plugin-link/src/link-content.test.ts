@@ -58,12 +58,15 @@ describe("Link content", () => {
   });
 
   it("keeps internal fields out of public metadata and saves them through the private hook", async () => {
-    const result = await handlers.update!({ user, resource, payload: { internalSummary: "Private teaching notes", summaryMaxWords: 75 } });
+    const result = await handlers.update!({ user, resource, payload: { internalSummary: "Private teaching notes", summaryMaxWords: 75, summaryFollowSameDomainLinks: true } });
     expect(result.metadata).toEqual(resource.metadata);
     expect(JSON.stringify(result.metadata)).not.toContain("Private teaching notes");
     const execute = vi.fn().mockResolvedValue(1);
     await result.afterPersist!({ resource, transaction: { execute, query: vi.fn() } });
-    expect(execute.mock.calls[0]?.slice(1)).toEqual([resource.id, "Private teaching notes", 75, "Private teaching notes", 75]);
+    expect(execute.mock.calls[0]?.slice(1)).toEqual([resource.id, "Private teaching notes", 75, true, "Private teaching notes", 75, true]);
     await expect(handlers.update!({ user, resource, payload: { summaryMaxWords: 2001 } })).rejects.toThrow();
+    const disabled = await handlers.update!({ user, resource, payload: { summaryFollowSameDomainLinks: false } });
+    await disabled.afterPersist!({ resource, transaction: { execute, query: vi.fn() } });
+    expect(execute.mock.calls[1]?.slice(1)).toEqual([resource.id, "", 100, false, null, null, false]);
   });
 });

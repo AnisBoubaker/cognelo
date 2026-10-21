@@ -12,6 +12,9 @@ export const linkContentDatabaseModule = {
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`
     ]
+  }, {
+    id: "202610200003_link_summary_follow_links",
+    statements: [`ALTER TABLE "PluginLinkContentSettings" ADD COLUMN IF NOT EXISTS "followSameDomainLinks" BOOLEAN NOT NULL DEFAULT false`]
   }],
-  notes: ["Private teacher summaries and generation word limits; never included in public content metadata."]
+  notes: ["Private teacher summaries and generation preferences; never included in public content metadata."]
 } as const;

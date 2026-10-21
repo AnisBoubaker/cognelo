@@ -22,3 +22,5 @@ export const linkContentPlugin: ContentTypePlugin = {
 
 export { LinkContentSettingsForm } from "./settings";
 export { getLinkContentPresentation } from "./shared";
+
+export type { LinkSummaryResult } from "./shared";

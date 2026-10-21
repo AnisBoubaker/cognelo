@@ -7,7 +7,8 @@ import { generateLinkSummary } from "./summary";
 
 const payloadSchema = linkPayloadSchema.extend({
   internalSummary: z.string().trim().max(20_000).optional(),
-  summaryMaxWords: z.number().int().min(1).max(2000).optional()
+  summaryMaxWords: z.number().int().min(1).max(2000).optional(),
+  summaryFollowSameDomainLinks: z.boolean().optional()
 });
 
 export const linkContentServerPlugin: ServerContentTypePlugin = {
@@ -28,15 +29,15 @@ export const linkContentServerPlugin: ServerContentTypePlugin = {
   }],
   handlers: {
     async create({ payload }) {
-      const { title, internalSummary, summaryMaxWords, ...fields } = payloadSchema.parse(payload);
+      const { title, internalSummary, summaryMaxWords, summaryFollowSameDomainLinks, ...fields } = payloadSchema.parse(payload);
       const metadata = { url: "", description: "", openInNewTab: true, ...fields };
-      const afterPersist = persistInternalSettings({ internalSummary, maxWords: summaryMaxWords });
+      const afterPersist = persistInternalSettings({ internalSummary, maxWords: summaryMaxWords, followSameDomainLinks: summaryFollowSameDomainLinks });
       return { title: title ?? "Link", metadata: { ...metadata, ...(!metadata.url ? { setupStatus: "draft" } : {}) }, ...(afterPersist ? { afterPersist } : {}) };
     },
     async update({ resource, payload }) {
-      const { title, internalSummary, summaryMaxWords, ...fields } = payloadSchema.parse(payload);
+      const { title, internalSummary, summaryMaxWords, summaryFollowSameDomainLinks, ...fields } = payloadSchema.parse(payload);
       const metadata = { ...readLinkMetadata(resource.metadata), ...fields };
-      const afterPersist = persistInternalSettings({ internalSummary, maxWords: summaryMaxWords });
+      const afterPersist = persistInternalSettings({ internalSummary, maxWords: summaryMaxWords, followSameDomainLinks: summaryFollowSameDomainLinks });
       return { ...(title !== undefined ? { title } : {}), metadata: { ...metadata, ...(!metadata.url ? { setupStatus: "draft" } : {}) }, ...(afterPersist ? { afterPersist } : {}) };
     },
     async duplicate({ resource, title }) {

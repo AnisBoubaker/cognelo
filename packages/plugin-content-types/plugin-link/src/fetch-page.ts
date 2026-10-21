@@ -25,15 +25,24 @@ export function isPublicAddress(address: string) {
 }
 
 export async function fetchLinkPage(value: string, dependencies: {
+  collectLinks?: boolean;
+  allowedHostname?: string;
+  signal?: AbortSignal;
   resolve?: (hostname: string) => Promise<Address[]>;
   request?: (url: URL, address: Address, signal: AbortSignal) => Promise<PageResponse>;
 } = {}) {
   let url = new URL(linkUrlSchema.parse(value));
+  if (dependencies.signal?.aborted) throw new LinkPageError("LINK_FETCH_TIMEOUT", "The page took too long to respond.");
   const controller = new AbortController();
+  const abort = () => controller.abort();
+  dependencies.signal?.addEventListener("abort", abort, { once: true });
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   const aborted = new Promise<never>((_, reject) => controller.signal.addEventListener("abort", () => reject(new LinkPageError("LINK_FETCH_TIMEOUT", "The page took too long to respond.")), { once: true }));
   try {
     for (let redirects = 0; redirects <= 3; redirects += 1) {
+      if (dependencies.allowedHostname && url.hostname !== dependencies.allowedHostname) {
+        throw new LinkPageError("LINK_OUTSIDE_DOMAIN", "The linked page redirects outside the original domain.");
+      }
       const hostname = url.hostname.replace(/^\[|\]$/g, "");
       const addresses = isIP(hostname)
         ? [{ address: hostname, family: isIP(hostname) }]
@@ -64,16 +73,19 @@ export async function fetchLinkPage(value: string, dependencies: {
       const charset = /charset\s*=\s*["']?([^\s;"']+)/i.exec(contentType)?.[1] ?? "utf-8";
       let decoded: string;
       try { decoded = new TextDecoder(charset).decode(body); } catch { decoded = body.toString("utf8"); }
-      const text = contentType.toLowerCase().startsWith("text/plain") ? decoded.trim().slice(0, MAX_TEXT_CHARACTERS) : extractPageText(decoded);
+      const extracted = contentType.toLowerCase().startsWith("text/plain")
+        ? { text: decoded.trim().slice(0, MAX_TEXT_CHARACTERS), links: [], shortened: decoded.trim().length > MAX_TEXT_CHARACTERS }
+        : extractPageContent(decoded, dependencies.collectLinks ? url.href : undefined);
+      const { text } = extracted;
       if (text.length < 32) throw new LinkPageError("LINK_NO_READABLE_TEXT", "The page does not contain enough readable text to summarize.");
-      return { url: url.href, text };
+      return { url: url.href, ...extracted };
     }
     throw new LinkPageError("LINK_TOO_MANY_REDIRECTS", "The page redirects too many times.");
   } catch (error) {
     if (error instanceof LinkPageError) throw error;
     if (controller.signal.aborted) throw new LinkPageError("LINK_FETCH_TIMEOUT", "The page took too long to respond.");
     throw new LinkPageError("LINK_FETCH_FAILED", "The URL could not be reached.");
-  } finally { clearTimeout(timer); }
+  } finally { clearTimeout(timer); dependencies.signal?.removeEventListener("abort", abort); }
 }
 
 export function requestPinnedPage(url: URL, address: Address, signal: AbortSignal): Promise<PageResponse> {
@@ -109,16 +121,34 @@ export function requestPinnedPage(url: URL, address: Address, signal: AbortSigna
   });
 }
 
-export function extractPageText(html: string) {
+export function extractPageText(html: string) { return extractPageContent(html).text; }
+
+/** Resolve relative links against the final page URL (and HTML base), then constrain to its hostname. */
+export function sameDomainPageUrl(href: string, pageUrl: string, baseUrl = pageUrl) {
+  if (!href.trim() || href.trim().startsWith("#")) return null;
+  try {
+    const page = new URL(pageUrl); page.hash = "";
+    const url = new URL(linkUrlSchema.parse(new URL(href, baseUrl).href)); url.hash = "";
+    return url.hostname === page.hostname && url.href !== page.href ? url.href : null;
+  } catch { return null; }
+}
+
+export function extractPageContent(html: string, pageUrl?: string) {
   const ignoredTags = new Set(["script", "style", "noscript", "template", "svg", "canvas"]);
   let ignored = 0;
   let mainDepth = 0;
   let titleDepth = 0;
   let description = "";
+  let baseHref: string | undefined;
+  const hrefs: string[] = [];
   const title: string[] = [], all: string[] = [], main: string[] = [];
   const parser = new Parser({
     onopentag(name, attributes) {
       if (ignoredTags.has(name)) ignored += 1;
+      if (!ignored && pageUrl) {
+        if (name === "base" && baseHref === undefined && attributes.href) baseHref = attributes.href;
+        if (name === "a" && attributes.href) hrefs.push(attributes.href);
+      }
       if (name === "main" || name === "article") mainDepth += 1;
       if (name === "title") titleDepth += 1;
       if (name === "meta" && (attributes.name === "description" || attributes.property === "og:description")) description ||= attributes.content ?? "";
@@ -136,5 +166,9 @@ export function extractPageText(html: string) {
     }
   }, { decodeEntities: true });
   parser.end(html);
-  return [title.join(" "), description, (main.length ? main : all).join(" ")].join("\n").replace(/\s+/g, " ").trim().slice(0, MAX_TEXT_CHARACTERS);
+  const text = [title.join(" "), description, (main.length ? main : all).join(" ")].join("\n").replace(/\s+/g, " ").trim();
+  let baseUrl = pageUrl;
+  if (pageUrl && baseHref) { try { baseUrl = new URL(baseHref, pageUrl).href; } catch { /* Invalid bases fall back to the response URL. */ } }
+  const links = pageUrl ? [...new Set(hrefs.flatMap((href) => { const url = sameDomainPageUrl(href, pageUrl, baseUrl); return url ? [url] : []; }))] : [];
+  return { text: text.slice(0, MAX_TEXT_CHARACTERS), links, shortened: text.length > MAX_TEXT_CHARACTERS };
 }

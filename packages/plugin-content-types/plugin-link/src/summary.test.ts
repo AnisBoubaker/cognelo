@@ -82,3 +82,40 @@ describe("internal link summary generation", () => {
     await expect(generateLinkSummary(user, "course-1", { url: "https://example.org" })).rejects.toMatchObject({ code: "LINK_SUMMARY_EMPTY" });
   });
 });
+
+describe("summary link-following option", () => {
+  it.each([undefined, false])("fetches only the main page when following is %s", async (followSameDomainLinks) => {
+    mocks.fetchPage.mockResolvedValue({ url: "https://example.org/guide", text: "Root text", links: ["https://example.org/child"] });
+    await generateLinkSummary(user, "course-1", { url: "https://example.org", followSameDomainLinks });
+    expect(mocks.fetchPage).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchPage).toHaveBeenCalledWith("https://example.org/", { collectLinks: false });
+  });
+
+  it("sends the text of every successful one-level page to a single AI call in the course language", async () => {
+    mocks.fetchPage.mockImplementation(async (url: string) => {
+      if (url.endsWith("/missing")) throw new LinkPageError("LINK_HTTP_STATUS", "HTTP 404");
+      return url.endsWith("/child")
+        ? { url, text: "Child about functions", links: ["https://example.org/deeper"], shortened: false }
+        : { url: "https://example.org/guide", text: "Root about loops", links: ["https://example.org/child", "https://example.org/missing"], shortened: false };
+    });
+    const result = await generateLinkSummary(user, "course-1", { url: "https://example.org/guide", followSameDomainLinks: true, maxWords: 75 });
+    expect(mocks.fetchPage).toHaveBeenCalledTimes(3);
+    expect(mocks.generate).toHaveBeenCalledTimes(1);
+    const request = mocks.generate.mock.calls[0]![1];
+    expect(request.userPrompt).toContain("Root about loops");
+    expect(request.userPrompt).toContain("Child about functions");
+    expect(request.userPrompt).not.toContain("deeper");
+    expect(request.systemPrompt).toContain("Write only in French");
+    expect(request.systemPrompt).toContain("at most 75 words");
+    expect(result.sources).toEqual({ includedPages: 2, unavailablePages: 1, omittedPages: 0, shortened: false });
+  });
+
+  it("rejects a failed root or an invalid flag before crawling or calling AI", async () => {
+    await expect(generateLinkSummary(user, "course-1", { url: "https://example.org", followSameDomainLinks: "true" })).rejects.toThrow();
+    expect(mocks.fetchPage).not.toHaveBeenCalled();
+    mocks.fetchPage.mockRejectedValue(new LinkPageError("LINK_HTTP_STATUS", "HTTP 500"));
+    await expect(generateLinkSummary(user, "course-1", { url: "https://example.org", followSameDomainLinks: true })).rejects.toMatchObject({ code: "LINK_HTTP_STATUS" });
+    expect(mocks.fetchPage).toHaveBeenCalledTimes(1);
+    expect(mocks.generate).not.toHaveBeenCalled();
+  });
+});

@@ -4,7 +4,7 @@ import "@cognelo/plugin-registry/content";
 import { FileContentSettingsForm } from "@cognelo/plugin-file-content";
 import { GithubRepoSettingsForm } from "@cognelo/plugin-github-repo";
 import { TextContentEditor, TextContentViewer, getTextContentPresentation, TextContentSettingsForm } from "@cognelo/plugin-text-content";
-import { getLinkContentPresentation, LinkContentSettingsForm } from "@cognelo/plugin-link-content";
+import { getLinkContentPresentation, LinkContentSettingsForm, type LinkSummaryResult } from "@cognelo/plugin-link-content";
 import { api, type CourseContentItem, type CourseContentResource } from "./api";
 export { ContentTypeIcon } from "../components/app-icon";
 
@@ -58,8 +58,8 @@ const contentTypeSettingsRenderers: Record<string, ContentTypeRenderer> = {
     onUrlChange={context.settings.onUrlChange}
     onMetadataChange={context.settings.onMetadataChange}
     onSubmit={context.settings.onSubmit}
-    loadInternalSettings={async () => (await api.contentResourcePluginRequest<{ settings: { internalSummary: string; maxWords: number } }>(context.resource!, ["summary"])).settings}
-    generateInternalSummary={(url, maxWords) => api.contentResourcePluginRequest<{ summary: string; wordCount: number; maxWords: number }>(context.resource!, ["summary"], { method: "POST", payload: { url, maxWords } })}
+    loadInternalSettings={async () => (await api.contentResourcePluginRequest<{ settings: { internalSummary: string; maxWords: number; followSameDomainLinks: boolean } }>(context.resource!, ["summary"])).settings}
+    generateInternalSummary={(url, maxWords, followSameDomainLinks) => api.contentResourcePluginRequest<LinkSummaryResult>(context.resource!, ["summary"], { method: "POST", payload: { url, maxWords, followSameDomainLinks } })}
     t={context.t}
   /> : null,
   "file-content-settings": (context) =>

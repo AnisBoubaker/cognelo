@@ -130,3 +130,5 @@ The implemented section-scoped staff model, resolved policy decisions, and admin
 `test-regrading.spec.ts` covers individual and whole-class Test regrading with measured child progress, changed answer keys, preserved answers/timestamps/release gates, student rejection, and Programming Exercise reruns with corrected/added hidden tests, current test weights, and immutable original execution references. The coding case requires Judge0.
 
 - `text-content.spec.ts`: full-page text authoring, uploaded images, tables/formulas, inline/page/modal presentation, page targets, modal focus/scroll restoration, section visibility and reader/image authorization, plus media retention across duplication.
+
+Link-summary coverage also checks the default-off same-domain checkbox, its generation payload and source report, private persistence, duplication, and disabling it independently on the original. Crawling itself is validated by server tests; browser tests mock AI generation.

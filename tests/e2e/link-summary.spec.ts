@@ -28,11 +28,11 @@ test("generates an editable private link summary with a persisted word limit", a
     const gate = new Promise<void>((resolve) => { releaseGeneration = resolve; });
     await page.route(`**${privatePath}`, async (route) => {
       if (route.request().method() !== "POST") return route.continue();
-      expect(route.request().postDataJSON()).toEqual({ url: sourceUrl, maxWords: 75 });
+      expect(route.request().postDataJSON()).toEqual({ url: sourceUrl, maxWords: 75, followSameDomainLinks: true });
       if (mode === "http-error") return route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ error: { code: "LINK_HTTP_STATUS", message: "HTTP 404", details: { status: 404 } } }) });
       generationStarted();
       await gate;
-      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ summary: generated, wordCount: 16, maxWords: 75 }) });
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ summary: generated, wordCount: 16, maxWords: 75, sources: { includedPages: 3, unavailablePages: 1, omittedPages: 0, shortened: false } }) });
     });
     await page.goto(`/courses/${data.courseId}?tab=content`);
     await page.getByRole("button", { name: `Actions for ${title}`, exact: true }).click();
@@ -43,6 +43,9 @@ test("generates an editable private link summary with a persisted word limit", a
     const generate = settings.getByRole("button", { name: "Generate with AI", exact: true });
     await expect(summary).toBeEditable();
     await expect(maxWords).toHaveValue("100");
+    const followLinks = settings.getByLabel("Follow one level of same domain links", { exact: true });
+    await expect(followLinks).not.toBeChecked();
+    await followLinks.check();
     await expect(generate).toBeDisabled();
     await settings.getByLabel("URL", { exact: true }).fill(sourceUrl);
     await maxWords.fill("75");
@@ -52,12 +55,13 @@ test("generates an editable private link summary with a persisted word limit", a
       await expect(page.getByRole("dialog", { name: "Generating internal summary", exact: true })).toBeVisible();
     } finally { releaseGeneration(); }
     await expect(summary).toHaveValue(generated);
+    await expect(settings.getByRole("status")).toContainText("Pages summarized: 3. Linked pages that could not be read: 1.");
     await expect(page.getByRole("dialog", { name: "Generating internal summary", exact: true })).toHaveCount(0);
-    expect(await responseJson(await teacher.get(privatePath))).toEqual({ settings: { internalSummary: "", maxWords: 100 } });
+    expect(await responseJson(await teacher.get(privatePath))).toEqual({ settings: { internalSummary: "", maxWords: 100, followSameDomainLinks: false } });
     await summary.fill(edited);
     await settings.getByRole("button", { name: "Save material", exact: true }).click();
     await expect(settings).toBeHidden();
-    expect(await responseJson(await teacher.get(privatePath))).toEqual({ settings: { internalSummary: edited, maxWords: 75 } });
+    expect(await responseJson(await teacher.get(privatePath))).toEqual({ settings: { internalSummary: edited, maxWords: 75, followSameDomainLinks: true } });
 
     const publicResources = await responseJson<{ resources: Array<{ id: string; metadata: Record<string, unknown> }> }>(await student.get(`/api/courses/${data.courseId}/groups/${data.groupId}/content-resources`));
     expect(publicResources.resources.find((entry) => entry.id === resource.id)?.metadata).toEqual({ url: sourceUrl, description: publicDescription, openInNewTab: true });
@@ -75,6 +79,7 @@ test("generates an editable private link summary with a persisted word limit", a
     await page.getByRole("menuitem", { name: "Settings", exact: true }).click();
     await expect(summary).toHaveValue(edited);
     await expect(maxWords).toHaveValue("75");
+    await expect(followLinks).toBeChecked();
     mode = "http-error";
     await generate.click();
     await expect(settings.getByRole("alert")).toContainText("HTTP 404");
@@ -93,7 +98,15 @@ test("generates an editable private link summary with a persisted word limit", a
     await expect(page.getByRole("link", { name: copyTitle, exact: true })).toBeVisible();
     const { resources } = await responseJson<{ resources: Array<{ id: string; title: string }> }>(await teacher.get(`/api/courses/${data.courseId}/content-resources`));
     const copyId = resources.find((entry) => entry.title === copyTitle)!.id;
-    expect(await responseJson(await teacher.get(`/api/courses/${data.courseId}/content-resources/${copyId}/summary`))).toEqual({ settings: { internalSummary: edited, maxWords: 75 } });
+    expect(await responseJson(await teacher.get(`/api/courses/${data.courseId}/content-resources/${copyId}/summary`))).toEqual({ settings: { internalSummary: edited, maxWords: 75, followSameDomainLinks: true } });
+    await page.getByRole("button", { name: `Actions for ${title}`, exact: true }).click();
+    await page.getByRole("menuitem", { name: "Settings", exact: true }).click();
+    await expect(followLinks).toBeChecked();
+    await followLinks.uncheck();
+    await settings.getByRole("button", { name: "Save material", exact: true }).click();
+    await expect(settings).toBeHidden();
+    expect(await responseJson(await teacher.get(privatePath))).toEqual({ settings: { internalSummary: edited, maxWords: 75, followSameDomainLinks: false } });
+    expect(await responseJson(await teacher.get(`/api/courses/${data.courseId}/content-resources/${copyId}/summary`))).toEqual({ settings: { internalSummary: edited, maxWords: 75, followSameDomainLinks: true } });
     await responseJson(await teacher.delete(`/api/courses/${data.courseId}/content-resources/${copyId}`));
     const rows = await prisma.$queryRaw<Array<{ count: bigint }>>`SELECT count(*) FROM "PluginLinkContentSettings" WHERE "resourceId" = ${copyId}`;
     expect(rows[0]?.count).toBe(0n);

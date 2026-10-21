@@ -88,3 +88,39 @@ describe("public link page fetching", () => {
     } finally { await new Promise<void>((done) => server.close(() => done())); }
   });
 });
+
+describe("one-level link extraction", () => {
+  it("resolves relative/base URLs, deduplicates fragments, and excludes unrelated or unsafe links", async () => {
+    const html = `<base href="/lessons/"><main>${pageText}
+      <a href="intro#one">Intro</a><a href="intro#two">Repeated</a>
+      <a href="../example?x=1&amp;y=2">Example</a><a href="//EXAMPLE.org/next">Next</a>
+      <a href="#local">Local</a><a href="/guide#local">Self</a>
+      <a href="https://sub.example.org/sub">Subdomain</a><a href="https://example.org.evil.test/">Other</a>
+      <a href="javascript:alert(1)">Script</a><a href="mailto:teacher@example.org">Mail</a>
+      <a href="https://user:pass@example.org/private">Credentials</a>
+      <template><a href="/inert">Ignored template</a></template></main>`;
+    const dependencies = { resolve, request: async () => ({ status: 200, headers: { "content-type": "text/html" }, body: Buffer.from(html) }) };
+    const page = await fetchLinkPage("https://example.org/guide", { ...dependencies, collectLinks: true });
+    expect(page.links).toEqual(["https://example.org/lessons/intro", "https://example.org/example?x=1&y=2", "https://example.org/next"]);
+    expect((await fetchLinkPage("https://example.org/guide", dependencies)).links).toEqual([]);
+  });
+
+  it("uses the final root hostname and never connects to an off-domain child redirect", async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce({ status: 302, headers: { location: "https://www.example.org/guide" }, body: Buffer.alloc(0) })
+      .mockResolvedValueOnce({ status: 200, headers: { "content-type": "text/html" }, body: Buffer.from(`<main>${pageText}<a href="/next">Next</a></main>`) });
+    expect((await fetchLinkPage("https://example.org/guide", { resolve, request, collectLinks: true })).links).toEqual(["https://www.example.org/next"]);
+    request.mockReset().mockResolvedValue({ status: 302, headers: { location: "https://other.example.test/page" }, body: Buffer.alloc(0) });
+    await expect(fetchLinkPage("https://www.example.org/next", { resolve, request, allowedHostname: "www.example.org" })).rejects.toMatchObject({ code: "LINK_OUTSIDE_DOMAIN" });
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("honors the total crawl cancellation while DNS is pending", async () => {
+    const controller = new AbortController();
+    const request = vi.fn();
+    const pending = expect(fetchLinkPage("https://example.org", { signal: controller.signal, request, resolve: () => new Promise(() => {}) })).rejects.toMatchObject({ code: "LINK_FETCH_TIMEOUT" });
+    controller.abort();
+    await pending;
+    expect(request).not.toHaveBeenCalled();
+  });
+});

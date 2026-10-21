@@ -30,3 +30,12 @@ export function getLinkContentPresentation(metadata?: Record<string, unknown>): 
   const link = readLinkMetadata(metadata);
   return { href: link.url || null, target: link.openInNewTab ? "_blank" : "_self", description: link.description };
 }
+
+export const MAX_SUMMARY_LINKED_PAGES = 20;
+export type LinkSummarySources = {
+  includedPages: number;
+  unavailablePages: number;
+  omittedPages: number;
+  shortened: boolean;
+};
+export type LinkSummaryResult = { summary: string; wordCount: number; maxWords: number; sources?: LinkSummarySources };
