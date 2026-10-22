@@ -1,5 +1,7 @@
 "use client";
 
+import { isActivityContentClosedError } from "@cognelo/activity-ui";
+
 import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
 
 
@@ -598,7 +600,7 @@ export function CodingHomeworkGraderActivityView({
       setPreflightResult(result);
       notifications[result.summary.isValid ? "success" : "error"](result.summary.isValid ? copy.preflightReady : copy.preflightInvalid);
     } catch (error) {
-      notifications.error(error instanceof Error ? error.message : copy.preflightError);
+      if (!isActivityContentClosedError(error)) notifications.error(error instanceof Error ? error.message : copy.preflightError);
     } finally {
       setRunningPreflight(false);
     }
@@ -624,7 +626,7 @@ export function CodingHomeworkGraderActivityView({
       applyChallengeQuestions(questions);
       notifications[result.summary.isValid ? "success" : "error"](result.summary.isValid ? (questions.length ? copy.challengesReady : copy.submissionProcessing) : copy.submissionInvalid);
     } catch (error) {
-      notifications.error(error instanceof Error ? error.message : copy.submissionError);
+      if (!isActivityContentClosedError(error)) notifications.error(error instanceof Error ? error.message : copy.submissionError);
     } finally {
       setSubmitting(false);
     }
@@ -645,7 +647,7 @@ export function CodingHomeworkGraderActivityView({
       applyChallengeQuestions(result.questions);
       notifications.success(copy.answersSaved);
     } catch (error) {
-      notifications.error(error instanceof Error ? error.message : copy.answersError);
+      if (!isActivityContentClosedError(error)) notifications.error(error instanceof Error ? error.message : copy.answersError);
     } finally {
       setSavingAnswers(false);
     }
@@ -668,7 +670,7 @@ export function CodingHomeworkGraderActivityView({
       onSubmitted?.();
       return true;
     } catch (error) {
-      notifications.error(error instanceof Error ? error.message : copy.answersError);
+      if (!isActivityContentClosedError(error)) notifications.error(error instanceof Error ? error.message : copy.answersError);
       return false;
     } finally {
       setSubmittingAnswers(false);

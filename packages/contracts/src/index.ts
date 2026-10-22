@@ -896,6 +896,7 @@ export const CourseAllGroupsActivityAssignmentInputSchema = z.object({
   studentMessage: z.string().trim().max(4000).optional(),
   messagingEnabled: z.boolean().optional(),
   releaseSolution: z.boolean().optional(),
+  hideAfterAttempts: z.boolean().optional(),
   requireSafeExamBrowser: z.boolean().optional().default(false),
   gradeChallengesEnabled: z.boolean().optional().default(false),
   gradebookSettings: GradebookItemSettingsInputSchema.optional(),

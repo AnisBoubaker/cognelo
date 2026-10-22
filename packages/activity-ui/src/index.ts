@@ -16,4 +16,5 @@ export * from "./rich-text-editor";
 export * from "./unsaved-changes";
 
 export * from "./application-time";
+export * from "./activity-content-access";
 export * from "./zoned-date-time";

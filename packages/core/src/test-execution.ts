@@ -374,7 +374,7 @@ export async function claimTestAttemptSubmission(parentAttemptId: string) {
 /** Internal recovery, independent of a learner session. Never runs a grader. */
 export async function recoverExpiredTestAttempt(
   parentAttemptId: string,
-  options: { now?: Date; graceMilliseconds?: number; actorUserId?: string } = {}
+  options: { now?: Date; graceMilliseconds?: number; actorUserId?: string; includeClosingDate?: boolean } = {}
 ) {
   const now = options.now ?? new Date();
   return prisma.$transaction(async (tx) => {
@@ -391,7 +391,8 @@ export async function recoverExpiredTestAttempt(
     const exceptions = await loadAssignmentExceptions([attempt.groupActivityId], tx);
     const assignment = applyAssignmentExceptions(attempt.groupActivity, exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId));
     const minutes = assignmentTimeLimitMinutes(assignment.metadata);
-    const deadline = assignmentAttemptExpiresAt(attempt.startedAt, minutes, assignment.availableUntil);
+    const deadline = assignmentAttemptExpiresAt(attempt.startedAt, minutes, assignment.availableUntil)
+      ?? (options.includeClosingDate ? assignment.availableUntil : null);
     if (!deadline || deadline.getTime() + (options.graceMilliseconds ?? 30_000) > now.getTime()) return false;
     const test = await tx.test.findFirst({ where: { activityId: attempt.activityId }, include: runtimeTestInclude });
     if (!test) return false;

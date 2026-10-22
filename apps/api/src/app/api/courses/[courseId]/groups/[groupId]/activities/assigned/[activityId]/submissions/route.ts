@@ -12,7 +12,7 @@ export async function GET(request: Request, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, groupId, activityId } = await params;
-    await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId);
+    await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId, { receiptOnly: true });
     return json({
       audit: await getStudentActivitySubmissionAudit(user, courseId, groupId, activityId)
     });

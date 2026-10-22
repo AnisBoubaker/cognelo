@@ -4,6 +4,8 @@ This file is intentionally short. It records only cross-cutting decisions that a
 
 ## Platform Invariants
 
+- [Activity content access](ACTIVITY_CONTENT_ACCESS.md): optional General-only closure blocks student prompts, answers, histories, solutions, reports, and exam files once effective attempts/dates end. Keep valid started/reopened attempts usable, staff records intact, and only receipts/released totals visible after closure. Enforce through the shared assigned-route guard, grade projections, and media access; finalization may finish expired saved work but cannot return protected content.
+
 - Public release notes contain only Highlights, Fixed, Database migrations (Yes/No and commands), and Environment variables only when changed. Keep bullets short and omit approvals, names/dates, rehearsal reports, and deployment narratives.
 - Public deployment docs and release notes contain generic examples only. Actual infrastructure inventory and per-environment evidence belong in private operator notes outside Git; an optional local .git/info/cognelo-operations pointer locates them.
 

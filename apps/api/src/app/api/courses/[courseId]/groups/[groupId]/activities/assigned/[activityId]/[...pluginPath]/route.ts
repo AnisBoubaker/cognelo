@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { resolvePluginRoute } from "@cognelo/activity-sdk/server";
-import { AppError, assertActivityTypePluginEnabled, assertTimedActivityWriteAllowed, getGroupAssignedActivity } from "@cognelo/core";
+import { AppError, assertActivityTypePluginEnabled, assertTimedActivityWriteAllowed, getGroupAssignedActivity, assertActivityContentAccess } from "@cognelo/core";
+import { activityContentResponse } from "@/lib/activity-content-response";
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 import { requireSafeExamBrowserAccess } from "@/lib/safe-exam-browser";
 
@@ -15,7 +16,7 @@ export function OPTIONS() {
 async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params["params"]>) {
   const user = await requireUser();
   const { courseId, groupId, activityId, pluginPath } = params;
-  await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId);
+  const access = await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId, { receiptOnly: true });
   const activity = await getGroupAssignedActivity(user, courseId, groupId, activityId);
   await assertActivityTypePluginEnabled(activity.activityType.key);
   const route = resolvePluginRoute(activity.activityType.key, pluginPath);
@@ -30,6 +31,11 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
   }
 
   const unsafeMethod = request.method as "POST" | "PATCH" | "PUT" | "DELETE";
+  if (access?.hideAfterAttempts) {
+    await assertActivityContentAccess(user, courseId, groupId, activityId, {
+      allowFinalization: route.allowExpiredTimedAttemptMethods?.includes(unsafeMethod) === true
+    });
+  }
   if (["POST", "PATCH", "PUT", "DELETE"].includes(unsafeMethod)) {
     await assertTimedActivityWriteAllowed(user, courseId, groupId, activityId, {
       allowExpiredAttempt: route.allowExpiredTimedAttemptMethods?.includes(unsafeMethod) === true
@@ -80,7 +86,7 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
     }
   });
 
-  return json(payload);
+  return json(await activityContentResponse(user, courseId, groupId, activityId, payload, access?.hideAfterAttempts === true), { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function GET(request: NextRequest, { params }: Params) {

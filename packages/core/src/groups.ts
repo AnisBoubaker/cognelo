@@ -29,7 +29,7 @@ import {
 import { listContentItems } from "./course-content";
 import { AppError, notFound } from "./errors";
 import { confirmLiveActivitySettings } from "./activity-settings-live";
-import { assignmentAllowsGradeChallenges, assignmentAssessmentPolicyMode, assignmentTimeLimitMinutes, courseActivitySolutionReleased, courseActivityMessagingEnabled } from "./activity-assignment-policy";
+import { assignmentAllowsGradeChallenges, assignmentAssessmentPolicyMode, assignmentTimeLimitMinutes, courseActivitySolutionReleased, courseActivityMessagingEnabled, courseActivityHidesAfterAttempts } from "./activity-assignment-policy";
 import { applyAssignmentExceptions, assignmentExceptionsForUser, exceptionsForParticipant, loadAssignmentExceptions, resolveAssignmentExceptions, saveAssignmentExceptions } from "./activity-assignment-exceptions";
 
 type StudentAccessDb = Pick<typeof prisma, "role" | "userRole" | "courseMembership">;
@@ -46,6 +46,7 @@ type CourseWideAssignmentMetadata = {
   assessmentMode?: AssignedActivityAssessmentMode;
   messagingEnabled?: boolean;
   releaseSolution?: boolean;
+  hideAfterAttempts?: boolean;
   requireSafeExamBrowser?: boolean;
   gradeChallengesEnabled?: boolean;
   gradebookSettings?: GradebookItemSettingsInput;
@@ -152,7 +153,7 @@ export async function getCourseGroup(user: CurrentUser, courseId: string, groupI
     ...group,
     activities: isManager || canTeach
       ? visibleActivities
-      : visibleActivities.map((assignment) => assignmentRequiresSafeExamBrowser(assignment.metadata)
+      : visibleActivities.map((assignment) => (assignmentRequiresSafeExamBrowser(assignment.metadata) || courseActivityHidesAfterAttempts(assignment.activity.metadata))
         ? {
             ...assignment,
             config: {},
@@ -245,6 +246,7 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
   const general = {
     messagingEnabled: courseActivityMessagingEnabled(activity.metadata),
     releaseSolution: courseActivitySolutionReleased(activity.metadata),
+    hideAfterAttempts: courseActivityHidesAfterAttempts(activity.metadata),
     availableFrom: rule?.availableFrom ?? null,
     availableUntil: rule?.availableUntil ?? null,
     timeLimitMinutes: normalizeTimeLimitMinutes(rule?.timeLimitMinutes),
@@ -386,6 +388,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
             enablePerGroupSettings: true,
             futureGroupsAssigned: false,
             assessmentMode: data.assessmentMode,
+            hideAfterAttempts: data.hideAfterAttempts ?? courseActivityHidesAfterAttempts(activity.metadata),
             messagingEnabled: data.messagingEnabled ?? courseActivityMessagingEnabled(activity.metadata),
             releaseSolution: getActivityDefinition(activity.activityType?.key ?? "")?.supportsSolution === true
               && (data.releaseSolution ?? courseActivitySolutionReleased(activity.metadata)),
@@ -915,6 +918,7 @@ export async function getGroupAssignedActivityAccess(
     assignmentId: activity.assignment.id,
     title: activity.title,
     requiresSafeExamBrowser: assignmentRequiresSafeExamBrowser(activity.assignment.metadata),
+    hideAfterAttempts: courseActivityHidesAfterAttempts(activity.metadata),
     canBypass: isAdmin(user) || (await canManageCourse(user, courseId))
   };
 }

@@ -14,3 +14,5 @@ This file is for placeholder-plugin memory only.
 - It also needs no explicit synchronization hook: core copies its generic authoring state, locks bank-to-course retrieval after attempts, continues to allow course-to-bank publication, and enforces bank permissions.
 - It needs no bank-version diff extension; the shared core visualizer covers its generic version snapshots.
 - Its bank drafts follow core publication versioning: only a changed Published save creates an immutable version.
+
+- Honor the host [activity content closure policy](../../../docs/ACTIVITY_CONTENT_ACCESS.md) for prompts, histories, solutions, and files. Final submission may return a host-handled closure signal instead of a review payload; preserve records and finalization cleanup.

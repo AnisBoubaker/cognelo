@@ -15,7 +15,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, groupId, activityId } = await params;
-    await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId);
+    await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId, { receiptOnly: true });
     return json({ runtime: await finalizeExpiredTimedActivityAttempt(user, courseId, groupId, activityId) });
   });
 }

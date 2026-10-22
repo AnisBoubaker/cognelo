@@ -18,6 +18,8 @@ Presence continues while messaging is disabled so the teacher still receives the
 
 ## Scope and authorization
 
+The opt-in [activity content closure rule](ACTIVITY_CONTENT_ACCESS.md) additionally blocks learner conversation retrieval after attempts end, since notices may quote exam content. Stored conversations remain intact for staff. This takes precedence over the ordinary retained-notice behavior described below.
+
 Each thread belongs to one assignment, student enrollment, and attempt number. Timed standalone activities and compound Tests require a started core attempt. Untimed activities use the next logical attempt number without creating an academic attempt on page load. New attempts start with an empty thread.
 
 Staff broadcasts target only authorized, current conversations present within the last 45 seconds. Course teachers and administrators can reach all assigned sections; section teachers are restricted to their sections; teaching assistants cannot broadcast. Learners cannot send messages. Starting or renewing presence retains activity-access and Safe Exam Browser checks. When messaging is enabled, existing notices remain readable through enrollment ownership after a live policy change closes activity access, without renewing presence or exposing activity content.

@@ -1880,6 +1880,7 @@ describe("gradebook attempt services", () => {
           isPass: null,
           latePenaltyApplied: false,
           latePenaltyPercent: null,
+          contentClosed: false,
           feedback: {
             kind: "parsons",
             feedbackText: null,

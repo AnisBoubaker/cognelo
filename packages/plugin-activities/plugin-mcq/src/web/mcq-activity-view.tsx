@@ -1,5 +1,7 @@
 "use client";
 
+import { isActivityContentClosedError } from "@cognelo/activity-ui";
+
 import { useApplicationTime } from "@cognelo/activity-ui";
 
 
@@ -655,7 +657,7 @@ export function McqActivityView({
       setShowSubmitConfirmDialog(true);
       return false;
     } catch (err) {
-      notifications.error(err instanceof Error ? err.message : copy.submitError);
+      if (!isActivityContentClosedError(err)) notifications.error(err instanceof Error ? err.message : copy.submitError);
       return false;
     }
   }
@@ -675,7 +677,7 @@ export function McqActivityView({
       onSubmitted?.();
       return true;
     } catch (err) {
-      notifications.error(err instanceof Error ? err.message : copy.submitError);
+      if (!isActivityContentClosedError(err)) notifications.error(err instanceof Error ? err.message : copy.submitError);
       return false;
     } finally {
       setSubmitting(false);

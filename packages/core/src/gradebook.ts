@@ -11,7 +11,8 @@ import {
 } from "./authorization";
 import { AppError, forbidden, notFound } from "./errors";
 import { gradeChallengeTargetForGrade } from "./grade-challenge-targets";
-import { assignmentAllowsGradeChallenges, assignmentTimeLimitMinutes } from "./activity-assignment-policy";
+import { assignmentAllowsGradeChallenges, assignmentTimeLimitMinutes, courseActivityHidesAfterAttempts } from "./activity-assignment-policy";
+import { getActivityContentAccess } from "./activity-content-access";
 import { applyAssignmentExceptions, applyGradebookExceptions, exceptionsForParticipant, loadAssignmentExceptions } from "./activity-assignment-exceptions";
 import { recoverExpiredTestAttempts } from "./test-timeout-recovery";
 
@@ -1741,6 +1742,7 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
         select: {
           id: true,
           title: true,
+          metadata: true,
           activityType: { select: { key: true, name: true } }
         }
       },
@@ -1777,7 +1779,12 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
     const overrides = exceptionsForParticipant(exceptions, item.groupActivityId, participant.id);
     return { ...applyGradebookExceptions(item, overrides), groupActivity: applyAssignmentExceptions(item.groupActivity, overrides) };
   });
+  const closed = new Set<string>();
+  await Promise.all(items.filter((item) => courseActivityHidesAfterAttempts(item.activity.metadata)).map(async (item) => {
+    if ((await getActivityContentAccess(user, courseId, groupId, item.activityId)).locked) closed.add(item.activityId);
+  }));
   const rows = items.flatMap((item) => {
+      const contentClosed = closed.has(item.activityId);
       const grade = item.grades[0] && item.grades[0].isActive !== false ? item.grades[0] : null;
       const activeAttempts = item.attempts.filter((attempt) => attempt.lifecycle !== "deleted");
       const submittedAttempts = activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
@@ -1812,17 +1819,18 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
         isPass: effectiveGrade?.isPass ?? null,
         latePenaltyApplied: effectiveGrade?.latePenaltyApplied ?? false,
         latePenaltyPercent: effectiveGrade?.latePenaltyPercent ?? null,
-        feedback: sanitizeStudentGradeFeedback(effectiveGrade?.normalizedResult),
+        contentClosed,
+        feedback: contentClosed ? null : sanitizeStudentGradeFeedback(effectiveGrade?.normalizedResult),
         selectedAttemptId: effectiveGrade?.selectedAttemptId ?? null,
         challengeAttemptId,
-        gradeChallengeTarget: gradeChallengeTarget
+        gradeChallengeTarget: !contentClosed && gradeChallengeTarget
           ? { feedbackRef: gradeChallengeTarget.feedbackRef, feedbackVersion: gradeChallengeTarget.feedbackVersion }
           : null,
-        gradeChallengesEnabled: assignmentAllowsGradeChallenges(item.groupActivity.metadata),
+        gradeChallengesEnabled: !contentClosed && assignmentAllowsGradeChallenges(item.groupActivity.metadata),
         selectedAttemptNumber: effectiveGrade?.selectedAttempt?.attemptNumber ?? null,
         attemptCount: activeAttempts.length,
         submittedAttemptCount: submittedAttempts.length,
-        deletedSubmissions: deletedSubmissionAuditsForParticipant(item.events ?? [], participant.id, false),
+        deletedSubmissions: deletedSubmissionAuditsForParticipant(item.events ?? [], participant.id, false).map((entry) => contentClosed ? { ...entry, metadata: {}, pluginAttemptRef: null } : entry),
         availableFrom: item.groupActivity.availableFrom?.toISOString() ?? null,
         availableUntil: item.groupActivity.availableUntil?.toISOString() ?? null,
         gradedAt: effectiveGrade?.gradedAt.toISOString() ?? null
@@ -1901,6 +1909,7 @@ export async function getStudentActivitySubmissionAudit(user: CurrentUser, cours
       activityId
     },
     include: {
+      activity: { select: { metadata: true } },
       attempts: {
         where: { participantId: participant.id },
         orderBy: [{ attemptNumber: "asc" }]
@@ -1919,10 +1928,12 @@ export async function getStudentActivitySubmissionAudit(user: CurrentUser, cours
   });
 
   const activeAttempts = item?.attempts.filter((attempt) => attempt.lifecycle !== "deleted") ?? [];
+  const contentClosed = courseActivityHidesAfterAttempts(item?.activity?.metadata)
+    && (await getActivityContentAccess(user, courseId, groupId, activityId)).locked;
 
   return {
     submittedAttemptCount: activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded").length,
-    deletedSubmissions: item ? deletedSubmissionAuditsForParticipant(item.events, participant.id, false) : []
+    deletedSubmissions: item ? deletedSubmissionAuditsForParticipant(item.events, participant.id, false).map((entry) => contentClosed ? { ...entry, metadata: {}, pluginAttemptRef: null } : entry) : []
   };
 }
 

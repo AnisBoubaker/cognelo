@@ -2,7 +2,8 @@ import { getActivityDefinition, type ActivitySolution } from "@cognelo/activity-
 import { resolvePluginStudentSolutionHandler, type ServerActivityRecord } from "@cognelo/activity-sdk/server";
 import type { CurrentUser } from "@cognelo/contracts";
 import { prisma } from "@cognelo/db";
-import { assignmentAssessmentPolicyMode, courseActivitySolutionReleased } from "./activity-assignment-policy";
+import { assignmentAssessmentPolicyMode, courseActivitySolutionReleased, courseActivityHidesAfterAttempts } from "./activity-assignment-policy";
+import { getActivityContentAccess } from "./activity-content-access";
 import { AppError, forbidden } from "./errors";
 import { getGroupAssignedActivity } from "./groups";
 import { isActivityTypeAvailable } from "./plugins";
@@ -18,6 +19,7 @@ async function solutionContext(user: CurrentUser, courseId: string, groupId: str
     && (typeKey === "test" || Boolean(resolvePluginStudentSolutionHandler(typeKey)))
     && await isActivityTypeAvailable(typeKey);
   let available = supported && courseActivitySolutionReleased(activity.metadata);
+  if (available && courseActivityHidesAfterAttempts(activity.metadata) && (await getActivityContentAccess(user, courseId, groupId, activityId)).locked) available = false;
   if (available && (activity.activityType.key === "test" || assignmentAssessmentPolicyMode(activity.assignment.metadata) === "summative")) {
     const item = await prisma.gradebookItem.findFirst({
       where: { courseId, groupId, activityId, groupActivityId: activity.assignment.id },

@@ -2,6 +2,14 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const arMessages = {
+  activityContentAccess: {
+    "setting": "إخفاء محتوى النشاط عند عدم السماح بمحاولات أخرى",
+    "settingHelp": "بعد المحاولة الأخيرة أو موعد الإغلاق، تُخفى الأسئلة والإجابات والسجل والحلول والتقارير التفصيلية. تبقى إيصالات التسليم والدرجات المنشورة متاحة. ينطبق على جميع الشعب وتمارين الاختبار.",
+    "closed": "هذا النشاط مغلق. لم تعد أسئلته وإجاباته متاحة.",
+    "receipt": "تم تسليم المحاولة {number}",
+    "deletedReceipt": "تم حذف المحاولة {number}",
+    "loadError": "تعذر التحقق من الوصول إلى النشاط. يرجى المحاولة مجددًا."
+},
   timeSettings: {
     "courseHelp": "تُستخدم للتواريخ والجداول في هذا المقرر للمعلمين والطلاب.",
     "inheritZone": "استخدام منطقة التطبيق الزمنية ({zone})",

@@ -567,6 +567,7 @@ describe("group services", () => {
               assessmentMode: "formative",
               messagingEnabled: false,
               releaseSolution: false,
+              hideAfterAttempts: false,
               timeLimitMinutes: null,
               assignedGroupIds: ["group-1", "group-2"]
             }
@@ -1319,7 +1320,7 @@ describe("group services", () => {
       .mockResolvedValueOnce({
         id: "group-1",
         courseId: "course-1",
-        activities: [{ id: "visible-assignment" }, { id: "hidden-assignment" }],
+        activities: [{ id: "visible-assignment", activity: { metadata: {} } }, { id: "hidden-assignment", activity: { metadata: {} } }],
         participants: [{ id: "participant-1", userId: "student-1" }],
         hiddenCourseMaterials: []
       })

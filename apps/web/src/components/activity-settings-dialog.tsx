@@ -51,6 +51,7 @@ type ActivitySettingsDraft = {
   assessmentMode: AssignedActivityAssessmentMode;
   messagingEnabled: boolean;
   releaseSolution: boolean;
+    hideAfterAttempts: boolean;
   contentParentId: string;
   general: AssignmentValueDraft;
   groups: GroupAssignmentDraft[];
@@ -193,6 +194,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
         assessmentMode: draft.assessmentMode,
         messagingEnabled: draft.messagingEnabled,
         releaseSolution: draft.releaseSolution,
+        hideAfterAttempts: draft.hideAfterAttempts,
         confirmSummativeToFormative: convertsSummativeToFormative,
         requireSafeExamBrowser: draft.assessmentMode === "summative" && draft.general.requireSafeExamBrowser,
         gradeChallengesEnabled: draft.assessmentMode === "summative" && draft.general.gradeChallengesEnabled,
@@ -350,6 +352,14 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                       {t("activityMessenger.enabledLabel")}
                     </label>
                     <p className="muted" id={`activity-settings-messaging-help-${activity.id}`}>{t("activityMessenger.enabledHelp")}</p>
+                  </div>
+                  <div>
+                    <label className="checkbox-row" htmlFor={`activity-settings-hide-after-attempts-${activity.id}`}>
+                      <input type="checkbox" id={`activity-settings-hide-after-attempts-${activity.id}`} checked={draft.hideAfterAttempts} disabled={saving}
+                        onChange={(event) => setDraft((current) => current ? { ...current, hideAfterAttempts: event.target.checked } : current)} />
+                      {t("activityContentAccess.setting")}
+                    </label>
+                    <p className="muted">{t("activityContentAccess.settingHelp")}</p>
                   </div>
                   {getActivityDefinition(activity.activityType.key)?.supportsSolution ? (
                     <div>
@@ -959,6 +969,7 @@ function buildDraft(settings: CourseActivityAssignmentSettings, isTest: boolean,
     assessmentMode,
     messagingEnabled: settings.general.messagingEnabled,
     releaseSolution: settings.general.releaseSolution ?? false,
+    hideAfterAttempts: settings.general.hideAfterAttempts ?? false,
     contentParentId: settings.general.contentPlacement.parentId ?? "",
     general: assignmentValueDraft(settings.general, timeZone),
     groups: settings.groups.map((group) => ({

@@ -172,7 +172,7 @@ test("Programming Homework has no solution setting or learner tab", { tag: "@reg
     expect(await responseJson(await studentApi.get(`${assigned}/solution`))).toEqual({ available: false });
     expect((await studentApi.post(`${assigned}/solution`)).status()).toBe(403);
     await studentPage.goto(assigned.replace("/api", ""));
-    await expect(studentPage.getByRole("heading", { name: title, exact: true })).toBeVisible();
+    await expect(studentPage.getByRole("heading", { name: title, exact: true, level: 1 })).toBeVisible();
     await expect(studentPage.getByRole("tab", { name: "Solution", exact: true })).toBeHidden();
   } finally { await studentApi.dispose(); }
 });

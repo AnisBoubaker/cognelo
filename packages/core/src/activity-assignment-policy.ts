@@ -1,5 +1,13 @@
 export type AssignmentAssessmentPolicyMode = "formative" | "formative_ai" | "summative";
 
+/** Exam-content retention is opt-in and shared by all sections and Test children. */
+export function courseActivityHidesAfterAttempts(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const rule = (value as Record<string, unknown>).allGroupsAssignment;
+  return Boolean(rule && typeof rule === "object" && !Array.isArray(rule)
+    && (rule as Record<string, unknown>).hideAfterAttempts === true);
+}
+
 /** Solution release is opt-in and shared by all sections of a course activity. */
 export function courseActivitySolutionReleased(value: unknown): boolean {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;

@@ -48,6 +48,8 @@ It is intentionally a planning artifact. Implementation should proceed iterative
 
 ### Submission deletion
 
+With [activity content closure](ACTIVITY_CONTENT_ACCESS.md) enabled and effective attempts exhausted, learners retain deletion receipts and reasons but cannot retrieve the retained answer/code snapshots. Released-grade totals remain available; detailed reports, feedback, and challenge content stay closed. Staff inspection is unchanged.
+
 **Student results**, whether entered from course Content or the detailed Gradebook, exposes **Delete submission** in each student's three-dot action menu. This is a core operation independent of plugin grading/feedback renderers, so it also covers MCQ, Programming Exercises, Web Design, and compound Tests. The dialog defaults to the newest submitted/graded attempt in the assignment's current assessment mode and offers a selector when there are several, including older submissions and current-mode formative submissions. Ongoing and already-deleted attempts are excluded; no action appears for a student who never submitted.
 
 The teacher must enter a nonblank reason (maximum 1,000 characters) and confirm the exact student/submission. Cancel writes nothing. The same requirement applies to deletion buttons retained in older manual-review panels; there is no automatic fallback reason. The existing DELETE endpoint rechecks course/section grading scope and rejects unfinished attempts, blank reasons, and already-deleted attempts.

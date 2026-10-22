@@ -54,10 +54,19 @@ import type {
 } from "@cognelo/contracts";
 import type { ActivityVersionDiff, TestRegradeProgress, TestRegradeItemResult } from "@cognelo/contracts";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
+import { ACTIVITY_CONTENT_CLOSED_EVENT } from "@cognelo/activity-ui";
 
 export type { StudentGroupingDto, StudentGroupingStudent, MaterialKind, SubjectKnowledgeGraphDraft, SubjectProgrammingLanguage };
 
 export type AdminRole = { id: string; key: "admin" | "course_manager" | "teacher" | "student"; name: string; description: string | null };
+export type ActivityContentAccess = {
+  title: string;
+  enabled: boolean;
+  locked: boolean;
+  canFinalize: boolean;
+  grade: { score: number; maxScore: number } | null;
+  receipts: Array<{ attemptNumber: number; submittedAt: string | null; deleted: boolean; reason?: string | null }>;
+};
 export type AdminUser = {
   id: string;
   email: string;
@@ -919,6 +928,7 @@ export type CourseActivityAssignmentSettings = {
   general: {
     messagingEnabled: boolean;
     releaseSolution: boolean;
+    hideAfterAttempts: boolean;
     availableFrom: string | null;
     availableUntil: string | null;
     timeLimitMinutes: number | null;
@@ -1291,6 +1301,7 @@ export type StudentReleasedGrades = {
 };
 
 export type StudentReleasedGradeRow = {
+  contentClosed?: boolean;
   gradebookItemId: string;
   activityId: string;
   activityTitle: string;
@@ -1510,6 +1521,10 @@ async function request<T>(path: string, init?: RequestInit, onProgress?: (progre
   }
 
   const body = await response.json().catch(() => ({}));
+  if (body?.activityContentClosed || body?.error?.code === "ACTIVITY_CONTENT_CLOSED") {
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(ACTIVITY_CONTENT_CLOSED_EVENT, { detail: { path } }));
+    throw new ApiError("This activity is closed. Its questions and answers are no longer available.", { code: "ACTIVITY_CONTENT_CLOSED", status: 403 });
+  }
   if (!response.ok) {
     if (response.status === 401 || body?.error?.code === "UNAUTHORIZED") {
       notifyUnauthorized();
@@ -1539,6 +1554,8 @@ export function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  activityContentAccess: (courseId: string, groupId: string, activityId: string) => request<{ access: ActivityContentAccess }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/content-access`),
+  finalizeClosedActivityContent: (courseId: string, groupId: string, activityId: string) => request<{ access: ActivityContentAccess }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/content-access`, { method: "POST" }),
   applicationTime: () => request<{ timeZone: string; serverNow: string }>("/application-time"),
   applicationTimeSettings: () => request<ApplicationTimeSettingsDto>("/settings/time"),
   updateApplicationTimeSettings: (timeZone: string, allowCourseTimeZone?: boolean) => request<ApplicationTimeSettingsDto>("/settings/time", { method: "PUT", body: JSON.stringify({ timeZone, allowCourseTimeZone }) }),

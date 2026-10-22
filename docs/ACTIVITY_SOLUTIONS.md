@@ -1,5 +1,7 @@
 # Student solutions
 
+The optional [activity content closure rule](ACTIVITY_CONTENT_ACCESS.md) takes precedence over solution and grade release. A closed student cannot request or display solutions, including a compound Test's children.
+
 Course content → activity Settings → General includes **Release solution** for MCQ, Parsons, Programming Exercises, Web Design, and compound Tests. It defaults to false for existing and new activities. Programming Homework and unsupported types do not offer the switch or learner tab. This is a course-activity setting shared by every section, like messaging; it is not a section/team/student override. An older settings client that omits the field preserves its existing value. Activity duplication removes assignment policy, so a new copy starts with solutions disabled.
 
 For formative and formative-with-AI assignments, enabling the switch makes the **Solution** tab available without requiring an attempt or submission. The tab first encourages independent work and offers **Show solution**. Opening the tab does not request the solution; the explicit button loads it. Switching tabs keeps the answering renderer mounted so drafts, Test state, timers, and autosaves survive. Returning to the solution tab requires another explicit reveal.

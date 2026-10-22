@@ -1,5 +1,7 @@
 # Browser user flows
 
+`activity-content-access.spec.ts` verifies optional exam-content closure: setting persistence, final-attempt receipts, current exceptions and reopening, restricted histories/solutions/reports/images, released grade totals, compound Test finalization, and installed plugin routes. It uses disposable course data and requires no AI or execution runner.
+
 The Playwright suite covers the platform's critical browser journeys with real API and database integration:
 
 - anonymous access control, sign-in, first-time activation UI, and sign-out;

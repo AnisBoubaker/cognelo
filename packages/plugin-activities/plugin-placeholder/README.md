@@ -38,3 +38,5 @@ When changing this plugin, update:
 
 - `packages/plugin-activities/plugin-placeholder/README.md`
 - `packages/plugin-activities/plugin-placeholder/PROJECT_MEMORY.md`
+
+The shared [activity content closure setting](../../../docs/ACTIVITY_CONTENT_ACCESS.md) can restrict student access after effective attempts or closing dates end. The host then shows only receipts and released grade totals; staff records remain available.

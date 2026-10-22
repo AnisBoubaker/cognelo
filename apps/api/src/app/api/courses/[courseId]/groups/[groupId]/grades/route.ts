@@ -14,7 +14,7 @@ export async function GET(_request: Request, { params }: Params) {
     const { courseId, groupId } = await params;
     const grades = await getStudentReleasedGrades(user, courseId, groupId);
     const rows = await Promise.all(grades.rows.map(async (row) => {
-      const getReport = row.gradeKind === "final"
+      const getReport = row.gradeKind === "final" && !row.contentClosed
         ? resolvePluginStudentGradeReportHandler(row.activityTypeKey)
         : null;
       return {

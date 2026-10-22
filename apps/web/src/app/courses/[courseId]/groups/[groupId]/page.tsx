@@ -327,6 +327,7 @@ export default function CourseGroupPage() {
                 label: t("groupPage.gradesTab"),
                 render: () => (
                   <section className="section stack">
+                    <StudentGradesRefresh courseId={courseId} groupId={groupId} onRefresh={setStudentGrades} />
                     <div>
                       <p className="eyebrow">{t("groupPage.gradesEyebrow")}</p>
                       <h2>{t("groupPage.gradesTitle")}</h2>
@@ -2513,4 +2514,28 @@ function MaterialActionIcon({
   return (
     <AppIcon name={name} />
   );
+}
+
+// Mount only with the Grades tab; never poll detailed reports from the content tree.
+function StudentGradesRefresh({ courseId, groupId, onRefresh }: {
+  courseId: string; groupId: string; onRefresh: (grades: StudentReleasedGrades) => void;
+}) {
+  useEffect(() => {
+    let cancelled = false;
+    let pending = false;
+    const refresh = async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        const result = await api.studentGroupGrades(courseId, groupId);
+        if (!cancelled) onRefresh(result.grades);
+      } catch { /* Retry without replacing a mounted report during a network failure. */ }
+      finally { pending = false; }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 20_000);
+    window.addEventListener("focus", refresh);
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener("focus", refresh); };
+  }, [courseId, groupId, onRefresh]);
+  return null;
 }

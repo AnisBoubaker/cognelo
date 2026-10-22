@@ -2,6 +2,14 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const zhMessages = {
+  activityContentAccess: {
+    "setting": "不再允许尝试时隐藏活动内容",
+    "settingHelp": "最后一次尝试或截止时间之后，隐藏题目、答案、历史记录、参考答案和详细报告。学生仍可查看提交记录及已发布成绩。适用于所有班级和测验中的所有练习。",
+    "closed": "此活动已关闭，无法再查看题目和答案。",
+    "receipt": "第 {number} 次尝试已提交",
+    "deletedReceipt": "第 {number} 次尝试已删除",
+    "loadError": "无法检查活动访问权限，请重试。"
+},
   timeSettings: {
     "courseHelp": "用于本课程中教师和学生看到的日期与日程安排。",
     "inheritZone": "使用应用时区（{zone}）",

@@ -2,6 +2,14 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const frMessages = {
+  activityContentAccess: {
+    "setting": "Masquer le contenu lorsqu’aucune nouvelle tentative n’est autorisée",
+    "settingHelp": "Après la dernière tentative ou la date de fermeture, masquer les questions, réponses, historiques, solutions et rapports détaillés. Les reçus de remise et les notes publiées restent accessibles. S’applique à toutes les sections et à tous les exercices d’un test.",
+    "closed": "Cette activité est fermée. Ses questions et réponses ne sont plus accessibles.",
+    "receipt": "Tentative {number} remise",
+    "deletedReceipt": "Tentative {number} supprimée",
+    "loadError": "Impossible de vérifier l’accès à l’activité. Veuillez réessayer."
+},
   timeSettings: {
     "courseHelp": "Utilisé pour les dates et horaires de ce cours, pour le personnel et les étudiants.",
     "inheritZone": "Utiliser le fuseau de l’application ({zone})",

@@ -171,3 +171,7 @@ This type supports the shared [Solution tab](../../../../docs/ACTIVITY_SOLUTIONS
 ## Test automatic regrading
 
 The core [Test regrading batch](../../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-automatic-regrading) reevaluates every submitted child against current grading rules, including previously graded work. Individual and whole-class actions show measured progress. Saved answers, original timing, submitted composition/point weights, and grade-release state remain fixed. Each successful rerun is audited; an individual failure does not stop later exercises, and an incomplete batch leaves the parent total unchanged. Recovery may initially preserve responses without a grade or runner artifact; later teacher regrading uses the same batch. No AI feedback is requested automatically. Standalone behavior is unchanged.
+
+## Restricted student review
+
+The optional [core content-closure policy](../../../../docs/ACTIVITY_CONTENT_ACCESS.md) governs learner retrieval after permitted attempts end, including compound Test children. Shared dispatch denies closed content/history/file reads and returns only a closure signal after the final submission; teacher inspection and stored evidence remain intact. Released grades do not authorize detailed reports or solutions while closed.

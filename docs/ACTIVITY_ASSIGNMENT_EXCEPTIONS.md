@@ -24,6 +24,8 @@ The last six categories are summative-only. Switching to formative removes their
 
 [Release solution](ACTIVITY_SOLUTIONS.md) is General-only and shared by sections, like messaging. Summative solutions require the independent section grade release as well.
 
+[Hide activity content when no further attempts are allowed](ACTIVITY_CONTENT_ACCESS.md) is also General-only. It uses each student's resolved attempts, duration, and Until date; additional attempts or extensions may restore access. Grade release does not bypass closure.
+
 Targets are section-local: exactly one team or student enrollment per exception, at most one exception per target per assignment. Team membership is resolved at use time, including memberships in hidden groupings. Moving into/out of a team changes live policy resolution without copying settings onto students. Pending student enrollments may receive exceptions; teachers and TAs cannot be student targets.
 
 ## Enforcement and academic history

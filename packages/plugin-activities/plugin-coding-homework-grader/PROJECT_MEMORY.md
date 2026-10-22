@@ -21,3 +21,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - [Submission continuation](../../../docs/SUBMISSION_CONTINUATION.md): Reopens the existing challenge answers while retaining the uploaded ZIP and generated questions. Prior mutable completion evidence is audited; final answers submit through the same core attempt without regenerating questions. Restore through the host transaction; reopening preserves the original start and applies current exceptions.
 
 - Display timestamps through the shared application-time context (the effective course zone within course pages) and explicit-zone formatters; the browser timezone is not a user preference. See [Application time](../../../docs/APPLICATION_TIME.md).
+
+- Honor the host [activity content closure policy](../../../docs/ACTIVITY_CONTENT_ACCESS.md) for prompts, histories, solutions, and files. Final submission may return a host-handled closure signal instead of a review payload; preserve records and finalization cleanup.

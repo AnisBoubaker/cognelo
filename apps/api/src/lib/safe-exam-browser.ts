@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 import { getServerEnv } from "@cognelo/config";
 import {
   AppError,
+  assertActivityContentAccess,
   createSafeExamBrowserAccessToken,
   getGroupAssignedActivityAccess,
   verifySafeExamBrowserAccessToken,
@@ -141,10 +142,15 @@ export async function requireSafeExamBrowserAccess(
   user: CurrentUser,
   courseId: string,
   groupId: string,
-  activityId: string
+  activityId: string,
+  options: { allowFinalization?: boolean; receiptOnly?: boolean } = {}
 ) {
   void request;
-  const access = await getGroupAssignedActivityAccess(user, courseId, groupId, activityId);
+  const access: Awaited<ReturnType<typeof getGroupAssignedActivityAccess>> & { contentClosed?: boolean } = await getGroupAssignedActivityAccess(user, courseId, groupId, activityId);
+  if (access.hideAfterAttempts && !options.receiptOnly) {
+    const content = await assertActivityContentAccess(user, courseId, groupId, activityId, options);
+    if (content.locked) access.contentClosed = true;
+  }
   if (!access.requiresSafeExamBrowser || access.canBypass) return access;
   if (await hasSafeExamBrowserAccess(user, { courseId, groupId, activityId })) return access;
   throw new AppError(

@@ -4,6 +4,7 @@ import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
 
 
 import { CodeRenderer } from "@cognelo/activity-ui";
+import { ActivityContentBoundary } from "@/components/activity-content-boundary";
 import Link from "next/link";
 import { useServerCountdown } from "@/lib/use-server-countdown";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -25,6 +26,10 @@ import { readSafeExamBrowserProof } from "@/lib/safe-exam-browser";
 import { formatRemainingTime, getTestCountdownTone } from "@/lib/test-countdown";
 
 export default function GroupActivityPage() {
+  return <ActivityContentBoundary><GroupActivityContent /></ActivityContentBoundary>;
+}
+
+function GroupActivityContent() {
   const params = useParams<{ courseId: string; groupId: string; activityId: string }>();
   const { courseId, groupId, activityId } = params;
   const router = useRouter();

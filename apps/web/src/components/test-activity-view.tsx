@@ -1,5 +1,7 @@
 "use client";
 
+import { isActivityContentClosedError } from "@cognelo/activity-ui";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -657,7 +659,7 @@ function TestStudentRuntime({
       setShowStartConfirmation(false);
       notifications.success(t("courseDetail.testStarted"));
     } catch (reason) {
-      notifications.error(reason instanceof Error ? reason.message : t("courseDetail.testStartError"));
+      if (!isActivityContentClosedError(reason)) notifications.error(reason instanceof Error ? reason.message : t("courseDetail.testStartError"));
     } finally {
       setBusy(false);
       setLongRunningStudentAction(null);
@@ -681,7 +683,7 @@ function TestStudentRuntime({
       applyRuntime(latest);
       setReviewAnswers(Object.fromEntries(answers));
     } catch (reason) {
-      notifications.error(reason instanceof Error ? reason.message : t("courseDetail.testReviewLoadError"));
+      if (!isActivityContentClosedError(reason)) notifications.error(reason instanceof Error ? reason.message : t("courseDetail.testReviewLoadError"));
     } finally {
       setBusy(false);
     }
@@ -739,7 +741,7 @@ function TestStudentRuntime({
       notifications.success(t("courseDetail.testSubmitted"));
       onSubmitted?.();
     } catch (reason) {
-      notifications.error(reason instanceof Error ? reason.message : t("courseDetail.testSubmitError"));
+      if (!isActivityContentClosedError(reason)) notifications.error(reason instanceof Error ? reason.message : t("courseDetail.testSubmitError"));
       if (autoSubmittedAttemptRef.current === runtime.attempt.id) retryAutomaticSubmission();
     } finally {
       setBusy(false);

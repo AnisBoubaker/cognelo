@@ -1,3 +1,4 @@
+import { activityContentResponse } from "@/lib/activity-content-response";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { resolveCompositeExecutionSubmissionHandler } from "@cognelo/activity-sdk/server";
@@ -27,18 +28,18 @@ export async function POST(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, groupId, activityId } = await params;
-    await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId);
+    const access = await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId, { allowFinalization: true });
     const input = inputSchema.parse(await readJson(request));
     let runtime = await getTestRuntime(user, courseId, groupId, activityId, "attempt", input.sessionId);
     if (!runtime.attempt || runtime.attempt.id !== input.parentAttemptId || runtime.attempt.lifecycle !== "started") {
       const previousRuntime = await getTestRuntime(user, courseId, groupId, activityId, "previous");
       if (previousRuntime.attempt?.id === input.parentAttemptId) {
-        return json({ runtime: previousRuntime });
+        return json(await activityContentResponse(user, courseId, groupId, activityId, { runtime: previousRuntime }, access?.hideAfterAttempts === true));
       }
       throw new AppError(404, "TEST_ATTEMPT_NOT_FOUND", "The active Test attempt was not found.");
     }
 
-    if (input.onlyIfExpired && !runtime.timing.isExpired) return json({ runtime });
+    if (input.onlyIfExpired && !runtime.timing.isExpired && !access?.contentClosed) return json({ runtime });
 
     if (!(await claimTestAttemptSubmission(input.parentAttemptId))) {
       throw new AppError(409, "TEST_SUBMISSION_IN_PROGRESS", "This Test submission is already being processed.");
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     try {
       runtime = await getTestRuntime(user, courseId, groupId, activityId, "attempt", input.sessionId);
-      if (input.onlyIfExpired && !runtime.timing.isExpired) {
+      if (input.onlyIfExpired && !runtime.timing.isExpired && !access?.contentClosed) {
         await releaseTestAttemptSubmission(input.parentAttemptId);
         return json({ runtime });
       }
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
       const submitted = await submitTestAttempt(user, courseId, groupId, activityId, input.parentAttemptId);
       await completeTestAttemptSubmission(input.parentAttemptId);
-      return json({ runtime: submitted });
+      return json(await activityContentResponse(user, courseId, groupId, activityId, { runtime: submitted }, access?.hideAfterAttempts === true));
     } catch (error) {
       await releaseTestAttemptSubmission(input.parentAttemptId).catch(() => undefined);
       throw error;

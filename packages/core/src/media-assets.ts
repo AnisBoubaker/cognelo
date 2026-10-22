@@ -7,6 +7,8 @@ import { canManageCourse, isAdmin, isCourseManager, isTeacher } from "./authoriz
 import { AppError, forbidden, notFound } from "./errors";
 import { getContentResourceForPluginRoute } from "./course-content";
 import { assertCanViewGroup, assignmentRequiresSafeExamBrowser, getGroupAssignedActivity } from "./groups";
+import { assertActivityContentAccess } from "./activity-content-access";
+import { courseActivityHidesAfterAttempts } from "./activity-assignment-policy";
 
 export const MAX_MEDIA_IMAGE_BYTES = 10 * 1024 * 1024;
 export const MEDIA_ASSET_STAGING_HOURS = 24;
@@ -196,6 +198,9 @@ async function canDeliverActiveAsset(
     for (const assignment of assignments) {
       try {
         const assignedActivity = await getGroupAssignedActivity(user, courseId, assignment.groupId, assignment.activityId);
+        if (courseActivityHidesAfterAttempts(assignedActivity.metadata)) {
+          await assertActivityContentAccess(user, courseId, assignment.groupId, assignment.activityId);
+        }
         if (
           assignmentRequiresSafeExamBrowser(assignedActivity.assignment.metadata) &&
           !(await options.hasSafeExamBrowserAccess?.({

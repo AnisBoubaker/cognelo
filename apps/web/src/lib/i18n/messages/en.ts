@@ -2,6 +2,14 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const enMessages = {
+  activityContentAccess: {
+    "setting": "Hide activity content when no further attempts are allowed",
+    "settingHelp": "After the final attempt or closing deadline, hide questions, answers, history, solutions, and detailed reports. Students retain submission receipts and released grades. Applies to every section and all exercises in a Test.",
+    "closed": "This activity is closed. Its questions and answers are no longer available.",
+    "receipt": "Attempt {number} submitted",
+    "deletedReceipt": "Attempt {number} deleted",
+    "loadError": "Unable to check activity access. Please retry."
+},
   timeSettings: {
     "courseHelp": "Used for dates and scheduling throughout this course, for staff and students.",
     "inheritZone": "Use application timezone ({zone})",

@@ -39,3 +39,5 @@ export * from "./users";
 
 export * from "./application-time";
 export * from "./course-time";
+export * from "./activity-content-access";
+export * from "./activity-content-finalization";

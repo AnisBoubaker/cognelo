@@ -1,3 +1,5 @@
+import { assertActivityContentAccess } from "./activity-content-access";
+import { courseActivityHidesAfterAttempts } from "./activity-assignment-policy";
 import { z } from "zod";
 import { prisma, type Prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -52,6 +54,7 @@ export async function createGradeChallenge(
   if (attempt.participant.userId !== user.id) {
     throw forbidden();
   }
+  if (courseActivityHidesAfterAttempts(attempt.activity.metadata)) await assertActivityContentAccess(user, courseId, attempt.groupId, attempt.activityId);
   if (!attempt.gradebookItem.gradesReleased) {
     throw new AppError(409, "GRADE_NOT_RELEASED", "Feedback can only be challenged after the grade is released.");
   }
@@ -292,7 +295,7 @@ export async function listCourseGradeChallenges(user: CurrentUser, courseId: str
 export async function listAttemptGradeChallenges(user: CurrentUser, courseId: string, attemptId: string) {
   const attempt = await prisma.activityAttempt.findFirst({
     where: { id: attemptId, courseId },
-    select: { participant: { select: { userId: true } } }
+    select: { groupId: true, activityId: true, activity: { select: { metadata: true } }, participant: { select: { userId: true } } }
   });
   if (!attempt) {
     throw notFound("Activity attempt");
@@ -300,6 +303,7 @@ export async function listAttemptGradeChallenges(user: CurrentUser, courseId: st
   if (attempt.participant.userId !== user.id) {
     throw forbidden();
   }
+  if (courseActivityHidesAfterAttempts(attempt.activity?.metadata)) await assertActivityContentAccess(user, courseId, attempt.groupId, attempt.activityId);
   return prisma.gradeChallenge.findMany({
     where: { courseId, attemptId },
     orderBy: [{ createdAt: "desc" }]

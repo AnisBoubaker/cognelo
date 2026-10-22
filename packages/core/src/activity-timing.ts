@@ -77,7 +77,8 @@ export async function finalizeExpiredTimedActivityAttempt(
   user: CurrentUser,
   courseId: string,
   groupId: string,
-  activityId: string
+  activityId: string,
+  options: { includeClosingDate?: boolean; graceMilliseconds?: number } = {}
 ) {
   const context = await resolveTimedActivityContext(user, courseId, groupId, activityId);
   const activeAttempt = await findActiveAttempt(context.assignmentId, context.participantId);
@@ -85,7 +86,9 @@ export async function finalizeExpiredTimedActivityAttempt(
     return getTimedActivityRuntime(user, courseId, groupId, activityId);
   }
   const timeLimitMinutes = assignmentTimeLimitMinutes(context.assignmentMetadata);
-  const expiresAt = assignmentAttemptExpiresAt(activeAttempt.startedAt, timeLimitMinutes, context.availableUntil);
+  const expiresAt = assignmentAttemptExpiresAt(activeAttempt.startedAt, timeLimitMinutes, context.availableUntil)
+    ?? (options.includeClosingDate ? context.availableUntil : null);
+  if (options.graceMilliseconds && (!expiresAt || Date.now() < expiresAt.getTime() + options.graceMilliseconds)) return getTimedActivityRuntime(user, courseId, groupId, activityId);
   if (!expiresAt || Date.now() < expiresAt.getTime()) {
     throw new AppError(409, "ACTIVITY_TIME_LIMIT_ACTIVE", "The timed attempt has not expired.");
   }
