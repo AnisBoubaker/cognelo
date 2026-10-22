@@ -429,6 +429,8 @@ Programming children with no enabled hidden tests return no automatic grade; the
 
 ## Timeout recovery
 
+Current and previous-submission views use separate [in-memory editor scopes](EDITOR_UNDO.md). An already-started Test remains reachable from its previous-submission view even when no additional attempts remain; availability identifies the active attempt without creating another one. Actual resume/session and deadline checks still govern answering.
+
 The optional [activity content closure policy](ACTIVITY_CONTENT_ACCESS.md) also allows an authenticated learner's closed receipt page to request recovery of that learner's own expired saved work. It uses the same claim/row locks and 30-second grace, returns no questions or responses, and may use Until when no duration is configured. This does not add a scheduled job or permit new answering after expiry.
 
 Learner countdowns use the server's remaining seconds anchored to browser monotonic elapsed time (`performance.now()`), never the device wall clock. Every policy response refreshes that anchor, including live extensions and Until exceptions. Automatic submission deferred by the server, or interrupted by a request failure, waits at least 20 seconds before retrying. The server rechecks live expiry after claiming submission. Claim acquisition, autosaves, and recovery coordinate on the parent row so a queued save cannot change recovered responses.

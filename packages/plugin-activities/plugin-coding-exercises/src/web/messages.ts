@@ -160,6 +160,8 @@ type MessageKey =
   | "noRunInput"
   | "loadHiddenTestsError"
   | "loadHistoryError"
+  | "loadingAnswer"
+  | "retryLoadAnswer"
   | "saveError"
   | "referenceSolutionValidationFailed"
   | "referenceSolutionGenericFailure"
@@ -370,6 +372,8 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     noRunInput: "No input",
     loadHiddenTestsError: "Unable to load hidden tests.",
     loadHistoryError: "Unable to load coding exercise history.",
+    loadingAnswer: "Loading saved answer…",
+    retryLoadAnswer: "Retry loading answer",
     saveError: "Unable to save the coding exercise right now.",
     referenceSolutionValidationFailed: "The reference solution failed test \"{testName}\": {reason}",
     referenceSolutionGenericFailure: "The reference solution did not pass one of the saved tests.",
@@ -577,6 +581,8 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     noRunInput: "Aucune entrée",
     loadHiddenTestsError: "Impossible de charger les tests cachés.",
     loadHistoryError: "Impossible de charger l'historique de l'exercice.",
+    loadingAnswer: "Chargement de la réponse enregistrée…",
+    retryLoadAnswer: "Réessayer de charger la réponse",
     saveError: "Impossible d'enregistrer l'exercice pour le moment.",
     referenceSolutionValidationFailed: "La solution de référence a échoué au test « {testName} » : {reason}",
     referenceSolutionGenericFailure: "La solution de référence n’a pas réussi l’un des tests enregistrés.",
@@ -784,6 +790,8 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     noRunInput: "无输入",
     loadHiddenTestsError: "无法加载隐藏测试。",
     loadHistoryError: "无法加载编程练习历史记录。",
+    loadingAnswer: "正在加载已保存的答案…",
+    retryLoadAnswer: "重新加载答案",
     saveError: "暂时无法保存编程练习。",
     referenceSolutionValidationFailed: "参考答案未通过测试“{testName}”：{reason}",
     referenceSolutionGenericFailure: "参考答案未通过某个已保存的测试。",

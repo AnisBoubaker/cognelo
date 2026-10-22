@@ -237,7 +237,7 @@ export async function getActivityAttemptAvailability(user: CurrentUser, input: A
   });
   const assessmentMode = assignmentAssessmentMode(context.groupActivity.metadata);
   const details = await activityAttemptAvailabilityDetails(context, assessmentMode);
-  const resumableAttempt = await findResumableAttempt(context.groupActivity.id, context.participant.id);
+  const resumableAttempt = await findResumableAttempt(context.groupActivity.id, context.participant.id, true);
   if (resumableAttempt) {
     return { ...details, canStart: true as const, reason: null, activeAttemptId: resumableAttempt.id };
   }
@@ -264,12 +264,16 @@ export function activityAttemptTimeLimitMinutes(value: unknown): number | null {
     : null;
 }
 
-async function findResumableAttempt(groupActivityId: string, participantId: string) {
+async function findResumableAttempt(groupActivityId: string, participantId: string, includeTestAttempts = false) {
   const attempts = await prisma.activityAttempt.findMany({
     where: { groupActivityId, participantId, lifecycle: "started" },
     orderBy: [{ attemptNumber: "desc" }]
   });
-  return attempts.find((attempt) => (activityAttemptTimeLimitMinutes(attempt.metadata) !== null || asJsonObject(attempt.metadata)?.continuation)) ?? null;
+  return attempts.find((attempt) => (
+    (includeTestAttempts && attempt.pluginKey === "core:test")
+    || activityAttemptTimeLimitMinutes(attempt.metadata) !== null
+    || asJsonObject(attempt.metadata)?.continuation
+  )) ?? null;
 }
 
 async function activityAttemptAvailabilityDetails(

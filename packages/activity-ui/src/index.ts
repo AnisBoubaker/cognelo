@@ -10,6 +10,7 @@ export * from "./edit-action-bar";
 export * from "./markdown-renderer";
 export * from "./knowledge-generation";
 export * from "./monaco-code-editor";
+export { MonacoModelScope, MonacoModelGroup } from "./monaco-model-scope";
 export * from "./notifications";
 export * from "./progress-dialog";
 export * from "./rich-text-editor";

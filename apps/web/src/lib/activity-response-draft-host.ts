@@ -24,7 +24,7 @@ export function createStandaloneActivityDraftHost(input: {
       groupActivityId: input.groupActivityId,
       activityAttemptId: null
     },
-    load: input.client.load,
+    load: () => enqueue(input.client.load),
     save: (state) => enqueue(() => input.client.save(state)),
     clear: () => enqueue(input.client.clear)
   };

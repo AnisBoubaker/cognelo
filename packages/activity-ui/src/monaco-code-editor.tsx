@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Editor, { loader, type Monaco, type OnMount } from "@monaco-editor/react";
 import { codeInputProtectionAttributes, protectCodeInput } from "./code-input-protection";
 import { normalizeMonacoLanguage } from "./code-language";
+import { useMonacoModelStore } from "./monaco-model-scope";
 import {
   clampMonacoSelectionToEditableOffsets,
   getEditableMonacoOffsets,
@@ -29,6 +30,8 @@ type MonacoCodeEditorProps = {
   readOnly?: boolean;
   readOnlyPrefix?: string;
   readOnlySuffix?: string;
+  loading?: boolean;
+  loadingLabel?: string;
 };
 
 export function MonacoCodeEditor({
@@ -41,12 +44,18 @@ export function MonacoCodeEditor({
   ariaLabel,
   readOnly = false,
   readOnlyPrefix = "",
-  readOnlySuffix = ""
+  readOnlySuffix = "",
+  loading = false,
+  loadingLabel = "Loading editor…"
 }: MonacoCodeEditorProps) {
   const editorLanguage = useMemo(() => normalizeMonacoLanguage(language), [language]);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
-  const decorationIdsRef = useRef<string[]>([]);
+  const decorationsRef = useRef<ReturnType<Parameters<OnMount>[0]["createDecorationsCollection"]> | null>(null);
+  const synchronizingRef = useRef(false);
+  const fallbackId = useId();
+  const { store, group } = useMonacoModelStore();
+  const modelPath = store.path(group, id ?? fallbackId);
   const [monacoLoadState, setMonacoLoadState] = useState<"loading" | "ready" | "failed">(
     loader.__getMonacoInstance() ? "ready" : "loading"
   );
@@ -57,6 +66,18 @@ export function MonacoCodeEditor({
 
   displayedValueRef.current = displayedValue;
   readOnlyRegionRef.current = { readOnly, readOnlyPrefix, readOnlySuffix };
+
+  useLayoutEffect(() => () => {
+    // Runs before the child switches/disposes its editor. Keep cursor/scroll
+    // state with the same ephemeral owner as the model, never in a global map.
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+    if (editor && model) store.saveView(model.uri.toString(), editor.saveViewState());
+  }, [loading, modelPath, store]);
+
+  useEffect(() => {
+    if (!loading && editorRef.current) synchronizeValue(editorRef.current);
+  }, [displayedValue, loading, modelPath]);
 
   useEffect(() => {
     if (loader.__getMonacoInstance()) {
@@ -80,7 +101,7 @@ export function MonacoCodeEditor({
     };
   }, []);
 
-  useEffect(() => {
+  const updateDecorations = useCallback(() => {
     const editor = editorRef.current;
     const monaco = monacoRef.current;
     const model = editor?.getModel();
@@ -88,8 +109,10 @@ export function MonacoCodeEditor({
       return;
     }
 
-    if (!hasRestrictedEditableRegion) {
-      decorationIdsRef.current = model.deltaDecorations(decorationIdsRef.current, []);
+    const { readOnly, readOnlyPrefix, readOnlySuffix } = readOnlyRegionRef.current;
+    const displayedValue = model.getValue();
+    if (readOnly || (!readOnlyPrefix && !readOnlySuffix)) {
+      decorationsRef.current?.clear();
       return;
     }
 
@@ -122,8 +145,14 @@ export function MonacoCodeEditor({
       });
     }
 
-    decorationIdsRef.current = model.deltaDecorations(decorationIdsRef.current, nextDecorations);
-  }, [displayedValue, hasRestrictedEditableRegion, readOnlyPrefix, readOnlySuffix]);
+    decorationsRef.current?.set(nextDecorations);
+  }, []);
+
+  useEffect(() => {
+    updateDecorations();
+  }, [displayedValue, hasRestrictedEditableRegion, readOnlyPrefix, readOnlySuffix, updateDecorations]);
+
+  if (loading) return <div className="monaco-code-editor" role="status" style={editorContainerStyle(height, minHeight)}><span style={{ margin: "auto" }}>{loadingLabel}</span></div>;
 
   if (monacoLoadState === "failed") {
     return (
@@ -183,7 +212,7 @@ export function MonacoCodeEditor({
   if (monacoLoadState === "loading") {
     return (
       <div className="monaco-code-editor notranslate" translate="no" role="status" style={editorContainerStyle(height, minHeight)}>
-        <span style={{ margin: "auto" }}>Loading editor…</span>
+        <span style={{ margin: "auto" }}>{loadingLabel}</span>
       </div>
     );
   }
@@ -198,9 +227,11 @@ export function MonacoCodeEditor({
         beforeMount={configureMonaco}
         onMount={handleEditorMount}
         defaultLanguage={editorLanguage}
+        defaultValue={displayedValue}
         height={height ?? minHeight}
         language={editorLanguage}
         onChange={(nextValue) => {
+          if (synchronizingRef.current) return;
           const nextStudentValue = getEditableMonacoValue({
             nextValue,
             readOnly,
@@ -216,7 +247,7 @@ export function MonacoCodeEditor({
             const editor = editorRef.current;
             const model = editor?.getModel();
             if (editor && model && model.getValue() !== displayedValue) {
-              model.setValue(displayedValue);
+              synchronizeValue(editor);
               const editableOffsets = getEditableMonacoOffsets(displayedValue, readOnlyPrefix, readOnlySuffix);
               const nextPosition = model.getPositionAt(editableOffsets.endOffset);
               if (nextPosition) {
@@ -253,9 +284,10 @@ export function MonacoCodeEditor({
           tabSize: 2,
           wordWrap: "on"
         }}
-        path={id}
+        path={modelPath}
+        keepCurrentModel
+        saveViewState={false}
         theme="cognelo-light"
-        value={displayedValue}
       />
     </div>
   );
@@ -263,9 +295,28 @@ export function MonacoCodeEditor({
   function handleEditorMount(editor: Parameters<OnMount>[0], monaco: Monaco) {
     editorRef.current = editor;
     monacoRef.current = monaco;
+    let currentModel = editor.getModel();
+    const attachModel = () => {
+      currentModel = editor.getModel();
+      if (currentModel) { store.remember(currentModel); currentModel.pushStackElement(); }
+      synchronizeValue(editor);
+      const view = currentModel && store.view(currentModel.uri.toString());
+      if (view) editor.restoreViewState(view);
+      updateDecorations();
+    };
+    decorationsRef.current = editor.createDecorationsCollection();
+    attachModel();
+    editor.onDidChangeModel(() => {
+      if (currentModel && !currentModel.isDisposed()) currentModel.pushStackElement();
+      attachModel();
+    });
+    editor.onDidDispose(() => {
+      if (currentModel && !currentModel.isDisposed()) currentModel.pushStackElement();
+      if (editorRef.current === editor) editorRef.current = null;
+    });
     protectCodeInput(editor.getDomNode()?.querySelector("textarea") ?? null);
 
-    if (hasRestrictedEditableRegion) {
+    if (hasRestrictedEditableRegion && !store.view(editor.getModel()!.uri.toString())) {
       const model = editor.getModel();
       const editableOffsets = getEditableMonacoOffsets(
         displayedValueRef.current,
@@ -321,6 +372,18 @@ export function MonacoCodeEditor({
         editor.setSelection(nextSelection);
       }
     });
+  }
+
+  function synchronizeValue(editor: Parameters<OnMount>[0]) {
+    const model = editor.getModel();
+    const desired = displayedValueRef.current;
+    // Controlled-value echoes must leave typing/redo history intact, including
+    // Monaco's platform-dependent EOL normalization. Genuine external values
+    // (draft restoration, reset, changed scaffold) establish a fresh baseline.
+    if (!model || model.getValue().replace(/\r\n?/g, "\n") === desired.replace(/\r\n?/g, "\n")) return;
+    synchronizingRef.current = true;
+    try { model.setValue(desired); }
+    finally { synchronizingRef.current = false; }
   }
 }
 

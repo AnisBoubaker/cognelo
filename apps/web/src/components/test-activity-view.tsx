@@ -5,7 +5,7 @@ import { isActivityContentClosedError } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ConfirmationDialog, EditActionBar, MarkdownRenderer, ProgressDialog, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { ConfirmationDialog, EditActionBar, MarkdownRenderer, MonacoModelGroup, MonacoModelScope, ProgressDialog, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
 import { TestItemWeight } from "@/components/test-item-weight";
@@ -600,14 +600,10 @@ function TestStudentRuntime({
         testItemId,
         testItemAttemptId: selectedRuntimeItem.itemAttempt?.id ?? null
       },
-      load: async () => (await api.testItemAttempt(
-        courseId,
-        groupId,
-        activity.id,
-        testItemId,
-        parentAttemptId,
-        sessionId
-      )).itemAttempt?.state ?? null,
+      load: async () => {
+        await saveQueueRef.current;
+        return (await api.testItemAttempt(courseId, groupId, activity.id, testItemId, parentAttemptId, sessionId)).itemAttempt?.state ?? null;
+      },
       save: async (state) => {
         setPendingSaveCount((current) => current + 1);
         const save = saveQueueRef.current.then(async () => {
@@ -828,6 +824,7 @@ function TestStudentRuntime({
   }
 
   return (
+    <MonacoModelScope key={`${runtime.attempt.id}:${runtime.attempt.lifecycle}:${studentViewMode}`}>
     <div className="stack">
       {attemptStarted && remainingSeconds !== null && countdownTone ? (
         <ActivityLiveControlPortal>
@@ -923,12 +920,12 @@ function TestStudentRuntime({
               </div>
               {runtime.resume.blocked ? (
                 <p className="muted">{t("courseDetail.testResumeDisabledSubmitting")}</p>
-              ) : renderStudentItem && executionHost ? renderStudentItem({
+              ) : renderStudentItem && executionHost ? <MonacoModelGroup id={selectedItem.id}>{renderStudentItem({
                 runtime,
                 item: selectedItem,
                 disabled: isReadOnly,
                 executionHost
-              }) : <p className="error">{t("courseDetail.testRendererUnavailable")}</p>}
+              })}</MonacoModelGroup> : <p className="error">{t("courseDetail.testRendererUnavailable")}</p>}
             </section>
           ) : null}
 
@@ -974,6 +971,7 @@ function TestStudentRuntime({
         progressLabel={t("common.operationProgress")}
       />
     </div>
+    </MonacoModelScope>
   );
 }
 

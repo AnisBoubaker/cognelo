@@ -2,6 +2,24 @@ import { describe, expect, it, vi } from "vitest";
 import { createStandaloneActivityDraftHost } from "./activity-response-draft-host";
 
 describe("standalone activity response draft host", () => {
+  it("waits for pending autosaves before restoring the answer", async () => {
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => { finish = resolve; });
+    let saved = { sourceCode: "old" };
+    const client = {
+      load: vi.fn(async () => saved),
+      save: vi.fn(async (state: Record<string, unknown>) => { await pending; saved = state as typeof saved; return state; }),
+      clear: vi.fn().mockResolvedValue(undefined)
+    };
+    const host = createStandaloneActivityDraftHost({ groupActivityId: "assignment", client });
+    const write = host.save({ sourceCode: "latest" });
+    const read = host.load();
+    await Promise.resolve();
+    expect(client.load).not.toHaveBeenCalled();
+    finish();
+    await write;
+    await expect(read).resolves.toEqual({ sourceCode: "latest" });
+  });
   it("loads, saves, and clears through the standalone context", async () => {
     const client = {
       load: vi.fn().mockResolvedValue({ answers: { q1: ["a"] } }),

@@ -1,5 +1,7 @@
 # Browser user flows
 
+`editor-undo.spec.ts` checks actual Monaco undo/redo with persisted answers: fresh restored baselines, slow/failed loading, ordered autosaves during undo and failures, question/file isolation, identical file IDs across questions, reopening/reloading, previous submissions and later attempts, same-tab account changes, and protected templates. Undo history stays in memory and never enters answer writes or browser storage.
+
 `activity-content-access.spec.ts` verifies optional exam-content closure: setting persistence, final-attempt receipts, current exceptions and reopening, restricted histories/solutions/reports/images, released grade totals, compound Test finalization, and installed plugin routes. It uses disposable course data and requires no AI or execution runner.
 
 The Playwright suite covers the platform's critical browser journeys with real API and database integration:

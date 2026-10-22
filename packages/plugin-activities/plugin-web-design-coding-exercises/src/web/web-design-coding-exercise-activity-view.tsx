@@ -152,6 +152,8 @@ type PreviewPaneCopy = {
 };
 
 type StudentWorkspaceCopy = PreviewPaneCopy & {
+  loadingAnswer: string;
+  retryLoadAnswer: string;
   files: string;
   solutionFiles: string;
   starterFiles: string;
@@ -280,6 +282,8 @@ const copyByLocale = {
     passed: "Passed",
     failed: "Failed",
     noRunner: "Tests are not available yet.",
+    loadingAnswer: "Loading saved answer…",
+    retryLoadAnswer: "Retry loading answer",
     noCourse: "Open this exercise from a course to run tests."
   },
   fr: {
@@ -340,6 +344,8 @@ const copyByLocale = {
     passed: "Reussi",
     failed: "Echoue",
     noRunner: "Les tests ne sont pas encore disponibles.",
+    loadingAnswer: "Chargement de la réponse enregistrée…",
+    retryLoadAnswer: "Réessayer de charger la réponse",
     noCourse: "Ouvrez cet exercice depuis un cours pour lancer les tests."
   },
   zh: {
@@ -400,6 +406,8 @@ const copyByLocale = {
     passed: "通过",
     failed: "失败",
     noRunner: "测试暂不可用。",
+    loadingAnswer: "正在加载已保存的答案…",
+    retryLoadAnswer: "重新加载答案",
     noCourse: "请从课程中打开此练习以运行测试。"
   }
 } as const;
@@ -452,7 +460,16 @@ export function WebDesignCodingExerciseActivityView({
   const [expectedResultImageDataUrl, setExpectedResultImageDataUrl] = useState<string | null>(null);
   const [authoringTests, setAuthoringTests] = useState<WebDesignExerciseTestRecord[]>([]);
   const [authoringTestsLoaded, setAuthoringTestsLoaded] = useState(false);
-  const [executionStateLoaded, setExecutionStateLoaded] = useState(!executionStateHost);
+  const [loadedExecutionKey, setLoadedExecutionKey] = useState<string | null>(null);
+  const [draftLoadFailed, setDraftLoadFailed] = useState(false);
+  const [draftReload, setDraftReload] = useState(0);
+  const lastSavedFilesRef = useRef<string | null>(null);
+  const context = executionStateHost?.context;
+  const documentKey = context?.kind === "test_item" ? `${context.parentAttemptId}:${context.testItemId}`
+    : context?.kind === "standalone" ? `${context.groupActivityId}:${context.activityAttemptId ?? "draft"}`
+      : context?.kind === "student_preview" ? context.previewSessionId : activity.id;
+  const executionKey = `${activity.id}:${documentKey}`;
+  const executionStateLoaded = canManage || !executionStateHost || loadedExecutionKey === executionKey;
   const activityConfigKey = useMemo(() => JSON.stringify(activity.config ?? {}), [activity.config]);
   const previousActivityIdRef = useRef(activity.id);
   const referencePreloadActivityIdRef = useRef<string | null>(null);
@@ -521,11 +538,12 @@ export function WebDesignCodingExerciseActivityView({
 
   useEffect(() => {
     if (canManage || !executionStateHost) {
-      setExecutionStateLoaded(true);
       return;
     }
     let cancelled = false;
-    setExecutionStateLoaded(false);
+    setLoadedExecutionKey(null);
+    setDraftLoadFailed(false);
+    setExecutionError("");
     executionStateHost.load()
       .then((saved) => {
         if (cancelled) return;
@@ -534,16 +552,18 @@ export function WebDesignCodingExerciseActivityView({
           files: Array.isArray(saved?.files) ? saved.files : initialConfig.files
         });
         setStarterFiles(nextConfig.files);
+        lastSavedFilesRef.current = JSON.stringify(normalizeWorkspaceFiles(nextConfig.files));
         setActivePath(nextConfig.files[0]?.path ?? "index.html");
+        setLoadedExecutionKey(executionKey);
       })
       .catch((err) => {
-        if (!cancelled) setExecutionError(err instanceof Error ? err.message : copy.noRunner);
-      })
-      .finally(() => {
-        if (!cancelled) setExecutionStateLoaded(true);
+        if (!cancelled) {
+          setExecutionError(err instanceof Error ? err.message : copy.noRunner);
+          setDraftLoadFailed(true);
+        }
       });
     return () => { cancelled = true; };
-  }, [activity.id, canManage, executionStateHost]);
+  }, [activity.id, canManage, executionStateHost, executionKey, draftReload]);
 
   useEffect(() => {
     if (!canManage || !course?.id || !webDesignClient) {
@@ -658,10 +678,7 @@ export function WebDesignCodingExerciseActivityView({
   }, [isFullScreen]);
 
   const normalizedStarterFiles = useMemo(
-    () =>
-      starterFiles
-        .map((file, index) => ({ ...file, path: normalizeWebDesignFilePath(file.path), orderIndex: index }))
-        .sort((left, right) => left.orderIndex - right.orderIndex),
+    () => normalizeWorkspaceFiles(starterFiles),
     [starterFiles]
   );
   const normalizedSolutionFiles = useMemo(
@@ -673,7 +690,11 @@ export function WebDesignCodingExerciseActivityView({
   );
   useEffect(() => {
     if (!canManage && executionStateHost && executionStateLoaded && !readOnly) {
+      const snapshot = JSON.stringify(normalizedStarterFiles);
+      if (lastSavedFilesRef.current === snapshot) return;
+      lastSavedFilesRef.current = snapshot;
       void executionStateHost.save({ files: normalizedStarterFiles }).catch((err) => {
+        if (lastSavedFilesRef.current === snapshot) lastSavedFilesRef.current = null;
         setExecutionError(err instanceof Error ? err.message : copy.noRunner);
       });
     }
@@ -1127,6 +1148,7 @@ export function WebDesignCodingExerciseActivityView({
       <section className="section stack">
         {prompt ? <ExpectedResultPrompt imageDataUrl={expectedResultImageDataUrl} markdown={prompt} /> : null}
         <StudentWorkspace
+          loading={!executionStateLoaded}
           activeFile={activeFile}
           activePath={activePath}
           copy={copy}
@@ -1145,6 +1167,7 @@ export function WebDesignCodingExerciseActivityView({
           deferSubmission={deferSubmission}
           readOnly={readOnly || !executionStateLoaded}
         />
+        {draftLoadFailed ? <button type="button" className="secondary" onClick={() => setDraftReload((value) => value + 1)}>{copy.retryLoadAnswer}</button> : null}
       </section>
 
       {isFullScreen ? (
@@ -1159,6 +1182,7 @@ export function WebDesignCodingExerciseActivityView({
           }}
         >
           <StudentWorkspace
+            loading={!executionStateLoaded}
             activeFile={activeFile}
             activePath={activePath}
             copy={copy}
@@ -1361,6 +1385,7 @@ function ExpectedResultImage({ copy, imageDataUrl, prompt }: { copy: StudentWork
 }
 
 function StudentWorkspace({
+  loading,
   activeFile,
   activePath,
   copy,
@@ -1380,6 +1405,7 @@ function StudentWorkspace({
   deferSubmission,
   readOnly
 }: {
+  loading: boolean;
   activeFile: WebDesignExerciseFile | undefined;
   activePath: string;
   copy: StudentWorkspaceCopy;
@@ -1467,6 +1493,8 @@ function StudentWorkspace({
           {activeFile ? (
             <MonacoCodeEditor
               id={`web-design-student-${fullScreen ? "full-" : ""}${activeFile.id}`}
+              loading={loading}
+              loadingLabel={copy.loadingAnswer}
               value={activeFile.starterCode}
               onChange={(value) => onUpdateFile(activeFile.path, { starterCode: value })}
               language={activeFile.language}
@@ -1482,6 +1510,11 @@ function StudentWorkspace({
       </div>
     </div>
   );
+}
+
+function normalizeWorkspaceFiles(files: readonly WebDesignExerciseFile[]) {
+  return files.map((file, index) => ({ ...file, path: normalizeWebDesignFilePath(file.path), orderIndex: index }))
+    .sort((left, right) => left.orderIndex - right.orderIndex);
 }
 
 function StudentTestResultPanel({

@@ -381,9 +381,19 @@ export function CodingExerciseActivityView({
     aiFeedbackError?: string | null;
   } | null>(null);
   const [workingAction, setWorkingAction] = useState<"run" | "submit" | null>(null);
-  const [executionStateLoaded, setExecutionStateLoaded] = useState(!executionStateHost);
+  const [loadedExecutionKey, setLoadedExecutionKey] = useState<string | null>(null);
+  const [draftLoadFailed, setDraftLoadFailed] = useState(false);
+  const [draftReload, setDraftReload] = useState(0);
+  const [codeResetVersion, setCodeResetVersion] = useState(0);
   const studentWorkspaceRef = useRef<HTMLDivElement | null>(null);
   const activityConfigKey = useMemo(() => JSON.stringify(activity.config ?? {}), [activity.config]);
+  const executionContext = executionStateHost?.context;
+  const executionDocumentKey = executionContext?.kind === "test_item"
+    ? `${executionContext.parentAttemptId}:${executionContext.testItemId}`
+    : executionContext?.kind === "standalone" ? `${executionContext.groupActivityId}:${executionContext.activityAttemptId ?? "draft"}`
+      : executionContext?.kind === "student_preview" ? executionContext.previewSessionId : activity.id;
+  const executionKey = JSON.stringify([activity.id, activityConfigKey, executionDocumentKey, readOnly]);
+  const executionStateLoaded = canManage || !executionStateHost || loadedExecutionKey === executionKey;
   const sampleValidationTests = getReferenceValidationTests(referenceValidationSummary, "sampleTests");
   const hiddenValidationTests = getReferenceValidationTests(referenceValidationSummary, "hiddenTests");
   const templateProjection = buildCodingExerciseStudentTemplateProjectionFromSource(
@@ -502,11 +512,12 @@ export function CodingExerciseActivityView({
 
   useEffect(() => {
     if (canManage || !executionStateHost) {
-      setExecutionStateLoaded(true);
       return;
     }
     let cancelled = false;
-    setExecutionStateLoaded(false);
+    setLoadedExecutionKey(null);
+    setDraftLoadFailed(false);
+    setError("");
     const initialSourceCode = getCodingExerciseInitialStudentSource(
       JSON.parse(activityConfigKey) as Record<string, unknown>
     );
@@ -518,15 +529,16 @@ export function CodingExerciseActivityView({
         if (typeof saved?.sourceCode !== "string" && !readOnly && studentViewModeRef.current !== "previous") {
           await executionStateHost.save({ sourceCode });
         }
+        if (!cancelled) setLoadedExecutionKey(executionKey);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : t("loadHistoryError"));
-      })
-      .finally(() => {
-        if (!cancelled) setExecutionStateLoaded(true);
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : t("loadHistoryError"));
+          setDraftLoadFailed(true);
+        }
       });
     return () => { cancelled = true; };
-  }, [activity.id, activityConfigKey, canManage, executionStateHost, readOnly]);
+  }, [activity.id, activityConfigKey, canManage, executionStateHost, readOnly, executionKey, draftReload]);
 
   useEffect(() => {
     if (!canManage || !codingClient?.listProgrammingLanguages) return;
@@ -1193,6 +1205,7 @@ export function CodingExerciseActivityView({
       await executionStateHost?.clear?.().catch(() => undefined);
       setSubmitExecution(result.execution);
       setEditorCode(alignCodingExerciseStarterCodeToTemplate(config.starterCode, config.studentTemplateSource));
+      setCodeResetVersion((version) => version + 1);
       setRunExecution(null);
       setPreviousAttempts((current) => [
         { submission: result.execution, runs: [...recentRuns].reverse(), aiFeedback: result.aiFeedback ?? null },
@@ -2165,6 +2178,7 @@ export function CodingExerciseActivityView({
                 >
                   <div className="coding-exercise-editor-pane">
                     <MonacoCodeEditor
+                      key={`${executionDocumentKey}:${codeResetVersion}`}
                       id={`coding-exercise-student-${activity.id}`}
                       ariaLabel={activity.title || t("starterCode")}
                       value={editorCode}
@@ -2173,9 +2187,12 @@ export function CodingExerciseActivityView({
                       height="100%"
                       minHeight={isWorkspaceFullScreen ? 0 : 520}
                       readOnly={readOnly || !executionStateLoaded}
+                      loading={!executionStateLoaded}
+                      loadingLabel={t("loadingAnswer")}
                       readOnlyPrefix={templateProjection.readOnlyPrefix}
                       readOnlySuffix={templateProjection.readOnlySuffix}
                     />
+                    {draftLoadFailed ? <button type="button" className="secondary" onClick={() => setDraftReload((value) => value + 1)}>{t("retryLoadAnswer")}</button> : null}
                   </div>
 
                   {!deferSubmission ? (

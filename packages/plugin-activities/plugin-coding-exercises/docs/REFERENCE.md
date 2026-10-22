@@ -289,3 +289,7 @@ Submission, review, and other dated UI records use the shared effective course t
 ## Restricted student review
 
 The optional [core content-closure policy](../../../../docs/ACTIVITY_CONTENT_ACCESS.md) governs learner retrieval after permitted attempts end, including compound Test children. Shared dispatch denies closed content/history/file reads and returns only a closure signal after the final submission; teacher inspection and stored evidence remain intact. Released grades do not authorize detailed reports or solutions while closed.
+
+## Editor history and draft restoration
+
+Use the shared [editor undo lifecycle](../../../../docs/EDITOR_UNDO.md). Draft loading gates editing and offers Retry on failure. Restored answers establish a baseline without firing an autosave; real typing, undo, and redo use the existing ordered answer persistence. The Test host retains separate per-question/file models in memory only and disposes them on session/view changes. Reopening or reloading uses the saved answer with empty undo history.

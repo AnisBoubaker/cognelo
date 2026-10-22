@@ -254,6 +254,16 @@ describe("gradebook attempt services", () => {
     expect(mockPrisma.activityAttempt.count).not.toHaveBeenCalled();
   });
 
+  it("keeps an active Test reachable from history even when its last attempt is in progress", async () => {
+    mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({ ...groupActivity, metadata: { assessmentMode: "summative" }, gradebookItem: { ...groupActivity.gradebookItem, attemptLimitMode: "max_attempts", maxAttempts: 2 } });
+    mockPrisma.activityAttempt.count.mockResolvedValue(2);
+    mockPrisma.activityAttempt.findMany.mockResolvedValue([{ id: "active-test", pluginKey: "core:test", metadata: {} }]);
+    await expect(getActivityAttemptAvailability(studentUser, { courseId: "course-1", groupId: "group-1", activityId: "activity-1" })).resolves.toMatchObject({
+      canStart: true, activeAttemptId: "active-test", attemptsRemaining: 0
+    });
+    expect(tx.activityAttempt.create).not.toHaveBeenCalled();
+  });
+
   it("reuses the active timed attempt when the activity plugin creates its submission", async () => {
     mockPrisma.activityAttempt.findMany.mockResolvedValue([{
       id: "timed-attempt-1",
