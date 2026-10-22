@@ -70,11 +70,13 @@ describe("API HTTP helpers", () => {
     expect(listContentTypeDefinitions().map((definition) => definition.key).sort()).toEqual([
       "file",
       "github-repo",
+      "link",
       "text"
     ]);
     expect(listServerContentTypePlugins().map((plugin) => plugin.key).sort()).toEqual([
       "file-content",
       "github-repo-content",
+      "link-content",
       "text-content"
     ]);
   });

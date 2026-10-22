@@ -23,7 +23,7 @@ describe("Safe Exam Browser assignment metadata", () => {
   it("does not probe protected submission history from the ordinary course overview", () => {
     expect(groupPageSource).toContain("!assignmentRequiresSafeExamBrowser(assignment.metadata)");
     expect(groupPageSource).toContain(
-      "(!assignment.availableFrom || new Date(assignment.availableFrom).getTime() <= Date.now())"
+      "(!assignment.availableFrom || new Date(assignment.availableFrom).getTime() <= serverNow())"
     );
   });
 
