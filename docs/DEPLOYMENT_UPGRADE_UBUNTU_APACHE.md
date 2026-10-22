@@ -45,31 +45,21 @@ curl --fail https://instance1.example.com/api/health
 
 Stop and investigate if the current release is not the expected old tag or the instance is unhealthy before the upgrade.
 
-## 1. Read the release notes, then fetch the tag
+## 1. Read the release notes and private upgrade checklist, then fetch the tag
 
-Every production tag must have published GitHub Release notes with an **Upgrade from the previous release** section. Release authors—not production operators—are responsible for reviewing the code changes and identifying everything that affects an upgrade.
+Public GitHub Release notes contain only **Highlights**, **Fixed**, **Database migrations** (Yes/No and how to apply them), and **Environment variables** when they changed. Use [RELEASE_NOTES_TEMPLATE.md](RELEASE_NOTES_TEMPLATE.md). Do not publish approval names/dates, rehearsal results, validation narratives, inventories, or deployment procedures in release notes.
 
-The upgrade section must state:
+The release author must separately prepare a private operator checklist covering:
 
-- the exact previous tag(s) from which the instructions apply;
-- whether downtime is required and its expected duration;
-- whether the normal PostgreSQL backup in this guide is sufficient;
-- all database migrations, whether they run automatically, their expected duration, and whether they are backward-compatible;
-- every environment variable added, changed, renamed, or removed, with exact operator action;
-- any persistent-storage layout, permission, backup, or media-maintenance change;
-- every manual command required on the application host;
-- whether systemd, Apache, Ubuntu packages, Node.js, PostgreSQL, or filesystem permissions must change;
-- whether the sandbox must be updated and the exact runner, Compose, Judge0, Redis, PostgreSQL, seccomp, or WireGuard steps;
-- plugin activation, deactivation, backup/restore, or data-conversion requirements;
-- required post-migration/backfill jobs and how to verify completion;
-- release-specific smoke tests; and
-- whether code-only rollback is safe or a database restore is required.
+- the supported previous tag and approved target revision;
+- backups, downtime, storage, and schema compatibility;
+- environment, host, service, runner, and sandbox changes;
+- plugin actions and post-upgrade jobs;
+- smoke tests, rollback, and private validation evidence.
 
-Each category must contain explicit instructions or the word **None**. “Review the diff,” “update configuration as needed,” or similar language is not an acceptable substitute.
+Public release notes do not replace that checklist. If required migration instructions or the private checklist are missing, stop and have the release author complete the appropriate record. Do not infer operational requirements during a production upgrade.
 
-Use [RELEASE_NOTES_TEMPLATE.md](RELEASE_NOTES_TEMPLATE.md) when publishing a release. If the GitHub Release is missing, its upgrade section is incomplete, or it does not explicitly support the currently installed tag, **stop**. Do not ask the production operator to infer upgrade requirements from commits or changed files. Have the release author correct the notes before deployment.
-
-Read the complete release notes before connecting to production. Copy the release-specific upgrade checklist into the maintenance record and check off each instruction as it is performed.
+Read both records before connecting to production, and track operational completion in the private maintenance record.
 
 Before applying any environment changes, create the protected upgrade backup directory and preserve the current application `.env`:
 
@@ -104,14 +94,14 @@ sudo -u instance1 git -C /srv/cognelo/instance1/repository \
   verify-tag cognelo-0.6.0
 ```
 
-Confirm that the fetched tag matches the release notes and record its commit:
+Confirm that the fetched tag matches the approved revision in the private upgrade checklist and record its commit:
 
 ```bash
 sudo -u instance1 git -C /srv/cognelo/instance1/repository \
   rev-list -n 1 cognelo-0.6.0
 ```
 
-Perform the environment and manual actions listed in the release notes. If a new environment value is required, add it manually to `/srv/cognelo/instance1/shared/.env`. Do not replace the production file with `.env.example`, and do not rotate existing secrets as part of a routine upgrade unless the release notes explicitly require it.
+Apply environment changes listed in the release notes and manual actions recorded in the private upgrade checklist. If a new environment value is required, add it manually to `/srv/cognelo/instance1/shared/.env`. Do not replace the production file with `.env.example`, and do not rotate existing secrets as part of a routine upgrade unless the private upgrade checklist explicitly requires it.
 
 ## 2. Create and build the new release
 
@@ -196,15 +186,15 @@ Re-run `readlink -f` and verify the instance-specific target before migrating.
 
 Do not continue if installation, generation, lint, tests, type checking, or the build fails. Fix the release and publish a new tag rather than editing the production worktree.
 
-## 3. Update the sandbox only when the release notes require it
+## 3. Update the sandbox only when the private upgrade checklist requires it
 
-The release notes must say either **Sandbox update: None** or provide the exact required procedure. Skip this section when they say `None`.
+The private upgrade checklist must say either **Sandbox update: None** or provide the exact required procedure. Skip this section when it says `None`.
 
 Release authors must evaluate every registered core feature, activity plugin, content-type plugin, shared SDK, runner, infrastructure template, and external-service contract. The upgrade process deliberately does not maintain a hardcoded list of plugin paths: such a list would become incomplete as soon as another plugin adds a sandbox or external dependency.
 
-The commands below are an example for the currently deployed web-design runner. If a release adds or changes another sandbox service, plugin-owned worker, or external dependency, its release notes must provide the complete service-specific procedure instead of asking the operator to adapt this example.
+The commands below are an example for the currently deployed web-design runner. If a release adds or changes another sandbox service, plugin-owned worker, or external dependency, its private upgrade checklist must provide the complete service-specific procedure instead of asking the operator to adapt this example.
 
-If the release notes require an update to the existing web-design runner, use the sandbox server to fetch the same new tag and create its worktree:
+If the private upgrade checklist requires an update to the existing web-design runner, use the sandbox server to fetch the same new tag and create its worktree:
 
 Before changing sandbox runtime configuration, preserve its environment and Judge0 configuration in a root-only directory on the sandbox host:
 
@@ -267,7 +257,7 @@ sudo docker compose --env-file .env -f sandbox.compose.yml \
 curl --fail http://10.80.0.2:3456/health
 ```
 
-If the release notes specify changes to `sandbox.compose.yml`, `judge0.conf`, Playwright, Judge0, Redis, the sandbox PostgreSQL version, seccomp, ports, or WireGuard, follow those exact release-specific steps. Do not overwrite the persistent runtime `.env` or `judge0.conf`, because they contain instance-specific settings and secrets. Do not use mutable image tags such as `latest`.
+If the private upgrade checklist specifies changes to `sandbox.compose.yml`, `judge0.conf`, Playwright, Judge0, Redis, the sandbox PostgreSQL version, seccomp, ports, or WireGuard, follow those exact release-specific steps. Do not overwrite the persistent runtime `.env` or `judge0.conf`, because they contain instance-specific settings and secrets. Do not use mutable image tags such as `latest`.
 
 When a release changes the Judge0 language configuration, copy both versioned files from that release, validate them, stop workers, run the configuration once, and recreate the workers only after it succeeds:
 
@@ -343,7 +333,7 @@ test "$(readlink -f /srv/cognelo/instance1/deployments/cognelo-0.6.0/storage)" =
 
 If the installation's normal storage backup or filesystem snapshot is overdue, take it through the existing backup system before continuing. Do not create an extra full copy merely for every routine tagged upgrade.
 
-When release notes introduce rich-text media, set `MEDIA_STORAGE_ROOT="./storage/media"` (or retain the default), verify the instance account owns `shared/storage`, and install/enable the instance-specific media garbage-collection service and timer from the initial deployment runbook. Run `npm run media:gc` first and review its counts; never delete files directly from the content-addressed tree.
+When the private upgrade checklist introduces rich-text media, set `MEDIA_STORAGE_ROOT="./storage/media"` (or retain the default), verify the instance account owns `shared/storage`, and install/enable the instance-specific media garbage-collection service and timer from the initial deployment runbook. Run `npm run media:gc` first and review its counts; never delete files directly from the content-addressed tree.
 
 ## 5. Run migrations and activate the release
 

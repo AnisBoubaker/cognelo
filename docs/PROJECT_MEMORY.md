@@ -4,6 +4,7 @@ This file is intentionally short. It records only cross-cutting decisions that a
 
 ## Platform Invariants
 
+- Public release notes contain only Highlights, Fixed, Database migrations (Yes/No and commands), and Environment variables only when changed. Keep bullets short and omit approvals, names/dates, rehearsal reports, and deployment narratives.
 - Public deployment docs and release notes contain generic examples only. Actual infrastructure inventory and per-environment evidence belong in private operator notes outside Git; an optional local .git/info/cognelo-operations pointer locates them.
 
 - [Application time](APPLICATION_TIME.md): administrators choose one instance timezone for display and scheduling. Persist UTC instants; use shared explicit-zone formatters/converters, never browser timezone defaults. Availability and deadlines remain server-clock decisions. Client availability displays use a server-synchronized monotonic clock; open date forms retain their loaded timezone until reload.

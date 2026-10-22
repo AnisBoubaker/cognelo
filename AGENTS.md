@@ -47,3 +47,5 @@ Before starting a new task, evaluate whether this is a totally new feature or on
 ## Deployment privacy
 
 Keep actual deployment hostnames, IPs, account/database names, inventories, and environment-specific incident or rehearsal evidence out of tracked files, commit messages, and public release notes. Use reserved example domains and generic instance identifiers in public runbooks. Keep operator inventory outside the checkout; the local untracked .git/info/cognelo-operations pointer may identify its location for authorized operations.
+
+Public release notes follow docs/RELEASE_NOTES_TEMPLATE.md: only Highlights, Fixed, Database migrations (Yes/No and commands), and Environment variables when changed. Keep them concise; do not add approvals, rehearsal/validation narratives, or deployment sections. Retain operational detail privately.
