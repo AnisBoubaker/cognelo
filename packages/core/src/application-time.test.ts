@@ -26,4 +26,12 @@ describe("instance timezone", () => {
     expect(db.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { timeZone: "America/Toronto", updatedById: "u" } }));
     expect((await getApplicationTimeSettings(user(["admin"]))).timeZones).toContain("America/Toronto");
   });
+  it("defaults course timezone permission off and lets only administrators enable it", async () => {
+    expect((await getApplicationTimeSettings(user(["admin"]))).allowCourseTimeZone).toBe(false);
+    await expect(updateApplicationTimeSettings(user(["teacher"]), { timeZone: "UTC", allowCourseTimeZone: true })).rejects.toMatchObject({ status: 403 });
+    expect(db.upsert).not.toHaveBeenCalled();
+    await updateApplicationTimeSettings(user(["admin"]), { timeZone: "UTC", allowCourseTimeZone: true });
+    expect(db.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { timeZone: "UTC", allowCourseTimeZone: true, updatedById: "u" } }));
+    await expect(updateApplicationTimeSettings(user(["admin"]), { timeZone: "UTC", allowCourseTimeZone: "true" })).rejects.toThrow();
+  });
 });

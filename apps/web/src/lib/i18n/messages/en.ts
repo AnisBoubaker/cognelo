@@ -3,10 +3,15 @@ import type { MessageTree } from "../types";
 
 export const enMessages = {
   timeSettings: {
+    "courseHelp": "Used for dates and scheduling throughout this course, for staff and students.",
+    "inheritZone": "Use application timezone ({zone})",
+    "courseZone": "Course timezone",
+    "courseTimeZoneHelp": "Courses use the application timezone by default. When disabled, all courses use the application timezone; saved course choices are retained.",
+    "allowCourseTimeZone": "Allow teachers (course owners) to set a course timezone.",
     "title": "Date and time",
     "navText": "Instance timezone and scheduling",
     "zone": "Timezone",
-    "help": "All dates, times, and scheduling use this timezone. Activity access and deadlines are enforced using the server clock.",
+    "help": "Dates and scheduling use this timezone by default. Activity access and deadlines are enforced using the server clock.",
     "reloadHelp": "Open pages use the new timezone after reloading. Existing scheduled instants do not move.",
     "saved": "Timezone saved.",
     "loadError": "Unable to load the server time and timezone. Please retry.",

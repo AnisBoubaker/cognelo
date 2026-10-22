@@ -121,4 +121,4 @@ The composite regrade handler reconciles the original response against current a
 
 ### Timestamp display
 
-Submission, review, and other dated UI records use the shared administrator-configured instance timezone. Stored instants remain UTC; plugin UI must not infer a timezone from the learner device. See [Application time](../../../../docs/APPLICATION_TIME.md) for the shared context and clock/security contract.
+Submission, review, and other dated UI records use the shared effective course timezone: the administrator’s application default unless a course owner has selected an allowed override. Stored instants remain UTC; plugin UI must not infer a timezone from the learner device. See [Application time](../../../../docs/APPLICATION_TIME.md) for the shared context and clock/security contract.

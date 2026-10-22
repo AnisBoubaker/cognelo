@@ -49,4 +49,4 @@ Load only the topic relevant to the change.
 
 When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an invariant changed, and the relevant detailed section or implementation plan.
 
-Displayed submission and review timestamps use the shared [administrator-configured instance timezone](../../../docs/APPLICATION_TIME.md).
+Displayed submission and review timestamps use the shared [effective course timezone (application default unless overridden)](../../../docs/APPLICATION_TIME.md).

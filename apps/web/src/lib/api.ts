@@ -1,4 +1,6 @@
 import type {
+  ApplicationTimeSettingsDto,
+  CourseTimeSettingsDto,
   MyStudentGroupingDto,
   StudentGroupingDto,
   StudentGroupingInput,
@@ -1538,8 +1540,10 @@ export function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   applicationTime: () => request<{ timeZone: string; serverNow: string }>("/application-time"),
-  applicationTimeSettings: () => request<{ timeZone: string; serverNow: string; timeZones: string[] }>("/settings/time"),
-  updateApplicationTimeSettings: (timeZone: string) => request<{ timeZone: string; serverNow: string }>("/settings/time", { method: "PUT", body: JSON.stringify({ timeZone }) }),
+  applicationTimeSettings: () => request<ApplicationTimeSettingsDto>("/settings/time"),
+  updateApplicationTimeSettings: (timeZone: string, allowCourseTimeZone?: boolean) => request<ApplicationTimeSettingsDto>("/settings/time", { method: "PUT", body: JSON.stringify({ timeZone, allowCourseTimeZone }) }),
+  courseTimeSettings: (courseId: string) => request<CourseTimeSettingsDto>(`/courses/${courseId}/time`),
+  updateCourseTimeSettings: (courseId: string, timeZone: string | null) => request<CourseTimeSettingsDto>(`/courses/${courseId}/time`, { method: "PUT", body: JSON.stringify({ timeZone }) }),
   login: (email: string, password: string) =>
     request<{ user: CurrentUser }>("/auth/login", {
       method: "POST",

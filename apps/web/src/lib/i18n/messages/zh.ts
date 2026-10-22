@@ -3,10 +3,15 @@ import type { MessageTree } from "../types";
 
 export const zhMessages = {
   timeSettings: {
+    "courseHelp": "用于本课程中教师和学生看到的日期与日程安排。",
+    "inheritZone": "使用应用时区（{zone}）",
+    "courseZone": "课程时区",
+    "courseTimeZoneHelp": "课程默认使用应用时区。关闭后，所有课程都使用应用时区，但会保留已保存的课程时区选择。",
+    "allowCourseTimeZone": "允许教师（课程所有者）设置课程时区。",
     "title": "日期和时间",
     "navText": "实例时区与日程安排",
     "zone": "时区",
-    "help": "所有日期、时间和日程安排均使用此时区。活动访问和截止时间由服务器时钟控制。",
+    "help": "日期和日程安排默认使用此时区。活动访问和截止时间由服务器时钟控制。",
     "reloadHelp": "已打开的页面重新加载后使用新时区。现有日程对应的实际时刻不会改变。",
     "saved": "时区已保存。",
     "loadError": "无法加载服务器时间和时区，请重试。",

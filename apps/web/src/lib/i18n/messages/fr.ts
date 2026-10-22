@@ -3,10 +3,15 @@ import type { MessageTree } from "../types";
 
 export const frMessages = {
   timeSettings: {
+    "courseHelp": "Utilisé pour les dates et horaires de ce cours, pour le personnel et les étudiants.",
+    "inheritZone": "Utiliser le fuseau de l’application ({zone})",
+    "courseZone": "Fuseau horaire du cours",
+    "courseTimeZoneHelp": "Les cours utilisent le fuseau de l’application par défaut. Si cette option est désactivée, tous les cours utilisent ce fuseau ; leurs choix enregistrés sont conservés.",
+    "allowCourseTimeZone": "Autoriser les enseignants (propriétaires du cours) à définir le fuseau horaire de leur cours.",
     "title": "Date et heure",
     "navText": "Fuseau horaire et planification",
     "zone": "Fuseau horaire",
-    "help": "Les dates, heures et horaires utilisent ce fuseau. Le serveur contrôle l’accès aux activités et les échéances avec sa propre horloge.",
+    "help": "Les dates et horaires utilisent ce fuseau par défaut. Le serveur contrôle l’accès aux activités et les échéances avec sa propre horloge.",
     "reloadHelp": "Les pages ouvertes utilisent le nouveau fuseau après rechargement. Les instants déjà planifiés ne sont pas déplacés.",
     "saved": "Fuseau horaire enregistré.",
     "loadError": "Impossible de charger l’heure et le fuseau du serveur. Veuillez réessayer.",

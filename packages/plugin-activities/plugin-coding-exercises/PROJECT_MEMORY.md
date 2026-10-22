@@ -40,4 +40,4 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
 - [Compound Test timeout recovery](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#timeout-recovery) preserves the saved response without a plugin execution or invented grade. Later teacher-triggered [Test regrading](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-automatic-regrading) evaluates every child, including already-graded children, while preserving timing, audit evidence, and grade-release gates. AI/manual grade aggregation must not trigger automatic reruns.
 
-- Display timestamps through the shared application-time context and explicit-zone formatters; the browser timezone is not a user preference. See [Application time](../../../docs/APPLICATION_TIME.md).
+- Display timestamps through the shared application-time context (the effective course zone within course pages) and explicit-zone formatters; the browser timezone is not a user preference. See [Application time](../../../docs/APPLICATION_TIME.md).

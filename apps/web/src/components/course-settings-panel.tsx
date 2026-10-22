@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { EditActionBar, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import { CourseForm } from "@/components/course-form";
+import { CourseTimeSettings } from "@/components/course-time-settings";
 import { SettingsSectionNav } from "@/components/settings-nav";
 import { api, type AiAgentConnection, type Course, type Subject } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -142,6 +143,8 @@ export function CourseSettingsPanel({
             />
           </section>
         ) : null}
+
+        {activeSection === "general" ? <CourseTimeSettings /> : null}
 
         {activeSection === "ai" ? (
           <section className="section stack">

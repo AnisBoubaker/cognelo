@@ -91,4 +91,4 @@ When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an inva
 
 Expired compound Test responses can be [recovered from teacher results](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#timeout-recovery) without running a grader. The teacher’s automatic-grading action reruns every child of a submitted Test against current grading rules, with measured progress for individual and whole-class batches. See [Test regrading](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-automatic-regrading).
 
-Displayed submission and review timestamps use the shared [administrator-configured instance timezone](../../../docs/APPLICATION_TIME.md).
+Displayed submission and review timestamps use the shared [effective course timezone (application default unless overridden)](../../../docs/APPLICATION_TIME.md).

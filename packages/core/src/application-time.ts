@@ -10,16 +10,20 @@ export async function getApplicationTime() {
 export async function getApplicationTimeSettings(user: CurrentUser) {
   if (!isAdmin(user)) throw forbidden();
   const snapshot = await getApplicationTime();
-  return { ...snapshot, timeZones: [...new Set(["UTC", snapshot.timeZone, "America/Toronto", ...Intl.supportedValuesOf("timeZone")])].sort() };
+  const settings = await prisma.applicationSettings.findUnique({ where: { id: "instance" }, select: { allowCourseTimeZone: true } });
+  return { ...snapshot, allowCourseTimeZone: settings?.allowCourseTimeZone ?? false, timeZones: getTimeZoneChoices(snapshot.timeZone) };
+}
+export function getTimeZoneChoices(...zones: string[]) {
+  return [...new Set(["UTC", ...zones, ...Intl.supportedValuesOf("timeZone")])].sort();
 }
 export async function updateApplicationTimeSettings(user: CurrentUser, input: unknown) {
   if (!isAdmin(user)) throw forbidden();
-  const { timeZone } = ApplicationTimeSettingsSchema.parse(input);
+  const { timeZone, allowCourseTimeZone } = ApplicationTimeSettingsSchema.parse(input);
   const canonical = new Intl.DateTimeFormat("en", { timeZone }).resolvedOptions().timeZone;
   await prisma.applicationSettings.upsert({
     where: { id: "instance" },
-    create: { id: "instance", timeZone: canonical, updatedById: user.id },
-    update: { timeZone: canonical, updatedById: user.id }
+    create: { id: "instance", timeZone: canonical, allowCourseTimeZone, updatedById: user.id },
+    update: { timeZone: canonical, allowCourseTimeZone, updatedById: user.id }
   });
-  return getApplicationTime();
+  return getApplicationTimeSettings(user);
 }

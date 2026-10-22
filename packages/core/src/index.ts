@@ -38,3 +38,4 @@ export * from "./test-timeout-recovery";
 export * from "./users";
 
 export * from "./application-time";
+export * from "./course-time";

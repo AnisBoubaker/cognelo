@@ -587,4 +587,4 @@ The root README and project memory remain concise entry points. Detailed platfor
 
 ## Instance timezone
 
-Administrators configure **Settings → Date and time**. Date displays and scheduling use the saved IANA timezone, while UTC instants and server-side availability/deadline enforcement remain authoritative. See [Application timezone and server time](../APPLICATION_TIME.md) for API, migration, DST, and open-page behavior.
+Administrators configure **Settings → Date and time**, including the default-off permission for course owners to choose a course timezone. Courses inherit the application zone until customized; the effective zone applies throughout course pages for staff and learners. UTC instants and server-side availability/deadline enforcement remain authoritative. See [Application timezone and server time](../APPLICATION_TIME.md) for API, migration, inheritance, DST, and open-page behavior.
