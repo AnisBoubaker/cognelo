@@ -405,6 +405,8 @@ The Test opens as one assigned activity. The shell provides:
 - read-only submitted state;
 - released overall grade and permitted item feedback.
 
+The current numbered exercise button uses `aria-current="step"` and an explicit dark fill with white text. Its selected appearance is independent of ordinary primary/secondary action styling and follows numbered, Previous/Next, and review-return navigation in both learner and teacher Student view.
+
 When a new attempt is blocked by grade release, the due date, or the attempt limit, the student Test shell remains visible with a disabled start action and a localized explanation. The assigned-activity tab shell must not hide the Test renderer merely because attempt availability is false.
 
 No child activity should expose standalone submit, attempt-limit, grade-release, or assignment controls.

@@ -3472,6 +3472,17 @@ button:hover > .disclosure-indicator {
   width: min(100%, 1840px);
 }
 
+.test-activity-step {
+  min-width: var(--button-height);
+  font-variant-numeric: tabular-nums;
+}
+
+.test-activity-step[aria-current="step"] {
+  background: var(--brand-ink);
+  border-color: var(--brand-ink);
+  color: #fff;
+}
+
 .test-report-summary {
   background: linear-gradient(145deg, color-mix(in srgb, var(--brand-blue), white 96%), #fff 58%, color-mix(in srgb, var(--brand-teal), white 96%));
   border: 1px solid color-mix(in srgb, var(--brand-blue), white 78%);

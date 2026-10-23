@@ -903,7 +903,7 @@ function TestStudentRuntime({
                 return (
                   <button
                     aria-current={selectedIndex === index ? "step" : undefined}
-                    className={selectedIndex === index ? "button" : "button secondary"}
+                    className="button test-activity-step"
                     disabled={sequentiallyLocked || busy || pendingSaveCount > 0}
                     key={item.id}
                     type="button"
