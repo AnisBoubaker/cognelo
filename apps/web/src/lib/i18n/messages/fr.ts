@@ -194,6 +194,11 @@ export const frMessages = {
       time: "Heure"
     },
     activityMessenger: {
+      deleted: "Supprimé",
+      deleteMessage: "Supprimer le message",
+      deleteBroadcast: "Supprimer la diffusion pour tous les destinataires",
+      deleteError: "Le message n’a pas pu être supprimé.",
+
       readOnly: "Vous pouvez consulter cette discussion. L’envoi de messages est actuellement indisponible.",
       studentHelp: "Messages diffusés et conversation privée avec vos enseignants.",
       privateHelp: "Conversation privée avec cet étudiant.",

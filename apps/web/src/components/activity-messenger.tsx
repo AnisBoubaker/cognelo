@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useActivityMessagingStatus } from "@/components/activity-content-boundary";
 import { ActivityLiveControlPortal } from "@/components/activity-live-controls";
-import { ActivityChatComposer, ActivityChatDialog, ActivityChatThread, mergeChatMessages } from "@/components/activity-chat";
+import { ActivityChatComposer, ActivityChatDialog, ActivityChatThread } from "@/components/activity-chat";
 import { AppIcon } from "@/components/app-icon";
+import { mergeChatMessages } from "@/lib/activity-chat-history";
 import { api, type LearnerActivityConversation } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
@@ -30,7 +31,7 @@ export function ActivityMessenger({ courseId, groupId, activityId, enabled, hist
       if (requestGeneration !== generation.current) return;
       if (!result.conversation) { setConversation(null); setOpen(false); return; }
       const next = result.conversation;
-      setConversation((old) => ({ ...next, messages: mergeChatMessages(old?.messages ?? [], next.messages),
+      setConversation((old) => ({ ...next, messages: mergeChatMessages(old?.messages ?? [], next.messages, next.deletedMessages),
         hasMore: !before && old && old.messages.length > next.messages.length ? old.hasMore : next.hasMore }));
       setError("");
     } catch (cause) {

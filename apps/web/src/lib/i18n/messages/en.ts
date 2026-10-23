@@ -194,6 +194,11 @@ export const enMessages = {
       time: "Time"
     },
     activityMessenger: {
+      deleted: "Deleted",
+      deleteMessage: "Delete message",
+      deleteBroadcast: "Delete broadcast for all recipients",
+      deleteError: "The message could not be deleted.",
+
       readOnly: "You can read this discussion. Sending messages is currently unavailable.",
       studentHelp: "Broadcasts and your private conversation with your teachers.",
       privateHelp: "Private conversation with this student.",

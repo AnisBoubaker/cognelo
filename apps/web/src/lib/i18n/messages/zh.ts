@@ -194,6 +194,11 @@ export const zhMessages = {
       time: "时间"
     },
     activityMessenger: {
+      deleted: "已删除",
+      deleteMessage: "删除消息",
+      deleteBroadcast: "为所有接收者删除此广播",
+      deleteError: "无法删除消息。",
+
       readOnly: "您可以查看此对话。目前无法发送消息。",
       studentHelp: "广播消息以及您与教师的私密对话。",
       privateHelp: "与该学生的私密对话。",

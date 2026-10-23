@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppIcon } from "@/components/app-icon";
-import { ActivityChatComposer, ActivityChatDialog, ActivityChatThread, mergeChatMessages } from "@/components/activity-chat";
+import { ActivityChatComposer, ActivityChatDialog, ActivityChatThread } from "@/components/activity-chat";
+import { applyChatDeletion, mergeChatMessages } from "@/lib/activity-chat-history";
 import { api, type ActivityMessagingOverview, type StaffActivityConversation } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
@@ -17,7 +18,7 @@ export function ActivityBroadcastDialog({ courseId, activityId, groupId, onClose
     const result = await api.activityMessagingOverview(courseId, activityId, groupId);
     setError("");
     setOverview((old) => ({ ...result.messaging,
-      broadcasts: mergeChatMessages(old?.broadcasts ?? [], result.messaging.broadcasts),
+      broadcasts: mergeChatMessages(old?.broadcasts ?? [], result.messaging.broadcasts, result.messaging.deletedBroadcasts),
       hasMoreBroadcasts: old && old.broadcasts.length > result.messaging.broadcasts.length ? old.hasMoreBroadcasts : result.messaging.hasMoreBroadcasts
     }));
   }, [activityId, courseId, groupId]);
@@ -31,7 +32,7 @@ export function ActivityBroadcastDialog({ courseId, activityId, groupId, onClose
     if (!overview?.broadcasts[0]) return;
     try {
       const result = await api.activityMessagingOverview(courseId, activityId, groupId, overview.broadcasts[0].id);
-      setOverview((old) => old ? { ...old, broadcasts: mergeChatMessages(old.broadcasts, result.messaging.broadcasts), hasMoreBroadcasts: result.messaging.hasMoreBroadcasts } : old);
+      setOverview((old) => old ? { ...old, broadcasts: mergeChatMessages(old.broadcasts, result.messaging.broadcasts, result.messaging.deletedBroadcasts), hasMoreBroadcasts: result.messaging.hasMoreBroadcasts } : old);
     } catch (cause) { setError(cause instanceof Error ? cause.message : t("activityMessenger.loadError")); }
   }
   return <ActivityChatDialog wide onClose={onClose}>
@@ -55,7 +56,10 @@ export function ActivityBroadcastDialog({ courseId, activityId, groupId, onClose
       <div className="activity-chat-panel" id="activity-chat-panel" role="tabpanel" aria-labelledby={`chat-tab-${selected}`}>
         {selected === "broadcast" ? <>
           <div className="activity-chat-context"><strong>{t("activityMessenger.broadcastTab")}</strong><small className="muted">{t("activityMessenger.allStudents", { count: overview?.recipientCount ?? 0 })} · {t("activityMessenger.activeAttempts", { count: overview?.activeRecipientCount ?? 0 })}</small></div>
-          <ActivityChatThread messages={(overview?.broadcasts ?? []).map((broadcast) => ({ ...broadcast, broadcastId: broadcast.id, senderKind: "staff", attemptNumber: 0 }))} ownKind="staff" hasMore={overview?.hasMoreBroadcasts} onLoadMore={olderBroadcasts} loading={!overview && !error} empty={t("activityMessenger.noBroadcasts")} />
+          <ActivityChatThread messages={(overview?.broadcasts ?? []).map((broadcast) => ({ ...broadcast, broadcastId: broadcast.id, senderKind: "staff", attemptNumber: 0 }))} ownKind="staff" onDelete={async (message) => {
+            const deletion = await api.deleteActivityMessage(courseId, activityId, { broadcastId: message.broadcastId! });
+            setOverview((old) => old ? { ...old, broadcasts: applyChatDeletion(old.broadcasts, deletion) } : old);
+          }} hasMore={overview?.hasMoreBroadcasts} onLoadMore={olderBroadcasts} loading={!overview && !error} empty={t("activityMessenger.noBroadcasts")} />
           {overview?.broadcasts.at(-1) ? <small className="muted activity-chat-delivery">{t("activityMessenger.deliverySummary", { recipients: overview.broadcasts.at(-1)!.recipientCount, read: overview.broadcasts.at(-1)!.readCount })}</small> : null}
           {overview?.enabled && overview.recipientCount ? <ActivityChatComposer broadcast onSend={async (body) => { await api.sendActivityBroadcast(courseId, activityId, body, groupId); void refresh().catch(() => undefined); }} /> : <p className="muted activity-chat-notice">{t("activityMessenger.disabled")}</p>}
         </> : <StaffActivityChat key={selected} courseId={courseId} activityId={activityId} participantId={selected} updateKey={updateKey} onRead={refresh} />}
@@ -77,7 +81,7 @@ export function StaffActivityChat({ courseId, activityId, participantId, attempt
     const result = await api.staffActivityConversation(courseId, activityId, participantId, { attemptId, before });
     setError("");
     setConversation((old) => ({ ...result.conversation,
-      messages: mergeChatMessages(old?.messages ?? [], result.conversation.messages),
+      messages: mergeChatMessages(old?.messages ?? [], result.conversation.messages, result.conversation.deletedMessages),
       hasMore: !before && old && old.messages.length > result.conversation.messages.length ? old.hasMore : result.conversation.hasMore
     }));
     const last = result.conversation.messages.at(-1)?.id;
@@ -93,7 +97,11 @@ export function StaffActivityChat({ courseId, activityId, participantId, attempt
   }, [refresh, t, updateKey]);
   return <>
     <div className="activity-chat-context"><strong>{conversation?.studentName ?? t("common.loading")}</strong><small className="muted">{t("activityMessenger.privateHelp")}</small></div>
-    <ActivityChatThread messages={conversation?.messages ?? []} ownKind="staff" loading={!conversation && !error} hasMore={conversation?.hasMore} onLoadMore={async () => {
+    <ActivityChatThread messages={conversation?.messages ?? []} ownKind="staff" onDelete={async (message) => {
+      const deletion = await api.deleteActivityMessage(courseId, activityId, message.broadcastId ? { broadcastId: message.broadcastId } : { messageId: message.id });
+      setConversation((old) => old ? { ...old, messages: applyChatDeletion(old.messages, deletion) } : old);
+      void onReadRef.current?.().catch(() => undefined);
+    }} loading={!conversation && !error} hasMore={conversation?.hasMore} onLoadMore={async () => {
       try { await refresh(conversation?.messages[0]?.id); } catch (cause) { setError(cause instanceof Error ? cause.message : t("activityMessenger.loadError")); }
     }} />
     {conversation?.canSend && !attemptId && !readOnly ? <ActivityChatComposer onSend={async (body) => { await api.sendStaffActivityReply(courseId, activityId, participantId, body); void refresh().catch(() => undefined); }} /> : <p className="muted activity-chat-notice">{t("activityMessenger.readOnly")}</p>}

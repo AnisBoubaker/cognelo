@@ -5,10 +5,12 @@ const mocks = vi.hoisted(() => ({
   getOverview: vi.fn(),
   getStatus: vi.fn(),
   sendBroadcast: vi.fn(),
+  deleteMessage: vi.fn(),
   requireUser: vi.fn()
 }));
 
 vi.mock("@cognelo/core", () => ({
+  deleteActivityMessage: mocks.deleteMessage,
   getActivityMessagingStatus: mocks.getStatus,
   getActivityMessagingOverview: mocks.getOverview,
   sendActivityBroadcast: mocks.sendBroadcast
@@ -21,7 +23,7 @@ vi.mock("@/lib/http", () => ({
   requireUser: mocks.requireUser
 }));
 
-const { GET, POST } = await import("./route");
+const { GET, POST, DELETE } = await import("./route");
 const params = { params: Promise.resolve({ courseId: "course-1", activityId: "activity-1" }) };
 
 describe("teacher activity messaging route", () => {
@@ -48,6 +50,15 @@ describe("teacher activity messaging route", () => {
     const response = await GET(new NextRequest("http://test.local/messages?summary=1&groupId=group-1"), params);
     expect(await response.json()).toEqual({ messaging: { enabled: true, version: "revision" } });
     expect(mocks.getOverview).not.toHaveBeenCalled();
+  });
+
+  it("deletes a validated target through the authenticated core boundary", async () => {
+    mocks.deleteMessage.mockResolvedValue({ messageId: "reply", deletedAt: "now" });
+    const request = (data: object) => new NextRequest("http://test.local/messages", { method: "DELETE", body: JSON.stringify(data) });
+    expect((await DELETE(request({ messageId: "reply" }), params)).status).toBe(200);
+    expect(mocks.deleteMessage).toHaveBeenCalledWith({ id: "teacher-1", roles: ["teacher"] }, "course-1", "activity-1", { messageId: "reply" });
+    await expect(DELETE(request({ messageId: "reply", senderUserId: "someone-else" }), params)).rejects.toThrow();
+    expect(mocks.deleteMessage).toHaveBeenCalledTimes(1);
   });
 
   it("validates and sends a trimmed broadcast", async () => {

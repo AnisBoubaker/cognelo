@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { ActivityBroadcastMessageInputSchema, RecordIdSchema } from "@cognelo/contracts";
-import { getActivityMessagingStatus, getActivityMessagingOverview, sendActivityBroadcast } from "@cognelo/core";
+import { ActivityMessageDeletionInputSchema, ActivityBroadcastMessageInputSchema, RecordIdSchema } from "@cognelo/contracts";
+import { deleteActivityMessage, getActivityMessagingStatus, getActivityMessagingOverview, sendActivityBroadcast } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; activityId: string }> };
@@ -26,5 +26,14 @@ export async function POST(request: NextRequest, { params }: Params) {
     const groupId = request.nextUrl.searchParams.get("groupId");
     const input = ActivityBroadcastMessageInputSchema.parse(await readJson(request));
     return json(await sendActivityBroadcast(user, courseId, activityId, input.body, groupId), { status: 201 });
+  });
+}
+
+export async function DELETE(request: NextRequest, { params }: Params) {
+  return handleRoute(async () => {
+    const user = await requireUser();
+    const { courseId, activityId } = await params;
+    const input = ActivityMessageDeletionInputSchema.parse(await readJson(request));
+    return json(await deleteActivityMessage(user, courseId, activityId, input));
   });
 }

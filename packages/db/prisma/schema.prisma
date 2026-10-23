@@ -1377,6 +1377,7 @@ model ActivityMessageBroadcast {
   senderName     String
   body           String
   targetGroupIds Json                          @default("[]")
+  deletedAt      DateTime?
   createdAt      DateTime                      @default(now())
   course         Course                        @relation(fields: [courseId], references: [id], onDelete: Cascade)
   activity       Activity                      @relation(fields: [activityId], references: [id], onDelete: Cascade)
@@ -1385,6 +1386,7 @@ model ActivityMessageBroadcast {
 
   @@index([courseId, activityId, createdAt])
   @@index([senderUserId])
+  @@index([courseId, activityId, deletedAt])
 }
 
 model ActivityConversation {
@@ -1423,6 +1425,7 @@ model ActivityConversationMessage {
   senderKind     ActivityConversationSenderKind
   senderName     String
   body           String
+  deletedAt      DateTime?
   createdAt      DateTime                       @default(now())
   conversation   ActivityConversation           @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   broadcast      ActivityMessageBroadcast?      @relation(fields: [broadcastId], references: [id], onDelete: SetNull)
@@ -1431,6 +1434,7 @@ model ActivityConversationMessage {
   @@index([conversationId, createdAt])
   @@index([broadcastId])
   @@index([senderUserId])
+  @@index([conversationId, deletedAt])
 }
 
 model ActivityConversationRead {

@@ -6686,3 +6686,7 @@ button:hover > .disclosure-indicator {
   justify-content: flex-start;
   padding: 10px;
 }
+
+.activity-chat-message-footer { align-items: center; }
+.activity-chat-deleted { font-weight: 700; margin-inline-end: auto; }
+.activity-chat-bubble del { text-decoration-thickness: 1.5px; }

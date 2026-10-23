@@ -194,6 +194,11 @@ export const arMessages = {
       time: "الوقت"
     },
     activityMessenger: {
+      deleted: "محذوفة",
+      deleteMessage: "حذف الرسالة",
+      deleteBroadcast: "حذف البث لجميع المستلمين",
+      deleteError: "تعذر حذف الرسالة.",
+
       readOnly: "يمكنك قراءة هذه المحادثة. إرسال الرسائل غير متاح حاليًا.",
       studentHelp: "رسائل البث ومحادثتك الخاصة مع معلميك.",
       privateHelp: "محادثة خاصة مع هذا الطالب.",

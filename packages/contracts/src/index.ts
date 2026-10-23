@@ -59,6 +59,13 @@ export const ActivityBroadcastMessageInputSchema = z.object({
 }).strict();
 export type ActivityBroadcastMessageInput = z.infer<typeof ActivityBroadcastMessageInputSchema>;
 
+export const ActivityMessageDeletionInputSchema = z.union([
+  z.object({ messageId: RecordIdSchema }).strict(),
+  z.object({ broadcastId: RecordIdSchema }).strict()
+]);
+export type ActivityMessageDeletionInput = z.infer<typeof ActivityMessageDeletionInputSchema>;
+
+
 export const LoginInputSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8)

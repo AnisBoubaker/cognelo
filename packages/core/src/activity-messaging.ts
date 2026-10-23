@@ -1,5 +1,5 @@
 import { Prisma, prisma } from "@cognelo/db";
-import { ActivityBroadcastMessageInputSchema, type CurrentUser } from "@cognelo/contracts";
+import { ActivityBroadcastMessageInputSchema, ActivityMessageDeletionInputSchema, type ActivityMessageDeletionInput, type CurrentUser } from "@cognelo/contracts";
 import { assignmentAttemptExpiresAt, assignmentTimeLimitMinutes, courseActivityMessagingEnabled, courseActivityTwoWayMessagingEnabled } from "./activity-assignment-policy";
 import { assertCanGradeGroup, getActivityMessagingGroupScope } from "./authorization";
 import { assertActivityContentAccess } from "./activity-content-access";
@@ -14,23 +14,24 @@ type ConversationIdentity = { id: string; attemptId: string | null; attemptNumbe
 
 export type ActivityConversationMessageView = {
   id: string; senderKind: "staff" | "student" | "system"; senderName: string;
-  body: string; createdAt: string; broadcastId: string | null; attemptNumber: number;
+  body: string; createdAt: string; broadcastId: string | null; attemptNumber: number; deletedAt: string | null; canDelete: boolean;
 };
 export type LearnerActivityMessagingStatus = { id: string; attemptNumber: number; canSend: boolean; unreadCount: number; version: string };
 export type ActivityMessagingStatus = { enabled: boolean; version: string };
-export type ActivityMessageHistory = { messages: ActivityConversationMessageView[]; hasMore: boolean; unreadCount: number };
+export type ActivityMessageDeletionMarker = { id: string; deletedAt: string };
+export type ActivityMessageHistory = { deletedMessages: ActivityMessageDeletionMarker[]; messages: ActivityConversationMessageView[]; hasMore: boolean; unreadCount: number };
 export type LearnerActivityConversationView = ActivityMessageHistory & {
   id: string; attemptId: string | null; attemptNumber: number; canSend: boolean;
 };
 export type ActivityBroadcastView = {
-  id: string; senderName: string; body: string; createdAt: string; recipientCount: number; readCount: number;
+  id: string; senderName: string; body: string; createdAt: string; recipientCount: number; readCount: number; deletedAt: string | null; canDelete: boolean;
 };
 export type ActivityStudentConversationView = {
   participantId: string; studentName: string; groupId: string; groupTitle: string; unread: boolean;
 };
 export type ActivityMessagingOverview = {
   enabled: boolean; twoWayEnabled: boolean; activeRecipientCount: number; recipientCount: number;
-  broadcasts: ActivityBroadcastView[]; hasMoreBroadcasts: boolean; conversations: ActivityStudentConversationView[];
+  broadcasts: ActivityBroadcastView[]; deletedBroadcasts: ActivityMessageDeletionMarker[]; hasMoreBroadcasts: boolean; conversations: ActivityStudentConversationView[];
 };
 
 export async function getLearnerActivityConversation(
@@ -96,33 +97,35 @@ function participantConversationScope(conversation: ConversationIdentity): Prism
 async function readLearnerConversation(user: CurrentUser, conversation: ConversationIdentity, canSend: boolean, before?: string, summaryOnly = false) {
   if (summaryOnly) {
     const scope = participantConversationScope(conversation);
-    const [last, conversations] = await Promise.all([
+    const [last, conversations, deletion] = await Promise.all([
       prisma.activityConversationMessage.findFirst({ where: { conversation: scope }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true } }),
-      prisma.activityConversation.findMany({ where: scope, select: { id: true, reads: { where: { userId: user.id }, select: { lastReadAt: true } } } })
+      prisma.activityConversation.findMany({ where: scope, select: { id: true, reads: { where: { userId: user.id }, select: { lastReadAt: true } } } }),
+      prisma.activityConversationMessage.aggregate({ where: { conversation: scope }, _max: { deletedAt: true }, _count: { deletedAt: true } })
     ]);
     const unreadCount = conversations.length ? await prisma.activityConversationMessage.count({ where: { AND: [
       { OR: [{ senderUserId: null }, { senderUserId: { not: user.id } }] },
       { OR: conversations.map((entry) => ({ conversationId: entry.id, ...(entry.reads[0] ? { createdAt: { gt: entry.reads[0].lastReadAt } } : {}) })) }
     ] } }) : 0;
     return { conversation: null, messaging: { id: conversation.id, attemptNumber: conversation.attemptNumber, canSend, unreadCount,
-      version: `${conversation.id}:${canSend}:${last?.id ?? ""}` } };
+      version: `${conversation.id}:${canSend}:${last?.id ?? ""}:${deletion._max.deletedAt?.toISOString() ?? ""}:${deletion._count.deletedAt}` } };
   }
   const history = await readMessageHistory(user, participantConversationScope(conversation), before);
   return { conversation: { id: conversation.id, attemptId: conversation.attemptId, attemptNumber: conversation.attemptNumber, canSend, ...history } };
 }
 
-async function readMessageHistory(user: CurrentUser, scope: Prisma.ActivityConversationWhereInput, before?: string): Promise<ActivityMessageHistory> {
+async function readMessageHistory(user: CurrentUser, scope: Prisma.ActivityConversationWhereInput, before?: string, deleteScope?: string[] | null): Promise<ActivityMessageHistory> {
   const cursor = before ? await prisma.activityConversationMessage.findFirst({
     where: { id: before, conversation: scope }, select: { id: true, createdAt: true }
   }) : null;
   if (before && !cursor) throw notFound("Message");
-  const [messages, conversations] = await Promise.all([
+  const [messages, conversations, deletions] = await Promise.all([
     prisma.activityConversationMessage.findMany({
       where: { conversation: scope, ...(cursor ? { OR: [{ createdAt: { lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { lt: cursor.id } }] } : {}) },
-      select: { id: true, senderKind: true, senderName: true, body: true, createdAt: true, broadcastId: true, conversation: { select: { attemptNumber: true } } },
+      select: { id: true, senderKind: true, senderName: true, senderUserId: true, body: true, createdAt: true, deletedAt: true, broadcastId: true, broadcast: { select: { targetGroupIds: true } }, conversation: { select: { attemptNumber: true } } },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: HISTORY_LIMIT + 1
     }),
-    prisma.activityConversation.findMany({ where: scope, select: { id: true, reads: { where: { userId: user.id }, select: { lastReadAt: true } } } })
+    prisma.activityConversation.findMany({ where: scope, select: { id: true, reads: { where: { userId: user.id }, select: { lastReadAt: true } } } }),
+    prisma.activityConversationMessage.findMany({ where: { conversation: scope, deletedAt: { not: null } }, select: { id: true, deletedAt: true } })
   ]);
   const unreadCount = conversations.length ? await prisma.activityConversationMessage.count({
     where: { AND: [
@@ -131,9 +134,12 @@ async function readMessageHistory(user: CurrentUser, scope: Prisma.ActivityConve
         ...(conversation.reads[0] ? { createdAt: { gt: conversation.reads[0].lastReadAt } } : {}) })) }
     ] }
   }) : 0;
-  return { unreadCount, hasMore: messages.length > HISTORY_LIMIT,
-    messages: messages.slice(0, HISTORY_LIMIT).reverse().map(({ conversation, ...message }) => ({
-      ...message, createdAt: message.createdAt.toISOString(), attemptNumber: conversation.attemptNumber
+  return { unreadCount, hasMore: messages.length > HISTORY_LIMIT, deletedMessages: deletions.map((message) => ({ id: message.id, deletedAt: message.deletedAt!.toISOString() })),
+    messages: messages.slice(0, HISTORY_LIMIT).reverse().map(({ conversation, broadcast, senderUserId, ...message }) => ({
+      ...message, deletedAt: message.deletedAt?.toISOString() ?? null,
+      canDelete: deleteScope !== undefined && !message.deletedAt && message.senderKind === "staff" && senderUserId === user.id
+        && (!broadcast || coversBroadcast(deleteScope, broadcast.targetGroupIds)),
+      createdAt: message.createdAt.toISOString(), attemptNumber: conversation.attemptNumber
     })) };
 }
 
@@ -195,20 +201,22 @@ export async function getLearnerActivityMessagingStatus(user: CurrentUser, cours
 export async function getActivityMessagingStatus(user: CurrentUser, courseId: string, activityId: string, groupId?: string | null): Promise<ActivityMessagingStatus> {
   const { enabled, twoWayEnabled, groupScope } = await assertActivityMessagingAccess(user, courseId, activityId, groupId);
   const scope = { courseId, activityId, ...(groupScope ? { groupId: { in: groupScope } } : {}) };
-  const [last, read] = await Promise.all([
+  const [last, read, deletion] = await Promise.all([
     prisma.activityConversationMessage.findFirst({ where: { conversation: scope }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true } }),
-    prisma.activityConversationRead.findFirst({ where: { conversation: scope }, orderBy: { updatedAt: "desc" }, select: { updatedAt: true } })
+    prisma.activityConversationRead.findFirst({ where: { conversation: scope }, orderBy: { updatedAt: "desc" }, select: { updatedAt: true } }),
+    prisma.activityConversationMessage.aggregate({ where: { conversation: scope }, _max: { deletedAt: true }, _count: { deletedAt: true } })
   ]);
-  return { enabled, version: `${enabled}:${twoWayEnabled}:${last?.id ?? ""}:${read?.updatedAt.toISOString() ?? ""}` };
+  return { enabled, version: `${enabled}:${twoWayEnabled}:${last?.id ?? ""}:${read?.updatedAt.toISOString() ?? ""}:${deletion._max.deletedAt?.toISOString() ?? ""}:${deletion._count.deletedAt}` };
 }
 
 export async function getActivityMessagingOverview(user: CurrentUser, courseId: string, activityId: string, groupId?: string | null, now = new Date(), before?: string): Promise<ActivityMessagingOverview> {
   const { groupScope, enabled, twoWayEnabled } = await assertActivityMessagingAccess(user, courseId, activityId, groupId);
   const scope = { courseId, activityId, ...(groupScope ? { groupId: { in: groupScope } } : {}) };
+  const deleteScope = groupId ? await getActivityMessagingGroupScope(user, courseId) : groupScope;
   const broadcastWhere = { courseId, activityId, messages: { some: { conversation: scope } } };
   const cursor = before ? await prisma.activityMessageBroadcast.findFirst({ where: { ...broadcastWhere, id: before } }) : null;
   if (before && !cursor) throw notFound("Broadcast");
-  const [active, recipientCount, broadcasts, conversations] = await Promise.all([
+  const [active, recipientCount, broadcasts, conversations, deletions] = await Promise.all([
     listActiveConversations(courseId, activityId, groupScope, now),
     prisma.courseGroupParticipant.count({ where: { role: "student", group: { courseId, activities: { some: { activityId } } }, ...(groupScope ? { groupId: { in: groupScope } } : {}) } }),
     prisma.activityMessageBroadcast.findMany({
@@ -222,7 +230,8 @@ export async function getActivityMessagingOverview(user: CurrentUser, courseId: 
         participant: { select: { firstName: true, lastName: true, email: true } },
         messages: { where: { senderKind: "student" }, orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
         reads: { where: { userId: user.id }, select: { lastReadAt: true } } }, orderBy: { updatedAt: "asc" }
-    })
+    }),
+    prisma.activityMessageBroadcast.findMany({ where: { ...broadcastWhere, deletedAt: { not: null } }, select: { id: true, deletedAt: true } })
   ]);
   const threads = new Map<string, ActivityStudentConversationView>();
   for (const conversation of conversations) {
@@ -234,9 +243,11 @@ export async function getActivityMessagingOverview(user: CurrentUser, courseId: 
     });
   }
   return { enabled, twoWayEnabled, activeRecipientCount: active.length, recipientCount,
+    deletedBroadcasts: deletions.map((broadcast) => ({ id: broadcast.id, deletedAt: broadcast.deletedAt!.toISOString() })),
     hasMoreBroadcasts: broadcasts.length > HISTORY_LIMIT, conversations: [...threads.values()],
     broadcasts: broadcasts.slice(0, HISTORY_LIMIT).map((broadcast) => ({
       id: broadcast.id, senderName: broadcast.senderName, body: broadcast.body, createdAt: broadcast.createdAt.toISOString(),
+      deletedAt: broadcast.deletedAt?.toISOString() ?? null, canDelete: !broadcast.deletedAt && broadcast.senderUserId === user.id && coversBroadcast(deleteScope, broadcast.targetGroupIds),
       recipientCount: broadcast.messages.length, readCount: broadcast.messages.filter((message) => {
         const userId = message.conversation.participant.userId;
         return userId && message.conversation.reads.some((read) => read.userId === userId && read.lastReadAt >= message.createdAt);
@@ -290,7 +301,7 @@ export async function sendActivityBroadcast(user: CurrentUser, courseId: string,
     await tx.activityConversationMessage.createMany({ data: recipients.map((conversationId) => ({
       conversationId, broadcastId: broadcast.id, senderUserId: user.id, senderKind: "staff" as const, senderName, body, createdAt: now
     })) });
-    return { broadcast: { id: broadcast.id, senderName, body, createdAt: now.toISOString(), recipientCount: recipients.length, readCount: 0 } satisfies ActivityBroadcastView };
+    return { broadcast: { id: broadcast.id, senderName, body, createdAt: now.toISOString(), recipientCount: recipients.length, readCount: 0, deletedAt: null, canDelete: true } satisfies ActivityBroadcastView };
   }, { timeout: 30_000 });
 }
 
@@ -312,17 +323,16 @@ async function staffConversationScope(user: CurrentUser, courseId: string, activ
 
 export async function getStaffActivityConversation(user: CurrentUser, courseId: string, activityId: string, participantId: string, options: { before?: string; attemptId?: string } = {}) {
   const { scope, participant } = await staffConversationScope(user, courseId, activityId, participantId, options.attemptId);
+  let deleteScope: string[] | null | undefined;
+  try {
+    const allowed = await getActivityMessagingGroupScope(user, courseId);
+    if (allowed === null || allowed.includes(participant.groupId)) deleteScope = allowed;
+  } catch (error) { if (!(error instanceof AppError) || error.code !== "FORBIDDEN") throw error; }
   const [history, activity] = await Promise.all([
-    readMessageHistory(user, scope, options.before), prisma.activity.findFirst({ where: { id: activityId, courseId }, select: { metadata: true } })
+    readMessageHistory(user, scope, options.before, deleteScope), prisma.activity.findFirst({ where: { id: activityId, courseId }, select: { metadata: true } })
   ]);
-  // Reviewers (including TAs) may read retained discussions; sending needs teacher scope.
-  let canSend = false;
-  if (courseActivityMessagingEnabled(activity?.metadata) && courseActivityTwoWayMessagingEnabled(activity?.metadata)) {
-    try {
-      await getActivityMessagingGroupScope(user, courseId, participant.groupId);
-      canSend = Boolean(await prisma.activityConversationMessage.findFirst({ where: { conversation: scope, senderKind: "student" }, select: { id: true } }));
-    } catch (error) { if (!(error instanceof AppError) || error.code !== "FORBIDDEN") throw error; }
-  }
+  const canSend = deleteScope !== undefined && courseActivityMessagingEnabled(activity?.metadata) && courseActivityTwoWayMessagingEnabled(activity?.metadata)
+    && Boolean(await prisma.activityConversationMessage.findFirst({ where: { conversation: scope, senderKind: "student" }, select: { id: true } }));
   return { conversation: { ...history, canSend, studentName: `${participant.firstName} ${participant.lastName}`.trim() || participant.email } };
 }
 
@@ -341,6 +351,39 @@ export async function sendStaffActivityReply(user: CurrentUser, courseId: string
     if (!conversation) throw new AppError(409, "ACTIVITY_CONVERSATION_NOT_STARTED", "The student must send a message before you can reply.");
     await tx.activityConversationMessage.create({ data: { conversationId: conversation.id, senderUserId: user.id, senderKind: "staff", senderName: displayUserName(user), body } });
     return { sent: true };
+  });
+}
+
+function coversBroadcast(groupScope: string[] | null, targetGroupIds: unknown) {
+  return groupScope === null || (Array.isArray(targetGroupIds) && targetGroupIds.every((id) => typeof id === "string" && groupScope.includes(id)));
+}
+
+export async function deleteActivityMessage(user: CurrentUser, courseId: string, activityId: string, input: ActivityMessageDeletionInput, now = new Date()) {
+  const target = ActivityMessageDeletionInputSchema.parse(input);
+  const { groupScope } = await assertActivityMessagingAccess(user, courseId, activityId);
+  return prisma.$transaction(async (tx) => {
+    let broadcastId = "broadcastId" in target ? target.broadcastId : null;
+    if ("messageId" in target) {
+      const message = await tx.activityConversationMessage.findFirst({
+        where: { id: target.messageId, conversation: { courseId, activityId, ...(groupScope ? { groupId: { in: groupScope } } : {}) } },
+        select: { id: true, senderUserId: true, senderKind: true, broadcastId: true }
+      });
+      if (!message) throw notFound("Message");
+      if (message.senderKind !== "staff" || message.senderUserId !== user.id) throw forbidden();
+      broadcastId = message.broadcastId;
+      if (!broadcastId) {
+        await tx.activityConversationMessage.updateMany({ where: { id: message.id, deletedAt: null }, data: { deletedAt: now } });
+        const deleted = await tx.activityConversationMessage.findUniqueOrThrow({ where: { id: message.id }, select: { deletedAt: true } });
+        return { messageId: message.id, broadcastId: null, deletedAt: deleted.deletedAt!.toISOString() };
+      }
+    }
+    const broadcast = await tx.activityMessageBroadcast.findFirst({ where: { id: broadcastId!, courseId, activityId }, select: { id: true, senderUserId: true, targetGroupIds: true } });
+    if (!broadcast) throw notFound("Broadcast");
+    if (broadcast.senderUserId !== user.id || !coversBroadcast(groupScope, broadcast.targetGroupIds)) throw forbidden();
+    await tx.activityMessageBroadcast.updateMany({ where: { id: broadcast.id, deletedAt: null }, data: { deletedAt: now } });
+    const deleted = await tx.activityMessageBroadcast.findUniqueOrThrow({ where: { id: broadcast.id }, select: { deletedAt: true } });
+    await tx.activityConversationMessage.updateMany({ where: { broadcastId: broadcast.id, deletedAt: null }, data: { deletedAt: deleted.deletedAt } });
+    return { messageId: null, broadcastId: broadcast.id, deletedAt: deleted.deletedAt!.toISOString() };
   });
 }
 

@@ -5,7 +5,7 @@ const db = vi.hoisted(() => ({
   activity: { findFirst: vi.fn() },
   activityAttempt: { findMany: vi.fn(), findFirst: vi.fn() },
   activityConversation: { findMany: vi.fn(), updateMany: vi.fn(), upsert: vi.fn(), findFirst: vi.fn() },
-  activityConversationMessage: { findMany: vi.fn(), count: vi.fn(), findFirst: vi.fn() },
+  activityConversationMessage: { findMany: vi.fn(), count: vi.fn(), findFirst: vi.fn(), aggregate: vi.fn() },
   activityConversationRead: { findUnique: vi.fn(), upsert: vi.fn() },
   activityMessageBroadcast: { findMany: vi.fn() },
   courseGroupActivity: { findFirst: vi.fn() },
@@ -14,8 +14,8 @@ const db = vi.hoisted(() => ({
 }));
 const tx = vi.hoisted(() => ({
   activity: { findFirst: vi.fn() },
-  activityMessageBroadcast: { create: vi.fn() },
-  activityConversationMessage: { createMany: vi.fn(), create: vi.fn() },
+  activityMessageBroadcast: { create: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), findUniqueOrThrow: vi.fn() },
+  activityConversationMessage: { createMany: vi.fn(), create: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), findUniqueOrThrow: vi.fn() },
   courseGroupActivity: { findMany: vi.fn() },
   activityAttempt: { findMany: vi.fn() },
   activityConversation: { upsert: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() }
@@ -35,7 +35,7 @@ import {
   getLearnerActivityConversation,
   getStoredLearnerActivityConversation,
   markLearnerActivityConversationRead,
-  sendActivityBroadcast, sendLearnerActivityMessage, sendStaffActivityReply, getStaffActivityConversation, listActiveConversations, getLearnerActivityMessagingStatus
+  sendActivityBroadcast, sendLearnerActivityMessage, sendStaffActivityReply, getStaffActivityConversation, listActiveConversations, getLearnerActivityMessagingStatus, deleteActivityMessage
 } from "./activity-messaging";
 
 const student: CurrentUser = {
@@ -82,6 +82,7 @@ describe("activity attempt messaging", () => {
     });
     db.activityConversationMessage.findMany.mockResolvedValue([]);
     db.activityConversationMessage.count.mockResolvedValue(0);
+    db.activityConversationMessage.aggregate.mockResolvedValue({ _max: { deletedAt: null }, _count: { deletedAt: 0 } });
     db.activityConversationRead.findUnique.mockResolvedValue(null);
     db.activity.findFirst.mockResolvedValue({ id: "activity-1", metadata: enabledMetadata });
     tx.activity.findFirst.mockResolvedValue({ metadata: enabledMetadata });
@@ -151,7 +152,7 @@ describe("activity attempt messaging", () => {
     await expect(getLearnerActivityConversation(student, "course-1", "group-1", "activity-1", now)).resolves.toMatchObject({ conversation: { id: "conversation-1", attemptId: "attempt-1" } });
     groups.getGroupAssignedActivity.mockResolvedValue({ ...activity, metadata: { allGroupsAssignment: { messagingEnabled: false } } });
     await expect(getLearnerActivityConversation(student, "course-1", "group-1", "activity-1", now)).resolves.toEqual({ conversation: null });
-    expect(db.activityConversationMessage.findMany).toHaveBeenCalledTimes(1);
+    expect(db.activityConversationMessage.findMany).toHaveBeenCalledTimes(2);
   });
 
   it("hides stored notices and rejects read receipts while messaging is disabled", async () => {
@@ -233,10 +234,21 @@ describe("activity attempt messaging", () => {
     db.activityAttempt.findMany.mockResolvedValue([]);
     db.activityConversationMessage.findFirst.mockResolvedValue({ id: "latest" });
     const status = await getLearnerActivityMessagingStatus(student, "course-1", "group-1", "activity-1", true);
-    expect(status).toMatchObject({ id: "conversation-2", version: "conversation-2:false:latest", unreadCount: 0 });
+    expect(status).toMatchObject({ id: "conversation-2", version: "conversation-2:false:latest::0", unreadCount: 0 });
     expect(status).not.toHaveProperty("messages");
     expect(db.activityConversationMessage.findMany).not.toHaveBeenCalled();
     expect(db.activityConversationMessage.findFirst).toHaveBeenCalledWith(expect.objectContaining({ select: { id: true } }));
+  });
+
+  it("detects older-message deletions even when their timestamps match and the newest message is unchanged", async () => {
+    db.activityAttempt.findMany.mockResolvedValue([]);
+    db.activityConversationMessage.findFirst.mockResolvedValue({ id: "latest" });
+    db.activityConversationMessage.aggregate.mockResolvedValueOnce({ _max: { deletedAt: now }, _count: { deletedAt: 1 } })
+      .mockResolvedValueOnce({ _max: { deletedAt: now }, _count: { deletedAt: 2 } });
+    const first = await getLearnerActivityMessagingStatus(student, "course-1", "group-1", "activity-1", true);
+    const second = await getLearnerActivityMessagingStatus(student, "course-1", "group-1", "activity-1", true);
+    expect(second?.version).not.toBe(first?.version);
+    expect(db.activityConversationMessage.findMany).not.toHaveBeenCalled();
   });
 
   it("never bypasses activity content closure through stored history or read receipts", async () => {
@@ -282,5 +294,71 @@ describe("activity attempt messaging", () => {
     db.activityConversationMessage.findFirst.mockResolvedValue(null);
     await expect(getStaffActivityConversation(teacher, "course-1", "activity-1", "participant-1", { before: "someone-elses-message" })).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(db.activityConversationMessage.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("teacher message deletion", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    db.$transaction.mockImplementation((callback) => callback(tx));
+    db.activity.findFirst.mockResolvedValue({ id: "activity-1", metadata: {} });
+    authorization.getActivityMessagingGroupScope.mockResolvedValue(null);
+    tx.activityConversationMessage.findFirst.mockResolvedValue({ id: "message-1", senderKind: "staff", senderUserId: teacher.id, broadcastId: null });
+    tx.activityConversationMessage.findUniqueOrThrow.mockResolvedValue({ deletedAt: now });
+    tx.activityMessageBroadcast.findFirst.mockResolvedValue({ id: "broadcast-1", senderUserId: teacher.id, targetGroupIds: ["group-1", "group-2"] });
+    tx.activityMessageBroadcast.findUniqueOrThrow.mockResolvedValue({ deletedAt: now });
+  });
+
+  it("marks an author's reply without changing its text, even with messaging disabled", async () => {
+    expect(await deleteActivityMessage(teacher, "course-1", "activity-1", { messageId: "message-1" }, now)).toEqual({ messageId: "message-1", broadcastId: null, deletedAt: now.toISOString() });
+    expect(tx.activityConversationMessage.updateMany).toHaveBeenCalledWith({ where: { id: "message-1", deletedAt: null }, data: { deletedAt: now } });
+  });
+
+  it.each([
+    { senderKind: "student", senderUserId: student.id },
+    { senderKind: "staff", senderUserId: "other-teacher" },
+    { senderKind: "system", senderUserId: teacher.id }
+  ])("rejects deletion of another author's or non-staff message: %j", async (sender) => {
+    tx.activityConversationMessage.findFirst.mockResolvedValue({ id: "message-1", broadcastId: null, ...sender });
+    await expect(deleteActivityMessage(teacher, "course-1", "activity-1", { messageId: "message-1" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(tx.activityConversationMessage.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects callers without teacher messaging permissions", async () => {
+    authorization.getActivityMessagingGroupScope.mockRejectedValue(new Error("forbidden"));
+    await expect(deleteActivityMessage(student, "course-1", "activity-1", { messageId: "message-1" })).rejects.toThrow("forbidden");
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("scopes private-message lookup to the authorized sections and activity", async () => {
+    authorization.getActivityMessagingGroupScope.mockResolvedValue(["group-1"]);
+    tx.activityConversationMessage.findFirst.mockResolvedValue(null);
+    await expect(deleteActivityMessage(teacher, "course-1", "activity-1", { messageId: "outside-scope" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(tx.activityConversationMessage.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "outside-scope", conversation: { courseId: "course-1", activityId: "activity-1", groupId: { in: ["group-1"] } } } }));
+  });
+
+  it("atomically marks a broadcast and all its copies when a delivered copy is selected", async () => {
+    tx.activityConversationMessage.findFirst.mockResolvedValue({ id: "copy-1", senderKind: "staff", senderUserId: teacher.id, broadcastId: "broadcast-1" });
+    await deleteActivityMessage(teacher, "course-1", "activity-1", { messageId: "copy-1" }, now);
+    expect(tx.activityMessageBroadcast.updateMany).toHaveBeenCalledWith({ where: { id: "broadcast-1", deletedAt: null }, data: { deletedAt: now } });
+    expect(tx.activityConversationMessage.updateMany).toHaveBeenCalledWith({ where: { broadcastId: "broadcast-1", deletedAt: null }, data: { deletedAt: now } });
+  });
+
+  it("requires permission for every section originally targeted by a broadcast", async () => {
+    authorization.getActivityMessagingGroupScope.mockResolvedValue(["group-1"]);
+    await expect(deleteActivityMessage(teacher, "course-1", "activity-1", { broadcastId: "broadcast-1" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(tx.activityMessageBroadcast.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("does not allow deleting another teacher's broadcast", async () => {
+    tx.activityMessageBroadcast.findFirst.mockResolvedValue({ id: "broadcast-1", senderUserId: "other-teacher", targetGroupIds: ["group-1"] });
+    await expect(deleteActivityMessage(teacher, "course-1", "activity-1", { broadcastId: "broadcast-1" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("preserves the original deletion time when repeated", async () => {
+    const later = new Date(now.getTime() + 60_000);
+    const result = await deleteActivityMessage(teacher, "course-1", "activity-1", { broadcastId: "broadcast-1" }, later);
+    expect(result.deletedAt).toBe(now.toISOString());
+    expect(tx.activityConversationMessage.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { deletedAt: now } }));
   });
 });

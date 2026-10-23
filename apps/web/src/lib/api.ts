@@ -1,4 +1,5 @@
 import type {
+  ActivityMessageDeletionInput,
   ApplicationTimeSettingsDto,
   CourseTimeSettingsDto,
   MyStudentGroupingDto,
@@ -874,6 +875,8 @@ export type TimedActivityRuntime = {
 };
 
 export type ActivityConversationMessage = {
+  deletedAt: string | null;
+  canDelete: boolean;
   broadcastId: string | null;
   attemptNumber: number;
   id: string;
@@ -885,7 +888,9 @@ export type ActivityConversationMessage = {
 
 export type LearnerActivityMessagingStatus = { id: string; attemptNumber: number; canSend: boolean; unreadCount: number; version: string };
 export type ActivityMessagingStatus = { enabled: boolean; version: string };
-export type ActivityMessageHistory = { messages: ActivityConversationMessage[]; hasMore: boolean; unreadCount: number; canSend: boolean };
+export type ActivityMessageDeletionMarker = { id: string; deletedAt: string };
+export type ActivityMessageDeletion = { messageId: string | null; broadcastId: string | null; deletedAt: string };
+export type ActivityMessageHistory = { deletedMessages: ActivityMessageDeletionMarker[]; messages: ActivityConversationMessage[]; hasMore: boolean; unreadCount: number; canSend: boolean };
 export type StaffActivityConversation = ActivityMessageHistory & { studentName: string };
 export type LearnerActivityConversation = ActivityMessageHistory & {
   id: string;
@@ -896,6 +901,8 @@ export type LearnerActivityConversation = ActivityMessageHistory & {
 };
 
 export type ActivityBroadcast = {
+  deletedAt: string | null;
+  canDelete: boolean;
   id: string;
   senderName: string;
   body: string;
@@ -905,6 +912,7 @@ export type ActivityBroadcast = {
 };
 
 export type ActivityMessagingOverview = {
+  deletedBroadcasts: ActivityMessageDeletionMarker[];
   twoWayEnabled: boolean;
   recipientCount: number;
   hasMoreBroadcasts: boolean;
@@ -1900,6 +1908,8 @@ export const api = {
       `/courses/${courseId}/gradebook/activities/${activityId}/messages${query}`
     );
   },
+  deleteActivityMessage: (courseId: string, activityId: string, input: ActivityMessageDeletionInput) =>
+    request<ActivityMessageDeletion>(`/courses/${courseId}/gradebook/activities/${activityId}/messages`, { method: "DELETE", body: JSON.stringify(input) }),
   sendActivityBroadcast: (courseId: string, activityId: string, body: string, groupId?: string) => {
     const params = new URLSearchParams();
     if (groupId) params.set("groupId", groupId);

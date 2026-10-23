@@ -30,15 +30,17 @@ export function ActivityChatDialog({ children, onClose, wide = false }: { childr
   );
 }
 
-export function ActivityChatThread({ messages, ownKind, hasMore, onLoadMore, loading = false, empty }: {
+export function ActivityChatThread({ messages, ownKind, hasMore, onLoadMore, loading = false, empty, onDelete }: {
   messages: ActivityConversationMessage[]; ownKind: "student" | "staff"; hasMore?: boolean;
-  onLoadMore?: () => Promise<void>; loading?: boolean; empty?: string;
+  onLoadMore?: () => Promise<void>; loading?: boolean; empty?: string; onDelete?: (message: ActivityConversationMessage) => Promise<void>;
 }) {
   const { t, locale } = useI18n();
   const { timeZone } = useApplicationTime();
   const scroller = useRef<HTMLDivElement>(null);
   const previousLast = useRef<string | undefined>(undefined);
   const nearBottom = useRef(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   const [loadingOlder, setLoadingOlder] = useState(false);
   const lastId = messages.at(-1)?.id;
   useLayoutEffect(() => {
@@ -55,18 +57,31 @@ export function ActivityChatThread({ messages, ownKind, hasMore, onLoadMore, loa
       requestAnimationFrame(() => { if (scroller.current) scroller.current.scrollTop = previousTop + scroller.current.scrollHeight - previousHeight; });
     } finally { setLoadingOlder(false); }
   }
+  async function deleteMessage(message: ActivityConversationMessage) {
+    if (!onDelete || deletingId) return;
+    setDeletingId(message.id); setDeleteError("");
+    try { await onDelete(message); }
+    catch (cause) { setDeleteError(cause instanceof Error ? cause.message : t("activityMessenger.deleteError")); }
+    finally { setDeletingId(null); }
+  }
   return <div className="activity-chat-thread" ref={scroller} role="log" aria-label={t("activityMessenger.title")} aria-live="polite"
     onScroll={() => { const element = scroller.current; if (element) nearBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; }}>
     {hasMore ? <button className="secondary activity-chat-older" type="button" disabled={loadingOlder} onClick={() => void loadOlder()}><AppIcon name="history" /> {t("activityMessenger.older")}</button> : null}
     {loading ? <p className="muted activity-messenger-empty">{t("common.loading")}</p> : !messages.length ? <p className="muted activity-messenger-empty">{empty ?? t("activityMessenger.empty")}</p> : null}
     {messages.map((message) => <article className={`activity-chat-bubble${message.broadcastId ? " activity-chat-bubble--broadcast" : message.senderKind === ownKind ? " activity-chat-bubble--own" : ""}`} key={message.id}>
       <div className="activity-message-meta"><strong>{message.senderName}</strong>{message.broadcastId ? <span className="activity-chat-badge">{t("activityMessenger.broadcastTab")}</span> : null}</div>
-      <p>{message.body}</p>
+      <p>{message.deletedAt ? <del dateTime={message.deletedAt}>{message.body}</del> : message.body}</p>
       <div className="activity-chat-message-footer">
+        {message.deletedAt ? <span className="activity-chat-deleted">{t("activityMessenger.deleted")}</span> : null}
+        {onDelete && message.canDelete && !message.deletedAt ? <button className="danger icon-button activity-chat-delete" type="button" disabled={deletingId !== null}
+          aria-label={t(message.broadcastId ? "activityMessenger.deleteBroadcast" : "activityMessenger.deleteMessage")}
+          title={t(message.broadcastId ? "activityMessenger.deleteBroadcast" : "activityMessenger.deleteMessage")}
+          onClick={() => void deleteMessage(message)}><AppIcon name="remove" size={16} /></button> : null}
         {message.attemptNumber > 0 ? <span>{t("activityMessenger.attempt", { count: message.attemptNumber })}</span> : null}
         <time dateTime={message.createdAt}>{new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "short", timeStyle: "short" }).format(new Date(message.createdAt))}</time>
       </div>
     </article>)}
+    {deleteError ? <p className="error" role="alert">{deleteError}</p> : null}
   </div>;
 }
 
@@ -93,9 +108,4 @@ export function ActivityChatComposer({ onSend, broadcast = false }: { onSend: (b
     </div>
     {error ? <p className="error" role="alert">{error}</p> : null}
   </form>;
-}
-
-export function mergeChatMessages<T extends { id: string; createdAt: string }>(old: T[], incoming: T[]) {
-  return [...new Map([...old, ...incoming].map((message) => [message.id, message])).values()]
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 }
