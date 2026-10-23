@@ -194,6 +194,7 @@ export const frMessages = {
       time: "Heure"
     },
     activityMessenger: {
+      testExercise: "Exercice {number} : {title}",
       deleted: "Supprimé",
       deleteMessage: "Supprimer le message",
       deleteBroadcast: "Supprimer la diffusion pour tous les destinataires",

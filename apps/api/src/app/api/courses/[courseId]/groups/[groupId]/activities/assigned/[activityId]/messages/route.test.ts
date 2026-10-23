@@ -68,6 +68,14 @@ describe("learner activity messaging route", () => {
     expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
+  it("passes the student's selected Test item to the authorized send service", async () => {
+    mocks.sendMessage.mockResolvedValue({ sent: true });
+    const testItem = { parentAttemptId: "attempt-1", testItemId: "item-2" };
+    const response = await POST(new NextRequest("http://test.local/messages", { method: "POST", body: JSON.stringify({ body: "  Help  ", testItem }) }), params);
+    expect(response.status).toBe(201);
+    expect(mocks.sendMessage).toHaveBeenCalledWith({ id: "student-1", roles: ["student"] }, "course-1", "group-1", "activity-1", "Help", testItem);
+  });
+
   it("enforces the access guard before sending student messages", async () => {
     mocks.requireSafeExamBrowserAccess.mockRejectedValueOnce(new Error("closed"));
     await expect(POST(new NextRequest("http://test.local/messages", { method: "POST", body: JSON.stringify({ body: "Hi" }) }), params)).rejects.toThrow("closed");

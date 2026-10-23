@@ -1,5 +1,7 @@
 import type {
   ActivityMessageDeletionInput,
+  ActivityMessageTestItemInput,
+  ActivityMessageTestItemContext,
   ApplicationTimeSettingsDto,
   CourseTimeSettingsDto,
   MyStudentGroupingDto,
@@ -875,6 +877,7 @@ export type TimedActivityRuntime = {
 };
 
 export type ActivityConversationMessage = {
+  testItemContext: ActivityMessageTestItemContext | null;
   deletedAt: string | null;
   canDelete: boolean;
   broadcastId: string | null;
@@ -1925,8 +1928,8 @@ export const api = {
     request<{ sent: boolean }>(`/courses/${courseId}/gradebook/activities/${activityId}/messages/conversations/${participantId}`, { method: "POST", body: JSON.stringify({ body }) }),
   markStaffActivityConversationRead: (courseId: string, activityId: string, participantId: string, lastMessageId: string, attemptId?: string) =>
     request<{ readAt: string }>(`/courses/${courseId}/gradebook/activities/${activityId}/messages/conversations/${participantId}`, { method: "PATCH", body: JSON.stringify({ lastMessageId, attemptId }) }),
-  sendLearnerActivityMessage: (courseId: string, groupId: string, activityId: string, body: string) =>
-    request<{ sent: boolean }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/messages`, { method: "POST", body: JSON.stringify({ body }) }),
+  sendLearnerActivityMessage: (courseId: string, groupId: string, activityId: string, body: string, testItem?: ActivityMessageTestItemInput) =>
+    request<{ sent: boolean }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/messages`, { method: "POST", body: JSON.stringify({ body, testItem }) }),
   courseGradebookCsvUrl: (courseId: string, filters?: { groupId?: string; activityId?: string; status?: GradebookStatus }) => {
     const params = new URLSearchParams({ format: "csv" });
     if (filters?.groupId) {

@@ -1,10 +1,11 @@
 import { Prisma, prisma } from "@cognelo/db";
-import { ActivityBroadcastMessageInputSchema, ActivityMessageDeletionInputSchema, type ActivityMessageDeletionInput, type CurrentUser } from "@cognelo/contracts";
+import { ActivityBroadcastMessageInputSchema, ActivityMessageDeletionInputSchema, ActivityMessageTestItemContextSchema, LearnerActivityMessageInputSchema, type ActivityMessageDeletionInput, type ActivityMessageTestItemInput, type ActivityMessageTestItemContext, type CurrentUser } from "@cognelo/contracts";
 import { assignmentAttemptExpiresAt, assignmentTimeLimitMinutes, courseActivityMessagingEnabled, courseActivityTwoWayMessagingEnabled } from "./activity-assignment-policy";
 import { assertCanGradeGroup, getActivityMessagingGroupScope } from "./authorization";
 import { assertActivityContentAccess } from "./activity-content-access";
 import { AppError, forbidden, notFound } from "./errors";
 import { getActivityAttemptAvailability } from "./gradebook";
+import { orderedLiveTestItems } from "./test-item-order";
 import { getGroupAssignedActivity } from "./groups";
 
 export const ACTIVITY_MESSAGING_PRESENCE_WINDOW_MS = 45_000;
@@ -13,6 +14,7 @@ const conversationIdentity = { id: true, attemptId: true, attemptNumber: true, g
 type ConversationIdentity = { id: string; attemptId: string | null; attemptNumber: number; groupActivityId: string; participantId: string };
 
 export type ActivityConversationMessageView = {
+  testItemContext: ActivityMessageTestItemContext | null;
   id: string; senderKind: "staff" | "student" | "system"; senderName: string;
   body: string; createdAt: string; broadcastId: string | null; attemptNumber: number; deletedAt: string | null; canDelete: boolean;
 };
@@ -121,7 +123,7 @@ async function readMessageHistory(user: CurrentUser, scope: Prisma.ActivityConve
   const [messages, conversations, deletions] = await Promise.all([
     prisma.activityConversationMessage.findMany({
       where: { conversation: scope, ...(cursor ? { OR: [{ createdAt: { lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { lt: cursor.id } }] } : {}) },
-      select: { id: true, senderKind: true, senderName: true, senderUserId: true, body: true, createdAt: true, deletedAt: true, broadcastId: true, broadcast: { select: { targetGroupIds: true } }, conversation: { select: { attemptNumber: true } } },
+      select: { id: true, senderKind: true, senderName: true, senderUserId: true, body: true, testItemContext: true, createdAt: true, deletedAt: true, broadcastId: true, broadcast: { select: { targetGroupIds: true } }, conversation: { select: { attemptNumber: true } } },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: HISTORY_LIMIT + 1
     }),
     prisma.activityConversation.findMany({ where: scope, select: { id: true, reads: { where: { userId: user.id }, select: { lastReadAt: true } } } }),
@@ -136,7 +138,7 @@ async function readMessageHistory(user: CurrentUser, scope: Prisma.ActivityConve
   }) : 0;
   return { unreadCount, hasMore: messages.length > HISTORY_LIMIT, deletedMessages: deletions.map((message) => ({ id: message.id, deletedAt: message.deletedAt!.toISOString() })),
     messages: messages.slice(0, HISTORY_LIMIT).reverse().map(({ conversation, broadcast, senderUserId, ...message }) => ({
-      ...message, deletedAt: message.deletedAt?.toISOString() ?? null,
+      ...message, testItemContext: ActivityMessageTestItemContextSchema.safeParse(message.testItemContext).data ?? null, deletedAt: message.deletedAt?.toISOString() ?? null,
       canDelete: deleteScope !== undefined && !message.deletedAt && message.senderKind === "staff" && senderUserId === user.id
         && (!broadcast || coversBroadcast(deleteScope, broadcast.targetGroupIds)),
       createdAt: message.createdAt.toISOString(), attemptNumber: conversation.attemptNumber
@@ -174,17 +176,43 @@ export async function markLearnerActivityConversationRead(user: CurrentUser, cou
   return markHistoryRead(user, participantConversationScope(conversation), now, lastMessageId);
 }
 
-export async function sendLearnerActivityMessage(user: CurrentUser, courseId: string, groupId: string, activityId: string, body: string) {
-  const input = ActivityBroadcastMessageInputSchema.parse({ body });
+export async function sendLearnerActivityMessage(user: CurrentUser, courseId: string, groupId: string, activityId: string, body: string, testItem?: ActivityMessageTestItemInput) {
+  const input = LearnerActivityMessageInputSchema.parse({ body, testItem });
   await assertActivityContentAccess(user, courseId, groupId, activityId);
   const { conversation } = await getLearnerActivityConversation(user, courseId, groupId, activityId);
   if (!conversation?.canSend) throw new AppError(403, "ACTIVITY_REPLY_DISABLED", "You cannot send messages for this activity right now.");
   await prisma.$transaction(async (tx) => {
     await assertTwoWayEnabled(tx, courseId, activityId);
+    const testItemContext = input.testItem ? await resolveMessageTestItemContext(tx, user, courseId, groupId, activityId, conversation.attemptId, input.testItem) : null;
     await tx.activityConversationMessage.create({ data: { conversationId: conversation.id,
-      senderUserId: user.id, senderKind: "student", senderName: displayUserName(user), body: input.body } });
+      senderUserId: user.id, senderKind: "student", senderName: displayUserName(user), body: input.body,
+      ...(testItemContext ? { testItemContext: testItemContext as Prisma.InputJsonValue } : {}) } });
   });
   return { sent: true };
+}
+
+async function resolveMessageTestItemContext(
+  tx: Prisma.TransactionClient, user: CurrentUser, courseId: string, groupId: string, activityId: string,
+  activeAttemptId: string | null, input: ActivityMessageTestItemInput
+): Promise<ActivityMessageTestItemContext> {
+  const invalidContext = () => new AppError(409, "ACTIVITY_MESSAGE_TEST_CONTEXT_INVALID", "The Test exercise is no longer available. Refresh the Test before sending your message.");
+  if (!activeAttemptId || activeAttemptId !== input.parentAttemptId) throw invalidContext();
+  const [attempt, test] = await Promise.all([
+    tx.activityAttempt.findFirst({
+      where: { id: input.parentAttemptId, courseId, groupId, activityId, pluginKey: "core:test", lifecycle: "started", participant: { userId: user.id, role: "student" } },
+      select: { metadata: true }
+    }),
+    tx.test.findFirst({ where: { courseId, activityId }, select: { settings: true, items: {
+      where: { removedAt: null }, orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+      select: { id: true, activityId: true, activity: { select: { title: true } } }
+    } } })
+  ]);
+  if (!attempt || !test) throw invalidContext();
+  const items = orderedLiveTestItems(test.items, attempt.metadata, test.settings);
+  const index = items.findIndex((item) => item.id === input.testItemId);
+  if (index < 0) throw invalidContext();
+  const item = items[index];
+  return { testItemId: item.id, activityId: item.activityId, title: item.activity.title, exerciseNumber: index + 1 };
 }
 
 // A small revision marker rides on the learner's existing content-access poll.

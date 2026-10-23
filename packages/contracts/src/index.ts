@@ -59,6 +59,26 @@ export const ActivityBroadcastMessageInputSchema = z.object({
 }).strict();
 export type ActivityBroadcastMessageInput = z.infer<typeof ActivityBroadcastMessageInputSchema>;
 
+export const ActivityMessageTestItemInputSchema = z.object({
+  parentAttemptId: RecordIdSchema,
+  testItemId: RecordIdSchema
+}).strict();
+export type ActivityMessageTestItemInput = z.infer<typeof ActivityMessageTestItemInputSchema>;
+
+export const LearnerActivityMessageInputSchema = ActivityBroadcastMessageInputSchema.extend({
+  testItem: ActivityMessageTestItemInputSchema.optional()
+});
+
+// A server-created snapshot; clients cannot supply an exercise title or number.
+export const ActivityMessageTestItemContextSchema = z.object({
+  testItemId: RecordIdSchema,
+  activityId: RecordIdSchema,
+  title: z.string(),
+  exerciseNumber: z.number().int().positive()
+}).strict();
+export type ActivityMessageTestItemContext = z.infer<typeof ActivityMessageTestItemContextSchema>;
+
+
 export const ActivityMessageDeletionInputSchema = z.union([
   z.object({ messageId: RecordIdSchema }).strict(),
   z.object({ broadcastId: RecordIdSchema }).strict()

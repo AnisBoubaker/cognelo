@@ -1425,6 +1425,7 @@ model ActivityConversationMessage {
   senderKind     ActivityConversationSenderKind
   senderName     String
   body           String
+  testItemContext Json?
   deletedAt      DateTime?
   createdAt      DateTime                       @default(now())
   conversation   ActivityConversation           @relation(fields: [conversationId], references: [id], onDelete: Cascade)

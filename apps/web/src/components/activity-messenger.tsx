@@ -77,7 +77,9 @@ export function ActivityMessenger({ courseId, groupId, activityId, enabled, hist
       <div className="activity-chat-panel">
         <div className="activity-chat-context"><strong>{t("activityMessenger.attempt", { count: conversation?.attemptNumber ?? status.attemptNumber })}</strong><small className="muted">{t("activityMessenger.studentHelp")}</small></div>
         <ActivityChatThread messages={conversation?.messages ?? []} loading={!conversation && !error} ownKind="student" hasMore={conversation?.hasMore} onLoadMore={() => refresh(conversation?.messages[0]?.id)} />
-        {status.canSend && !historyOnly ? <ActivityChatComposer onSend={async (body) => { await api.sendLearnerActivityMessage(courseId, groupId, activityId, body); await refresh(); }} />
+        {status.canSend && !historyOnly ? <ActivityChatComposer onSend={async (body) => { const current = messaging?.activeTestItem.current;
+          const testItem = current?.testActivityId === activityId ? { parentAttemptId: current.parentAttemptId, testItemId: current.testItemId } : undefined;
+          await api.sendLearnerActivityMessage(courseId, groupId, activityId, body, testItem); await refresh(); }} />
           : <p className="muted activity-chat-notice">{t("activityMessenger.readOnly")}</p>}
         {error ? <div className="activity-chat-notice"><p className="error" role="alert">{error}</p><button className="secondary" type="button" onClick={() => void refresh()}><AppIcon name="refresh" />{t("common.retry")}</button></div> : null}
       </div>

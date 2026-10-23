@@ -70,6 +70,7 @@ export function ActivityChatThread({ messages, ownKind, hasMore, onLoadMore, loa
     {loading ? <p className="muted activity-messenger-empty">{t("common.loading")}</p> : !messages.length ? <p className="muted activity-messenger-empty">{empty ?? t("activityMessenger.empty")}</p> : null}
     {messages.map((message) => <article className={`activity-chat-bubble${message.broadcastId ? " activity-chat-bubble--broadcast" : message.senderKind === ownKind ? " activity-chat-bubble--own" : ""}`} key={message.id}>
       <div className="activity-message-meta"><strong>{message.senderName}</strong>{message.broadcastId ? <span className="activity-chat-badge">{t("activityMessenger.broadcastTab")}</span> : null}</div>
+      {message.testItemContext ? <p className="activity-chat-exercise">{t("activityMessenger.testExercise", { number: message.testItemContext.exerciseNumber, title: message.testItemContext.title })}</p> : null}
       <p>{message.deletedAt ? <del dateTime={message.deletedAt}>{message.body}</del> : message.body}</p>
       <div className="activity-chat-message-footer">
         {message.deletedAt ? <span className="activity-chat-deleted">{t("activityMessenger.deleted")}</span> : null}

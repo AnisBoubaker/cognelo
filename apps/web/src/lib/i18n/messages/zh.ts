@@ -194,6 +194,7 @@ export const zhMessages = {
       time: "时间"
     },
     activityMessenger: {
+      testExercise: "练习 {number}：{title}",
       deleted: "已删除",
       deleteMessage: "删除消息",
       deleteBroadcast: "为所有接收者删除此广播",

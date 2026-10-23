@@ -56,7 +56,7 @@ export function ActivityBroadcastDialog({ courseId, activityId, groupId, onClose
       <div className="activity-chat-panel" id="activity-chat-panel" role="tabpanel" aria-labelledby={`chat-tab-${selected}`}>
         {selected === "broadcast" ? <>
           <div className="activity-chat-context"><strong>{t("activityMessenger.broadcastTab")}</strong><small className="muted">{t("activityMessenger.allStudents", { count: overview?.recipientCount ?? 0 })} · {t("activityMessenger.activeAttempts", { count: overview?.activeRecipientCount ?? 0 })}</small></div>
-          <ActivityChatThread messages={(overview?.broadcasts ?? []).map((broadcast) => ({ ...broadcast, broadcastId: broadcast.id, senderKind: "staff", attemptNumber: 0 }))} ownKind="staff" onDelete={async (message) => {
+          <ActivityChatThread messages={(overview?.broadcasts ?? []).map((broadcast) => ({ ...broadcast, broadcastId: broadcast.id, senderKind: "staff", attemptNumber: 0, testItemContext: null }))} ownKind="staff" onDelete={async (message) => {
             const deletion = await api.deleteActivityMessage(courseId, activityId, { broadcastId: message.broadcastId! });
             setOverview((old) => old ? { ...old, broadcasts: applyChatDeletion(old.broadcasts, deletion) } : old);
           }} hasMore={overview?.hasMoreBroadcasts} onLoadMore={olderBroadcasts} loading={!overview && !error} empty={t("activityMessenger.noBroadcasts")} />

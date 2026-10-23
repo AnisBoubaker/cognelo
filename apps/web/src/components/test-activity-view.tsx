@@ -6,7 +6,7 @@ import { isActivityContentClosedError } from "@cognelo/activity-ui";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ConfirmationDialog, EditActionBar, MarkdownRenderer, MonacoModelGroup, MonacoModelScope, ProgressDialog, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
@@ -30,6 +30,7 @@ import { activityCreationConfig } from "@/lib/activity-creation-defaults";
 import { type Locale, useI18n } from "@/lib/i18n";
 import { createStudentPreviewStateHost } from "@/lib/student-preview-state-host";
 import { formatRemainingTime, getTestCountdownTone, shouldAutoSubmitTestAttempt } from "@/lib/test-countdown";
+import { useActivityMessagingStatus } from "@/components/activity-content-boundary";
 import { ActivityLiveControlPortal } from "@/components/activity-live-controls";
 import { useServerCountdown } from "@/lib/use-server-countdown";
 
@@ -579,6 +580,17 @@ function TestStudentRuntime({
   }, [reviewAnswers]);
 
   const selectedRuntimeItem = runtime?.test.items[selectedIndex] ?? null;
+  const messageItemRef = useActivityMessagingStatus()?.activeTestItem;
+  const messageItemId = !studentPreview && studentViewMode === "attempt" && runtime?.attempt?.lifecycle === "started"
+    && !runtime.resume.blocked && reviewAnswers === null ? selectedRuntimeItem?.id : undefined;
+  const messageAttemptId = runtime?.attempt?.id;
+  useLayoutEffect(() => {
+    if (!messageItemRef) return;
+    const context = messageItemId && messageAttemptId ? { testActivityId: activity.id, parentAttemptId: messageAttemptId, testItemId: messageItemId } : null;
+    messageItemRef.current = context;
+    return () => { if (messageItemRef.current === context) messageItemRef.current = null; };
+  }, [activity.id, messageAttemptId, messageItemId, messageItemRef]);
+
   const executionHost = useMemo<ActivityExecutionStateHost<Record<string, unknown>> | null>(() => {
     if (!runtime?.attempt || !selectedRuntimeItem) return null;
     if (studentPreview) {

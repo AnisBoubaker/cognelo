@@ -1,5 +1,6 @@
 "use client";
 
+import type { ActivityMessageTestItemInput } from "@cognelo/contracts";
 import { AppIcon } from "@/components/app-icon";
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
@@ -14,6 +15,7 @@ import { useI18n } from "@/lib/i18n";
 const ActivityMessagingContext = createContext<{
   status: LearnerActivityMessagingStatus | null;
   presence: { current: boolean };
+  activeTestItem: { current: (ActivityMessageTestItemInput & { testActivityId: string }) | null };
 } | null>(null);
 export function useActivityMessagingStatus() { return useContext(ActivityMessagingContext); }
 
@@ -22,6 +24,7 @@ export function ActivityContentBoundary({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { t, locale } = useI18n();
   const presence = useRef(true);
+  const activeTestItem = useRef<(ActivityMessageTestItemInput & { testActivityId: string }) | null>(null);
   const [messaging, setMessaging] = useState<LearnerActivityMessagingStatus | null>(null);
   const [access, setAccess] = useState<ActivityContentAccess | null>(null);
   const scope = `${courseId}/${groupId}/${activityId}/${user?.id ?? ""}`;
@@ -68,7 +71,7 @@ export function ActivityContentBoundary({ children }: { children: ReactNode }) {
   }, [activityId, courseId, groupId, retry, scope, t, user]);
 
   const currentAccess = loadedScope === scope ? access : null;
-  if (currentAccess && !currentAccess.locked) return <ActivityMessagingContext.Provider value={{ status: messaging, presence }}>{children}</ActivityMessagingContext.Provider>;
+  if (currentAccess && !currentAccess.locked) return <ActivityMessagingContext.Provider value={{ status: messaging, presence, activeTestItem }}>{children}</ActivityMessagingContext.Provider>;
   return <AppShell><main className="page stack">
     <div className="row" style={{ justifyContent: "flex-end" }}><Link className="button secondary" href={`/courses/${courseId}/groups/${groupId}`}><AppIcon name="back" /> {t("courseDetail.backToCourseContent")}</Link></div>
     {currentAccess?.locked ? <section className="section stack">

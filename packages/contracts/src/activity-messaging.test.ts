@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ActivityMessageDeletionInputSchema, ActivityBroadcastMessageInputSchema, CourseAllGroupsActivityAssignmentInputSchema } from "./index";
+import { LearnerActivityMessageInputSchema, ActivityMessageDeletionInputSchema, ActivityBroadcastMessageInputSchema, CourseAllGroupsActivityAssignmentInputSchema } from "./index";
 
 describe("ActivityBroadcastMessageInputSchema", () => {
   it("trims and accepts a bounded message", () => {
@@ -28,6 +28,18 @@ describe("message deletion targets", () => {
     expect(ActivityMessageDeletionInputSchema.parse({ broadcastId: "broadcast" })).toEqual({ broadcastId: "broadcast" });
     for (const input of [{}, { messageId: "" }, { messageId: "reply", broadcastId: "broadcast" }, { messageId: "reply", senderUserId: "teacher" }]) {
       expect(ActivityMessageDeletionInputSchema.safeParse(input).success).toBe(false);
+    }
+  });
+});
+
+describe("student Test message input", () => {
+  it("accepts a scoped Test item or a legacy plain message", () => {
+    expect(LearnerActivityMessageInputSchema.parse({ body: "Hello" })).toEqual({ body: "Hello" });
+    expect(LearnerActivityMessageInputSchema.parse({ body: "Help", testItem: { parentAttemptId: "attempt", testItemId: "item" } }).testItem?.testItemId).toBe("item");
+  });
+  it("rejects incomplete context and client-provided exercise titles or positions", () => {
+    for (const testItem of [{ testItemId: "item" }, { parentAttemptId: "attempt", testItemId: "item", title: "Forged title" }, { parentAttemptId: "attempt", testItemId: "item", exerciseNumber: 9 }]) {
+      expect(LearnerActivityMessageInputSchema.safeParse({ body: "Help", testItem }).success).toBe(false);
     }
   });
 });

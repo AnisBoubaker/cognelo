@@ -194,6 +194,7 @@ export const arMessages = {
       time: "الوقت"
     },
     activityMessenger: {
+      testExercise: "التمرين {number}: {title}",
       deleted: "محذوفة",
       deleteMessage: "حذف الرسالة",
       deleteBroadcast: "حذف البث لجميع المستلمين",

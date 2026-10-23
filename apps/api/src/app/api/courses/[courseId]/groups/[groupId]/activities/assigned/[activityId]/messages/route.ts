@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { ActivityBroadcastMessageInputSchema, RecordIdSchema } from "@cognelo/contracts";
+import { LearnerActivityMessageInputSchema, RecordIdSchema } from "@cognelo/contracts";
 import { AppError, getStoredLearnerActivityConversation, getLearnerActivityConversation, markLearnerActivityConversationRead, sendLearnerActivityMessage } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 import { requireSafeExamBrowserAccess } from "@/lib/safe-exam-browser";
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { courseId, groupId, activityId } = await params;
     await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId);
-    const input = ActivityBroadcastMessageInputSchema.parse(await readJson(request));
-    return json(await sendLearnerActivityMessage(user, courseId, groupId, activityId, input.body), { status: 201 });
+    const input = LearnerActivityMessageInputSchema.parse(await readJson(request));
+    return json(await sendLearnerActivityMessage(user, courseId, groupId, activityId, input.body, input.testItem), { status: 201 });
   });
 }

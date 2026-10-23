@@ -194,6 +194,7 @@ export const enMessages = {
       time: "Time"
     },
     activityMessenger: {
+      testExercise: "Exercise {number}: {title}",
       deleted: "Deleted",
       deleteMessage: "Delete message",
       deleteBroadcast: "Delete broadcast for all recipients",

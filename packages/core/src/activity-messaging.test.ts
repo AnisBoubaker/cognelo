@@ -17,7 +17,8 @@ const tx = vi.hoisted(() => ({
   activityMessageBroadcast: { create: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), findUniqueOrThrow: vi.fn() },
   activityConversationMessage: { createMany: vi.fn(), create: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), findUniqueOrThrow: vi.fn() },
   courseGroupActivity: { findMany: vi.fn() },
-  activityAttempt: { findMany: vi.fn() },
+  activityAttempt: { findMany: vi.fn(), findFirst: vi.fn() },
+  test: { findFirst: vi.fn() },
   activityConversation: { upsert: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() }
 }));
 const authorization = vi.hoisted(() => ({ getActivityMessagingGroupScope: vi.fn(), assertCanGradeGroup: vi.fn() }));
@@ -360,5 +361,68 @@ describe("teacher message deletion", () => {
     const result = await deleteActivityMessage(teacher, "course-1", "activity-1", { broadcastId: "broadcast-1" }, later);
     expect(result.deletedAt).toBe(now.toISOString());
     expect(tx.activityConversationMessage.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { deletedAt: now } }));
+  });
+});
+
+describe("student Test message context", () => {
+  const input = { parentAttemptId: "attempt-1", testItemId: "item-2" };
+  beforeEach(() => {
+    vi.resetAllMocks();
+    db.$transaction.mockImplementation((callback) => callback(tx));
+    const metadata = { allGroupsAssignment: { messagingEnabled: true, twoWayMessagingEnabled: true } };
+    groups.getGroupAssignedActivity.mockResolvedValue({ metadata, activityType: { key: "test" }, assignment: { id: "assignment-1", metadata: {} } });
+    db.courseGroupParticipant.findFirst.mockResolvedValue({ id: "participant-1" });
+    db.activityAttempt.findMany.mockResolvedValue([{ id: "attempt-1", lifecycle: "started", attemptNumber: 1, startedAt: now }]);
+    db.activityConversation.upsert.mockResolvedValue({ id: "conversation-1", attemptId: "attempt-1", attemptNumber: 1, groupActivityId: "assignment-1", participantId: "participant-1" });
+    db.activityConversation.findMany.mockResolvedValue([]);
+    db.activityConversationMessage.findMany.mockResolvedValue([]);
+    tx.activity.findFirst.mockResolvedValue({ metadata });
+    tx.activityAttempt.findFirst.mockResolvedValue({ metadata: { manifest: { items: [{ testItemId: "item-2" }, { testItemId: "item-1" }] } } });
+    tx.test.findFirst.mockResolvedValue({ settings: { randomizeItems: false }, items: [
+      { id: "item-1", activityId: "child-1", activity: { title: "First exercise" } },
+      { id: "item-2", activityId: "child-2", activity: { title: "Loops" } }
+    ] });
+  });
+
+  it("snapshots the validated child title and displayed number with the message", async () => {
+    await sendLearnerActivityMessage(student, "course-1", "group-1", "activity-1", "Please explain", input);
+    expect(tx.activityConversationMessage.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      body: "Please explain", testItemContext: { testItemId: "item-2", activityId: "child-2", title: "Loops", exerciseNumber: 2 }
+    }) });
+    expect(tx.activityAttempt.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
+      id: "attempt-1", courseId: "course-1", groupId: "group-1", activityId: "activity-1", lifecycle: "started", participant: { userId: student.id, role: "student" }
+    }) }));
+  });
+
+  it("uses the student's shuffled order rather than the teacher's authoring position", async () => {
+    const current = await tx.test.findFirst();
+    tx.test.findFirst.mockResolvedValue({ ...current, settings: { randomizeItems: true } });
+    await sendLearnerActivityMessage(student, "course-1", "group-1", "activity-1", "Please explain", input);
+    expect(tx.activityConversationMessage.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      testItemContext: expect.objectContaining({ testItemId: "item-2", exerciseNumber: 1 })
+    }) });
+  });
+
+  it.each(["other-attempt", "completed-attempt"])("rejects stale or foreign parent attempt %s", async (parentAttemptId) => {
+    await expect(sendLearnerActivityMessage(student, "course-1", "group-1", "activity-1", "Question", { ...input, parentAttemptId })).rejects.toMatchObject({ code: "ACTIVITY_MESSAGE_TEST_CONTEXT_INVALID" });
+    expect(tx.activityConversationMessage.create).not.toHaveBeenCalled();
+  });
+
+  it("rechecks that the supplied attempt is still active and belongs to the sender", async () => {
+    tx.activityAttempt.findFirst.mockResolvedValue(null);
+    await expect(sendLearnerActivityMessage(student, "course-1", "group-1", "activity-1", "Question", input)).rejects.toMatchObject({ code: "ACTIVITY_MESSAGE_TEST_CONTEXT_INVALID" });
+    expect(tx.activityConversationMessage.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects an item from another Test or one that was removed", async () => {
+    await expect(sendLearnerActivityMessage(student, "course-1", "group-1", "activity-1", "Question", { ...input, testItemId: "other-item" })).rejects.toMatchObject({ code: "ACTIVITY_MESSAGE_TEST_CONTEXT_INVALID" });
+    expect(tx.test.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { courseId: "course-1", activityId: "activity-1" }, select: expect.objectContaining({ items: expect.objectContaining({ where: { removedAt: null } }) }) }));
+    expect(tx.activityConversationMessage.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps messages without an exercise context compatible with existing clients and the Test review screen", async () => {
+    await sendLearnerActivityMessage(student, "course-1", "group-1", "activity-1", "General question");
+    expect(tx.test.findFirst).not.toHaveBeenCalled();
+    expect(tx.activityConversationMessage.create.mock.calls[0][0].data).not.toHaveProperty("testItemContext");
   });
 });

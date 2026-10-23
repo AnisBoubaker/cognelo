@@ -9,11 +9,21 @@ These activity-wide switches apply to every section, not to section/team/student
 
 ## Chat and delivery
 
-The teacher's **Message students** dialog has left-side Broadcast and student tabs. A private tab appears only after that student sends a message; opening the activity or receiving a broadcast does not establish a private chat. Staff cannot initiate a private conversation. Students see broadcasts and their own private messages/replies together, with distinct broadcast labels and chat bubbles. The student write endpoint accepts only message text: it derives enrollment, conversation, and sender on the server and has no recipient selector.
+The teacher's **Message students** dialog has left-side Broadcast and student tabs. A private tab appears only after that student sends a message; opening the activity or receiving a broadcast does not establish a private chat. Staff cannot initiate a private conversation. Students see broadcasts and their own private messages/replies together, with distinct broadcast labels and chat bubbles. The student write endpoint accepts message text and an optional active Test item reference: it derives enrollment, conversation, sender, and exercise details on the server and has no recipient selector.
 
 Explicit broadcasts reach every student enrollment in the assigned, authorized sections, including offline students. Delivery is recorded once per enrollment, against its latest current/logical attempt, and does not renew presence or create academic attempts. Broadcast history includes delivery/read counts. The optional notice accompanying a live settings or authoring change still targets only students currently answering: its existing transaction and recipient behavior are preserved. See [Live activity authoring](LIVE_ACTIVITY_AUTHORING.md).
 
 Messages remain stored in attempt-scoped `ActivityConversation` records. The activity chat combines an enrollment's records across attempts, labels messages with their attempt, and pages backward in batches of 100. Broadcast history is also paginated. Staff review can filter history to the submission being inspected, including logical conversations whose `attemptId` was not yet linked. Per-user read cursors are monotonic and bounded by the latest displayed message; reading a specific attempt does not mark other attempts read.
+
+## Exercise context in Test messages
+
+A new student message sent while viewing a Test exercise displays **Exercise N: title** in the chat, above the message text, for both teacher and student. It captures the exercise selected when Send is pressed, independently of autosaves or the last answered exercise. The host keeps the current Test/attempt/item reference in memory; navigation updates it immediately, and review screens, completed attempts, teacher previews, unmounting, and leaving the Test clear it. No extra heartbeat, selection-saving request, or polling interval is introduced.
+
+The client may send only the parent attempt and Test-item IDs. Core verifies that the parent is the sender's current active Test attempt in the same course/section/activity and that the item is still part of that Test. The server derives its title and displayed number using the same ordering helper as the live runtime, including per-attempt randomization, surviving items, and new additions. Invalid/stale references reject the send while the composer retains the unsent text.
+
+`ActivityConversationMessage.testItemContext` stores a nullable JSON snapshot containing the item ID, child activity ID, title, and exercise number. History and grading review use that snapshot, so later renames, reordering, or removal do not relabel an old message. Existing messages have no inferred context. Standalone messages and messages from the Test's final review screen remain unlabelled; broadcasts and teacher replies do not invent an exercise association. The snapshot contains no prompt, response, solution, or grading data and remains behind the existing conversation/content-access checks.
+
+Apply additive migration `202610230002_activity_message_test_context` with `npm run db:migrate:all`. No environment variables change.
 
 ## Deleting sent messages
 
@@ -45,6 +55,7 @@ Learners can retrieve and mark only their own enrolled history. Ordinary availab
 
 ## Verification
 
+- `tests/e2e/activity-message-test-context.spec.ts`: current exercise vs. last answer, randomized order, stable historical labels after edits/removal, rejected foreign context, and clearing context on review/standalone pages.
 - `tests/e2e/activity-message-deletion.spec.ts`: teacher/learner strikethrough, retained text, broadcast copies, author-only authorization, idempotency, old history pages, and heartbeat invalidation.
 - Core and route unit tests cover deletion ownership/scope, retained client history, switches, ownership, section scope, student-initiated replies, offline delivery, current-attempt presence, history cursors, and content closure.
 - `tests/e2e/activity-chat.spec.ts`: chat UI, offline delivery, student isolation, live two-way toggles, post-submission review, content closure, retained staff access, pagination, and read receipts.

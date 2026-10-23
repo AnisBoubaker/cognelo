@@ -1,3 +1,4 @@
+import { orderedLiveTestItems as orderedLiveItems } from "./test-item-order";
 import { applyAssignmentExceptions, exceptionsForParticipant, loadAssignmentExceptions } from "./activity-assignment-exceptions";
 import { lockTestAuthoring } from "./activity-authoring-live";
 import { createHash } from "node:crypto";
@@ -1034,14 +1035,6 @@ function currentManifest(metadata: unknown) {
 }
 function activeRuntimeItems<T extends { removedAt?: Date | null }>(items: T[]) {
   return items.filter((item) => !item.removedAt);
-}
-function orderedLiveItems<T extends { id: string }>(items: T[], metadata: unknown, settings: unknown) {
-  if (asRecord(settings).randomizeItems !== true || !metadata) return items;
-  const oldOrder = manifestItems(metadata).map((item) => item.testItemId);
-  return [...items].sort((a, b) => {
-    const aIndex = oldOrder.indexOf(a.id), bIndex = oldOrder.indexOf(b.id);
-    return (aIndex < 0 ? oldOrder.length : aIndex) - (bIndex < 0 ? oldOrder.length : bIndex);
-  });
 }
 
 function reconcileItemState(activity: { config: unknown; activityType: { key: string } }, result: unknown) {
