@@ -1555,6 +1555,11 @@ export default function CourseDetailPage() {
                             const contentResourceTarget = contentResourceDefinition?.editorRendererKey ? "_self" : contentPresentation?.target ?? (contentResourceIsFile ? undefined : "_blank");
                             const assignment = item.courseGroupActivityId ? groupAssignmentById.get(item.courseGroupActivityId) : null;
                             const activity = assignment?.activity ?? (item.activityId ? courseActivityById.get(item.activityId) : null);
+                            const previewGroupIds = new Set((activity ? courseActivityById.get(activity.id)?.groupAssignments ?? [] : []).map((entry) => entry.groupId));
+                            const previewGroup = contentGroup
+                              ? previewGroupIds.has(contentGroup.id) ? contentGroup : null
+                              : sortedCourseGroups.find((group) => group.id === lastSelectedContentGroupId && previewGroupIds.has(group.id))
+                                ?? sortedCourseGroups.find((group) => previewGroupIds.has(group.id));
                             const allGroupsRule = activity ? getAllGroupsAssignmentRule(activity) : null;
                             const activityLabel = activity ? activityCopy(activity.activityType.key).name : null;
                             const isHidden = item.effectiveVisibility ? item.effectiveVisibility !== "visible" : !item.isVisible;
@@ -1729,6 +1734,28 @@ export default function CourseDetailPage() {
                                           <MaterialActionIcon name="open" />
                                           <span>{t("common.open")}</span>
                                         </Link>
+                                      )
+                                    ) : null}
+                                    {item.kind === "activity" && activity ? (
+                                      previewGroup ? (
+                                        <Link
+                                          className="content-context-menu-item"
+                                          href={`/courses/${courseId}/groups/${previewGroup.id}/student-view/activities/${activity.id}`}
+                                          role="menuitem"
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          prefetch={false}
+                                          title={t("courseDetail.previewActivityInSection", { section: previewGroup.title })}
+                                          onClick={() => setContentContextMenu(null)}
+                                        >
+                                          <AppIcon name="visible" />
+                                          <span>{t("courseDetail.previewActivity")}</span>
+                                        </Link>
+                                      ) : (
+                                        <button className="content-context-menu-item" role="menuitem" type="button" disabled title={t("courseDetail.previewActivityNeedsAssignment")}>
+                                          <AppIcon name="visible" />
+                                          <span>{t("courseDetail.previewActivity")}</span>
+                                        </button>
                                       )
                                     ) : null}
                                     {item.kind === "activity" && activity ? (

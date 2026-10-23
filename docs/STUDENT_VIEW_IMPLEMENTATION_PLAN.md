@@ -6,6 +6,7 @@ Implemented for course/group content and the learner renderers used by MCQ, Pars
 
 ## Product behavior
 
+- Activity context menus in course content include **Preview**, opening the existing `/courses/:courseId/groups/:groupId/student-view/activities/:activityId` page in a new tab with `noopener noreferrer`. Group perspective uses that section only. Course perspective prefers the last selected section if assigned, otherwise the first assigned section in the locale-aware alphabetical order; the tooltip identifies it. Unassigned activities show a disabled action with an assignment hint. The manager-only course detail includes just the actual assignment group IDs for this routing; never infer assignment from legacy General metadata or expose these IDs in learner projections. Preview still enforces the ordinary Student view rules below.
 - In a course's group content perspective, **Student view** opens a separate browser window. Section teachers receive the same action for their assigned group.
 - The preview contains the student-visible content projection for that group and never includes the Grades tab. Its heading matches the learner workspace: the subject title followed by “Course title: Section name”, without publication status or section availability dates. The workspace API includes only the subject title for this context.
 - The preview and the real learner course page use the same `StudentCourseContent` component for folder tabs/accordions, activity badges, availability locks, icons, and material links. Preview-specific code supplies only alternate activity URLs and omits learner-specific grades/submission badges.
@@ -42,6 +43,7 @@ Coding Homework Grader requires ZIP attachments, background processing, and mult
 - Core assignment tests prove manager previews still obey learner availability and content visibility.
 - Runner tests prove preview execution returns genuine results without calling plugin persistence clients.
 - Activity SDK unit tests inject neutral fake plugins and ensure only explicitly registered stateless preview handlers can be dispatched; plugin-registry tests validate the complete installed graph.
+- `activity-menu-preview.spec.ts` verifies direct new-tab navigation from both content perspectives, correct section selection, disabled unassigned actions, opener isolation, temporary answers, and absence of academic writes or assignment-ID leakage to students.
 - Browser coverage should verify new-window navigation, absence of Grades, hidden content, reset behavior, stateless activity interaction, compound Tests, and denied cross-group section-teacher access.
 - Browser coverage also verifies that the preview workspace does not refetch during ordinary rerenders, Parsons and Programming Exercise server actions resolve through the preview registry, programming runs stay non-academic, and learner-visible uploaded files download from Student view.
 - SDK coverage must reject a missing client adapter, an interactive renderer on a non-interactive definition, a missing or mismatched plugin server adapter, and duplicate server ownership.

@@ -150,7 +150,18 @@ export async function getCourse(user: CurrentUser, courseId: string) {
   const course = await prisma.course.findUnique({
     where: { id: courseId },
     include: capabilities.canManageCourse
-      ? courseInclude
+      ? {
+          ...courseInclude,
+          activities: {
+            ...courseInclude.activities,
+            include: {
+              ...courseInclude.activities.include,
+              // Preview links need actual assignments, including independently
+              // assigned sections and older activities without General metadata.
+              groupAssignments: { select: { groupId: true } }
+            }
+          }
+        }
       : capabilities.canViewGradebook
         ? buildCourseIncludeForSectionStaff(user.id)
         : buildCourseIncludeForStudent(user.id)

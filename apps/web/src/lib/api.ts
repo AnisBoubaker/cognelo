@@ -719,6 +719,7 @@ export type Activity = {
   activityVersion?: ActivityVersion | null;
   position: number;
   knowledgeConcepts?: ActivityKnowledgeConceptLink[];
+  groupAssignments?: Array<{ groupId: string }>;
 };
 
 export type SafeExamBrowserAccess = {
