@@ -5,6 +5,56 @@ import { ensureContentTypePluginEnabled } from "./fixtures/content-plugins";
 
 test.beforeAll(() => ensureContentTypePluginEnabled("text-content"));
 
+test("display settings preserve long imported text and concurrent content edits", async ({ teacherPage: page }) => {
+  const data = await provisionActivitySuite();
+  const teacher = await createAuthenticatedApi("teacher");
+  const title = "Long imported assignment";
+  try {
+    const { resource } = await responseJson<{ resource: { id: string } }>(await teacher.post(`/api/courses/${data.courseId}/content-resources`, {
+      data: { contentTypeKey: "text", payload: { title, body: "Initial text" }, isVisible: true }
+    }));
+    const path = `/api/courses/${data.courseId}/content-resources/${resource.id}`;
+    // Imports/seeded resources can contain more text than the authoring limit.
+    // Reproduce that existing state only on this test's disposable resource.
+    const originalBody = "# Imported assignment\n\n" + "Legacy text ".repeat(2800);
+    await prisma.courseContentResource.update({ where: { id: resource.id }, data: { metadata: {
+      body: originalBody, format: "markdown", importReference: "original"
+    } } });
+    await page.goto(`/courses/${data.courseId}?tab=content`);
+    await page.getByRole("button", { name: `Actions for ${title}`, exact: true }).click();
+    await page.getByRole("menuitem", { name: "Settings", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: title, exact: true });
+    await dialog.getByLabel("Student display").selectOption("modal");
+
+    const latestBody = originalBody + "\n\nLatest content revision.";
+    await prisma.courseContentResource.update({ where: { id: resource.id }, data: { metadata: {
+      body: latestBody, format: "markdown", importReference: "newer revision"
+    } } });
+    const requestPromise = page.waitForRequest((request) => request.method() === "PATCH" && new URL(request.url()).pathname === path);
+    await dialog.getByRole("button", { name: "Save material", exact: true }).click();
+    const request = await requestPromise;
+    expect(request.postDataJSON()).toEqual({
+      payload: { title, displayMode: "modal", openInNewTab: false }, isVisible: true
+    });
+    await expect(dialog).toBeHidden();
+    const saved = await responseJson<{ resource: { metadata: Record<string, unknown> } }>(await teacher.get(path));
+    expect(saved.resource.metadata).toMatchObject({ body: latestBody, importReference: "newer revision", displayMode: "modal" });
+
+    await page.getByRole("button", { name: `Actions for ${title}`, exact: true }).click();
+    await page.getByRole("menuitem", { name: "Settings", exact: true }).click();
+    await expect(dialog.getByLabel("Student display")).toHaveValue("modal");
+    await dialog.getByLabel("Student display").selectOption("page");
+    await dialog.getByLabel("Open in a new tab").check();
+    await dialog.getByRole("button", { name: "Save material", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    const pageSettings = await responseJson<{ resource: { metadata: Record<string, unknown> } }>(await teacher.get(path));
+    expect(pageSettings.resource.metadata).toMatchObject({ body: latestBody, importReference: "newer revision", displayMode: "page", openInNewTab: true });
+  } finally {
+    await teacher.dispose();
+    await removeActivitySuite(data);
+  }
+});
+
 test("authors rich text with retained images and presents inline, page, and modal views with section visibility", async ({ teacherPage: page, studentPage }, testInfo) => {
   test.setTimeout(150_000);
   const data = await provisionActivitySuite();

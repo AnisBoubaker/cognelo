@@ -38,7 +38,12 @@ export function TextContentSettingsForm({ error, editorHref, onSubmit, ...props 
   const copy = textContentCopy(props.locale);
   return <form className="form" onSubmit={onSubmit}>
     {editorHref ? <a className="button secondary" href={editorHref}><ActionIcon name="edit" /> {copy.edit}</a> : null}
-    <TextDisplaySettings {...props} />
+    <TextDisplaySettings {...props} onMetadataChange={(metadata) => {
+      // This dialog edits presentation only. Sending the stored body would
+      // revalidate imported notes and overwrite concurrent text-editor changes.
+      const { displayMode, openInNewTab } = readTextContent(metadata);
+      props.onMetadataChange({ displayMode, openInNewTab });
+    }} />
     {error ? <p className="error" role="alert">{error}</p> : null}
     <button type="submit"><ActionIcon name="save" /> {copy.save}</button>
   </form>;

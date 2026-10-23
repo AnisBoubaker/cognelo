@@ -143,3 +143,5 @@ Link-summary coverage also checks the default-off same-domain checkbox, its gene
 
 - `application-time.spec.ts`: admin-only timezone updates, Toronto scheduling in a Tokyo browser, unchanged stored instants, and Test start/deadline enforcement under forward/backward browser-clock manipulation. The test restores the prior instance timezone and uses disposable course data.
 - `course-time.spec.ts`: default-off administrator permission, inherited course defaults, owner-only editing and audit, Save/Cancel/reload, cross-course isolation, scheduling and learner display, disable/re-enable, and returning to inheritance. It restores the instance policy and removes disposable courses.
+
+`text-content.spec.ts` also verifies that display settings for long imported notes send only presentation fields and preserve both the full body and concurrent content edits.

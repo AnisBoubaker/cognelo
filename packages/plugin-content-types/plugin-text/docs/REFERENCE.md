@@ -4,7 +4,7 @@
 
 Choosing Text in the Material picker creates a shell in the selected folder, preserving the selected visibility, and navigates to `/courses/:courseId/materials/:resourceId/edit`. The course row title and Edit action reopen that page. The teacher edits a required title (maximum 180 characters) and Markdown body (maximum 20,000 characters) with the shared visual/Markdown editor. Image uploads, alt text and sizing, tables, formulas, source editing, fullscreen, and resizing come from that editor.
 
-The editor uses the shared save/cancel bar, unsaved-navigation guard, and success notifications. Save persists title, body, display preferences, visibility, and media references transactionally; the content-tree title snapshot follows the resource title. The right-aligned **Back to course** control returns to the course tree, reusing the activity modules’ `activity-editor-context` layout and shared `groupPage.backToCourse` translation. Display and visibility controls are also available in the existing course-content Settings dialog; editing the text itself stays on the dedicated page.
+The editor uses the shared save/cancel bar, unsaved-navigation guard, and success notifications. Save persists title, body, display preferences, visibility, and media references transactionally; the content-tree title snapshot follows the resource title. The right-aligned **Back to course** control returns to the course tree, reusing the activity modules’ `activity-editor-context` layout and shared `groupPage.backToCourse` translation. Display and visibility controls are also available in the existing course-content Settings dialog; editing the text itself stays on the dedicated page. The settings-only form forwards only `displayMode` and `openInNewTab`, with visibility saved separately by the host. It must not copy stored Markdown, format, or derived metadata into the update payload. Imported/seeded notes can exceed the authoring body limit; presentation changes preserve that existing text without revalidating or truncating it. Concurrent content edits remain intact because the server merges the presentation patch into its current resource metadata.
 
 ## Student display
 
@@ -31,7 +31,7 @@ Duplication copies Markdown and display preferences, excluding `embeddingIndex`.
 
 - Plugin tests cover legacy defaults, page targets, schema bounds, partial settings updates, and independent duplication.
 - Core media tests cover reference ownership and section/resource visibility during image delivery.
-- `tests/e2e/text-content.spec.ts` covers dedicated editing, actual image uploads and retention, tables/formulas, inline/page/modal display, new-tab behavior, focus/scroll restoration, section visibility, student permissions, and duplicate image retention.
+- `tests/e2e/text-content.spec.ts` covers dedicated editing, actual image uploads and retention, tables/formulas, inline/page/modal display, new-tab behavior, focus/scroll restoration, section visibility, student permissions, and duplicate image retention, plus presentation updates on long imported notes without resending text or overwriting concurrent content edits.
 - Existing content-resource E2E coverage also checks inherited folder visibility, duplication, file and GitHub materials, and saved ordering.
 
 ## Shared action controls
