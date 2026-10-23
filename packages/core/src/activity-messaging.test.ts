@@ -3,21 +3,26 @@ import type { CurrentUser } from "@cognelo/contracts";
 
 const db = vi.hoisted(() => ({
   activity: { findFirst: vi.fn() },
-  activityAttempt: { findMany: vi.fn() },
+  activityAttempt: { findMany: vi.fn(), findFirst: vi.fn() },
   activityConversation: { findMany: vi.fn(), updateMany: vi.fn(), upsert: vi.fn(), findFirst: vi.fn() },
-  activityConversationMessage: { findMany: vi.fn(), count: vi.fn() },
+  activityConversationMessage: { findMany: vi.fn(), count: vi.fn(), findFirst: vi.fn() },
   activityConversationRead: { findUnique: vi.fn(), upsert: vi.fn() },
   activityMessageBroadcast: { findMany: vi.fn() },
   courseGroupActivity: { findFirst: vi.fn() },
-  courseGroupParticipant: { findFirst: vi.fn() },
+  courseGroupParticipant: { findFirst: vi.fn(), count: vi.fn() },
   $transaction: vi.fn()
 }));
 const tx = vi.hoisted(() => ({
   activity: { findFirst: vi.fn() },
   activityMessageBroadcast: { create: vi.fn() },
-  activityConversationMessage: { createMany: vi.fn() }
+  activityConversationMessage: { createMany: vi.fn(), create: vi.fn() },
+  courseGroupActivity: { findMany: vi.fn() },
+  activityAttempt: { findMany: vi.fn() },
+  activityConversation: { upsert: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() }
 }));
-const authorization = vi.hoisted(() => ({ getActivityMessagingGroupScope: vi.fn() }));
+const authorization = vi.hoisted(() => ({ getActivityMessagingGroupScope: vi.fn(), assertCanGradeGroup: vi.fn() }));
+const contentAccess = vi.hoisted(() => ({ assertActivityContentAccess: vi.fn() }));
+vi.mock("./activity-content-access", () => contentAccess);
 const gradebook = vi.hoisted(() => ({ getActivityAttemptAvailability: vi.fn() }));
 const groups = vi.hoisted(() => ({ getGroupAssignedActivity: vi.fn() }));
 
@@ -30,7 +35,7 @@ import {
   getLearnerActivityConversation,
   getStoredLearnerActivityConversation,
   markLearnerActivityConversationRead,
-  sendActivityBroadcast
+  sendActivityBroadcast, sendLearnerActivityMessage, sendStaffActivityReply, getStaffActivityConversation, listActiveConversations, getLearnerActivityMessagingStatus
 } from "./activity-messaging";
 
 const student: CurrentUser = {
@@ -54,8 +59,8 @@ const enabledMetadata = { allGroupsAssignment: { messagingEnabled: true } };
 
 describe("activity attempt messaging", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    db.$transaction.mockImplementation((callback) => callback(tx));
+    vi.resetAllMocks();
+    db.$transaction.mockImplementation((callback) => typeof callback === "function" ? callback(tx) : Promise.all(callback));
     groups.getGroupAssignedActivity.mockResolvedValue({
       id: "activity-1",
       metadata: enabledMetadata,
@@ -64,6 +69,11 @@ describe("activity attempt messaging", () => {
     });
     db.courseGroupParticipant.findFirst.mockResolvedValue({ id: "participant-1" });
     gradebook.getActivityAttemptAvailability.mockResolvedValue({ canStart: true, reason: null });
+    db.activityConversation.findMany.mockResolvedValue([]);
+    db.activityConversation.findFirst.mockResolvedValue(null);
+    tx.activityConversation.findMany.mockResolvedValue([]);
+    tx.courseGroupActivity.findMany.mockResolvedValue([]);
+    tx.activityAttempt.findMany.mockResolvedValue([]);
     db.activityConversation.updateMany.mockResolvedValue({ count: 0 });
     db.activityConversation.upsert.mockResolvedValue({
       id: "conversation-2",
@@ -187,28 +197,12 @@ describe("activity attempt messaging", () => {
     expect(db.activityConversation.upsert).not.toHaveBeenCalled();
   });
 
-  it("fans one broadcast out only to recently active, still-current conversations", async () => {
-    db.activityConversation.findMany.mockResolvedValue([
-      {
-        id: "conversation-1",
-        groupId: "group-1",
-        groupActivityId: "assignment-1",
-        participantId: "participant-1",
-        attemptNumber: 1,
-        lastSeenAt: now,
-        attempt: { lifecycle: "started" }
-      },
-      {
-        id: "conversation-2",
-        groupId: "group-2",
-        groupActivityId: "assignment-2",
-        participantId: "participant-2",
-        attemptNumber: 1,
-        lastSeenAt: now,
-        attempt: null
-      }
+  it("fans one broadcast out to enrolled offline students without renewing presence", async () => {
+    tx.courseGroupActivity.findMany.mockResolvedValue([
+      { id: "assignment-1", groupId: "group-1", group: { participants: [{ id: "participant-1" }] } },
+      { id: "assignment-2", groupId: "group-2", group: { participants: [{ id: "participant-2" }] } }
     ]);
-    db.activityAttempt.findMany.mockResolvedValue([]);
+    tx.activityConversation.upsert.mockResolvedValueOnce({ id: "conversation-1" }).mockResolvedValueOnce({ id: "conversation-2" });
     tx.activityMessageBroadcast.create.mockResolvedValue({ id: "broadcast-1" });
     tx.activityConversationMessage.createMany.mockResolvedValue({ count: 2 });
 
@@ -229,31 +223,64 @@ describe("activity attempt messaging", () => {
     });
   });
 
-  it("does not deliver to a conversation whose matching attempt has finished", async () => {
-    db.activityConversation.findMany.mockResolvedValue([{
-      id: "conversation-1",
-      groupId: "group-1",
-      groupActivityId: "assignment-1",
-      participantId: "participant-1",
-      attemptNumber: 1,
-      lastSeenAt: now,
-      attempt: null
-    }]);
-    db.activityAttempt.findMany.mockResolvedValue([{
-      groupActivityId: "assignment-1",
-      participantId: "participant-1",
-      attemptNumber: 1,
-      lifecycle: "submitted"
-    }]);
+  it("excludes submitted attempts from presence, even without a linked attempt id", async () => {
+    db.activityConversation.findMany.mockResolvedValue([{ id: "conversation-1", groupId: "group-1", groupActivityId: "assignment-1", participantId: "participant-1", attemptNumber: 1, attempt: null }]);
+    db.activityAttempt.findMany.mockResolvedValue([{ groupActivityId: "assignment-1", participantId: "participant-1", attemptNumber: 1, lifecycle: "submitted" }]);
+    expect(await listActiveConversations("course-1", "activity-1", null, now)).toEqual([]);
+  });
 
-    await expect(sendActivityBroadcast(
-      teacher,
-      "course-1",
-      "activity-1",
-      "Too late",
-      null,
-      now
-    )).rejects.toMatchObject({ code: "NO_ACTIVE_ACTIVITY_ATTEMPTS" });
-    expect(tx.activityMessageBroadcast.create).not.toHaveBeenCalled();
+  it("returns only a revision and unread count during the existing learner heartbeat", async () => {
+    db.activityAttempt.findMany.mockResolvedValue([]);
+    db.activityConversationMessage.findFirst.mockResolvedValue({ id: "latest" });
+    const status = await getLearnerActivityMessagingStatus(student, "course-1", "group-1", "activity-1", true);
+    expect(status).toMatchObject({ id: "conversation-2", version: "conversation-2:false:latest", unreadCount: 0 });
+    expect(status).not.toHaveProperty("messages");
+    expect(db.activityConversationMessage.findMany).not.toHaveBeenCalled();
+    expect(db.activityConversationMessage.findFirst).toHaveBeenCalledWith(expect.objectContaining({ select: { id: true } }));
+  });
+
+  it("never bypasses activity content closure through stored history or read receipts", async () => {
+    contentAccess.assertActivityContentAccess.mockRejectedValue(new Error("closed"));
+    await expect(getStoredLearnerActivityConversation(student, "course-1", "group-1", "activity-1")).rejects.toThrow("closed");
+    await expect(markLearnerActivityConversationRead(student, "course-1", "group-1", "activity-1", "conversation-1")).rejects.toThrow("closed");
+    expect(db.activityConversation.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("does not allow students to send when two-way messaging is off", async () => {
+    db.activityAttempt.findMany.mockResolvedValue([]);
+    await expect(sendLearnerActivityMessage(student, "course-1", "group-1", "activity-1", "Question")).rejects.toMatchObject({ code: "ACTIVITY_REPLY_DISABLED" });
+    expect(tx.activityConversationMessage.create).not.toHaveBeenCalled();
+  });
+
+  it("uses the current student's conversation and rechecks two-way permission inside the write", async () => {
+    groups.getGroupAssignedActivity.mockResolvedValue({ metadata: { allGroupsAssignment: { messagingEnabled: true, twoWayMessagingEnabled: true } }, activityType: { key: "mcq" }, assignment: { id: "assignment-1", metadata: {} } });
+    db.activityAttempt.findMany.mockResolvedValue([]);
+    await expect(sendLearnerActivityMessage(student, "course-1", "group-1", "activity-1", "Question")).rejects.toMatchObject({ code: "ACTIVITY_REPLY_DISABLED" });
+    tx.activity.findFirst.mockResolvedValue({ metadata: { allGroupsAssignment: { messagingEnabled: true, twoWayMessagingEnabled: true } } });
+    await sendLearnerActivityMessage(student, "course-1", "group-1", "activity-1", "  Question  ");
+    expect(tx.activityConversationMessage.create).toHaveBeenCalledWith({ data: expect.objectContaining({ conversationId: "conversation-2", senderUserId: student.id, senderKind: "student", body: "Question" }) });
+  });
+
+  it("requires a student-initiated conversation before a teacher can reply", async () => {
+    db.courseGroupParticipant.findFirst.mockResolvedValue({ groupId: "group-1", firstName: "Student", lastName: "One" });
+    tx.activity.findFirst.mockResolvedValue({ metadata: { allGroupsAssignment: { messagingEnabled: true, twoWayMessagingEnabled: true } } });
+    tx.activityConversation.findFirst.mockResolvedValue(null);
+    await expect(sendStaffActivityReply(teacher, "course-1", "activity-1", "participant-1", "Reply")).rejects.toMatchObject({ code: "ACTIVITY_CONVERSATION_NOT_STARTED" });
+    expect(tx.activityConversationMessage.create).not.toHaveBeenCalled();
+  });
+
+  it("checks section permission before reading or replying to a student", async () => {
+    db.courseGroupParticipant.findFirst.mockResolvedValue({ groupId: "other-group", firstName: "Student", lastName: "One" });
+    authorization.assertCanGradeGroup.mockRejectedValue(new Error("forbidden"));
+    await expect(getStaffActivityConversation(teacher, "course-1", "activity-1", "participant-1")).rejects.toThrow("forbidden");
+    await expect(sendStaffActivityReply(teacher, "course-1", "activity-1", "participant-1", "Reply")).rejects.toThrow("forbidden");
+    expect(db.activityConversationMessage.findMany).not.toHaveBeenCalled();
+  });
+
+  it("does not accept a pagination cursor from another conversation", async () => {
+    db.courseGroupParticipant.findFirst.mockResolvedValue({ groupId: "group-1", firstName: "Student", lastName: "One" });
+    db.activityConversationMessage.findFirst.mockResolvedValue(null);
+    await expect(getStaffActivityConversation(teacher, "course-1", "activity-1", "participant-1", { before: "someone-elses-message" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(db.activityConversationMessage.findMany).not.toHaveBeenCalled();
   });
 });

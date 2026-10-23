@@ -17,6 +17,13 @@ export function courseActivitySolutionReleased(value: unknown): boolean {
 }
 
 /** Messaging is a course-activity setting, shared by every section and attempt. */
+export function courseActivityTwoWayMessagingEnabled(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const rule = (value as Record<string, unknown>).allGroupsAssignment;
+  return Boolean(rule && typeof rule === "object" && !Array.isArray(rule)
+    && (rule as Record<string, unknown>).twoWayMessagingEnabled === true);
+}
+
 export function courseActivityMessagingEnabled(value: unknown): boolean {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const rule = (value as Record<string, unknown>).allGroupsAssignment;

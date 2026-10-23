@@ -3,6 +3,18 @@ import { expect, test } from "./fixtures/auth";
 import { provisionLearningFlow, removeLearningFlow } from "./fixtures/learning-flow";
 
 test.describe("consistent gradebook review actions", () => {
+  test("batch grading exposes the selected student's retained discussion", async ({ teacherPage: page }) => {
+    await page.goto("/courses/seed-course-programming-101/gradebook/activities/seed-activity-c-median-feedback");
+    await page.getByRole("button", { name: "Review and grade all", exact: true }).click();
+    await expect(page.getByRole("dialog").getByRole("heading", { name: "Review and grade", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Activity messages", exact: true }).click();
+    const discussion = page.getByRole("dialog", { name: "Activity messages", exact: true });
+    await expect(discussion.getByText("No messages yet.", { exact: true })).toBeVisible();
+    await expect(discussion.getByRole("textbox")).toHaveCount(0);
+    await discussion.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(page.getByRole("dialog").getByRole("heading", { name: "Review and grade", exact: true })).toBeVisible();
+  });
+
   test("programming exercises combine rubric feedback and the final grade in one review", async ({ teacherPage: page }) => {
     await page.goto("/courses/seed-course-programming-101/gradebook/activities/seed-activity-c-median-feedback");
 
@@ -68,6 +80,11 @@ test.describe("consistent gradebook review actions", () => {
     const nextCriterionScore = Number(await firstCriterion.inputValue()) === 100 ? "0" : "100";
     await firstCriterion.fill(nextCriterionScore);
     await expect.poll(() => totalGrade.inputValue()).not.toBe(totalBefore);
+    await expect.poll(async () => Number(await finalGrade.inputValue())).toBe(Number(await totalGrade.inputValue()));
+    await page.getByRole("button", { name: "Activity messages", exact: true }).click();
+    const discussion = page.getByRole("dialog", { name: "Activity messages", exact: true });
+    await expect(discussion.getByText("No messages yet.", { exact: true })).toBeVisible();
+    await discussion.getByRole("button", { name: "Close", exact: true }).click();
     await expect.poll(async () => Number(await finalGrade.inputValue())).toBe(Number(await totalGrade.inputValue()));
   });
 

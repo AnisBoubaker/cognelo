@@ -615,9 +615,10 @@ function GroupActivityContent() {
           activityId={activityId}
           courseId={courseId}
           enabled={Boolean(
-            isLearner && selectedTab === "attempt"
+            isLearner
           )}
           groupId={groupId}
+          historyOnly={selectedTab !== "attempt"}
         />
 
         <div hidden={showSolution || isActivityUnavailable || Boolean(safeExamBrowserAccess?.requiresSafeExamBrowser && !safeExamBrowserAccess.accessGranted)}>

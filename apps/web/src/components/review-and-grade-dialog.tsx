@@ -1,5 +1,7 @@
 "use client";
 
+import { ActivityChatDialog } from "@/components/activity-chat";
+import { StaffActivityChat } from "@/components/activity-broadcast-dialog";
 import { AppIcon } from "@/components/app-icon";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -74,6 +76,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
   const [manualReview, setManualReview] = useState<ManualReviewState | null>(null);
   const [feedbackReview, setFeedbackReview] = useState<FeedbackReviewState | null>(null);
   const [savingAction, setSavingAction] = useState<"delete" | "override" | "regrade" | null>(null);
+  const [showMessages, setShowMessages] = useState(false);
   const [regradeProgress, setRegradeProgress] = useState<TestRegradeProgress | null>(null);
   const loadReviewRef = useRef<() => void>(() => undefined);
   const loadedReviewIdentityRef = useRef<string | null>(null);
@@ -417,6 +420,9 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
   }
 
   const selectedAttempt = manualReview?.attempts[manualReview.selectedIndex] ?? null;
+  const messageAttemptId = useFeedbackReview
+    ? feedbackReview?.attemptReferences[feedbackReview.selectedAttemptIndex]?.coreAttemptId
+    : row.attempts.find((attempt) => attempt.id === selectedAttempt?.id || attempt.pluginAttemptRef === selectedAttempt?.id)?.id;
   const close = async () => {
     if (!feedbackReview || !hasUnsavedFeedbackReview(feedbackReview) || await dialogs.confirm({
       message: t("courseDetail.feedbackReviewDiscardConfirm"),
@@ -435,6 +441,8 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
         progressSummary={regradeProgress ? t("courseDetail.batchActionProgress", {
           completed: regradeProgress.completed, total: regradeProgress.total
         }) : undefined} />
+      <div className="review-chat-workspace">
+        <div className="review-chat-toolbar"><button type="button" className="secondary" onClick={() => setShowMessages(true)}><AppIcon name="messages" />{t("activityMessenger.title")}</button></div>
       {useFeedbackReview ? feedbackReview ? (
           <AiFeedbackReviewPanel
           row={row}
@@ -492,6 +500,10 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
           <p className="error-text">{t("courseDetail.feedbackReviewUnavailable")}</p>
         </section>
       )}
+      </div>
+      {showMessages ? <ActivityChatDialog onClose={() => setShowMessages(false)}>
+        <div className="activity-chat-panel"><StaffActivityChat key={messageAttemptId ?? row.participantId} courseId={courseId} activityId={row.activityId} participantId={row.participantId} attemptId={messageAttemptId} readOnly /></div>
+      </ActivityChatDialog> : null}
     </div>
   );
 }

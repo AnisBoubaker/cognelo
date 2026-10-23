@@ -1,33 +1,38 @@
 # Activity messaging
 
-Messaging is a core, course-activity setting. In **Course content → activity Settings → General**, **Enable activity messaging** controls staff broadcasts and the learner's Messages button, including compound Tests. It is off by default. The switch applies to every section; it is not a section, team, or individual exception.
+Messaging belongs to core and works for standalone activities and compound Tests without plugin changes. **Course content → activity Settings → General** offers two switches, both off by default:
 
-Authoring edits, including prompts and private test cases within a compound Test, use the same confirmation and optional notice. The edit and its notice/audit share a transaction; see [Live activity authoring](LIVE_ACTIVITY_AUTHORING.md).
+- **Enable activity messaging** enables broadcasts and the learner's envelope.
+- **Allow students to message teachers** additionally permits student-initiated private conversations and teacher replies.
 
-## Persistence and live changes
+These activity-wide switches apply to every section, not to section/team/student exceptions. They persist as `Activity.metadata.allGroupsAssignment.messagingEnabled` and `twoWayMessagingEnabled`. Assignment-settings GET exposes both booleans; POST preserves an omitted switch for older callers. No database migration is required.
 
-`Activity.metadata.allGroupsAssignment.messagingEnabled` stores the boolean. Missing values mean disabled. The course assignment-settings GET exposes `general.messagingEnabled`; the POST accepts the optional boolean and preserves the saved value when older callers omit it. No database migration is needed for this switch.
+## Chat and delivery
 
-Eligible learner pages poll their conversation every five seconds even while messaging is disabled. Disabled conversations return `null`, so the envelope is hidden. Enabling during an attempt exposes the existing attempt's conversation on the next poll without reloading the activity or replacing answers. Disabling hides the button and closes an open message dialog. Messages and read cursors are retained; enabling again restores the same thread. Polling pauses in hidden tabs and resumes on the next visible poll.
+The teacher's **Message students** dialog has left-side Broadcast and student tabs. A private tab appears only after that student sends a message; opening the activity or receiving a broadcast does not establish a private chat. Staff cannot initiate a private conversation. Students see broadcasts and their own private messages/replies together, with distinct broadcast labels and chat bubbles. The student write endpoint accepts only message text: it derives enrollment, conversation, and sender on the server and has no recipient selector.
 
-The activity report polls messaging availability every ten seconds and on window focus. **Message students** appears only with both the enabled switch and existing teacher permissions. Disabling also closes an open broadcast dialog. Broadcast writes recheck the switch on the server, including inside the write transaction; learner history and read receipts are also gated by the current switch.
+Explicit broadcasts reach every student enrollment in the assigned, authorized sections, including offline students. Delivery is recorded once per enrollment, against its latest current/logical attempt, and does not renew presence or create academic attempts. Broadcast history includes delivery/read counts. The optional notice accompanying a live settings or authoring change still targets only students currently answering: its existing transaction and recipient behavior are preserved. See [Live activity authoring](LIVE_ACTIVITY_AUTHORING.md).
 
-## Presence and settings warnings
+Messages remain stored in attempt-scoped `ActivityConversation` records. The activity chat combines an enrollment's records across attempts, labels messages with their attempt, and pages backward in batches of 100. Broadcast history is also paginated. Staff review can filter history to the submission being inspected, including logical conversations whose `attemptId` was not yet linked. Per-user read cursors are monotonic and bounded by the latest displayed message; reading a specific attempt does not mark other attempts read.
 
-Presence continues while messaging is disabled so the teacher still receives the **Students are answering** confirmation before changing live settings. That confirmation offers an optional notice only when the resulting setting enables messaging and the teacher has permission for every target section. Enabling can include an initial notice in the same transaction; disabling cannot send an inaccessible notice. Section and exception saves use the saved course-activity switch.
+## Live controls and presence
 
-## Scope and authorization
+The existing learner content-access poll runs every 20 seconds, including while messaging is disabled. It carries only a small messaging revision, unread count, conversation identity, and sending permission; it never returns message bodies. There is no separate messenger timer. Closed chats fetch no history; opening a chat, sending, loading earlier messages, or receiving a changed revision while open retrieves history. Enabling midway exposes the envelope without reloading or replacing answers; disabling closes the dialog and hides the envelope while retaining records. The separate two-way switch updates the composer live. History tabs use read-only retrieval and never renew answering presence. Student sending requires an active, unexpired timed/Test attempt or a permitted next untimed attempt; submitted/expired work remains readable when consultation is allowed.
 
-The opt-in [activity content closure rule](ACTIVITY_CONTENT_ACCESS.md) additionally blocks learner conversation retrieval after attempts end, since notices may quote exam content. Stored conversations remain intact for staff. This takes precedence over the ordinary retained-notice behavior described below.
+The open activity report polls a small messaging revision every ten seconds and on focus, using its existing cadence. Open dialogs fetch their contents only when that revision changes; they have no independent timer. Grading review loads its selected discussion on demand without polling. Hidden tabs skip periodic messaging checks, and unmounting the activity page cancels its timer. **Message students** requires messaging enabled and teacher messaging permission. Disabling messaging closes that dialog. Saved discussions remain accessible from **Review and grade → Activity messages** in individual and batch grading, even with messaging subsequently disabled. Review is read-only and follows the selected submission when one is available.
 
-Each thread belongs to one assignment, student enrollment, and attempt number. Timed standalone activities and compound Tests require a started core attempt. Untimed activities use the next logical attempt number without creating an academic attempt on page load. New attempts start with an empty thread.
+Presence remains independent of messaging. Recently present, unfinished attempts (45-second window) drive the **Students are answering** warning for live settings changes, even when messaging is off. Timed activities and Tests require a started attempt to renew presence; untimed activities use the next logical attempt. A broadcast created for an offline student uses a closed, inactive delivery record. Review/history requests do not renew presence.
 
-Staff broadcasts target only authorized, current conversations present within the last 45 seconds. Course teachers and administrators can reach all assigned sections; section teachers are restricted to their sections; teaching assistants cannot broadcast. Learners cannot send messages. Starting or renewing presence retains activity-access and Safe Exam Browser checks. When messaging is enabled, existing notices remain readable through enrollment ownership after a live policy change closes activity access, without renewing presence or exposing activity content.
+## Authorization and retained access
+
+Course teachers and administrators may broadcast/reply across assigned sections; section teachers are limited to their own sections. Authorized grading staff, including section teaching assistants, can read discussions during review, but TAs cannot broadcast or reply. Every participant, activity, course, optional attempt, and history cursor is checked against this scope.
+
+Learners can retrieve and mark only their own enrolled history. Ordinary availability/SEB changes may leave existing notices readable without renewing presence. The opt-in [activity content closure rule](ACTIVITY_CONTENT_ACCESS.md) takes precedence on all history/read/write paths: if post-submission consultation is closed, messages are also closed because they may quote exam content. Staff retain access. Writes check current messaging/two-way switches again inside the transaction.
 
 ## Verification
 
-- `packages/core/src/activity-messaging.test.ts`: default-off presence, live toggles, stored-message/read gating, attempt isolation, recipient boundaries, and server broadcast checks.
-- `packages/core/src/activity-settings-live.test.ts`: warnings while disabled and notice permissions when enabling/disabling.
-- `tests/e2e/activity-messaging-settings.spec.ts`: General settings, cancellation, timed/untimed live toggles, preserved answers and history, older API caller compatibility, and teacher/learner controls.
-- `tests/e2e/activity-messaging.spec.ts`: delivery, unread/read status, countdown placement, and subsequent-attempt isolation.
-- `tests/e2e/live-test-settings.spec.ts`: enabling during a compound Test while applying a live exception.
+- Core and route unit tests cover switches, ownership, section scope, student-initiated replies, offline delivery, current-attempt presence, history cursors, and content closure.
+- `tests/e2e/activity-chat.spec.ts`: chat UI, offline delivery, student isolation, live two-way toggles, post-submission review, content closure, retained staff access, pagination, and read receipts.
+- `tests/e2e/activity-messaging.spec.ts`: broadcast delivery, read state, countdown/envelope placement, and history retained across attempts.
+- `tests/e2e/activity-messaging-settings.spec.ts`: timed/untimed enablement, preserved answers/history, settings cancellation, and older API callers.
+- `tests/e2e/live-test-settings.spec.ts`: enabling messaging while applying a live compound-Test exception.

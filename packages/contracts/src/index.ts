@@ -895,6 +895,7 @@ export const CourseAllGroupsActivityAssignmentInputSchema = z.object({
   confirmActiveStudents: z.boolean().optional(),
   studentMessage: z.string().trim().max(4000).optional(),
   messagingEnabled: z.boolean().optional(),
+  twoWayMessagingEnabled: z.boolean().optional(),
   releaseSolution: z.boolean().optional(),
   hideAfterAttempts: z.boolean().optional(),
   requireSafeExamBrowser: z.boolean().optional().default(false),

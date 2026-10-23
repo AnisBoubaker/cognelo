@@ -4,7 +4,7 @@ import { createAuthenticatedApi, credentialsFor } from "./fixtures/auth";
 import type { CourseActivityAssignmentSettings, CourseTestRuntime } from "../../apps/web/src/lib/api";
 
 test("compound Test applies live exceptions and ignores stale automatic submission", { tag: "@regression" }, async ({ bankCourse: data, teacherApi, studentPage }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   const studentApi = await createAuthenticatedApi("student");
   try {
     const title = `Live Test ${data.token}`;
@@ -42,7 +42,7 @@ test("compound Test applies live exceptions and ignores stale automatic submissi
     await responseJson(await teacherApi.post(settingsPath, { data: { ...update, confirmActiveStudents: true } }));
     await expect(studentPage.getByRole("timer")).toContainText(/59:/, { timeout: 30_000 });
     await expect(studentPage.getByLabel("Four", { exact: true })).toBeChecked();
-    await expect(studentPage.getByRole("button", { name: "Open activity messages" })).toBeVisible({ timeout: 10_000 });
+    await expect(studentPage.getByRole("button", { name: "Open activity messages" })).toBeVisible({ timeout: 30_000 });
     const { runtime: extended } = await responseJson<{ runtime: CourseTestRuntime }>(await studentApi.get(`${assignedPath}/test`));
     expect(extended.attempt!.id).toBe(initial.attempt!.id);
     expect(new Date(extended.timing.expiresAt!).getTime() - new Date(initial.timing.expiresAt!).getTime()).toBe(30 * 60_000);

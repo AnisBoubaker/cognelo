@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getConversation: vi.fn(),
   getStoredConversation: vi.fn(),
   markRead: vi.fn(),
+  sendMessage: vi.fn(),
   requireUser: vi.fn(),
   requireSafeExamBrowserAccess: vi.fn()
 }));
@@ -13,7 +14,8 @@ vi.mock("@cognelo/core", () => ({
   AppError: class extends Error { constructor(public status: number, public code: string, message: string) { super(message); } },
   getStoredLearnerActivityConversation: mocks.getStoredConversation,
   getLearnerActivityConversation: mocks.getConversation,
-  markLearnerActivityConversationRead: mocks.markRead
+  markLearnerActivityConversationRead: mocks.markRead,
+  sendLearnerActivityMessage: mocks.sendMessage
 }));
 vi.mock("@/lib/http", () => ({
   handleRoute: async (handler: () => Promise<Response>) => handler(),
@@ -26,7 +28,7 @@ vi.mock("@/lib/safe-exam-browser", () => ({
   requireSafeExamBrowserAccess: mocks.requireSafeExamBrowserAccess
 }));
 
-const { GET, PATCH } = await import("./route");
+const { GET, PATCH, POST } = await import("./route");
 const params = {
   params: Promise.resolve({ courseId: "course-1", groupId: "group-1", activityId: "activity-1" })
 };
@@ -61,6 +63,17 @@ describe("learner activity messaging route", () => {
     expect(mocks.getConversation).not.toHaveBeenCalled();
   });
 
+  it("rejects attempts to choose a recipient on the student endpoint", async () => {
+    await expect(POST(new NextRequest("http://test.local/messages", { method: "POST", body: JSON.stringify({ body: "Hi", participantId: "other-student" }) }), params)).rejects.toThrow();
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("enforces the access guard before sending student messages", async () => {
+    mocks.requireSafeExamBrowserAccess.mockRejectedValueOnce(new Error("closed"));
+    await expect(POST(new NextRequest("http://test.local/messages", { method: "POST", body: JSON.stringify({ body: "Hi" }) }), params)).rejects.toThrow("closed");
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+  });
+
   it("marks only the requested learner conversation as read", async () => {
     const request = new NextRequest("http://test.local/messages", {
       method: "PATCH",
@@ -73,7 +86,7 @@ describe("learner activity messaging route", () => {
       "course-1",
       "group-1",
       "activity-1",
-      "conversation-1"
+      "conversation-1", undefined, undefined
     );
   });
 });

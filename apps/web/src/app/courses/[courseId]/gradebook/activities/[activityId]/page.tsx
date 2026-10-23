@@ -10,7 +10,8 @@ import { ContextMenu, ProgressDialog, useDialogs, useNotifications } from "@cogn
 import { createMcqClient } from "@cognelo/plugin-mcq";
 import { createParsonsClient } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
-import { ActivityBroadcastDialog } from "@/components/activity-broadcast-dialog";
+import { ActivityChatDialog } from "@/components/activity-chat";
+import { ActivityBroadcastDialog, StaffActivityChat } from "@/components/activity-broadcast-dialog";
 import { ActivitySettingsModal } from "@/components/activity-settings-dialog";
 import { AppIcon } from "@/components/app-icon";
 import { TestReviewAllPanel } from "@/components/test-review-all-panel";
@@ -83,6 +84,7 @@ export default function GradebookActivityResultsPage() {
   const [showGradeExport, setShowGradeExport] = useState(false);
   const [showActivitySettings, setShowActivitySettings] = useState(false);
   const [showActivityMessenger, setShowActivityMessenger] = useState(false);
+  const [messagingVersion, setMessagingVersion] = useState("");
   const [messagingEnabled, setMessagingEnabled] = useState(false);
   const [reportTab, setReportTab] = useState<"overview" | "students">(
     requestedReportTab ?? (origin === "content" ? "overview" : "students")
@@ -190,9 +192,10 @@ export default function GradebookActivityResultsPage() {
     const refresh = async () => {
       if (document.visibilityState !== "visible") return;
       try {
-        const { messaging } = await api.activityMessagingOverview(courseId, activityId, groupId);
+        const { messaging } = await api.activityMessagingStatus(courseId, activityId, groupId);
         if (cancelled) return;
         setMessagingEnabled(messaging.enabled);
+        setMessagingVersion(messaging.version);
         if (!messaging.enabled) setShowActivityMessenger(false);
       } catch {
         // Keep the last known setting during a temporary network failure.
@@ -220,7 +223,7 @@ export default function GradebookActivityResultsPage() {
     await refresh();
     setReviewAll(null);
     if (hasMessagingPermission) {
-      await api.activityMessagingOverview(courseId, activityId, groupId)
+      await api.activityMessagingStatus(courseId, activityId, groupId)
         .then(({ messaging }) => setMessagingEnabled(messaging.enabled))
         .catch(() => { /* The regular messaging poll retries temporary failures. */ });
     }
@@ -1160,6 +1163,7 @@ export default function GradebookActivityResultsPage() {
             }}
           >
             <AiFeedbackReviewPanel
+              courseId={courseId}
               state={feedbackReview}
               onClose={() => {
                 void confirmLeaveFeedbackReview(feedbackReview).then((confirmed) => {
@@ -1197,6 +1201,7 @@ export default function GradebookActivityResultsPage() {
         ) : null}
         {showActivityMessenger ? (
           <ActivityBroadcastDialog
+            updateKey={messagingVersion}
             activityId={activityId}
             courseId={courseId}
             groupId={groupId}
@@ -1223,7 +1228,8 @@ type AiFeedbackReviewState = {
   error: string;
 };
 
-function AiFeedbackReviewPanel({ state, onClose, onFeedbackChange, onGradeChange, onSelectIndex, onSave, t }: {
+function AiFeedbackReviewPanel({ courseId, state, onClose, onFeedbackChange, onGradeChange, onSelectIndex, onSave, t }: {
+  courseId: string;
   state: AiFeedbackReviewState;
   onClose: () => void;
   onFeedbackChange: (feedback: Record<string, unknown>) => void;
@@ -1232,10 +1238,12 @@ function AiFeedbackReviewPanel({ state, onClose, onFeedbackChange, onGradeChange
   onSave: () => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
+  const [showMessages, setShowMessages] = useState(false);
   const row = state.rows[state.selectedIndex];
   const renderer = state.review ? getAiFeedbackReviewRenderer(state.review.activityTypeKey) : null;
   const teacherRevision = state.review && typeof state.review.feedback.teacherRevision === "number" ? state.review.feedback.teacherRevision : 0;
   return (
+    <>
     <section className="dialog-panel answer-overlay test-review-overlay stack" role="dialog" aria-modal="true">
       <div className="section-heading">
         <div>
@@ -1245,7 +1253,10 @@ function AiFeedbackReviewPanel({ state, onClose, onFeedbackChange, onGradeChange
             {row?.participantName} · {state.selectedIndex + 1} / {state.rows.length}
           </p>
         </div>
+        <div className="row wrap">
+          <button className="secondary" type="button" onClick={() => setShowMessages(true)}><AppIcon name="messages" />{t("activityMessenger.title")}</button>
         <button className="button secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.close")}</button>
+        </div>
       </div>
       {state.rows.length > 1 ? (
         <div className="row wrap">
@@ -1296,6 +1307,10 @@ function AiFeedbackReviewPanel({ state, onClose, onFeedbackChange, onGradeChange
         </div>
       ) : null}
     </section>
+    {showMessages && row ? <ActivityChatDialog onClose={() => setShowMessages(false)}>
+      <div className="activity-chat-panel"><StaffActivityChat key={`${row.participantId}:${state.review?.attemptId}`} courseId={courseId} activityId={row.activityId} participantId={row.participantId} attemptId={state.review?.attemptId} readOnly /></div>
+    </ActivityChatDialog> : null}
+    </>
   );
 }
 

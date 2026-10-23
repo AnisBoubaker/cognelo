@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { ActivityBroadcastMessageInputSchema } from "@cognelo/contracts";
-import { getActivityMessagingOverview, sendActivityBroadcast } from "@cognelo/core";
+import { ActivityBroadcastMessageInputSchema, RecordIdSchema } from "@cognelo/contracts";
+import { getActivityMessagingStatus, getActivityMessagingOverview, sendActivityBroadcast } from "@cognelo/core";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; activityId: string }> };
@@ -14,7 +14,8 @@ export async function GET(request: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { courseId, activityId } = await params;
     const groupId = request.nextUrl.searchParams.get("groupId");
-    return json({ messaging: await getActivityMessagingOverview(user, courseId, activityId, groupId) });
+    if (request.nextUrl.searchParams.get("summary") === "1") return json({ messaging: await getActivityMessagingStatus(user, courseId, activityId, groupId) });
+    return json({ messaging: await getActivityMessagingOverview(user, courseId, activityId, groupId, undefined, RecordIdSchema.optional().parse(request.nextUrl.searchParams.get("before") ?? undefined)) });
   });
 }
 

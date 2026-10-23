@@ -874,6 +874,8 @@ export type TimedActivityRuntime = {
 };
 
 export type ActivityConversationMessage = {
+  broadcastId: string | null;
+  attemptNumber: number;
   id: string;
   senderKind: "staff" | "student" | "system";
   senderName: string;
@@ -881,7 +883,11 @@ export type ActivityConversationMessage = {
   createdAt: string;
 };
 
-export type LearnerActivityConversation = {
+export type LearnerActivityMessagingStatus = { id: string; attemptNumber: number; canSend: boolean; unreadCount: number; version: string };
+export type ActivityMessagingStatus = { enabled: boolean; version: string };
+export type ActivityMessageHistory = { messages: ActivityConversationMessage[]; hasMore: boolean; unreadCount: number; canSend: boolean };
+export type StaffActivityConversation = ActivityMessageHistory & { studentName: string };
+export type LearnerActivityConversation = ActivityMessageHistory & {
   id: string;
   attemptId: string | null;
   attemptNumber: number;
@@ -899,6 +905,10 @@ export type ActivityBroadcast = {
 };
 
 export type ActivityMessagingOverview = {
+  twoWayEnabled: boolean;
+  recipientCount: number;
+  hasMoreBroadcasts: boolean;
+  conversations: { participantId: string; studentName: string; groupId: string; groupTitle: string; unread: boolean }[];
   enabled: boolean;
   activeRecipientCount: number;
   broadcasts: ActivityBroadcast[];
@@ -929,6 +939,7 @@ export type ActivityAssignmentGradebookSettings = {
 export type CourseActivityAssignmentSettings = {
   general: {
     messagingEnabled: boolean;
+    twoWayMessagingEnabled: boolean;
     releaseSolution: boolean;
     hideAfterAttempts: boolean;
     availableFrom: string | null;
@@ -1557,7 +1568,7 @@ export function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  activityContentAccess: (courseId: string, groupId: string, activityId: string) => request<{ access: ActivityContentAccess }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/content-access`),
+  activityContentAccess: (courseId: string, groupId: string, activityId: string, messaging?: "presence" | "history") => request<{ access: ActivityContentAccess; messaging?: LearnerActivityMessagingStatus | null }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/content-access${messaging ? `?messaging=${messaging}` : ""}`),
   finalizeClosedActivityContent: (courseId: string, groupId: string, activityId: string) => request<{ access: ActivityContentAccess }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/content-access`, { method: "POST" }),
   applicationTime: () => request<{ timeZone: string; serverNow: string }>("/application-time"),
   applicationTimeSettings: () => request<ApplicationTimeSettingsDto>("/settings/time"),
@@ -1878,9 +1889,12 @@ export const api = {
     }
     return request<{ attempts: CourseActivityInProgressAttempt[] }>(`/courses/${courseId}/gradebook?${params.toString()}`);
   },
-  activityMessagingOverview: (courseId: string, activityId: string, groupId?: string) => {
+  activityMessagingStatus: (courseId: string, activityId: string, groupId?: string) =>
+    request<{ messaging: ActivityMessagingStatus }>(`/courses/${courseId}/gradebook/activities/${activityId}/messages?${new URLSearchParams({ summary: "1", ...(groupId ? { groupId } : {}) })}`),
+  activityMessagingOverview: (courseId: string, activityId: string, groupId?: string, before?: string) => {
     const params = new URLSearchParams();
     if (groupId) params.set("groupId", groupId);
+    if (before) params.set("before", before);
     const query = params.size ? `?${params.toString()}` : "";
     return request<{ messaging: ActivityMessagingOverview }>(
       `/courses/${courseId}/gradebook/activities/${activityId}/messages${query}`
@@ -1895,6 +1909,14 @@ export const api = {
       { method: "POST", body: JSON.stringify({ body }) }
     );
   },
+  staffActivityConversation: (courseId: string, activityId: string, participantId: string, options: { before?: string; attemptId?: string } = {}) =>
+    request<{ conversation: StaffActivityConversation }>(`/courses/${courseId}/gradebook/activities/${activityId}/messages/conversations/${participantId}?${new URLSearchParams({ ...(options.before ? { before: options.before } : {}), ...(options.attemptId ? { attemptId: options.attemptId } : {}) })}`),
+  sendStaffActivityReply: (courseId: string, activityId: string, participantId: string, body: string) =>
+    request<{ sent: boolean }>(`/courses/${courseId}/gradebook/activities/${activityId}/messages/conversations/${participantId}`, { method: "POST", body: JSON.stringify({ body }) }),
+  markStaffActivityConversationRead: (courseId: string, activityId: string, participantId: string, lastMessageId: string, attemptId?: string) =>
+    request<{ readAt: string }>(`/courses/${courseId}/gradebook/activities/${activityId}/messages/conversations/${participantId}`, { method: "PATCH", body: JSON.stringify({ lastMessageId, attemptId }) }),
+  sendLearnerActivityMessage: (courseId: string, groupId: string, activityId: string, body: string) =>
+    request<{ sent: boolean }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/messages`, { method: "POST", body: JSON.stringify({ body }) }),
   courseGradebookCsvUrl: (courseId: string, filters?: { groupId?: string; activityId?: string; status?: GradebookStatus }) => {
     const params = new URLSearchParams({ format: "csv" });
     if (filters?.groupId) {
@@ -2177,18 +2199,19 @@ export const api = {
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/timing`,
       { method: "POST" }
     ),
-  learnerActivityConversation: (courseId: string, groupId: string, activityId: string) =>
+  learnerActivityConversation: (courseId: string, groupId: string, activityId: string, options: { before?: string; history?: boolean } = {}) =>
     request<{ conversation: LearnerActivityConversation | null }>(
-      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/messages`
+      `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/messages?${new URLSearchParams({ ...(options.before ? { before: options.before } : {}), ...(options.history ? { history: "1" } : {}) })}`
     ),
   markLearnerActivityConversationRead: (
     courseId: string,
     groupId: string,
     activityId: string,
-    conversationId: string
+    conversationId: string,
+    lastMessageId?: string
   ) => request<{ readAt: string }>(
     `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/messages`,
-    { method: "PATCH", body: JSON.stringify({ conversationId }) }
+    { method: "PATCH", body: JSON.stringify({ conversationId, lastMessageId }) }
   ),
   finalizeTimedActivityAttempt: (courseId: string, groupId: string, activityId: string) =>
     request<{ runtime: TimedActivityRuntime }>(

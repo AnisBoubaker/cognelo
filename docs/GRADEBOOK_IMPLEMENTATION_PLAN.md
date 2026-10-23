@@ -537,6 +537,8 @@ First plugin integration target:
 - Completed: consolidate teacher-facing actions across activity types. **Class overview** is the aggregate report; **Rerun automatic grading** appears only for types that explicitly declare regrading support; **Assess with AI** states whether it will update grades; and **Review and grade** replaces the separate feedback-review/manual-grade entry points. Feedback-capable activities show their answer, structured feedback or rubric, and an editable final grade in the same review surface. Other types use the common review-and-grade page, which now also renders submitted web-design files. Unsupported actions are omitted instead of displayed as “Unavailable.”
 - Completed: Programming Exercise automatic regrading reruns current hidden tests in separate private evaluation records without invoking AI, composes the latest rubric score with current component weights, and defers final grading when that rubric score is missing. The batch continues after individual errors. **Assess with AI** separately evaluates the current rubric using the latest saved test result without rerunning tests.
 
+- Completed: shared **Review and grade** exposes retained core activity messages, filtered to the inspected submission when available. Authorized grading staff can read history even after messaging is disabled; review does not renew student presence or permit replies. See [Activity messaging](ACTIVITY_MESSAGING.md).
+
 ### Phase 9: Analytics And Research Exports
 
 - Add attempt/grade analytics queries.

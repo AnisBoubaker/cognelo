@@ -276,6 +276,7 @@ describe("group services", () => {
       general: {
         assessmentMode: "formative",
         messagingEnabled: false,
+        twoWayMessagingEnabled: false,
         contentPlacement: { parentId: "folder-1", isVisible: true }
       },
       groups: [
@@ -566,6 +567,7 @@ describe("group services", () => {
               futureGroupsAssigned: false,
               assessmentMode: "formative",
               messagingEnabled: false,
+              twoWayMessagingEnabled: false,
               releaseSolution: false,
               hideAfterAttempts: false,
               timeLimitMinutes: null,

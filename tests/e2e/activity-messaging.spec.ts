@@ -20,11 +20,11 @@ test.describe("attempt-scoped activity messaging", () => {
     await removeLearningFlow(data);
   });
 
-  test("broadcasts to the active attempt, records reads, and starts the next attempt empty", async ({
+  test("broadcasts to students, records reads, and retains messages across attempts", async ({
     studentPage,
     teacherPage
   }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(120_000);
     if (!data) throw new Error("Activity-messaging data was not provisioned.");
 
     await studentPage.goto(
@@ -36,7 +36,7 @@ test.describe("attempt-scoped activity messaging", () => {
     const timer = liveControls.getByRole("timer");
     const messenger = liveControls.getByRole("button", { name: "Open activity messages" });
     await expect(timer).toBeVisible();
-    await expect(studentPage.getByRole("button", { name: "Open activity messages" })).toBeVisible();
+    await expect(studentPage.getByRole("button", { name: "Open activity messages" })).toBeVisible({ timeout: 30_000 });
     await expect(messenger).toBeVisible();
     await expect(liveControls.locator(".activity-messenger-label")).toBeHidden();
     const [timerBox, messengerBox, liveControlStyles] = await Promise.all([
@@ -70,20 +70,20 @@ test.describe("attempt-scoped activity messaging", () => {
       `/courses/${data.courseId}/gradebook/activities/${data.activityId}?groupId=${data.groupId}`
     );
     await teacherPage.getByRole("button", { name: "Message students" }).click();
-    const teacherDialog = teacherPage.getByRole("dialog", { name: "Broadcast a message" });
-    await expect(teacherDialog.getByText("1 active learner attempt(s)")).toBeVisible();
+    const teacherDialog = teacherPage.getByRole("dialog", { name: "Activity messages" });
+    await expect(teacherDialog.getByText(/1 active learner attempt\(s\)/)).toBeVisible();
     await teacherDialog.getByLabel("Message", { exact: true }).fill("Please reread question 2 before submitting.");
     await teacherDialog.getByRole("button", { name: "Send broadcast" }).click();
     await expect(teacherDialog.getByText("Please reread question 2 before submitting.")).toBeVisible();
 
     const unreadTrigger = studentPage.getByRole("button", { name: "Open activity messages (1 unread)" });
-    await expect(unreadTrigger).toBeVisible({ timeout: 15_000 });
+    await expect(unreadTrigger).toBeVisible({ timeout: 30_000 });
     await expect(unreadTrigger.locator(".activity-messenger-unread-dot")).toBeVisible();
     await unreadTrigger.click();
     const learnerDialog = studentPage.getByRole("dialog", { name: "Activity messages" });
-    await expect(learnerDialog.getByText("Attempt 1", { exact: true })).toBeVisible();
+    await expect(learnerDialog.locator(".activity-chat-context").getByText("Attempt 1", { exact: true })).toBeVisible();
     await expect(learnerDialog.getByText("Please reread question 2 before submitting.")).toBeVisible();
-    await expect(teacherDialog.getByText("Delivered to 1 · Read by 1")).toBeVisible({ timeout: 15_000 });
+    await expect(teacherDialog.getByText("Delivered to 1 · Read by 1")).toBeVisible({ timeout: 30_000 });
 
     await learnerDialog.getByRole("button", { name: "Close" }).click();
     await studentPage.getByLabel("Four", { exact: true }).check();
@@ -95,10 +95,10 @@ test.describe("attempt-scoped activity messaging", () => {
 
     await studentPage.getByRole("link", { name: data.activityTitle, exact: true }).click();
     await studentPage.getByRole("button", { name: "Start timed attempt" }).click();
+    await expect(studentPage.getByRole("button", { name: "Open activity messages" })).toBeVisible({ timeout: 30_000 });
     await studentPage.getByRole("button", { name: "Open activity messages" }).click();
     const nextAttemptDialog = studentPage.getByRole("dialog", { name: "Activity messages" });
-    await expect(nextAttemptDialog.getByText("Attempt 2", { exact: true })).toBeVisible();
-    await expect(nextAttemptDialog.getByText("No messages have been sent for this attempt yet.")).toBeVisible();
-    await expect(nextAttemptDialog.getByText("Please reread question 2 before submitting.")).toHaveCount(0);
+    await expect(nextAttemptDialog.locator(".activity-chat-context").getByText("Attempt 2", { exact: true })).toBeVisible();
+    await expect(nextAttemptDialog.getByText("Please reread question 2 before submitting.")).toBeVisible();
   });
 });

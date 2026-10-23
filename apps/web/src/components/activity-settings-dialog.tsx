@@ -51,6 +51,7 @@ type ExceptionDraft = AssignmentValueDraft & { key: string; teamId: string | nul
 type ActivitySettingsDraft = {
   assessmentMode: AssignedActivityAssessmentMode;
   messagingEnabled: boolean;
+  twoWayMessagingEnabled: boolean;
   releaseSolution: boolean;
     hideAfterAttempts: boolean;
   contentParentId: string;
@@ -216,6 +217,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
         enablePerGroupSettings: true,
         assessmentMode: draft.assessmentMode,
         messagingEnabled: draft.messagingEnabled,
+        twoWayMessagingEnabled: draft.twoWayMessagingEnabled,
         releaseSolution: draft.releaseSolution,
         hideAfterAttempts: draft.hideAfterAttempts,
         confirmSummativeToFormative: convertsSummativeToFormative,
@@ -375,6 +377,12 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                       {t("activityMessenger.enabledLabel")}
                     </label>
                     <p className="muted" id={`activity-settings-messaging-help-${activity.id}`}>{t("activityMessenger.enabledHelp")}</p>
+                    {draft.messagingEnabled ? <label className="checkbox-row" htmlFor={`activity-settings-two-way-${activity.id}`}>
+                      <input id={`activity-settings-two-way-${activity.id}`} type="checkbox" disabled={saving}
+                        checked={draft.twoWayMessagingEnabled}
+                        onChange={(event) => setDraft((current) => current ? { ...current, twoWayMessagingEnabled: event.target.checked } : current)} />
+                      {t("activityMessenger.twoWayLabel")}
+                    </label> : null}
                   </div>
                   <div>
                     <label className="checkbox-row" htmlFor={`activity-settings-hide-after-attempts-${activity.id}`}>
@@ -994,6 +1002,7 @@ function buildDraft(settings: CourseActivityAssignmentSettings, isTest: boolean,
   return {
     assessmentMode,
     messagingEnabled: settings.general.messagingEnabled,
+    twoWayMessagingEnabled: settings.general.twoWayMessagingEnabled,
     releaseSolution: settings.general.releaseSolution ?? false,
     hideAfterAttempts: settings.general.hideAfterAttempts ?? false,
     contentParentId: settings.general.contentPlacement.parentId ?? "",

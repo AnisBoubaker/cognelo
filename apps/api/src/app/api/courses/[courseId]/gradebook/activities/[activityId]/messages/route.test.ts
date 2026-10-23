@@ -3,11 +3,13 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   getOverview: vi.fn(),
+  getStatus: vi.fn(),
   sendBroadcast: vi.fn(),
   requireUser: vi.fn()
 }));
 
 vi.mock("@cognelo/core", () => ({
+  getActivityMessagingStatus: mocks.getStatus,
   getActivityMessagingOverview: mocks.getOverview,
   sendActivityBroadcast: mocks.sendBroadcast
 }));
@@ -37,8 +39,15 @@ describe("teacher activity messaging route", () => {
       { id: "teacher-1", roles: ["teacher"] },
       "course-1",
       "activity-1",
-      "group-1"
+      "group-1", undefined, undefined
     );
+  });
+
+  it("uses the lightweight status for teacher heartbeat requests", async () => {
+    mocks.getStatus.mockResolvedValue({ enabled: true, version: "revision" });
+    const response = await GET(new NextRequest("http://test.local/messages?summary=1&groupId=group-1"), params);
+    expect(await response.json()).toEqual({ messaging: { enabled: true, version: "revision" } });
+    expect(mocks.getOverview).not.toHaveBeenCalled();
   });
 
   it("validates and sends a trimmed broadcast", async () => {

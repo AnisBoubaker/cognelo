@@ -29,7 +29,7 @@ import {
 import { listContentItems } from "./course-content";
 import { AppError, notFound } from "./errors";
 import { confirmLiveActivitySettings } from "./activity-settings-live";
-import { assignmentAllowsGradeChallenges, assignmentAssessmentPolicyMode, assignmentTimeLimitMinutes, courseActivitySolutionReleased, courseActivityMessagingEnabled, courseActivityHidesAfterAttempts } from "./activity-assignment-policy";
+import { assignmentAllowsGradeChallenges, assignmentAssessmentPolicyMode, assignmentTimeLimitMinutes, courseActivitySolutionReleased, courseActivityMessagingEnabled, courseActivityTwoWayMessagingEnabled, courseActivityHidesAfterAttempts } from "./activity-assignment-policy";
 import { applyAssignmentExceptions, assignmentExceptionsForUser, exceptionsForParticipant, loadAssignmentExceptions, resolveAssignmentExceptions, saveAssignmentExceptions } from "./activity-assignment-exceptions";
 
 type StudentAccessDb = Pick<typeof prisma, "role" | "userRole" | "courseMembership">;
@@ -45,6 +45,7 @@ type CourseWideAssignmentMetadata = {
   enablePerGroupSettings?: boolean;
   assessmentMode?: AssignedActivityAssessmentMode;
   messagingEnabled?: boolean;
+  twoWayMessagingEnabled?: boolean;
   releaseSolution?: boolean;
   hideAfterAttempts?: boolean;
   requireSafeExamBrowser?: boolean;
@@ -245,6 +246,7 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
   };
   const general = {
     messagingEnabled: courseActivityMessagingEnabled(activity.metadata),
+    twoWayMessagingEnabled: courseActivityTwoWayMessagingEnabled(activity.metadata),
     releaseSolution: courseActivitySolutionReleased(activity.metadata),
     hideAfterAttempts: courseActivityHidesAfterAttempts(activity.metadata),
     availableFrom: rule?.availableFrom ?? null,
@@ -390,6 +392,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
             assessmentMode: data.assessmentMode,
             hideAfterAttempts: data.hideAfterAttempts ?? courseActivityHidesAfterAttempts(activity.metadata),
             messagingEnabled: data.messagingEnabled ?? courseActivityMessagingEnabled(activity.metadata),
+            twoWayMessagingEnabled: data.twoWayMessagingEnabled ?? courseActivityTwoWayMessagingEnabled(activity.metadata),
             releaseSolution: getActivityDefinition(activity.activityType?.key ?? "")?.supportsSolution === true
               && (data.releaseSolution ?? courseActivitySolutionReleased(activity.metadata)),
             ...(data.requireSafeExamBrowser ? { requireSafeExamBrowser: true } : {}),

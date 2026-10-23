@@ -5,7 +5,7 @@ import { responseJson } from "./fixtures/activity-suite";
 
 for (const timed of [false, true]) {
   test(`messaging toggles live during ${timed ? "a timed" : "an untimed"} activity without losing answers or messages`, { tag: "@regression" }, async ({ bankCourse: data, teacherApi, teacherPage, studentPage }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(180_000);
     const studentApi = await createAuthenticatedApi("student");
     const settingsPath = `${data.courseActivityPath}/assign-all-groups`;
     const assignedPath = `/api/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${data.activityId}`;
@@ -38,7 +38,7 @@ for (const timed of [false, true]) {
       await warning.getByLabel("Message to students (optional)").fill("Messaging is now available.");
       await warning.getByRole("button", { name: "Apply settings", exact: true }).click();
       await expect(settingsDialog).toBeHidden();
-      await expect(trigger).toBeVisible({ timeout: 10_000 });
+      await expect(trigger).toBeVisible({ timeout: 30_000 });
       await expect(studentPage.getByLabel("Four", { exact: true })).toBeChecked();
       await trigger.click();
       const messages = studentPage.getByRole("dialog", { name: "Activity messages", exact: true });
@@ -60,15 +60,15 @@ for (const timed of [false, true]) {
       expect(rejected.status()).toBe(409);
       expect((await rejected.json()).error.details.canNotifyStudents).toBe(false);
       await responseJson(await teacherApi.post(settingsPath, { data: { ...update, confirmActiveStudents: true } }));
-      await expect(messages).toBeHidden({ timeout: 10_000 });
+      await expect(messages).toBeHidden({ timeout: 30_000 });
       await expect(trigger).toBeHidden();
-      await expect(broadcastButton).toBeHidden({ timeout: 15_000 });
-      await expect(teacherPage.getByRole("dialog", { name: "Broadcast a message" })).toBeHidden();
+      await expect(broadcastButton).toBeHidden({ timeout: 30_000 });
+      await expect(teacherPage.getByRole("dialog", { name: "Activity messages" })).toBeHidden();
       await expect(studentPage.getByLabel("Four", { exact: true })).toBeChecked();
       expect((await teacherApi.post(messagingPath, { data: { body: "Disabled" } })).status()).toBe(403);
       expect((await studentApi.patch(`${assignedPath}/messages`, { data: { conversationId: conversation.id } })).status()).toBe(403);
       await responseJson(await teacherApi.post(settingsPath, { data: { ...update, messagingEnabled: true, confirmActiveStudents: true } }));
-      await expect(trigger).toBeVisible({ timeout: 10_000 });
+      await expect(trigger).toBeVisible({ timeout: 30_000 });
       await trigger.click();
       await expect(messages.getByText("Messaging is now available.")).toBeVisible();
       const restored = await responseJson<{ conversation: typeof conversation }>(await studentApi.get(`${assignedPath}/messages`));

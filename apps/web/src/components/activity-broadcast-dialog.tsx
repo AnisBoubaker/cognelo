@@ -1,146 +1,102 @@
 "use client";
 
-import { useApplicationTime } from "@cognelo/activity-ui";
-
-
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppIcon } from "@/components/app-icon";
-import { api, type ActivityMessagingOverview } from "@/lib/api";
+import { ActivityChatComposer, ActivityChatDialog, ActivityChatThread, mergeChatMessages } from "@/components/activity-chat";
+import { api, type ActivityMessagingOverview, type StaffActivityConversation } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import { useNotifications } from "@cognelo/activity-ui";
 
-export function ActivityBroadcastDialog({
-  courseId,
-  activityId,
-  groupId,
-  onClose
-}: {
-  courseId: string;
-  activityId: string;
-  groupId?: string;
-  onClose: () => void;
+export function ActivityBroadcastDialog({ courseId, activityId, groupId, onClose, updateKey }: {
+  courseId: string; activityId: string; groupId?: string; onClose: () => void; updateKey: string;
 }) {
-  const { timeZone } = useApplicationTime();
-  const { locale, t } = useI18n();
-  const notifications = useNotifications();
+  const { t } = useI18n();
   const [overview, setOverview] = useState<ActivityMessagingOverview | null>(null);
-  const [body, setBody] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
+  const [selected, setSelected] = useState("broadcast");
   const [error, setError] = useState("");
-
-  const refresh = useCallback(async (showError = false) => {
-    try {
-      const result = await api.activityMessagingOverview(courseId, activityId, groupId);
-      setOverview(result.messaging);
-      setError("");
-    } catch (refreshError) {
-      if (showError) setError(refreshError instanceof Error ? refreshError.message : t("activityMessenger.loadError"));
-    } finally {
-      setLoading(false);
-    }
-  }, [activityId, courseId, groupId, t]);
-
-  useEffect(() => {
-    void refresh(true);
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") void refresh();
-    }, 10_000);
-    return () => window.clearInterval(interval);
-  }, [refresh]);
-
-  async function send(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const message = body.trim();
-    if (!message || !overview?.enabled || !overview.activeRecipientCount) return;
-    setSending(true);
+  const refresh = useCallback(async () => {
+    const result = await api.activityMessagingOverview(courseId, activityId, groupId);
     setError("");
+    setOverview((old) => ({ ...result.messaging,
+      broadcasts: mergeChatMessages(old?.broadcasts ?? [], result.messaging.broadcasts),
+      hasMoreBroadcasts: old && old.broadcasts.length > result.messaging.broadcasts.length ? old.hasMoreBroadcasts : result.messaging.hasMoreBroadcasts
+    }));
+  }, [activityId, courseId, groupId]);
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => refresh().catch((cause: unknown) => { if (!cancelled) setError(cause instanceof Error ? cause.message : t("activityMessenger.loadError")); });
+    void load();
+    return () => { cancelled = true; };
+  }, [refresh, t, updateKey]);
+  async function olderBroadcasts() {
+    if (!overview?.broadcasts[0]) return;
     try {
-      await api.sendActivityBroadcast(courseId, activityId, message, groupId);
-      setBody("");
-      await refresh();
-      notifications.success(t("activityMessenger.sent"));
-    } catch (sendError) {
-      setError(sendError instanceof Error ? sendError.message : t("activityMessenger.sendError"));
-    } finally {
-      setSending(false);
-    }
+      const result = await api.activityMessagingOverview(courseId, activityId, groupId, overview.broadcasts[0].id);
+      setOverview((old) => old ? { ...old, broadcasts: mergeChatMessages(old.broadcasts, result.messaging.broadcasts), hasMoreBroadcasts: result.messaging.hasMoreBroadcasts } : old);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t("activityMessenger.loadError")); }
   }
-
-  return (
-    <div className="dialog-backdrop" role="presentation">
-      <section aria-labelledby="activity-broadcast-title" aria-modal="true" className="dialog-panel activity-broadcast-dialog" role="dialog">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">{t("activityMessenger.teacherEyebrow")}</p>
-            <h2 id="activity-broadcast-title">{t("activityMessenger.broadcastTitle")}</h2>
-          </div>
-          <button className="secondary icon-button" disabled={sending} type="button" title={t("common.close")} onClick={onClose}>
-            <AppIcon name="close" />
-          </button>
-        </div>
-
-        <form className="form activity-broadcast-composer" onSubmit={send}>
-          {overview && !overview.enabled ? <p className="muted" role="status">{t("activityMessenger.disabled")}</p> : null}
-          <div className="activity-broadcast-presence" role="status">
-            <span aria-hidden="true" className={`activity-presence-dot${overview?.activeRecipientCount ? " is-active" : ""}`} />
-            {loading
-              ? t("common.loading")
-              : t("activityMessenger.activeAttempts", { count: overview?.activeRecipientCount ?? 0 })}
-          </div>
-          <div className="field">
-            <label htmlFor="activity-broadcast-body">{t("activityMessenger.messageLabel")}</label>
-            <textarea
-              autoFocus
-              disabled={!overview?.enabled || sending}
-              id="activity-broadcast-body"
-              maxLength={2000}
-              placeholder={t("activityMessenger.messagePlaceholder")}
-              rows={4}
-              value={body}
-              onChange={(event) => setBody(event.target.value)}
-            />
-            <div className="field-hint-row">
-              <span className="muted">{t("activityMessenger.currentAttemptsOnly")}</span>
-              <span className="muted">{body.length}/2000</span>
-            </div>
-          </div>
-          {error ? <p className="error" role="alert">{error}</p> : null}
-          <div className="dialog-actions">
-            <button className="secondary" disabled={sending} type="button" onClick={onClose}><AppIcon name="close" /> {t("common.cancel")}</button>
-            <button disabled={sending || !body.trim() || !overview?.enabled || !overview.activeRecipientCount} type="submit">
-              <AppIcon name="messages" />
-              {sending ? t("activityMessenger.sending") : t("activityMessenger.sendBroadcast")}
-            </button>
-          </div>
-        </form>
-
-        <div className="activity-broadcast-history">
-          <h3>{t("activityMessenger.broadcastHistory")}</h3>
-          {overview?.broadcasts.length ? overview.broadcasts.map((broadcast) => (
-            <article className="activity-broadcast-history-item" key={broadcast.id}>
-              <div className="activity-message-meta">
-                <strong>{broadcast.senderName}</strong>
-                <time dateTime={broadcast.createdAt}>{formatMessageTime(broadcast.createdAt, locale, timeZone)}</time>
-              </div>
-              <p>{broadcast.body}</p>
-              <small className="muted">
-                {t("activityMessenger.deliverySummary", {
-                  recipients: broadcast.recipientCount,
-                  read: broadcast.readCount
-                })}
-              </small>
-            </article>
-          )) : !loading ? <p className="muted">{t("activityMessenger.noBroadcasts")}</p> : null}
-        </div>
-      </section>
+  return <ActivityChatDialog wide onClose={onClose}>
+    <div className="activity-chat-workspace">
+      <div className="activity-chat-tabs" role="tablist" aria-label={t("activityMessenger.conversations")} aria-orientation="vertical"
+        onKeyDown={(event) => {
+          if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+          const tabs = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+          const index = tabs.indexOf(document.activeElement as HTMLButtonElement);
+          const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + tabs.length) % tabs.length;
+          event.preventDefault(); tabs[next]?.focus(); tabs[next]?.click();
+        }}>
+        <button type="button" role="tab" id="chat-tab-broadcast" aria-controls="activity-chat-panel" aria-selected={selected === "broadcast"} tabIndex={selected === "broadcast" ? 0 : -1} onClick={() => setSelected("broadcast")}><AppIcon name="messages" />{t("activityMessenger.broadcastTab")}</button>
+        {overview?.conversations.map((conversation) => <button key={conversation.participantId} id={`chat-tab-${conversation.participantId}`} type="button" role="tab" aria-controls="activity-chat-panel" aria-selected={selected === conversation.participantId} tabIndex={selected === conversation.participantId ? 0 : -1} onClick={() => setSelected(conversation.participantId)}>
+          <span className="activity-chat-avatar" aria-hidden="true">{conversation.studentName.slice(0, 1)}</span>
+          <span><strong>{conversation.studentName}</strong><small>{conversation.groupTitle}</small></span>
+          {conversation.unread ? <span className="activity-chat-unread" aria-label={t("activityMessenger.unread")} /> : null}
+        </button>)}
+        {overview && !overview.conversations.length ? <p className="muted activity-chat-sidebar-hint">{t("activityMessenger.noConversations")}</p> : null}
+      </div>
+      <div className="activity-chat-panel" id="activity-chat-panel" role="tabpanel" aria-labelledby={`chat-tab-${selected}`}>
+        {selected === "broadcast" ? <>
+          <div className="activity-chat-context"><strong>{t("activityMessenger.broadcastTab")}</strong><small className="muted">{t("activityMessenger.allStudents", { count: overview?.recipientCount ?? 0 })} · {t("activityMessenger.activeAttempts", { count: overview?.activeRecipientCount ?? 0 })}</small></div>
+          <ActivityChatThread messages={(overview?.broadcasts ?? []).map((broadcast) => ({ ...broadcast, broadcastId: broadcast.id, senderKind: "staff", attemptNumber: 0 }))} ownKind="staff" hasMore={overview?.hasMoreBroadcasts} onLoadMore={olderBroadcasts} loading={!overview && !error} empty={t("activityMessenger.noBroadcasts")} />
+          {overview?.broadcasts.at(-1) ? <small className="muted activity-chat-delivery">{t("activityMessenger.deliverySummary", { recipients: overview.broadcasts.at(-1)!.recipientCount, read: overview.broadcasts.at(-1)!.readCount })}</small> : null}
+          {overview?.enabled && overview.recipientCount ? <ActivityChatComposer broadcast onSend={async (body) => { await api.sendActivityBroadcast(courseId, activityId, body, groupId); void refresh().catch(() => undefined); }} /> : <p className="muted activity-chat-notice">{t("activityMessenger.disabled")}</p>}
+        </> : <StaffActivityChat key={selected} courseId={courseId} activityId={activityId} participantId={selected} updateKey={updateKey} onRead={refresh} />}
+      </div>
     </div>
-  );
+    {error ? <div className="activity-chat-notice"><p role="alert" className="error">{error}</p><button className="secondary" type="button" onClick={() => void refresh().catch(() => undefined)}><AppIcon name="refresh" />{t("common.retry")}</button></div> : null}
+  </ActivityChatDialog>;
 }
 
-function formatMessageTime(value: string, locale: string, timeZone: string = "UTC") {
-  return new Intl.DateTimeFormat(locale, { timeZone,
-    dateStyle: "medium",
-    timeStyle: "short"
-  }).format(new Date(value));
+export function StaffActivityChat({ courseId, activityId, participantId, attemptId, onRead, readOnly = false, updateKey }: {
+  courseId: string; activityId: string; participantId: string; attemptId?: string; onRead?: () => Promise<void>; readOnly?: boolean; updateKey?: string;
+}) {
+  const { t } = useI18n();
+  const [conversation, setConversation] = useState<StaffActivityConversation | null>(null);
+  const [error, setError] = useState("");
+  const readId = useRef<string | null>(null);
+  const onReadRef = useRef(onRead); onReadRef.current = onRead;
+  const refresh = useCallback(async (before?: string) => {
+    const result = await api.staffActivityConversation(courseId, activityId, participantId, { attemptId, before });
+    setError("");
+    setConversation((old) => ({ ...result.conversation,
+      messages: mergeChatMessages(old?.messages ?? [], result.conversation.messages),
+      hasMore: !before && old && old.messages.length > result.conversation.messages.length ? old.hasMore : result.conversation.hasMore
+    }));
+    const last = result.conversation.messages.at(-1)?.id;
+    if (!before && last && readId.current !== last) {
+      await api.markStaffActivityConversationRead(courseId, activityId, participantId, last, attemptId);
+      readId.current = last;
+      await onReadRef.current?.();
+    }
+  }, [activityId, attemptId, courseId, participantId]);
+  useEffect(() => {
+    const load = () => refresh().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : t("activityMessenger.loadError")));
+    void load();
+  }, [refresh, t, updateKey]);
+  return <>
+    <div className="activity-chat-context"><strong>{conversation?.studentName ?? t("common.loading")}</strong><small className="muted">{t("activityMessenger.privateHelp")}</small></div>
+    <ActivityChatThread messages={conversation?.messages ?? []} ownKind="staff" loading={!conversation && !error} hasMore={conversation?.hasMore} onLoadMore={async () => {
+      try { await refresh(conversation?.messages[0]?.id); } catch (cause) { setError(cause instanceof Error ? cause.message : t("activityMessenger.loadError")); }
+    }} />
+    {conversation?.canSend && !attemptId && !readOnly ? <ActivityChatComposer onSend={async (body) => { await api.sendStaffActivityReply(courseId, activityId, participantId, body); void refresh().catch(() => undefined); }} /> : <p className="muted activity-chat-notice">{t("activityMessenger.readOnly")}</p>}
+    {error ? <div className="activity-chat-notice"><p className="error" role="alert">{error}</p><button className="secondary" type="button" onClick={() => void refresh().catch(() => undefined)}><AppIcon name="refresh" />{t("common.retry")}</button></div> : null}
+  </>;
 }

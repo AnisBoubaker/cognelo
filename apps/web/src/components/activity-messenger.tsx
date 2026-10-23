@@ -1,136 +1,85 @@
 "use client";
 
-import { useApplicationTime } from "@cognelo/activity-ui";
-
-
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useActivityMessagingStatus } from "@/components/activity-content-boundary";
 import { ActivityLiveControlPortal } from "@/components/activity-live-controls";
+import { ActivityChatComposer, ActivityChatDialog, ActivityChatThread, mergeChatMessages } from "@/components/activity-chat";
 import { AppIcon } from "@/components/app-icon";
 import { api, type LearnerActivityConversation } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
-export function ActivityMessenger({
-  courseId,
-  groupId,
-  activityId,
-  enabled
-}: {
-  courseId: string;
-  groupId: string;
-  activityId: string;
-  enabled: boolean;
+export function ActivityMessenger({ courseId, groupId, activityId, enabled, historyOnly = false }: {
+  courseId: string; groupId: string; activityId: string; enabled: boolean; historyOnly?: boolean;
 }) {
-  const { timeZone } = useApplicationTime();
-  const { locale, t } = useI18n();
+  const { t } = useI18n();
+  const messaging = useActivityMessagingStatus();
+  const status = enabled ? messaging?.status : null;
+  const statusVersion = status?.version;
+  const presence = messaging?.presence;
+  const [readVersion, setReadVersion] = useState("");
   const [conversation, setConversation] = useState<LearnerActivityConversation | null>(null);
   const [open, setOpen] = useState(false);
-  const currentConversationIdRef = useRef<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
-  const refresh = useCallback(async () => {
-    // `enabled` means this is an active learner view. Keep polling when the
-    // activity's messaging switch is off so it can become available live.
+  const [error, setError] = useState("");
+  const generation = useRef(0);
+  const readId = useRef<string | null>(null);
+  const refresh = useCallback(async (before?: string) => {
     if (!enabled || document.visibilityState !== "visible") return;
+    const requestGeneration = generation.current;
     try {
-      const result = await api.learnerActivityConversation(courseId, groupId, activityId);
-      const nextId = result.conversation?.id ?? null;
-      if (currentConversationIdRef.current && currentConversationIdRef.current !== nextId) {
-        setOpen(false);
-      }
-      currentConversationIdRef.current = nextId;
-      setConversation(result.conversation);
-    } catch {
-      // Preserve the last successful conversation during transient polling failures.
+      const result = await api.learnerActivityConversation(courseId, groupId, activityId, { before, history: historyOnly });
+      if (requestGeneration !== generation.current) return;
+      if (!result.conversation) { setConversation(null); setOpen(false); return; }
+      const next = result.conversation;
+      setConversation((old) => ({ ...next, messages: mergeChatMessages(old?.messages ?? [], next.messages),
+        hasMore: !before && old && old.messages.length > next.messages.length ? old.hasMore : next.hasMore }));
+      setError("");
+    } catch (cause) {
+      // Closed activity content must disappear even if the parent boundary is still polling.
+      if (cause && typeof cause === "object" && "status" in cause && (cause.status === 403 || cause.status === 404)) {
+        setConversation(null); setOpen(false);
+      } else setError(cause instanceof Error ? cause.message : t("activityMessenger.loadError"));
     }
-  }, [activityId, courseId, enabled, groupId]);
-
+  }, [activityId, courseId, enabled, groupId, historyOnly, t]);
   useEffect(() => {
-    if (!enabled) {
-      currentConversationIdRef.current = null;
-      setConversation(null);
-      setOpen(false);
-      return;
-    }
-    void refresh();
-    const interval = window.setInterval(() => void refresh(), 5_000);
-    return () => window.clearInterval(interval);
-  }, [enabled, refresh]);
-
-  const markRead = useCallback(async (current: LearnerActivityConversation) => {
-    setConversation((value) => value?.id === current.id ? { ...value, unreadCount: 0 } : value);
-    try {
-      await api.markLearnerActivityConversationRead(courseId, groupId, activityId, current.id);
-    } catch {
-      // The next poll restores the unread marker when the acknowledgement failed.
-    }
-  }, [activityId, courseId, groupId]);
-
+    if (presence) presence.current = enabled && !historyOnly;
+    return () => { if (presence) presence.current = false; };
+  }, [enabled, historyOnly, presence]);
   useEffect(() => {
-    if (!open || !conversation?.unreadCount) return;
-    void markRead(conversation);
-  }, [conversation, markRead, open]);
-
+    generation.current += 1;
+    setConversation(null); setOpen(false); readId.current = null;
+    return () => { generation.current += 1; };
+  }, [activityId, courseId, groupId, enabled]);
   useEffect(() => {
-    if (open) messagesEndRef.current?.scrollIntoView({ block: "nearest" });
-  }, [conversation?.messages.length, open]);
-
-  if (!conversation) return null;
-
-  return (
-    <>
-      <ActivityLiveControlPortal>
-        <button
-          aria-label={conversation.unreadCount
-            ? t("activityMessenger.openUnread", { count: conversation.unreadCount })
-            : t("activityMessenger.open")}
-          className={`activity-messenger-trigger${conversation.unreadCount ? " has-unread" : ""}`}
-          type="button"
-          onClick={() => {
-            setOpen(true);
-            if (conversation.unreadCount) void markRead(conversation);
-          }}
-        >
-          <AppIcon name="messages" size={22} />
-          <span className="activity-messenger-label">{t("activityMessenger.label")}</span>
-          {conversation.unreadCount ? <span aria-hidden="true" className="activity-messenger-unread-dot" /> : null}
-        </button>
-      </ActivityLiveControlPortal>
-
-      {open ? (
-        <div className="dialog-backdrop" role="presentation">
-          <section aria-labelledby="activity-messenger-title" aria-modal="true" className="dialog-panel activity-messenger-dialog" role="dialog">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">{t("activityMessenger.attempt", { count: conversation.attemptNumber })}</p>
-                <h2 id="activity-messenger-title">{t("activityMessenger.title")}</h2>
-              </div>
-              <button className="secondary icon-button" type="button" title={t("common.close")} onClick={() => setOpen(false)}>
-                <AppIcon name="close" />
-              </button>
-            </div>
-            <div className="activity-messenger-thread" role="log" aria-live="polite">
-              {conversation.messages.length ? conversation.messages.map((message) => (
-                <article className={`activity-message activity-message--${message.senderKind}`} key={message.id}>
-                  <div className="activity-message-meta">
-                    <strong>{message.senderName}</strong>
-                    <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt, locale, timeZone)}</time>
-                  </div>
-                  <p>{message.body}</p>
-                </article>
-              )) : <p className="muted activity-messenger-empty">{t("activityMessenger.empty")}</p>}
-              <div ref={messagesEndRef} />
-            </div>
-            <p className="muted activity-messenger-one-way">{t("activityMessenger.oneWayHelp")}</p>
-          </section>
-        </div>
-      ) : null}
-    </>
-  );
-}
-
-function formatMessageTime(value: string, locale: string, timeZone: string = "UTC") {
-  return new Intl.DateTimeFormat(locale, { timeZone,
-    dateStyle: "medium",
-    timeStyle: "short"
-  }).format(new Date(value));
+    if (!statusVersion) { setOpen(false); setConversation(null); return; }
+    if (open) void refresh();
+  }, [open, statusVersion, refresh]);
+  useEffect(() => {
+    const last = conversation?.messages.at(-1)?.id;
+    if (!open || !conversation || !last || readId.current === last) return;
+    readId.current = last;
+    void api.markLearnerActivityConversationRead(courseId, groupId, activityId, conversation.id, last).then(() => {
+      setReadVersion(statusVersion ?? "");
+      setConversation((current) => current ? { ...current, unreadCount: 0 } : current);
+    }).catch(() => { readId.current = null; });
+  }, [activityId, conversation, courseId, groupId, open, statusVersion]);
+  if (!status) return null;
+  const unreadCount = readVersion === status.version ? 0 : status.unreadCount;
+  return <>
+    <ActivityLiveControlPortal>
+      <button aria-label={unreadCount ? t("activityMessenger.openUnread", { count: unreadCount }) : t("activityMessenger.open")}
+        className={`activity-messenger-trigger${unreadCount ? " has-unread" : ""}`} type="button" onClick={() => setOpen(true)}>
+        <AppIcon name="messages" size={22} /><span className="activity-messenger-label">{t("activityMessenger.label")}</span>
+        {unreadCount ? <span aria-hidden="true" className="activity-messenger-unread-dot" /> : null}
+      </button>
+    </ActivityLiveControlPortal>
+    {open ? <ActivityChatDialog onClose={() => setOpen(false)}>
+      <div className="activity-chat-panel">
+        <div className="activity-chat-context"><strong>{t("activityMessenger.attempt", { count: conversation?.attemptNumber ?? status.attemptNumber })}</strong><small className="muted">{t("activityMessenger.studentHelp")}</small></div>
+        <ActivityChatThread messages={conversation?.messages ?? []} loading={!conversation && !error} ownKind="student" hasMore={conversation?.hasMore} onLoadMore={() => refresh(conversation?.messages[0]?.id)} />
+        {status.canSend && !historyOnly ? <ActivityChatComposer onSend={async (body) => { await api.sendLearnerActivityMessage(courseId, groupId, activityId, body); await refresh(); }} />
+          : <p className="muted activity-chat-notice">{t("activityMessenger.readOnly")}</p>}
+        {error ? <div className="activity-chat-notice"><p className="error" role="alert">{error}</p><button className="secondary" type="button" onClick={() => void refresh()}><AppIcon name="refresh" />{t("common.retry")}</button></div> : null}
+      </div>
+    </ActivityChatDialog> : null}
+  </>;
 }
