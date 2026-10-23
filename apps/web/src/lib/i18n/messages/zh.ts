@@ -278,6 +278,7 @@ export const zhMessages = {
       accountMenu: "打开账户菜单"
     },
     notifications: {
+      clearAll: "全部清除",
       dismiss: "关闭通知",
       history: "消息",
       historyTitle: "最近消息",

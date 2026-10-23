@@ -278,6 +278,7 @@ export const frMessages = {
       accountMenu: "Ouvrir le menu du compte"
     },
     notifications: {
+      clearAll: "Tout effacer",
       dismiss: "Fermer la notification",
       history: "Messages",
       historyTitle: "Messages récents",

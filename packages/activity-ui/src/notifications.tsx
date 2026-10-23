@@ -23,6 +23,7 @@ type NotificationRecord = NotificationInput & {
 };
 
 export type NotificationLabels = Record<NotificationVariant, string> & {
+  clearAll: string;
   dismiss: string;
   history: string;
   historyTitle: string;
@@ -356,9 +357,12 @@ export function NotificationProvider({ children, labels }: { children: ReactNode
         <>
           {historyOpen ? (
             <section aria-label={labels.historyTitle} style={historyPanelStyle}>
-              <div style={{ alignItems: "center", display: "flex", justifyContent: "space-between" }}>
-                <p style={titleStyle}>{labels.historyTitle}</p>
-                <button aria-label={labels.dismiss} onClick={() => setHistoryOpen(false)} style={closeButtonStyle} type="button"><ActionIcon name="close" /></button>
+              <div style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between" }}>
+                <p style={{ ...titleStyle, flex: 1 }}>{labels.historyTitle}</p>
+                <div style={{ alignItems: "center", display: "flex", gap: 12, marginInlineStart: "auto" }}>
+                  <button className="secondary" onClick={clearCurrentPageNotifications} type="button"><ActionIcon name="remove" />{labels.clearAll}</button>
+                  <button aria-label={labels.dismiss} onClick={() => setHistoryOpen(false)} style={closeButtonStyle} type="button"><ActionIcon name="close" /></button>
+                </div>
               </div>
               {history
                 .slice()

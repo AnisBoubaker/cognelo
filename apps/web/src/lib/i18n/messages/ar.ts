@@ -278,6 +278,7 @@ export const arMessages = {
       accountMenu: "فتح قائمة الحساب"
     },
     notifications: {
+      clearAll: "مسح الكل",
       dismiss: "إغلاق الإشعار",
       history: "الرسائل",
       historyTitle: "الرسائل الأخيرة",

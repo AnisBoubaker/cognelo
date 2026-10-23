@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n";
 export function AppNotificationProvider({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   const labels: NotificationLabels = {
+    clearAll: t("notifications.clearAll"),
     dismiss: t("notifications.dismiss"),
     history: t("notifications.history"),
     historyTitle: t("notifications.historyTitle"),

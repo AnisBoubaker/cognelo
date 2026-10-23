@@ -278,6 +278,7 @@ export const enMessages = {
       accountMenu: "Open account menu"
     },
     notifications: {
+      clearAll: "Clear all",
       dismiss: "Dismiss notification",
       history: "Messages",
       historyTitle: "Recent messages",
