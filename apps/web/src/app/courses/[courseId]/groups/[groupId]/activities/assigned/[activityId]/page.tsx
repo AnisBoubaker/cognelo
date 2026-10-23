@@ -219,9 +219,9 @@ function GroupActivityContent() {
     async function refresh() {
       const courseResult = await api.course(courseId);
       if (courseResult.course.permissions?.canManageCourse) {
-        // Authoring belongs to the shared editor shell, which owns the Concepts
-        // tab and the plugin's Grading portal. Never mount a bare teacher form here.
-        router.replace(`/courses/${courseId}/activities/${activityId}`);
+        // Match the course-content entry point; authoring is an explicit action
+        // in the report workspace, never a bare form on the learner route.
+        router.replace(`/courses/${courseId}/gradebook/activities/${activityId}?origin=content&report=overview&groupId=${encodeURIComponent(groupId)}`);
         return;
       }
       const [groupResult, typeResult, aiAgentResult] = await Promise.all([

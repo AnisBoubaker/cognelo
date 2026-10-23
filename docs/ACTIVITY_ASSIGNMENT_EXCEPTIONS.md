@@ -1,6 +1,6 @@
 # Activity assignment exceptions
 
-Implemented in the activity settings dialog's **Exceptions** tab. Course managers select a section, add teams or individual student enrollments, and check only the settings to replace. Changes, removals, and priority moves share the dialog's ordinary Save/Cancel boundary. The section must be assigned the activity first. Hidden groupings remain eligible exception targets.
+Implemented in the activity settings dialog's **Exceptions** tab. Course managers open the same modal from course content or the **Settings** action on the activity-report page (Class overview or Student results). Saving from a report keeps the selected tab and section context; cancellation discards the draft. Course managers select a section, add teams or individual student enrollments, and check only the settings to replace. Changes, removals, and priority moves share the dialog's ordinary Save/Cancel boundary. The section must be assigned the activity first. Hidden groupings remain eligible exception targets.
 
 ## Precedence and fields
 

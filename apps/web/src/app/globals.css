@@ -1748,6 +1748,48 @@ a.card:hover,
   gap: 8px;
 }
 
+.activity-report-heading {
+  flex-wrap: wrap;
+  gap: 16px 24px;
+}
+
+.activity-report-heading .workspace-context {
+  flex: 1 1 260px;
+}
+
+.activity-report-actions {
+  gap: 8px;
+}
+
+.activity-report-actions .button {
+  font-size: 0.875rem;
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.activity-report-actions .button svg {
+  flex-shrink: 0;
+}
+
+@media (max-width: 780px) {
+  .activity-report-heading .workspace-context {
+    flex: 0 1 auto;
+    width: 100%;
+  }
+
+  .activity-report-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .activity-report-actions .activity-report-back {
+    flex-basis: 100%;
+    justify-content: center;
+  }
+}
+
 .test-submission-review {
   min-width: 0;
   overflow-wrap: anywhere;

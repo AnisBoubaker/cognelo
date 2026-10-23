@@ -1,6 +1,7 @@
 import {
   IconAlertCircle,
   IconArrowDown,
+  IconArrowLeft,
   IconArrowRight,
   IconArrowUp,
   IconArrowsExchange,
@@ -42,6 +43,7 @@ import {
   IconReplace,
   IconRoute,
   IconSquare,
+  IconSettings,
   IconTextSize,
   IconTornado,
   IconTrash,
@@ -56,16 +58,17 @@ import type { ContentTypeIconName } from "@cognelo/content-type-sdk";
 import React, { type ComponentType } from "react";
 
 export type AppIconName =
-  | "activityAdd" | "add" | "alert" | "assign" | "check" | "chevronDown" | "close"
+  | "activityAdd" | "add" | "alert" | "assign" | "back" | "check" | "chevronDown" | "close"
   | "compare" | "course" | "download" | "duplicate" | "down" | "drag" | "edit" | "folder"
   | "folderAdd" | "folderOpen" | "hidden" | "messages" | "more" | "move" | "open" | "remove"
-  | "participants" | "save" | "sync" | "up" | "upload" | "visible";
+  | "participants" | "save" | "settings" | "sync" | "up" | "upload" | "visible";
 
 const appIcons = {
   activityAdd: IconFilePlus,
   add: IconPlus,
   alert: IconAlertCircle,
   assign: IconListCheck,
+  back: IconArrowLeft,
   check: IconCheck,
   chevronDown: IconChevronDown,
   close: IconX,
@@ -87,6 +90,7 @@ const appIcons = {
   participants: IconUsersGroup,
   remove: IconTrash,
   save: IconFileCheck,
+  settings: IconSettings,
   sync: IconReplace,
   up: IconArrowUp,
   upload: IconUpload,

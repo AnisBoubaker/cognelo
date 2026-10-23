@@ -11,6 +11,7 @@ import { createMcqClient } from "@cognelo/plugin-mcq";
 import { createParsonsClient } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
 import { ActivityBroadcastDialog } from "@/components/activity-broadcast-dialog";
+import { ActivitySettingsModal } from "@/components/activity-settings-dialog";
 import { AppIcon } from "@/components/app-icon";
 import { TestReviewAllPanel } from "@/components/test-review-all-panel";
 import { ActivityReviewAllPanel, toActivityReviewResponse, type ActivityReviewResponse } from "@/components/activity-review-all-panel";
@@ -80,6 +81,7 @@ export default function GradebookActivityResultsPage() {
   const [reviewAndGradeRow, setReviewAndGradeRow] = useState<CourseGradebookRow | null>(null);
   const [submissionDeletionRow, setSubmissionDeletionRow] = useState<CourseGradebookRow | null>(null);
   const [showGradeExport, setShowGradeExport] = useState(false);
+  const [showActivitySettings, setShowActivitySettings] = useState(false);
   const [showActivityMessenger, setShowActivityMessenger] = useState(false);
   const [messagingEnabled, setMessagingEnabled] = useState(false);
   const [reportTab, setReportTab] = useState<"overview" | "students">(
@@ -167,8 +169,9 @@ export default function GradebookActivityResultsPage() {
   const inProgressAttemptByParticipant = useMemo(() => new Map(
     inProgressAttempts.map((attempt) => [`${attempt.groupId}:${attempt.participantId}`, attempt])
   ), [inProgressAttempts]);
-  const activityTitle = rows[0]?.activityTitle ?? gradebook?.items[0]?.activityTitle ?? t("common.loading");
-  const activityTypeKey = rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? "";
+  const reportActivity = course?.activities?.find((activity) => activity.id === activityId);
+  const activityTitle = rows[0]?.activityTitle ?? gradebook?.items[0]?.activityTitle ?? reportActivity?.title ?? t("common.loading");
+  const activityTypeKey = rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? reportActivity?.activityType.key ?? "";
   const activityActions = getGradebookActivityActions(activityTypeKey);
   const isSummativeActivity = (rows[0]?.assessmentMode ?? gradebook?.items[0]?.assessmentMode) === "summative";
   const canManageCourse = Boolean(course?.permissions?.canManageCourse);
@@ -204,18 +207,28 @@ export default function GradebookActivityResultsPage() {
       window.removeEventListener("focus", refresh);
     };
   }, [activityId, courseId, groupId, hasMessagingPermission]);
-  const groupTitle = groupId ? gradebook?.items.find((item) => item.groupId === groupId)?.groupTitle : null;
+  const groupTitle = groupId ? gradebook?.items.find((item) => item.groupId === groupId)?.groupTitle
+    ?? course?.groups?.find((group) => group.id === groupId)?.title : null;
   const backHref = origin === "content"
-    ? `/courses/${courseId}?tab=content`
+    ? `/courses/${courseId}?tab=content${groupId ? `&view=group&groupId=${encodeURIComponent(groupId)}` : ""}`
     : groupId ? `/courses/${courseId}?tab=gradebook&groupId=${encodeURIComponent(groupId)}` : `/courses/${courseId}?tab=gradebook`;
   const backLabel = origin === "content" ? t("courseDetail.backToCourseContent") : t("courseDetail.backToCourseGradebook");
   const hasRowsWithSubmittedAttempts = rows.some((row) => hasSubmittedAttempt(row));
-  const isTest = rows[0]?.activityTypeKey === "test" || gradebook?.items[0]?.activityTypeKey === "test";
+  const isTest = activityTypeKey === "test";
+
+  async function refreshAfterSettings() {
+    await refresh();
+    setReviewAll(null);
+    if (hasMessagingPermission) {
+      await api.activityMessagingOverview(courseId, activityId, groupId)
+        .then(({ messaging }) => setMessagingEnabled(messaging.enabled))
+        .catch(() => { /* The regular messaging poll retries temporary failures. */ });
+    }
+  }
 
   async function openReviewAll() {
     setReviewAll({ loading: true, error: "", submissions: [] });
     try {
-      const activityTypeKey = rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? "";
       if (activityTypeKey !== "test") {
         const activityResult = await api.activity(courseId, activityId);
         let solution: unknown = null;
@@ -832,7 +845,7 @@ export default function GradebookActivityResultsPage() {
     <AppShell>
       <main className="page stack">
         <section className="section stack">
-          <div className="section-heading content-context">
+          <div className="section-heading content-context activity-report-heading">
             <div className="workspace-context">
               <h1>{activityTitle}</h1>
               <p className="muted">
@@ -840,7 +853,7 @@ export default function GradebookActivityResultsPage() {
                 {groupTitle ? ` · ${groupTitle}` : ""}
               </p>
             </div>
-            <div className="section-actions">
+            <div className="section-actions activity-report-actions">
               {canMessageStudents ? (
                 <button className="button secondary" type="button" onClick={() => setShowActivityMessenger(true)}>
                   <AppIcon name="messages" />
@@ -848,14 +861,23 @@ export default function GradebookActivityResultsPage() {
                 </button>
               ) : null}
               {canManageCourse ? (
-                <Link className="button primary" href={`/courses/${courseId}/activities/${activityId}`}>
-                  {t("courseDetail.editActivityTitle")}
-                </Link>
+                <>
+                  <Link className="button secondary" href={`/courses/${courseId}/activities/${activityId}`}>
+                    <AppIcon name="edit" />
+                    {t("courseDetail.editActivityTitle")}
+                  </Link>
+                  <button className="button secondary" disabled={!reportActivity} type="button" onClick={() => setShowActivitySettings(true)}>
+                    <AppIcon name="settings" />
+                    {t("courseDetail.contentSettingsAction")}
+                  </button>
+                </>
               ) : null}
               <button className="button secondary" disabled={!course || !gradebook} type="button" onClick={() => setShowGradeExport(true)}>
+                <AppIcon name="download" />
                 {t("courseDetail.exportGrades")}
               </button>
-              <Link className="button secondary" href={backHref}>
+              <Link className="button secondary activity-report-back" href={backHref}>
+                <AppIcon name="back" />
                 {backLabel}
               </Link>
             </div>
@@ -996,6 +1018,15 @@ export default function GradebookActivityResultsPage() {
               })
             : undefined}
         />
+
+        {showActivitySettings && canManageCourse && reportActivity ? (
+          <ActivitySettingsModal
+            activity={reportActivity}
+            courseId={courseId}
+            onClose={() => setShowActivitySettings(false)}
+            onSaved={refreshAfterSettings}
+          />
+        ) : null}
 
         {showGradeExport && course && gradebook ? (
           <GradebookExportDialog

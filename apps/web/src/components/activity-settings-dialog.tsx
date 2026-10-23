@@ -5,8 +5,9 @@ import { toZonedDateTimeInput, fromZonedDateTimeInput, useApplicationTime } from
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import "@cognelo/plugin-registry/activity";
 import type { ActivityAssignmentOverrideField, AssignedActivityAssessmentMode } from "@cognelo/contracts";
-import { useDialogs } from "@cognelo/activity-ui";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useBodyScrollLock, useDialogs } from "@cognelo/activity-ui";
+import { FormEvent, useEffect, useId, useMemo, useState } from "react";
+import { AppIcon } from "@/components/app-icon";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import {
   api,
@@ -63,6 +64,28 @@ type ActivitySettingsDialogProps = {
   onClose: () => void;
   onSaved: () => Promise<void> | void;
 };
+
+export function ActivitySettingsModal(props: ActivitySettingsDialogProps & { title?: string }) {
+  const { t } = useI18n();
+  const titleId = useId();
+  useBodyScrollLock(true);
+  return (
+    <div className="dialog-backdrop" role="presentation">
+      <section aria-labelledby={titleId} aria-modal="true" className="dialog-panel activity-settings-dialog" role="dialog">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">{t("courseDetail.contentSettingsEyebrow")}</p>
+            <h2 id={titleId}>{props.title ?? props.activity.title}</h2>
+          </div>
+          <button className="secondary icon-button" onClick={props.onClose} title={t("common.cancel")} type="button">
+            <AppIcon name="close" />
+          </button>
+        </div>
+        <ActivitySettingsDialog {...props} />
+      </section>
+    </div>
+  );
+}
 
 const summativeOverrideFields = new Set<ActivityAssignmentOverrideField>([
   "requireSafeExamBrowser",

@@ -1,6 +1,6 @@
 # Browser user flows
 
-`assigned-activity-editor.spec.ts` verifies that active and expired section links open the canonical teacher editor with Activity, Concepts, and Grading tabs, persist concept selections, keep rubric/tests out of the Activity panel, and retain the learner route for students.
+`assigned-activity-editor.spec.ts` verifies that active and expired section links open Class overview before the explicit Edit activity action opens the complete Activity / Concepts / Grading editor; it checks concept persistence, grading placement, and learner-route preservation. `activity-report-settings.spec.ts` checks matching course/section report entry points, shared settings persistence/cancellation from both report tabs and course content, section-aware back navigation, messaging refresh, scroll restoration, and desktop/mobile header and dialog layout.
 
 `editor-undo.spec.ts` checks actual Monaco undo/redo with persisted answers: fresh restored baselines, slow/failed loading, ordered autosaves during undo and failures, question/file isolation, identical file IDs across questions, reopening/reloading, previous submissions and later attempts, same-tab account changes, and protected templates. Undo history stays in memory and never enters answer writes or browser storage.
 

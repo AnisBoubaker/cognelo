@@ -21,7 +21,7 @@ import {
 } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ActivityPickerDialog } from "@/components/activity-picker-dialog";
-import { ActivitySettingsDialog } from "@/components/activity-settings-dialog";
+import { ActivitySettingsModal } from "@/components/activity-settings-dialog";
 import { ActivityTypeIcon, AppIcon, FolderContentIcon as SharedFolderContentIcon } from "@/components/app-icon";
 import { useAuth } from "@/components/auth-provider";
 import { CourseSettingsPanel, type CourseSettingsSection } from "@/components/course-settings-panel";
@@ -1321,7 +1321,10 @@ export default function CourseDetailPage() {
   function contentItemHref(item: CourseContentItem) {
     if (contentGroup && item.courseGroupActivityId) {
       const assignment = groupAssignmentById.get(item.courseGroupActivityId);
-      return assignment ? `/courses/${courseId}/groups/${contentGroup.id}/activities/assigned/${assignment.activity.id}` : null;
+      if (!assignment) return null;
+      return course?.permissions?.canViewGradebook
+        ? `/courses/${courseId}/gradebook/activities/${assignment.activity.id}?origin=content&report=overview&groupId=${encodeURIComponent(contentGroup.id)}`
+        : `/courses/${courseId}/groups/${contentGroup.id}/activities/assigned/${assignment.activity.id}`;
     }
     if (item.activityId && courseActivityById.has(item.activityId)) {
       return course?.permissions?.canViewGradebook
@@ -2132,12 +2135,20 @@ export default function CourseDetailPage() {
                 </section>
               </div>
             ) : null}
-            {settingsContentItem ? (
+            {settingsContentItem && settingsActivity ? (
+              <ActivitySettingsModal
+                activity={settingsActivity}
+                title={contentItemTitle(settingsContentItem)}
+                courseId={courseId}
+                onClose={closeContentSettings}
+                onSaved={refresh}
+              />
+            ) : settingsContentItem ? (
               <div className="dialog-backdrop" role="presentation">
                 <section
                   aria-labelledby="course-content-settings-title"
                   aria-modal="true"
-                  className={settingsActivity ? "dialog-panel activity-settings-dialog" : "dialog-panel"}
+                  className="dialog-panel"
                   role="dialog"
                 >
                   <div className="section-heading">
@@ -2150,14 +2161,7 @@ export default function CourseDetailPage() {
                     </button>
                   </div>
 
-                  {settingsActivity ? (
-                    <ActivitySettingsDialog
-                      activity={settingsActivity}
-                      courseId={courseId}
-                      onClose={closeContentSettings}
-                      onSaved={refresh}
-                    />
-                  ) : settingsContentResource && settingsContentType && SettingsContentTypeRenderer ? (
+                  {settingsContentResource && settingsContentType && SettingsContentTypeRenderer ? (
                     SettingsContentTypeRenderer({
                       definition: settingsContentType,
                       contentItem: settingsContentItem ?? undefined,

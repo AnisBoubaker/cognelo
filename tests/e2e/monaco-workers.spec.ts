@@ -21,7 +21,10 @@ for (const expired of [false, true]) {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(`/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${activityId}`);
-    if (expired) await page.getByRole("tab", { name: "Student starting files", exact: true }).click();
+    if (expired) {
+      await page.getByRole("link", { name: "Edit activity", exact: true }).click();
+      await page.getByRole("tab", { name: "Student starting files", exact: true }).click();
+    }
     await expect(page.locator(".monaco-editor").first()).toBeVisible();
 
     // A painted editor alone does not prove that its background language services work.

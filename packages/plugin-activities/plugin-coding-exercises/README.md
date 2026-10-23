@@ -2,7 +2,7 @@
 
 `@cognelo/plugin-coding-exercises` provides the `coding-exercise` activity type. Teachers author prompts, starter/template code, reference solutions, visible and hidden tests, rubrics, and optional automatic feedback. Learners write and run code in Monaco, submit against hidden tests through Judge0, resume drafts, and review prior submissions.
 
-Course authoring uses the shared **Activity / Concepts / Grading** tabs, including when a course manager opens the exercise through a section link. Rubric and test-case controls stay within Grading.
+Course and section links open the same teacher activity-report workspace. Its **Edit activity** action opens the shared **Activity / Concepts / Grading** authoring tabs; **Settings** opens the same assignment-settings modal as course content. Rubric and test-case controls stay within Grading.
 
 Teacher review routes consume core grade capabilities: explicit course teachers/admins work course-wide, while section teachers/TAs can inspect and grade only assigned sections. Authoring, hidden-test mutation, grade release, and persisted activity-wide AI-instruction changes remain course-management operations.
 

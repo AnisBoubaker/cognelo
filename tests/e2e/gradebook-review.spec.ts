@@ -73,6 +73,8 @@ test.describe("consistent gradebook review actions", () => {
 
   test("course content opens the activity report workspace and keeps editing available", async ({ teacherPage: page }) => {
     await page.goto("/courses/seed-course-programming-101?tab=content");
+    await page.getByRole("button", { name: "Content tree actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Expand all", exact: true }).click();
 
     const activityLink = page.getByRole("link", { name: "C exercise: Median of three integers", exact: true }).first();
     await expect(activityLink).toHaveAttribute(
