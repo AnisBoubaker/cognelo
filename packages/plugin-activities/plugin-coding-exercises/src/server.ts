@@ -2,6 +2,7 @@ import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import {
   codingExerciseGeneratePromptRoute,
   codingExerciseGenerateRubricRoute,
+  codingExerciseRubricGuidanceRoute,
   codingExerciseGenerateSolutionRoute,
   codingExerciseGenerateTestsRoute,
   codingExerciseHistoryRoute,
@@ -74,6 +75,7 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
     codingExerciseGeneratePromptRoute,
     codingExerciseGenerateSolutionRoute,
     codingExerciseGenerateRubricRoute,
+    codingExerciseRubricGuidanceRoute,
     codingExerciseGenerateTestsRoute
   ],
   bankVariation: {

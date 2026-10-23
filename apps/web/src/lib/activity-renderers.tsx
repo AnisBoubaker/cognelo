@@ -314,6 +314,7 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
               api.generateCodingExerciseSolution(courseId, activityProps.activity.id, input),
             generateRubric: (input: Parameters<typeof api.generateCodingExerciseRubric>[2]) =>
               api.generateCodingExerciseRubric(courseId, activityProps.activity.id, input),
+            saveRubricGuidance: (guidance: string) => api.saveCodingExerciseRubricGuidance(courseId, activityProps.activity.id, guidance),
             generateTests: (input: Parameters<typeof api.generateCodingExerciseTests>[2]) =>
               api.generateCodingExerciseTests(courseId, activityProps.activity.id, input)
           }
@@ -1276,6 +1277,7 @@ function CodingExerciseBankActivityRenderer(context: BankActivityRendererContext
               generatePrompt: (input) => api.generateBankCodingExercisePrompt(context.activityBankId, context.bankActivityId, input),
               generateSolution: (input) => api.generateBankCodingExerciseSolution(context.activityBankId, context.bankActivityId, input),
               generateRubric: (input) => api.generateBankCodingExerciseRubric(context.activityBankId, context.bankActivityId, input),
+              saveRubricGuidance: (guidance) => api.saveBankCodingExerciseRubricGuidance(context.activityBankId, context.bankActivityId, guidance),
               generateTests: (input) => api.generateBankCodingExerciseTests(context.activityBankId, context.bankActivityId, input)
             }
           : undefined

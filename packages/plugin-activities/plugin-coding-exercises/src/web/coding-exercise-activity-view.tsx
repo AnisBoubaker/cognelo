@@ -1,6 +1,6 @@
 "use client";
 
-import { ActionIcon, useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
+import { ActionIcon, ConfirmationDialog, useBodyScrollLock, useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
 
 import { type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -259,6 +259,7 @@ type CodingExerciseAiGenerationClient = {
       }
   >;
   generateRubric: (input: {
+    guidance: string;
     title: string;
     description: string;
     prompt: string;
@@ -267,6 +268,7 @@ type CodingExerciseAiGenerationClient = {
     locale: CodingExercisesLocale;
     knowledge: ActivityKnowledgeGenerationRequest;
   }) => Promise<{ criteria: RubricCriterion[]; attempts: number }>;
+  saveRubricGuidance: (guidance: string) => Promise<{ guidance: string }>;
 };
 
 type CodingExerciseActivityViewProps = {
@@ -352,8 +354,12 @@ export function CodingExerciseActivityView({
   const [generatingSolution, setGeneratingSolution] = useState(false);
   const [generatingTests, setGeneratingTests] = useState(false);
   const [generatingRubric, setGeneratingRubric] = useState(false);
+  const [rubricGenerationDialogOpen, setRubricGenerationDialogOpen] = useState(false);
+  const [rubricGuidanceDraft, setRubricGuidanceDraft] = useState("");
+  const rubricGuidanceId = useId();
+  useBodyScrollLock(rubricGenerationDialogOpen);
   const [gradingSection, setGradingSection] = useState<"rubric" | "tests">("rubric");
-  const [replacementDialog, setReplacementDialog] = useState<"prompt" | "solution" | "rubric" | null>(null);
+  const [replacementDialog, setReplacementDialog] = useState<"prompt" | "solution" | null>(null);
   const [testGenerationDialogOpen, setTestGenerationDialogOpen] = useState(false);
   const [testGenerationMode, setTestGenerationMode] = useState<TestGenerationMode>("add");
   const [visibleTestGenerationCount, setVisibleTestGenerationCount] = useState(codingExerciseDefaultVisibleTestCount);
@@ -1127,11 +1133,8 @@ export function CodingExerciseActivityView({
       notifications.error(t("generateRubricRequirements"));
       return;
     }
-    if (privateConfig.aiFeedback.criteria.length > 0) {
-      setReplacementDialog("rubric");
-      return;
-    }
-    void generateRubric();
+    setRubricGuidanceDraft(privateConfig.rubricGenerationGuidance ?? "");
+    setRubricGenerationDialogOpen(true);
   }
 
   async function generateRubric() {
@@ -1140,10 +1143,14 @@ export function CodingExerciseActivityView({
     }
 
     setGeneratingRubric(true);
-    setReplacementDialog(null);
     setError("");
     try {
+      const { guidance } = await aiGenerationClient.saveRubricGuidance(rubricGuidanceDraft.trim());
+      setPrivateConfig((current) => ({ ...current, rubricGenerationGuidance: guidance }));
+      setSavedSnapshot((current) => ({ ...current, privateConfig: { ...current.privateConfig, rubricGenerationGuidance: guidance } }));
+      setRubricGenerationDialogOpen(false);
       const result = await aiGenerationClient.generateRubric({
+        guidance,
         title,
         description,
         prompt: config.prompt,
@@ -1255,53 +1262,23 @@ export function CodingExerciseActivityView({
   }
 
   function getReplacementDialogEyebrow() {
-    if (replacementDialog === "prompt") {
-      return t("generatePrompt");
-    }
-    if (replacementDialog === "solution") {
-      return t("generateSolution");
-    }
-    return t("generateRubric");
+    return t(replacementDialog === "prompt" ? "generatePrompt" : "generateSolution");
   }
 
   function getReplacementDialogTitle() {
-    if (replacementDialog === "prompt") {
-      return t("replacePromptTitle");
-    }
-    if (replacementDialog === "solution") {
-      return t("replaceSolutionTitle");
-    }
-    return t("replaceRubricTitle");
+    return t(replacementDialog === "prompt" ? "replacePromptTitle" : "replaceSolutionTitle");
   }
 
   function getReplacementDialogMessage() {
-    if (replacementDialog === "prompt") {
-      return t("replacePromptMessage");
-    }
-    if (replacementDialog === "solution") {
-      return t("replaceSolutionMessage");
-    }
-    return t("replaceRubricMessage");
+    return t(replacementDialog === "prompt" ? "replacePromptMessage" : "replaceSolutionMessage");
   }
 
   function getKeepReplacementLabel() {
-    if (replacementDialog === "prompt") {
-      return t("keepCurrentPrompt");
-    }
-    if (replacementDialog === "solution") {
-      return t("keepCurrentSolution");
-    }
-    return t("keepCurrentRubric");
+    return t(replacementDialog === "prompt" ? "keepCurrentPrompt" : "keepCurrentSolution");
   }
 
   function getReplaceReplacementLabel() {
-    if (replacementDialog === "prompt") {
-      return t("replaceCurrentPrompt");
-    }
-    if (replacementDialog === "solution") {
-      return t("replaceCurrentSolution");
-    }
-    return t("replaceCurrentRubric");
+    return t(replacementDialog === "prompt" ? "replaceCurrentPrompt" : "replaceCurrentSolution");
   }
 
   function confirmReplacementGeneration() {
@@ -1311,10 +1288,6 @@ export function CodingExerciseActivityView({
     }
     if (replacementDialog === "solution") {
       void generateSolution();
-      return;
-    }
-    if (replacementDialog === "rubric") {
-      void generateRubric();
       return;
     }
   }
@@ -1372,6 +1345,7 @@ export function CodingExerciseActivityView({
                 aiGenerationDraftRef.current = null;
                 setReplacementDialog(null);
                 setTestGenerationDialogOpen(false);
+                setRubricGenerationDialogOpen(false);
                 setReferenceValidationSummary(null);
                 setConfig((current) => ({ ...current, language: nextLanguage }));
               }}
@@ -1436,6 +1410,28 @@ export function CodingExerciseActivityView({
               <ActionIcon name="generate" />
               {generatingSolution ? t("generatingSolution") : t("generateSolution")}
             </button>
+          ) : null}
+
+          {rubricGenerationDialogOpen && typeof document !== "undefined" ? createPortal(
+            <ConfirmationDialog
+              open
+              title={t("generateRubric")}
+              message={<div className="stack">
+                <div className="field">
+                  <label htmlFor={rubricGuidanceId}>{t("rubricGuidanceLabel")}</label>
+                  <textarea id={rubricGuidanceId} autoFocus rows={5} maxLength={8000}
+                    value={rubricGuidanceDraft} onChange={(event) => setRubricGuidanceDraft(event.target.value)} />
+                  <p className="muted">{t("rubricGuidanceHelp")}</p>
+                </div>
+                {privateConfig.aiFeedback.criteria.length ? <p>{t("replaceRubricMessage")}</p> : null}
+              </div>}
+              confirmLabel={t(privateConfig.aiFeedback.criteria.length ? "replaceCurrentRubric" : "generateRubric")}
+              confirmIcon="generate"
+              cancelLabel={t("cancelTestGeneration")}
+              isConfirming={generatingRubric}
+              onCancel={() => setRubricGenerationDialogOpen(false)}
+              onConfirm={() => void generateRubric()}
+            />, document.body
           ) : null}
 
           {replacementDialog && typeof document !== "undefined" ? createPortal(

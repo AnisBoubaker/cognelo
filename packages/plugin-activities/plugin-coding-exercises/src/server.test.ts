@@ -37,6 +37,7 @@ vi.mock("./db-client", () => ({ prisma: { pluginCodingExerciseExecution: { findF
 vi.mock("./routes", () => ({
   codingExerciseGeneratePromptRoute: { path: "generate-prompt", methods: {} },
   codingExerciseGenerateRubricRoute: { path: "generate-rubric", methods: {} },
+  codingExerciseRubricGuidanceRoute: { path: "rubric-guidance", methods: {} },
   codingExerciseGenerateSolutionRoute: { path: "generate-solution", methods: {} },
   codingExerciseGenerateTestsRoute: { path: "generate-tests", methods: {} },
   codingExerciseHistoryRoute: { path: "history", methods: {} },

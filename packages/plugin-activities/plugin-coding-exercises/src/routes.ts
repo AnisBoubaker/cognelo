@@ -1,4 +1,5 @@
 import { canShowStudentActivityGrade } from "@cognelo/core";
+import { randomUUID } from "node:crypto";
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import {
   AppError,
@@ -41,7 +42,7 @@ import {
 } from "./hidden-tests";
 import { prisma, type Prisma } from "@cognelo/db";
 import { prisma as codingExercisePrisma } from "./db-client";
-import { parseCodingExercisePrivateConfig } from "./coding-exercises";
+import { codingExerciseRubricGuidanceInputSchema, parseCodingExercisePrivateConfig } from "./coding-exercises";
 import { evaluateCodingExerciseAttemptWithAi } from "./ai-feedback";
 
 function requireCourseId(courseId: string | undefined) {
@@ -624,6 +625,36 @@ export const codingExerciseGenerateTestsRoute: PluginRouteDefinition = {
   }
 };
 
+export const codingExerciseRubricGuidanceRoute: PluginRouteDefinition = {
+  path: "coding-exercises/rubric-guidance",
+  activityTypeKeys: ["coding-exercise"],
+  methods: {
+    PUT: async ({ context, readJson }) => {
+      await assertCanManageGenerationContext(context);
+      const { guidance } = codingExerciseRubricGuidanceInputSchema.parse(await readJson());
+      const preference = JSON.stringify({ rubricGenerationGuidance: guidance });
+      // Merge just this authoring preference; never save a draft solution, tests,
+      // rubric, or grading instructions as a side effect of generation.
+      if (context.activityBankId) {
+        await codingExercisePrisma.$executeRaw`INSERT INTO "PluginBankCodingExerciseReferenceSolution"
+          ("id", "bankActivityId", "sourceCode", "privateConfig", "validationSummary", "createdAt", "updatedAt")
+          VALUES (${randomUUID()}, ${context.activity.id}, '', ${preference}::jsonb, '{}'::jsonb, NOW(), NOW())
+          ON CONFLICT ("bankActivityId") DO UPDATE SET
+            "privateConfig" = "PluginBankCodingExerciseReferenceSolution"."privateConfig" || EXCLUDED."privateConfig",
+            "updatedAt" = NOW()`;
+      } else {
+        await codingExercisePrisma.$executeRaw`INSERT INTO "PluginCodingExerciseReferenceSolution"
+          ("id", "activityId", "sourceCode", "privateConfig", "validationSummary", "createdAt", "updatedAt")
+          VALUES (${randomUUID()}, ${context.activity.id}, '', ${preference}::jsonb, '{}'::jsonb, NOW(), NOW())
+          ON CONFLICT ("activityId") DO UPDATE SET
+            "privateConfig" = "PluginCodingExerciseReferenceSolution"."privateConfig" || EXCLUDED."privateConfig",
+            "updatedAt" = NOW()`;
+      }
+      return { guidance };
+    }
+  }
+};
+
 export const codingExerciseGenerateRubricRoute: PluginRouteDefinition = {
   path: "coding-exercises/generate-rubric",
   activityTypeKeys: ["coding-exercise"],
@@ -634,6 +665,7 @@ export const codingExerciseGenerateRubricRoute: PluginRouteDefinition = {
       const subject = await resolveSubjectContext(context.activityBankId, context.courseId);
 
       return generateCodingExerciseRubric({
+        guidance: input.guidance,
         user: context.user,
         title: input.title,
         description: input.description,

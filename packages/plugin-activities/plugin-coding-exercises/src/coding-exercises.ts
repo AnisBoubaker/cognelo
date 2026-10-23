@@ -115,7 +115,11 @@ export function balanceCodingExerciseAiRubricCriterionWeights<T extends CodingEx
   }));
 }
 
+export const codingExerciseRubricGuidanceSchema = z.string().trim().max(8000);
+export const codingExerciseRubricGuidanceInputSchema = z.object({ guidance: codingExerciseRubricGuidanceSchema });
+
 export const codingExercisePrivateConfigSchema = z.object({
+  rubricGenerationGuidance: codingExerciseRubricGuidanceSchema.optional(),
   hiddenSupportCode: z.string().max(60000).default(""),
   templateSource: z.string().max(120000).default(""),
   templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([]),

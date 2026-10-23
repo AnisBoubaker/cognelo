@@ -275,6 +275,7 @@ export type CodingExerciseTestsGenerationInput = CodingExerciseGenerationBaseInp
 };
 
 export type CodingExerciseRubricGenerationInput = CodingExerciseGenerationBaseInput & {
+  guidance?: string;
   title: string;
   referenceSolution: string;
 };
@@ -991,6 +992,7 @@ export type CodingExerciseHiddenTest = {
 export type CodingExerciseReferenceSolution = {
   sourceCode: string;
   privateConfig: {
+    rubricGenerationGuidance?: string;
     hiddenSupportCode: string;
     templateSource: string;
     templateVisibleLineNumbers: number[];
@@ -2302,6 +2304,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input)
     }),
+  saveCodingExerciseRubricGuidance: (courseId: string, activityId: string, guidance: string) =>
+    request<{ guidance: string }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/rubric-guidance`, {
+      method: "PUT", body: JSON.stringify({ guidance })
+    }),
   bankCodingExerciseHiddenTests: (activityBankId: string, bankActivityId: string) =>
     request<{ tests: CodingExerciseHiddenTest[]; referenceSolution: CodingExerciseReferenceSolution | null }>(
       `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-exercises/hidden-tests`
@@ -2366,6 +2372,10 @@ export const api = {
         body: JSON.stringify(input)
       }
     ),
+  saveBankCodingExerciseRubricGuidance: (activityBankId: string, bankActivityId: string, guidance: string) =>
+    request<{ guidance: string }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-exercises/rubric-guidance`, {
+      method: "PUT", body: JSON.stringify({ guidance })
+    }),
   webDesignExerciseTests: (courseId: string, activityId: string) =>
     request<{ tests: WebDesignExerciseTest[]; referenceBundle: WebDesignExerciseReferenceBundle | null }>(
       `/courses/${courseId}/activities/${activityId}/web-design-coding-exercises/tests`

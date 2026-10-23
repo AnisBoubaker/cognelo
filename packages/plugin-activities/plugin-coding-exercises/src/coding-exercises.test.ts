@@ -114,6 +114,7 @@ describe("coding exercise config and template helpers", () => {
 
   it("preserves the rubric when a generated solution replaces the private template", () => {
     const current = parseCodingExercisePrivateConfig({
+      rubricGenerationGuidance: "Emphasize algorithmic reasoning.",
       templateSource: "old\n{{ STUDENT_CODE }}",
       templateVisibleLineNumbers: [0],
       aiFeedback: {
@@ -134,6 +135,7 @@ describe("coding exercise config and template helpers", () => {
     expect(merged.templateSource).toBe("new\n{{ STUDENT_CODE }}\n{{ TEST_CODE }}");
     expect(merged.templateVisibleLineNumbers).toEqual([0, 2]);
     expect(merged.aiFeedback).toEqual(current.aiFeedback);
+    expect(merged.rubricGenerationGuidance).toBe(current.rubricGenerationGuidance);
   });
 
   it("reports incomplete rubric drafts before they are sent to the API", () => {

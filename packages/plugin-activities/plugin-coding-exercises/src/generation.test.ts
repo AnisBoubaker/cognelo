@@ -652,6 +652,7 @@ describe("coding exercise AI generation", () => {
     await expect(generateCodingExerciseRubric({
       user,
       title: "Find the smallest value",
+      guidance: "Focus on reasoning; assign 70% to correctness and 30% to clarity.",
       description: "Compare three values.",
       prompt: "Read three values and display the smallest value.",
       referenceSolution: "print(min(map(float, input().split())))",
@@ -669,5 +670,10 @@ describe("coding exercise AI generation", () => {
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.systemPrompt).toContain("Do not include a rubric name");
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.userPrompt).toContain("Find the smallest value");
     expect(mocks.generateQuestionAuthoringText.mock.calls[0]?.[1]?.userPrompt).toContain("<reference_solution>");
+    for (const [, request] of mocks.generateQuestionAuthoringText.mock.calls) {
+      expect(request.userPrompt).toContain("Focus on reasoning; assign 70% to correctness and 30% to clarity.");
+      expect(request.userPrompt).toContain("Read three values and display the smallest value.");
+      expect(request.userPrompt).toContain("print(min(map(float, input().split())))");
+    }
   });
 });

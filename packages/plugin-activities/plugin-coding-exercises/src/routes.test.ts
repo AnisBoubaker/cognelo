@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   runCodingExercise: vi.fn(),
   submitCodingExercise: vi.fn(),
   prisma: {
+    $executeRaw: vi.fn(),
     activityAttempt: { findMany: vi.fn() },
     course: { findUnique: vi.fn() },
     courseGroupParticipant: { findMany: vi.fn() },
@@ -91,6 +92,7 @@ vi.mock("./ai-feedback", () => ({
 const {
   codingExerciseGeneratePromptRoute,
   codingExerciseGenerateRubricRoute,
+  codingExerciseRubricGuidanceRoute,
   codingExerciseGenerateSolutionRoute,
   codingExerciseGenerateTestsRoute,
   codingExerciseHistoryRoute,
@@ -517,6 +519,7 @@ describe("coding exercise plugin routes", () => {
         context,
         readJson: async () => ({
           title: "Smallest value",
+          guidance: "Give algorithmic reasoning the most weight.",
           prompt: "Write code that displays the smallest value.",
           description: "Generate a list exercise.",
           referenceSolution: "print(1)",
@@ -528,6 +531,7 @@ describe("coding exercise plugin routes", () => {
     expect(mocks.generateCodingExerciseRubric).toHaveBeenCalledWith(expect.objectContaining({
       locale: "fr",
       title: "Smallest value",
+      guidance: "Give algorithmic reasoning the most weight.",
       referenceSolution: "print(1)",
       subject: expect.objectContaining({ teachingLanguage: "fr" })
     }));
@@ -553,5 +557,26 @@ describe("coding exercise plugin routes", () => {
       })
     ).rejects.toThrow();
     expect(mocks.generateCodingExerciseRubric).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("saves only private rubric guidance in the correct ownership scope (bank: %s)", async (bank) => {
+    const ownerContext = bank ? { ...context, courseId: undefined, activityBankId: "bank-1" } : context;
+    await expect(codingExerciseRubricGuidanceRoute.methods.PUT?.({
+      request: new Request("http://test.local"), context: ownerContext,
+      readJson: async () => ({ guidance: "  Emphasize clarity.  " })
+    })).resolves.toEqual({ guidance: "Emphasize clarity." });
+    const [sql, , activityId, preference] = mocks.prisma.$executeRaw.mock.calls[0];
+    expect(sql.join("")).toContain(bank ? '"PluginBankCodingExerciseReferenceSolution"' : '"PluginCodingExerciseReferenceSolution"');
+    expect(activityId).toBe(context.activity.id);
+    expect(JSON.parse(preference)).toEqual({ rubricGenerationGuidance: "Emphasize clarity." });
+    expect(mocks.generateCodingExerciseRubric).not.toHaveBeenCalled();
+  });
+
+  it("rejects unauthorized or oversized guidance before writing anything", async () => {
+    mocks.assertCanManageCourse.mockRejectedValueOnce(new Error("Forbidden"));
+    const input = { request: new Request("http://test.local"), context, readJson: async () => ({ guidance: "Private guidance" }) };
+    await expect(codingExerciseRubricGuidanceRoute.methods.PUT?.(input)).rejects.toThrow("Forbidden");
+    await expect(codingExerciseRubricGuidanceRoute.methods.PUT?.({ ...input, readJson: async () => ({ guidance: "x".repeat(8001) }) })).rejects.toThrow();
+    expect(mocks.prisma.$executeRaw).not.toHaveBeenCalled();
   });
 });

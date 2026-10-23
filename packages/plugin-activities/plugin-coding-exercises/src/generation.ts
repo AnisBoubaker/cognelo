@@ -7,6 +7,7 @@ import {
   codingExerciseHiddenTestSchema,
   codingExerciseMaxGeneratedTestCount,
   codingExerciseMaxHiddenTestCount,
+  codingExerciseRubricGuidanceSchema,
   codingExerciseTestInsertionToken,
   codingExerciseTemplateInsertionToken,
   parseCodingExercisePrivateConfig,
@@ -61,6 +62,7 @@ export const codingExerciseTestsGenerationInputSchema = z.object({
 });
 
 export const codingExerciseRubricGenerationInputSchema = z.object({
+  guidance: codingExerciseRubricGuidanceSchema.default(""),
   title: z.string().trim().min(1).max(300),
   description: z.string().max(4000).default(""),
   prompt: z.string().min(10).max(12000),
@@ -466,6 +468,7 @@ export async function generateCodingExerciseTests(input: {
 }
 
 export async function generateCodingExerciseRubric(input: {
+  guidance?: string;
   user: Parameters<typeof generateQuestionAuthoringText>[0];
   title: string;
   description: string;
@@ -477,8 +480,11 @@ export async function generateCodingExerciseRubric(input: {
   knowledge?: ActivityGenerationKnowledge;
 }) {
   const systemPrompt = buildRubricGenerationSystemPrompt(input);
-  let userPrompt = [
+  const initialPrompt = [
     "Generate a grading rubric for this coding exercise.",
+    "",
+    "Teacher guidance for rubric generation:",
+    input.guidance?.trim() || "No additional guidance provided.",
     "",
     "Activity title:",
     input.title.trim(),
@@ -494,6 +500,7 @@ export async function generateCodingExerciseRubric(input: {
     input.referenceSolution,
     "</reference_solution>"
   ].join("\n");
+  let userPrompt = initialPrompt;
   let lastPayload: unknown = null;
   let lastIssues: string[] = [];
 
@@ -507,7 +514,7 @@ export async function generateCodingExerciseRubric(input: {
     if (!parsed.ok) {
       lastPayload = raw;
       lastIssues = [parsed.issue];
-      userPrompt = buildCorrectionPrompt("JSON payload", raw, lastIssues);
+      userPrompt = `${initialPrompt}\n\n${buildCorrectionPrompt("JSON payload", raw, lastIssues)}`;
       continue;
     }
 
@@ -530,7 +537,7 @@ export async function generateCodingExerciseRubric(input: {
 
     lastPayload = parsed.value;
     lastIssues = validation.error.issues.map((issue) => `${issue.path.join(".") || "payload"}: ${issue.message}`);
-    userPrompt = buildCorrectionPrompt("JSON payload", JSON.stringify(parsed.value, null, 2), lastIssues);
+    userPrompt = `${initialPrompt}\n\n${buildCorrectionPrompt("JSON payload", JSON.stringify(parsed.value, null, 2), lastIssues)}`;
   }
 
   throw new AppError(422, "CODING_EXERCISE_RUBRIC_GENERATION_INVALID", "The AI agent could not generate a valid rubric.", {
@@ -708,6 +715,7 @@ function buildRubricGenerationSystemPrompt(input: { language: string; locale: Ge
     "Rules:",
     "- Generate between 2 and 6 criteria unless the exercise genuinely needs only one.",
     "- Criterion weights must be whole numbers and total exactly 100.",
+    "- Follow the teacher's guidance on rubric priorities and weighting while staying aligned with the exercise requirements and the rules above.",
     "- Each criterion must measure a distinct, observable aspect of the submitted work.",
     "- Align the rubric with the student-facing requirements and the selected programming language.",
     "- Do not include deterministic test pass rates as a criterion; tests are scored separately.",

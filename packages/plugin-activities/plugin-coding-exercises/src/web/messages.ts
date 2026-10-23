@@ -29,6 +29,8 @@ type MessageKey =
   | "keepCurrentSolution"
   | "replaceCurrentSolution"
   | "generateRubric"
+  | "rubricGuidanceLabel"
+  | "rubricGuidanceHelp"
   | "generatingRubric"
   | "generatedRubric"
   | "generateRubricRequirements"
@@ -241,6 +243,8 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     keepCurrentSolution: "Keep current solution",
     replaceCurrentSolution: "Replace solution",
     generateRubric: "Generate rubric automatically",
+    rubricGuidanceLabel: "Guidance for the AI (optional)",
+    rubricGuidanceHelp: "Describe the criteria, priorities, or weighting you want. Your guidance is saved for this exercise when you generate, even if generation fails. It is separate from grading instructions.",
     generatingRubric: "Generating rubric...",
     generatedRubric: "Rubric generated.",
     generateRubricRequirements: "Add an activity title, a student prompt, and a reference solution before generating a rubric.",
@@ -450,6 +454,8 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     keepCurrentSolution: "Conserver la solution",
     replaceCurrentSolution: "Remplacer la solution",
     generateRubric: "Générer la grille automatiquement",
+    rubricGuidanceLabel: "Consignes pour l’IA (facultatif)",
+    rubricGuidanceHelp: "Précisez les critères, les priorités ou la pondération souhaités. Vos consignes sont enregistrées pour cet exercice au lancement de la génération, même si elle échoue. Elles sont distinctes des consignes de correction.",
     generatingRubric: "Génération de la grille...",
     generatedRubric: "Grille générée.",
     generateRubricRequirements: "Ajoutez un titre d’activité, une consigne étudiante et une solution de référence avant de générer une grille.",
@@ -659,6 +665,8 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     keepCurrentSolution: "保留当前答案",
     replaceCurrentSolution: "替换答案",
     generateRubric: "自动生成量规",
+    rubricGuidanceLabel: "给 AI 的指导（可选）",
+    rubricGuidanceHelp: "说明所需的评分标准、重点或权重。点击生成时，这些指导会为本练习保存，即使生成失败也会保留。它们与批改指令分开保存。",
     generatingRubric: "正在生成量规...",
     generatedRubric: "量规已生成。",
     generateRubricRequirements: "请先添加活动标题、学生题目和参考答案，再生成量规。",
