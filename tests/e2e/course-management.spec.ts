@@ -117,7 +117,7 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     await settings.getByLabel("Grading").selectOption("pass_fail");
     await settings.getByLabel("Pass at").fill("18");
     await settings.getByLabel("Out of").fill("25");
-    await settings.getByLabel("Attempts").selectOption("max_attempts");
+    await settings.getByLabel("Attempts", { exact: true }).selectOption("max_attempts");
     await settings.getByLabel("Maximum attempts").fill("3");
     await settings.getByLabel("Grade counted").selectOption("weighted_average");
     await settings.getByLabel("Drop lowest attempt").check();
