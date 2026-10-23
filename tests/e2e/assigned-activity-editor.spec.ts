@@ -22,7 +22,7 @@ for (const expired of [false, true]) {
       }
     }));
     const assignedPath = `/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${activityId}`;
-    const editorPath = `/courses/${data.courseId}/activities/${activityId}`;
+    const editorPath = `/courses/${data.courseId}/activities/${activityId}?returnTo=report&origin=content&report=overview&groupId=${data.groupId}`;
     const reportPath = `/courses/${data.courseId}/gradebook/activities/${activityId}?origin=content&report=overview&groupId=${data.groupId}`;
 
     await page.goto(assignedPath);
@@ -31,6 +31,13 @@ for (const expired of [false, true]) {
     await expect(page.getByRole("tab", { name: "Student results", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Edit activity", exact: true })).toHaveClass(/secondary/);
     await expect(page.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
+    await page.getByRole("link", { name: "Edit activity", exact: true }).click();
+    await expect(page).toHaveURL(editorPath);
+    await page.reload();
+    await expect(page.getByRole("link", { name: "Back to activity overview", exact: true })).toHaveAttribute("href", reportPath);
+    await page.getByRole("link", { name: "Back to activity overview", exact: true }).click();
+    await expect(page).toHaveURL(reportPath);
+    await expect(page.getByRole("tab", { name: "Class overview", exact: true })).toHaveAttribute("aria-selected", "true");
     await page.getByRole("link", { name: "Edit activity", exact: true }).click();
     await expect(page).toHaveURL(editorPath);
     await expect(page.getByRole("tab", { name: "Activity", exact: true })).toHaveAttribute("aria-selected", "true");

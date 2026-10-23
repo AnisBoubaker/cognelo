@@ -12,6 +12,7 @@ import { createParsonsClient } from "@cognelo/plugin-parsons";
 import { AppShell } from "@/components/app-shell";
 import { ActivityChatDialog } from "@/components/activity-chat";
 import { ActivityBroadcastDialog, StaffActivityChat } from "@/components/activity-broadcast-dialog";
+import { activityEditorHref } from "@/lib/activity-editor-navigation";
 import { ActivitySettingsModal } from "@/components/activity-settings-dialog";
 import { AppIcon } from "@/components/app-icon";
 import { TestReviewAllPanel } from "@/components/test-review-all-panel";
@@ -865,7 +866,7 @@ export default function GradebookActivityResultsPage() {
               ) : null}
               {canManageCourse ? (
                 <>
-                  <Link className="button secondary" href={`/courses/${courseId}/activities/${activityId}`}>
+                  <Link className="button secondary" href={activityEditorHref(courseId, activityId, { origin, report: reportTab, groupId })}>
                     <AppIcon name="edit" />
                     {t("courseDetail.editActivityTitle")}
                   </Link>

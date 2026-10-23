@@ -386,7 +386,7 @@ The Test editor includes:
 - teacher preview;
 - save/discard and unsaved-change protection.
 
-Opening an item embeds its normal plugin authoring view in a Test-specific route. The child remains invisible in ordinary course activity lists.
+Opening an item uses its normal course activity editor with `testActivityId` identifying the parent Test. **Back to Test** preserves any report return context, allowing Test overview → Test editor → exercise editor → Test editor → the same overview/section, even after reloading the exercise editor. The child remains invisible in ordinary course activity lists.
 
 Whole-Test duplication and course-to-bank publication deep-copy the owned child graph and therefore display the shared blocking, indeterminate progress dialog until the operation finishes.
 

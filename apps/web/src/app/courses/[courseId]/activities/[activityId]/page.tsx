@@ -10,6 +10,7 @@ import { AppShell } from "@/components/app-shell";
 import { ActivityEditorTabs } from "@/components/activity-editor-tabs";
 import { api, Activity, ActivityDefinition, Course } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { activityEditorHref, activityReportHref, activityReportReturnContext } from "@/lib/activity-editor-navigation";
 import { activityRenderers } from "@/lib/activity-renderers";
 
 export default function ActivityPage() {
@@ -17,6 +18,7 @@ export default function ActivityPage() {
   const { courseId, activityId } = params;
   const searchParams = useSearchParams();
   const testActivityId = searchParams.get("testActivityId");
+  const returnContext = activityReportReturnContext(searchParams);
   const { locale, t } = useI18n();
   const [course, setCourse] = useState<Course | null>(null);
   const [activity, setActivity] = useState<Activity | null>(null);
@@ -74,15 +76,22 @@ export default function ActivityPage() {
     return localized?.name ?? definition?.name ?? activity.activityType.name;
   }
 
+  const backHref = testActivityId
+    ? activityEditorHref(courseId, testActivityId, returnContext)
+    : returnContext ? activityReportHref(courseId, activityId, returnContext) : `/courses/${courseId}`;
+  const backLabel = testActivityId ? t("courseDetail.backToTest")
+    : returnContext ? t(returnContext.report === "overview" ? "courseDetail.backToActivityOverview" : "courseDetail.backToStudentResults")
+      : t("parsons.backToCourse");
+
   const activityContext = (
     <div className="row activity-editor-context">
       <div className="workspace-context">
         <h1>{activity?.title ?? t("common.loading")}</h1>
         <span className="muted">{course?.title} · {localizedActivityName()}</span>
       </div>
-      <Link className="button secondary" href={testActivityId ? `/courses/${courseId}/activities/${testActivityId}` : `/courses/${courseId}`}>
+      <Link className="button secondary" href={backHref}>
         <AppIcon name="back" />
-        {testActivityId ? "Back to Test" : t("parsons.backToCourse")}
+        {backLabel}
       </Link>
     </div>
   );

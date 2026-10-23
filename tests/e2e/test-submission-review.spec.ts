@@ -128,6 +128,15 @@ test("teacher Student view reviews and restores temporary answers without creati
     config: { source: ORIGINAL_SOURCE, randomizeChoices: false }, pointsPossible: 10, isRequired: true
   } }));
   await assignCourseTest(data, activityId, title);
+  const overviewPath = `/courses/${data.courseId}/gradebook/activities/${activityId}?origin=content&report=overview&groupId=${data.groupId}`;
+  await teacherPage.goto(overviewPath);
+  await teacherPage.getByRole("link", { name: "Edit activity", exact: true }).click();
+  await teacherPage.getByRole("article").filter({ hasText: "Preview addition" }).getByRole("link", { name: "Edit", exact: true }).click();
+  await expect(teacherPage.getByRole("link", { name: "Back to Test", exact: true })).toBeVisible();
+  await teacherPage.reload();
+  await teacherPage.getByRole("link", { name: "Back to Test", exact: true }).click();
+  await teacherPage.getByRole("link", { name: "Back to activity overview", exact: true }).click();
+  await expect(teacherPage).toHaveURL(overviewPath);
   await teacherPage.goto(`/courses/${data.courseId}/groups/${data.groupId}/student-view/activities/${activityId}`);
   await teacherPage.getByRole("button", { name: "Start Test", exact: true }).click();
   await teacherPage.getByRole("dialog").getByRole("button", { name: "Start Test", exact: true }).click();

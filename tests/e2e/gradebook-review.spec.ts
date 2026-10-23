@@ -105,7 +105,7 @@ test.describe("consistent gradebook review actions", () => {
     await expect(page.getByRole("tab", { name: "Student results" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Edit activity" })).toHaveAttribute(
       "href",
-      "/courses/seed-course-programming-101/activities/seed-activity-c-median-feedback"
+      "/courses/seed-course-programming-101/activities/seed-activity-c-median-feedback?returnTo=report&origin=content&report=overview"
     );
     await expect(page.getByRole("link", { name: "Back to course content" })).toBeVisible();
   });

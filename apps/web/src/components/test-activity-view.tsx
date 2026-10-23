@@ -5,7 +5,7 @@ import { AppIcon } from "@/components/app-icon";
 import { isActivityContentClosedError } from "@cognelo/activity-ui";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmationDialog, EditActionBar, MarkdownRenderer, MonacoModelGroup, MonacoModelScope, ProgressDialog, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { ActivityExecutionStateHost } from "@cognelo/activity-sdk";
@@ -25,6 +25,7 @@ import {
   type CourseTestRuntimeItem,
   type SubjectProgrammingLanguage
 } from "@/lib/api";
+import { activityEditorHref, activityReportReturnContext } from "@/lib/activity-editor-navigation";
 import { activityCreationConfig } from "@/lib/activity-creation-defaults";
 import { type Locale, useI18n } from "@/lib/i18n";
 import { createStudentPreviewStateHost } from "@/lib/student-preview-state-host";
@@ -74,6 +75,8 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
   const { t } = useI18n();
   const courseId = activityRouteCourseId ?? course?.id ?? "";
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnContext = activityReportReturnContext(searchParams);
   const notifications = useNotifications();
   const [test, setTest] = useState<CourseTest | null>(null);
   const [definitions, setDefinitions] = useState<ActivityDefinition[]>([]);
@@ -350,7 +353,7 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
               </div>
             </div>
             {canManage ? <div className="section-actions">
-              <Link className="button secondary" href={`/courses/${courseId}/activities/${item.activityId}?testActivityId=${activity.id}`}><AppIcon name="edit" /> Edit</Link>
+              <Link className="button secondary" href={activityEditorHref(courseId, item.activityId, returnContext, activity.id)}><AppIcon name="edit" /> Edit</Link>
               <button className="button secondary" disabled={busy || hasUnsavedSettings || index === 0} type="button" onClick={() => perform(async () => {
                 const previous = test.items[index - 1];
                 await api.updateTestItem(courseId, activity.id, item.id, { position: previous.position });

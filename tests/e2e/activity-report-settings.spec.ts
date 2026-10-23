@@ -74,4 +74,15 @@ test("course and section reports share settings, preserve context, and fit narro
   await settings.getByRole("button", { name: "Cancel", exact: true }).last().click();
   await page.getByRole("link", { name: "Back to course content", exact: true }).click();
   await expect(page).toHaveURL(groupPath);
+
+  // The return destination follows the selected tab, even though the report URL still says overview.
+  await page.goto(`${reportPath}&groupId=${data.groupId}`);
+  await page.getByRole("tab", { name: "Student results", exact: true }).click();
+  await page.getByRole("link", { name: "Edit activity", exact: true }).click();
+  const studentResultsPath = reportPath.replace("report=overview", "report=students") + `&groupId=${data.groupId}`;
+  await expect(page.getByRole("link", { name: "Back to student results", exact: true })).toHaveAttribute("href", studentResultsPath);
+  await page.getByRole("link", { name: "Back to student results", exact: true }).click();
+  await expect(page).toHaveURL(studentResultsPath);
+  await expect(page.getByRole("tab", { name: "Student results", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("link", { name: "Back to course content", exact: true })).toHaveAttribute("href", groupPath);
 });
