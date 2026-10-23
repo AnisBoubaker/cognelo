@@ -217,8 +217,14 @@ function GroupActivityContent() {
 
   useEffect(() => {
     async function refresh() {
-      const [courseResult, groupResult, typeResult, aiAgentResult] = await Promise.all([
-        api.course(courseId),
+      const courseResult = await api.course(courseId);
+      if (courseResult.course.permissions?.canManageCourse) {
+        // Authoring belongs to the shared editor shell, which owns the Concepts
+        // tab and the plugin's Grading portal. Never mount a bare teacher form here.
+        router.replace(`/courses/${courseId}/activities/${activityId}`);
+        return;
+      }
+      const [groupResult, typeResult, aiAgentResult] = await Promise.all([
         api.group(courseId, groupId),
         api.activityTypes(),
         api.aiAgentConnections()
@@ -306,7 +312,7 @@ function GroupActivityContent() {
     }
 
     refresh().catch((err) => setError(err instanceof Error ? err.message : t("activityPage.loadError")));
-  }, [activityId, courseId, groupId, safeExamBrowserLaunchToken, t, user]);
+  }, [activityId, courseId, groupId, router, safeExamBrowserLaunchToken, t, user]);
 
   useEffect(() => {
     const challengeAttemptId = releasedGrade?.challengeAttemptId ?? releasedGrade?.selectedAttemptId;

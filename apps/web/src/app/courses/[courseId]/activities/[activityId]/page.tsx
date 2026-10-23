@@ -6,7 +6,6 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ActivityEditorTabs } from "@/components/activity-editor-tabs";
-import { useAuth } from "@/components/auth-provider";
 import { api, Activity, ActivityDefinition, Course } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { activityRenderers } from "@/lib/activity-renderers";
@@ -16,7 +15,6 @@ export default function ActivityPage() {
   const { courseId, activityId } = params;
   const searchParams = useSearchParams();
   const testActivityId = searchParams.get("testActivityId");
-  const { user } = useAuth();
   const { locale, t } = useI18n();
   const [course, setCourse] = useState<Course | null>(null);
   const [activity, setActivity] = useState<Activity | null>(null);
@@ -26,7 +24,7 @@ export default function ActivityPage() {
   const conceptDraftRef = useRef<ActivityKnowledgeConceptSelection[]>([]);
   const updateConceptDraft = useCallback((selections: ActivityKnowledgeConceptSelection[]) => { conceptDraftRef.current = selections; }, []);
 
-  const canManage = user?.roles.includes("admin") || user?.roles.includes("teacher");
+  const canManage = Boolean(course?.permissions?.canManageCourse);
   const ActivityRenderer =
     activity && activityDefinitions.some((definition) => definition.key === activity.activityType.key)
       ? activityRenderers[activity.activityType.key as keyof typeof activityRenderers]
